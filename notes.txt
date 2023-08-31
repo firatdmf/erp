@@ -1,0 +1,6 @@
+let's create the virtual environment first
+python -m venv erp_vir_env
+virtual environments are important for deployment, collaboration, package management.
+
+to activate windows virtual environment use:
+erp_vir_env\Scripts\activate.bat

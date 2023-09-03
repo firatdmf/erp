@@ -73,7 +73,7 @@ WSGI_APPLICATION = 'erp.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
+# DATABASE_URL = 'postgresql://postgres:z5nJKvkJjjrYwgHZZYRz@containers-us-west-99.railway.app:6547/railway'
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
@@ -82,17 +82,32 @@ WSGI_APPLICATION = 'erp.wsgi.application'
 # }
 
 # below is for postgres that I added myself @firat
+# below is for local postgres
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         # name of database
+#         "NAME": "postgres",
+#         # user that created the database, or have access to it
+#         "USER": "postgres",
+#         # user password
+#         "PASSWORD": "123456",
+#         "HOST": "", # an empty string means localhost
+#         "PORT": "5432",
+#     }
+# }
+# below is for railway postgres db
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         # name of database
-        "NAME": "postgres",
+        "NAME": "railway",
         # user that created the database, or have access to it
         "USER": "postgres",
         # user password
-        "PASSWORD": "123456",
-        "HOST": "", # an empty string means localhost
-        "PORT": "5432",
+        "PASSWORD": "z5nJKvkJjjrYwgHZZYRz",
+        "HOST": "containers-us-west-99.railway.app", # an empty string means localhost
+        "PORT": "6547",
     }
 }
 

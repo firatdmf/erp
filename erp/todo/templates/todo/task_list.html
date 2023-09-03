@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- below is for loading the static files from the django -->
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{% static 'todo/style.css' %}">
+</head>
+
+<body>
+    <!-- Form for creating a new task -->
+    <form action="{% url 'todo:create_task' %}" method="post">
+        {% csrf_token %}
+        <fieldset>
+            <legend>
+                <h1>Create a new task</h1>
+            </legend>
+            {% if error_message %}
+            <p><strong>{{error_message}}</strong></p>
+            {% endif %}
+            <label for="task_name">Task name</label>
+            <input type="text" name="task_name" id="task_name">
+            <br />
+            <label for="due_date">Due date</label>
+            <input type="date" name="due_date" id="due_date">
+            <br />
+            <label for="description">Description</label>
+            <input type="text" name="description" id="description">
+        </fieldset>
+        <button type="submit">Create task</button>
+        <h2>Cancel</h2>
+    </form>
+
+
+
+    <h1>Task List</h1>
+    <ul>
+        {% for task in tasks %}
+        {% if task.completed == False %}
+        <li>
+            <strong>{{ task.task_name }}</strong><br />
+            {{ task.description }}<br />
+        </li>
+        {{task.due_date}}<br>
+        <b>Created at:</b>  {{task.created_at}}
+        <br />
+        <form action="{% url 'todo:complete_task' task.id %}" method="post">
+            {% csrf_token %}
+            <button type="submit" style="color:green">Complete Task</button><br />
+        </form>
+        <a href="" style="color: red;">Delete Task</a>
+        {% endif %}
+        {% empty %}
+        <li>No tasks available.</li>
+        {% endfor %}
+    </ul>
+    <div class="report">
+        <h1>Activity report</h1>
+        {% for task in tasks %}
+        {% if task.completed == True %}
+        <li>
+            <strong>{{ task.task_name }}</strong><br />
+            {{ task.description }}<br />
+        </li>
+        Task was due: {{task.due_date}}<br>
+        <b>Created at:</b>  {{task.created_at}}
+        <br />
+        <b>Task was completed at: </b> {{task.completed_at}}
+        {% endif %}
+        {% empty %}
+        <li>You have not completed any tasks yet.</li>
+        {% endfor %}
+
+    </div>
+
+</body>
+
+</html>

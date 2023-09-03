@@ -8,6 +8,10 @@ erp_vir_env\Scripts\activate
 to deactivate windows virtual environment, type:
 deactivate
 
+django admin pass:
+user: admin
+pass: firatPRL
+
 Activate the virtual environment
 
 Now I want to bring in database, POSTGRESQL. To do that, I need to psycopg package. 
@@ -35,3 +39,10 @@ The makemigrations command looks at all your available models and creates migrat
 $ python manage.py makemigrations
 migrate runs the migrations and creates tables in your database, as well as optionally providing much richer schema control.
 $ python manage.py migrate
+-----
+
+GITHUB
+to remove a file from github, "git rm -r --cached erp_vir_env" This does not removes locally, only in the git folder, then you can push it
+
+to create the requirements.txt file:
+python -m pip freeze > requirements.txt

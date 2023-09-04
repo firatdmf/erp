@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-73==gidfdp1!g%3n=1-4on)s)c01hw*xx^i2g-i#zgrl6=#1ub
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'https://erp.demfirat.com',
+    'erp.demfirat.com',
 
 ]
 

@@ -29,6 +29,7 @@ ALLOWED_HOSTS = [
     'erp-production-6055.up.railway.app',
     '8o336lc0.up.railway.app',
     'erp.demfirat.com',
+    'railway.app'
 ]
 
 

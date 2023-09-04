@@ -46,3 +46,7 @@ to remove a file from github, "git rm -r --cached erp_vir_env" This does not rem
 
 to create the requirements.txt file:
 python -m pip freeze > requirements.txt
+
+
+----
+I deployed by form is creating a problem for me

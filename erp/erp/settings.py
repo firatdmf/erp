@@ -26,14 +26,16 @@ SECRET_KEY = 'django-insecure-73==gidfdp1!g%3n=1-4on)s)c01hw*xx^i2g-i#zgrl6=#1ub
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    'erp-production-6055.up.railway.app',
-    '8o336lc0.up.railway.app',
-    'erp.demfirat.com',
-    'railway.app',
-    'containers-us-west-99.railway.app',
-    'https://erp.demfirat.com',
+    # 'erp-production-6055.up.railway.app',
+    # '8o336lc0.up.railway.app',
+    # 'erp.demfirat.com',
+    # 'railway.app',
+    # 'containers-us-west-99.railway.app',
+    # 'https://erp.demfirat.com',
 
 ]
+
+CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
 
 
 # Application definition

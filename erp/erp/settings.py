@@ -31,6 +31,8 @@ ALLOWED_HOSTS = [
     'erp.demfirat.com',
     'railway.app',
     'containers-us-west-99.railway.app',
+    'https://erp.demfirat.com',
+
 ]
 
 

@@ -36,6 +36,11 @@ class task_list(generic.ListView):
     template_name="todo/task_list.html"
     # Variable to use in the template for listing out
     context_object_name = 'tasks'
+    # ordering = '-created_at'
+
+    # def get_ordering(self):
+    #     ordering = self.request.GET.get('ordering','-created_at')
+    #     return ordering
 
 # -----------Manual Form Responder-----------------
 
@@ -48,7 +53,8 @@ def create_task(request):
 
         new_task = Task(task_name=task_name,due_date =due_date,description=description)
         new_task.save()
-        return HttpResponse('Task has been saved')
+        # return HttpResponse('Task has been saved')
+        return redirect('/todo/tasks')
     else:
         return HttpResponse('did not work bro')
     
@@ -59,7 +65,14 @@ def complete_task(request,task_id):
     task.completed = True
     task.completed_at = datetime.now()
     task.save()
-    return HttpResponse(task)
+    return redirect('/todo/tasks')
+
+def delete_task(request,task_id):
+    if (request.method == 'POST'):
+        task = get_object_or_404(Task, pk=task_id)
+        task.delete()
+        return redirect('/todo/tasks')
+    
 
     
 

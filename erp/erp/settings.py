@@ -27,10 +27,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     'erp.demfirat.com',
+    '127.0.0.1',
 
 ]
 
-CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
+# CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
+CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com']
 
 
 # Application definition

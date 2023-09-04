@@ -37,38 +37,47 @@
 
 
     <h1>Task List</h1>
-    <ul>
-        {% for task in tasks %}
-        {% if task.completed == False %}
-        <li>
-            <strong>{{ task.task_name }}</strong><br />
-            {{ task.description }}<br />
-        </li>
-        {{task.due_date}}<br>
-        <b>Created at:</b>  {{task.created_at}}
-        <br />
-        <form action="{% url 'todo:complete_task' task.id %}" method="post">
-            {% csrf_token %}
-            <button type="submit" style="color:green">Complete Task</button><br />
-        </form>
-        <a href="" style="color: red;">Delete Task</a>
-        {% endif %}
-        {% empty %}
-        <li>No tasks available.</li>
-        {% endfor %}
-    </ul>
-    <div class="report">
+    <div class="container">
+        <ul>
+            {% for task in tasks|dictsortreversed:"created_at" %}
+            {% if task.completed == False %}
+            <li>
+                <strong>{{ task.task_name }}</strong><br />
+                {{ task.description }}<br />
+            </li>
+            {{task.due_date}}<br>
+            <b>Created at:</b> {{task.created_at}}
+            <br />
+            <form action="{% url 'todo:complete_task' task.id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" style="color:green">Complete Task</button><br />
+            </form>
+            <form action="{% url 'todo:delete_task' task.id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" style="color:red">Delete Task</button><br />
+            </form>
+            <!-- <a href="{% url 'todo:delete_task' task.id %}" style="color: red;">Delete Task</a> -->
+            {% endif %}
+            {% empty %}
+            <li>No tasks available.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="report container">
         <h1>Activity report</h1>
-        {% for task in tasks %}
+        <!-- Show the latest completed tasks, and limit to 18 queries -->
+        {% for task in tasks|dictsortreversed:"completed_at"|slice:"-18:" %}
+
         {% if task.completed == True %}
         <li>
             <strong>{{ task.task_name }}</strong><br />
             {{ task.description }}<br />
+            Task was due: {{task.due_date}}<br>
+            <b>Created at:</b> {{task.created_at}}
+            <br />
+            <b>Task was completed at: </b> {{task.completed_at}}
         </li>
-        Task was due: {{task.due_date}}<br>
-        <b>Created at:</b>  {{task.created_at}}
-        <br />
-        <b>Task was completed at: </b> {{task.completed_at}}
         {% endif %}
         {% empty %}
         <li>You have not completed any tasks yet.</li>

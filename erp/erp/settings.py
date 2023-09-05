@@ -14,11 +14,11 @@ from pathlib import Path
 import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-print('The base dir is: ')
-print('00000000000')
-print(BASE_DIR)
-print('00000000000')
-print(list(BASE_DIR.iterdir()))
+# print('The base dir is: ')
+# print('00000000000')
+# print(BASE_DIR)
+# print('00000000000')
+# print(list(BASE_DIR.iterdir()))
 
 
 # Quick-start development settings - unsuitable for production
@@ -165,8 +165,8 @@ STATIC_URL = 'static/'
 
     # os.path.join(BASE_DIR, 'static'),
 # STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATIC_ROOT = BASE_DIR / STATIC_URL
-print(STATIC_ROOT)
+STATIC_ROOT = BASE_DIR / 'static'
+# print(STATIC_ROOT)
 # STATICFILES_DIRS = (
 #      os.path.join(BASE_DIR, "static"),
 # )

@@ -33,11 +33,12 @@ DEBUG = False
 ALLOWED_HOSTS = [
     'erp.demfirat.com',
     '127.0.0.1',
+    'erp-production-6055.up.railway.app',
 
 ]
 
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
-CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com']
+CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com', 'https://erp-production-6055.up.railway.app/']
 
 
 # Application definition
@@ -164,7 +165,7 @@ STATIC_URL = 'static/'
 
     # os.path.join(BASE_DIR, 'static'),
 # STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATIC_ROOT = BASE_DIR / "static"
+STATIC_ROOT = BASE_DIR / STATIC_URL
 print(STATIC_ROOT)
 # STATICFILES_DIRS = (
 #      os.path.join(BASE_DIR, "static"),

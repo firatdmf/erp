@@ -18,6 +18,7 @@ print('The base dir is: ')
 print('00000000000')
 print(BASE_DIR)
 print('00000000000')
+print(os.listdir(os.device_encodinggetcwd()))
 
 
 # Quick-start development settings - unsuitable for production

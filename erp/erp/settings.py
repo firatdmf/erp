@@ -28,7 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-73==gidfdp1!g%3n=1-4on)s)c01hw*xx^i2g-i#zgrl6=#1ub'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = [
     'erp.demfirat.com',
@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # below are added by me
     'todo',
     'crm',
 ]
@@ -163,13 +162,8 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-    # os.path.join(BASE_DIR, 'static'),
-# STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATIC_ROOT = BASE_DIR / 'static'
-# print(STATIC_ROOT)
-# STATICFILES_DIRS = (
-#      os.path.join(BASE_DIR, "static"),
-# )
+STATIC_ROOT = BASE_DIR / "static"
+
 
 
 # Default primary key field type

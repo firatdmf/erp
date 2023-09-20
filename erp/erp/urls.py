@@ -17,12 +17,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.http import HttpResponse
-from . import views
-from django.contrib.staticfiles.views import serve
+from .import views
+# from django.contrib.staticfiles.views import serve
+
 urlpatterns = [
     path("", views.index,name="index"),
     path('admin/', admin.site.urls),
     path('todo/',include("todo.urls")),
     path('crm/',include("crm.urls")),
-    path('static/<path:path>',serve),
+    # path('static/<path:path>',serve),
 ]

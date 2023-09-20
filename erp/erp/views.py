@@ -1,6 +1,5 @@
 from django.http import HttpResponse
 from django.shortcuts import render
-
 def index(request):
-    # return HttpResponse('Welcome to the ERP!')
-    return render(request,'crm/create_client.html',)
+    return HttpResponse('<h1>Welcome to the ERP!</h1>')
+    # return render(request,'erp/index.html')

@@ -1,0 +1,7 @@
+Tasks
+Activity Report (What has been done to this day), Task report (future tasks)
+Create contact (business or individual) related to each other
+Create notes to contacts
+Attach files, tasks, events to the 
+Schedule Events
+Email or Text notifications 

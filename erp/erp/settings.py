@@ -12,6 +12,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+# below is for loading environment variables for establishing security
+from dotenv import load_dotenv
+# load_dotenv()
+# print(os.getenv('DATABASE'))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 # print('The base dir is: ')
@@ -28,7 +32,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-73==gidfdp1!g%3n=1-4on)s)c01hw*xx^i2g-i#zgrl6=#1ub'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = [
     'erp.demfirat.com',
@@ -98,33 +102,38 @@ WSGI_APPLICATION = 'erp.wsgi.application'
 
 # below is for postgres that I added myself @firat
 # below is for local postgres
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         # name of database
-#         "NAME": "postgres",
-#         # user that created the database, or have access to it
-#         "USER": "postgres",
-#         # user password
-#         "PASSWORD": "123456",
-#         "HOST": "", # an empty string means localhost
-#         "PORT": "5432",
-#     }
-# }
-# below is for railway postgres db
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         # name of database
-        "NAME": "railway",
+        "NAME": "postgres",
         # user that created the database, or have access to it
         "USER": "postgres",
         # user password
-        "PASSWORD": "z5nJKvkJjjrYwgHZZYRz",
-        "HOST": "containers-us-west-99.railway.app", # an empty string means localhost
-        "PORT": "6547",
+        "PASSWORD": "12345678",
+        "HOST": "", # an empty string means localhost
+        "PORT": "5432",
     }
 }
+# BELOW IS FOR SECURE LOCAL DB WITH ENV FILE
+# DATABASES = {
+#     os.getenv('DATABASE')
+# }
+
+# below is for railway postgres db
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         # name of database
+#         "NAME": "railway",
+#         # user that created the database, or have access to it
+#         "USER": "postgres",
+#         # user password
+#         "PASSWORD": "z5nJKvkJjjrYwgHZZYRz",
+#         "HOST": "containers-us-west-99.railway.app", # an empty string means localhost
+#         "PORT": "6547",
+#     }
+# }
 
 
 # Password validation

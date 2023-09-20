@@ -9,8 +9,8 @@ to deactivate windows virtual environment, type:
 deactivate
 
 django admin pass:
-user: admin
-pass: firatPRL
+user: firat
+pass: karvenDMF
 
 Activate the virtual environment
 
@@ -57,3 +57,18 @@ pip install -r .\requirements.txt
 
 now lets install whitenoise
 pip install whitenoise
+-----------------------------------
+How to reset your db:
+ manage.py migrate --fake <appname> zero
+$ rm -rf migrations
+$ manage.py makemigrations <appname>
+$ manage.py migrate --fake <appname>
+----------------------------------
+
+Postgres username: postgres
+pass: 12345678
+
+(psql -U postgres)
+
+django admin username: firat
+django adming pass: karvenDMF

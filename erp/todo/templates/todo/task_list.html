@@ -11,43 +11,63 @@
 </head>
 
 <body>
-    <!-- Form for creating a new task -->
-    <form action="{% url 'todo:create_task' %}" method="post">
+    <form method="post">
         {% csrf_token %}
-        <fieldset>
-            <legend>
-                <h1>Create a new task</h1>
-            </legend>
-            {% if error_message %}
-            <p><strong>{{error_message}}</strong></p>
-            {% endif %}
-            <label for="task_name">Task name</label>
-            <input type="text" name="task_name" id="task_name">
-            <br />
-            <label for="due_date">Due date</label>
-            <input type="date" name="due_date" id="due_date">
-            <br />
-            <label for="description">Description</label>
-            <input type="text" name="description" id="description">
-        </fieldset>
-        <button type="submit">Create task</button>
-        <h2>Cancel</h2>
+        {{ form.as_p }}
+        <button type="submit">Submit</button>
     </form>
+    <p style="float:right">We love Dem Fırat Karven</p>
+    <!-- Form for creating a new task -->
+    <div class="form_container">
+        <form action="{% url 'todo:create_task' %}" method="post">
+            {% csrf_token %}
+            <fieldset>
+                <legend>
+                    <h1>Create a new task</h1>
+                </legend>
+                {% if error_message %}
+                <p><strong>{{error_message}}</strong></p>
+                {% endif %}
+                <label for="task_name">Task name</label>
+                <input type="text" name="task_name" id="task_name">
+                <br />
+                <label for="due_date">Due date</label>
+                <input type="date" name="due_date" id="due_date">
+                <br />
+                <label for="description">Description</label>
+                <input type="text" name="description" id="description">
+                <br />
+                <button type="submit">Create task</button>
+            </fieldset>
+        </form>
+    </div>
 
 
 
-    <h1>Task List</h1>
+
+
+
+
+
+
+    <h1>Tasks that are due</h1>
     <div class="container">
         <ul>
             {% for task in tasks|dictsortreversed:"created_at" %}
             {% if task.completed == False %}
-            <li>
-                <strong>{{ task.task_name }}</strong><br />
-                {{ task.description }}<br />
+            <li style="margin-top: 20px;">
+                <p><strong>{{ task.name }}</strong>
+                    {% if task.days_since_due > 0 %}
+                    <span style="color:red">{{ task.days_since_due }}d</span>
+                    {% endif %}
+                </p>
+                {% if task.description %}
+                <p>{{ task.description }}</p>
+                {% endif %}
             </li>
-            {{task.due_date}}<br>
-            <b>Created at:</b> {{task.created_at}}
-            <br />
+            <!-- Due date: {{task.due_date}}<br> -->
+            <!-- <b>Created at:</b> {{task.created_at}} -->
+            <!-- <br /> -->
             <form action="{% url 'todo:complete_task' task.id %}" method="post">
                 {% csrf_token %}
                 <button type="submit" style="color:green">Complete Task</button><br />
@@ -68,22 +88,48 @@
         <h1>Activity report</h1>
         <!-- Show the latest completed tasks, and limit to 18 queries -->
         {% for task in tasks|dictsortreversed:"completed_at"|slice:"-18:" %}
-
-        {% if task.completed == True %}
-        <li>
-            <strong>{{ task.task_name }}</strong><br />
-            {{ task.description }}<br />
-            Task was due: {{task.due_date}}<br>
-            <b>Created at:</b> {{task.created_at}}
-            <br />
-            <b>Task was completed at: </b> {{task.completed_at}}
-        </li>
-        {% endif %}
-        {% empty %}
-        <li>You have not completed any tasks yet.</li>
-        {% endfor %}
+        <ul>
+            {% if task.completed == True %}
+            <li>
+                <strong>{{ task.name }}</strong><br />
+                {{ task.description }}<br />
+                Task was due: {{task.due_date}}<br>
+                <b>Created at:</b> {{task.created_at}}
+                <br />
+                <b>Task was completed at: </b> {{task.completed_at}}
+            </li>
+            {% endif %}
+            {% empty %}
+            <li>You have not completed any tasks yet.</li>
+            {% endfor %}
+        </ul>
 
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Get today's date
+            var today = new Date();
+
+            // Initialize Pikaday
+            var picker = new Pikaday({
+                field: document.getElementById("datepicker"),
+                format: "MM/DD/YYYY", // Change the format as needed
+                yearRange: [today.getFullYear(), today.getFullYear() + 1], // Display two years
+                minDate: today, // Start from today's date
+                maxDate: new Date(today.getFullYear() + 1, 11, 31), // End at the last day of next year
+                onSelect: function (date) {
+                    // Handle date selection here
+                    console.log("Selected date: " + date.toLocaleDateString());
+                },
+            });
+
+            // Display the date picker with two months
+            picker.gotoDate(today);
+        });
+
+    </script>
+
 
 </body>
 

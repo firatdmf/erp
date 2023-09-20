@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <h1>Contact List</h1>
+    <ul>
+        <p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
+        {% for company in companies %}
+
+        <li><a href="{% url 'crm:company_detail' company.id%}">{{company.name}}</a></li>
+        {% empty %}
+        <li>No contacts available.</li>
+        {% endfor %}
+    </ul>
+
+</body>
+
+</html>

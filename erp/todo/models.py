@@ -7,7 +7,7 @@ from django.urls import reverse
 from crm.models import Contact, Company
 
 class Task(models.Model):
-    name = models.CharField(max_length=200)
+    task_name = models.CharField(max_length=200)
     due_date = models.DateField()
     description = models.TextField()
     completed = models.BooleanField(default=False)
@@ -16,7 +16,7 @@ class Task(models.Model):
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE,blank=True,  null=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE,blank=True,  null=True)
     def __str__(self):
-        return(self.name)
+        return(self.task_name)
     
     #  Add a delete_url field to your Todo model to store the URL that will be used to delete the todo item.
     #  You can use the reverse function to generate this URL.

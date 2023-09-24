@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{% static 'erp/style.css' %}">
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <div class="line">
+            <p>Welcome to the base page!
+                <span style="float:right;">{% now 'F j, Y' %}</span>
+            </p>
+
+        </div>
+    </header>
+    {% block content %}
+    {% endblock %}
+    <footer>Goodbye!</footer>
+</body>
+
+</html>

@@ -45,8 +45,8 @@ class Contact(models.Model):
     def __str__(self):
         return self.name
 
-    # class Meta:
-    #     verbose_name_plural = "Contacts"
+    class Meta:
+        verbose_name_plural = "Contacts"
 
 class Note(models.Model):
     # If I delete the contact, then delete the notes associated to it.

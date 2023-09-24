@@ -13,7 +13,8 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 # below is for loading environment variables for establishing security
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
+from decouple import config
 # load_dotenv()
 # print(os.getenv('DATABASE'))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -29,10 +30,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-73==gidfdp1!g%3n=1-4on)s)c01hw*xx^i2g-i#zgrl6=#1ub'
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = [
     'erp.demfirat.com',
@@ -54,8 +55,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'erp',
     'todo',
     'crm',
+    'jquery',
 ]
 
 MIDDLEWARE = [
@@ -102,38 +105,38 @@ WSGI_APPLICATION = 'erp.wsgi.application'
 
 # below is for postgres that I added myself @firat
 # below is for local postgres
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        # name of database
-        "NAME": "postgres",
-        # user that created the database, or have access to it
-        "USER": "postgres",
-        # user password
-        "PASSWORD": "12345678",
-        "HOST": "", # an empty string means localhost
-        "PORT": "5432",
-    }
-}
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         # name of database
+#         "NAME": "postgres",
+#         # user that created the database, or have access to it
+#         "USER": "postgres",
+#         # user password
+#         "PASSWORD": "12345678",
+#         "HOST": "", # an empty string means localhost
+#         "PORT": "5432",
+#     }
+# }
 # BELOW IS FOR SECURE LOCAL DB WITH ENV FILE
 # DATABASES = {
 #     os.getenv('DATABASE')
 # }
 
 # below is for railway postgres db
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         # name of database
-#         "NAME": "railway",
-#         # user that created the database, or have access to it
-#         "USER": "postgres",
-#         # user password
-#         "PASSWORD": "z5nJKvkJjjrYwgHZZYRz",
-#         "HOST": "containers-us-west-99.railway.app", # an empty string means localhost
-#         "PORT": "6547",
-#     }
-# }
+DATABASES = {
+    "default": {
+        "ENGINE": config('ENGINE'),
+        # name of database
+        "NAME": config("NAME"),
+        # user that created the database, or have access to it
+        "USER": config("USER"),
+        # user password
+        "PASSWORD": config("PASSWORD"),
+        "HOST": config("HOST"), # an empty string means localhost
+        "PORT": config("PORT"),
+    }
+}
 
 
 # Password validation
@@ -161,7 +164,7 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 
 # TIME_ZONE = 'UTC'
-TIME_ZONE = 'Europe/Istanbul'
+TIME_ZONE = 'US/Pacific'
 
 USE_I18N = True
 
@@ -173,7 +176,7 @@ USE_TZ = True
 # STATIC_URL = '/static/'
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 

@@ -1,40 +1,23 @@
-{% block content %}
+{% extends "base.html" %}
 {% load static %}
-<link rel="stylesheet" href="{% static 'todo/task_list.css' %}">
-
-    <p style="float:right">We love Dem Fırat Karven</p>
-    <!-- Form for creating a new task -->
-    <div class="form_container">
-        <form action="{% url 'todo:create_task' %}" method="post">
-            {% csrf_token %}
-            <fieldset>
-                <legend>
-                    <h1>Create a new task</h1>
-                </legend>
-                {% if error_message %}
-                <p><strong>{{error_message}}</strong></p>
-                {% endif %}
-                <label for="task_name">Task name</label>
-                <input type="text" name="task_name" id="task_name">
-                <br />
-                <label for="due_date">Due date</label>
-                <input type="date" name="due_date" id="due_date">
-                <br />
-                <label for="description">Description</label>
-                <input type="text" name="description" id="description">
-                <br />
-                <button type="submit">Create task</button>
-            </fieldset>
-        </form>
-    </div>
-
-
-
-
-
-
-
-
+{% block content %}
+<body>
+    <style></style>
+    <script src="{% static 'todo/index.js' %}"></script>
+    <h1>Create Task</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="search-container">
+            <input type="text" id="contact-company-search" name="contact_company_search"
+                placeholder="Search Contacts and Companies">
+            <div id="suggestions-dropdown"></div>
+            <input type="hidden" name="contact_company_id" id="contact_company_id" value="">
+        </div>
+        <!-- <input type="text" id="name_input" placeholder="Start typing...">
+        <div id="suggestions"></div> -->
+        <button type="submit">Create Task</button>
+    </form>
 
     <h1>Tasks that are due</h1>
     <div class="task_container">
@@ -70,14 +53,19 @@
         </ul>
     </div>
 
+    <!-- <p>-----</p>
+    <input type="text" id="name_input" placeholder="Start typing...">
+    <div id="suggestions"></div>
+    <p>-----</p> -->
+
     <div class="report container">
         <h1>Activity report</h1>
         <!-- Show the latest completed tasks, and limit to 18 queries -->
-        {% for task in tasks|dictsortreversed:"completed_at"|slice:"-18:" %}
         <ul>
+            {% for task in tasks|dictsortreversed:"completed_at"|slice:"-18:" %}
             {% if task.completed == True %}
             <li>
-                <strong>{{ task.name }}</strong><br />
+                <strong>{{ task.task_name }}</strong><br />
                 {{ task.description }}<br />
                 Task was due: {{task.due_date}}<br>
                 <b>Created at:</b> {{task.created_at}}
@@ -89,7 +77,5 @@
             <li>You have not completed any tasks yet.</li>
             {% endfor %}
         </ul>
-
     </div>
-{% endblock %}
-
+    {% endblock %}

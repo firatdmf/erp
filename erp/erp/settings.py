@@ -179,6 +179,9 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# specify the URL where Django should redirect unauthenticated users:
+LOGIN_URL = 'login'
+
 
 if not DEBUG:
     STATIC_ROOT = BASE_DIR / "static"

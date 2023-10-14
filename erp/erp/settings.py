@@ -137,38 +137,38 @@ WSGI_APPLICATION = "erp.wsgi.application"
 
 # below is for postgres that I added myself @firat
 # below is for local postgres
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        # name of database
-        "NAME": "erp",
-        # user that created the database, or have access to it
-        "USER": "postgres",
-        # user password
-        "PASSWORD": "12345678",
-        "HOST": "",  # an empty string means localhost
-        "PORT": "5432",
-    }
-}
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         # name of database
+#         "NAME": "erp",
+#         # user that created the database, or have access to it
+#         "USER": "postgres",
+#         # user password
+#         "PASSWORD": "12345678",
+#         "HOST": "",  # an empty string means localhost
+#         "PORT": "5432",
+#     }
+# }
 # BELOW IS FOR SECURE LOCAL DB WITH ENV FILE
 # DATABASES = {
 #     os.getenv('DATABASE')
 # }
 
 # below is for railway postgres db
-# DATABASES = {
-#     "default": {
-#         "ENGINE": config('ENGINE'),
-#         # name of database
-#         "NAME": config("NAME"),
-#         # user that created the database, or have access to it
-#         "USER": config("USER"),
-#         # user password
-#         "PASSWORD": config("PASSWORD"),
-#         "HOST": config("HOST"), # an empty string means localhost
-#         "PORT": config("PORT"),
-#     }
-# }
+DATABASES = {
+    "default": {
+        "ENGINE": config('ENGINE'),
+        # name of database
+        "NAME": config("NAME"),
+        # user that created the database, or have access to it
+        "USER": config("USER"),
+        # user password
+        "PASSWORD": config("PASSWORD"),
+        "HOST": config("HOST"), # an empty string means localhost
+        "PORT": config("PORT"),
+    }
+}
 
 
 # Password validation

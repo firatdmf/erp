@@ -49,6 +49,7 @@ I deployed by form is creating a problem for me
 
 
 pip install -r .\requirements.txt
+for mac: pip install -r requirements.txt
 
 
 now lets install whitenoise

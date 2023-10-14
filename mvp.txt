@@ -1,7 +1,66 @@
-Tasks
-Activity Report (What has been done to this day), Task report (future tasks)
-Create contact (business or individual) related to each other
-Create notes to contacts
-Attach files, tasks, events to the 
-Schedule Events
-Email or Text notifications 
+Tasks -DONE
+Activity Report (What has been done till this day), Task report (future tasks) -DONE
+Create contact (business or individual) related to each other -DONE
+Create notes to contacts - DONE
+   -be able to alter notes -DONE 
+-don't show future tasks DONE
+-upload your own crm data
+Email notification for reminders (Tasks)
+
+A Minimum Viable Product (MVP) for a Customer Relationship Management (CRM) application should focus on delivering core features and functionality that provide value to users while keeping development efforts and costs manageable. The goal of an MVP is to test your CRM concept, gather user feedback, and refine the product based on that feedback. Here are some essential features for a CRM MVP:
+
+1. **User Registration and Authentication:**
+   - Allow users to create accounts and log in securely. -> Each client will have their own POSTGRES database
+
+2. **Contact Management:**
+   - Enable users to add, edit, and delete contacts.
+   - Store basic contact information, such as name, email, phone number, and company.
+   - Categorize or tag contacts for segmentation.
+
+3. **Interaction Tracking:**
+   - Allow users to record interactions with contacts (calls, emails, meetings).
+   - Maintain a history of interactions for each contact.
+
+4. **Task and Reminder System:**
+   - Provide a way for users to create tasks and set reminders.
+   - Link tasks to specific contacts or companies.
+
+5. **Notes and Attachments:**
+   - Let users add notes and attach files or documents to contact profiles.
+   
+6. **Search and Filter Functionality:**
+   - Allow users to search for contacts by name, company, or other criteria.
+   - Implement basic filters to sort and categorize contacts.
+
+7. **Dashboard and Analytics:**
+   - Provide a simple dashboard with key metrics (e.g., number of contacts, tasks, interactions).
+   - Offer basic reporting capabilities, such as contact activity reports.
+
+8. **User Roles and Permissions:**
+   - Implement role-based access control to manage user permissions.
+   - Define user roles (e.g., admin, sales, support) and their access levels.
+
+9. **Integration with Email:**
+   - Allow users to connect their email accounts (e.g., Gmail, Outlook) to track email interactions automatically.
+
+10. **Mobile Responsiveness:**
+    - Ensure the CRM is accessible and usable on both desktop and mobile devices.
+z
+11. **Feedback Mechanism:**
+    - Include a way for users to provide feedback or report issues within the CRM.
+
+12. **Onboarding and Help:**
+    - Provide user onboarding guidance or tutorials.
+    - Include a help section or knowledge base.
+
+13. **Data Import/Export:**
+    - Allow users to import contacts from CSV files.
+    - Enable data export for backup and data transfer purposes.
+
+14. **Basic Notifications:**
+    - Implement notifications for reminders, upcoming tasks, and interactions.
+
+15. **Security and Data Privacy:**
+    - Ensure data security, encryption, and compliance with relevant data privacy regulations (e.g., GDPR).
+
+Remember that the emphasis of an MVP is on simplicity and usability. You want to launch quickly to gather user feedback and iterate on your CRM based on real user experiences. As you receive feedback and understand user needs better, you can expand and enhance the CRM with additional features and integrations in future iterations. The key is to start with the core functionality that solves a specific problem for your target users.

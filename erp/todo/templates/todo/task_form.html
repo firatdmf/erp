@@ -1,0 +1,10 @@
+<!-- card_component.html -->
+{% extends "base.html" %}
+{% block content %}
+<p><a href="{% url 'todo:index' %}"><--- Go to Contact List page</a></p>
+<form class="task_update_form" method="post">
+    {% csrf_token %}
+    {{form.as_p}}
+    <button type="submit">Save</button>
+</form>
+{% endblock %}

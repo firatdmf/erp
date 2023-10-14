@@ -11,17 +11,26 @@
 </head>
 
 <body>
+    {% with member=user.member %}
     <header>
         <div class="line">
-            <p>Welcome to the base page!
+            <p><span style="float:right;"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a href="{% url 'index' %}"><h3>ERP</h3></a></p>
+            <p>Welcome to the base page{% if member %}, {{member.user.first_name|title}}{% endif %}! 
                 <span style="float:right;">{% now 'F j, Y' %}</span>
             </p>
-
         </div>
     </header>
+    <nav>
+        <ul>
+            <li><a href="{% url 'index' %}">Home</a></li>
+            <li><a href="{% url 'crm:index' %}">CRM</a></li>
+            <li><a href="{% url 'todo:index' %}">Todo Tasks</a></li>
+          </ul>
+    </nav>
     {% block content %}
     {% endblock %}
     <footer>Goodbye!</footer>
+    {% endwith %}
 </body>
 
 </html>

@@ -3,11 +3,23 @@ from django import forms
 from django.http import HttpResponse
 from django.views import View, generic
 from .models import Contact, Company, Note
+from todo.models import Task
 from .forms import ContactForm, NoteForm, CompanyForm
+from datetime import datetime, date
+from todo.views import task_list
+from django.urls import reverse_lazy
+
+# to make it only viewable to users
+from django.utils.decorators import method_decorator
+from django.contrib.auth.decorators import login_required
+
 # def index(request):
 #     return HttpResponse('Welcome to the CRM APP')
 
+
+
 # Create your views here.
+@method_decorator(login_required, name="dispatch")
 class index(View):
     def get(self,request):
         # handle get request
@@ -69,6 +81,7 @@ class company_create(generic.edit.CreateView):
     success_url = '/crm/company_list/'
     def form_valid(self, form):
         return super().form_valid(form)
+    
 
 class contact_detail_view(generic.DetailView):
     model = Contact
@@ -82,7 +95,9 @@ class contact_detail_view(generic.DetailView):
         contact = self.get_object()
         context['notes'] = Note.objects.filter(contact=contact)
         context['note_form'] = NoteForm()
+        context['tasks'] = Task.objects.filter(contact=contact)
         return context
+    
 
     def post(self, request, *args, **kwargs):
         contact = self.get_object()
@@ -136,3 +151,9 @@ class company_detail_view(generic.DetailView):
         context = self.get_context_data()
         context['note_form'] = form
         return self.render_to_response(context)
+    
+class EditNoteView(generic.edit.UpdateView):
+    model = Note
+    form_class = NoteForm  # Your form class for editing the entry
+    template_name = 'crm/update_note.html'  # Template for editing an entry
+    success_url = '/crm/'  # URL to redirect after successfully editing an entry

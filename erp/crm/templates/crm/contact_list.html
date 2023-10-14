@@ -1,16 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-
-<body>
+{% extends "base.html" %}
+{% block content %}
+<p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
     <h1>Contact List</h1>
     <ul>
-        <p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
         {% for contact in contacts %}
 
         <li><a href="{% url 'crm:contact_detail' contact.id%}">{{contact.name}}</a></li>
@@ -18,7 +10,4 @@
         <li>No contacts available.</li>
         {% endfor %}
     </ul>
-
-</body>
-
-</html>
+{% endblock %}

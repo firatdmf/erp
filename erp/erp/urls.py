@@ -25,10 +25,10 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path("", views.index.as_view(), name="index"),
-    path("login/", auth_views.LoginView.as_view(), name="login"),
-    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("admin/", admin.site.urls),
+    path('authentication/',include('authentication.urls')),
     path("todo/", include("todo.urls")),
     path("crm/", include("crm.urls")),
+    path('accounts/', include('django.contrib.auth.urls')),
     # path('static/<path:path>',serve),
 ]

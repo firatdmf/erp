@@ -1,9 +1,25 @@
 {% extends "base.html" %}
 {% load static %}
+{% load custom_tags %}
+{% load custom_filters %}
 {% block content %}
-<body>
-    <style></style>
-    <script src="{% static 'todo/index.js' %}"></script>
+<style>
+    .todo_index_page {
+        margin: 20px;
+    }
+    
+    #cancel_selected{
+        display: none;
+    }
+</style>
+
+
+<script src="{% static 'todo/index.js' %}"></script>
+
+
+
+<div class="todo_index_page">
+    <p><a href="{% url 'todo:task_report' %}">See Task Report</a></p>
     <h1>Create Task</h1>
     <form method="post">
         {% csrf_token %}
@@ -14,14 +30,22 @@
             <div id="suggestions-dropdown"></div>
             <input type="hidden" name="contact_company_id" id="contact_company_id" value="">
         </div>
-        <button type="submit">Create Task</button>
+        <div class="selected_result">
+
+            <span id="cancel_selected">X</span>
+        </div>
+        <button type="submit" onclick="">Create Task</button>
     </form>
+
+    <!--  -->
+
+    <!--  -->
 
     <h1>Tasks that are due</h1>
     <div class="task_container">
         <ul>
             {% for task in tasks|dictsortreversed:"created_at" %}
-            {% if task.completed == False %}
+            {% if task.completed == False and task.due_date|is_past_due %}
             <li>
                 <p><strong>{{ task.task_name }}</strong>
                     {% if task.days_since_due > 0 %}
@@ -30,6 +54,12 @@
                 </p>
                 {% if task.description %}
                 <p>{{ task.description }}</p>
+                {% endif %}
+                {% if task.contact %}
+                <a href="{% url 'crm:contact_detail' task.contact.id%}" style="color:blue;">{{ task.contact }}</a>
+                {% endif %}
+                {% if task.company %}
+                <a href="{% url 'crm:company_detail' task.company.id%}" style="color:blue;">{{ task.company }}</a>
                 {% endif %}
             </li>
             <!-- Due date: {{task.due_date}}<br> -->
@@ -43,7 +73,8 @@
                 {% csrf_token %}
                 <button type="submit" style="color:red">Delete Task</button><br />
             </form>
-            <!-- <a href="{% url 'todo:delete_task' task.id %}" style="color: red;">Delete Task</a> -->
+            <a href="{% url 'todo:update_task' task.id %}">Update Task</a>
+            
             {% endif %}
             {% empty %}
             <li>No tasks available.</li>
@@ -72,4 +103,5 @@
             {% endfor %}
         </ul>
     </div>
-    {% endblock %}
+</div>
+{% endblock %}

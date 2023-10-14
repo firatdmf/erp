@@ -8,10 +8,6 @@ erp_vir_env\Scripts\activate
 to deactivate windows virtual environment, type:
 deactivate
 
-django admin pass:
-user: firat
-pass: karvenDMF
-
 Activate the virtual environment
 
 Now I want to bring in database, POSTGRESQL. To do that, I need to psycopg package. 
@@ -63,12 +59,3 @@ How to reset your db:
 $ rm -rf migrations
 $ manage.py makemigrations <appname>
 $ manage.py migrate --fake <appname>
-----------------------------------
-
-Postgres username: postgres
-pass: 12345678
-
-(psql -U postgres)
-
-django admin username: firat
-django adming pass: karvenDMF

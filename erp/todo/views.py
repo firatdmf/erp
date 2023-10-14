@@ -12,6 +12,10 @@ from .forms import TaskForm
 from django.http import JsonResponse
 from .models import Contact, Company
 
+# to make it only viewable to users
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+
 
 class task_list(generic.ListView):
     # Model to list out
@@ -22,63 +26,31 @@ class task_list(generic.ListView):
     context_object_name = "tasks"
     # ordering = '-created_at'
 
-    def get_queryset(self):
-        # Get the current date
-        current_date = date.today()
+    # def get_queryset(self):
+    #     # Get the current date
+    #     current_date = date.today()
 
-        # Calculate the days since due for each task
-        queryset = super().get_queryset()
-        for task in queryset:
-            task.days_since_due = (current_date - task.due_date).days
+    #     # Calculate the days since due for each task
+    #     queryset = super().get_queryset()
+    #     for task in queryset:
+    #         task.days_since_due = (current_date - task.due_date).days
 
-        return queryset
+    #     return queryset
 
     # def get_ordering(self):
     #     ordering = self.request.GET.get('ordering','-created_at')
     #     return ordering
-    def get_context_data(self, **kwargs):
-        # get the current context data
-        context = super().get_context_data(**kwargs)
-        # add to it
-        context["current_date"] = date.today()  # Add the current date to the context
-        return context
 
-
-class CreateTask(generic.edit.CreateView):
-    model = Task
-    form_class = TaskForm
-    template_name = "todo/index.html"
-    # index here is from the url name
-    success_url = reverse_lazy("index")
-
-    def form_valid(self, form):
-        return super().form_valid(form)
-
-
-def search_contacts_and_companies(request):
-    search_query = request.GET.get("search_query", "")
-
-    # Query the database for contacts and companies with matching names
-    matching_contacts = Contact.objects.filter(name__icontains=search_query)
-    matching_companies = Company.objects.filter(name__icontains=search_query)
-
-    # Serialize the suggestions as JSON
-    # suggestions = list(matching_contacts.values_list('name', flat=True)) + list(matching_companies.values_list('name', flat=True))
-
-    # Serialize the suggestions as JSON, including IDs
-    contact_suggestions = [
-        {"id": contact.id, "name": contact.name, "type":"contact",} for contact in matching_contacts
-    ]
-    company_suggestions = [
-        {"id": company.id, "name": company.name, "type":"company",} for company in matching_companies
-    ]
-
-    suggestions = contact_suggestions + company_suggestions
-
-    return JsonResponse({"suggestions": suggestions})
+    # def get_context_data(self, **kwargs):
+    #     # get the current context data
+    #     context = super().get_context_data(**kwargs)
+    #     # add to it
+    #     context["current_date"] = date.today()  # Add the current date to the context
+    #     return context
 
 
 # just a simple template view
+@method_decorator(login_required, name="dispatch")
 class index(View):
     def get(self, request):
         # Get the data from the task_list view
@@ -123,6 +95,92 @@ class index(View):
         return render(request, "todo/index.html", context)
 
 
+# -------------------------------------------------
+
+@method_decorator(login_required, name="dispatch")
+class CreateTask(generic.edit.CreateView):
+    model = Task
+    form_class = TaskForm
+    template_name = "todo/index.html"
+    # index here is from the url name
+    success_url = reverse_lazy("index")
+
+    def form_valid(self, form):
+        return super().form_valid(form)
+
+@method_decorator(login_required, name="dispatch")
+class TaskReport(generic.ListView):
+    # Model to list out
+    model = Task
+    # Where to list out
+    template_name = "todo/task_report.html"
+    # Variable to use in the template for listing out
+    context_object_name = "tasks"
+
+@method_decorator(login_required, name="dispatch")
+class EditEntryView(generic.edit.UpdateView):
+    model = Task
+    form_class = TaskForm  # Your form class for editing the entry
+    template_name = "todo/update_task.html"  # Template for editing an entry
+    success_url = "/todo/"  # URL to redirect after successfully editing an entry
+
+
+# class TaskUpdateView(generic.edit.UpdateView):
+#     model = Task
+#     form_class = TaskForm
+#     template_name = 'todo/your_template.html'  # Replace 'your_template.html' with your actual template file
+
+#     def get_object(self, queryset=None):
+#         # Retrieve the Task object you want to edit based on its ID
+#         return get_object_or_404(Task, pk=self.kwargs['pk'])
+
+#     def get_context_data(self, **kwargs):
+#         context = super(TaskUpdateView, self).get_context_data(**kwargs)
+#         # You can add additional context data if needed
+#         return context
+
+#     def form_valid(self, form):
+#         # Your logic for handling the form submission if it's valid
+#         return super(TaskUpdateView, self).form_valid(form)
+
+#     def get_success_url(self):
+#         # Specify the URL to redirect to after a successful form submission
+#         return redirect("/todo")  # Replace 'your_success_url_name' with your actual URL name
+
+@method_decorator(login_required, name="dispatch")
+def search_contacts_and_companies(request):
+    search_query = request.GET.get("search_query", "")
+
+    # Query the database for contacts and companies with matching names
+    matching_contacts = Contact.objects.filter(name__icontains=search_query)
+    matching_companies = Company.objects.filter(name__icontains=search_query)
+
+    # Serialize the suggestions as JSON
+    # suggestions = list(matching_contacts.values_list('name', flat=True)) + list(matching_companies.values_list('name', flat=True))
+
+    # Serialize the suggestions as JSON, including IDs
+    contact_suggestions = [
+        {
+            "id": contact.id,
+            "name": contact.name,
+            "type": "contact",
+        }
+        for contact in matching_contacts
+    ]
+    company_suggestions = [
+        {
+            "id": company.id,
+            "name": company.name,
+            "type": "company",
+        }
+        for company in matching_companies
+    ]
+
+    suggestions = contact_suggestions + company_suggestions
+
+    return JsonResponse({"suggestions": suggestions})
+
+@method_decorator(login_required, name="dispatch")
 def complete_task(request, task_id):
     task = get_object_or_404(Task, pk=task_id)
     task.completed = True
@@ -130,7 +188,7 @@ def complete_task(request, task_id):
     task.save()
     return redirect("/todo")
 
-
+@method_decorator(login_required, name="dispatch")
 def delete_task(request, task_id):
     if request.method == "POST":
         task = get_object_or_404(Task, pk=task_id)

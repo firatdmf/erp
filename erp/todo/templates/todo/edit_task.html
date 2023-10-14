@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    .edit-task-page {
+        margin: 20px;
+    }
+</style>
+<p><a href="{% url 'todo:index' %}"><--- Go to Task List page</a></p>
+<div class="edit-task-page">
+    <h1>Edit Task</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="search-container">
+            <input type="text" id="contact-company-search" name="contact_company_search"
+                placeholder="Search Contacts and Companies">
+            <div id="suggestions-dropdown"></div>
+            <input type="hidden" name="contact_company_id" id="contact_company_id" value="">
+        </div>
+        <button type="submit">Save Changes</button>
+    </form>
+</div>
+
+<script src="{% static 'todo/index.js' %}"></script>
+<script>
+    // JavaScript code for handling search and selection logic, similar to what you have in index.js
+</script>
+
+{% endblock %}

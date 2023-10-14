@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<p><a href="{% url 'todo:index' %}"><--- Go to Contact List page</a></p>
+<form method="post" action="{% url 'todo:update_task' task.id%}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Update</button>
+  </form>
+
+{% endblock %}
+  

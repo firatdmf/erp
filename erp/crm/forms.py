@@ -1,6 +1,8 @@
 from .models import Contact, Note, Company
 # below is for creating forms
 from django.forms import ModelForm
+from django import forms
+
 
 class ContactForm(ModelForm):
     class Meta:
@@ -9,6 +11,9 @@ class ContactForm(ModelForm):
         fields = '__all__' #
         # except the company model itself
         exclude = ('company',)
+        widgets = {
+            'birthday': forms.DateInput(attrs={'type': 'date'}),
+        }
 class CompanyForm(ModelForm):
     class Meta:
         model = Company

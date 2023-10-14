@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
+<p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
     <h1>Create Contact Form</h1>
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }} {# Render each form field as a paragraph #}
         <button type="submit">Submit</button>
     </form>
-</body>
-</html>
+{% endblock %}

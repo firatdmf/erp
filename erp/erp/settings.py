@@ -36,6 +36,7 @@ ALLOWED_HOSTS = [
     "erp.demfirat.com",
     "127.0.0.1",
     "erp-production-6055.up.railway.app",
+    "localhost"
 ]
 
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']

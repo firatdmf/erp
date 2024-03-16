@@ -35,6 +35,7 @@ def home(request):
 
 def signup(request):
     if request.method == "POST":
+        print('hello')
         # this is based on name, not id
         # username = request.POST.get('username')
         # below is same as above
@@ -48,7 +49,7 @@ def signup(request):
         myuser = User.objects.create_user(username, email, password)
         myuser.first_name = fname
         myuser.last_name = lname
-
+        print(myuser)
         myuser.save()
         mymember = Member.objects.create(user=myuser, company_name=cname)
         mymember.save()

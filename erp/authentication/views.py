@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 
 
-# @login_required
+@login_required
 def home(request):
     # try:
     #     member = Member.objects.get(user=request.user)
@@ -26,7 +26,7 @@ def home(request):
             member = Member.objects.get(user=request.user)
         except:
             member = None
-        return render(request, "authentication/index.html", {'member':member})
+        return render(request, "authentication/index.html", {"member": member})
     else:
         print("There is no user!")
 
@@ -35,7 +35,7 @@ def home(request):
 
 def signup(request):
     if request.method == "POST":
-        print('hello')
+        print("hello")
         # this is based on name, not id
         # username = request.POST.get('username')
         # below is same as above
@@ -55,7 +55,7 @@ def signup(request):
         mymember.save()
 
         messages.success(request, "Your acccount has been successfully created.")
-        return redirect("signin")
+        return redirect("/authentication/signin")
 
     return render(request, "authentication/signup.html")
 
@@ -64,8 +64,8 @@ def signin(request):
     # go_to_url = request.GET['next']
     # print(go_to_url)
     if request.method == "GET":
-        go_to_url = request.GET.get('next','home')
-        return render(request,"authentication/signin.html",{"next":go_to_url})
+        go_to_url = request.GET.get("next", "home")
+        return render(request, "authentication/signin.html", {"next": go_to_url})
 
         # print('-------')
         # print(type(str(go_to_url)))
@@ -77,10 +77,10 @@ def signin(request):
         username = request.POST["username"]
         password = request.POST["password"]
         go_to_url = request.POST["next"]
-        print('-------')
+        print("-------")
         print(type(str(go_to_url)))
         print(go_to_url)
-        print('-------')
+        print("-------")
         user = authenticate(username=username, password=password)
         if user is not None:
             login(request, user)
@@ -100,10 +100,10 @@ def signin(request):
         else:
             messages.error(request, "Bad Credentials!")
             # this is the name of the url
-            return redirect("/authentication/home")
-            
-
-    return render(request, "authentication/signin.html")
+            # return redirect("/authentication/signin")
+            args ={}
+            args['errorMessage'] = 'Your password was wrong'
+    return render(request, "authentication/signin.html",args)
 
 
 def signout(request):

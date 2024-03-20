@@ -35,14 +35,12 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = [
     "erp.demfirat.com",
     "127.0.0.1",
-    "erp-production-6055.up.railway.app",
     "localhost"
 ]
 
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
 CSRF_TRUSTED_ORIGINS = [
     "https://*.demfirat.com",
-    "https://erp-production-6055.up.railway.app/",
 ]
 
 # Below is added for django OAuth
@@ -243,3 +241,4 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # LOGIN_REDIRECT_URL = ""
 LOGIN_URL = '/authentication/signin'
 LOGOUT_REDIRECT_URL = "/authentication/index"
+# LOGOUT_REDIRECT_URL = "/"

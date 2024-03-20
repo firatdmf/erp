@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <link rel="stylesheet" href="{% static 'erp/style.css' %}">
+    <link rel="stylesheet" href="{% static 'erp/base.css' %}">
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 </head>
 
@@ -14,8 +14,11 @@
     {% with member=user.member %}
     <header>
         <div class="line">
-            <p><span style="float:right;"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a href="{% url 'index' %}"><h3>ERP</h3></a></p>
-            <p>Welcome to the base page{% if member %}, {{member.user.first_name|title}}{% endif %}! 
+            <p><span style="float:right;"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a
+                    href="{% url 'index' %}">
+                    <h3>ERP</h3>
+                </a></p>
+            <p>Welcome to the base page{% if member %}, {{member.user.first_name|title}}{% endif %}!
                 <span style="float:right;">{% now 'F j, Y' %}</span>
             </p>
         </div>
@@ -25,11 +28,11 @@
             <li><a href="{% url 'index' %}">Home</a></li>
             <li><a href="{% url 'crm:index' %}">CRM</a></li>
             <li><a href="{% url 'todo:index' %}">Todo Tasks</a></li>
-          </ul>
+        </ul>
     </nav>
     {% block content %}
     {% endblock %}
-    <footer>Goodbye!</footer>
+    <footer style="background-color: beige;">This is the footer.</footer>
     {% endwith %}
 </body>
 

@@ -9,3 +9,59 @@ header{
     padding:20px;
 }
 
+
+
+/* Added later */
+ /* CSS for Horizontal Side Navigation */
+ .sidenav {
+    height: 100%;
+    width: 250px; /* Width of the side navigation */
+    position: fixed;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    background-color: rgb(240,245,250); /* Background color */
+    padding-top: 20px; /* Padding for top spacing */
+}
+
+.sidenav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidenav li {
+    margin-bottom: 10px; /* Spacing between navigation items */
+    position: relative; /* Required for absolute positioning of sub-menu */
+}
+
+.sidenav a {
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 2rem;
+    display: block; /* Make the whole area clickable */
+    padding: 10px 20px; /* Padding for each navigation item */
+}
+
+/* Sub-menu */
+.sub-menu {
+    display: none; /* Initially hide sub-menu */
+    position: absolute;
+    top: 0;
+    left: 100%; /* Position sub-menu to the right of parent */
+    background-color: #555; /* Background color for sub-menu */
+    padding: 10px;
+    min-width: 200px; /* Set a minimum width for sub-menu */
+}
+
+.sidenav li:hover .sub-menu {
+    display: block; /* Show sub-menu on hover */
+}
+
+.sub-menu li {
+    margin: 5px 0; /* Spacing between sub-menu items */
+}
+
+.content {
+    margin-left:250px;
+}

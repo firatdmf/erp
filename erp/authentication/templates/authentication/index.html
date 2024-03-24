@@ -10,14 +10,10 @@
     </div>
     {% endfor %}
 
-    <h3>Welcome to Aimbot ERP</h3>
 
     <!-- if user is logged in -->
     {% if user.is_authenticated %}
     <h3>Hello, {{user.first_name}}</h3>
-    {% if member.company_name %}
-    <h3>We love, {{member.company_name|upper}}</h3>
-    {% endif %}
     <h4>You are successfully logged in</h4>
     <button type="submit"><a href="{% url 'authentication:signout' %}">SignOut</a></button>
     {% else %}

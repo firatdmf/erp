@@ -13,8 +13,8 @@
 
 <body>
     {% with member=user.member %}
-    <header>
-        <div class="sidenav">
+    {% comment %} <header> {% endcomment %}
+        {% comment %} <div class="sidenav">
             <ul>
                 <li>
                     <a href="#">Home</a>
@@ -39,8 +39,8 @@
                     </ul>
                 </li>
             </ul>
-        </div>
-    </header>
+        </div> {% endcomment %}
+    {% comment %} </header> {% endcomment %}
     <div class="content">
         <div class="line">
             <p><span style="float:right;"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a

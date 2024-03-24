@@ -1,39 +1,52 @@
-{% extends "base.html" %}
-{% block content %}
-    {% load custom_filters %}
+{% extends "base.html" %} {% block content %} {% load custom_filters %} 
+{% load static %} 
+{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
 
-    <p><a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a></p>
-    <h1>Contact Details</h1>
-    <p><strong>Name:</strong> {{ company.name }}</p>
-    <p><strong>Email:</strong> {{ company.email }}</p>
-    <p><strong>Phone:</strong> {{ company.email }}</p>
-    <p><strong>Address:</strong> {{ company.address }}</p>
-    <p><strong>City:</strong> {{ company.city }}</p>
-    <p><strong>State:</strong> {{ company.state }}</p>
-    <p><strong>Zip Code:</strong> {{ company.zip_code }}</p>
-    <p><strong>Country:</strong> {{ company.country }}</p>
-    <p><strong>Website:</strong> {{ company.website }}</p>
+{% block css %}
+<link rel="stylesheet" href="{% static 'crm/css/detailPages.css' %}" />
+{% endblock %}
 
-    <!-- Add other fields as needed -->
-    <!-- Note submission form -->
+<!-- below is for ajax so the page does not have to refresh when I add or delete notes -->
+{% block js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="{% static 'crm/js/detailPages.js' %}"></script>
+{% endblock %}
+
+<p><a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a></p>
+<h1>Contact Details</h1>
+<p><strong>Name:</strong> {{ company.name }}</p>
+<p><strong>Email:</strong> {{ company.email }}</p>
+<p><strong>Phone:</strong> {{ company.phone }}</p>
+<p><strong>Address:</strong> {{ company.address }}</p>
+<p><strong>City:</strong> {{ company.city }}</p>
+<p><strong>State:</strong> {{ company.state }}</p>
+<p><strong>Zip Code:</strong> {{ company.zip_code }}</p>
+<p><strong>Country:</strong> {{ company.country }}</p>
+<p><strong>Website:</strong> {{ company.website }}</p>
+
+<!-- Add other fields as needed -->
+<!-- Note submission form -->
 
 {% if contacts %}
-    <h2>Contacts</h2>
-    <ul>
-        {% for contact in contacts %}
-            <li><a href="{% url 'crm:contact_detail' contact.id%}">{{ contact.name }} works here</a></li>
-        {% endfor %}
-    </ul>
+<h2>Contacts</h2>
+<ul>
+  {% for contact in contacts %}
+  <li>
+    <a href="{% url 'crm:contact_detail' contact.id%}"
+      >{{ contact.name }} works here</a
+    >
+  </li>
+  {% endfor %}
+</ul>
 {% else %}
-    <p>No contacts found for this company.</p>
+<p>No contacts found for this company.</p>
 {% endif %}
-    <h2>Add a Note</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ note_form.as_p }}
-        <button type="submit">Add Note</button>
-    </form>
-    <h2>Notes</h2>
+<h2>Add a Note</h2>
+<form method="post">
+  {% csrf_token %} {{ note_form.as_p }}
+  <button type="submit">Add Note</button>
+</form>
+<!-- <h2>Notes</h2>
     <ul>
         {% for note in notes %}
         {% if note.modified_date == note.created_at%}
@@ -46,43 +59,82 @@
         {% empty %}
         <li>No notes available.</li>
         {% endfor %}
-    </ul>
-    <h2>Tasks</h2>
-    <ul>
-        {% for task in tasks|dictsortreversed:"created_at" %}
-        {% if task.completed == False and task.due_date|is_past_due %}
+    </ul> -->
 
-        <!-- {% if task.completed == False %} -->
-        <li>
-            <p><strong>{{ task.task_name }}</strong>
-                {% if task.days_since_due > 0 %}
-                <span style="color:red">{{ task.days_since_due }}d</span>
-                {% else %}
-                <p>what is wrong</p>
-                {% endif %}
-            </p>
-            {% if task.description %}
-            <p>{{ task.description }}</p>
-            {% endif %}
-            {% if task.contact %}
-            <a href="{% url 'crm:contact_detail' task.contact.id%}" style="color:blue;">{{ task.contact }}</a>
-            {% endif %}
-            {% if task.company %}
-            <a href="{% url 'crm:company_detail' task.company.id%}" style="color:blue;">{{ task.company }}</a>
-            {% endif %}
-        </li>
-        <form action="{% url 'todo:complete_task' task.id %}" method="post">
-            {% csrf_token %}
-            <button type="submit" style="color:green">Complete Task</button><br />
-        </form>
-        <form action="{% url 'todo:delete_task' task.id %}" method="post">
-            {% csrf_token %}
-            <button type="submit" style="color:red">Delete Task</button><br />
-        </form>
-        {% endif %}
-        {% endif %}
-        {% empty %}
-        <li>No tasks available.</li>
-        {% endfor %}
-    </ul>
-{% endblock %}
+<h2>Notes</h2>
+<ul>
+  {% for note in notes|dictsortreversed:"modified_date" %}
+  <li>
+    {{ note.content }} ({% if note.modified_date %}{{ note.modified_date }}
+    {%else %} {{ note.created_at }} {%endif%})
+    <a href="{% url 'crm:update_note' note.id %}">Edit Note</a>
+    <!-- <a href="{% url 'crm:delete_note' note.id %}">Delete Note</a> -->
+    <form
+      action="{% url 'crm:delete_note' note.id %}"
+      method="post"
+      class="delete-note-form"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="note_id" value="{{ note.id }}" />
+      <button type="submit">Delete Note</button>
+    </form>
+  </li>
+  {% empty %}
+  <li>No notes available.</li>
+  {% endfor %}
+</ul>
+<h2>Add a Task</h2>
+<form method="post">
+  {% csrf_token %} {{ task_form.as_p }}
+  <button type="submit">Add Task</button>
+</form>
+<h2>Tasks</h2>
+{% for task in tasks|dictsort:"due_date" %}
+<ul>
+  {% comment %}
+  <p>Idon't know what's wrong {{task}}</p>
+  {% endcomment %} {% comment %} {% if task.completed == False and
+  task.due_date|is_past_due %} {% endcomment %}
+
+  <!-- {% if task.completed == False %} -->
+  <li class="taskComponent">
+    <p class="taskName">
+      {{ task.task_name }}
+    </p>
+    {% if task.description %}
+    <p class="taskDescription">{{ task.description }}</p>
+    {% endif %}
+    <p class="taskDueDate">
+      Due: {{task.due_date}} {% if task.days_since_due > 0 %}
+      <span class="daysDue">{{ task.days_since_due }}d</span>
+      {% endif %}
+    </p>
+    {% if task.contact %}
+    <a href="{% url 'crm:contact_detail' task.contact.id%}" style="color: blue"
+      >{{ task.contact }}</a
+    >
+    {% endif %} {% if task.company %}
+    <a href="{% url 'crm:company_detail' task.company.id%}" style="color: blue"
+      >{{ task.company }}</a
+    >
+    {% endif %}
+    <form action="{% url 'todo:complete_task' task.id %}" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="task_id" value="{{ task.id }}" />
+      <button type="submit">Complete Task</button>
+    </form>
+    <form action="{% url 'todo:delete_task' task.id %}" method="post">
+      {% csrf_token %}
+      <button type="submit" style="color: red">Delete Task</button><br />
+    </form>
+    <a
+      href="{% url 'todo:update_task' task.id %}?next={{ request.path|urlencode }}"
+      ><button>Update Task</button></a
+    >
+  </li>
+
+  {% endif %} {% empty %}
+  <li>No tasks available.</li>
+</ul>
+{% endfor %}
+ {% endblock %}

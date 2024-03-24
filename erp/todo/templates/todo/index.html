@@ -1,17 +1,11 @@
 {% extends "base.html" %}
+{% block content %}
 {% load static %}
 {% load custom_tags %}
 {% load custom_filters %}
-{% block content %}
-<style>
-    .todo_index_page {
-        margin: 20px;
-    }
-    
-    #cancel_selected{
-        display: none;
-    }
-</style>
+{% block css%}
+<link rel="stylesheet" href="{% static 'todo/index.css' %}" />
+{% endblock %}
 
 
 <script src="{% static 'todo/index.js' %}"></script>
@@ -24,7 +18,7 @@
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <div class="search-container">
+        {% comment %} <div class="search-container">
             <input type="text" id="contact-company-search" name="contact_company_search"
                 placeholder="Search Contacts and Companies">
             <div id="suggestions-dropdown"></div>
@@ -33,7 +27,7 @@
         <div class="selected_result">
 
             <span id="cancel_selected">X</span>
-        </div>
+        </div> {% endcomment %}
         <button type="submit" onclick="">Create Task</button>
     </form>
 

@@ -5,7 +5,7 @@
     {% load static %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Automation Simple</title>
     <link rel="stylesheet" href="{% static 'erp/base.css' %}">
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 </head>
@@ -16,7 +16,7 @@
         <div class="line">
             <p><span style="float:right;"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a
                     href="{% url 'index' %}">
-                    <h3>ERP</h3>
+                    <h3>Automation Simple</h3>
                 </a></p>
             <p>Welcome to the base page{% if member %}, {{member.user.first_name|title}}{% endif %}!
                 <span style="float:right;">{% now 'F j, Y' %}</span>

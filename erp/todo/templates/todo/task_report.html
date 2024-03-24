@@ -11,7 +11,8 @@
         {% if task.due_date|is_past_due %}
         {% else %}
         <li>
-            <p><strong>{{ task.task_name }}</strong>
+            <!-- today's date: {% now "SHORT_DATETIME_FORMAT" %} -->
+            <p><strong>{{ task.task_name }}</strong> | Due: {{task.due_date}}
                 {% if task.days_since_due > 0 %}
                 <span style="color:red">{{ task.days_since_due }}d</span>
                 {% endif %}

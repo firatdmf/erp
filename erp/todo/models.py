@@ -4,7 +4,7 @@ from django.db import models
 from django.utils import timezone
 from django.urls import reverse
 from crm.models import Contact, Company
-from authentication.models import Member
+# from authentication.models import Member
 from datetime import datetime, date
 
 
@@ -20,9 +20,14 @@ class Task(models.Model):
     days_since_due = models.IntegerField(default=0)
     # member = models.OneToOneField
 
-
     def __str__(self):
-        return(self.task_name)
+        if(self.company):
+            # return(self.task_name + "|"+self.company+"|")
+            return f"{self.task_name} for | {self.company}"
+        elif (self.contact):
+            return f"{self.task_name} for | {self.contact}"
+        else:
+            return self.task_name
     
     # To be able to save the days_since_due, we need to override the save model.
     def save(self, *args, **kwargs):

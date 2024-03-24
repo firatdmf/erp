@@ -1,23 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-    {% load custom_filters %}
+{% load custom_filters %}
 
 
-    <p><a href="{% url 'crm:contact_list' %}"><--- Go to Contact List page</a></p>
-    <h1>Contact Details</h1>
-    <p><strong>Name:</strong> {{ contact.name }}</p>
-    <p><strong>Email:</strong> {{ contact.email }}</p>
-    <p><strong>Company:</strong> {{ contact.company }}</p> <!-- Assuming you have a ForeignKey to Company -->
-    <!-- Add other fields as needed -->
-    <!-- Note submission form -->
-    <h2>Add a Note</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ note_form.as_p }}
-        <button type="submit">Add Note</button>
-    </form>
-    <h2>Notes</h2>
-    <ul>
+<p><a href="{% url 'crm:contact_list' %}"><--- Go to Contact List page</a></p>
+<h1>Contact Details</h1>
+<p><strong>Name:</strong> {{ contact.name }}</p>
+<p><strong>Email:</strong> {{ contact.email }}</p>
+<p><strong>Company:</strong> {{ contact.company }}</p> <!-- Assuming you have a ForeignKey to Company -->
+<!-- Add other fields as needed -->
+<!-- Note submission form -->
+<h2>Add a Note</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ note_form.as_p }}
+    <button type="submit">Add Note</button>
+</form>
+<h2>Notes</h2>
+<!-- <ul>
         {% for note in notes %}
         {% if note.modified_date == note.created_at%}
         <li>{{ note.content }} ({{ note.created_at }})</li>
@@ -29,7 +29,19 @@
         {% empty %}
         <li>No notes available.</li>
         {% endfor %}
-    </ul>
+    </ul> -->
+<ul>
+    {% for note in notes|dictsortreversed:"modified_date" %}
+    <li>{{ note.content }} ({% if note.modified_date %}{{ note.modified_date }}{% else %}{{ note.created_at }}
+        {%endif%})
+        <a href="{% url 'crm:update_note' note.id %}">Edit Note</a>
+    </li>
+    {% empty %}
+    <li>No notes available.</li>
+    {% endfor %}
+</ul>
+<h2>Tasks</h2>
+<ul>
     <h2>Tasks</h2>
     <ul>
         {% for task in tasks|dictsortreversed:"created_at" %}
@@ -41,8 +53,8 @@
                 {% if task.days_since_due > 0 %}
                 <span style="color:red">{{ task.days_since_due }}d</span>
                 {% else %}
-                <p>what is wrong</p>
-                {% endif %}
+            <p>what is wrong</p>
+            {% endif %}
             </p>
             {% if task.description %}
             <p>{{ task.description }}</p>
@@ -68,4 +80,4 @@
         <li>No tasks available.</li>
         {% endfor %}
     </ul>
-{% endblock %}
+    {% endblock %}

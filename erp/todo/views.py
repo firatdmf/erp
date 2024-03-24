@@ -122,7 +122,16 @@ class EditEntryView(generic.edit.UpdateView):
     model = Task
     form_class = TaskForm  # Your form class for editing the entry
     template_name = "todo/update_task.html"  # Template for editing an entry
-    success_url = "/todo/"  # URL to redirect after successfully editing an entry
+    # success_url = "/todo/"  # URL to redirect after successfully editing an entry
+    def get_success_url(self):
+        next_url = self.request.GET.get('next')
+        if next_url:
+            print('yes you got there')
+            return next_url
+        else:
+            # If 'next' parameter is not present, redirect to a default URL
+            # return reverse('todo:update_task')  # Change 'todo:task_list' to your desired URL name
+            return "/todo/"
 
 
 # class TaskUpdateView(generic.edit.UpdateView):
@@ -180,7 +189,7 @@ def search_contacts_and_companies(request):
 
     return JsonResponse({"suggestions": suggestions})
 
-@method_decorator(login_required, name="dispatch")
+# @method_decorator(login_required, name="dispatch")
 def complete_task(request, task_id):
     task = get_object_or_404(Task, pk=task_id)
     task.completed = True

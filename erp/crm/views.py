@@ -25,7 +25,7 @@ from django.contrib.auth.decorators import login_required
 class index(View):
     def get(self, request):
         # handle get request
-        context = {"message": "Hello from index!"}
+        context = {"message": "Hello from CRM index!"}
         return render(request, "crm/index.html", context)
 
     # Handling post request
@@ -143,9 +143,11 @@ class company_detail_view(generic.DetailView):
         context["note_form"] = NoteForm()
 
         # below is to preselect the company field in the task form with the current company
-        initial_task_data = {'company': company.pk}
+        initial_task_data = {"company": company.pk}
         # below is hide some specific fields I chose in todo task form view
-        context["task_form"] = TaskForm(initial=initial_task_data,hide_fields=True)  # Add task form to context
+        context["task_form"] = TaskForm(
+            initial=initial_task_data, hide_fields=True
+        )  # Add task form to context
 
         contacts = Contact.objects.filter(company=company)
         context["contacts"] = contacts
@@ -161,7 +163,7 @@ class company_detail_view(generic.DetailView):
         # NoteForm() creates a form instance for adding notes, which is added to the context as note_form.
         # It instantiates a NoteForm object with the form data from the request.
         note_form = NoteForm(request.POST)
-        task_form = TaskForm(request.POST) #Get task from form data
+        task_form = TaskForm(request.POST)  # Get task from form data
         if note_form.is_valid():
             note = note_form.save(commit=False)
             note.company = company
@@ -176,7 +178,7 @@ class company_detail_view(generic.DetailView):
         # If the form data is invalid, it adds the form with errors to the context and renders the page again with the form and errors displayed.        # You might want to add error handling or return an error message.
         context = self.get_context_data()
         context["note_form"] = note_form
-        context["note_form"] = task_form # Add task form to context
+        context["note_form"] = task_form  # Add task form to context
         return self.render_to_response(context)
 
 
@@ -188,7 +190,17 @@ class EditNoteView(generic.edit.UpdateView):
 
 
 class DeleteNoteView(generic.View):
-    def post(self, request, pk):
-        note = get_object_or_404(Note, pk=pk)
-        note.delete()
-        return JsonResponse({"message": "Note deleted successfully."})
+    # def post(self, request, pk, *args, **kwargs):
+    #     note = get_object_or_404(Note, pk=pk)
+    #     note.delete()
+    #     return JsonResponse({"message": "Note deleted successfully."})
+    def post(self, request, *args, **kwargs):
+        note_id = request.POST.get("note_id")
+        if note_id:
+            try:
+                note = Note.objects.get(pk=note_id)
+                note.delete()
+            except Note.DoesNotExist:
+                pass
+        # Redirect back to the same page
+        return redirect(request.META.get("HTTP_REFERER"))

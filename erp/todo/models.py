@@ -9,9 +9,15 @@ from datetime import datetime, date
 
 
 class Task(models.Model):
+    # blank=True: This parameter specifies whether the field is allowed to be blank in forms
+    # null=True: This parameter specifies whether the field is allowed to have a null value in the database. If null=True, the field will be nullable in the database, meaning it can have a value of NULL. It applies to the database schema. Setting null=True means that the field can be empty in the database, but it may still be required in forms unless blank=True is also set.
+    # So, in summary:
+    # blank=True affects form validation.
+    # null=True affects the database schema.
+    
     task_name = models.CharField(max_length=200)
     due_date = models.DateField()
-    description = models.TextField()
+    description = models.TextField(blank=True,null=True)
     completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(auto_now_add=True)

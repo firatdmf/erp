@@ -4,13 +4,13 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'crm/css/detailPages.css' %}" />
-{% endblock %}
+{% endblock css %}
 
 <!-- below is for ajax so the page does not have to refresh when I add or delete notes -->
 {% block js %}
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="{% static 'crm/js/detailPages.js' %}"></script>
-{% endblock %}
+{% comment %} <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {% endcomment %}
+{% comment %} <script src="{% static 'crm/js/detailPages.js' %}"></script> {% endcomment %}
+{% endblock js %}
 
 <p><a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a></p>
 <h1>Contact Details</h1>
@@ -32,7 +32,7 @@
 <ul>
   {% for contact in contacts %}
   <li>
-    <a href="{% url 'crm:contact_detail' contact.id%}"
+    <a href="{% url 'crm:contact_detail' contact.id %}"
       >{{ contact.name }} works here</a
     >
   </li>
@@ -66,7 +66,7 @@
   {% for note in notes|dictsortreversed:"modified_date" %}
   <li>
     {{ note.content }} ({% if note.modified_date %}{{ note.modified_date }}
-    {%else %} {{ note.created_at }} {%endif%})
+    {% else %} {{ note.created_at }} {% endif %})
     <a href="{% url 'crm:update_note' note.id %}">Edit Note</a>
     <!-- <a href="{% url 'crm:delete_note' note.id %}">Delete Note</a> -->
     <form
@@ -105,27 +105,28 @@
     <p class="taskDescription">{{ task.description }}</p>
     {% endif %}
     <p class="taskDueDate">
-      Due: {{task.due_date}} {% if task.days_since_due > 0 %}
+      Due: {{ task.due_date }} {% if task.days_since_due > 0 %}
       <span class="daysDue">{{ task.days_since_due }}d</span>
       {% endif %}
     </p>
     {% if task.contact %}
-    <a href="{% url 'crm:contact_detail' task.contact.id%}" style="color: blue"
+    <a href="{% url 'crm:contact_detail' task.contact.id %}"
       >{{ task.contact }}</a
     >
-    {% endif %} {% if task.company %}
-    <a href="{% url 'crm:company_detail' task.company.id%}" style="color: blue"
+    {% endif %} 
+    {% comment %} {% if task.company %}
+    <a href="{% url 'crm:company_detail' task.company.id %}" 
       >{{ task.company }}</a
     >
-    {% endif %}
+    {% endif %} {% endcomment %}
     <form action="{% url 'todo:complete_task' task.id %}" method="post">
       {% csrf_token %}
       <input type="hidden" name="task_id" value="{{ task.id }}" />
-      <button type="submit">Complete Task</button>
+      <button type="submit" class="completeTaskButton">Complete Task</button>
     </form>
     <form action="{% url 'todo:delete_task' task.id %}" method="post">
       {% csrf_token %}
-      <button type="submit" style="color: red">Delete Task</button><br />
+      <button type="submit" class="deleteTaskButton">Delete Task</button><br />
     </form>
     <a
       href="{% url 'todo:update_task' task.id %}?next={{ request.path|urlencode }}"
@@ -137,4 +138,4 @@
   <li>No tasks available.</li>
 </ul>
 {% endfor %}
- {% endblock %}
+ {% endblock content %}

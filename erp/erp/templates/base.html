@@ -1,72 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    {% load static %}
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Automation Simple</title>
-    <link rel="stylesheet" href="{% static 'erp/base.css' %}">
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-    <script src="{% static 'erp/base.js' %}"></script>
-</head>
-
-<body>
-    {% with member=user.member %}
-    {% comment %} <header> {% endcomment %}
-        {% comment %} <div class="sidenav">
-            <ul>
-                <li>
-                    <a href="#">Home</a>
-                </li>
-                <li>
-                    <a href="#">Services</a>
-                    <ul class="sub-menu">
-                        <li><a href="#">Service 1</a></li>
-                        <li><a href="#">Service 2</a></li>
-                        <li><a href="#">Service 3</a></li>
-                    </ul>
-                </li>
-                <li>
-                    <a href="#">About</a>
-                </li>
-                <li>
-                    <a href="#">Contact</a>
-                    <ul class="sub-menu">
-                        <li><a href="#">Location</a></li>
-                        <li><a href="#">Email</a></li>
-                        <li><a href="#">Phone</a></li>
-                    </ul>
-                </li>
-            </ul>
-        </div> {% endcomment %}
-    {% comment %} </header> {% endcomment %}
-    <div class="content">
-        <div class="line">
-            <p><span style="float:right;"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a
-                    href="{% url 'index' %}">
-                    <h3>Automation Simple</h3>
-                </a></p>
-            <p>Welcome to the base page{% if member %}, {{member.user.first_name|title}}{% endif %}.
-                {% if member.company_name %}We love, {{member.company_name|upper}}{% endif %}!
-                <span style="float:right;">{% now 'F j, Y' %}</span>
-            </p>
-        </div>
-        {% block content %}
-        {% endblock %}
-    </div>
-
-    <footer style="background-color: beige; text-align: center;">This is the footer.</footer>
-    {% endwith %}
-
-
-    <script>
-        // Function to toggle the side navigation menu on mobile
-        function toggleMenu() {
-            let sidenav = document.getElementById('sidenav');
-            sidenav.classList.toggle('active');
-        }
-    </script>
-</body>
-
+    {% comment %} This file includes the app title, user greeting if they are logged in, Signout | signin buttons|  {% endcomment %}
+    <head>
+        {% load static %}
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description"
+              content="Simplest Automation Tool for Manufacturers">
+        <meta name="keywords" content="Manufacturing, ERP, Digital Transformation">
+        <title>Automation Simple</title>
+        <link rel="stylesheet" href="{% static 'erp/base.css' %}">
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        <script src="{% static 'erp/base.js' %}"></script>
+    </head>
+    <body>
+        {% with member=user.member %}
+            <header>
+                <div class="line">
+                    <p>
+                        <span class="floatRight signoutButton"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a href="{% url 'index' %}">
+                            <h2>Automation Simple</h2>
+                        </a>
+                    </p>
+                    <p>
+                        Welcome to the base page
+                        {% if member %}
+                            , {{ member.user.first_name|title }}
+                        {% elif user %}
+                            , {{ user.first_name|title }}
+                        {% endif %}
+                        {% if member.company_name %}We love, {{ member.company_name|upper }}{% endif %}
+                        !
+                        <span class="floatRight">{% now "F j, Y" %}</span>
+                    </p>
+                </div>
+                <nav>
+                    <ul>
+                        <li><a href="{% url 'crm:index' %}">CRM</a></li>
+                        <li><a href="{% url 'todo:index' %}">To do</a></li>
+                      </ul>
+                </nav>
+            </header>
+            {% block content %}
+            {% endblock content %}
+            <footer>
+                This is the footer.
+            </footer>
+        {% endwith %}
+    </body>
 </html>

@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django import forms
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.views import View, generic
 from .models import Contact, Company, Note
 from todo.models import Task
@@ -86,10 +86,36 @@ class company_create(generic.edit.CreateView):
     model = Company
     form_class = CompanyForm
     template_name = "crm/create_company.html"
-    success_url = "/crm/company_list/"
+    # success_url = "/crm/company_list/"
 
     def form_valid(self, form):
-        return super().form_valid(form)
+        #  # Save the form data to create the Company instance but do not commit yet because there might be duplicates
+        self.object = form.save(commit=False)
+        self.object.save()
+        # Save the note if it exists
+        note_content = form.cleaned_data.get("note_content")
+        if note_content:
+            Note.objects.create(company=self.object, content=note_content)
+
+
+        # Save the task if all required fields are provided
+        task_name = form.cleaned_data.get("task_name")
+        due_date = form.cleaned_data.get("due_date")
+        if task_name and due_date:
+            task_description = form.cleaned_data.get("task_description", "")
+            Task.objects.create(
+                task_name=task_name,
+                due_date=due_date,
+                description=task_description,
+                company=self.object,
+            )
+        # return super().form_valid(form)
+        return HttpResponseRedirect(self.get_success_url())
+
+    
+    # taking the user to the page of the company just created
+    def get_success_url(self) -> str:
+        return reverse_lazy('crm:company_detail', kwargs={'pk': self.object.pk})
 
 
 class contact_detail_view(generic.DetailView):
@@ -186,7 +212,11 @@ class EditNoteView(generic.edit.UpdateView):
     model = Note
     form_class = NoteForm  # Your form class for editing the entry
     template_name = "crm/update_note.html"  # Template for editing an entry
-    success_url = "/crm/"  # URL to redirect after successfully editing an entry
+    # success_url = "/crm/"  # URL to redirect after successfully editing an entry
+    def form_valid(self, form):
+        next_url = self.request.POST.get('next_url')
+        self.success_url = next_url
+        return super().form_valid(form)
 
 
 class DeleteNoteView(generic.View):

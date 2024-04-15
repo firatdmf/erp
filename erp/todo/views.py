@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse,HttpResponseRedirect
+from django.urls import reverse
 from django import forms
 from .models import Task
+from django.http import HttpRequest
 
 # Create your views here.
 from django.views import generic, View
@@ -11,6 +13,7 @@ from datetime import datetime, date
 from .forms import TaskForm
 from django.http import JsonResponse
 from .models import Contact, Company
+from django.urls import reverse_lazy
 
 # to make it only viewable to users
 from django.contrib.auth.decorators import login_required
@@ -97,6 +100,7 @@ class index(View):
 
 # -------------------------------------------------
 
+
 @method_decorator(login_required, name="dispatch")
 class CreateTask(generic.edit.CreateView):
     model = Task
@@ -108,6 +112,7 @@ class CreateTask(generic.edit.CreateView):
     def form_valid(self, form):
         return super().form_valid(form)
 
+
 @method_decorator(login_required, name="dispatch")
 class TaskReport(generic.ListView):
     # Model to list out
@@ -117,21 +122,37 @@ class TaskReport(generic.ListView):
     # Variable to use in the template for listing out
     context_object_name = "tasks"
 
+
+
 @method_decorator(login_required, name="dispatch")
-class EditEntryView(generic.edit.UpdateView):
+class EditTaskView(generic.edit.UpdateView):
     model = Task
     form_class = TaskForm  # Your form class for editing the entry
     template_name = "todo/update_task.html"  # Template for editing an entry
+
     # success_url = "/todo/"  # URL to redirect after successfully editing an entry
-    def get_success_url(self):
-        next_url = self.request.GET.get('next')
-        if next_url:
-            print('yes you got there')
-            return next_url
+    # Instead of doing like above, let's get the url to go to from the get variable in the url. 
+    # To accomplish this I will pass the variable from the update_task.html template and set it equal to the success_url 
+    def form_valid(self, form):
+        next_url = self.request.POST.get('next_url')
+        if(next_url):
+            self.success_url = next_url
         else:
-            # If 'next' parameter is not present, redirect to a default URL
-            # return reverse('todo:update_task')  # Change 'todo:task_list' to your desired URL name
-            return "/todo/"
+            self.success_url = '/todo/'
+        return super().form_valid(form)
+
+
+# def edit_task(request,pk):
+#     task = get_object_or_404(Task,pk=pk)
+#     if request.method == 'POST':
+#         form = TaskForm(request.POST, instance=task)
+#         if form.is_valid():
+#             form.save()
+#             return redirect('/todo/')  # Redirect to success URL
+#     else:
+#         form = TaskForm(instance=task)
+
+#     return render(request, 'todo/update_task.html', {'form': form})
 
 
 # class TaskUpdateView(generic.edit.UpdateView):
@@ -156,7 +177,8 @@ class EditEntryView(generic.edit.UpdateView):
 #         # Specify the URL to redirect to after a successful form submission
 #         return redirect("/todo")  # Replace 'your_success_url_name' with your actual URL name
 
-@method_decorator(login_required, name="dispatch")
+
+# @method_decorator(login_required, name="dispatch")
 def search_contacts_and_companies(request):
     search_query = request.GET.get("search_query", "")
 
@@ -189,17 +211,21 @@ def search_contacts_and_companies(request):
 
     return JsonResponse({"suggestions": suggestions})
 
+
 # @method_decorator(login_required, name="dispatch")
 def complete_task(request, task_id):
     task = get_object_or_404(Task, pk=task_id)
     task.completed = True
     task.completed_at = datetime.now()
     task.save()
-    return redirect("/todo")
+    # below line brings back the user to the current page
+    return redirect(request.META.get("HTTP_REFERER"))
 
-@method_decorator(login_required, name="dispatch")
+
+# @method_decorator(login_required, name="dispatch")
 def delete_task(request, task_id):
     if request.method == "POST":
         task = get_object_or_404(Task, pk=task_id)
         task.delete()
-        return redirect("/todo")
+        # below line brings back the user to the current page
+        return redirect(request.META.get("HTTP_REFERER"))

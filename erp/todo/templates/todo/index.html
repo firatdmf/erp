@@ -1,101 +1,101 @@
 {% extends "base.html" %}
 {% block content %}
-{% load static %}
-{% load custom_tags %}
-{% load custom_filters %}
-{% block css%}
-<link rel="stylesheet" href="{% static 'todo/index.css' %}" />
-{% endblock %}
-
-
-<script src="{% static 'todo/index.js' %}"></script>
-
-
-
-<div class="todo_index_page">
-    <p><a href="{% url 'todo:task_report' %}">See Task Report</a></p>
-    <h1>Create Task</h1>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        {% comment %} <div class="search-container">
-            <input type="text" id="contact-company-search" name="contact_company_search"
-                placeholder="Search Contacts and Companies">
+    {% load static %}
+    {% load custom_tags %}
+    {% load custom_filters %}
+    {% load todo_tags %}
+    {% block css %}
+        <link rel="stylesheet" href="{% static 'todo/index.css' %}" />
+    {% endblock css %}
+    <script src="{% static 'todo/index.js' %}"></script>
+    <div class="todo_index_page">
+        <p>
+            <a href="{% url 'todo:task_report' %}">See Task Report</a>
+        </p>
+        <h1>Create Task</h1>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            {% comment %} <div class="search-container">
+            <input type="text" id="contact-company-search" name="contact_company_search" placeholder="Search Contacts and Companies">
             <div id="suggestions-dropdown"></div>
             <input type="hidden" name="contact_company_id" id="contact_company_id" value="">
         </div>
         <div class="selected_result">
 
             <span id="cancel_selected">X</span>
-        </div> {% endcomment %}
-        <button type="submit" onclick="">Create Task</button>
-    </form>
+            </div> {% endcomment %}
+            <button type="submit" onclick="">Create Task</button>
+        </form>
+        <!--  -->
+        <!--  -->
+        <h1>Tasks that are due</h1>
+        <div class="task_container">
+            <ul>
+                {% comment %} {% for task in tasks|dictsortreversed:"created_at" %} {% endcomment %}
+                {% for task in tasks|dictsortreversed:"due_date" %}
+                        {% if task.completed == False and task.due_date|is_past_due %}
+                            <li>
+                                <p>{{ days_since }}</p>
+                                <p>
+                                    <strong>{{ task.task_name }}</strong><br/>
+                                    <span>Due: {{ task.due_date }}</span>
+                                </p>
+                                {% if task.description %}<p>{{ task.description }}</p>{% endif %}
+                                {% if task.contact %}
+                                    <a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a>
+                                {% endif %}
+                                {% if task.company %}
+                                    <a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a>
+                                {% endif %}
+                            </li>
+                            <!-- Due date: {{task.due_date}}<br> -->
+                            <!-- <b>Created at:</b> {{task.created_at}} -->
+                            <!-- <br /> -->
+                            <form action="{% url 'todo:complete_task' task.id %}" method="post">
+                                {% csrf_token %}
+                                <button type="submit">Complete Task</button>
+                                <br />
+                            </form>
+                            <form action="{% url 'todo:delete_task' task.id %}" method="post">
+                                {% csrf_token %}
+                                <button type="submit">Delete Task</button>
+                                <br />
+                            </form>
+                            <a href="{% url 'todo:update_task' task.id %}">Update Task</a>
+                        {% endif %}
+                    {% empty %}
+                        <li>No tasks available.</li>
+                    {% endfor %}
 
-    <!--  -->
-
-    <!--  -->
-
-    <h1>Tasks that are due</h1>
-    <div class="task_container">
-        <ul>
-            {% for task in tasks|dictsortreversed:"created_at" %}
-            {% if task.completed == False and task.due_date|is_past_due %}
-            <li>
-                <p><strong>{{ task.task_name }}</strong>
-                    {% if task.days_since_due > 0 %}
-                    <span style="color:red">{{ task.days_since_due }}d</span>
-                    {% endif %}
-                </p>
-                {% if task.description %}
-                <p>{{ task.description }}</p>
-                {% endif %}
-                {% if task.contact %}
-                <a href="{% url 'crm:contact_detail' task.contact.id%}" style="color:blue;">{{ task.contact }}</a>
-                {% endif %}
-                {% if task.company %}
-                <a href="{% url 'crm:company_detail' task.company.id%}" style="color:blue;">{{ task.company }}</a>
-                {% endif %}
-            </li>
-            <!-- Due date: {{task.due_date}}<br> -->
-            <!-- <b>Created at:</b> {{task.created_at}} -->
-            <!-- <br /> -->
-            <form action="{% url 'todo:complete_task' task.id %}" method="post">
-                {% csrf_token %}
-                <button type="submit" style="color:green">Complete Task</button><br />
-            </form>
-            <form action="{% url 'todo:delete_task' task.id %}" method="post">
-                {% csrf_token %}
-                <button type="submit" style="color:red">Delete Task</button><br />
-            </form>
-            <a href="{% url 'todo:update_task' task.id %}">Update Task</a>
-            
-            {% endif %}
-            {% empty %}
-            <li>No tasks available.</li>
-            {% endfor %}
-        </ul>
-    </div>
-
-
-    <div class="report container">
-        <h1>Activity report</h1>
-        <!-- Show the latest completed tasks, and limit to 18 queries -->
-        <ul>
-            {% for task in tasks|dictsortreversed:"completed_at"|slice:"-18:" %}
-            {% if task.completed == True %}
-            <li>
-                <strong>{{ task.task_name }}</strong><br />
-                {{ task.description }}<br />
-                Task was due: {{task.due_date}}<br>
-                <b>Created at:</b> {{task.created_at}}
-                <br />
-                <b>Task was completed at: </b> {{task.completed_at}}
-            </li>
-            {% endif %}
-            {% empty %}
-            <li>You have not completed any tasks yet.</li>
-            {% endfor %}
-        </ul>
-    </div>
-</div>
-{% endblock %}
+                </ul>
+            </div><br/>
+            <p>------------------------</p>
+            {% task_component sort_type="dictsortreversed" page_type="dashboard" csrf_token=csrf_token %}
+            <p>------------------------</p>
+            <br/>
+            <div class="report container">
+                <h1>Activity report</h1>
+                <!-- Show the latest completed tasks, and limit to 18 queries -->
+                <ul>
+                    {% for task in tasks|dictsortreversed:"completed_at"|slice:"-18:" %}
+                        {% if task.completed == True %}
+                            <li>
+                                <strong>{{ task.task_name }}</strong>
+                                <br />
+                                {{ task.description }}
+                                <br />
+                                Task was due: {{ task.due_date }}
+                                <br>
+                                <b>Created at:</b> {{ task.created_at }}
+                                <br />
+                                <b>Task was completed at: </b> {{ task.completed_at }}
+                            </li>
+                        {% endif %}
+                    {% empty %}
+                        <li>You have not completed any tasks yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% endblock content %}

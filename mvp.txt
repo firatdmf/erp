@@ -8,3 +8,33 @@ Create notes to contacts - DONE
 Email notification for reminders (Tasks)
 
 Remember that the emphasis of an MVP is on simplicity and usability. You want to launch quickly to gather user feedback and iterate on your CRM based on real user experiences. As you receive feedback and understand user needs better, you can expand and enhance the CRM with additional features and integrations in future iterations. The key is to start with the core functionality that solves a specific problem for your target users.
+
+
+A business should be good in 3 things: Accounting, Marketing, Operations
+
+#1 Authentication:
+   -Simple
+   -Secure
+#2 Website:
+   -Be crystal clear on what you offer
+   -SEO
+   -Blog Component
+#3 CRM:
+   -Store prospect/client interactions
+   -To do
+#4 KPI Report:
+   -Production Efficiency
+   -Designs produced
+   -Breakeven Status
+   -Cash on hand
+   -Debt, Expenses
+#5 Accounting:
+   -Simplest Breakeven Format
+#6 Order Tracking:
+   -Just track
+#7 Inventory Management:
+   -Raw Materials
+   -Goods with status/stage
+#8 Supplier Management
+#9 Bill of Materials
+#10 Production Planning

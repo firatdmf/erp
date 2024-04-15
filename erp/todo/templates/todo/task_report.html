@@ -3,37 +3,37 @@
 {% load custom_filters %}
 {% block content %}
 <link rel="stylesheet" href="{% static 'todo/task_list.css' %}">
-<p><a href="{% url 'todo:index' %}"><--- Go to Contact List page</a></p>
+<p><a href="{% url 'todo:index' %}"><--- Go to Todo List page</a></p>
 <h1>Tasks that are in the future</h1>
 <div class="task_container">
     <ul>
-        {% for task in tasks|dictsortreversed:"created_at" %}
-        {% if task.due_date|is_past_due %}
+        {% for task in tasks|dictsortreversed:"due_date" %}
+        {% if task.due_date|days_since %}
         {% else %}
         <li>
             <!-- today's date: {% now "SHORT_DATETIME_FORMAT" %} -->
-            <p><strong>{{ task.task_name }}</strong> | Due: {{task.due_date}}
-                {% if task.days_since_due > 0 %}
-                <span style="color:red">{{ task.days_since_due }}d</span>
+            <p><strong>{{ task.task_name }}</strong> <br/>Due: {{ task.due_date }}
+                {% if task.due_date|days_since %}
+                <span>{{ task.due_date|days_since }}d</span>
                 {% endif %}
             </p>
             {% if task.description %}
             <p>{{ task.description }}</p>
             {% endif %}
             {% if task.contact %}
-            <a href="{% url 'crm:contact_detail' task.contact.id%}" style="color:blue;">{{ task.contact }}</a>
+            <a href="{% url 'crm:contact_detail' task.contact.id %}" >{{ task.contact }}</a>
             {% endif %}
             {% if task.company %}
-            <a href="{% url 'crm:company_detail' task.company.id%}" style="color:blue;">{{ task.company }}</a>
+            <a href="{% url 'crm:company_detail' task.company.id %}" >{{ task.company }}</a>
             {% endif %}
         </li>
         <form action="{% url 'todo:complete_task' task.id %}" method="post">
             {% csrf_token %}
-            <button type="submit" style="color:green">Complete Task</button><br />
+            <button type="submit" >Complete Task</button><br />
         </form>
         <form action="{% url 'todo:delete_task' task.id %}" method="post">
             {% csrf_token %}
-            <button type="submit" style="color:red">Delete Task</button><br />
+            <button type="submit" >Delete Task</button><br />
         </form>
         <a href="{% url 'todo:update_task' task.id %}">Update Task</a>
 
@@ -44,4 +44,4 @@
     </ul>
 </div>
 
-{% endblock %}
+{% endblock content %}

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-    {% comment %} This file includes the app title, user greeting if they are logged in, Signout | signin buttons|  {% endcomment %}
+    {% comment %} This file includes the app title, user greeting if they are logged in, Signout | signin buttons|
+    {% endcomment %}
     <head>
         {% load static %}
         <meta charset="UTF-8">
@@ -10,42 +11,142 @@
         <meta name="keywords" content="Manufacturing, ERP, Digital Transformation">
         <title>Automation Simple</title>
         <link rel="stylesheet" href="{% static 'erp/base.css' %}">
-        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        {% comment %} this is for favicon {% endcomment %}
+        <link rel="shortcut icon"
+              type="image/ico"
+              href="{% static 'erp/images/favicon.ico' %}">
+        {% comment %}
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        {% endcomment %}
+        <!-- font awesome 4.7 cdn -->
+        <link rel="stylesheet"
+              href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <script src="{% static 'erp/base.js' %}"></script>
     </head>
     <body>
+        {% comment %} Member model includes more information about the user. {% endcomment %}
         {% with member=user.member %}
-            <header>
-                <div class="line">
-                    <p>
-                        <span class="floatRight signoutButton"><a href="{% url 'authentication:signout' %}">Sign Out</a></span><a href="{% url 'index' %}">
-                            <h2>Automation Simple</h2>
+            {% comment %} <div class="gridContainer">
+        <div class="sideMenu">
+            <div class="menuContent menuContent1"></div>
+            <div class="menuContent menuContent2"></div>
+            <div class="menuContent menuContent3"></div>
+            <div class="menuContent menuContent4"></div>
+            </div> {% endcomment %}
+            <nav class="navbar">
+                <ul class="navbar-nav">
+                    <!-- <li class="logo">
+                    <a href="" class="nav-link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
+                            <path d="M320 192h17.1c22.1 38.3 63.5 64 110.9 64c11 0 21.8-1.4 32-4v4 32V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V339.2L280 448h56c17.7 0 32 14.3 32 32s-14.3 32-32 32H192c-53 0-96-43-96-96V192.5c0-16.1-12-29.8-28-31.8l-7.9-1c-17.5-2.2-30-18.2-27.8-35.7s18.2-30 35.7-27.8l7.9 1c48 6 84.1 46.8 84.1 95.3v85.3c34.4-51.7 93.2-85.8 160-85.8zm160 26.5v0c-10 3.5-20.8 5.5-32 5.5c-28.4 0-54-12.4-71.6-32h0c-3.7-4.1-7-8.5-9.9-13.2C357.3 164 352 146.6 352 128v0V32 12 10.7C352 4.8 356.7 .1 362.6 0h.2c3.3 0 6.4 1.6 8.4 4.2l0 .1L384 21.3l27.2 36.3L416 64h64l4.8-6.4L512 21.3 524.8 4.3l0-.1c2-2.6 5.1-4.2 8.4-4.2h.2C539.3 .1 544 4.8 544 10.7V12 32v96c0 17.3-4.6 33.6-12.6 47.6c-11.3 19.8-29.6 35.2-51.4 42.9zM432 128a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zm48 16a16 16 0 1 0 0-32 16 16 0 1 0 0 32z" />
+                        </svg>
+                        <span class="link-text">Fireship</span>
+                    </a>
+                </li> -->
+                    
+                    <li class="logo">
+                        <a href="{% url 'index' %}" class="nav-link">
+                            <span class="link-text logo-text">Automation Simple</span>
+                            <svg aria-hidden="true"
+                                 focusable="false"
+                                 data-prefix="fad"
+                                 data-icon="angle-double-right"
+                                 role="img"
+                                 xmlns="http://www.w3.org/2000/svg"
+                                 viewBox="0 0 448 512"
+                                 class="svg-inline--fa fa-angle-double-right fa-w-14 fa-5x">
+                                <g class="fa-group">
+                                <path fill="currentColor" d="M224 273L88.37 409a23.78 23.78 0 0 1-33.8 0L32 386.36a23.94 23.94 0 0 1 0-33.89l96.13-96.37L32 159.73a23.94 23.94 0 0 1 0-33.89l22.44-22.79a23.78 23.78 0 0 1 33.8 0L223.88 239a23.94 23.94 0 0 1 .1 34z" class="fa-secondary">
+                                </path>
+                                <path fill="currentColor" d="M41  5.89 273L280.34 409a23.77 23.77 0 0 1-33.79 0L224 386.26a23.94 23.94 0 0 1 0-33.89L320.11 256l-96-96.47a23.94 23.94 0 0 1 0-33.89l22.52-22.59a23.77 23.77 0 0 1 33.79 0L416 239a24 24 0 0 1-.11 34z" class="fa-primary">
+                                </path>
+                                </g>
+                            </svg>
                         </a>
-                    </p>
-                    <p>
-                        Welcome to the base page
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'index' %}" class="nav-link">
+                            <i class="fa fa-home fa-2x" aria-hidden="true"></i>
+                            <span class="link-text">Home</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'crm:index' %}" class="nav-link">
+                            {% comment %} <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
+                                <!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                                <path d="M320 192h17.1c22.1 38.3 63.5 64 110.9 64c11 0 21.8-1.4 32-4v4 32V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V339.2L280 448h56c17.7 0 32 14.3 32 32s-14.3 32-32 32H192c-53 0-96-43-96-96V192.5c0-16.1-12-29.8-28-31.8l-7.9-1c-17.5-2.2-30-18.2-27.8-35.7s18.2-30 35.7-27.8l7.9 1c48 6 84.1 46.8 84.1 95.3v85.3c34.4-51.7 93.2-85.8 160-85.8zm160 26.5v0c-10 3.5-20.8 5.5-32 5.5c-28.4 0-54-12.4-71.6-32h0c-3.7-4.1-7-8.5-9.9-13.2C357.3 164 352 146.6 352 128v0V32 12 10.7C352 4.8 356.7 .1 362.6 0h.2c3.3 0 6.4 1.6 8.4 4.2l0 .1L384 21.3l27.2 36.3L416 64h64l4.8-6.4L512 21.3 524.8 4.3l0-.1c2-2.6 5.1-4.2 8.4-4.2h.2C539.3 .1 544 4.8 544 10.7V12 32v96c0 17.3-4.6 33.6-12.6 47.6c-11.3 19.8-29.6 35.2-51.4 42.9zM432 128a16 16 0 1 0 -32 0 16 16 0 1 0 32 0zm48 16a16 16 0 1 0 0-32 16 16 0 1 0 0 32z" />
+                            </svg> {% endcomment %}
+                            <i class="fa fa-users fa-2x" aria-hidden="true"></i>
+                            <span class="link-text">CRM</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'todo:index' %}" class="nav-link">
+                            {% comment %} <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                                <!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                                <path d="M373 138.6c-25.2 0-46.3-17.5-51.9-41l0 0c-30.6 4.3-54.2 30.7-54.2 62.4l0 .2c47.4 1.8 90.6 15.1 124.9 36.3c12.6-9.7 28.4-15.5 45.5-15.5c41.3 0 74.7 33.4 74.7 74.7c0 29.8-17.4 55.5-42.7 67.5c-2.4 86.8-97 156.6-213.2 156.6S45.5 410.1 43 323.4C17.6 311.5 0 285.7 0 255.7c0-41.3 33.4-74.7 74.7-74.7c17.2 0 33 5.8 45.7 15.6c34-21.1 76.8-34.4 123.7-36.4l0-.3c0-44.3 33.7-80.9 76.8-85.5C325.8 50.2 347.2 32 373 32c29.4 0 53.3 23.9 53.3 53.3s-23.9 53.3-53.3 53.3zM157.5 255.3c-20.9 0-38.9 20.8-40.2 47.9s17.1 38.1 38 38.1s36.6-9.8 37.8-36.9s-14.7-49.1-35.7-49.1zM395 303.1c-1.2-27.1-19.2-47.9-40.2-47.9s-36.9 22-35.7 49.1c1.2 27.1 16.9 36.9 37.8 36.9s39.3-11 38-38.1zm-60.1 70.8c1.5-3.6-1-7.7-4.9-8.1c-23-2.3-47.9-3.6-73.8-3.6s-50.8 1.3-73.8 3.6c-3.9 .4-6.4 4.5-4.9 8.1c12.9 30.8 43.3 52.4 78.7 52.4s65.8-21.6 78.7-52.4z" />
+                            </svg> {% endcomment %}
+                            <i class="fa fa-check-circle-o fa-2x" aria-hidden="true"></i>
+                            <span class="link-text">To do</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'reports' %}" class="nav-link">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512">
+                                <!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                                <path d="M130 480c40.6 0 80.4-11 115.2-31.9L352 384l-224 0 0 96h2zM352 128L245.2 63.9C210.4 43 170.6 32 130 32h-2v96l224 0zM96 128l0-96H80C53.5 32 32 53.5 32 80v48h8c-22.1 0-40 17.9-40 40v16V328v16c0 22.1 17.9 40 40 40H32v48c0 26.5 21.5 48 48 48H96l0-96h8c26.2 0 49.4-12.6 64-32H456c69.3 0 135-22.7 179.2-81.6c6.4-8.5 6.4-20.3 0-28.8C591 182.7 525.3 160 456 160H168c-14.6-19.4-37.8-32-64-32l-8 0zM512 243.6v24.9c0 19.6-15.9 35.6-35.6 35.6c-2.5 0-4.4-2-4.4-4.4V212.4c0-2.5 2-4.4 4.4-4.4c19.6 0 35.6 15.9 35.6 35.6z" />
+                            </svg>
+                            <span class="link-text">Reports</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                                <!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.-->
+                                <path d="M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z" />
+                            </svg>
+                            <span class="link-text">Settings</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{% url 'authentication:signout' %}" class="nav-link">
+                            <i class="fa fa-sign-out fa-2x" aria-hidden="true"></i>
+                            <!-- <span class="link-text"><a href="{% url 'authentication:signout' %}">Sign Out</a></span> -->
+                            <span class="link-text floatRight signoutButton">Sign Out</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <main>
+                <header>
+                    <div class="line">
                         {% if member %}
-                            , {{ member.user.first_name|title }}
+                            <p>Welcome to the base page, {{ member.user.first_name|title }}!</p>
                         {% elif user %}
-                            , {{ user.first_name|title }}
+                            <p>Welcome to the base page, {{ user.first_name|title }}!</p>
                         {% endif %}
-                        {% if member.company_name %}We love, {{ member.company_name|upper }}{% endif %}
-                        !
+                        {% if member.company_name %}<p>We love, {{ member.company_name|upper }}!</p>{% endif %}
                         <span class="floatRight">{% now "F j, Y" %}</span>
-                    </p>
-                </div>
-                <nav>
+                    </div>
+                    {% comment %} <nav>
                     <ul>
-                        <li><a href="{% url 'crm:index' %}">CRM</a></li>
-                        <li><a href="{% url 'todo:index' %}">To do</a></li>
-                      </ul>
-                </nav>
-            </header>
-            {% block content %}
-            {% endblock content %}
-            <footer>
-                This is the footer.
-            </footer>
+                        <li>
+                            <a href="{% url 'crm:index' %}">CRM</a>
+                        </li>
+                        <li>
+                            <a href="{% url 'todo:index' %}">To do</a>
+                        </li>
+                    </ul>
+                    </nav> {% endcomment %}
+                </header>
+                {% block content %}
+                {% endblock content %}
+            </main>
+            {% comment %} <footer>
+            This is the footer.
+            </footer> {% endcomment %}
         {% endwith %}
+        {% comment %}
+        </div> {% endcomment %}
     </body>
 </html>

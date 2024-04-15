@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <p><a href="{% url 'todo:index' %}"><--- Go to Contact List page</a></p>
-<form method="post" action="{% url 'todo:update_task' task.id%}">
+{% comment %} {% if request.GET.my_variable %}
+    <p>The value of the variable is: {{ request.GET.my_variable }}</p>
+{% endif %} {% endcomment %}
+<form method="post" action="{% url 'todo:update_task' task.id %}">
     {% csrf_token %}
     {{ form.as_p }}
+    <input type="hidden" name="next_url" value="{{ request.GET.next_url }}">
     <button type="submit" class="btn btn-primary">Update</button>
   </form>
 
-{% endblock %}
+{% endblock content %}
   

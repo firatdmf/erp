@@ -39,3 +39,8 @@ button:hover{
 .completeTaskButton{
     color:green;
 }
+
+.whoWorksHere ul, .whoWorksHere li{
+    margin:0;
+    padding:0;
+}

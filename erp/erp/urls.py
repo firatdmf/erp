@@ -29,6 +29,8 @@ urlpatterns = [
     path('authentication/',include('authentication.urls')),
     path("todo/", include("todo.urls")),
     path("crm/", include("crm.urls")),
+    path("reports/",views.reports.as_view(),name="reports"),
+    path("reports/task_report",views.task_report.as_view(),name="task_report"),
     path('accounts/', include('django.contrib.auth.urls')),
     # path('static/<path:path>',serve),
 ]

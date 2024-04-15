@@ -1,73 +1,79 @@
-{% extends "base.html" %} {% block content %} {% load custom_filters %} 
-{% load static %} 
-{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
+{% extends "base.html" %} 
+{% block content %} 
+{% load custom_filters %} 
+{% load crm_tags %}
+{% load static %}
 
+{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
 {% block css %}
 <link rel="stylesheet" href="{% static 'crm/css/detailPages.css' %}" />
 {% endblock css %}
 
 <!-- below is for ajax so the page does not have to refresh when I add or delete notes -->
-{% block js %}
+{% comment %} {% block js %} {% endcomment %}
 {% comment %} <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {% endcomment %}
 {% comment %} <script src="{% static 'crm/js/detailPages.js' %}"></script> {% endcomment %}
-{% endblock js %}
+{% comment %} {% endblock js %} {% endcomment %}
 
 <p><a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a></p>
-<h1>Contact Details</h1>
-<p><strong>Name:</strong> {{ company.name }}</p>
+<h1>Company Details</h1>
+<p><strong>Company Name</strong> <br/>{{ company.name }}</p>
+{% if company.email %}
 <p><strong>Email:</strong> {{ company.email }}</p>
+{% endif %}
+{% if company.phone %}
 <p><strong>Phone:</strong> {{ company.phone }}</p>
+{% endif %}
+{% if company.address %}
 <p><strong>Address:</strong> {{ company.address }}</p>
+{% endif %}
+{% if company.city %}
 <p><strong>City:</strong> {{ company.city }}</p>
+{% endif %}
+{% if company.state %}
 <p><strong>State:</strong> {{ company.state }}</p>
+{% endif %}
+{% if company.zip_code %}
 <p><strong>Zip Code:</strong> {{ company.zip_code }}</p>
+{% endif %}
+{% if company.country %}
 <p><strong>Country:</strong> {{ company.country }}</p>
+{% endif %}
+{% if company.website %}
 <p><strong>Website:</strong> {{ company.website }}</p>
+{% endif %}
 
 <!-- Add other fields as needed -->
 <!-- Note submission form -->
 
 {% if contacts %}
+<div class="whoWorksHere">
 <h2>Contacts</h2>
 <ul>
   {% for contact in contacts %}
   <li>
     <a href="{% url 'crm:contact_detail' contact.id %}"
-      >{{ contact.name }} works here</a
-    >
+      >{{ contact.name }}</a> works here
   </li>
   {% endfor %}
 </ul>
 {% else %}
 <p>No contacts found for this company.</p>
 {% endif %}
-<h2>Add a Note</h2>
+</div>
+{% comment %} <h2>Add a Note</h2>
 <form method="post">
   {% csrf_token %} {{ note_form.as_p }}
   <button type="submit">Add Note</button>
-</form>
-<!-- <h2>Notes</h2>
-    <ul>
-        {% for note in notes %}
-        {% if note.modified_date == note.created_at%}
-        <li>{{ note.content }} ({{ note.created_at }})</li>
-        {% else %}
-        <li>{{ note.content }} ({{note.modified_date}})</li>
-        {% endif %}
-        <a href="{% url 'crm:update_note' note.id %}">Edit Note</a>
+</form> {% endcomment %}
 
-        {% empty %}
-        <li>No notes available.</li>
-        {% endfor %}
-    </ul> -->
-
-<h2>Notes</h2>
+{% comment %} <h2>Notes</h2>
 <ul>
   {% for note in notes|dictsortreversed:"modified_date" %}
   <li>
     {{ note.content }} ({% if note.modified_date %}{{ note.modified_date }}
     {% else %} {{ note.created_at }} {% endif %})
-    <a href="{% url 'crm:update_note' note.id %}">Edit Note</a>
+    <a href="{% url 'crm:update_note' note.id %}?next_url={{ request.path|urlencode }}">Edit Note</a>
     <!-- <a href="{% url 'crm:delete_note' note.id %}">Delete Note</a> -->
     <form
       action="{% url 'crm:delete_note' note.id %}"
@@ -82,22 +88,17 @@
   {% empty %}
   <li>No notes available.</li>
   {% endfor %}
-</ul>
+</ul> {% endcomment %}
 <h2>Add a Task</h2>
 <form method="post">
   {% csrf_token %} {{ task_form.as_p }}
   <button type="submit">Add Task</button>
 </form>
 <h2>Tasks</h2>
-{% for task in tasks|dictsort:"due_date" %}
 <ul>
-  {% comment %}
-  <p>Idon't know what's wrong {{task}}</p>
-  {% endcomment %} {% comment %} {% if task.completed == False and
-  task.due_date|is_past_due %} {% endcomment %}
-
-  <!-- {% if task.completed == False %} -->
-  <li class="taskComponent">
+{% for task in tasks|dictsortreversed:"due_date" %}
+ {% if task.completed == False %}
+   <li class="taskComponent">
     <p class="taskName">
       {{ task.task_name }}
     </p>
@@ -105,8 +106,12 @@
     <p class="taskDescription">{{ task.description }}</p>
     {% endif %}
     <p class="taskDueDate">
-      Due: {{ task.due_date }} {% if task.days_since_due > 0 %}
+      Due: {{ task.due_date }} 
+      {% comment %} {% if task.days_since_due > 0 %}
       <span class="daysDue">{{ task.days_since_due }}d</span>
+      {% endif %} {% endcomment %}
+      {% if task.due_date|days_since  %}
+      <span class="daysDue">{{ task.due_date|days_since }}d</span>
       {% endif %}
     </p>
     {% if task.contact %}
@@ -114,11 +119,7 @@
       >{{ task.contact }}</a
     >
     {% endif %} 
-    {% comment %} {% if task.company %}
-    <a href="{% url 'crm:company_detail' task.company.id %}" 
-      >{{ task.company }}</a
-    >
-    {% endif %} {% endcomment %}
+
     <form action="{% url 'todo:complete_task' task.id %}" method="post">
       {% csrf_token %}
       <input type="hidden" name="task_id" value="{{ task.id }}" />
@@ -126,16 +127,20 @@
     </form>
     <form action="{% url 'todo:delete_task' task.id %}" method="post">
       {% csrf_token %}
+      <input type="hidden" name="company_id" value="{{ company.id }}" />
       <button type="submit" class="deleteTaskButton">Delete Task</button><br />
     </form>
     <a
-      href="{% url 'todo:update_task' task.id %}?next={{ request.path|urlencode }}"
+      href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}"
       ><button>Update Task</button></a
     >
   </li>
 
   {% endif %} {% empty %}
   <li>No tasks available.</li>
+  {% endfor %}
 </ul>
-{% endfor %}
- {% endblock content %}
+{% comment %} {% greeting "Firat" %} {% endcomment %}
+{% comment %} The notes and tasks come from the views.py from crm app {% endcomment %}
+{% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
+{% endblock content %}

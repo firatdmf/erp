@@ -12,12 +12,14 @@ class Company(models.Model):
     email = models.EmailField(blank=True)
     backgroundInfo = models.CharField(max_length=400,verbose_name="Background info", blank=True,)
     phone = models.CharField(max_length=15, blank=True)
-    website = models.URLField(blank=True)
+    # website = models.URLField(blank=True)
+    website = models.CharField(max_length=200,blank=True)
     address = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
     zip_code = models.CharField(max_length=10, blank=True, verbose_name="Zip")
     country = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
@@ -44,6 +46,7 @@ class Contact(models.Model):
     )
     job_title = models.CharField(max_length=100, blank=True, verbose_name="Job Title")
     # notes = ArrayField(ArrayField(models.TextField(blank=True)))
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name

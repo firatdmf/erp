@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% load static %}
+{% load todo_tags %}
+{% block content %}
+<p>This is Task report page</p>
+<p>{{ my_variable }}</p>
+{% task_component sort_type='dictsort' csrf_token=csrf_token page_type="report" %}
+{% endblock content %}

@@ -5,9 +5,9 @@
     <ul>
         {% for company in companies %}
 
-        <li><a href="{% url 'crm:company_detail' company.id%}">{{company.name}}</a></li>
+        <li><a href="{% url 'crm:company_detail' company.id %}">{{ company.name }}</a></li>
         {% empty %}
         <li>No contacts available.</li>
         {% endfor %}
     </ul>
-{% endblock %}
+{% endblock content %}

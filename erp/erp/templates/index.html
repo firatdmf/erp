@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 {% load erp_component_views %}
 {% block content %}
@@ -6,5 +6,5 @@
     
   </div>
   <p>welcome to ERP HOME PAGE</p>
-  {% dashboard_component %}
+  {% dashboard_component csrf_token=csrf_token %}
 {% endblock content %}

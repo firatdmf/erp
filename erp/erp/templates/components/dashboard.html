@@ -1,12 +1,17 @@
 {% load static %}
+{% load todo_tags %}
 {% block css %}
-  <link rel="stylesheet" href="{% static 'erp/css/components/dashboard.css' %}" />
-{% endblock %}
+  <link rel="stylesheet"
+        href="{% static 'erp/css/components/dashboard.css' %}" />
+{% endblock css %}
 <div class="dashboardComponent">
   <div class="dashboardContainer">
     <div class="tasks">
-      <h3>Tasks that are due</h3>
-      <p>Task content</p>
+      <h3>
+        Tasks that are due <a target='_blank' title="Task Report" href="{% url 'task_report' %}"><i class="fa fa-external-link fa-xs" aria-hidden="true"></i></a>
+      </h3>
+      {% comment %} <p>Task content</p> {% endcomment %}
+      {% task_component sort_type="dictsortreversed" page_type="dashboard" csrf_token=csrf_token %}
     </div>
     <div class="activityReport">
       <h3>Activity Report</h3>

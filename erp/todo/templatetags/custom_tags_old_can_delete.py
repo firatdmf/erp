@@ -1,3 +1,4 @@
+# You can delete this tag
 # below is for creating custom components
 from django import template
 from django.template.loader import render_to_string

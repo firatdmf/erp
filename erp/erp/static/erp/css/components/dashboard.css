@@ -8,6 +8,6 @@
 
 .dashboardComponent .tasks,
 .dashboardComponent .activityReport {
-    border: 1px dashed black;
+    /* border: 1px dashed black; */
     padding: 0 20px;
 }

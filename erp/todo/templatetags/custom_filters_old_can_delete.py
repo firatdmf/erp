@@ -1,3 +1,4 @@
+# You can delete this
 from django import template
 from django.utils import timezone
 from datetime import datetime, date

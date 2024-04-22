@@ -4,6 +4,10 @@ from todo.models import Task
 register = template.Library()
 
 @register.simple_tag
+def update_task(task_id):
+    return render_to_string('todo/update_task.html',{'task_id':task_id})
+
+@register.simple_tag
 def task_component(sort_type,csrf_token,page_type):
     print(sort_type)
     tasks = Task.objects.all()

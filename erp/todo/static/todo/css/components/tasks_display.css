@@ -5,6 +5,8 @@
     border-radius: 15px;
 }
 
+
+
 .tasks_display_page .daysDueToday{
     color:rgb(46, 107, 49);
     padding:3px 6px;
@@ -12,13 +14,13 @@
     border-radius: 15px;
 }
 
-.tasks_display_page li{
+/* .tasks_display_page li{
     list-style-type: none;
-}
+} */
 .tasks_display_page button:hover{
     cursor: pointer;
 }
-.tasks_display_page .taskComponent{
+/* .tasks_display_page .taskComponent{
     padding:20px 20px;
     width: 15%;
     border-radius: 30px;
@@ -28,6 +30,25 @@
     line-height: 21px;
     border:0.5px solid;
     border-color: rgba(0, 0, 0, 0.6);
+} */
+.tasks_display_page .taskComponent{
+    background-color: #F8FAFC;
+    margin:10px 0;
+}
+
+.tasks_display_page .taskComponent a:hover {
+    text-decoration: underline;
+}
+.tasks_display_page ul {
+    border:1px dashed;
+}
+
+.tasks_display_page .task_buttons{
+    display: inline-flex;
+}
+
+.tasks_display_page .task_buttons > *{
+    margin:0 3px;
 }
 /* .taskName{
     font-weight: bold;

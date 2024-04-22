@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
     {% load static %}
-    {% load custom_tags %}
-    {% load custom_filters %}
+    {% comment %} {% load custom_tags %} {% endcomment %}
+    {% comment %} {% load custom_filters %} {% endcomment %}
+    {% load todo_filters %}
     {% load todo_tags %}
     {% block css %}
         <link rel="stylesheet" href="{% static 'todo/index.css' %}" />

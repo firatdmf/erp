@@ -1,6 +1,6 @@
 {% extends "base.html" %} 
 {% block content %} 
-{% load custom_filters %} 
+{% load todo_filters %} 
 {% load crm_tags %}
 {% load static %}
 
@@ -111,7 +111,7 @@
       <span class="daysDue">{{ task.days_since_due }}d</span>
       {% endif %} {% endcomment %}
       {% if task.due_date|days_since  %}
-      <span class="daysDue">{{ task.due_date|days_since }}d</span>
+      <span class="daysDue">{{ task.due_date|days_since }}</span>
       {% endif %}
     </p>
     {% if task.contact %}

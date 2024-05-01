@@ -3,7 +3,8 @@
 <p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
     <h1>Contact List</h1>
     <ul>
-        {% for company in companies %}
+        {% comment %} List the company names alphabetically {% endcomment %}
+        {% for company in companies|dictsort:"name" %}
 
         <li><a href="{% url 'crm:company_detail' company.id %}">{{ company.name }}</a></li>
         {% empty %}

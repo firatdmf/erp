@@ -5,7 +5,7 @@
   --text-primary: #D6D6D7;
 
 
-  --text-secondary: #D6D6D7;
+  --text-secondary: #ececec;
   /* --text-secondary: #fff; */
   --bg-primary: #23232e;
   /* below is from incognito */
@@ -27,14 +27,11 @@ body {
 
 main {
   /* we previously set the rem to be 16px so this will always be proportionate */
-  margin-left: 6em;
-  padding: 1rem 4rem;
+  margin-left: 5rem;
+  padding: 1rem;
 }
 
 .navbar {
-  top:0;
-  width:6rem;
-  height:100vh;
   /* matches with main element */
   /* width: 5rem;
   height: 100vh; */
@@ -57,7 +54,6 @@ main {
 .nav-item {
   width: 100%;
 }
-
 .nav-item:last-child {
   /* background: white; */
   /* will make the margin as big as possible pushing it all the way down */
@@ -66,39 +62,9 @@ main {
   /* align-self: flex-end; */
 }
 
-.nav-item .add-button{
-  position: relative;
-  overflow: visible;
-}
-
-.nav-item .add-button:hover + .add-expanded{
-  display: flex;
-}
-
-.nav-item .add-expanded{
-  position: absolute;
-  right:-60px;
-  /* display: none; */
-  height:15px;
-  width:50px;
-  background-color: black;
-}
-
-.nav-item .nav-separator {
-  padding:0.5rem 0; 
-}
-.nav-item .nav-separator-line{
-  border-bottom: 1px solid var(--text-primary);
-  /* text-align: center; */
-  margin:auto;
-  width: 70%;
-  /* height:30px; */
-}
 .nav-link {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
   /* matching the current width, making the items perfectly squared */
   height: 5rem;
   color: var(--text-primary);
@@ -109,40 +75,41 @@ main {
   overflow: hidden;
 }
 
-.nav-link:hover, .nav-link .active {
+.nav-link:hover {
   /* filter:grayscale(0%) opacity(1) hue-rotate(0.7); */
   filter: grayscale(0%) opacity(1);
   background: var(--bg-secondary);
-  /* color: var(--text-secondary); */
+  color: var(--text-secondary);
 }
-
 
 .link-text {
-  /* margin-left: 1rem; */
-  margin-top:0.5rem;
+  display: none;
+  margin-left: 1rem;
 }
 
-/* .nav-link svg, .nav-link i {
+.nav-link svg, .nav-link i {
   min-width: 2rem;
   margin: 0 1.5rem;
-} */
+}
 /* svg icon colors */
 /* path {
   fill: white;
 } */
 
-/* .navbar:hover {
+.navbar:hover {
   width: 16rem;
 }
 .navbar:hover .link-text {
-  display: flex;
-} */
+  display: block;
+}
 
 path {
-  fill:#D6D6D7;
+  fill: #ff7eee;
+  fill:green;
 }
 path:hover {
-  fill:#ffffff;
+  fill: #df49a6;
+  fill:green;
 }
 
 path,
@@ -171,22 +138,19 @@ a{
   width: 100%;
 }
 
-.logo-text{
-  font-size: 2rem;
-}
-
-/* .logo .logo-text, .logo i {
+.logo svg, .logo i {
   transform: rotate(0deg);
   transition: var(--transition-speed);
-} */
+  /* transition: 1000ms ease; */
+}
 
-/* .navbar:hover .logo .logo-text, .navbar:hover .logo i {
-  transform: rotate(360deg);
-} */
+.navbar:hover .logo svg, .navbar:hover .logo i {
+  transform: rotate(-540deg);
+}
 
 /* now let's make it responsive */
 /* small screens */
-/* @media only screen and (max-width: 600px) {
+@media only screen and (max-width: 600px) {
   .navbar {
     bottom: 0;
     width:100vw;
@@ -207,10 +171,10 @@ a{
   main{
     margin:0;
   }
-} */
+}
 
 /* large screens */
-/* @media only screen and (min-width: 600px) {
+@media only screen and (min-width: 600px) {
   .navbar {
     top: 0;
     width: 5rem;
@@ -224,4 +188,4 @@ a{
     display: inline;
     transition: opacity var(--transition-speed);
   }
-} */
+}

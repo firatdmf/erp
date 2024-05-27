@@ -9,7 +9,7 @@ def update_task(task_id):
 
 @register.simple_tag
 def task_component(sort_type,csrf_token,page_type):
-    print(sort_type)
+    # print(sort_type)
     tasks = Task.objects.all()
     return render_to_string('todo/components/tasks_display.html', {
         'tasks':tasks,

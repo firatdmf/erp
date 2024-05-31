@@ -17,7 +17,14 @@
 
 <p><a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a></p>
 <h1>Company Details</h1>
-<p><strong>Company Name</strong> <br/>{{ company.name }}</p>
+{% comment %} <form action="{% url 'crm:delete_company' company.id %}" method="post">
+  {% csrf_token %}
+  <input type="hidden" name="company_id" value="{{ company.id }}" />
+  <button type="submit">Delete Company</button>
+  <br />
+</form> {% endcomment %}
+
+<p><strong>Company Name</strong> <br/>{{ company.name }} + {{company.id}}</p>
 {% if company.email %}
 <p><strong>Email:</strong> {{ company.email }}</p>
 {% endif %}
@@ -143,4 +150,5 @@
 {% comment %} {% greeting "Firat" %} {% endcomment %}
 {% comment %} The notes and tasks come from the views.py from crm app {% endcomment %}
 {% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
+
 {% endblock content %}

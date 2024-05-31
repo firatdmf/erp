@@ -234,3 +234,28 @@ class DeleteNoteView(generic.View):
                 pass
         # Redirect back to the same page
         return redirect(request.META.get("HTTP_REFERER"))
+    
+
+def delete_company(request, company_id):
+    if request.method == "POST":
+        company = get_object_or_404(Company, pk=company_id)
+        company.delete()
+        # below line brings back the user to the current page
+        return redirect(request.META.get("HTTP_REFERER"))
+    
+
+class DeleteCompanyView(generic.View):
+    # def post(self, request, pk, *args, **kwargs):
+    #     note = get_object_or_404(Note, pk=pk)
+    #     note.delete()
+    #     return JsonResponse({"message": "Note deleted successfully."})
+    def post(self, request, *args, **kwargs):
+        company_id = request.POST.get("company_id")
+        if company_id:
+            try:
+                company = Company.objects.get(pk=company_id)
+                company.delete()
+            except Company.DoesNotExist:
+                pass
+        # Redirect back to the same page
+        return redirect(request.META.get("HTTP_REFERER"))

@@ -18,32 +18,51 @@
       <nav class="navbar">
         <ul class="navbar-nav">
           <li class="logo">
-            <a href="{% url 'index' %}" class="nav-link">
-              <span class="link-text logo-text">D</span>
-              {% comment %} <svg aria-hidden="true" focusable="false" data-prefix="fad" data-icon="angle-double-right" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" class="svg-inline--fa fa-w-14 fa-5x">
-                <g class="fa-group">
-                  <path fill="currentColor" d="M224 273L88.37 409a23.78 23.78 0 0 1-33.8 0L32 386.36a23.94 23.94 0 0 1 0-33.89l96.13-96.37L32 159.73a23.94 23.94 0 0 1 0-33.89l22.44-22.79a23.78 23.78 0 0 1 33.8 0L223.88 239a23.94 23.94 0 0 1 .1 34z" class="fa-secondary"></path>
-                  <path fill="currentColor" d="M41  5.89 273L280.34 409a23.77 23.77 0 0 1-33.79 0L224 386.26a23.94 23.94 0 0 1 0-33.89L320.11 256l-96-96.47a23.94 23.94 0 0 1 0-33.89l22.52-22.59a23.77 23.77 0 0 1 33.79 0L416 239a24 24 0 0 1-.11 34z" class="fa-primary"></path>
-                </g>
-              </svg> {% endcomment %}
+            <a href="{% url 'index' %}" class="nav-link"><span class="link-text logo-text">D</span></a>
+          </li>
+          <li class="nav-item" id="searchButton">
+            <a class="nav-link">
+              <i class="fa fa-solid fa-search fa-2x"></i>
+              <span class="link-text" id="searchButton">Search</span>
             </a>
           </li>
-          <li class="nav-item">
-            <a href="#search" class="nav-link">
-                <i class="fa fa-solid fa-search fa-2x"></i>
-              <span class="link-text">Search</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a href="#add" class="nav-link add-button">
+
+          <div class="overlay" id="searchOverlay">
+            <div class="overlayContent">
+              <input type="text" name="searchInput" id="searchInput" placeholder="Search for a company or contact..."/>
+              <div class="searchResults"></div>
+            </div>
+          </div>
+
+          <li class="nav-item" id="addButton">
+            <a href="#add" class="nav-link">
               <i class="fa fa-plus fa-2x" aria-hidden="true"></i>
               <span class="link-text">Add</span>
-              {% comment %} <div class="add-expanded"></div> {% endcomment %}
             </a>
+            <div id="addExpanded">
+              <h2>Add new records</h2>
+              <div>
+                <ul>
+                  <li>
+                    <a href="{% url 'crm:create_contact' %}">Add Contact</a>
+                  </li>
+                  <li>
+                    <a href="{% url 'crm:create_company' %}">Add Company</a>
+                  </li>
+                  <li>
+                    <a href="{% url 'todo:index' %}">Add Task</a>
+                  </li>
+                  <li>
+                    <a class="futureFeature">Add Order (Soon)</a>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </li>
+
           <li class="nav-item">
             <div class="nav-separator">
-                <div class="nav-separator-line"></div>
+              <div class="nav-separator-line"></div>
             </div>
           </li>
           <li class="nav-item">
@@ -70,18 +89,20 @@
               <span class="link-text">Reports</span>
             </a>
           </li>
-          <li class="nav-item">
-            <a href="#" class="nav-link">
-              <i class="fa fa-solid fa-gear fa-2x"></i>
-              <span class="link-text">Settings</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a href="{% url 'authentication:signout' %}" class="nav-link">
-              <i class="fa fa-sign-out fa-2x" aria-hidden="true"></i>
-              <span class="link-text floatRight signoutButton">Sign Out</span>
-            </a>
-          </li>
+          <div class="last2items">
+            <li class="nav-item">
+              <a href="#" class="nav-link">
+                <i class="fa fa-solid fa-gear fa-2x"></i>
+                <span class="link-text">Settings</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="{% url 'authentication:signout' %}" class="nav-link">
+                <i class="fa fa-sign-out fa-2x" aria-hidden="true"></i>
+                <span class="link-text floatRight signoutButton">Sign Out</span>
+              </a>
+            </li>
+          </div>
         </ul>
       </nav>
       <main>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-    {% load custom_filters %}
+    {% load todo_filters %}
     {% load crm_tags %}
     {% load static %}
     {% block css %}
@@ -64,8 +64,6 @@
         {% endfor %}
     </ul>
     <h2>Tasks</h2>
-    <ul>
-        <h2>Tasks</h2>
         <ul>
             {% for task in tasks|dictsortreversed:"created_at" %}
                 {% if task.completed == False and task.due_date|is_past_due %}
@@ -105,4 +103,6 @@
             <li>No tasks available.</li>
         {% endfor %}
     </ul>
+
+    <a href="{% url 'crm:update_contact' contact.id %}?next_url={{ request.path|urlencode }}">Edit Contact</a>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 {% comment %} <p>{{ request.GET.next_url }}</p> {% endcomment %}
-<form method="post" action="{% url 'crm:update_contact' contact.id %}">
+<form method="post" action="{% url 'crm:update_contact' note.id %}">
   {% csrf_token %}
   {{ form.as_p }}
   <input type="hidden" name="next_url" value="{{ request.GET.next_url }}">

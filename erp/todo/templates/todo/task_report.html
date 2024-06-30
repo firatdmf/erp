@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% load custom_filters %}
+{% load todo_filters %}
 {% block content %}
 <link rel="stylesheet" href="{% static 'todo/task_list.css' %}">
 <p><a href="{% url 'todo:index' %}"><--- Go to Todo List page</a></p>
@@ -13,9 +13,7 @@
         <li>
             <!-- today's date: {% now "SHORT_DATETIME_FORMAT" %} -->
             <p><strong>{{ task.task_name }}</strong> <br/>Due: {{ task.due_date }}
-                {% if task.due_date|days_since %}
                 <span>{{ task.due_date|days_since }}d</span>
-                {% endif %}
             </p>
             {% if task.description %}
             <p>{{ task.description }}</p>

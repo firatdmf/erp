@@ -8,9 +8,12 @@ from .forms import ContactForm, NoteForm, CompanyForm
 from todo.forms import TaskForm
 from datetime import datetime, date
 from todo.views import task_list
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
+from itertools import chain
+from operator import attrgetter
+from django.db.models import Value, CharField
 
 # to make it only viewable to users
 from django.utils.decorators import method_decorator
@@ -82,6 +85,18 @@ class contact_create(generic.edit.CreateView):
         return super().form_valid(form)
 
 
+class EditContactView(generic.edit.UpdateView):
+    model = Contact
+    form_class = ContactForm  # Your form class for editing the entry
+    template_name = "crm/update_note.html"  # Template for editing an entry
+
+    # success_url = "/crm/"  # URL to redirect after successfully editing an entry
+    def form_valid(self, form):
+        next_url = self.request.POST.get("next_url")
+        self.success_url = next_url
+        return super().form_valid(form)
+
+
 class company_create(generic.edit.CreateView):
     model = Company
     form_class = CompanyForm
@@ -97,7 +112,6 @@ class company_create(generic.edit.CreateView):
         if note_content:
             Note.objects.create(company=self.object, content=note_content)
 
-
         # Save the task if all required fields are provided
         task_name = form.cleaned_data.get("task_name")
         due_date = form.cleaned_data.get("due_date")
@@ -112,10 +126,9 @@ class company_create(generic.edit.CreateView):
         # return super().form_valid(form)
         return HttpResponseRedirect(self.get_success_url())
 
-    
     # taking the user to the page of the company just created
     def get_success_url(self) -> str:
-        return reverse_lazy('crm:company_detail', kwargs={'pk': self.object.pk})
+        return reverse_lazy("crm:company_detail", kwargs={"pk": self.object.pk})
 
 
 class contact_detail_view(generic.DetailView):
@@ -212,9 +225,10 @@ class EditNoteView(generic.edit.UpdateView):
     model = Note
     form_class = NoteForm  # Your form class for editing the entry
     template_name = "crm/update_note.html"  # Template for editing an entry
+
     # success_url = "/crm/"  # URL to redirect after successfully editing an entry
     def form_valid(self, form):
-        next_url = self.request.POST.get('next_url')
+        next_url = self.request.POST.get("next_url")
         self.success_url = next_url
         return super().form_valid(form)
 
@@ -234,7 +248,7 @@ class DeleteNoteView(generic.View):
                 pass
         # Redirect back to the same page
         return redirect(request.META.get("HTTP_REFERER"))
-    
+
 
 def delete_company(request, company_id):
     if request.method == "POST":
@@ -242,7 +256,7 @@ def delete_company(request, company_id):
         company.delete()
         # below line brings back the user to the current page
         return redirect(request.META.get("HTTP_REFERER"))
-    
+
 
 class DeleteCompanyView(generic.View):
     # def post(self, request, pk, *args, **kwargs):
@@ -259,3 +273,34 @@ class DeleteCompanyView(generic.View):
                 pass
         # Redirect back to the same page
         return redirect(request.META.get("HTTP_REFERER"))
+
+
+def search_contact(request):
+    search_text = request.POST.get("contactName")  # search is the name of the field
+    if search_text:
+        # i in front of contains makes it case insensitive
+        resultsContact = Contact.objects.filter(name__icontains=search_text).annotate(entry_type=Value('Contact',output_field=CharField()))
+        resultsCompany = Company.objects.filter(name__icontains=search_text).annotate(entry_type=Value('Company',output_field=CharField()))
+        results = sorted(chain(resultsContact,resultsCompany),key=attrgetter('created_at'),reverse=True)
+        # print(type(results[0]))
+        # print(results.model.__name__)
+        # print(results)
+        # baron = "bar"
+        # return JsonResponse({"foo":baron})
+        # return render(request,"components/test_component.html",{results})
+        # context = {"results": results}
+        # response = HttpResponse(context)
+        response = HttpResponse()
+        for item in results:
+            
+            print(item.entry_type)
+            if (item.entry_type == "Contact"):
+                url = reverse('crm:contact_detail',args=[item.id])
+                response.write(f'<a href="{url}"><p><i class="fa fa-user" aria-hidden="true"></i>{item.name}</p></a>'.format(item.id,item.name))
+            elif (item.entry_type == "Company"):
+                url = reverse('crm:company_detail',args=[item.id])
+                response.write(f'<a href="{url}"><p><i class="fa fa-briefcase" aria-hidden="true"></i>{item.name}</p></a>'.format(item.id,item.name))
+            # print(context)
+        return response
+    else:
+        return HttpResponse("")

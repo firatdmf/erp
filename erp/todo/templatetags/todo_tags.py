@@ -1,6 +1,8 @@
 from django import template
 from django.template.loader import render_to_string
 from todo.models import Task
+from .todo_filters import days_since,is_past_due
+
 register = template.Library()
 
 @register.simple_tag
@@ -11,6 +13,10 @@ def update_task(task_id):
 def task_component(sort_type,csrf_token,page_type):
     # print(sort_type)
     tasks = Task.objects.all()
+    if page_type=="report":
+        print("report")
+    elif page_type=="dashboard":
+        print("dashboard")
     return render_to_string('todo/components/tasks_display.html', {
         'tasks':tasks,
         'sort_type':sort_type,

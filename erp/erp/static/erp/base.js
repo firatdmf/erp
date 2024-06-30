@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   const addButton = document.getElementById("addButton");
   const addExpanded = document.getElementById("addExpanded");
+  const recent = document.querySelector(".recent");
 
   const addExpandedShow = () => {
     addExpanded.style.display = "block";
@@ -41,12 +42,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   searchInput.addEventListener("input", () => {
     const query = searchInput.value.trim();
+    if (query != "") {
+      recent.style.display = "none";
+    } else {
+      recent.style.display = "flex";
+    }
     if (query.length > 0) {
       performSearch(query);
     } else {
       searchResults.innerHTML = "";
     }
   });
-
- 
 });

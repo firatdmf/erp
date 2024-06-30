@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "crm",
     "jquery",
     "authentication",
+    "django_htmx",
     # below is for google auth
     # "django.contrib.sites",
     # "allauth",  # this allows us to do other authentications beside the standard one (like google)
@@ -103,6 +104,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
     # "allauth.account.middleware.AccountMiddleware",
 ]
 

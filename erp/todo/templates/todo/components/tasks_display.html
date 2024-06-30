@@ -1,58 +1,86 @@
-{% comment %} {% load custom_filters %}  {% endcomment %}
 {% load todo_filters %}
 {% load static %}
 {% block css %}
-  <link rel="stylesheet"
-        href="{% static 'todo/css/components/tasks_display.css' %}" />
+  <link rel="stylesheet" href="{% static 'todo/css/components/tasks_display.css' %}" />
 {% endblock css %}
 <div class="tasks_display_page">
-  {% comment %} <p>I am the component</p>
-  <h2>Task Report</h2> {% endcomment %}
-  {% comment %} {% if page_type == 'dashboard' %}
-<p>dashboard</p>
-  {% endif %} {% endcomment %}
+  {% comment %} {{ page_type }} {% endcomment %}
   <ul>
     {% for task in tasks|task_sort:sort_type %}
-      {% if not task.completed and task.due_date|is_past_due %}
-        <li class="taskComponent">
-          <p class="taskName">
-            {{ task.task_name }}
-            {% if task.contact %} - 
-              <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
-            {% elif task.company %} - 
-              <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
-            {% endif %}
-          </p>
-          {% if task.description %}<p class="taskDescription">{{ task.description }}</p>{% endif %}
-          <p class="taskDueDate">
-            Due: {{ task.due_date }}
-            {% if task.due_date|days_since == 'today' and page_type == "report" %}
-              <span class="daysDueToday">{{ task.due_date|days_since }}</span>
-            {% elif task.due_date|days_since == 'today' and page_type != "report" %}
-            {% elif task.due_date|days_since != 'today' and page_type != "report" %}
-            <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
-            {% else %}
-            <div class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></div>
-            {% endif %}
-          </p>
-          <div class="task_buttons">
-            <form action="{% url 'todo:complete_task' task.id %}" method="post">
-              {% csrf_token %}
-              <input type="hidden" name="task_id" value="{{ task.id }}" />
-              <button type="submit" class="completeTaskButton">Complete Task</button>
-            </form>
-            <a href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}">
-              <button>Update Task</button>
-            </a>
-            <form action="{% url 'todo:delete_task' task.id %}" method="post">
-              {% csrf_token %}
-              <input type="hidden" name="company_id" value="{{ company.id }}" />
-              <button type="submit" class="deleteTaskButton">Delete Task</button>
-              <br />
-            </form>
-          </div>
-          
-        </li>
+      {% if page_type == "dashboard" %}
+        {% if not task.completed and task.due_date|is_past_due %}
+          <li class="taskComponent">
+            <p class="taskName">
+              {{ task.task_name }}
+              {% if task.contact %} - 
+                <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
+              {% elif task.company %} - 
+                <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
+              {% endif %}
+            </p>
+            {% if task.description %}<p class="taskDescription">{{ task.description }}</p>{% endif %}
+            <p class="taskDueDate">
+              Due: {{ task.due_date }}
+              {% if task.due_date|days_since == 'today' %}
+                <span class="daysDueToday">{{ task.due_date|days_since }}</span>
+              {% elif task.due_date|days_since != 'today' %}
+                <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
+              {% endif %}
+            </p>
+            <div class="task_buttons">
+              <form action="{% url 'todo:complete_task' task.id %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="task_id" value="{{ task.id }}" />
+                <button type="submit" class="completeTaskButton">Complete Task</button>
+              </form>
+              <a href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}">
+                <button>Update Task</button>
+              </a>
+              <form action="{% url 'todo:delete_task' task.id %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="company_id" value="{{ company.id }}" />
+                <button type="submit" class="deleteTaskButton">Delete Task</button>
+                <br />
+              </form>
+            </div>
+          </li>
+        {% endif %}
+      {% elif page_type == "report" %}
+        {% if not task.completed %}
+          <li class="taskComponent">
+            <p class="taskName">
+              {{ task.task_name }}
+              {% if task.contact %} - 
+                <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
+              {% elif task.company %} - 
+                <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
+              {% endif %}
+            </p>
+            {% if task.description %}<p class="taskDescription">{{ task.description }}</p>{% endif %}
+            <p class="taskDueDate">
+              Due: {{ task.due_date }}
+              {% if task.due_date|days_since == 'today' %}
+                <span class="daysDueToday">{{ task.due_date|days_since }}</span>
+              {% endif %}
+            </p>
+            <div class="task_buttons">
+              <form action="{% url 'todo:complete_task' task.id %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="task_id" value="{{ task.id }}" />
+                <button type="submit" class="completeTaskButton">Complete Task</button>
+              </form>
+              <a href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}">
+                <button>Update Task</button>
+              </a>
+              <form action="{% url 'todo:delete_task' task.id %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="company_id" value="{{ company.id }}" />
+                <button type="submit" class="deleteTaskButton">Delete Task</button>
+                <br />
+              </form>
+            </div>
+          </li>
+        {% endif %}
       {% endif %}
     {% empty %}
       <li>No tasks available.</li>

@@ -144,6 +144,10 @@ main {
   max-width: 600px;
 }
 
+.navbar .overlay .recent h4{
+  color:rgba(0,0,0,0.4)
+}
+
 .navbar .overlay .searchResults {
   margin-top:20px;
 }
@@ -158,6 +162,13 @@ main {
   cursor: pointer;
 }
 
+.navbar .overlay .recent ul {
+  list-style-type: none;
+}
+
+.navbar .overlay .recent ul li {
+  margin-top:10px;
+}
 
 
 .nav-item .nav-separator {

@@ -32,5 +32,6 @@ urlpatterns = [
     path("reports/",views.reports.as_view(),name="reports"),
     path("reports/task_report",views.task_report.as_view(),name="task_report"),
     path('accounts/', include('django.contrib.auth.urls')),
+    path("testpage/",views.test_page.as_view(),name="test_page")
     # path('static/<path:path>',serve),
 ]

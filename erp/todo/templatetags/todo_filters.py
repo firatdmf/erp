@@ -22,6 +22,8 @@ def task_sort(tasks, sort_type):
         return tasks
     
 
+    
+
 @register.filter
 def is_past_due(due_date):
     # return due_date <= timezone.now().date()
@@ -32,6 +34,7 @@ def is_past_due(due_date):
     
 
 # Below calculates the number of days passed between the date provided and now
+# Below returns false if the due date is in the future
 @register.filter(expects_localtime=True)
 def days_since(value, arg=None):
     try:

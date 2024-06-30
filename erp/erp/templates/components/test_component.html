@@ -1,0 +1,25 @@
+{% load static %}
+<head>
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'erp/css/components/test_component.css' %}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  {% endblock %}
+</head>
+
+<div class="test_component">
+  <p>This is the test component</p>
+  <p>{{ context }}</p>
+
+  <label for="contactName">Contact name:</label>
+
+  <form>
+    {% csrf_token %}
+    <input type="text" hx-post="{% url 'crm:search_contact' %}" hx-target="#results" hx-trigger="keyup changed delay:500ms" name="contactName" placeholder="search for contacts" />
+    <i class="fa fa-solid fa-search"></i>
+  </form>
+
+  <div class="searchResults" id="results">
+    <p>This is where the results will be displayed</p>
+  </div>
+</div>
+<script src="{% static 'erp/htmx.min.js' %}" defer></script>

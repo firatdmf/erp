@@ -5,13 +5,15 @@
     {% load static %}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Simplest Automation Tool for Manufacturers" />
+    <meta name="description" content="Automation for Manufacturers" />
     <meta name="keywords" content="Manufacturing, ERP, Digital Transformation" />
     <title>DEMFIRAT</title>
     <link rel="stylesheet" href="{% static 'erp/css/base.css' %}" />
     <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
     <script src="{% static 'erp/base.js' %}"></script>
+    {% comment %} below is htmx {% endcomment %}
+    <script src="{% static 'erp/htmx.min.js' %}" defer></script>
   </head>
   <body>
     {% with member=user.member %}
@@ -29,8 +31,23 @@
 
           <div class="overlay" id="searchOverlay">
             <div class="overlayContent">
-              <input type="text" name="searchInput" id="searchInput" placeholder="Search for a company or contact..."/>
+              <input type="text" name="searchInput" id="searchInput" placeholder="Search for a company or contact..." />
               <div class="searchResults"></div>
+              <div class="recent">
+                <h4>Recent</h4>
+                <ul>
+                  {% for entry in last_five_entries %}
+                    <li>
+                      {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
+                      {% if entry.entry_type == 'Contact' %}
+                      <i class="fa fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                      {% elif entry.entry_type == 'Company' %}
+                      <i class="fa fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -116,7 +133,7 @@
             {% if member.company_name %}
               <p>We love, {{ member.company_name|upper }}!</p>
             {% endif %}
-            <span class="floatRight">{% now 'F j, Y' %}</span>
+            <span>{% now 'F j, Y' %}</span>
           </div>
         </header>
         {% block content %}

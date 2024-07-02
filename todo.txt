@@ -1,0 +1,2 @@
+update company info
+create new company shortcut from add

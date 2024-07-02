@@ -60,3 +60,12 @@ How to reset your db:
 $ rm -rf migrations
 $ manage.py makemigrations <appname>
 $ manage.py migrate --fake <appname>
+
+
+
+I removed the psycopg2 package from requirements file when I deployed because that only works in development
+For production you need psycopg2-binary
+
+
+--
+You need to run: "py manage.py collectstatic", so it builds the stylesheets and js to production

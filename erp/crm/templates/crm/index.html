@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
+{% load static %}
 
+{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
+{% block css %}
+<link rel="stylesheet" href="{% static 'crm/css/index.css' %}" />
+{% endblock css %}
 <h1>CRM Index</h1>
 <p class="crmMessage">{{ message }}</p>
 <ul>

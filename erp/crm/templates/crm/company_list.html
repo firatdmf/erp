@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
-    <h1>Contact List</h1>
+    <h1>Company List ({{ companies.count }})</h1>
     <ul>
         {% comment %} List the company names alphabetically {% endcomment %}
         {% for company in companies|dictsort:"name" %}

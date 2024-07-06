@@ -47,6 +47,7 @@ class contact_list(generic.ListView):
 
 class company_list(generic.ListView):
     model = Company
+    number_of_companies = len(Company.objects.all())
     template_name = "crm/company_list.html"
     context_object_name = "companies"
 
@@ -129,6 +130,17 @@ class company_create(generic.edit.CreateView):
     # taking the user to the page of the company just created
     def get_success_url(self) -> str:
         return reverse_lazy("crm:company_detail", kwargs={"pk": self.object.pk})
+    
+
+class EditCompanyView(generic.edit.UpdateView):
+    model = Company
+    form_class = CompanyForm
+    template_name = "crm/update_company.html"
+        # success_url = "/crm/"  # URL to redirect after successfully editing an entry
+    def form_valid(self, form):
+        next_url = self.request.POST.get("next_url")
+        self.success_url = next_url
+        return super().form_valid(form)
 
 
 class contact_detail_view(generic.DetailView):
@@ -248,22 +260,11 @@ class DeleteNoteView(generic.View):
                 pass
         # Redirect back to the same page
         return redirect(request.META.get("HTTP_REFERER"))
+    
 
-
-def delete_company(request, company_id):
-    if request.method == "POST":
-        company = get_object_or_404(Company, pk=company_id)
-        company.delete()
-        # below line brings back the user to the current page
-        return redirect(request.META.get("HTTP_REFERER"))
-
-
+# Below is not used
 class DeleteCompanyView(generic.View):
-    # def post(self, request, pk, *args, **kwargs):
-    #     note = get_object_or_404(Note, pk=pk)
-    #     note.delete()
-    #     return JsonResponse({"message": "Note deleted successfully."})
-    def post(self, request, *args, **kwargs):
+    def post(self,request, *args, **kwargs):
         company_id = request.POST.get("company_id")
         if company_id:
             try:
@@ -271,8 +272,20 @@ class DeleteCompanyView(generic.View):
                 company.delete()
             except Company.DoesNotExist:
                 pass
-        # Redirect back to the same page
         return redirect(request.META.get("HTTP_REFERER"))
+
+
+# This one is used
+def delete_company(request, pk):
+    if request.method == "POST":
+        company = get_object_or_404(Company, pk=pk)
+        company_name = company.name
+        company.delete()
+        # below line brings back the user to the current page
+        # return render(request,'crm/index.html',{"message":f"Company, {company_name}, has been successfully deleted."})
+        return redirect('crm:index')
+
+
 
 
 def search_contact(request):

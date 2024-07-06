@@ -36,7 +36,7 @@
               <div class="recent">
                 <h4>Recent</h4>
                 <ul>
-                  {% for entry in last_five_entries %}
+                  {% for entry in last_five_entities %}
                     <li>
                       {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
                       {% if entry.entry_type == 'Contact' %}

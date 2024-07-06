@@ -150,5 +150,11 @@
 {% comment %} {% greeting "Firat" %} {% endcomment %}
 {% comment %} The notes and tasks come from the views.py from crm app {% endcomment %}
 {% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
+<p><a href="{% url 'crm:update_company' company.id %}?next_url={{ request.path|urlencode}}">Update Company Information</a></p>
+
+<form action="{% url 'crm:delete_company' company.id %}" method="post">
+  {% csrf_token %}
+  <button type="submit" class="deleteButton">Delete Company</button><br />
+</form>
 
 {% endblock content %}

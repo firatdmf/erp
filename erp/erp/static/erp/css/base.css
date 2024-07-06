@@ -1,6 +1,11 @@
+@import url('https://fonts.cdnfonts.com/css/recoleta');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
 :root {
   font-size: 16px;
-  font-family: Georgia, "Times New Roman", Times, serif;
+  /* font-family: Georgia, "Times New Roman", Times, serif; */
+  font-family: "Fira Sans",sans-serif;
   /* --text-primary: #b6b6b6; */
   --text-primary: #d6d6d7;
 
@@ -34,6 +39,8 @@ main {
   top: 0;
   width: 6rem;
   height: 100vh;
+  /* font-family: 'Recoleta', sans-serif; */
+  font-family: 'Fira Sans', sans-serif;
   /* matches with main element */
   /* width: 5rem;
   height: 100vh; */
@@ -336,7 +343,7 @@ a {
   display: none;
   position: absolute;
   top:-60px;
-  right: -248px;
+  right: -221px;
   background-color:#f0fbfa;
   width:max-content;
   padding:10px 20px;

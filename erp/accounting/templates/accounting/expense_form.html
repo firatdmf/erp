@@ -1,0 +1,43 @@
+<!-- templates/expense_form.html -->
+{% extends 'base.html' %}
+{% block content %}
+  <h1>Report Expense</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Submit</button>
+  </form>
+
+  <script>
+    document.addEventListener('input', function (event) {
+      if (event.target.classList.contains('category-input')) {
+        let query = event.target.value
+        if (query.length > 2) {
+          fetch(`/category-search/?query=${query}`)
+            .then((response) => response.json())
+            .then((data) => {
+              let dropdown = document.createElement('div')
+              dropdown.classList.add('dropdown')
+              data.forEach((item) => {
+                let option = document.createElement('div')
+                option.textContent = item.name
+                option.addEventListener('click', () => {
+                  event.target.value = item.name
+                  dropdown.remove()
+                })
+                dropdown.appendChild(option)
+              })
+              document.body.appendChild(dropdown)
+            })
+        }
+      }
+    })
+    
+    document.addEventListener('click', function (event) {
+      let dropdown = document.querySelector('.dropdown')
+      if (dropdown && !event.target.classList.contains('category-input')) {
+        dropdown.remove()
+      }
+    })
+  </script>
+{% endblock %}

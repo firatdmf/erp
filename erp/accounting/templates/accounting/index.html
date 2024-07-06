@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+  {% load static %}
+  {% comment %} {% load custom_tags %} {% endcomment %}
+  {% comment %} {% load custom_filters %} {% endcomment %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'accounting/index.css' %}" />
+  {% endblock %}
+  <div class="accounting_index_page">
+    <p>This is your accounting page</p>
+    <a href="{% url 'accounting:report_expense' %}">Report Expense</a>
+    <p>Total expenses for the last 7 days: ${{ total_expenses }}</p>
+  </div>
+{% endblock %}

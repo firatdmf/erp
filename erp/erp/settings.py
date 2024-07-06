@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "erp",
     "todo",
     "crm",
+    "accounting",
     "jquery",
     "authentication",
     "django_htmx",
@@ -121,6 +122,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                # The below helps to put the view function variable global in all templates
                 'erp.context_processors.last_five_entities',
             ],
         },

@@ -5,14 +5,14 @@
     {% load static %}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Automation for Manufacturers" />
+    <meta name="description" content="DEMFIRAT is providing Digital Transformation and Industrial Automation services" />
     <meta name="keywords" content="Manufacturing, ERP, Digital Transformation" />
     <title>DEMFIRAT</title>
     <link rel="stylesheet" href="{% static 'erp/css/base.css' %}" />
     <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
     <script src="{% static 'erp/base.js' %}"></script>
-    {% comment %} below is htmx {% endcomment %}
+    {% comment %}below is htmx{% endcomment %}
     <script src="{% static 'erp/htmx.min.js' %}" defer></script>
   </head>
   <body>
@@ -40,9 +40,9 @@
                     <li>
                       {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
                       {% if entry.entry_type == 'Contact' %}
-                      <i class="fa fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                        <i class="fa fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
                       {% elif entry.entry_type == 'Company' %}
-                      <i class="fa fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                        <i class="fa fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
                       {% endif %}
                     </li>
                   {% endfor %}
@@ -85,19 +85,19 @@
           <li class="nav-item">
             <a href="{% url 'index' %}" class="nav-link">
               <i class="fa fa-home fa-2x" aria-hidden="true"></i>
-              <span class="link-text">Home</span>
+              <span class="link-text">Workspace</span>
             </a>
           </li>
           <li class="nav-item">
             <a href="{% url 'crm:index' %}" class="nav-link">
               <i class="fa fa-users fa-2x" aria-hidden="true"></i>
-              <span class="link-text">CRM</span>
+              <span class="link-text">Contacts</span>
             </a>
           </li>
           <li class="nav-item">
-            <a href="{% url 'todo:index' %}" class="nav-link">
-              <i class="fa fa-check-circle-o fa-2x" aria-hidden="true"></i>
-              <span class="link-text">To do</span>
+            <a href="{% url 'accounting:index' %}" class="nav-link">
+              <i class="fa fa-money fa-2x" aria-hidden="true"></i>
+              <span class="link-text">Accounting</span>
             </a>
           </li>
           <li class="nav-item">
@@ -108,7 +108,7 @@
           </li>
           <div class="last2items">
             <li class="nav-item">
-              <a href="#" class="nav-link">
+              <a href="{% url 'user_settings' %}" class="nav-link">
                 <i class="fa fa-solid fa-gear fa-2x"></i>
                 <span class="link-text">Settings</span>
               </a>

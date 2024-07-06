@@ -29,6 +29,9 @@ class reports(View):
     def get(self, request):
         return render(request, self.template_name)
 
+class user_settings(TemplateView):
+    template_name = "user_settings.html"
+
 
 class task_report(View):
     template_name = "task_report.html"

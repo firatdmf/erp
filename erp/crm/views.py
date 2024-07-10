@@ -289,7 +289,7 @@ def delete_company(request, pk):
 
 
 def search_contact(request):
-    search_text = request.POST.get("contactName")  # search is the name of the field
+    search_text = request.POST.get("searchInput")  # search is the name of the field
     if search_text:
         # i in front of contains makes it case insensitive
         resultsContact = Contact.objects.filter(name__icontains=search_text).annotate(entry_type=Value('Contact',output_field=CharField()))
@@ -306,7 +306,7 @@ def search_contact(request):
         response = HttpResponse()
         for item in results:
             
-            print(item.entry_type)
+            # print(item.entry_type)
             if (item.entry_type == "Contact"):
                 url = reverse('crm:contact_detail',args=[item.id])
                 response.write(f'<a href="{url}"><p><i class="fa fa-user" aria-hidden="true"></i>{item.name}</p></a>'.format(item.id,item.name))

@@ -1,0 +1,11 @@
+button:hover{
+    cursor: pointer;
+}
+
+.fa-search:hover{
+    cursor: pointer;
+}
+
+#searchInput{
+    width:5px;
+}

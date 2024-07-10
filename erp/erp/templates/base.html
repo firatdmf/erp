@@ -3,6 +3,7 @@
   {% comment %}This file includes the app title, user greeting if they are logged in, Signout | signin buttons|{% endcomment %}
   <head>
     {% load static %}
+    {% load erp_tags %}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="DEMFIRAT is providing Digital Transformation and Industrial Automation services" />
@@ -31,18 +32,20 @@
 
           <div class="overlay" id="searchOverlay">
             <div class="overlayContent">
-              <input type="text" name="searchInput" id="searchInput" placeholder="Search for a company or contact..." />
-              <div class="searchResults"></div>
+              {% comment %} <input type="text" name="searchInput" id="searchInput" placeholder="Search for a company or contact..." /> {% endcomment %}
+              {% comment %} <div class="searchResults"></div> {% endcomment %}
+              {% search_component csrf_token=csrf_token %}
               <div class="recent">
                 <h4>Recent</h4>
                 <ul>
+                 
                   {% for entry in last_five_entities %}
                     <li>
                       {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
                       {% if entry.entry_type == 'Contact' %}
-                        <i class="fa fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                        <a href="{% url 'crm:contact_detail' entry.id %}"><i class="fa fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}</a>
                       {% elif entry.entry_type == 'Company' %}
-                        <i class="fa fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                        <a href="{% url 'crm:company_detail' entry.id %}"><i class="fa fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}</a>
                       {% endif %}
                     </li>
                   {% endfor %}

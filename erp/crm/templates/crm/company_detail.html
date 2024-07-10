@@ -60,7 +60,7 @@
   {% for contact in contacts %}
   <li>
     <a href="{% url 'crm:contact_detail' contact.id %}"
-      >{{ contact.name }}</a> works here
+      ><i><b>{{ contact.name }}</b></i></a> works here
   </li>
   {% endfor %}
 </ul>

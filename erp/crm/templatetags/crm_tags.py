@@ -32,7 +32,7 @@ register = template.Library()
 @register.simple_tag
 def history_component(contact, company, note_form, csrf_token, current_url):
     if contact is None:
-        print("hello")
+        # print("hello")
         notes = Note.objects.filter(company=company)
         completed_tasks = Task.objects.filter(completed=True, company=company)
     else:

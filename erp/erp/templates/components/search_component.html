@@ -1,0 +1,24 @@
+{% load static %}
+<head>
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'erp/css/components/search_component.css' %}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <script src="{% static 'erp/js/search_component.js' %}" defer></script>
+  {% endblock %}
+</head>
+
+<div class="search_component">
+  {% comment %} <p>{{ context }}</p> {% endcomment %}
+
+  {% comment %} <label for="contactName">Contact name:</label> {% endcomment %}
+
+  <form>
+    {% csrf_token %}
+    <input type="text" hx-post="{% url 'crm:search_contact' %}" hx-target="#results" hx-trigger="keyup changed delay:500ms" name="searchInput" id="searchInput" placeholder="Search for a name, email, phone number, etc." />
+  </form>
+
+  <div class="searchResults" id="results">
+    <p>This is where the results will be displayed</p>
+  </div>
+</div>
+

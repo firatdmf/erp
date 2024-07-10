@@ -1,5 +1,12 @@
+{% extends 'base.html' %}
 {% load static %}
 {% load erp_tags %}
+{% block content %}
 <p>welcome</p>
 <p>{{ context }}</p>
-{% test_component csrf_token=csrf_token %}
+{% comment %} {% test_component csrf_token=csrf_token %} {% endcomment %}
+<p>-----------------------------</p>
+<br />
+<br /><br />
+{% search_component csrf_token=csrf_token %}
+{% endblock %}

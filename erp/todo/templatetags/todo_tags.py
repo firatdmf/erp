@@ -13,10 +13,10 @@ def update_task(task_id):
 def task_component(sort_type,csrf_token,page_type):
     # print(sort_type)
     tasks = Task.objects.all()
-    if page_type=="report":
-        print("report")
-    elif page_type=="dashboard":
-        print("dashboard")
+    # if page_type=="report":
+    #     print("report")
+    # elif page_type=="dashboard":
+    #     print("dashboard")
     return render_to_string('todo/components/tasks_display.html', {
         'tasks':tasks,
         'sort_type':sort_type,

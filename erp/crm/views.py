@@ -229,7 +229,7 @@ class company_detail_view(generic.DetailView):
         # If the form data is invalid, it adds the form with errors to the context and renders the page again with the form and errors displayed.        # You might want to add error handling or return an error message.
         context = self.get_context_data()
         context["note_form"] = note_form
-        context["note_form"] = task_form  # Add task form to context
+        context["task_form"] = task_form  # Add task form to context
         return self.render_to_response(context)
 
 

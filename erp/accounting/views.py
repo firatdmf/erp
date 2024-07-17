@@ -1,8 +1,9 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
-from django.views.generic import TemplateView
-from django.views import View
-from .models import Expense, ExpenseCategory
+
+# from django.views.generic import TemplateView
+from django.views import View, generic
+from .models import Expense, ExpenseCategory, Income, IncomeCategory
 from .forms import ExpenseForm
 from django.http import JsonResponse
 from django.db.models import Q
@@ -11,21 +12,48 @@ from django.utils import timezone
 from datetime import timedelta
 
 
-class index(TemplateView):
+class index(generic.TemplateView):
     template_name = "accounting/index.html"
 
     def get_context_data(self, **kwargs):
+        # Returns a dictionary representing the template context.
         context = super().get_context_data(**kwargs)
+        # July 15, 2024
         today = timezone.now().date()
-        seven_days_ago = today - timedelta(days=7)
-        total_expenses = (
-            Expense.objects.filter(date__gte=seven_days_ago).aggregate(
+        # 15
+        # July 1, 2024
+        beginning_of_month = today - timedelta(days=(today.day-1))
+        total_expense = (
+            Expense.objects.filter(date__gte=beginning_of_month,date__lte=today).aggregate(
                 total=Sum("amount")
             )["total"]
             or 0
         )
-        context["total_expenses"] = total_expenses
+        total_income = (
+            Income.objects.filter(date__gte=beginning_of_month).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or 0
+        )
+
+        # total_income = (Income.objects.filter)
+        context["total_expense"] = total_expense
+        context ["expense_form"] = ExpenseForm()
         return context
+    
+    def post(self, request, *args, **kwargs):
+        expense_form = ExpenseForm(request.POST)
+        
+        if expense_form.is_valid():
+            money_amount = request.POST.get("amount")
+            expense_form.save()
+            # return redirect("/accounting/")
+            response = HttpResponse()
+            response.write(f'{money_amount} has been saved as an expense')
+            return response
+        context = self.get_context_data()
+        context ["expense_form"] = ExpenseForm()
+        return self.render_to_response(context)
 
 
 class ExpenseView(View):
@@ -46,7 +74,7 @@ class ExpenseView(View):
                 date=form.cleaned_data["date"],
             )
             expense.save()
-            return redirect("accounting/expense_list")
+            return redirect("/accounting")
         return render(request, "accounting/expense_form.html", {"form": form})
 
 

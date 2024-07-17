@@ -1,0 +1,29 @@
+Accounting:
+    1. Show Bank Balance (Connect bank account)
+    2. Show Money Coming and Coming Out (Categorize expenses)
+    3. Calculate Burn
+    4. Calculate Runway
+    5. Calculate Growth rate
+    6. State Default Alive
+    7. Show Total Accounts Receivable, Accounts Payable
+    8. Generate Income Statement, Balance Sheet, and Cash Flow statements.
+
+Marketing:
+    1. Classify Contacts: Lead, Prospect, Client, and Dead.
+    2. Group Contacts: Distributors, Retailers, or a group defined by user. 
+    3. Add Relationships between contacts.
+    4. Task: Create Web Push Notification feature (Progressive Web App?)
+    5. Create Auto follow up for leads
+    6. Create Auto new design sender to clients
+    7. Provide reports: Count Number of new leads added daily, and how things are going
+    8. Remove frictions in adding data (select contact via typo tolerant search, add existing contacts from csv)
+
+Operations:
+    1. Add Customer Order: Quotation, Waiting on Confirmation, Confirmed, In production(sub operations), Ready for Shipment, Shipped (Closed), On Hold (Closed) 
+    2. Show what order status of a client, create a link for the order status share with client
+    3. See the stock and share with clients
+    4. Productions today
+    5. Raw Materials Inventory
+    6. Calculate efficiency (Measure current status first)
+    7. Apply Lean Six Sigma Principles — Make your IE degree talk
+

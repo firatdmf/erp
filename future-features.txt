@@ -1,1 +1,4 @@
 predict when clients usually order and send them an reminer email to place their order.
+
+HR:
+    1. Calculte Monthly Payroll

@@ -1,0 +1,156 @@
+[
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 1,
+    "fields": {
+      "name": "Advertising"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 2,
+    "fields": {
+      "name": "Car and Truck Expenses"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 3,
+    "fields": {
+      "name": "Comissions and Fees"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 4,
+    "fields": {
+      "name": "Contract Labor"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 5,
+    "fields": {
+      "name": "Depletion"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 6,
+    "fields": {
+      "name": "Depreciation"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 7,
+    "fields": {
+      "name": "Employee Benefit Programs"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 8,
+    "fields": {
+      "name": "Insurance"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 9,
+    "fields": {
+      "name": "Interest: Mortgage"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 10,
+    "fields": {
+      "name": "Interest: Other"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 11,
+    "fields": {
+      "name": "Legal and Professional Services"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 12,
+    "fields": {
+      "name": "Office Expense"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 13,
+    "fields": {
+      "name": "Pension and Profit Sharing"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 14,
+    "fields": {
+      "name": "Rent or Lease: Vehicle, Machinery, and Equipment"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 15,
+    "fields": {
+      "name": "Rent or Lease: Other Business Property"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 16,
+    "fields": {
+      "name": "Repairs and Maintenance"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 17,
+    "fields": {
+      "name": "Supplies"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 18,
+    "fields": {
+      "name": "Taxes and Licenses"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 19,
+    "fields": {
+      "name": "Travel"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 20,
+    "fields": {
+      "name": "Deductible Meals and Entertainment"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 20,
+    "fields": {
+      "name": "Utilities"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 20,
+    "fields": {
+      "name": "Wages"
+    }
+  }
+]

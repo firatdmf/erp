@@ -69,3 +69,16 @@ For production you need psycopg2-binary
 
 --
 You need to run: "py manage.py collectstatic", so it builds the stylesheets and js to production
+
+
+
+If your migrations get messed up do below
+'py manage.py migrate --fake accounting zero'
+and then:
+'py manage.py migrate accounting'
+
+
+to load initial data to database do below:
+
+create a fixture file. And then run:
+py manage.py loaddata app_name/file_name.json

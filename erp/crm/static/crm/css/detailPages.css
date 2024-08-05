@@ -48,3 +48,10 @@ button:hover{
     margin:0;
     padding:0;
 }
+
+.addContact {
+    cursor: pointer;
+}
+.addContactForm{
+    display: none;
+}

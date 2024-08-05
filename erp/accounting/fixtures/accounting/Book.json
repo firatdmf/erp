@@ -1,0 +1,5 @@
+[{
+    "model":"accounting.Book",
+    "pk":1,
+    "fields":{"name":"Karven"}
+}]

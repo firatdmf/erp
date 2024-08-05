@@ -1,0 +1,12 @@
+[
+  {
+    "model": "accounting.IncomeCategory",
+    "pk": 1,
+    "fields": { "name": "Revenue" }
+  },
+  {
+    "model": "accounting.IncomeCategory",
+    "pk": 2,
+    "fields": { "name": "Capital" }
+  }
+]

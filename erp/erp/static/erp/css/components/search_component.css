@@ -1,15 +1,15 @@
-button:hover{
+.search_component button:hover{
     cursor: pointer;
 }
 
 .search_component{
     position: relative;
 }
-.fa-search:hover{
+.search_component .fa-search:hover{
     cursor: pointer;
 }
 
-#searchInput{
+.search_component #searchInput{
     height:2rem;
     width:30%;
     font-size:1.5rem;

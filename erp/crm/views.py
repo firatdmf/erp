@@ -14,6 +14,9 @@ from django.http import JsonResponse
 from itertools import chain
 from operator import attrgetter
 from django.db.models import Value, CharField
+from django.utils import timezone
+from django.middleware.csrf import get_token
+
 
 # to make it only viewable to users
 from django.utils.decorators import method_decorator
@@ -130,13 +133,14 @@ class company_create(generic.edit.CreateView):
     # taking the user to the page of the company just created
     def get_success_url(self) -> str:
         return reverse_lazy("crm:company_detail", kwargs={"pk": self.object.pk})
-    
+
 
 class EditCompanyView(generic.edit.UpdateView):
     model = Company
     form_class = CompanyForm
     template_name = "crm/update_company.html"
-        # success_url = "/crm/"  # URL to redirect after successfully editing an entry
+
+    # success_url = "/crm/"  # URL to redirect after successfully editing an entry
     def form_valid(self, form):
         next_url = self.request.POST.get("next_url")
         self.success_url = next_url
@@ -260,11 +264,11 @@ class DeleteNoteView(generic.View):
                 pass
         # Redirect back to the same page
         return redirect(request.META.get("HTTP_REFERER"))
-    
+
 
 # Below is not used
 class DeleteCompanyView(generic.View):
-    def post(self,request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         company_id = request.POST.get("company_id")
         if company_id:
             try:
@@ -283,18 +287,24 @@ def delete_company(request, pk):
         company.delete()
         # below line brings back the user to the current page
         # return render(request,'crm/index.html',{"message":f"Company, {company_name}, has been successfully deleted."})
-        return redirect('crm:index')
-
-
+        return redirect("crm:index")
 
 
 def search_contact(request):
     search_text = request.POST.get("searchInput")  # search is the name of the field
     if search_text:
         # i in front of contains makes it case insensitive
-        resultsContact = Contact.objects.filter(name__icontains=search_text).annotate(entry_type=Value('Contact',output_field=CharField()))
-        resultsCompany = Company.objects.filter(name__icontains=search_text).annotate(entry_type=Value('Company',output_field=CharField()))
-        results = sorted(chain(resultsContact,resultsCompany),key=attrgetter('created_at'),reverse=True)
+        resultsContact = Contact.objects.filter(name__icontains=search_text).annotate(
+            entry_type=Value("Contact", output_field=CharField())
+        )
+        resultsCompany = Company.objects.filter(name__icontains=search_text).annotate(
+            entry_type=Value("Company", output_field=CharField())
+        )
+        results = sorted(
+            chain(resultsContact, resultsCompany),
+            key=attrgetter("created_at"),
+            reverse=True,
+        )
         # print(type(results[0]))
         # print(results.model.__name__)
         # print(results)
@@ -305,15 +315,86 @@ def search_contact(request):
         # response = HttpResponse(context)
         response = HttpResponse()
         for item in results:
-            
+
             # print(item.entry_type)
-            if (item.entry_type == "Contact"):
-                url = reverse('crm:contact_detail',args=[item.id])
-                response.write(f'<a href="{url}"><p><i class="fa fa-user" aria-hidden="true"></i>{item.name}</p></a>'.format(item.id,item.name))
-            elif (item.entry_type == "Company"):
-                url = reverse('crm:company_detail',args=[item.id])
-                response.write(f'<a href="{url}"><p><i class="fa fa-briefcase" aria-hidden="true"></i>{item.name}</p></a>'.format(item.id,item.name))
+            if item.entry_type == "Contact":
+                url = reverse("crm:contact_detail", args=[item.id])
+                response.write(
+                    f'<a href="{url}"><p><i class="fa fa-user" aria-hidden="true"></i>{item.name}</p></a>'.format(
+                        item.id, item.name
+                    )
+                )
+            elif item.entry_type == "Company":
+                url = reverse("crm:company_detail", args=[item.id])
+                response.write(
+                    f'<a href="{url}"><p><i class="fa fa-briefcase" aria-hidden="true"></i>{item.name}</p></a>'.format(
+                        item.id, item.name
+                    )
+                )
             # print(context)
         return response
     else:
         return HttpResponse("")
+
+
+def search_contacts_only(request):
+    csrf_token = get_token(request)
+    search_text = request.POST.get("searchInput")  # search is the name of the field
+    company_id = request.POST.get("company_id")
+    if search_text:
+        resultsContact = Contact.objects.filter(name__icontains=search_text).annotate(
+            entry_type=Value("Contact", output_field=CharField())
+        )
+        resultsContact = sorted(
+            chain(resultsContact), key=attrgetter("created_at"), reverse=True
+        )
+        response = HttpResponse()
+        for item in resultsContact:
+            url = reverse("crm:add_contact_to_company", kwargs={"company_pk":company_id,"contact_pk":item.pk})
+            response.write(f"<form hx-post='{url}' hx-target='.whoWorksHere'><input type='hidden' name='csrfmiddlewaretoken' value='{csrf_token}'>")
+            response.write(f"<input type='hidden' name='contact_id' value='{item.pk}'><button type='submit'>{item.name}</button></form>")
+            # response.write(f"<label for='contact' >{item.name}</label><input hx-trigger='click' value='{item.pk}' name='contact' readonly>")
+            # response.write('<input hx-post="{% url "crm:add_contact_to_company" %}"> type="hidden"')
+        return response
+    else:
+        return HttpResponse("<p>Contacts not found</p>")
+
+
+class add_contact_to_company(View):
+    
+    def post(self,request,company_pk,contact_pk):
+        csrf_token = get_token(request)
+        print("post request has been made")
+        print(request.POST.get("contact_id"))
+        print(company_pk,contact_pk)
+        contact = get_object_or_404(Contact, pk=contact_pk)
+        company = get_object_or_404(Company, pk=company_pk)
+        contact.company = company
+        contact.save()
+        response = HttpResponse()
+        all_contacts_at_this_company = Contact.objects.filter(company=company)
+        if(len(all_contacts_at_this_company)==0):
+            response.write("<p>No contacts found for this company.</p>")
+        else:
+            response.write("<ul>")
+            for contact_item in all_contacts_at_this_company:
+                url = reverse("crm:contact_detail", args=[contact_item.id])
+                url_for_company_delete = reverse("crm:delete_company_from_contact",args=[contact_item.id])
+                response.write(f"<li><a href='{url}'><i><b>{ contact_item.name }</b></i></a> works here</li>")
+                response.write(f"<form action='{url_for_company_delete}' method='post'><input type='hidden' name='csrfmiddlewaretoken' value='{csrf_token}'><button type='submit'>Delete this contact</button></form>")
+            response.write("</ul>")
+        return response
+        # below line brings back the user to the current page
+        # return render(request,'crm/index.html',{"message":f"Company, {company_name}, has been successfully deleted."})
+
+        # return redirect("crm:company_detail", pk=company_pk)
+
+class delete_company_from_contact(View):
+    def post(self,request,contact_pk):
+        print('Contact pk is:', contact_pk)
+        # contact_pk = request.POST.get("contact_pk")
+        contact = get_object_or_404(Contact,pk=contact_pk)
+        print(contact.name + ", is deleted.")
+        contact.company = None
+        contact.save()
+        return redirect(request.META.get("HTTP_REFERER"))

@@ -1,160 +1,198 @@
-{% extends "base.html" %} 
-{% block content %} 
-{% load todo_filters %} 
-{% load crm_tags %}
-{% load static %}
+{% extends 'base.html' %}
+{% block content %}
+  {% load todo_filters %}
+  {% load crm_tags %}
+  {% load static %}
 
-{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
-{% block css %}
-<link rel="stylesheet" href="{% static 'crm/css/detailPages.css' %}" />
-{% endblock css %}
+  {% comment %}Below is to use unique css for each file as in this case here{% endcomment %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'crm/css/detailPages.css' %}" />
+  {% endblock %}
+  {% block js %}
+    <script src="{% static 'crm/js/detailPages.js' %}" defer></script>
+  {% endblock %}
 
-<!-- below is for ajax so the page does not have to refresh when I add or delete notes -->
-{% comment %} {% block js %} {% endcomment %}
-{% comment %} <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {% endcomment %}
-{% comment %} <script src="{% static 'crm/js/detailPages.js' %}"></script> {% endcomment %}
-{% comment %} {% endblock js %} {% endcomment %}
+  <!-- below is for ajax so the page does not have to refresh when I add or delete notes -->
+  {% comment %} {% block js %}
+    {% endcomment %}
+    {% comment %} <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {% endcomment %}
+    {% comment %} <script src="{% static 'crm/js/detailPages.js' %}"></script> {% endcomment %}
+    {% comment %}
+  {% endblock %} {% endcomment %}
 
-<p><a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a></p>
-<h1>Company Details</h1>
-{% comment %} <form action="{% url 'crm:delete_company' company.id %}" method="post">
-  {% csrf_token %}
-  <input type="hidden" name="company_id" value="{{ company.id }}" />
-  <button type="submit">Delete Company</button>
-  <br />
-</form> {% endcomment %}
+  <p>
+    <a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a>
+  </p>
+  <h1>Company Details</h1>
+  {% comment %} <form action="{% url 'crm:delete_company' company.id %}" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="company_id" value="{{ company.id }}" />
+    <button type="submit">Delete Company</button>
+    <br />
+  </form> {% endcomment %}
 
-<p><strong>Company Name</strong> <br/>{{ company.name }}</p>
-{% if company.email %}
-<p><strong>Email:</strong> {{ company.email }}</p>
-{% endif %}
-{% if company.phone %}
-<p><strong>Phone:</strong> {{ company.phone }}</p>
-{% endif %}
-{% if company.address %}
-<p><strong>Address:</strong> {{ company.address }}</p>
-{% endif %}
-{% if company.city %}
-<p><strong>City:</strong> {{ company.city }}</p>
-{% endif %}
-{% if company.state %}
-<p><strong>State:</strong> {{ company.state }}</p>
-{% endif %}
-{% if company.zip_code %}
-<p><strong>Zip Code:</strong> {{ company.zip_code }}</p>
-{% endif %}
-{% if company.country %}
-<p><strong>Country:</strong> {{ company.country }}</p>
-{% endif %}
-{% if company.website %}
-<p><strong>Website:</strong> {{ company.website }}</p>
-{% endif %}
-
-<!-- Add other fields as needed -->
-<!-- Note submission form -->
-
-{% if contacts %}
-<div class="whoWorksHere">
-<h2>Contacts</h2>
-<ul>
-  {% for contact in contacts %}
-  <li>
-    <a href="{% url 'crm:contact_detail' contact.id %}"
-      ><i><b>{{ contact.name }}</b></i></a> works here
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<p>No contacts found for this company.</p>
-{% endif %}
-</div>
-{% comment %} <h2>Add a Note</h2>
-<form method="post">
-  {% csrf_token %} {{ note_form.as_p }}
-  <button type="submit">Add Note</button>
-</form> {% endcomment %}
-
-{% comment %} <h2>Notes</h2>
-<ul>
-  {% for note in notes|dictsortreversed:"modified_date" %}
-  <li>
-    {{ note.content }} ({% if note.modified_date %}{{ note.modified_date }}
-    {% else %} {{ note.created_at }} {% endif %})
-    <a href="{% url 'crm:update_note' note.id %}?next_url={{ request.path|urlencode }}">Edit Note</a>
-    <!-- <a href="{% url 'crm:delete_note' note.id %}">Delete Note</a> -->
-    <form
-      action="{% url 'crm:delete_note' note.id %}"
-      method="post"
-      class="delete-note-form"
-    >
-      {% csrf_token %}
-      <input type="hidden" name="note_id" value="{{ note.id }}" />
-      <button type="submit">Delete Note</button>
-    </form>
-  </li>
-  {% empty %}
-  <li>No notes available.</li>
-  {% endfor %}
-</ul> {% endcomment %}
-<h2>Add a Task</h2>
-<form method="post">
-  {% csrf_token %} {{ task_form.as_p }}
-  <button type="submit">Add Task</button>
-</form>
-<h2>Tasks</h2>
-<ul>
-{% for task in tasks|dictsortreversed:"due_date" %}
- {% if task.completed == False %}
-   <li class="taskComponent">
-    <p class="taskName">
-      {{ task.task_name }}
+  <p>
+    <strong>Company Name</strong> <br />{{ company.name }}
+  </p>
+  {% if company.email %}
+    <p>
+      <strong>Email:</strong> {{ company.email }}
     </p>
-    {% if task.description %}
-    <p class="taskDescription">{{ task.description }}</p>
+  {% endif %}
+  {% if company.phone %}
+    <p>
+      <strong>Phone:</strong> {{ company.phone }}
+    </p>
+  {% endif %}
+  {% if company.address %}
+    <p>
+      <strong>Address:</strong> {{ company.address }}
+    </p>
+  {% endif %}
+  {% if company.city %}
+    <p>
+      <strong>City:</strong> {{ company.city }}
+    </p>
+  {% endif %}
+  {% if company.state %}
+    <p>
+      <strong>State:</strong> {{ company.state }}
+    </p>
+  {% endif %}
+  {% if company.zip_code %}
+    <p>
+      <strong>Zip Code:</strong> {{ company.zip_code }}
+    </p>
+  {% endif %}
+  {% if company.country %}
+    <p>
+      <strong>Country:</strong> {{ company.country }}
+    </p>
+  {% endif %}
+  {% if company.website %}
+    <p>
+      <strong>Website:</strong> {{ company.website }}
+    </p>
+  {% endif %}
+
+  <!-- Add other fields as needed -->
+  <!-- Note submission form -->
+
+  <div class="whoWorksHere">
+    {% if contacts %}
+      <h2>Contacts</h2>
+
+      {% for contact in contacts %}
+        <ul>
+          <li>
+            <a href="{% url 'crm:contact_detail' contact.id %}"><i><b>{{ contact.name }}</b></i></a> <span>Works here</span>
+
+            <form action="{% url 'crm:delete_company_from_contact' contact.pk %}" method="POST">
+              {% csrf_token %}
+              <button type="submit">Delete this contact</button>
+            </form>
+          </li>
+        </ul>
+      {% endfor %}
+    {% else %}
+      <p>No contacts found for this company.</p>
     {% endif %}
-    <p class="taskDueDate">
-      Due: {{ task.due_date }} 
-      {% comment %} {% if task.days_since_due > 0 %}
-      <span class="daysDue">{{ task.days_since_due }}d</span>
-      {% endif %} {% endcomment %}
-      {% if task.due_date|days_since  %}
-      <span class="daysDue">{{ task.due_date|days_since }}</span>
+  </div>
+  <div class="addContacts">
+    <p class="addContact" onclick="openAddContactForm()">Click to add a contact</p>
+    <div class="addContactForm">
+      <form>
+        {% csrf_token %}
+        <input type="hidden" name="company_id" value="{{ company.id }}" />
+        <input type="text" hx-post="{% url 'crm:search_contacts_only' %}" hx-target="#results2" hx-trigger="keyup changed delay:500ms" name="searchInput" placeholder="Type contact name" />
+      </form>
+      <br />
+    </div>
+    <div id="results2" class="searchResults">
+      <p>Your results will be here</p>
+    </div>
+    <div id="results3">This will be your contacts</div>
+  </div>
+  {% comment %} <h2>Add a Note</h2>
+  <form method="post">
+    {% csrf_token %} {{ note_form.as_p }}
+    <button type="submit">Add Note</button>
+  </form> {% endcomment %}
+
+  {% comment %} <h2>Notes</h2>
+  <ul>
+    {% for note in notes|dictsortreversed:'modified_date' %}
+      <li>
+        {{ note.content }} ({% if note.modified_date %}
+          {{ note.modified_date }}
+        {% else %}
+          {{ note.created_at }}
+        {% endif %})
+        <a href="{% url 'crm:update_note' note.id %}?next_url={{ request.path|urlencode }}">Edit Note</a>
+        <!-- <a href="{% url 'crm:delete_note' note.id %}">Delete Note</a> -->
+        <form action="{% url 'crm:delete_note' note.id %}" method="post" class="delete-note-form">
+          {% csrf_token %}
+          <input type="hidden" name="note_id" value="{{ note.id }}" />
+          <button type="submit">Delete Note</button>
+        </form>
+      </li>
+    {% empty %}
+      <li>No notes available.</li>
+    {% endfor %}
+  </ul> {% endcomment %}
+  <h2>Add a Task</h2>
+  <form method="post">
+    {% csrf_token %} {{ task_form.as_p }}
+    <button type="submit">Add Task</button>
+  </form>
+  <h2>Tasks</h2>
+  <ul>
+    {% for task in tasks|dictsortreversed:'due_date' %}
+      {% if task.completed == False %}
+        <li class="taskComponent">
+          <p class="taskName">{{ task.task_name }}</p>
+          {% if task.description %}
+            <p class="taskDescription">{{ task.description }}</p>
+          {% endif %}
+          <p class="taskDueDate">
+            Due: {{ task.due_date }}
+            {% comment %} {% if task.days_since_due > 0 %}
+              <span class="daysDue">{{ task.days_since_due }}d</span>
+            {% endif %} {% endcomment %}
+            {% if task.due_date|days_since %}
+              <span class="daysDue">{{ task.due_date|days_since }}</span>
+            {% endif %}
+          </p>
+          {% if task.contact %}
+            <a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a>
+          {% endif %}
+
+          <form action="{% url 'todo:complete_task' task.id %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="task_id" value="{{ task.id }}" />
+            <button type="submit" class="completeTaskButton">Complete Task</button>
+          </form>
+          <form action="{% url 'todo:delete_task' task.id %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="company_id" value="{{ company.id }}" />
+            <button type="submit" class="deleteTaskButton">Delete Task</button><br />
+          </form>
+          <a href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}"><button>Update Task</button></a>
+        </li>
       {% endif %}
-    </p>
-    {% if task.contact %}
-    <a href="{% url 'crm:contact_detail' task.contact.id %}"
-      >{{ task.contact }}</a
-    >
-    {% endif %} 
+    {% empty %}
+      <li>No tasks available.</li>
+    {% endfor %}
+  </ul>
+  {% comment %} {% greeting 'Firat' %} {% endcomment %}
+  {% comment %}The notes and tasks come from the views.py from crm app{% endcomment %}
+  {% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
+  <p>
+    <a href="{% url 'crm:update_company' company.id %}?next_url={{ request.path|urlencode }}">Update Company Information</a>
+  </p>
 
-    <form action="{% url 'todo:complete_task' task.id %}" method="post">
-      {% csrf_token %}
-      <input type="hidden" name="task_id" value="{{ task.id }}" />
-      <button type="submit" class="completeTaskButton">Complete Task</button>
-    </form>
-    <form action="{% url 'todo:delete_task' task.id %}" method="post">
-      {% csrf_token %}
-      <input type="hidden" name="company_id" value="{{ company.id }}" />
-      <button type="submit" class="deleteTaskButton">Delete Task</button><br />
-    </form>
-    <a
-      href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}"
-      ><button>Update Task</button></a
-    >
-  </li>
-
-  {% endif %} {% empty %}
-  <li>No tasks available.</li>
-  {% endfor %}
-</ul>
-{% comment %} {% greeting "Firat" %} {% endcomment %}
-{% comment %} The notes and tasks come from the views.py from crm app {% endcomment %}
-{% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
-<p><a href="{% url 'crm:update_company' company.id %}?next_url={{ request.path|urlencode}}">Update Company Information</a></p>
-
-<form action="{% url 'crm:delete_company' company.id %}" method="post">
-  {% csrf_token %}
-  <button type="submit" class="deleteButton">Delete Company</button><br />
-</form>
-
-{% endblock content %}
+  <form action="{% url 'crm:delete_company' company.id %}" method="post">
+    {% csrf_token %}
+    <button type="submit" class="deleteButton">Delete Company</button><br />
+  </form>
+{% endblock %}

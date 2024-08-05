@@ -1,0 +1,23 @@
+[
+  {
+    "model": "accounting.CurrencyCategory",
+    "pk": 1,
+    "fields": {
+      "name": "USD"
+    }
+  },
+  {
+    "model": "accounting.CurrencyCategory",
+    "pk": 2,
+    "fields": {
+      "name": "EUR"
+    }
+  },
+  {
+    "model": "accounting.CurrencyCategory",
+    "pk": 3,
+    "fields": {
+      "name": "TRY"
+    }
+  }
+]

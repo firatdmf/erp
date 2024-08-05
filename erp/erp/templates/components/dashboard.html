@@ -4,11 +4,16 @@
   <link rel="stylesheet"
         href="{% static 'erp/css/components/dashboard.css' %}" />
 {% endblock css %}
+{% block js %}
+
+<script src="{% static 'erp/js/dashboard.js' %}"></script>
+{% endblock js %}
 <div class="dashboardComponent">
+  <h2>New leads added today: {{ number_of_leads_added }}</h2>
   <div class="dashboardContainer">
     <div class="tasks">
       <h3>
-        Tasks that are due <a target='_blank' title="Task Report" href="{% url 'task_report' %}"><i class="fa fa-external-link fa-xs" aria-hidden="true"></i></a>
+        Tasks that are due <a target='_blank' title="Task Report" ><i class="fa fa-external-link fa-xs" aria-hidden="true"></i></a>
       </h3>
       {% comment %} <p>Task content</p> {% endcomment %}
       {% task_component sort_type="dictsortreversed" page_type="dashboard" csrf_token=csrf_token %}
@@ -19,3 +24,4 @@
     </div>
   </div>
 </div>
+

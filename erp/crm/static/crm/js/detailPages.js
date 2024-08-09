@@ -1,40 +1,13 @@
 // console.log("Hello");
 
-openAddContactForm = ()=>{
-
+openAddContactForm = () => {
   document.querySelector(".addContactForm").style.display = "flex";
   document.querySelector(".addContact").style.display = "none";
+};
 
-}
-
-selectedContact = () =>{
-  print('hello')
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+selectedContact = () => {
+  print("hello");
+};
 
 // $(document).ready(function () {
 //     $(".delete-note-form").submit(function (event) {

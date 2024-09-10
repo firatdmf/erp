@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load accounting_tags %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" />
+{% endblock %}
+{% block content %}
+  <h4>﷽ <br /> Bismillah Ar-Rahman Ar-Raheem</h4>
+  <div class="BookSelection">   
+    <form method="post">
+      {% csrf_token %}
+      {{ book_selection_form }}
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+  {% if selected_book %}
+    <p>The book is: {{ selected_book }}</p>
+    {% book_component csrf_token=csrf_token selected_book=selected_book %}
+  {% else %}
+    <p>Please select a book first.</p>
+  {% endif %}
+{% endblock %}

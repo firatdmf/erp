@@ -1,0 +1,43 @@
+{% load static %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'accounting/cs/book_component.css' %}" />
+{% endblock %}
+{% block content %}
+  <div class="form_container">
+    <div class="expense_container">
+      <h2>Report an Expense</h2>
+      <form hx-post="{% url 'accounting:add_expense' %}" hx-target="#netResult" class="expense_form">
+        {% csrf_token %}
+        {{ expense_form.as_p }}
+        {% comment %} <input type="text" hx-post="{% url 'crm:search_contact' %}" hx-target="#results" hx-trigger="keyup changed delay:500ms" name="searchInput" id="searchInput" placeholder="Search for a name, email, phone number, etc." /> {% endcomment %}
+        <input type="hidden" value="expense" name="expenseOrIncome" />
+        <input type="submit" value="Submit" />
+      </form>
+      {% comment %} <p>Total expenses occured this month is: ${{ total_expense }}</p> {% endcomment %}
+    </div>
+    <div class="income_container">
+      <h2>Report an Income</h2>
+      <form hx-post="{% url 'accounting:add_income' %}" hx-target="#netResult" class="income_form">
+        {% csrf_token %}
+        {{ income_form.as_p }}
+        <input type="hidden" value="income" name="expenseOrIncome" />
+        <input type="submit" value="Submit" />
+      </form>
+      {% comment %} <p id="incomeResult">Total income this month is: ${{ total_income }}</p> {% endcomment %}
+    </div>
+    {% comment %} <div class="asset_container">
+      <h2>Claim an Asset</h2>
+    </div> {% endcomment %}
+  </div>
+  <p id="netResult">
+    Total Income this month: ${{ total_income }}<br />Total expenses occured this month is: ${{ total_expense }}<br />Net: ${{ total_net }}
+  </p>
+
+  <a href="{% url 'accounting:create_asset'  selected_book.id %}">Create an asset for {{ selected_book.name }}</a>
+  <div class="KPI">
+    <p><b>Burn: </b>$750</p>
+    <p><b>Runway: </b>25.3 months</p>
+    <p><b>Growth Rate: </b>33.33%</p>
+    <p><b>Default Alive: </b>True</p>
+  </div>
+{% endblock %}

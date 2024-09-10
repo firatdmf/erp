@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+
+{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
+{% block css %}
+<link rel="stylesheet" href="{% static 'operating/css/index.css' %}" />
+{% endblock css %}
+<h1>Operating Index</h1>
+<p class="OperatingMessage">{{ message }}</p>
+{% endblock content %}

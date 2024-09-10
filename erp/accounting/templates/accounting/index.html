@@ -1,38 +1,16 @@
 {% extends 'base.html' %}
+{% load static %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" />
+{% endblock %}
 {% block content %}
-  {% load static %}
-  {% comment %} {% load custom_tags %} {% endcomment %}
-  {% comment %} {% load custom_filters %} {% endcomment %}
-  {% block css %}
-    <link rel="stylesheet" href="{% static 'accounting/index.css' %}" />
-  {% endblock %}
   <div class="accounting_index_page">
-    <p>This is your accounting page</p>
-    {% comment %} <a href="{% url 'accounting:report_expense' %}">Report Expense</a> {% endcomment %}
-    <div class="form_container">
-      <div class="expense_container">
-        <h2>Report an Expense</h2>
-        <form hx-post="{% url 'accounting:add_expense' %}" hx-target="#netResult" class="expense_form">
-          {% csrf_token %}
-          {{ expense_form.as_p }}
-          {% comment %} <input type="text" hx-post="{% url 'crm:search_contact' %}" hx-target="#results" hx-trigger="keyup changed delay:500ms" name="searchInput" id="searchInput" placeholder="Search for a name, email, phone number, etc." /> {% endcomment %}
-          <input type="hidden" value="expense" name="expenseOrIncome">
-          <input type="submit" value="Submit"  />
-        </form>
-        {% comment %} <p>Total expenses occured this month is: ${{ total_expense }}</p> {% endcomment %}
-      </div>
-      <div class="income_container">
-        <h2>Report an Income</h2>
-        <form hx-post="{% url 'accounting:add_income' %}" hx-target="#netResult" class="income_form">
-          {% csrf_token %}
-          {{ income_form.as_p }}
-          <input type="hidden" value="income" name="expenseOrIncome">
-          <input type="submit" value="Submit" />
-
-        </form>
-        {% comment %} <p id="incomeResult">Total income this month is: ${{ total_income }}</p> {% endcomment %}
-      </div>
-    </div>
-    <p id="netResult">Total Income this month: ${{ total_income }}<br/>Total expenses occured this month is: ${{ total_expense }}<br/>Net: ${{ total_net }}</p>
+    <p>welcome to the accounting index</p>
+    <h3>Books</h3>
+    {% for book in books %}
+      <p>
+        <a href="{% url 'accounting:book_detail' book.id %}">{{ book.name }}</a>
+      </p>
+    {% endfor %}
   </div>
 {% endblock %}

@@ -1,12 +1,13 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse
 
 # from django.views.generic import TemplateView
+from django.urls import reverse_lazy
 from django.views import View, generic
-from .models import Expense, ExpenseCategory, Income, IncomeCategory
+from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset
 
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
-from .forms import ExpenseForm, IncomeForm
+from .forms import ExpenseForm, IncomeForm, AssetForm
 from django.http import JsonResponse
 from django.db.models import Q
 from django.db.models import Sum
@@ -20,157 +21,17 @@ class index(generic.TemplateView):
     template_name = "accounting/index.html"
 
     def get_context_data(self, **kwargs):
-        # Returns a dictionary representing the template context.
         context = super().get_context_data(**kwargs)
-        # July 15, 2024
-        today = timezone.localtime(timezone.now()).date()
-        # print(timezone.localtime(timezone.now()))
-        # 15
-        # July 1, 2024
-        beginning_of_month = today - timedelta(days=(today.day - 1))
-        total_expense = (
-            Expense.objects.filter(
-                date__gte=beginning_of_month, date__lte=today, currency=1
-            ).aggregate(total=Sum("amount"))["total"]
-            or 0
-        )
-
-        # Accounting for Euro
-        total_expense += decimal.Decimal(
-            "%.2f"
-            % CurrencyConverter().convert(
-                Expense.objects.filter(
-                    date__gte=beginning_of_month, date__lte=today, currency=2
-                ).aggregate(total=Sum("amount"))["total"]
-                or 0,
-                "EUR",
-                "USD",
-            )
-        )
-        # Accounting for TRY
-        total_expense += decimal.Decimal(
-            "%.2f"
-            % CurrencyConverter().convert(
-                Expense.objects.filter(
-                    date__gte=beginning_of_month, date__lte=today, currency=3
-                ).aggregate(total=Sum("amount"))["total"]
-                or 0,
-                "TRY",
-                "USD",
-            )
-        )
-
-        # Total income for USD
-        total_income = (
-            Income.objects.filter(
-                date__gte=beginning_of_month, date__lte=today,currency=1
-            ).aggregate(total=Sum("amount"))["total"]
-            or 0
-        )
-        # Accounting for Euro
-        total_income += decimal.Decimal(
-            "%.2f"
-            % CurrencyConverter().convert(
-                Income.objects.filter(
-                    date__gte=beginning_of_month, date__lte=today, currency=2
-                ).aggregate(total=Sum("amount"))["total"]
-                or 0,
-                "EUR",
-                "USD",
-            )
-        )
-        # income accounting for TRY
-        total_income += decimal.Decimal(
-            "%.2f"
-            % CurrencyConverter().convert(
-                Income.objects.filter(
-                    date__gte=beginning_of_month, date__lte=today, currency=3
-                ).aggregate(total=Sum("amount"))["total"]
-                or 0,
-                "TRY",
-                "USD",
-            )
-        )
-
-        # total_income = (Income.objects.filter)
-        context["total_expense"] = total_expense
-        context["total_income"] = total_income
-        # Currency 1 stands for dollar
-        context["expense_form"] = ExpenseForm()
-        context["income_form"] = IncomeForm()
-        context["total_net"] = total_income - total_expense
+        books = Book.objects.all()
+        context["books"] = books
+        print(books)
         return context
 
-    def post(self, request, *args, **kwargs):
-        currencies = ["USD", "EUR", "TRY"]
-        expense_form = ExpenseForm(request.POST)
-        income_form = IncomeForm(request.POST)
-        context = self.get_context_data()
-        if expense_form.is_valid() and request.POST["expenseOrIncome"] == "expense":
-            money_amount = request.POST.get("amount")
-            money_currency = request.POST.get("currency")
-            expense_form.save()
-            # return redirect("/accounting/")
-            response = HttpResponse()
-            if money_currency != 1:
-                money_amount = decimal.Decimal(
-                    "%.2f"
-                    % CurrencyConverter().convert(
-                        money_amount, currencies[int(money_currency) - 1], "USD"
-                    )
-                )
-                context["total_expense"] += money_amount
-            response.write(
-                # f'<p>Total Income this month: ${context["total_income"]}</p><p>Total expenses occured this month is: ${context["total_expense"]+money_amount}</p><p>Net: ${context["total_income"]-(context["total_expense"]+money_amount)}</p>'
-                f'<p>Total Income this month: ${context["total_income"]}</p><p>Total expenses occured this month is: ${context["total_expense"]}</p><p>Net: ${context["total_income"]-context["total_expense"]}</p>'
-            )
-            return response
-        if income_form.is_valid() and request.POST["expenseOrIncome"] == "income":
-            money_amount = request.POST.get("amount")
-            money_currency = request.POST.get("currency")
-            income_form.save()
-            response = HttpResponse()
-            if money_currency != 1:
-                money_amount = decimal.Decimal(
-                    "%.2f"
-                    % CurrencyConverter().convert(
-                        money_amount, currencies[int(money_currency) - 1], "USD"
-                    )
-                )
-                context["total_income"] += money_amount
-            response.write(
-                f'<p>Total Income this month: ${context["total_income"]}</p><p>Total expenses occured this month is: ${context["total_expense"]}</p><p>Net: ${context["total_income"]-context["total_expense"]}</p>'
-            )
-            return response
 
-        # Currency 1 stands for dollar
-        context = self.get_context_data()
-        context["expense_form"] = ExpenseForm()
-        context["income_form"] = IncomeForm()
-        return self.render_to_response(context)
-
-
-# class ExpenseView(View):
-#     def get(self, request):
-#         form = ExpenseForm()
-#         return render(request, "accounting/expense_form.html", {"form": form})
-
-#     def post(self, request):
-#         form = ExpenseForm(request.POST)
-#         if form.is_valid():
-#             category_name = form.cleaned_data["category_name"]
-#             if (category_name) != "":
-#                 category, created = ExpenseCategory.objects.get_or_create(
-#                     name=category_name
-#                 )
-#             expense = Expense(
-#                 category=category,
-#                 amount=form.cleaned_data["amount"],
-#                 date=form.cleaned_data["date"],
-#             )
-#             expense.save()
-#             return redirect("/accounting")
-#         return render(request, "accounting/expense_form.html", {"form": form})
+class BookDetail(generic.DetailView):
+    model = Book
+    template_name = "accounting/book_detail.html"
+    context_object_name = "Book"
 
 
 class CategorySearchView(View):
@@ -182,3 +43,55 @@ class CategorySearchView(View):
             categories = ExpenseCategory.objects.none()
         data = [{"id": category.id, "name": category.name} for category in categories]
         return JsonResponse(data, safe=False)
+
+
+class SalesView(generic.TemplateView):
+    template_name = "accounting/sales_report.html"
+
+
+class CreateAsset(generic.edit.CreateView):
+    model = Asset
+    form_class = AssetForm
+    template_name = "accounting/create_asset.html"
+    # success_url = "accounting/books/"
+
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        return {'book': book}
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pass the book to the template if needed
+        context['book'] = Book.objects.get(pk=self.kwargs.get('pk'))
+        return context
+    
+    def get_success_url(self) -> str:
+        return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
+
+    
+
+
+# class BookView(generic.TemplateView):
+#     template_name = "accounting/book_view.html"
+#     def get_context_data(self, **kwargs):
+#         # Returns a dictionary representing the template context.
+#         context = super().get_context_data(**kwargs)
+#         context["book_selection_form"] = BookSelectionForm()
+#         return context
+
+#     def post(self, request,*args,**kwargs):
+#         context = self.get_context_data()
+#         book_selection_form = BookSelectionForm(request.POST)
+#         response = HttpResponse()
+#         if(book_selection_form.is_valid()):
+#             book_id = request.POST.get("Book")
+#             book = get_object_or_404(Book,pk=book_id)
+
+#             print(book)
+#         context['selected_book'] = book
+#         response.write(context['selected_book'].name)
+#         # return render(request, "accounting/book_view.html", context)
+#         return redirect(f"/accounting/book/{book.pk}",context)

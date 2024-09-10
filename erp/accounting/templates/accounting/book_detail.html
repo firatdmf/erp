@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load accounting_tags %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" />
+{% endblock %}
+{% block content %}
+  <p>
+    <a href="{% url 'accounting:index' %}"><--- Accounting Index Page</a>
+  </p>
+  <p>The book name is: {{ Book.name }}</p>
+  {% book_component csrf_token=csrf_token selected_book=Book %}
+{% endblock %}

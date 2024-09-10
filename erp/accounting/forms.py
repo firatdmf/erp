@@ -1,5 +1,5 @@
 from django import forms
-from .models import Expense, Income
+from .models import Expense, Income, Book, Asset
 from datetime import date
 
 
@@ -13,6 +13,7 @@ class ExpenseForm(forms.ModelForm):
         # fields = '__all__'
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
+            "book": forms.HiddenInput()
         }
 
     def __init__(self, *args, **kwargs):
@@ -22,14 +23,16 @@ class ExpenseForm(forms.ModelForm):
         # This removed the empty label option and preselects the 1st option (USD)
         self.fields["currency"].empty_label = None
         self.fields["category"].empty_label = None
+        self.fields["book"].empty_label = None
 
 
 class IncomeForm(forms.ModelForm):
     class Meta:
         model = Income
-        fields = ["book","category", "amount", "currency", "description", "date" ]
+        fields = ["book","contact","company","category", "amount", "currency", "description", "date" ]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
+            "book": forms.HiddenInput()
         }
 
     def __init__(self, *args, **kwargs):
@@ -39,3 +42,22 @@ class IncomeForm(forms.ModelForm):
         # This removed the empty label option and preselects the 1st option (USD)
         self.fields["currency"].empty_label = None
         self.fields["category"].empty_label = None
+        self.fields["book"].empty_label = None
+
+class AssetForm(forms.ModelForm):
+    class Meta:
+        model = Asset
+        fields = '__all__'
+        # widgets = {
+        #     "book": forms.HiddenInput(),
+        # }
+    
+    def __init__(self,*args,**kwargs):
+        super(AssetForm, self).__init__(*args, **kwargs)
+        # self.fields["value"].label = "Value(USD)"
+        self.fields["book"].empty_label = None
+        self.fields["category"].empty_label = None
+
+
+# class BookSelectionForm(forms.Form):
+#     Book = forms.ModelChoiceField(queryset=Book.objects.all(), empty_label="Select a book")

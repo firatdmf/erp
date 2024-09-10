@@ -75,6 +75,10 @@
     </p>
   {% endif %}
 
+  {% if net_account %}
+    <p>The balance is: {{ net_account }}</p>
+  {% endif %}
+
   <!-- Add other fields as needed -->
   <!-- Note submission form -->
 
@@ -99,7 +103,7 @@
     {% endif %}
   </div>
   <div class="addContacts">
-    <p class="addContact" onclick="openAddContactForm()">Click to add a contact</p>
+    <p class="addContact" onclick="openAddContactForm()">Add a contact</p>
     <div class="addContactForm">
       <form>
         {% csrf_token %}
@@ -109,9 +113,8 @@
       <br />
     </div>
     <div id="results2" class="searchResults">
-      <p>Your results will be here</p>
     </div>
-    <div id="results3">This will be your contacts</div>
+    <div id="results3"></div>
   </div>
   {% comment %} <h2>Add a Note</h2>
   <form method="post">

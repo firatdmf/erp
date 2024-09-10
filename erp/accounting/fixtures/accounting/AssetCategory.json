@@ -1,0 +1,44 @@
+[
+  {
+    "model": "accounting.AssetCategory",
+    "pk": 1,
+    "fields": {
+      "name": "Cash"
+    }
+  },
+  {
+    "model": "accounting.AssetCategory",
+    "pk": 2,
+    "fields": {
+      "name": "Merchandise Inventory"
+    }
+  },
+  {
+    "model": "accounting.AssetCategory",
+    "pk": 3,
+    "fields": {
+      "name": "Property"
+    }
+  },
+  {
+    "model": "accounting.AssetCategory",
+    "pk": 4,
+    "fields": {
+      "name": "Furniture"
+    }
+  },
+  {
+    "model": "accounting.AssetCategory",
+    "pk": 5,
+    "fields": {
+      "name": "Accounts Receivable"
+    }
+  },
+  {
+    "model": "accounting.AssetCategory",
+    "pk": 6,
+    "fields": {
+      "name": "Office Supplies"
+    }
+  }
+]

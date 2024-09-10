@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load accounting_tags %}
+{% block css %}
+  {% comment %} <link rel="stylesheet" href="{% static 'accounting/index.css' %}" /> {% endcomment %}
+{% endblock %}
+{% block content %}
+{% sales_report %}
+{% endblock %}

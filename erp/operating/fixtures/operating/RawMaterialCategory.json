@@ -1,0 +1,32 @@
+[
+  {
+    "model": "operating.RawMaterialCategory",
+    "pk": 1,
+    "fields": { "name": "fabric", "unit": "m" }
+  },
+  {
+    "model": "operating.RawMaterialCategory",
+    "pk": 2,
+    "fields": { "name": "yarn", "unit": "kg" }
+  },
+  {
+    "model": "operating.RawMaterialCategory",
+    "pk": 3,
+    "fields": { "name": "dye", "unit": "kg" }
+  },
+  {
+    "model": "operating.RawMaterialCategory",
+    "pk": 4,
+    "fields": { "name": "velvet", "unit": "mt" }
+  },
+  {
+    "model": "operating.RawMaterialCategory",
+    "pk": 5,
+    "fields": { "name": "crystal", "unit": "piece" }
+  },
+  {
+    "model": "operating.RawMaterialCategory",
+    "pk": 6,
+    "fields": { "name": "pearl", "unit": "piece" }
+  }
+]

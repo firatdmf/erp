@@ -1,2 +1,7 @@
-update company info
-create new company shortcut from add
+When you create a new company check if it already exists; typo tolerant search
+See all orders, Mustafa kafa
+Put feedback mechanism  
+auto follow up
+activity report
+contacts: show all together both
+all orders should have photos

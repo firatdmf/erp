@@ -82,3 +82,10 @@ to load initial data to database do below:
 
 create a fixture file. And then run:
 py manage.py loaddata app_name/file_name.json
+
+------------------------------------------------------
+To access a variable globally:
+erp.context_processors.py -> put into settings.py file -> into template variable
+
+anything you put there shows everywhere
+----------------------------------------------------------

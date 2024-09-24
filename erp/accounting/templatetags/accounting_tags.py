@@ -10,6 +10,7 @@ import decimal
 from currency_converter import CurrencyConverter
 from accounting.models import Expense, Income, Book
 from accounting.forms import ExpenseForm, IncomeForm
+import time
 
 register = template.Library()
 
@@ -25,8 +26,9 @@ def book_component(csrf_token,selected_book):
     context = {}
     today = timezone.localtime(timezone.now()).date()
     beginning_of_month = today - timedelta(days=(today.day - 1))
-
-
+    starting_time = time.time()
+    print("starting")
+    print("expenses dollar")
     # Calculate total expenses for the current month
     total_expense = (
         Expense.objects.filter(
@@ -34,7 +36,7 @@ def book_component(csrf_token,selected_book):
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
-    
+    print("expenses euro")
     # Accounting for Euro
     total_expense += decimal.Decimal(
         "%.2f"
@@ -47,7 +49,7 @@ def book_component(csrf_token,selected_book):
             "USD",
         )
     )
-    
+    print("expenses lira")
     # Accounting for TRY
     total_expense += decimal.Decimal(
         "%.2f"
@@ -62,13 +64,14 @@ def book_component(csrf_token,selected_book):
     )
 
     # Calculate total income for the current month
+    print("income total dollar")
     total_income = (
         Income.objects.filter(
             date__gte=beginning_of_month, date__lte=today, currency=1,book=selected_book
         ).aggregate(total=Sum("amount"))["total"]
         or 0
     )
-    
+    print("income total euro")
     # Accounting for Euro
     total_income += decimal.Decimal(
         "%.2f"
@@ -82,6 +85,7 @@ def book_component(csrf_token,selected_book):
         )
     )
     
+    print("income total lira")
     # Accounting for TRY
     total_income += decimal.Decimal(
         "%.2f"
@@ -95,6 +99,7 @@ def book_component(csrf_token,selected_book):
         )
     )
 
+    print("now putting all in context")
     # Populate context with calculated data
     context["total_expense"] = total_expense
     context["total_income"] = total_income
@@ -104,4 +109,7 @@ def book_component(csrf_token,selected_book):
     context["total_net"] = total_income - total_expense
     context["csrf_token"] = csrf_token
     context["selected_book"] = selected_book
-    return render_to_string('accounting/components/book_component.html',context)
+    ending_time = time.time()
+    print(f"Total time it took: {ending_time-starting_time}")
+    print("done")
+    return render_to_string('accounting/components/book_component.html',context) 

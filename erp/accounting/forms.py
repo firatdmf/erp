@@ -44,20 +44,6 @@ class IncomeForm(forms.ModelForm):
         self.fields["category"].empty_label = None
         self.fields["book"].empty_label = None
 
-class AssetForm(forms.ModelForm):
-    class Meta:
-        model = Asset
-        fields = '__all__'
-        # widgets = {
-        #     "book": forms.HiddenInput(),
-        # }
-    
-    def __init__(self,*args,**kwargs):
-        super(AssetForm, self).__init__(*args, **kwargs)
-        # self.fields["value"].label = "Value(USD)"
-        self.fields["book"].empty_label = None
-        self.fields["category"].empty_label = None
-
 
 # class BookSelectionForm(forms.Form):
 #     Book = forms.ModelChoiceField(queryset=Book.objects.all(), empty_label="Select a book")

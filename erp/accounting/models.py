@@ -138,8 +138,25 @@ class AssetCategory(models.Model):
     def __str__(self):
         return self.name
 
+class BankAccounts(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    # name = models.CharField(max_length=100)
+    name = models.CharField(max_length=6, blank=False, null=False)
+    # last_four_digits = models.DecimalField(max_digits=4, decimal_places=0,blank=True,null=True)
+    currency = models.ForeignKey(
+        CurrencyCategory,
+        on_delete=models.CASCADE,
+        blank=False,
+        null=False,
+        default = 1
+    )
+    balance = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.currency, self.name}"
 
 
+# Equity: Capital + Rev - Exp - Dividends
 # Cash, Land, Furniture, Accounts Receivable, Office Supplies
 class Asset(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
@@ -159,5 +176,18 @@ class Asset(models.Model):
     useful_life_in_months = models.DecimalField(max_digits=10, decimal_places=0,blank=True,null=True)
 
     def __str__(self):
-        return f"Book: {self.book.name}, Asset name: {self.name}"
+        return f"Book: {self.book.name}, Asset Category: {self.category}, Asset Name: {self.name}, Asset Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
     
+
+class Transaction(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    # 1 for addition, 0 for subtraction
+    operation = models.BooleanField()
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.ForeignKey(
+        CurrencyCategory,
+        on_delete=models.CASCADE,
+        blank=False,
+        null=False,
+        default = 1
+    )

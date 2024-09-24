@@ -3,6 +3,7 @@
   <link rel="stylesheet" href="{% static 'accounting/cs/book_component.css' %}" />
 {% endblock %}
 {% block content %}
+  <h4>﷽ <br /> Bismillah Ar-Rahman Ar-Raheem</h4>
   <div class="form_container">
     <div class="expense_container">
       <h2>Report an Expense</h2>
@@ -33,11 +34,19 @@
     Total Income this month: ${{ total_income }}<br />Total expenses occured this month is: ${{ total_expense }}<br />Net: ${{ total_net }}
   </p>
 
-  <a href="{% url 'accounting:create_asset'  selected_book.id %}">Create an asset for {{ selected_book.name }}</a>
+  <a href="{% url 'accounting:create_asset' selected_book.id %}">Create an asset for {{ selected_book.name }}</a>
   <div class="KPI">
-    <p><b>Burn: </b>$750</p>
-    <p><b>Runway: </b>25.3 months</p>
-    <p><b>Growth Rate: </b>33.33%</p>
-    <p><b>Default Alive: </b>True</p>
+    <p>
+      <b>Burn:</b>$750
+    </p>
+    <p>
+      <b>Runway:</b>25.3 months
+    </p>
+    <p>
+      <b>Growth Rate:</b>33.33%
+    </p>
+    <p>
+      <b>Default Alive:</b>True
+    </p>
   </div>
 {% endblock %}

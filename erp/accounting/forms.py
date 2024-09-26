@@ -47,3 +47,9 @@ class IncomeForm(forms.ModelForm):
 
 # class BookSelectionForm(forms.Form):
 #     Book = forms.ModelChoiceField(queryset=Book.objects.all(), empty_label="Select a book")
+
+
+class AssetForm(forms.ModelForm):
+    class Meta:
+        model = Asset
+        fields = '__all__'

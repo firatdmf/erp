@@ -142,7 +142,7 @@ class AssetCategory(models.Model):
         return self.name
 
 
-class BankAccounts(models.Model):
+class CashAccounts(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     # name = models.CharField(max_length=100)
     name = models.CharField(max_length=6, blank=False, null=False)

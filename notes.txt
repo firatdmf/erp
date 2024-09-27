@@ -89,3 +89,6 @@ erp.context_processors.py -> put into settings.py file -> into template variable
 
 anything you put there shows everywhere
 ----------------------------------------------------------
+
+
+Model->Form->Template->View->Url

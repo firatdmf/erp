@@ -150,10 +150,12 @@ class CashAccounts(models.Model):
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
+
     balance = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
         return f"{self.currency, self.name}"
+    
 
 
 # Equity: Capital + Rev - Exp - Dividends

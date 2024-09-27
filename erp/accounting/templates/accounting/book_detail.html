@@ -10,5 +10,14 @@
     <a href="{% url 'accounting:index' %}"><--- Accounting Index Page</a>
   </p>
   <p>The book name is: {{ Book.name }}</p>
-  {% book_component csrf_token=csrf_token selected_book=Book %}
+  <ul>
+    <li>
+      <a href="{% url 'accounting:create_asset' Book.id %}">Create an asset</a>
+    </li>
+    <li>
+      <a href="{% url 'accounting:add_capital' Book.id %}">Add capital</a>
+    </li>
+  </ul>
+
+  {% comment %} {% book_component csrf_token=csrf_token selected_book=Book %} {% endcomment %}
 {% endblock %}

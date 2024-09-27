@@ -9,6 +9,7 @@ from .models import (
     Account,
     Sale,
     Asset,
+    Capital,
 )
 
 admin.site.register(CurrencyCategory)
@@ -20,5 +21,6 @@ admin.site.register(IncomeCategory)
 admin.site.register(Income)
 admin.site.register(Sale)
 admin.site.register(Asset)
+admin.site.register(Capital)
 
 # Register your models here.

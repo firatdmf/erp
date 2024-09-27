@@ -18,6 +18,7 @@ class CurrencyCategory(models.Model):
 class Book(models.Model):
     name = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
     def __str__(self):
         return self.name
 
@@ -130,13 +131,16 @@ class Sale(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+
 class AssetCategory(models.Model):
     name = models.CharField(max_length=100)
+
     class Meta:
         verbose_name_plural = "Asset Categories"
 
     def __str__(self):
         return self.name
+
 
 class BankAccounts(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
@@ -144,11 +148,7 @@ class BankAccounts(models.Model):
     name = models.CharField(max_length=6, blank=False, null=False)
     # last_four_digits = models.DecimalField(max_digits=4, decimal_places=0,blank=True,null=True)
     currency = models.ForeignKey(
-        CurrencyCategory,
-        on_delete=models.CASCADE,
-        blank=False,
-        null=False,
-        default = 1
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
     balance = models.DecimalField(max_digits=10, decimal_places=2)
 
@@ -164,20 +164,20 @@ class Asset(models.Model):
     category = models.ForeignKey(AssetCategory, on_delete=models.CASCADE)
     value = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(
-        CurrencyCategory,
-        on_delete=models.CASCADE,
-        blank=False,
-        null=False,
-        default = 1
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
     created_at = models.DateTimeField(auto_now_add=True)
     depreciating = models.BooleanField(default=False)
-    residual_value = models.DecimalField(max_digits=10, decimal_places=2,blank=True,null=True)
-    useful_life_in_months = models.DecimalField(max_digits=10, decimal_places=0,blank=True,null=True)
+    residual_value = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True
+    )
+    useful_life_in_months = models.DecimalField(
+        max_digits=10, decimal_places=0, blank=True, null=True
+    )
 
     def __str__(self):
         return f"Book: {self.book.name}, Asset Category: {self.category}, Asset Name: {self.name}, Asset Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
-    
+
 
 class Transaction(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
@@ -185,9 +185,15 @@ class Transaction(models.Model):
     operation = models.BooleanField()
     value = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(
-        CurrencyCategory,
-        on_delete=models.CASCADE,
-        blank=False,
-        null=False,
-        default = 1
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+    )
+
+
+class Capital(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    # The name of the person or company who provides the capital
+    provider = models.CharField(max_length=100)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )

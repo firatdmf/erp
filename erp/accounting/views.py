@@ -4,7 +4,7 @@ from django.http import HttpResponse
 # from django.views.generic import TemplateView
 from django.urls import reverse_lazy
 from django.views import View, generic
-from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset
+from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Capital
 
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
 from .forms import ExpenseForm, IncomeForm, AssetForm
@@ -72,7 +72,10 @@ class CreateAsset(generic.edit.CreateView):
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
 
     
-
+class AddCapital(generic.edit.CreateView):
+    model = Capital
+    template_name = "accounting/add_capital.html"
+    fields = "__all__"
 
 # class BookView(generic.TemplateView):
 #     template_name = "accounting/book_view.html"

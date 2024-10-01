@@ -142,19 +142,20 @@ class AssetCategory(models.Model):
         return self.name
 
 
-class CashAccounts(models.Model):
+class CashCategory(models.Model):
+    class Meta:
+        verbose_name_plural = "Cash Categories"
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     # name = models.CharField(max_length=100)
-    name = models.CharField(max_length=6, blank=False, null=False)
+    name = models.CharField(max_length=6, blank=False, null=False, unique=True)
     # last_four_digits = models.DecimalField(max_digits=4, decimal_places=0,blank=True,null=True)
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
-
     balance = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
-        return f"{self.currency, self.name}"
+        return f"{self.book} | {self.name} | {self.currency} | balance: {self.balance}"
     
 
 
@@ -182,6 +183,7 @@ class Asset(models.Model):
 
 
 class Transaction(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     # 1 for addition, 0 for subtraction
     operation = models.BooleanField()
@@ -192,6 +194,7 @@ class Transaction(models.Model):
 
 
 class Capital(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     # The name of the person or company who provides the capital
     provider = models.CharField(max_length=100)
@@ -199,3 +202,20 @@ class Capital(models.Model):
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
+    CashCategory = models.ForeignKey(
+        CashCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+    )
+
+
+class Stakeholder(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    name = models.CharField(max_length=150)
+    description = models.CharField(max_length=200, unique=False, blank=True, null=True)
+
+    # A stakeholder's ownership percentage is calculated by: [#shares/(Capital Stock)]*100%
+    share = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=1) 
+
+    def __str__(self):
+        return f"Name: {self.name} | Book: {self.book} | Share: {self.share}"
+

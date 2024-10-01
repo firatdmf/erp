@@ -1,5 +1,5 @@
 from django import forms
-from .models import Expense, Income, Book, Asset
+from .models import Expense, Income, Book, Asset, Capital, CashCategory, Stakeholder
 from datetime import date
 
 
@@ -45,11 +45,44 @@ class IncomeForm(forms.ModelForm):
         self.fields["book"].empty_label = None
 
 
-# class BookSelectionForm(forms.Form):
-#     Book = forms.ModelChoiceField(queryset=Book.objects.all(), empty_label="Select a book")
+
+
 
 
 class AssetForm(forms.ModelForm):
     class Meta:
         model = Asset
         fields = '__all__'
+
+class StakeholderForm(forms.ModelForm):
+    class Meta:
+        model = Stakeholder
+        fields = '__all__'
+        widgets = {
+            "book" : forms.HiddenInput(),
+        }
+    
+    # def __init__(self,*args,**kwargs):
+    #     book = kwargs.pop('book',None)
+    #     super(StakeholderForm,self).__init__(*args,**kwargs)
+
+
+        
+class CapitalForm(forms.ModelForm):
+    class Meta:
+        model = Capital
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+
+        book = kwargs.pop('book',None)
+        super(CapitalForm, self).__init__(*args, **kwargs)
+
+
+        # This ensures only the same book from the model can be selected with the cash categories (accounts)
+        if book:
+            self.fields["CashCategory"].queryset = CashCategory.objects.filter(book=book)
+
+
+        # print(f'yooo the book pk is {book_pk}')
+        # self.fields['CashCategory'].queryset = 

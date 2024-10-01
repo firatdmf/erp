@@ -10,6 +10,8 @@ from .models import (
     Sale,
     Asset,
     Capital,
+    CashCategory,
+    Stakeholder
 )
 
 admin.site.register(CurrencyCategory)
@@ -22,5 +24,8 @@ admin.site.register(Income)
 admin.site.register(Sale)
 admin.site.register(Asset)
 admin.site.register(Capital)
+admin.site.register(CashCategory)
+admin.site.register(Stakeholder)
+
 
 # Register your models here.

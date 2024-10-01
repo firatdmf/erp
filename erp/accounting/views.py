@@ -4,10 +4,10 @@ from django.http import HttpResponse
 # from django.views.generic import TemplateView
 from django.urls import reverse_lazy
 from django.views import View, generic
-from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Capital
+from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Capital, Stakeholder
 
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
-from .forms import ExpenseForm, IncomeForm, AssetForm
+from .forms import ExpenseForm, IncomeForm, AssetForm, CapitalForm,StakeholderForm
 from django.http import JsonResponse
 from django.db.models import Q
 from django.db.models import Sum
@@ -32,6 +32,11 @@ class BookDetail(generic.DetailView):
     model = Book
     template_name = "accounting/book_detail.html"
     context_object_name = "Book"
+
+    def get_context_data(self,**kwargs):
+        context = super().get_context_data(**kwargs)
+        context['Stakeholders'] = Stakeholder.objects.filter(book=self.kwargs.get('pk'))
+        return context
 
 
 class CategorySearchView(View):
@@ -74,8 +79,54 @@ class CreateAsset(generic.edit.CreateView):
     
 class AddCapital(generic.edit.CreateView):
     model = Capital
+    form_class = CapitalForm
     template_name = "accounting/add_capital.html"
-    fields = "__all__"
+    # fields = "__all__"
+
+    
+    # This sends to the form data on what book is this thing
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        kwargs['book'] = book
+        return kwargs
+    
+    # below preselected the book field of the capital model
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        return {'book': book}
+    
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     # Pass the book to the template if needed
+    #     context['book'] = Book.objects.get(pk=self.kwargs.get('pk'))
+    #     print("printing book:", context["book"])
+    #     return context
+    
+    def get_success_url(self) -> str:
+        return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
+    
+class AddStakeholder(generic.edit.CreateView):
+    model = Stakeholder
+    form_class = StakeholderForm
+    template_name = "accounting/add_stakeholder.html"
+
+    # below preselected the book field of the model
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        return {'book': book}
+    
+    def get_success_url(self) -> str:
+        return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
+    
+
 
 # class BookView(generic.TemplateView):
 #     template_name = "accounting/book_view.html"

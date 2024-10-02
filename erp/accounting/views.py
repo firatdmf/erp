@@ -4,7 +4,7 @@ from django.http import HttpResponse
 # from django.views.generic import TemplateView
 from django.urls import reverse_lazy
 from django.views import View, generic
-from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Capital, Stakeholder
+from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Capital, Stakeholder, CashCategory
 
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
 from .forms import ExpenseForm, IncomeForm, AssetForm, CapitalForm,StakeholderForm
@@ -35,7 +35,11 @@ class BookDetail(generic.DetailView):
 
     def get_context_data(self,**kwargs):
         context = super().get_context_data(**kwargs)
-        context['Stakeholders'] = Stakeholder.objects.filter(book=self.kwargs.get('pk'))
+        # book = Book.objects.get(pk=self.kwargs.get('pk'))
+        book = self.get_object()
+        print(book)
+        context['Stakeholders'] = Stakeholder.objects.filter(books=book)
+        print(context['Stakeholders'])
         return context
 
 
@@ -100,6 +104,19 @@ class AddCapital(generic.edit.CreateView):
         # Set the initial value of the book field to the book retrieved
         return {'book': book}
     
+
+    def post(self,request,*args,**kwargs):
+        print('hello b')
+        form = self.get_form()
+        if form.is_valid():
+            target_cash_account = form.cleaned_data.get("CashCategory")
+            target_cash_account = CashCategory.objects.get(pk=target_cash_account.pk)
+            target_cash_account.balance = target_cash_account.balance + form.cleaned_data.get("value")
+            target_cash_account.save()
+            print('the form is valid')
+            print(target_cash_account.pk)
+            return self.form_valid(form)
+    
     # def get_context_data(self, **kwargs):
     #     context = super().get_context_data(**kwargs)
     #     # Pass the book to the template if needed
@@ -123,6 +140,7 @@ class AddStakeholder(generic.edit.CreateView):
         # Set the initial value of the book field to the book retrieved
         return {'book': book}
     
+
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     

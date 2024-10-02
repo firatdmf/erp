@@ -10,7 +10,11 @@
     <a href="{% url 'accounting:index' %}"><--- Accounting Index Page</a>
   </p>
   <p><b>Book:</b> {{ Book.name }}</p>
+  {% if Stakeholders %}
   <p><b>The Stakeholders:</b> {% for Stakeholder in Stakeholders %}{{ Stakeholder.name }}{% endfor %}</p> 
+  {% else %}
+  <p>There are no stakeholders at this company.</p>
+  {% endif %}
   <ul>
     <li>
       <a href="{% url 'accounting:create_asset' Book.id %}">Create an asset</a>

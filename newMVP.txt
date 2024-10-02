@@ -1,5 +1,5 @@
 Accounting:
-    1. Show Money Coming and Coming Out (Categorize expenses)
+    1. Show Money Coming in and Coming Out (Categorize expenses)
     2. Calculate Burn, Runway, Growth Rate, Default Alive
     3. Show Total Accounts Receivable, Accounts Payable
     4. Generate Income Statement, Balance Sheet, and Cash Flow statements.

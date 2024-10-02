@@ -37,7 +37,8 @@ ALLOWED_HOSTS = [
     "erp.demfirat.com",
     "demfirat.com",
     "127.0.0.1",
-    "localhost"
+    "localhost",
+    "www.nejum.com",
 ]
 
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']

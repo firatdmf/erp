@@ -16,10 +16,25 @@ class CurrencyCategory(models.Model):
 
 
 class Book(models.Model):
-    name = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
+        return self.name
+
+class Stakeholder(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    books = models.ManyToManyField(Book,related_name="Books")
+    name = models.CharField(max_length=150)
+    description = models.CharField(max_length=200, unique=False, blank=True, null=True)
+
+    # A stakeholder's ownership percentage is calculated by: [#shares/(Capital Stock)]*100%
+    # share = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=1) 
+
+    def __str__(self):
+        # Books are many to many field so we need to iterate and put them here
+        book_names = ", ".join(book.name for book in self.books.all())
+        # return f"{self.name}"
         return self.name
 
 
@@ -197,7 +212,7 @@ class Capital(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     # The name of the person or company who provides the capital
-    provider = models.CharField(max_length=100)
+    provider = models.ForeignKey(Stakeholder, on_delete=models.CASCADE, blank=False, null=False)
     value = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
@@ -206,16 +221,10 @@ class Capital(models.Model):
         CashCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
 
-
-class Stakeholder(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    name = models.CharField(max_length=150)
-    description = models.CharField(max_length=200, unique=False, blank=True, null=True)
-
-    # A stakeholder's ownership percentage is calculated by: [#shares/(Capital Stock)]*100%
-    share = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=1) 
+    
+    
 
     def __str__(self):
-        return f"Name: {self.name} | Book: {self.book} | Share: {self.share}"
+        return f"{self.currency}{self.value} | {self.provider}"
+
 

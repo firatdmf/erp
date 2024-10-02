@@ -58,9 +58,9 @@ class StakeholderForm(forms.ModelForm):
     class Meta:
         model = Stakeholder
         fields = '__all__'
-        widgets = {
-            "book" : forms.HiddenInput(),
-        }
+        # widgets = {
+        #     "book" : forms.HiddenInput(),
+        # }
     
     # def __init__(self,*args,**kwargs):
     #     book = kwargs.pop('book',None)
@@ -72,11 +72,16 @@ class CapitalForm(forms.ModelForm):
     class Meta:
         model = Capital
         fields = '__all__'
+        widgets = {
+            "book": forms.HiddenInput()
+        }
+
 
     def __init__(self, *args, **kwargs):
 
         book = kwargs.pop('book',None)
         super(CapitalForm, self).__init__(*args, **kwargs)
+        self.fields["provider"].empty_label = "Select a stakeholder"
 
 
         # This ensures only the same book from the model can be selected with the cash categories (accounts)

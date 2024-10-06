@@ -6,11 +6,12 @@
 {% block content %}
   <div class="accounting_index_page">
     <p>Welcome to the accounting index</p>
-    <h3>Books</h3>
+    <h3>Books (<a href="{% url 'accounting:create_book' %}">Click here to create a book</a>)</h3> 
     {% for book in books %}
       <p>
         <a href="{% url 'accounting:book_detail' book.id %}">{{ book.name }}</a>
       </p>
     {% endfor %}
+    
   </div>
 {% endblock %}

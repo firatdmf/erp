@@ -1,83 +1,92 @@
 [
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 1,
     "fields": {
       "book": 2,
       "name": "CB",
-      "currency": 1
+      "currency": 1,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 2,
     "fields": {
       "book": 2,
       "name": "CP",
-      "currency": 1
+      "currency": 1,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 3,
     "fields": {
       "book": 2,
       "name": "IB-USD",
-      "currency": 1
+      "currency": 1,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 4,
     "fields": {
       "book": 2,
       "name": "IB-EUR",
-      "currency": 2
+      "currency": 2,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 5,
     "fields": {
       "book": 2,
       "name": "IB-TRY",
-      "currency": 3
+      "currency": 3,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 6,
     "fields": {
       "book": 2,
       "name": "ZB",
-      "currency": 3
+      "currency": 3,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 7,
     "fields": {
       "book": 2,
       "name": "AB",
-      "currency": 3
+      "currency": 3,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 8,
     "fields": {
       "book": 2,
       "name": "EP",
-      "currency": 3
+      "currency": 3,
+      "balance":0
     }
   },
   {
-    "model": "accounting.CashCategory",
+    "model": "accounting.CashAccounts",
     "pk": 9,
     "fields": {
       "book": 2,
       "name": "OnHand",
-      "currency": 1
+      "currency": 1,
+      "balance":0
     }
   }
 ]

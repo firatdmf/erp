@@ -1,7 +1,12 @@
 from django import forms
-from .models import Expense, Income, Book, Asset, Capital, CashCategory, Stakeholder
+from .models import Expense, Income, Book, Asset, Equity, Stakeholder, EquityCapital, CashAccount
 from datetime import date
 
+
+class BookForm(forms.ModelForm):
+    class Meta:
+        model = Book
+        fields = '__all__'
 
 class ExpenseForm(forms.ModelForm):
     # category_name = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'category-input'}))
@@ -59,7 +64,7 @@ class StakeholderForm(forms.ModelForm):
         model = Stakeholder
         fields = '__all__'
         # widgets = {
-        #     "book" : forms.HiddenInput(),
+        #     "books" : forms.HiddenInput(),
         # }
     
     # def __init__(self,*args,**kwargs):
@@ -68,26 +73,50 @@ class StakeholderForm(forms.ModelForm):
 
 
         
-class CapitalForm(forms.ModelForm):
+# class EquityForm(forms.ModelForm):
+#     class Meta:
+#         model = Equity
+#         fields = '__all__'
+#         widgets = {
+#             "book": forms.HiddenInput()
+#         }
+
+
+#     def __init__(self, *args, **kwargs):
+
+#         book = kwargs.pop('book',None)
+#         super(EquityForm, self).__init__(*args, **kwargs)
+#         self.fields["stakeholder"].empty_label = "Select a stakeholder"
+
+
+#         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
+#         # if book:
+#         #     self.fields["CashCategory"].queryset = CashCategory.objects.filter(book=book)
+
+
+#         # print(f'yooo the book pk is {book_pk}')
+#         # self.fields['CashCategory'].queryset = 
+
+
+
+class EquityCapitalForm(forms.ModelForm):
     class Meta:
-        model = Capital
-        fields = '__all__'
+        model = EquityCapital
+        fields = "__all__"
         widgets = {
-            "book": forms.HiddenInput()
+            "date_invested": forms.DateInput(attrs={"type": "date"}),
         }
-
-
+        
     def __init__(self, *args, **kwargs):
-
         book = kwargs.pop('book',None)
-        super(CapitalForm, self).__init__(*args, **kwargs)
-        self.fields["provider"].empty_label = "Select a stakeholder"
-
+        super(EquityCapitalForm, self).__init__(*args, **kwargs)
+        # self.fields["stakeholder"].empty_label = "Select a stakeholder"
+        self.fields["date_invested"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
 
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
-            self.fields["CashCategory"].queryset = CashCategory.objects.filter(book=book)
-
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+        
 
         # print(f'yooo the book pk is {book_pk}')
-        # self.fields['CashCategory'].queryset = 
+        # self.fields['CashAccount'].queryset = 

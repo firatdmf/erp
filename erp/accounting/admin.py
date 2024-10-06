@@ -5,27 +5,29 @@ from .models import (
     CurrencyCategory,
     Income,
     IncomeCategory,
+    CashAccount,
+    EquityCapital,
     Book,
-    Account,
+    Source,
     Sale,
     Asset,
-    Capital,
-    CashCategory,
+    Equity,
     Stakeholder
 )
 
 admin.site.register(CurrencyCategory)
 admin.site.register(Book)
-admin.site.register(Account)
+admin.site.register(Source)
 admin.site.register(ExpenseCategory)
 admin.site.register(Expense)
 admin.site.register(IncomeCategory)
 admin.site.register(Income)
 admin.site.register(Sale)
 admin.site.register(Asset)
-admin.site.register(Capital)
-admin.site.register(CashCategory)
+admin.site.register(Equity)
 admin.site.register(Stakeholder)
+admin.site.register(CashAccount)
+admin.site.register(EquityCapital)
 
 
 # Register your models here.

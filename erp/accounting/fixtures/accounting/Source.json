@@ -1,0 +1,47 @@
+[
+  {
+    "model": "accounting.Source",
+    "pk": 1,
+    "fields": { "name": "Cash" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 2,
+    "fields": { "name": "Property" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 3,
+    "fields": { "name": "Inventory" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 4,
+    "fields": { "name": "Accounts Receivable" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 5,
+    "fields": { "name": "Accounts Payable" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 6,
+    "fields": { "name": "Capital" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 7,
+    "fields": { "name": "Revenue" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 8,
+    "fields": { "name": "Expense" }
+  },
+  {
+    "model": "accounting.Source",
+    "pk": 9,
+    "fields": { "name": "Divident" }
+  }
+]

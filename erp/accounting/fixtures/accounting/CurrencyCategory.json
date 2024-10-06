@@ -3,21 +3,27 @@
     "model": "accounting.CurrencyCategory",
     "pk": 1,
     "fields": {
-      "name": "USD"
+      "code":"USD",
+      "name": "US Dollar",
+      "symbol":"$"
     }
   },
   {
     "model": "accounting.CurrencyCategory",
     "pk": 2,
     "fields": {
-      "name": "EUR"
+      "code": "EUR",
+      "name":"Euro",
+      "symbol":"€"
     }
   },
   {
     "model": "accounting.CurrencyCategory",
     "pk": 3,
     "fields": {
-      "name": "TRY"
+      "code": "TRY",
+      "name":"Turkish Lira",
+      "symbol":"₺"
     }
   }
 ]

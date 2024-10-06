@@ -1,20 +1,24 @@
 from django.db import models
 from crm.models import Company, Contact
 from operating.models import Product
+from django.utils import timezone
 
 # Create your models here.
 
 
 class CurrencyCategory(models.Model):
-    name = models.CharField(max_length=8, unique=True)
+    code = models.CharField(max_length=3, unique=True)  # e.g., USD, EUR, TRY
+    name = models.CharField(max_length=50, unique=True)
+    symbol = models.CharField(max_length=5, blank=True, null=True)  # e.g., $, €, ₺
 
     def __str__(self):
-        return self.name
+        return f"{self.code} - {self.name}"
 
     class Meta:
         verbose_name_plural = "Currency Categories"
 
 
+# The books is to keep the separate entities apart for accounting, and operating purposes.
 class Book(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     name = models.CharField(max_length=50, unique=True)
@@ -22,14 +26,35 @@ class Book(models.Model):
     def __str__(self):
         return self.name
 
+
+class CashAccount(models.Model):
+    class Meta:
+        verbose_name_plural = "Cash Accounts"
+
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    # name = models.CharField(max_length=100)
+    name = models.CharField(max_length=12, blank=False, null=False, unique=True)
+    # last_four_digits = models.DecimalField(max_digits=4, decimal_places=0,blank=True,null=True)
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+    )
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"{self.name} | {self.currency} | balance: {self.balance} ({self.book})"
+
+
 class Stakeholder(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
-    books = models.ManyToManyField(Book,related_name="Books")
     name = models.CharField(max_length=150)
     description = models.CharField(max_length=200, unique=False, blank=True, null=True)
+    books = models.ManyToManyField(Book, related_name="stakeholders")
+
+    # Currency for the contributions
+    # currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, default=1)  # Default currency
 
     # A stakeholder's ownership percentage is calculated by: [#shares/(Capital Stock)]*100%
-    # share = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=1) 
+    # share = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=1)
 
     def __str__(self):
         # Books are many to many field so we need to iterate and put them here
@@ -38,14 +63,60 @@ class Stakeholder(models.Model):
         return self.name
 
 
-class Account(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    currency = models.ForeignKey(
-        CurrencyCategory,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
+class Equity(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    # The name of the person or company who provides the capital
+    stakeholder = models.ForeignKey(
+        Stakeholder, on_delete=models.CASCADE, blank=False, null=False
     )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.CharField(max_length=200, blank=True, null=True)
+    # currency = models.ForeignKey(
+    #     CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+    # )
+    # date_invested = models.DateField()
+
+    def __str__(self):
+        return f"{self.currency}{self.value} | {self.stakeholder}"
+
+
+class EquityCapital(models.Model):
+    class Meta:
+        verbose_name_plural = "Equity Capitals"
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    stakeholder = models.ForeignKey(
+        Stakeholder, on_delete=models.CASCADE, blank=False, null=False
+    )
+    cash_account = models.ForeignKey(
+        CashAccount, on_delete=models.CASCADE, blank=False, null=False
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    note = models.CharField(max_length=200, blank=True, null=True)
+    date_invested = models.DateField()
+
+    def __str__(self):
+        return (self.stakeholder, self.cash_account,self.cash_account.currency.symbol + str(self.amount),self.date_invested)
+
+
+# class Account(models.Model):
+#     name = models.CharField(max_length=50, unique=True)
+#     currency = models.ForeignKey(
+#         CurrencyCategory,
+#         on_delete=models.CASCADE,
+#         blank=True,
+#         null=True,
+#     )
+
+#     def __str__(self):
+#         return self.name
+
+
+class Source(models.Model):
+    name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
@@ -132,6 +203,7 @@ class Income(models.Model):
 
 
 class Sale(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, blank=False, null=False
@@ -144,7 +216,6 @@ class Sale(models.Model):
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True
     )
-    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class AssetCategory(models.Model):
@@ -157,21 +228,30 @@ class AssetCategory(models.Model):
         return self.name
 
 
-class CashCategory(models.Model):
-    class Meta:
-        verbose_name_plural = "Cash Categories"
+class Transaction(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True, blank=False, null=False)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    # name = models.CharField(max_length=100)
-    name = models.CharField(max_length=6, blank=False, null=False, unique=True)
-    # last_four_digits = models.DecimalField(max_digits=4, decimal_places=0,blank=True,null=True)
-    currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+    type = models.CharField(max_length=50, blank=False, null=False, unique=True)
+    description = models.CharField(max_length=200, blank=False, null=False, unique=True)
+    # ID of source
+    source = models.ForeignKey(
+        Source, on_delete=models.CASCADE, blank=False, null=False
     )
-    balance = models.DecimalField(max_digits=10, decimal_places=2)
-
-    def __str__(self):
-        return f"{self.book} | {self.name} | {self.currency} | balance: {self.balance}"
-    
+    # ID of target
+    # target = models.ForeignKey(Source, on_delete=models.CASCADE, blank=False, null=False)
+    currency = models.ForeignKey(
+        CurrencyCategory,
+        on_delete=models.CASCADE,
+        blank=False,
+        null=False,
+    )
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=False, null=False
+    )
+    balance = models.DecimalField(
+        max_digits=12, decimal_places=2, blank=False, null=False
+    )
+    operation = models.BooleanField(blank=False, null=False)
 
 
 # Equity: Capital + Rev - Exp - Dividends
@@ -185,6 +265,7 @@ class Asset(models.Model):
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    purchase_date = models.DateField()
     depreciating = models.BooleanField(default=False)
     residual_value = models.DecimalField(
         max_digits=10, decimal_places=2, blank=True, null=True
@@ -197,34 +278,24 @@ class Asset(models.Model):
         return f"Book: {self.book.name}, Asset Category: {self.category}, Asset Name: {self.name}, Asset Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
 
 
-class Transaction(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
+class Liability(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    # 1 for addition, 0 for subtraction
-    operation = models.BooleanField()
-    value = models.DecimalField(max_digits=10, decimal_places=2)
-    currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
-    )
-
-
-class Capital(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    # The name of the person or company who provides the capital
-    provider = models.ForeignKey(Stakeholder, on_delete=models.CASCADE, blank=False, null=False)
-    value = models.DecimalField(max_digits=10, decimal_places=2)
-    currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
-    )
-    CashCategory = models.ForeignKey(
-        CashCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
-    )
-
-    
-    
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=200, blank=True, null=True)
+    value = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
+    due_date = models.DateField()
 
     def __str__(self):
-        return f"{self.currency}{self.value} | {self.provider}"
+        return f"{self.name} - {self.value} {self.currency.code}"
 
 
+# class Transaction(models.Model):
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+#     # 1 for addition, 0 for subtraction
+#     operation = models.BooleanField()
+#     value = models.DecimalField(max_digits=10, decimal_places=2)
+#     currency = models.ForeignKey(
+#         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+#     )

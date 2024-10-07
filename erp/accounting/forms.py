@@ -1,5 +1,5 @@
 from django import forms
-from .models import Expense, Income, Book, Asset, Equity, Stakeholder, EquityCapital, CashAccount
+from .models import EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount
 from datetime import date
 
 
@@ -12,7 +12,7 @@ class ExpenseForm(forms.ModelForm):
     # category_name = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'category-input'}))
 
     class Meta:
-        model = Expense
+        model = EquityExpense
         # fields = ['category','category_name', 'amount', 'currency','description','date']
         fields = ["book","category", "amount", "currency", "description", "date"]
         # fields = '__all__'
@@ -120,3 +120,10 @@ class EquityCapitalForm(forms.ModelForm):
 
         # print(f'yooo the book pk is {book_pk}')
         # self.fields['CashAccount'].queryset = 
+
+
+class EquityExpenseForm(forms.ModelForm):
+    class Meta:
+        model = EquityExpense
+        fields = "__all__"
+        

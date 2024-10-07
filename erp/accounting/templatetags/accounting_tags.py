@@ -8,7 +8,7 @@ from django.db.models import Sum
 from datetime import timedelta
 import decimal
 from currency_converter import CurrencyConverter
-from accounting.models import Expense, Income, Book
+from accounting.models import EquityExpense, Income, Book
 from accounting.forms import ExpenseForm, IncomeForm
 import time
 

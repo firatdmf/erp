@@ -4,10 +4,10 @@ from django.http import HttpResponse
 # from django.views.generic import TemplateView
 from django.urls import reverse_lazy
 from django.views import View, generic
-from .models import Expense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Equity, Stakeholder,CashAccount, EquityCapital
+from .models import EquityExpense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Stakeholder,CashAccount, EquityCapital
 
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
-from .forms import ExpenseForm, IncomeForm, AssetForm,StakeholderForm, BookForm, EquityCapitalForm
+from .forms import ExpenseForm, IncomeForm, AssetForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm
 from django.http import JsonResponse
 from django.db.models import Q
 from django.db.models import Sum
@@ -163,3 +163,8 @@ class AddStakeholder(generic.edit.CreateView):
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
+
+class AddEquityExpense(generic.edit.CreateView):
+    model = EquityExpense
+    form_class = EquityExpenseForm
+    template_name = "accounting/add_equity_expense.html"

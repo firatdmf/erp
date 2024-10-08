@@ -2,3 +2,6 @@ predict when clients usually order and send them an reminer email to place their
 
 HR:
     1. Calculte Monthly Payroll
+
+
+ERP and social media for businesses

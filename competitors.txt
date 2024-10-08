@@ -1,0 +1,27 @@
+Monday.com
+Hubspot.com
+Zoho.com
+quickbooks.com
+recurrency.com
+salesforce.com
+pipedrive.com
+insightly.com
+zendesk.com
+katanamrp.com
+close.com
+odoo.com
+lessannoyingcrm.com
+clickup.com
+tines.com
+pulio.com
+pulitio.com
+glean.com
+mrpeasy.com
+
+--
+rockwellautomation.com
+---
+
+
+Sales force:
+cloud based crm 

@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import (
+    AssetCategory,
     EquityExpense,
     ExpenseCategory,
     CurrencyCategory,
@@ -18,6 +19,8 @@ from .models import (
 admin.site.register(CurrencyCategory)
 admin.site.register(Book)
 # admin.site.register(Source)
+
+admin.site.register(AssetCategory)
 admin.site.register(ExpenseCategory)
 admin.site.register(EquityExpense)
 admin.site.register(IncomeCategory)

@@ -63,39 +63,17 @@ class StakeholderForm(forms.ModelForm):
     class Meta:
         model = Stakeholder
         fields = '__all__'
+
+        # Below creates problems for many to many fields, so we just do exclude instead
         # widgets = {
         #     "books" : forms.HiddenInput(),
         # }
-    
-    # def __init__(self,*args,**kwargs):
-    #     book = kwargs.pop('book',None)
-    #     super(StakeholderForm,self).__init__(*args,**kwargs)
+        exclude = ['books', 'share']
 
 
-        
-# class EquityForm(forms.ModelForm):
-#     class Meta:
-#         model = Equity
-#         fields = '__all__'
-#         widgets = {
-#             "book": forms.HiddenInput()
-#         }
 
-
-#     def __init__(self, *args, **kwargs):
-
-#         book = kwargs.pop('book',None)
-#         super(EquityForm, self).__init__(*args, **kwargs)
-#         self.fields["stakeholder"].empty_label = "Select a stakeholder"
-
-
-#         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
-#         # if book:
-#         #     self.fields["CashCategory"].queryset = CashCategory.objects.filter(book=book)
-
-
-#         # print(f'yooo the book pk is {book_pk}')
-#         # self.fields['CashCategory'].queryset = 
+    # def __init__(self, *args, **kwargs):
+    #     super(StakeholderForm, self).__init__(*args, **kwargs)
 
 
 
@@ -105,6 +83,7 @@ class EquityCapitalForm(forms.ModelForm):
         fields = "__all__"
         widgets = {
             "date_invested": forms.DateInput(attrs={"type": "date"}),
+            "book": forms.HiddenInput()
         }
         
     def __init__(self, *args, **kwargs):
@@ -112,10 +91,12 @@ class EquityCapitalForm(forms.ModelForm):
         super(EquityCapitalForm, self).__init__(*args, **kwargs)
         # self.fields["stakeholder"].empty_label = "Select a stakeholder"
         self.fields["date_invested"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # self.fields["book"].widget.attrs["value"] = book
 
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            # self.fields["book"].queryset = Book.objects.filter(book=book)
         
 
         # print(f'yooo the book pk is {book_pk}')

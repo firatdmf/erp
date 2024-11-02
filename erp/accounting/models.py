@@ -54,7 +54,8 @@ class Stakeholder(models.Model):
     # currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, default=1)  # Default currency
 
     # A stakeholder's ownership percentage is calculated by: [#shares/(Capital Stock)]*100%
-    # share = models.DecimalField(max_digits=10, decimal_places=2, blank=False, null=False, default=1)
+    # 100 FOR 100%
+    share = models.DecimalField(max_digits=5, decimal_places=2, blank=False, null=False, default=100)
 
     def __str__(self):
         # Books are many to many field so we need to iterate and put them here

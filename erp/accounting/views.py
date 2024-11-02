@@ -123,6 +123,8 @@ class AddEquityCapital(generic.edit.CreateView):
             target_cash_account = CashAccount.objects.get(pk=target_cash_account.pk)
             target_cash_account.balance = target_cash_account.balance + form.cleaned_data.get("amount")
             target_cash_account.save()
+
+            new_asset = Asset.objects.create(book = self.kwargs.get('pk'), )
             print('the form is valid')
             print(target_cash_account.pk)
             return self.form_valid(form)
@@ -142,22 +144,31 @@ class AddStakeholder(generic.edit.CreateView):
     form_class = StakeholderForm
     template_name = "accounting/add_stakeholder.html"
 
-    # This sends to the form data on what book is this thing
     # def get_form_kwargs(self):
     #     kwargs = super().get_form_kwargs()
     #     book_pk = self.kwargs.get('pk')
     #     book = Book.objects.get(pk=book_pk)
-    #     kwargs['books'] = {'books': [book]}
+    #     print(book)
+    #     kwargs['book'] = [book_pk]
     #     return kwargs
-
-    # below preselected the book field of the model
-    def get_initial(self):
-        # Get the book by primary key from the URL
+    
+    def form_valid(self, form):
+       
+        self.object = form.save(commit=False) # Save the stakeholder instance without committing to the database
+        self.object.save() # Save the stakeholder instance first
+        # Add the selected book to the stakeholder's books field (ManyToMany)
         book_pk = self.kwargs.get('pk')
         book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved
-        # We do like this because it is a many to many field
-        return {'books': [book]}
+        self.object.books.add(book)  # Link the stakeholder to the book
+        return super().form_valid(form)
+  
+    # # below preselected the book field of the capital model
+    # def get_initial(self):
+    #     # Get the book by primary key from the URL
+    #     book_pk = self.kwargs.get('pk')
+    #     book = Book.objects.get(pk=book_pk)
+    #     # Set the initial value of the book field to the book retrieved
+    #     return {'books': [book]}
     
 
     def get_success_url(self) -> str:

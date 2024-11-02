@@ -38,7 +38,7 @@ ALLOWED_HOSTS = [
     "demfirat.com",
     "127.0.0.1",
     "localhost",
-    "*.nejum.com",
+    "app.nejum.com",
     "www.nejum.com",
     "nejum.com"
 ]

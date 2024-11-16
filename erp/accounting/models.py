@@ -41,7 +41,9 @@ class CashAccount(models.Model):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
-        return f"{self.name} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
+        return (
+            f"{self.name} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
+        )
 
 
 class Stakeholder(models.Model):
@@ -55,7 +57,9 @@ class Stakeholder(models.Model):
 
     # A stakeholder's ownership percentage is calculated by: [#shares/(Capital Stock)]*100%
     # 100 FOR 100%
-    share = models.DecimalField(max_digits=5, decimal_places=2, blank=False, null=False, default=100)
+    share = models.DecimalField(
+        max_digits=5, decimal_places=2, blank=False, null=False, default=100
+    )
 
     def __str__(self):
         # Books are many to many field so we need to iterate and put them here
@@ -99,7 +103,16 @@ class EquityCapital(models.Model):
     date_invested = models.DateField()
 
     def __str__(self):
-        return (self.stakeholder.name + ' ' + self.cash_account.name + ' ' + self.cash_account.currency.symbol + str(self.amount) + ' ' + str(self.date_invested))
+        return (
+            self.stakeholder.name
+            + " "
+            + self.cash_account.name
+            + " "
+            + self.cash_account.currency.symbol
+            + str(self.amount)
+            + " "
+            + str(self.date_invested)
+        )
         # return (self.cash_account.currency.symbol + str(self.amount))
 
 
@@ -141,6 +154,7 @@ class ExpenseCategory(models.Model):
 class EquityExpense(models.Model):
     class Meta:
         verbose_name_plural = "Equity Expenses"
+
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     category = models.ForeignKey(
@@ -158,6 +172,9 @@ class EquityExpense(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
     description = models.CharField(max_length=200, unique=False, blank=True)
+    account_balance = models.DecimalField(
+        max_digits=10, decimal_places=2, unique=False, blank=True
+    )
 
     def __str__(self):
         try:
@@ -235,30 +252,30 @@ class AssetCategory(models.Model):
         return self.name
 
 
-class Transaction(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True, blank=False, null=False)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    type = models.CharField(max_length=50, blank=False, null=False, unique=True)
-    description = models.CharField(max_length=200, blank=False, null=False, unique=True)
-    # ID of source
-    source = models.ForeignKey(
-        Source, on_delete=models.CASCADE, blank=False, null=False
-    )
-    # ID of target
-    # target = models.ForeignKey(Source, on_delete=models.CASCADE, blank=False, null=False)
-    currency = models.ForeignKey(
-        CurrencyCategory,
-        on_delete=models.CASCADE,
-        blank=False,
-        null=False,
-    )
-    amount = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=False, null=False
-    )
-    balance = models.DecimalField(
-        max_digits=12, decimal_places=2, blank=False, null=False
-    )
-    operation = models.BooleanField(blank=False, null=False)
+# class Transaction(models.Model):
+#     created_at = models.DateTimeField(auto_now_add=True, blank=False, null=False)
+#     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+#     type = models.CharField(max_length=50, blank=False, null=False, unique=True)
+#     description = models.CharField(max_length=200, blank=False, null=False, unique=True)
+#     # ID of source
+#     source = models.ForeignKey(
+#         Source, on_delete=models.CASCADE, blank=False, null=False
+#     )
+#     # ID of target
+#     # target = models.ForeignKey(Source, on_delete=models.CASCADE, blank=False, null=False)
+#     currency = models.ForeignKey(
+#         CurrencyCategory,
+#         on_delete=models.CASCADE,
+#         blank=False,
+#         null=False,
+#     )
+#     amount = models.DecimalField(
+#         max_digits=10, decimal_places=2, blank=False, null=False
+#     )
+#     balance = models.DecimalField(
+#         max_digits=12, decimal_places=2, blank=False, null=False
+#     )
+#     operation = models.BooleanField(blank=False, null=False)
 
 
 # Equity: Capital + Rev - Exp - Dividends

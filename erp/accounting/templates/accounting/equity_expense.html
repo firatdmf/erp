@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'accounting/css/equity_expense.css' %}" />
+  {% endblock %}
+
+  <div class="equity_expense">
+    <h1>Expenses Table</h1>
+    <table>
+      <tr>
+        <th>Expense #</th>
+        {% comment %} <th>Transaction #</th> {% endcomment %}
+        <th>Date</th>
+        <th>Category</th>
+        {% comment %} <th>Currency</th> {% endcomment %}
+        <th>Amount</th>
+        <th>Description</th>
+        <th>Account</th>
+        <th>Account Balance</th>
+      </tr>
+
+      {% for expense in object_list|dictsortreversed:'pk'|dictsortreversed:'date' %}
+        <tr>
+          <td>{{ expense.pk }}</td>
+          {% comment %} <td>2</td> {% endcomment %}
+          <td>{{ expense.date }}</td>
+          <td>{{ expense.category }}</td>
+          {% comment %} <td>{{ expense.currency }}</td> {% endcomment %}
+          <td>{{ expense.currency.symbol }}{{ expense.amount }}</td>
+          <td>{{ expense.description }}</td>
+          <td>{{ expense.cash_account.name }}</td>
+          <td>{{expense.currency.symbol}}{{expense.account_balance}}</td>
+
+        </tr>
+      {% empty %}
+        <tr>
+          <td>N/A</td>
+          {% comment %} <td>N/A</td> {% endcomment %}
+          <td>N/A</td>
+          <td>N/A</td>
+          {% comment %} <td>N/A</td> {% endcomment %}
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endblock %}

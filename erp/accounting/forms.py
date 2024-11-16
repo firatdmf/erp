@@ -109,7 +109,8 @@ class EquityExpenseForm(forms.ModelForm):
         fields = "__all__"
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
-            # "book": forms.HiddenInput()
+            "book": forms.HiddenInput(),
+            "balance":forms.HiddenInput()
         }
         
 

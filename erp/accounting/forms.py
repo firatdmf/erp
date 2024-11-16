@@ -1,5 +1,5 @@
 from django import forms
-from .models import EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount
+from .models import EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory
 from datetime import date
 
 
@@ -107,4 +107,21 @@ class EquityExpenseForm(forms.ModelForm):
     class Meta:
         model = EquityExpense
         fields = "__all__"
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}),
+            # "book": forms.HiddenInput()
+        }
+        
+
+    def __init__(self, *args, **kwargs):
+        book = kwargs.pop('book',None)
+        super(EquityExpenseForm, self).__init__(*args, **kwargs)
+        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # self.fields["stakeholder"].empty_label = "Select a stakeholder"
+        # self.fields["book"].widget.attrs["value"] = book
+
+        # # This ensures only the same book from the model can be selected with the cash categories (accounts)
+        if book:
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            # self.fields["book"].queryset = Book.objects.filter(book=book)
         

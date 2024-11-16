@@ -175,7 +175,35 @@ class AddStakeholder(generic.edit.CreateView):
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
 
+
+class EquityExpense(generic.ListView):
+    model = EquityExpense
+    
+
+
 class AddEquityExpense(generic.edit.CreateView):
     model = EquityExpense
     form_class = EquityExpenseForm
     template_name = "accounting/add_equity_expense.html"
+
+    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        print(book)
+        kwargs['book'] = book
+        return kwargs
+    
+    # below preselected the book field of the capital model (independent of the above function)
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        # By default make the currency US Dollars (which is 1)
+        return {'book': book, 'currency':1}
+    
+    def get_success_url(self) -> str:
+        return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
+    

@@ -25,6 +25,12 @@
     <li>
       <a href="{% url 'accounting:add_stakeholder' Book.id %}">Add Stakeholder</a>
     </li>
+    <li>
+      <a href="{% url 'accounting:add_equity_expense' Book.id %}">Add Expense</a>
+    </li>
+    <li>
+      <a href="{% url 'accounting:equity_expense' Book.id %}">See Expenses</a>
+    </li>
   </ul>
 
   {% comment %} {% book_component csrf_token=csrf_token selected_book=Book %} {% endcomment %}

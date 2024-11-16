@@ -1,7 +1,8 @@
 erp_vir_env
 pass.txt
 erp/.env
-
+*.pyo
+*.pyc
 
 # Here's the ultimate Django gitignore#
 # Django #
@@ -142,3 +143,7 @@ GitHub.sublime-settings
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .history
+
+
+
+

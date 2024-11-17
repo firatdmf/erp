@@ -4,10 +4,10 @@ from django.http import HttpResponse
 # from django.views.generic import TemplateView
 from django.urls import reverse_lazy
 from django.views import View, generic
-from .models import EquityExpense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Stakeholder,CashAccount, EquityCapital
+from .models import EquityRevenue, EquityExpense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Stakeholder,CashAccount, EquityCapital
 
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
-from .forms import ExpenseForm, IncomeForm, AssetForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm
+from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm
 from django.http import JsonResponse
 from django.db.models import Q
 from django.db.models import Sum
@@ -124,9 +124,7 @@ class AddEquityCapital(generic.edit.CreateView):
             target_cash_account.balance = target_cash_account.balance + form.cleaned_data.get("amount")
             target_cash_account.save()
 
-            new_asset = Asset.objects.create(book = self.kwargs.get('pk'), )
-            print('the form is valid')
-            print(target_cash_account.pk)
+            # new_asset = Asset.objects.create(book = self.kwargs.get('pk'), )
             return self.form_valid(form)
     
     # def get_context_data(self, **kwargs):
@@ -138,6 +136,30 @@ class AddEquityCapital(generic.edit.CreateView):
     
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
+    
+class AddEquityRevenue(generic.edit.CreateView):
+    model = EquityRevenue
+    form_class = EquityRevenueForm
+    template_name = "accounting/add_equity_revenue.html"
+
+        # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        print(book)
+        kwargs['book'] = book
+        return kwargs
+    
+    # below preselected the book field of the capital model (independent of the above function)
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        # By default make the currency US Dollars (which is 1)
+        return {'book': book, 'currency':1}
+
     
 class AddStakeholder(generic.edit.CreateView):
     model = Stakeholder

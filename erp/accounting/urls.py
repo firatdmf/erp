@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import CategorySearchView, SalesView,BookDetail,CreateAsset, AddEquityCapital, AddStakeholder, CreateBook,EquityExpense, AddEquityExpense
+from .views import AddEquityRevenue, CategorySearchView, SalesView,BookDetail,CreateAsset, AddEquityCapital, AddStakeholder, CreateBook,EquityExpense, AddEquityExpense
 
 app_name = 'accounting'
 urlpatterns = [
@@ -11,9 +11,10 @@ urlpatterns = [
     # path('books/',BookView.as_view(),name="book_view"),
     path('books/create/',CreateBook.as_view(),name="create_book"),
     path('books/<int:pk>/',BookDetail.as_view(),name="book_detail"),
+    path('books/<int:pk>/add_stakeholder/', AddStakeholder.as_view(),name="add_stakeholder"),
     path('books/<int:pk>/create_asset/',CreateAsset.as_view(),name="create_asset"),
     path('books/<int:pk>/add_equity_capital/', AddEquityCapital.as_view(),name="add_equity_capital"),
-    path('books/<int:pk>/add_stakeholder/', AddStakeholder.as_view(),name="add_stakeholder"),
+    path('books/<int:pk>/add_equity_revenue/',AddEquityRevenue.as_view(),name="add_equity_revenue"),
     path('books/<int:pk>/add_equity_expense/', AddEquityExpense.as_view(),name="add_equity_expense"),
     path('books/<int:pk>/equity_expense/', EquityExpense.as_view(),name="equity_expense")
 ]

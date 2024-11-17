@@ -1,5 +1,5 @@
 from django import forms
-from .models import EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory
+from .models import EquityRevenue, EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory
 from datetime import date
 
 
@@ -83,7 +83,7 @@ class EquityCapitalForm(forms.ModelForm):
         fields = "__all__"
         widgets = {
             "date_invested": forms.DateInput(attrs={"type": "date"}),
-            "book": forms.HiddenInput()
+            # "book": forms.HiddenInput()
         }
         
     def __init__(self, *args, **kwargs):
@@ -103,6 +103,28 @@ class EquityCapitalForm(forms.ModelForm):
         # self.fields['CashAccount'].queryset = 
 
 
+class EquityRevenueForm(forms.ModelForm):
+    class Meta:
+        model = EquityRevenue
+        fields = "__all__"
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}),
+            # "book": forms.HiddenInput(),
+        }
+        
+    def __init__(self, *args, **kwargs):
+        book = kwargs.pop('book',None)
+        super(EquityRevenueForm, self).__init__(*args, **kwargs)
+        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # self.fields["stakeholder"].empty_label = "Select a stakeholder"
+        # self.fields["book"].widget.attrs["value"] = book
+
+        # # This ensures only the same book from the model can be selected with the cash categories (accounts)
+        if book:
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            # self.fields["book"].queryset = Book.objects.filter(book=book)
+
+
 class EquityExpenseForm(forms.ModelForm):
     class Meta:
         model = EquityExpense
@@ -112,7 +134,7 @@ class EquityExpenseForm(forms.ModelForm):
             "book": forms.HiddenInput(),
             "balance":forms.HiddenInput()
         }
-        
+
 
     def __init__(self, *args, **kwargs):
         book = kwargs.pop('book',None)
@@ -126,3 +148,4 @@ class EquityExpenseForm(forms.ModelForm):
             self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
             # self.fields["book"].queryset = Book.objects.filter(book=book)
         
+

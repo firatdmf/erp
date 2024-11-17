@@ -17,13 +17,16 @@
   {% endif %}
   <ul>
     <li>
+      <a href="{% url 'accounting:add_stakeholder' Book.id %}">Add Stakeholder</a>
+    </li>
+    <li>
       <a href="{% url 'accounting:create_asset' Book.id %}">Create an asset</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_equity_capital' Book.id %}">Add Equity Capital</a>
+      <a href="{% url 'accounting:add_equity_capital' Book.id %}">Add Capital</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_stakeholder' Book.id %}">Add Stakeholder</a>
+      <a href="{% url 'accounting:add_equity_revenue' Book.id %}">Add Revenue</a>
     </li>
     <li>
       <a href="{% url 'accounting:add_equity_expense' Book.id %}">Add Expense</a>

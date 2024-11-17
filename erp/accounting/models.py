@@ -106,6 +106,10 @@ class EquityCapital(models.Model):
         return (
             self.stakeholder.name
             + " "
+            + "("
+            + self.book.name
+            + ")"
+            + " "
             + self.cash_account.name
             + " "
             + self.cash_account.currency.symbol
@@ -184,6 +188,23 @@ class EquityExpense(models.Model):
             return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')}"
 
 
+class EquityRevenue(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    cash_account = models.ForeignKey(
+        CashAccount, on_delete=models.CASCADE, blank=False, null=False
+    )
+    currency = models.ForeignKey(
+        CurrencyCategory,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    date = models.DateField()
+    description = models.CharField(max_length=200, unique=False, blank=True)
+
+
 class IncomeCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
@@ -194,6 +215,7 @@ class IncomeCategory(models.Model):
         verbose_name_plural = "Income Categories"
 
 
+# delete this income model, create EquityRevenue instead. Also delete IncomeCategory and its fixture
 class Income(models.Model):
     category = models.ForeignKey(
         IncomeCategory, on_delete=models.CASCADE, blank=True, null=True

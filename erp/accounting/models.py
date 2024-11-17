@@ -189,6 +189,8 @@ class EquityExpense(models.Model):
 
 
 class EquityRevenue(models.Model):
+    class Meta:
+        verbose_name_plural = "Equity Revenues"
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     cash_account = models.ForeignKey(
@@ -203,6 +205,7 @@ class EquityRevenue(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
     description = models.CharField(max_length=200, unique=False, blank=True)
+    invoice_number = models.CharField(max_length=20, unique=True, blank=True)
 
 
 class IncomeCategory(models.Model):

@@ -159,6 +159,41 @@ class AddEquityRevenue(generic.edit.CreateView):
         # Set the initial value of the book field to the book retrieved
         # By default make the currency US Dollars (which is 1)
         return {'book': book, 'currency':1}
+    
+
+    # You do this because you want to manually do some process when the expense form is submitted.
+    def post(self,request,*args,**kwargs):
+        form = self.get_form()
+        if form.is_valid():
+            # Get the selected cash account from the form
+            target_cash_account = form.cleaned_data.get("cash_account")
+            target_cash_account = CashAccount.objects.get(pk=target_cash_account.pk)
+            # Update the balance of the cash account
+            target_cash_account.balance = target_cash_account.balance + form.cleaned_data.get("amount")
+            
+             # Save the updated cash account
+            target_cash_account.save()
+
+
+            # # All cash accounts combined
+            # total_cash = CashAccount.objects.filter(book=kwargs['book'])
+
+             # Now you need to update the form instance before saving it
+            # Create the model instance but don't save it yet
+            my_form = form.save(commit=False)
+            # my_form.account_balance = target_cash_account.balance
+            # my_form.account_currency = target_cash_account.currency
+            my_form.save()
+            # my_field_value = form.cleaned_data.get('balance')
+            # form.cleaned_data['balance'] = target_cash_account.balance
+            # new_asset = Asset.objects.create(book = self.kwargs.get('pk'), )
+            # print('the form is valid')
+            # print(target_cash_account.pk)
+            return self.form_valid(form)
+    
+    def get_success_url(self) -> str:
+        return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
+    
 
     
 class AddStakeholder(generic.edit.CreateView):

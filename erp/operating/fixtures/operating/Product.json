@@ -1,0 +1,13 @@
+[
+    {
+      "model": "operating.Product",
+      "pk": 1,
+      "fields": { "sku": "Schiffli", "name": 500, "description": 21.5,"variant":null,"cost":14, "unit":"MT" }
+    },
+    {
+      "model": "operating.Product",
+      "pk": 2,
+      "fields": { "name": "flat", "max_rpm": 1000, "domain": 11 }
+    }
+  ]
+  

@@ -9,16 +9,19 @@
   font-family: "Fira Sans",sans-serif;
   /* --text-primary: #b6b6b6; */
   --text-primary: #d6d6d7;
+  --text-primary:#323639;
 
   --text-secondary: #d6d6d7;
   /* --text-secondary: #fff; */
   --bg-primary: #23232e;
   /* below is from incognito */
   --bg-primary: #202124;
+  --bg-primary:white;
   /* --bg-secondary: #141418; */
   --bg-secondary: purple;
   --bg-secondary: #383e42;
   --bg-secondary: #323639;
+  --bg-secondary: white;
   /* --bg-secondary: #05a; */
   --transition-speed: 300ms;
 }
@@ -52,6 +55,8 @@ main {
   background-color: var(--bg-primary);
   transition: width 200ms ease;
   /* overflow: scroll; */
+  /* border:1px solid #323639; */
+  box-shadow: 0.3px 0.3px 10px 1px #323639;
 }
 
 .navbar-nav {
@@ -212,6 +217,7 @@ main {
   /* filter:grayscale(0%) opacity(1) hue-rotate(0.7); */
   filter: grayscale(0%) opacity(1);
   background: var(--bg-secondary);
+  /* background-color: #202124 ; */
   /* color: var(--text-secondary); */
 }
 

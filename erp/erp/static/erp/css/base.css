@@ -370,3 +370,59 @@ a {
 #addExpanded .futureFeature{
   text-decoration: line-through;
 }
+
+
+
+/* Below is for countdown */
+/* ------------------------------------------------ */
+/* general styling */
+
+
+.countDown h3{
+  margin:0;
+  padding:0;
+}
+.countDown ul{
+  padding:0;
+  margin:0;
+}
+.countDown li {
+  display: inline-block;
+  /* font-size: 1.5em; */
+  list-style-type: none;
+  padding: 1em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.countDown li span {
+  display: block;
+  /* font-size: 1.5rem; */
+}
+
+.countDown .emoji {
+  display: none;
+  padding: 1rem;
+}
+
+.countDown .emoji span {
+  font-size: 4rem;
+  padding: 0 .5rem;
+}
+
+@media all and (max-width: 768px) {
+  .countDown h3 {
+    font-size: calc(1.5rem * var(--smaller));
+  }
+  
+  .countDown li {
+    font-size: calc(1.125rem * var(--smaller));
+  }
+  
+  .countDown li span {
+    font-size: calc(3.375rem * var(--smaller));
+  }
+}
+
+
+/* ------------------------------------------------ */

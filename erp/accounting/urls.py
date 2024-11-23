@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import AddEquityRevenue, CategorySearchView, SalesView,BookDetail,CreateAsset, AddEquityCapital, AddStakeholder, CreateBook,EquityExpense, AddEquityExpense
+from .views import AddEquityRevenue, CategorySearchView, SalesView,BookDetail,CreateAsset, AddEquityCapital, AddStakeholder, CreateBook,EquityExpense,AddEquityExpense, PayEquityDivident
 
 app_name = 'accounting'
 urlpatterns = [
@@ -16,7 +16,8 @@ urlpatterns = [
     path('books/<int:pk>/add_equity_capital/', AddEquityCapital.as_view(),name="add_equity_capital"),
     path('books/<int:pk>/add_equity_revenue/',AddEquityRevenue.as_view(),name="add_equity_revenue"),
     path('books/<int:pk>/add_equity_expense/', AddEquityExpense.as_view(),name="add_equity_expense"),
-    path('books/<int:pk>/equity_expense/', EquityExpense.as_view(),name="equity_expense")
+    path('books/<int:pk>/equity_expense/', EquityExpense.as_view(),name="equity_expense"),
+    path('books/<int:pk>/pay_equity_divident/', PayEquityDivident.as_view(),name="pay_equity_divident")
 ]
 
 htmx_urlpatterns = [

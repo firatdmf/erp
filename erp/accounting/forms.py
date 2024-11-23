@@ -1,5 +1,5 @@
 from django import forms
-from .models import EquityRevenue, EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory
+from .models import EquityRevenue, EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory, EquityDivident
 from datetime import date
 
 
@@ -149,3 +149,18 @@ class EquityExpenseForm(forms.ModelForm):
             # self.fields["book"].queryset = Book.objects.filter(book=book)
         
 
+class EquityDividentForm(forms.ModelForm):
+    class Meta:
+        model = EquityDivident
+        fields = "__all__"
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}),
+            "book": forms.HiddenInput(),
+        }
+    
+    def __init__(self,*args,**kwargs):
+        book = kwargs.pop('book',None)
+        super(EquityDividentForm,self).__init__(*args,**kwargs)
+        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        if book:
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)

@@ -186,6 +186,25 @@ class EquityExpense(models.Model):
             return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%d %B, %Y')} - {self.category.name}"
         except AttributeError:
             return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')}"
+        
+class EquityDivident(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    stakeholder = models.ForeignKey(
+        Stakeholder, on_delete=models.CASCADE, blank=False, null=False
+    )
+    cash_account = models.ForeignKey(
+        CashAccount, on_delete=models.CASCADE, blank=False, null=False
+    )
+    currency = models.ForeignKey(
+        CurrencyCategory,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    date = models.DateField()
+    description = models.CharField(max_length=200, unique=False, blank=True)
 
 
 class EquityRevenue(models.Model):

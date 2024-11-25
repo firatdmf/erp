@@ -5,3 +5,6 @@ auto follow up
 activity report
 contacts: show all together both
 all orders should have photos
+every taken payment should be linked with an invoice
+
+When customers take a picture of your product and publish it at their home. You give them a 30% discount. That is beautiful.

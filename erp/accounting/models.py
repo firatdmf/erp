@@ -191,7 +191,7 @@ class EquityDivident(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     stakeholder = models.ForeignKey(
-        Stakeholder, on_delete=models.CASCADE, blank=False, null=False
+        Stakeholder, on_delete=models.CASCADE, blank=True, null=True
     )
     cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, blank=False, null=False

@@ -4,4 +4,21 @@ crafybase.com
 recurrency.com
 rockwell automation,plex.com by rockwell 
 close.com
+odoo.com
+nejum.com
+mrpeasy.com
+open source
 
+
+
+Nejum.com provides industrial automation and digital transformation for businesses. 
+
+
+You make a very basic core erp: then you make it open source, providing clear documentation.
+Share the product with community, gain audience.
+Commercial:
+Then when you implement to people, you charge with with cloud fee, or setting up their local server. 
+Priority support and custom features
+Add other products: cameras, robotics, barcode printers etc.
+
+Start with distributors, then later move to manufacturing. 

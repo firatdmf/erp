@@ -10,7 +10,7 @@ Marketing:
     3. Add Relationships between contacts.
     4. Task: Create Web Push Notification feature (Progressive Web App?)
     5. Create Auto follow up for leads
-    6. Create Auto new design sender to clients
+    6. Create Auto product sender to clients
     7. Provide reports: Count Number of new leads added daily /, and how things are going
     8. Remove frictions in adding data (select contact via typo tolerant search, add existing contacts from csv)
 

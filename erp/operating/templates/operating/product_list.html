@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    {% comment %} <link rel="stylesheet" href="{% static 'accounting/css/equity_product.css' %}" /> {% endcomment %}
+  {% endblock %}
+
+  <div class="product">
+    <h1>Products Table</h1>
+    <table>
+      <tr>
+        <th>SKU</th>
+        {% comment %} <th>Transaction #</th> {% endcomment %}
+        <th>Name</th>
+        <th>Manufacturer</th>
+        {% comment %} <th>Currency</th> {% endcomment %}
+        <th>Description</th>
+        {% comment %} <th>Variant</th> {% endcomment %}
+        <th>Cost</th>
+        <th>Unit</th>
+        <th>Stock Quantity</th>
+      </tr>0
+      {% for product in object_list|dictsortreversed:'pk'|dictsortreversed:'created_at' %}
+        <tr>
+          <td>{{ product.sku }}</td>
+          {% comment %} <td>2</td> {% endcomment %}
+          <td>{{ product.name }}</td>
+          <td>{{ product.manufacturer }}</td>
+          {% comment %} <td>{{ product.currency }}</td> {% endcomment %}
+          <td>{{ product.description }}</td>
+          {% comment %} <td>{{ product.variant }}</td> {% endcomment %}
+          <td>${{ product.cost }}</td>
+          <td>{{ product.unit }}</td>
+          <td>{{product.stock_quantity}}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td>N/A</td>
+          {% comment %} <td>N/A</td> {% endcomment %}
+          <td>N/A</td>
+          <td>N/A</td>
+          {% comment %} <td>N/A</td> {% endcomment %}
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endblock %}

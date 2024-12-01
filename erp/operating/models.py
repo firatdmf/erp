@@ -41,14 +41,30 @@ class Machine(models.Model):
     max_rpm  = models.PositiveIntegerField()
     domain = models.DecimalField(max_digits=5, decimal_places=2)
 
+# class Product(models.Model):
+#     sku = models.CharField(max_length=50, unique=True, blank=False)
+#     name = models.CharField(max_length=50, unique=False, blank= True, null=True)
+#     description = models.CharField(max_length=250, blank= True, null=True)
+#     # variant = ArrayField(ArrayField(models.CharField()), blank=True,null=True)
+#     # machine = models.ForeignKey(Machine, on_delete=models.CASCADE, blank=False,null=False)
+#     cost = models.DecimalField(max_digits=6, decimal_places=2,unique=False, blank=True)
+#     # unit = models.CharField(max_length=10, unique=False, default="piece")
+#     unit = models.ForeignKey(UnitCategory, on_delete=models.CASCADE, blank=False, null=False )
+#     stock_quantity = models.DecimalField(max_digits=10, decimal_places=2,unique=False, blank=True)
+#     raw_materials = models.ManyToManyField(RawMaterial)
+
 class Product(models.Model):
-    sku = models.CharField(max_length=50, unique=True, blank=False)
-    name = models.CharField(max_length=50, unique=True, blank= True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sku = models.CharField(max_length=50, unique=False, blank=False)
+    name = models.CharField(max_length=50, unique=False, blank= True, null=True)
+    manufacturer = models.CharField(max_length=250, blank= False, null=False)
     description = models.CharField(max_length=250, blank= True, null=True)
-    variant = ArrayField(ArrayField(models.CharField()), blank=True,null=True)
+    variant = models.JSONField(blank=True,null=True)
     # machine = models.ForeignKey(Machine, on_delete=models.CASCADE, blank=False,null=False)
     cost = models.DecimalField(max_digits=6, decimal_places=2,unique=False, blank=True)
     # unit = models.CharField(max_length=10, unique=False, default="piece")
     unit = models.ForeignKey(UnitCategory, on_delete=models.CASCADE, blank=False, null=False )
     stock_quantity = models.DecimalField(max_digits=10, decimal_places=2,unique=False, blank=True)
-    raw_materials = models.ManyToManyField(RawMaterial)
+    raw_materials = models.ManyToManyField(RawMaterial,blank=True)
+    def __str__(self):
+        return self.name

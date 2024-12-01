@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    {% comment %} <link rel="stylesheet" href="{% static 'accounting/css/equity_product.css' %}" /> {% endcomment %}
+  {% endblock %}
+
+  <form method="POST">
+    {% csrf_token %}
+    {{ form.as_p }}  <!-- Invoice fields -->
+
+    <h3>Products</h3>
+    <div>
+        {% for form in item_formset %}
+            <div>
+                {{ form.as_p }}  <!-- Display product, quantity, and price fields -->
+            </div>
+        {% endfor %}
+    </div>
+    
+    <button type="submit">Create Invoice</button>
+</form>
+{% endblock %}

@@ -1,5 +1,7 @@
 from django import forms
-from .models import EquityRevenue, EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory, EquityDivident
+
+from .models import EquityRevenue, EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory, EquityDivident, Invoice, InvoiceItem
+from operating.models import Product
 from datetime import date
 
 
@@ -164,3 +166,37 @@ class EquityDividentForm(forms.ModelForm):
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+
+
+
+
+class InvoiceForm(forms.ModelForm):
+    class Meta:
+        model = Invoice
+        fields= ['invoice_number','company','due_date']
+        widgets = {
+            "due_date": forms.DateInput(attrs={"type":"date"}),
+        }
+
+
+class InvoiceItemForm(forms.ModelForm):
+    class Meta:
+        model = InvoiceItem
+        fields = ['product', 'quantity', 'price']
+
+        
+    quantity = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Allow decimal quantities
+    price = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Price can also be dynamic
+
+class CreateInvoiceForm(forms.Form):
+    invoice = InvoiceForm()
+    items = forms.ModelMultipleChoiceField(queryset=Product.objects.all(), widget=forms.CheckboxSelectMultiple)
+
+
+class InvoiceItemFormSet(forms.BaseFormSet):
+    def clean(self):
+        # Custom validation for the formset, e.g. if no items are selected
+        if any(self.errors):
+            return
+        if not any(form.cleaned_data for form in self.forms):
+            raise forms.ValidationError("At least one product must be added to the invoice.")

@@ -4,10 +4,15 @@ from django.http import HttpResponse
 # from django.views.generic import TemplateView
 from django.urls import reverse_lazy
 from django.views import View, generic
-from .models import EquityRevenue, EquityExpense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Stakeholder,CashAccount, EquityCapital, EquityDivident
+
+from operating.models import Product
+from .models import EquityRevenue, EquityExpense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem, Stakeholder,CashAccount, EquityCapital, EquityDivident
 
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
-from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm
+from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm, InvoiceForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm, InvoiceItemForm, InvoiceItemFormSet
+from django.forms import modelformset_factory
+
+
 from django.http import JsonResponse
 from django.db.models import Q
 from django.db.models import Sum
@@ -372,3 +377,49 @@ class AddEquityExpense(generic.edit.CreateView):
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
+
+class InvoiceCreateView(generic.CreateView):
+    model = Invoice
+    form_class = InvoiceForm
+    template_name = 'accounting/create_invoice.html'
+    success_url = reverse_lazy('operating:index')
+
+    def get_context_data(self, **kwargs):
+        # Add the invoice form and formset for items
+        context = super().get_context_data(**kwargs)
+        InvoiceItemFormSet = modelformset_factory(InvoiceItem, form=InvoiceItemForm, extra=1)
+        context['item_formset'] = InvoiceItemFormSet(queryset=InvoiceItem.objects.none())
+        return context
+
+    def form_valid(self,form):
+        invoice = form.save()
+        # Now that the invoice is saved, it has a primary key
+        # Get the formset for invoice items
+        item_formset = InvoiceItemFormSet(self.request.POST)
+        # products = self.request.POST.getlist('products')
+        if item_formset.is_valid():
+            total_amount = 0  # Initialize total_amount to 0
+            items_to_save = []  # Collect InvoiceItem instances to save later
+            # For each form in the formset, create an InvoiceItem entry
+            for item_form in item_formset:
+                product = item_form.cleaned_data.get('product')
+                quantity = item_form.cleaned_data.get('quantity')
+                price = item_form.cleaned_data.get('price')
+                if product and quantity is not None and price is not None:
+                    item = InvoiceItem(
+                        invoice=invoice,
+                        product=product,
+                        quantity=quantity,
+                        price=price
+                    )
+                    items_to_save.append(item)
+                    # Accumulate total amount
+                    total_amount += quantity * price
+
+                    
+            InvoiceItem.objects.bulk_create(items_to_save)
+            invoice.total_amount = total_amount
+            invoice.save()  # Save the updated invoice
+        return super().form_valid(form)
+
+

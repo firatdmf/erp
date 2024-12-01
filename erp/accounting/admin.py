@@ -11,10 +11,12 @@ from .models import (
     EquityCapital,
     Book,
     # Source,
-    Sale,
+    # Sale,
     Asset,
     # Equity,
-    Stakeholder
+    Stakeholder,
+    Invoice,
+    InvoiceItem,
 )
 
 admin.site.register(CurrencyCategory)
@@ -26,7 +28,7 @@ admin.site.register(ExpenseCategory)
 admin.site.register(EquityExpense)
 admin.site.register(IncomeCategory)
 admin.site.register(Income)
-admin.site.register(Sale)
+# admin.site.register(Sale)
 admin.site.register(Asset)
 # admin.site.register(Equity)
 admin.site.register(Stakeholder)
@@ -36,3 +38,21 @@ admin.site.register(EquityCapital)
 
 
 # Register your models here.
+
+
+
+
+# Below is for invoice
+# -----------------------------------------------------------------------------------------------------
+class InvoiceItemInline(admin.TabularInline):
+    model = InvoiceItem
+    extra = 1  # One extra empty row for new items
+
+class InvoiceAdmin(admin.ModelAdmin):
+    inlines = [InvoiceItemInline]
+    list_display = ['invoice_number', 'company', 'due_date', 'total_amount']
+
+admin.site.register(Invoice, InvoiceAdmin)
+admin.site.register(InvoiceItem)
+
+# -----------------------------------------------------------------------------------------------------

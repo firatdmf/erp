@@ -1,0 +1,39 @@
+Remember that the emphasis of an MVP is on simplicity and usability. 
+You want to launch quickly to gather user feedback and iterate on your CRM based on real user experiences. 
+As you receive feedback and understand user needs better, you can expand and enhance the CRM with additional features and integrations in future iterations. 
+The key is to start with the core functionality that solves a specific problem for your target users.
+
+-------------------------------------------------- MVP -------------------------------------------------------------------------
+
+Accounting:
+   Show Money Coming in and Coming Out (Categorize expenses)
+   Calculate Burn, Runway, Growth Rate, Default Alive
+   Show Total Accounts Receivable, Accounts Payable
+   Generate Income Statement, Balance Sheet, and Cash Flow statements.
+   Every taken income should link to an invoice
+
+Marketing:
+   Show all contacts and companies together both
+   Chill Todo and personal to do
+   Classify Contacts: Lead, Prospect, Client, and Dead.
+   Group Contacts: Distributors, Retailers, or a group defined by user. 
+   Add Relationships between contacts.
+   Task: Create Web Push Notification feature (Progressive Web App?) or Email notifications
+   Create Auto follow up for leads
+   Create Auto product sender to clients
+   Provide reports: Count Number of new leads added daily /, and how things are going
+   Remove frictions in adding data (select contact via typo tolerant search, add existing contacts from csv)
+   Be able to upload your own crm data
+   When creating a company or contact, dynamically check if it already exists
+
+Operations:
+   Add Customer Order: Quotation, Waiting on Confirmation, Confirmed, In production(sub operations), Ready for Shipment, Shipped (Closed), On Hold (Closed) 
+   Show what order status of a client, create a link for the order status share with client
+   See the stock and share with clients
+   Productions today
+   Raw Materials Inventory
+   Calculate efficiency (Measure current status first)
+   Apply Lean Six Sigma Principles — Make your IE degree talk
+   Create digital twin
+   Activity Report (what have you done recently)
+   Put feedback mechanism

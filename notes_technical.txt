@@ -1,0 +1,107 @@
+let's create the virtual environment first
+python -m venv vir_env
+virtual environments are important for deployment, collaboration, package management.
+
+to activate windows virtual environment, type:
+vir_env\Scripts\activate
+
+to deactivate windows virtual environment, type:
+deactivate
+
+Activate the virtual environment
+
+Now I want to bring in database, POSTGRESQL. To do that, I need to psycopg package. 
+Psycopg is the most popular PostgreSQL adapter for the python programming language.
+To do that I typed: pip install psycopg2
+I installed psycopg2 instead of psycopg
+
+now install django while in venv by typing "python -m pip install django"
+
+to learn your django version do: 
+python -m django --version
+
+let's create the project
+"django-admin startproject erp"
+
+go to erp folder and say
+"python manage.py runserver"
+
+it works! Let's now create an app.
+python manage.py startapp [appname]
+-------------------------------------
+Connected the database (used postgres admin)
+Next, run the Django command-line utilities to create the database tables automatically:
+The makemigrations command looks at all your available models and creates migrations for whichever tables don’t already exist. 
+$ python manage.py makemigrations
+migrate runs the migrations and creates tables in your database, as well as optionally providing much richer schema control.
+$ python manage.py migrate
+-----
+
+GITHUB
+to remove a file from github, "git rm -r --cached erp_vir_env" This does not removes locally, only in the git folder, then you can push it
+
+to create the requirements.txt file:
+python -m pip freeze > requirements.txt
+
+
+----
+I deployed by form is creating a problem for me
+
+
+pip install -r .\requirements.txt
+for mac: pip install -r requirements.txt
+
+
+now lets install whitenoise
+pip install whitenoise
+-----------------------------------
+How to reset your db:
+ manage.py migrate --fake <appname> zero
+$ rm -rf migrations
+$ manage.py makemigrations <appname>
+$ manage.py migrate --fake <appname>
+
+------------
+fix the relationship exists issue:
+delete all the related tables from database, delete the migrations folder
+py manage.py migrate --fake app_name zero
+python manage.py migrate APPNAME
+
+
+
+I removed the psycopg2 package from requirements file when I deployed because that only works in development
+For production you need psycopg2-binary
+
+
+--
+You need to run: "py manage.py collectstatic", so it builds the stylesheets and js to production
+
+
+
+If your migrations get messed up do below
+'py manage.py migrate --fake accounting zero'
+and then:
+'py manage.py migrate accounting'
+
+
+to load initial data to database do below:
+
+create a fixture file. And then run:
+py manage.py loaddata app_name/file_name.json
+
+------------------------------------------------------
+To access a variable globally:
+erp.context_processors.py -> put into settings.py file -> into template variable
+
+anything you put there shows everywhere
+----------------------------------------------------------
+
+
+Model->Form->Template->View->Url
+
+-----------------------------------------------------------------
+
+Dumping your database:
+
+
+pg_dump -f "dump_file.sql" -h "aws-0-eu-west-1.pooler.supabase.com" -U postgres.eyzefiawzpxtwzqymyph "postgres"

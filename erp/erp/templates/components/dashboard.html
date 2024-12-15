@@ -10,6 +10,9 @@
 {% endblock js %}
 <div class="dashboardComponent">
   <h2>New leads added today: {{ number_of_leads_added }}</h2>
+  {% if country_of_the_day %}
+  <h2>Country of the day: {{country_of_the_day}}</h2>
+  {% endif %}
   <div class="dashboardContainer">
     <div class="tasks">
       <h3>

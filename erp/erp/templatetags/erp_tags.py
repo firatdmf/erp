@@ -4,24 +4,38 @@ from crm.models import Contact, Company
 from django.utils import timezone
 import datetime
 import calendar
+from django.conf import settings
+# from django.utils.timezone import make_aware
+import pytz
 register = template.Library()
 
 
-country_index = 0
 @register.simple_tag
 def dashboard_component(csrf_token):
-    today = timezone.localtime(timezone.now()).date()
-    # today_day = (str(today)).split('-')[2]
-    # below is the current week number of the current year
+
+
+    # Below two lines result in the same thing but they give naive time warning so we fix it by setting the timezone
+    # today = timezone.localtime(timezone.now()).date()
+    # today = datetime.datetime.today().strftime('%Y-%m-%d')
+
+    # bring the timezone information from the settings and set to time zone variable via pytz library 
+    timezone = pytz.timezone(settings.TIME_ZONE)
+    
+    # Get the current date and localize it so you won't get the naive time warning
+    today = timezone.localize(datetime.datetime.today())
+
+    # There are 52 weeks in a year, this tells you which week of the day you are in (25th or 50th week etc)
     week_number = datetime.date.today().isocalendar()[1] 
     country_of_the_day = '' #initializing the variable
-    crm_countries = ['Spain','Italy','Portugal','Poland','Germany','France','Japan','Romania','Hungary','USA','Canada','UK']
-    # We need to make sure today is not Sunday, because we do not work on Sundays (sunday is the 6th day of the week iterating from zero)
-    if (today.weekday()!=6):
-        # If the week number is not even (is odd) then select the first 6 countries from the list and pick one according to the day of the week, where 0 is monday
+    crm_countries = ['Spain','Italy','Portugal','Poland','Germany','France','Japan','Romania','Hungary','USA','Canada','UK'] # Countries to sell
+    if (today.weekday()!=6): #6th day is sunday (iterating from 0 as monday). We do not work on Sunday, so eliminate it.
+        # If the week number is not even (in other words, odd) then select the first 6 countries from the list and pick one according to the day of the week, where 0 is monday
+        # This is helpful to make sure we cover all the countries in the list
         if week_number % 2 != 0:
+            # Pick among the first 6 countries
             country_of_the_day = crm_countries[:6][today.weekday()]
         else:
+            # Pick among the last 6 countries
             country_of_the_day = crm_countries[-6:][today.weekday()]
 
 

@@ -52,6 +52,10 @@ pip install -r .\requirements.txt
 for mac: pip install -r requirements.txt
 
 
+keep in mind that you need to install postgres to your computer: (mac)
+brew install postgresql
+
+
 now lets install whitenoise
 pip install whitenoise
 -----------------------------------

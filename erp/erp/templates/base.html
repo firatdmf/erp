@@ -143,9 +143,9 @@
               <p>We love, {{ member.company_name|upper }}!</p>
             {% endif %}
             <span>{% now 'F j, Y' %}</span>
-            <div class="countDown">
+            {% comment %}
+             <div class="countDown">
               <div class="container">
-                {% comment %} <h3 id="headline">Countdown to my project</h3> {% endcomment %}
                 <div id="countdown">
                   <ul>
                     <li><span id="days"></span>days</li>
@@ -162,7 +162,8 @@
                 </div>
               </div>
             </div>
-          </div>
+          </div> 
+          {% endcomment %}
         </header>
         {% block content %}
 

@@ -168,17 +168,30 @@ WSGI_APPLICATION = "erp.wsgi.app"
 # }
 
 # below is for railway postgres db
+# DATABASES = {
+#     "default": {
+#         "ENGINE": config('ENGINE'),
+#         # name of database
+#         "NAME": config("NAME"),
+#         # user that created the database, or have access to it
+#         "USER": config("USER"),
+#         # user password
+#         "PASSWORD": config("PASSWORD"),
+#         "HOST": config("HOST"), # an empty string means localhost
+#         "PORT": config("PORT"),
+#     }
+# }
 DATABASES = {
     "default": {
-        "ENGINE": config('ENGINE'),
+        "ENGINE": "django.db.backends.postgresql",
         # name of database
-        "NAME": config("NAME"),
+        "NAME": "postgres",
         # user that created the database, or have access to it
-        "USER": config("USER"),
+        "USER": "postgres.eyzefiawzpxtwzqymyph",
         # user password
-        "PASSWORD": config("PASSWORD"),
-        "HOST": config("HOST"), # an empty string means localhost
-        "PORT": config("PORT"),
+        "PASSWORD": "mzH36GKgBrDgr4QF",
+        "HOST": "aws-0-eu-west-1.pooler.supabase.com", # an empty string means localhost
+        "PORT": "6543",
     }
 }
 

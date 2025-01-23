@@ -181,19 +181,7 @@ WSGI_APPLICATION = "erp.wsgi.app"
 #         "PORT": config("PORT"),
 #     }
 # }
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        # name of database
-        "NAME": "postgres",
-        # user that created the database, or have access to it
-        "USER": "postgres.eyzefiawzpxtwzqymyph",
-        # user password
-        "PASSWORD": "mzH36GKgBrDgr4QF",
-        "HOST": "aws-0-eu-west-1.pooler.supabase.com", # an empty string means localhost
-        "PORT": "6543",
-    }
-}
+#
 
 
 # Password validation

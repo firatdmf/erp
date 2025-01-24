@@ -147,42 +147,21 @@ WSGI_APPLICATION = "erp.wsgi.app"
 #     }
 # }
 
-# below is for postgres that I added myself @firat
-# below is for local postgres
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         # name of database
-#         "NAME": "erp",
-#         # user that created the database, or have access to it
-#         "USER": "postgres",
-#         # user password
-#         "PASSWORD": "12345678",
-#         "HOST": "",  # an empty string means localhost
-#         "PORT": "5432",
-#     }
-# }
-# BELOW IS FOR SECURE LOCAL DB WITH ENV FILE
-# DATABASES = {
-#     os.getenv('DATABASE')
-# }
 
-# below is for railway postgres db
-# DATABASES = {
-#     "default": {
-#         "ENGINE": config('ENGINE'),
-#         # name of database
-#         "NAME": config("NAME"),
-#         # user that created the database, or have access to it
-#         "USER": config("USER"),
-#         # user password
-#         "PASSWORD": config("PASSWORD"),
-#         "HOST": config("HOST"), # an empty string means localhost
-#         "PORT": config("PORT"),
-#     }
-# }
-#
 
+DATABASES = {
+    "default": {
+        "ENGINE": config('DB_ENGINE'),
+        # name of database
+        "NAME": config("DB_NAME"),
+        # user that created the database, or have access to it
+        "USER": config("DB_USER"),
+        # user password
+        "PASSWORD": config("DB_PASSWORD"),
+        "HOST": config("DB_HOST"), # an empty string means localhost
+        "PORT": config("DB_PORT"),
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

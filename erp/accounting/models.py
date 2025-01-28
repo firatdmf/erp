@@ -20,7 +20,7 @@ class CurrencyCategory(models.Model):
 
 # The books is to keep the separate entities apart for accounting, and operating purposes.
 class Book(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now=True)
     name = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
@@ -107,12 +107,6 @@ class EquityCapital(models.Model):
 
 
 
-# Not used for now
-class Source(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.name
 
 
 class ExpenseCategory(models.Model):
@@ -125,9 +119,41 @@ class ExpenseCategory(models.Model):
         verbose_name_plural = "Expense Categories"
 
 
+class EquityRevenue(models.Model):
+    class Meta:
+        verbose_name_plural = "Equity Revenues"
+
+    def __str__(self):
+        return f"{self.currency.symbol}{self.amount} | {self.cash_account.name}"
+    
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    cash_account = models.ForeignKey(
+        CashAccount, on_delete=models.CASCADE, blank=False, null=False
+    )
+    currency = models.ForeignKey(
+        CurrencyCategory,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    date = models.DateField()
+    description = models.CharField(max_length=200, unique=False, blank=True)
+    invoice_number = models.CharField(max_length=20, unique=True, blank=True,null=True)
+
+
 class EquityExpense(models.Model):
     class Meta:
         verbose_name_plural = "Equity Expenses"
+
+    def __str__(self):
+        try:
+            # return f"{self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')} - {self.category.name}"
+            return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%d %B, %Y')} - {self.category.name}"
+        except AttributeError:
+            return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')}"
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
@@ -146,16 +172,11 @@ class EquityExpense(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
     description = models.CharField(max_length=200, unique=False, blank=True)
-    account_balance = models.DecimalField(
-        max_digits=10, decimal_places=2, unique=False, blank=True
-    )
+    # account_balance = models.DecimalField(
+    #     max_digits=10, decimal_places=2, unique=False, blank=True
+    # )
 
-    def __str__(self):
-        try:
-            # return f"{self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')} - {self.category.name}"
-            return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%d %B, %Y')} - {self.category.name}"
-        except AttributeError:
-            return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')}"
+
         
 class EquityDivident(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -176,25 +197,6 @@ class EquityDivident(models.Model):
     date = models.DateField()
     description = models.CharField(max_length=200, unique=False, blank=True)
 
-
-class EquityRevenue(models.Model):
-    class Meta:
-        verbose_name_plural = "Equity Revenues"
-    created_at = models.DateTimeField(auto_now_add=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    cash_account = models.ForeignKey(
-        CashAccount, on_delete=models.CASCADE, blank=False, null=False
-    )
-    currency = models.ForeignKey(
-        CurrencyCategory,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-    )
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateField()
-    description = models.CharField(max_length=200, unique=False, blank=True)
-    invoice_number = models.CharField(max_length=20, unique=True, blank=True)
 
 
 class IncomeCategory(models.Model):
@@ -239,43 +241,6 @@ class Income(models.Model):
         except AttributeError:
             return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')}"
 
-def invoice_default():
-    return {"firat":"hello"}
-
-def invoice_due_date():
-    return timezone.now() + timezone.timedelta(days=30)
-
-class Invoice(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    invoice_number = models.CharField(max_length=20, unique=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    company = models.ForeignKey(Company, on_delete=models.RESTRICT, blank=False, null=False)
-    date = models.DateField(default = timezone.now)
-    due_date = models.DateField(default = invoice_due_date())
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2,default=0)
-    paid = models.BooleanField(default=False)
-
-    def save(self, *args, **kwargs):
-        # Calculate the total amount by summing the prices of all related InvoiceItems
-        self.total_amount = sum(item.quantity * item.price for item in self.invoiceitem_set.all())
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Invoice {self.invoice_number}"
-
-class InvoiceItem(models.Model):
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-
-    def __str__(self):
-        return f"{self.quantity} x {self.product.name} in {self.invoice.invoice_number}"
-
-    def get_total_price(self):
-        return self.quantity * self.price
-
-    
 
 class AssetCategory(models.Model):
     name = models.CharField(max_length=100)
@@ -323,3 +288,72 @@ class Liability(models.Model):
         return f"{self.name} - {self.value} {self.currency.code}"
 
 
+class Transaction(models.Model):
+
+    def __str__(self):
+        return f"{self.type} | {self.currency.symbol}{self.value}"
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    value = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
+    type = models.CharField(max_length=50, blank=True, null=True)
+    type_pk = models.PositiveBigIntegerField(blank=True, null=True)
+    # type_id = models.CharField(max_length=50, blank=True, null=True)
+    account = models.ForeignKey(CashAccount, on_delete=models.CASCADE, blank=True, null=True)
+    # origin_account = models.ForeignKey(
+    #     CashAccount, on_delete=models.CASCADE, blank=False, null=False
+    # )
+    # destination_account = models.ForeignKey(
+    #     CashAccount, on_delete=models.CASCADE, blank=False, null=False
+    # )
+
+
+
+
+    # ----------------------------------------------------------------------
+
+def invoice_default():
+    return {"firat":"hello"}
+
+def invoice_due_date():
+    return timezone.now() + timezone.timedelta(days=30)
+
+class Invoice(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    invoice_number = models.CharField(max_length=20, unique=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    company = models.ForeignKey(Company, on_delete=models.RESTRICT, blank=False, null=False)
+    date = models.DateField(default = timezone.now)
+    due_date = models.DateField(default = invoice_due_date())
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2,default=0)
+    paid = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        # Calculate the total amount by summing the prices of all related InvoiceItems
+        self.total_amount = sum(item.quantity * item.price for item in self.invoiceitem_set.all())
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Invoice {self.invoice_number}"
+
+class InvoiceItem(models.Model):
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.quantity} x {self.product.name} in {self.invoice.invoice_number}"
+
+    def get_total_price(self):
+        return self.quantity * self.price
+
+    
+
+# Not used for now
+class Source(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name

@@ -6,8 +6,8 @@ from django.urls import reverse_lazy
 from django.views import View, generic
 
 from operating.models import Product
-from .models import EquityRevenue, EquityExpense, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem, Stakeholder,CashAccount, EquityCapital, EquityDivident
-
+from .models import EquityRevenue, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem, Stakeholder,CashAccount, EquityCapital, EquityDivident,Transaction
+from .models import EquityExpense
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
 from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm, InvoiceForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm, InvoiceItemForm, InvoiceItemFormSet
 from django.forms import modelformset_factory
@@ -21,6 +21,8 @@ from datetime import timedelta
 import decimal
 from currency_converter import CurrencyConverter
 
+
+# Make this functional programming
 
 class index(generic.TemplateView):
     template_name = "accounting/index.html"
@@ -112,7 +114,6 @@ class AddEquityCapital(generic.edit.CreateView):
         kwargs = super().get_form_kwargs()
         book_pk = self.kwargs.get('pk')
         book = Book.objects.get(pk=book_pk)
-        print(book)
         kwargs['book'] = book
         return kwargs
     
@@ -151,12 +152,11 @@ class AddEquityRevenue(generic.edit.CreateView):
     form_class = EquityRevenueForm
     template_name = "accounting/add_equity_revenue.html"
 
-        # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
+    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         book_pk = self.kwargs.get('pk')
         book = Book.objects.get(pk=book_pk)
-        print(book)
         kwargs['book'] = book
         return kwargs
     
@@ -172,8 +172,16 @@ class AddEquityRevenue(generic.edit.CreateView):
 
     # You do this because you want to manually do some process when the expense form is submitted.
     def post(self,request,*args,**kwargs):
+        print('you sent a post request')
         form = self.get_form()
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        latest_revenue_item = EquityRevenue.objects.filter(book=book).latest('pk')
+        type_pk = latest_revenue_item.pk + 1
         if form.is_valid():
+            print("hey the form is valid man!!!")
+
+
             # Get the selected cash account from the form
             target_cash_account = form.cleaned_data.get("cash_account")
             target_cash_account = CashAccount.objects.get(pk=target_cash_account.pk)
@@ -183,6 +191,10 @@ class AddEquityRevenue(generic.edit.CreateView):
              # Save the updated cash account
             target_cash_account.save()
 
+            currency = form.cleaned_data.get("currency")
+            # You need error handling here.
+            transaction = Transaction(book=book,value = form.cleaned_data.get("amount"),currency=currency,type="revenue", account =target_cash_account, type_pk =type_pk  )
+            transaction.save()
 
             # # All cash accounts combined
             # total_cash = CashAccount.objects.filter(book=kwargs['book'])
@@ -198,7 +210,14 @@ class AddEquityRevenue(generic.edit.CreateView):
             # new_asset = Asset.objects.create(book = self.kwargs.get('pk'), )
             # print('the form is valid')
             # print(target_cash_account.pk)
+
             return self.form_valid(form)
+        else:
+            for field in form:
+                print("Field Error:", field.name,  field.errors)
+    
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
     
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
@@ -242,9 +261,14 @@ class AddStakeholder(generic.edit.CreateView):
     
 
 
-class EquityExpense(generic.ListView):
+class EquityExpenseList(generic.ListView):
     model = EquityExpense
-    template_name = "accounting/equity_expense.html"
+    template_name = "accounting/equity_expense_list.html"
+
+
+class TransactionList(generic.ListView):
+    model =Transaction
+    template_name = "accounting/transaction_list.html"
 
 class PayEquityDivident(generic.edit.CreateView):
     model = EquityDivident
@@ -256,7 +280,6 @@ class PayEquityDivident(generic.edit.CreateView):
         kwargs = super().get_form_kwargs()
         book_pk = self.kwargs.get('pk')
         book = Book.objects.get(pk=book_pk)
-        print(book)
         kwargs['book'] = book
         return kwargs
     
@@ -281,6 +304,8 @@ class PayEquityDivident(generic.edit.CreateView):
             
              # Save the updated cash account
             target_cash_account.save()
+
+
 
 
             # # All cash accounts combined
@@ -319,7 +344,6 @@ class AddEquityExpense(generic.edit.CreateView):
         kwargs = super().get_form_kwargs()
         book_pk = self.kwargs.get('pk')
         book = Book.objects.get(pk=book_pk)
-        print(book)
         kwargs['book'] = book
         return kwargs
     
@@ -347,6 +371,10 @@ class AddEquityExpense(generic.edit.CreateView):
     # You do this because you want to manually do some process when the expense form is submitted.
     def post(self,request,*args,**kwargs):
         form = self.get_form()
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        latest_revenue_item = EquityExpense.objects.filter(book=book).latest('pk')
+        type_pk = latest_revenue_item.pk + 1
         if form.is_valid():
             # Get the selected cash account from the form
             target_cash_account = form.cleaned_data.get("cash_account")
@@ -356,6 +384,10 @@ class AddEquityExpense(generic.edit.CreateView):
             
              # Save the updated cash account
             target_cash_account.save()
+
+            currency = form.cleaned_data.get("currency")
+            transaction = Transaction(book=book,value = (form.cleaned_data.get("amount")),currency=currency,type="expense", account = target_cash_account, type_pk = type_pk )
+            transaction.save()
 
 
             # # All cash accounts combined

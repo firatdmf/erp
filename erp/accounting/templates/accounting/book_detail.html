@@ -32,10 +32,13 @@
       <a href="{% url 'accounting:add_equity_expense' Book.id %}">Add Expense</a>
     </li>
     <li>
-      <a href="{% url 'accounting:equity_expense' Book.id %}">See Expenses</a>
+      <a href="{% url 'accounting:equity_expense_list' Book.id %}">See Expenses</a>
     </li>
     <li>
       <a href="{% url 'accounting:pay_equity_divident' Book.id %}">Pay Divident</a>
+    </li>
+    <li>
+      <a href="{% url 'accounting:transaction_list' Book.id %}">See all Transactions</a>
     </li>
   </ul>
 

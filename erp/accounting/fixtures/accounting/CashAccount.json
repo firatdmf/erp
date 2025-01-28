@@ -1,6 +1,6 @@
 [
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 1,
     "fields": {
       "book": 2,
@@ -10,7 +10,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 2,
     "fields": {
       "book": 2,
@@ -20,7 +20,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 3,
     "fields": {
       "book": 2,
@@ -30,7 +30,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 4,
     "fields": {
       "book": 2,
@@ -40,7 +40,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 5,
     "fields": {
       "book": 2,
@@ -50,7 +50,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 6,
     "fields": {
       "book": 2,
@@ -60,7 +60,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 7,
     "fields": {
       "book": 2,
@@ -70,7 +70,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 8,
     "fields": {
       "book": 2,
@@ -80,7 +80,7 @@
     }
   },
   {
-    "model": "accounting.CashAccounts",
+    "model": "accounting.CashAccount",
     "pk": 9,
     "fields": {
       "book": 2,

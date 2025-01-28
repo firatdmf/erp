@@ -11,6 +11,7 @@ from .models import EquityExpense
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
 from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm, InvoiceForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm, InvoiceItemForm, InvoiceItemFormSet
 from django.forms import modelformset_factory
+from datetime import datetime
 
 
 from django.http import JsonResponse
@@ -20,6 +21,8 @@ from django.utils import timezone
 from datetime import timedelta
 import decimal
 from currency_converter import CurrencyConverter
+import yfinance as yf
+from decimal import Decimal
 
 
 # Make this functional programming
@@ -53,8 +56,119 @@ class BookDetail(generic.DetailView):
     template_name = "accounting/book_detail.html"
     context_object_name = "Book"
 
+    def get_exchange_rate(self,from_currency, to_currency):
+        ticker = f"{from_currency}{to_currency}=X"
+        data = yf.Ticker(ticker)
+        exchange_rate = data.history(period="1d")['Close'][0]
+        return exchange_rate
+
+    # def get_monthly_revenue_in_usd(self):
+    # # Get the first day of the current month
+    #     now = timezone.now()
+    #     first_day_of_month = datetime(now.year, now.month, 1)
+
+    #     # Fetch all revenues from the beginning of the month until now
+    #     revenues = EquityRevenue.objects.filter(date__gte=first_day_of_month)
+
+    #     total_revenue_usd = 0
+    #     for revenue in revenues:
+    #         if revenue.currency.code == 'USD':
+    #             amount_in_usd = revenue.amount
+    #         else:
+    #             # If we do not say self, it does not recognize it because BookDetail is a class
+    #             exchange_rate = self.get_exchange_rate(revenue.currency.code, 'USD')
+    #             amount_in_usd = revenue.amount * exchange_rate
+    #         total_revenue_usd += amount_in_usd
+
+    #     return total_revenue_usd
+
+    def get_monthly_revenue_in_usd(self, start_date, end_date):
+        revenues = EquityRevenue.objects.filter(date__gte=start_date, date__lt=end_date)
+        total_revenue_usd = 0
+        for revenue in revenues:
+            if revenue.currency.code == 'USD':
+                amount_in_usd = revenue.amount
+            else:
+                exchange_rate = self.get_exchange_rate(revenue.currency.code, 'USD')
+                amount_in_usd = revenue.amount * exchange_rate
+            total_revenue_usd += amount_in_usd
+        return total_revenue_usd
+    
+    def get_revenue_for_previous_months(self):
+        now = timezone.now()
+        first_day_of_current_month = datetime(now.year, now.month, 1)
+        first_day_of_last_month = first_day_of_current_month - timedelta(days=1)
+        first_day_of_last_month = datetime(first_day_of_last_month.year, first_day_of_last_month.month, 1)
+        first_day_of_two_months_ago = first_day_of_last_month - timedelta(days=1)
+        first_day_of_two_months_ago = datetime(first_day_of_two_months_ago.year, first_day_of_two_months_ago.month, 1)
+
+        revenue_last_month = self.get_monthly_revenue_in_usd(first_day_of_last_month, first_day_of_current_month)
+        revenue_two_months_ago = self.get_monthly_revenue_in_usd(first_day_of_two_months_ago, first_day_of_last_month)
+
+        return revenue_two_months_ago, revenue_last_month
+    
+    def calculate_growth_rate(self):
+        revenue_two_months_ago, revenue_last_month = self.get_revenue_for_previous_months()
+        if revenue_last_month == 0:
+            return 0  # Avoid division by zero
+        growth_rate = ((revenue_last_month - revenue_two_months_ago) / revenue_last_month) * 100
+        return growth_rate
+    
+    def get_monthly_expenses_in_usd(self):
+        # Get the first day of the current month
+        now = timezone.now()
+        first_day_of_month = datetime(now.year, now.month, 1)
+
+        # Fetch all expenses from the beginning of the month until now
+        expenses = EquityExpense.objects.filter(date__gte=first_day_of_month)
+
+        total_expense_usd = 0
+        for expense in expenses:
+            if expense.currency.code == 'USD':
+                amount_in_usd = expense.amount
+            else:
+                exchange_rate = self.get_exchange_rate(expense.currency.code, 'USD')
+                amount_in_usd = expense.amount * exchange_rate
+            total_expense_usd += amount_in_usd
+
+        return total_expense_usd
+    
+    def get_growth_rate(self):
+        now = timezone.now()
+        first_day_of_month = datetime(now.year, now.month-2, 1)
+
+
+
     def get_context_data(self,**kwargs):
         context = super().get_context_data(**kwargs)
+
+
+        # ----------------------------
+        # Below is for the total balance in cash accounts
+        balance_usd = CashAccount.objects.filter(currency=1).aggregate(Sum('balance'))['balance__sum'] or 0
+        balance_eur = CashAccount.objects.filter(currency=2).aggregate(Sum('balance'))['balance__sum'] or 0
+        balance_try = CashAccount.objects.filter(currency=3).aggregate(Sum('balance'))['balance__sum'] or 0
+        eur_to_usd = self.get_exchange_rate('EUR', 'USD')
+        try_to_usd = self.get_exchange_rate('TRY', 'USD')
+
+        balance_eur_in_usd = balance_eur * eur_to_usd
+        balance_try_in_usd = balance_try * try_to_usd
+
+        balance = Decimal(balance_usd) + Decimal(balance_eur_in_usd) + Decimal(balance_try_in_usd)
+
+        context['balance'] = balance
+
+        # ----------------------------
+        now = timezone.now()
+        first_day_of_month = datetime(now.year, now.month, 1)
+        day_of_today = datetime(now.year, now.month, now.day)
+        context['revenue'] = self.get_monthly_revenue_in_usd(first_day_of_month,day_of_today)
+        context['expense'] = self.get_monthly_expenses_in_usd()
+        context['burn'] = context['revenue'] - context['expense']
+        # Below is number of months you can survive, rounds it down to 2 decimals
+        context['runway'] = round(( context['balance'] / context['burn']),2)
+        context['growth_rate'] = self.calculate_growth_rate()
+        # print(f"Balance: {balance}")
         # book = Book.objects.get(pk=self.kwargs.get('pk'))
         book = self.get_object()
         # print(type(book))

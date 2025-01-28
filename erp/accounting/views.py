@@ -167,7 +167,8 @@ class BookDetail(generic.DetailView):
         context['burn'] = context['revenue'] - context['expense']
         # Below is number of months you can survive, rounds it down to 2 decimals
         context['runway'] = round(( context['balance'] / context['burn']),2)
-        context['growth_rate'] = self.calculate_growth_rate()
+        # context['growth_rate'] = self.calculate_growth_rate()
+        context['default_alive'] = ""
         # print(f"Balance: {balance}")
         # book = Book.objects.get(pk=self.kwargs.get('pk'))
         book = self.get_object()

@@ -18,4 +18,4 @@ application = get_wsgi_application()
 
 # I added below for deploying the django to Vercel
 # to bridge the connection with vercel (remember vercel.app from settings.py)
-# app = application
+app = application

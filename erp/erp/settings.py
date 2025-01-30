@@ -133,8 +133,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "erp.wsgi.application"
-# WSGI_APPLICATION = "erp.wsgi.app"
+# WSGI_APPLICATION = "erp.wsgi.application"
+WSGI_APPLICATION = "erp.wsgi.app"
 
 
 # Database

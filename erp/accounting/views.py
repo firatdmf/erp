@@ -23,6 +23,7 @@ import decimal
 from currency_converter import CurrencyConverter
 import yfinance as yf
 from decimal import Decimal
+import math
 
 
 # Make this functional programming
@@ -145,16 +146,17 @@ class BookDetail(generic.DetailView):
 
         # ----------------------------
         # Below is for the total balance in cash accounts
-        balance_usd = CashAccount.objects.filter(currency=1).aggregate(Sum('balance'))['balance__sum'] or 0
-        balance_eur = CashAccount.objects.filter(currency=2).aggregate(Sum('balance'))['balance__sum'] or 0
-        balance_try = CashAccount.objects.filter(currency=3).aggregate(Sum('balance'))['balance__sum'] or 0
+        balance_usd = Decimal(CashAccount.objects.filter(currency=1).aggregate(Sum('balance'))['balance__sum'] or 0)
+        balance_eur = Decimal(CashAccount.objects.filter(currency=2).aggregate(Sum('balance'))['balance__sum'] or 0)
+        balance_try = Decimal(CashAccount.objects.filter(currency=3).aggregate(Sum('balance'))['balance__sum'] or 0)
         eur_to_usd = self.get_exchange_rate('EUR', 'USD')
         try_to_usd = self.get_exchange_rate('TRY', 'USD')
 
-        balance_eur_in_usd = balance_eur * eur_to_usd
-        balance_try_in_usd = balance_try * try_to_usd
+        balance_eur_in_usd = Decimal(balance_eur) * Decimal(eur_to_usd)
+        balance_try_in_usd = Decimal(balance_try) * Decimal(try_to_usd)
 
         balance = Decimal(balance_usd) + Decimal(balance_eur_in_usd) + Decimal(balance_try_in_usd)
+        balance = round(balance,2)
 
         context['balance'] = balance
 
@@ -166,7 +168,8 @@ class BookDetail(generic.DetailView):
         context['expense'] = self.get_monthly_expenses_in_usd()
         context['burn'] = context['revenue'] - context['expense']
         # Below is number of months you can survive, rounds it down to 2 decimals
-        context['runway'] = round(( context['balance'] / context['burn']),2)
+        avg_burn = -1000
+        context['runway'] = round(( context['balance'] / abs(avg_burn)),1)
         context['growth_rate'] = self.calculate_growth_rate()
         context['default_alive'] = ""
         # print(f"Balance: {balance}")

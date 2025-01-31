@@ -17,6 +17,7 @@
         <th>Type</th>
         <th>Type #</th>
         <th>Account</th>
+        <th>Account Balance</th>
       </tr>
 
       {% for transaction in object_list|dictsortreversed:'pk'|dictsortreversed:'created_at' %}
@@ -29,6 +30,7 @@
           <td>{{ transaction.type }}</td>
           <td>{{ transaction.type_pk }}</td>
           <td>{{ transaction.account.name }}</td>
+          <td>{{ transaction.account_balance }}</td>
 
         </tr>
       {% empty %}

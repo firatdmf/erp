@@ -9,7 +9,7 @@ from operating.models import Product
 from .models import EquityRevenue, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem, Stakeholder,CashAccount, EquityCapital, EquityDivident,Transaction
 from .models import EquityExpense
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
-from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm, InvoiceForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm, InvoiceItemForm, InvoiceItemFormSet
+from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm, InvoiceForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm, InvoiceItemForm, InvoiceItemFormSet, InTransferForm
 from django.forms import modelformset_factory
 from datetime import datetime
 
@@ -57,34 +57,23 @@ class BookDetail(generic.DetailView):
     template_name = "accounting/book_detail.html"
     context_object_name = "Book"
 
+    def get_object(self):
+        # Get the primary key from the URL
+        pk = self.kwargs.get("pk")
+        # Retrieve the Book object
+    
+        return get_object_or_404(Book, pk=pk)
+    
+
     def get_exchange_rate(self,from_currency, to_currency):
         ticker = f"{from_currency}{to_currency}=X"
         data = yf.Ticker(ticker)
         exchange_rate = data.history(period="1d")['Close'][0]
-        return exchange_rate
-
-    # def get_monthly_revenue_in_usd(self):
-    # # Get the first day of the current month
-    #     now = timezone.now()
-    #     first_day_of_month = datetime(now.year, now.month, 1)
-
-    #     # Fetch all revenues from the beginning of the month until now
-    #     revenues = EquityRevenue.objects.filter(date__gte=first_day_of_month)
-
-    #     total_revenue_usd = 0
-    #     for revenue in revenues:
-    #         if revenue.currency.code == 'USD':
-    #             amount_in_usd = revenue.amount
-    #         else:
-    #             # If we do not say self, it does not recognize it because BookDetail is a class
-    #             exchange_rate = self.get_exchange_rate(revenue.currency.code, 'USD')
-    #             amount_in_usd = revenue.amount * exchange_rate
-    #         total_revenue_usd += amount_in_usd
-
-    #     return total_revenue_usd
+        return Decimal(exchange_rate)
 
     def get_monthly_revenue_in_usd(self, start_date, end_date):
-        revenues = EquityRevenue.objects.filter(date__gte=start_date, date__lt=end_date)
+        book = self.get_object()
+        revenues = EquityRevenue.objects.filter(book=book,date__gte=start_date, date__lt=end_date)
         total_revenue_usd = 0
         for revenue in revenues:
             if revenue.currency.code == 'USD':
@@ -93,7 +82,7 @@ class BookDetail(generic.DetailView):
                 exchange_rate = self.get_exchange_rate(revenue.currency.code, 'USD')
                 amount_in_usd = revenue.amount * exchange_rate
             total_revenue_usd += amount_in_usd
-        return total_revenue_usd
+        return round(total_revenue_usd,2)
     
     def get_revenue_for_previous_months(self):
         now = timezone.now()
@@ -113,15 +102,16 @@ class BookDetail(generic.DetailView):
         if revenue_last_month == 0:
             return 0  # Avoid division by zero
         growth_rate = ((revenue_last_month - revenue_two_months_ago) / revenue_last_month) * 100
-        return growth_rate
+        return round(growth_rate,2)
     
     def get_monthly_expenses_in_usd(self):
+        book = self.get_object()
         # Get the first day of the current month
         now = timezone.now()
         first_day_of_month = datetime(now.year, now.month, 1)
 
         # Fetch all expenses from the beginning of the month until now
-        expenses = EquityExpense.objects.filter(date__gte=first_day_of_month)
+        expenses = EquityExpense.objects.filter(book=book,date__gte=first_day_of_month)
 
         total_expense_usd = 0
         for expense in expenses:
@@ -132,23 +122,17 @@ class BookDetail(generic.DetailView):
                 amount_in_usd = expense.amount * exchange_rate
             total_expense_usd += amount_in_usd
 
-        return total_expense_usd
+        return round(total_expense_usd,2)
     
-    def get_growth_rate(self):
-        now = timezone.now()
-        first_day_of_month = datetime(now.year, now.month-2, 1)
-
-
 
     def get_context_data(self,**kwargs):
         context = super().get_context_data(**kwargs)
-
-
+        book = self.get_object()
         # ----------------------------
         # Below is for the total balance in cash accounts
-        balance_usd = Decimal(CashAccount.objects.filter(currency=1).aggregate(Sum('balance'))['balance__sum'] or 0)
-        balance_eur = Decimal(CashAccount.objects.filter(currency=2).aggregate(Sum('balance'))['balance__sum'] or 0)
-        balance_try = Decimal(CashAccount.objects.filter(currency=3).aggregate(Sum('balance'))['balance__sum'] or 0)
+        balance_usd = Decimal(CashAccount.objects.filter(book=book,currency=1).aggregate(Sum('balance'))['balance__sum'] or 0)
+        balance_eur = Decimal(CashAccount.objects.filter(book=book,currency=2).aggregate(Sum('balance'))['balance__sum'] or 0)
+        balance_try = Decimal(CashAccount.objects.filter(book=book,currency=3).aggregate(Sum('balance'))['balance__sum'] or 0)
         eur_to_usd = self.get_exchange_rate('EUR', 'USD')
         try_to_usd = self.get_exchange_rate('TRY', 'USD')
 
@@ -311,7 +295,7 @@ class AddEquityRevenue(generic.edit.CreateView):
 
             currency = form.cleaned_data.get("currency")
             # You need error handling here.
-            transaction = Transaction(book=book,value = form.cleaned_data.get("amount"),currency=currency,type="revenue", account =target_cash_account, type_pk =type_pk  )
+            transaction = Transaction(book=book,value = form.cleaned_data.get("amount"),currency=currency,type="revenue", account =target_cash_account, type_pk =type_pk , account_balance = target_cash_account.balance )
             transaction.save()
 
             # # All cash accounts combined
@@ -504,7 +488,7 @@ class AddEquityExpense(generic.edit.CreateView):
             target_cash_account.save()
 
             currency = form.cleaned_data.get("currency")
-            transaction = Transaction(book=book,value = (form.cleaned_data.get("amount")),currency=currency,type="expense", account = target_cash_account, type_pk = type_pk )
+            transaction = Transaction(book=book,value = (form.cleaned_data.get("amount")),currency=currency,type="expense", account = target_cash_account, type_pk = type_pk, account_balance = target_cash_account.balance )
             transaction.save()
 
 
@@ -573,3 +557,43 @@ class InvoiceCreateView(generic.CreateView):
         return super().form_valid(form)
 
 
+
+class MakeInTransfer(generic.edit.FormView):
+    form_class = InTransferForm
+    template_name = "accounting/make_in_transfer.html"
+
+    success_url = reverse_lazy('books/2/make_in_transfer')  # Replace 'success_page' with your success URL name
+
+
+    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        kwargs['book'] = book
+        return kwargs
+    
+
+    def form_valid(self, form):
+        # Process the form data
+        amount = form.cleaned_data['amount']
+        date = form.cleaned_data['date']
+        from_cash_account = form.cleaned_data['from_cash_account']
+        from_cash_account = CashAccount.objects.get(pk=from_cash_account.pk)
+        from_cash_account_new_balance = from_cash_account.balance - amount
+        from_cash_account.balance = from_cash_account_new_balance
+        from_cash_account.save()
+
+        transaction1 = Transaction(book=from_cash_account.book,value = amount,currency=from_cash_account.currency,type="transfer", account = from_cash_account, type_pk = None, account_balance= from_cash_account_new_balance )
+        transaction1.save()
+        print(f"from cash account is: {from_cash_account}")
+        to_cash_account = form.cleaned_data['to_cash_account']
+        to_cash_account = CashAccount.objects.get(pk=to_cash_account.pk)
+        to_cash_account_new_balance = to_cash_account.balance + amount
+        to_cash_account.balance = to_cash_account_new_balance
+        to_cash_account.save()
+
+        transaction2 = Transaction(book=to_cash_account.book,value = amount,currency=to_cash_account.currency,type="transfer", account = to_cash_account, type_pk = None, account_balance = to_cash_account_new_balance )
+        transaction2.save()
+        # Add your processing logic here
+        return super().form_valid(form)

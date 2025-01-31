@@ -55,6 +55,9 @@
     <li>
       <a href="{% url 'accounting:transaction_list' Book.id %}">See all Transactions</a>
     </li>
+    <li>
+      <a href="{% url 'accounting:make_in_transfer' Book.id %}">Make in Transfer</a>
+    </li>
   </ul>
 
   {% comment %} {% book_component csrf_token=csrf_token selected_book=Book %} {% endcomment %}

@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from .views import AddEquityRevenue, CategorySearchView, InvoiceCreateView, SalesView,BookDetail,CreateAsset, AddEquityCapital, AddStakeholder, CreateBook,EquityExpenseList,AddEquityExpense, PayEquityDivident, TransactionList
+from .views import MakeInTransfer
 
 app_name = 'accounting'
 urlpatterns = [
@@ -19,6 +20,7 @@ urlpatterns = [
     path('books/<int:pk>/equity_expense_list/', EquityExpenseList.as_view(),name="equity_expense_list"),
     path('books/<int:pk>/pay_equity_divident/', PayEquityDivident.as_view(),name="pay_equity_divident"),
     path('books/<int:pk>/create_invoice/', InvoiceCreateView.as_view(),name="create_invoice"),
+    path('books/<int:pk>/make_in_transfer/', MakeInTransfer.as_view(),name="make_in_transfer"),
     path('books/<int:pk>/transaction_list/', TransactionList.as_view(),name="transaction_list"),
 ]
 

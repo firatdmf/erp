@@ -287,6 +287,17 @@ class Liability(models.Model):
     def __str__(self):
         return f"{self.name} - {self.value} {self.currency.code}"
 
+class InTransfer(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    source = models.ForeignKey(CashAccount, on_delete=models.CASCADE, related_name="source")
+    destination = models.ForeignKey(CashAccount, on_delete=models.CASCADE, related_name="destination")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
+    description = models.CharField(max_length=200, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.source.name} -> {self.destination.name} | {self.currency.symbol}{self.amount}"
 
 class Transaction(models.Model):
 
@@ -301,6 +312,7 @@ class Transaction(models.Model):
     type_pk = models.PositiveBigIntegerField(blank=True, null=True)
     # type_id = models.CharField(max_length=50, blank=True, null=True)
     account = models.ForeignKey(CashAccount, on_delete=models.CASCADE, blank=True, null=True)
+    account_balance = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     # origin_account = models.ForeignKey(
     #     CashAccount, on_delete=models.CASCADE, blank=False, null=False
     # )
@@ -357,3 +369,4 @@ class Source(models.Model):
 
     def __str__(self):
         return self.name
+    

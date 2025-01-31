@@ -200,3 +200,36 @@ class InvoiceItemFormSet(forms.BaseFormSet):
             return
         if not any(form.cleaned_data for form in self.forms):
             raise forms.ValidationError("At least one product must be added to the invoice.")
+        
+    
+
+# class InTransferForm(forms.Form):
+#     from_cash_account = forms.ModelChoiceField(queryset=CashAccount.objects.all(), empty_label="Select a cash account")
+#     to_cash_account = forms.ModelChoiceField(queryset=CashAccount.objects.all(), empty_label="Select a cash account")
+#     amount = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Allow decimal quantities
+#     date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), initial=date.today())
+
+#     def __init__(self, *args, **kwargs):
+#         book = kwargs.pop('book',None)
+#         super(InTransferForm, self).__init__(*args, **kwargs)
+#         # This ensures only the same book from the model can be selected with the cash categories (accounts)
+#         if book:
+#             self.fields["from_cash_account"].queryset = CashAccount.objects.filter(book=book)
+#             self.fields["to_cash_account"].queryset = CashAccount.objects.filter(book=book)
+#             # self.fields["book"].queryset = Book.objects.filter(book=book)
+
+
+class InTransferForm(forms.Form):
+    from_cash_account = forms.ModelChoiceField(queryset=CashAccount.objects.filter(), empty_label="Select a cash account")
+    to_cash_account = forms.ModelChoiceField(queryset=CashAccount.objects.all(), empty_label="Select a cash account")
+    amount = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Allow decimal quantities
+    date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), initial=date.today())
+
+    def __init__(self, *args, **kwargs):
+        book = kwargs.pop('book',None)
+        super(InTransferForm, self).__init__(*args, **kwargs)
+        # This ensures only the same book from the model can be selected with the cash categories (accounts)
+        if book:
+            self.fields["from_cash_account"].queryset = CashAccount.objects.filter(book=book)
+            self.fields["to_cash_account"].queryset = CashAccount.objects.filter(book=book)
+            # self.fields["book"].queryset = Book.objects.filter(book=book)

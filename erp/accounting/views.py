@@ -7,11 +7,13 @@ from django.views import View, generic
 
 from operating.models import Product
 from .models import EquityRevenue, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem, Stakeholder,CashAccount, EquityCapital, EquityDivident,Transaction
-from .models import EquityExpense
+from .models import EquityExpense, AccountBalance
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
 from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm, InvoiceForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm, InvoiceItemForm, InvoiceItemFormSet, InTransferForm
 from django.forms import modelformset_factory
 from datetime import datetime
+from django.utils.decorators import method_decorator
+from django.contrib.auth.decorators import login_required
 
 
 from django.http import JsonResponse
@@ -28,6 +30,7 @@ import math
 
 # Make this functional programming
 
+@method_decorator(login_required, name='dispatch')
 class index(generic.TemplateView):
     template_name = "accounting/index.html"
 
@@ -42,7 +45,7 @@ class index(generic.TemplateView):
 
 
 
-
+@method_decorator(login_required, name='dispatch')
 class CreateBook(generic.edit.CreateView):
     model = Book
     form_class = BookForm
@@ -51,7 +54,7 @@ class CreateBook(generic.edit.CreateView):
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.object.pk})
 
-
+@method_decorator(login_required, name='dispatch')
 class BookDetail(generic.DetailView):
     model = Book
     template_name = "accounting/book_detail.html"
@@ -166,6 +169,7 @@ class BookDetail(generic.DetailView):
         return context
 
 
+@method_decorator(login_required, name='dispatch')
 class CategorySearchView(View):
     def get(self, request):
         query = request.GET.get("query", "")
@@ -176,11 +180,11 @@ class CategorySearchView(View):
         data = [{"id": category.id, "name": category.name} for category in categories]
         return JsonResponse(data, safe=False)
 
-
+@method_decorator(login_required, name='dispatch')
 class SalesView(generic.TemplateView):
     template_name = "accounting/sales_report.html"
 
-
+@method_decorator(login_required, name='dispatch')
 class CreateAsset(generic.edit.CreateView):
     model = Asset
     form_class = AssetForm
@@ -203,7 +207,7 @@ class CreateAsset(generic.edit.CreateView):
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
 
-
+@method_decorator(login_required, name='dispatch')
 class AddEquityCapital(generic.edit.CreateView):
     model = EquityCapital
     form_class = EquityCapitalForm
@@ -249,6 +253,7 @@ class AddEquityCapital(generic.edit.CreateView):
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
+@method_decorator(login_required, name='dispatch')
 class AddEquityRevenue(generic.edit.CreateView):
     model = EquityRevenue
     form_class = EquityRevenueForm
@@ -325,7 +330,7 @@ class AddEquityRevenue(generic.edit.CreateView):
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
 
-    
+@method_decorator(login_required, name='dispatch')
 class AddStakeholder(generic.edit.CreateView):
     model = Stakeholder
     form_class = StakeholderForm
@@ -362,16 +367,17 @@ class AddStakeholder(generic.edit.CreateView):
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
 
-
+@method_decorator(login_required, name='dispatch')
 class EquityExpenseList(generic.ListView):
     model = EquityExpense
     template_name = "accounting/equity_expense_list.html"
 
-
+@method_decorator(login_required, name='dispatch')
 class TransactionList(generic.ListView):
     model =Transaction
     template_name = "accounting/transaction_list.html"
 
+@method_decorator(login_required, name='dispatch')
 class PayEquityDivident(generic.edit.CreateView):
     model = EquityDivident
     form_class = EquityDividentForm
@@ -435,7 +441,7 @@ class PayEquityDivident(generic.edit.CreateView):
 
 
 
-
+@method_decorator(login_required, name='dispatch')
 class AddEquityExpense(generic.edit.CreateView):
     model = EquityExpense
     form_class = EquityExpenseForm
@@ -511,7 +517,7 @@ class AddEquityExpense(generic.edit.CreateView):
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
-
+@method_decorator(login_required, name='dispatch')
 class InvoiceCreateView(generic.CreateView):
     model = Invoice
     form_class = InvoiceForm
@@ -557,7 +563,7 @@ class InvoiceCreateView(generic.CreateView):
         return super().form_valid(form)
 
 
-
+@method_decorator(login_required, name='dispatch')
 class MakeInTransfer(generic.edit.FormView):
     form_class = InTransferForm
     template_name = "accounting/make_in_transfer.html"
@@ -597,3 +603,30 @@ class MakeInTransfer(generic.edit.FormView):
         transaction2.save()
         # Add your processing logic here
         return super().form_valid(form)
+    
+
+@method_decorator(login_required, name='dispatch')
+class AccountBalance(generic.CreateView):
+    model = AccountBalance
+    fields = '__all__'
+    template_name = 'accounting/account_balance.html'
+
+    def get_success_url(self) -> str:
+        return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
+
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get('pk')
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        return {'book': book}
+
+    # def form_valid(self, form):
+    #     # Process the form data
+    #     book_pk = self.kwargs.get('pk')
+    #     book = Book.objects.get(pk=book_pk)
+    #     cash_account = form.cleaned_data['cash_account']
+    #     cash_account = CashAccount.objects.get(pk=cash_account.pk)
+    #     cash_account.balance = form.cleaned_data['balance']
+    #     cash_account.save()
+    #     return super().form_valid(form)

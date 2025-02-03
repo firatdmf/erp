@@ -1,7 +1,8 @@
 from django.urls import path
 from . import views
 from .views import AddEquityRevenue, CategorySearchView, InvoiceCreateView, SalesView,BookDetail,CreateAsset, AddEquityCapital, AddStakeholder, CreateBook,EquityExpenseList,AddEquityExpense, PayEquityDivident, TransactionList
-from .views import MakeInTransfer
+from .views import MakeInTransfer,AccountBalance
+# from django.contrib.auth.decorators import login_required
 
 app_name = 'accounting'
 urlpatterns = [
@@ -11,6 +12,7 @@ urlpatterns = [
     path('sales/',SalesView.as_view(),name="sales_view"),
     # path('books/',BookView.as_view(),name="book_view"),
     path('books/create/',CreateBook.as_view(),name="create_book"),
+    # path('books/<int:pk>/',login_required(BookDetail.as_view()),name="book_detail"),
     path('books/<int:pk>/',BookDetail.as_view(),name="book_detail"),
     path('books/<int:pk>/add_stakeholder/', AddStakeholder.as_view(),name="add_stakeholder"),
     path('books/<int:pk>/create_asset/',CreateAsset.as_view(),name="create_asset"),
@@ -22,6 +24,7 @@ urlpatterns = [
     path('books/<int:pk>/create_invoice/', InvoiceCreateView.as_view(),name="create_invoice"),
     path('books/<int:pk>/make_in_transfer/', MakeInTransfer.as_view(),name="make_in_transfer"),
     path('books/<int:pk>/transaction_list/', TransactionList.as_view(),name="transaction_list"),
+    path('books/<int:pk>/account_balance/', AccountBalance.as_view(),name="account_balance"),
 ]
 
 htmx_urlpatterns = [

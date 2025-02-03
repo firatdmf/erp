@@ -18,6 +18,7 @@ from .models import (
     Invoice,
     InvoiceItem,
     Transaction,
+    AccountBalance
 )
 
 admin.site.register(CurrencyCategory)
@@ -37,6 +38,7 @@ admin.site.register(CashAccount)
 admin.site.register(EquityRevenue)
 admin.site.register(EquityCapital)
 admin.site.register(Transaction)
+admin.site.register(AccountBalance)
 
 
 # Register your models here.

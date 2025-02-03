@@ -276,6 +276,33 @@ class Asset(models.Model):
         return f"Book: {self.book.name}, Asset Category: {self.category}, Asset Name: {self.name}, Asset Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
 
 
+# class AssetAccountsReceivable(models.Model):
+#     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+#     name = models.CharField(max_length=100)
+#     value = models.DecimalField(max_digits=10, decimal_places=2)
+#     currency = models.ForeignKey(
+#         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+#     )
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     due_date = models.DateField()
+#     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, blank=True, null=True)
+
+#     def __str__(self):
+#         return f"Book: {self.book.name}, Name: {self.name}, Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
+    
+
+# If balance is positive, then it is accounts receivable, if negative, it is accounts payable
+# set it up so you can add a contact or a company and possibly no more than one row for each contact or company, meaning each row unique contact + company
+class AccountBalance(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=True, null=True)
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, blank=True, null= True)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, blank=True, null= True)
+    balance = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, blank=True, null=True)
+
+
+
 class Liability(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     name = models.CharField(max_length=100)

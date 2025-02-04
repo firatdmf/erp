@@ -9,15 +9,15 @@ Accounting:
    Show Money Coming in and Coming Out (Categorize expenses) / 
    Calculate Burn, Runway, Growth Rate, Default Alive /
    Live view of finances KPI DASHBOARD
-   Show Balance Equation
-   sync with bank
+   Show Balance Equation [after settings assets (inventory, cogs, etc)]
    Payment processor set up
-   payroll calculator from text or form logs
    Generate Invoices and Receipts | [Operations]
    Every taken income should link to an invoice or receipt [After invoice]
+   accounts receivable and accounts payable /
+   inventory purchases [after operation]
 
 Marketing:
-   Show all contacts and companies together both
+   Show all contacts and companies together both, combine contact and company models
    Chill Todo and personal to do
    Classify Contacts: Lead, Prospect, Client, and Dead.
    Group Contacts: Distributors, Retailers, or a group defined by user. 

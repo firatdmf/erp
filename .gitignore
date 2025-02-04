@@ -3,6 +3,7 @@ pass.txt
 erp/.env
 *.pyo
 *.pyc
+.env
 
 # Here's the ultimate Django gitignore#
 # Django #

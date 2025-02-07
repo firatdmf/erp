@@ -1,0 +1,84 @@
+/* Basic page setup */
+body{
+    margin:0;
+}
+.DashboardPage {
+    background-color: #1d1d1d;
+    color: #fff;
+    font-family: 'Press Start 2P', cursive; /* Pixelated font */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+/* Scoreboard container */
+.scoreboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    padding: 20px;
+    background-color: #333;
+    border: 10px solid #444;
+    box-shadow: 0 0 15px #000;
+    width: 80%;
+    max-width: 900px;
+}
+
+/* Scoreboard item */
+.scoreboard-item {
+    background-color: #222;
+    padding: 20px;
+    text-align: center;
+    border: 5px solid #666;
+    box-shadow: 0 0 10px #000;
+    align-content: center;
+}
+
+
+.scoreboard-item span {
+    display: block;
+    font-size: 32px;
+    color: #00ff00; /* Bright green for pixel look */
+}
+
+/* Pixelated effect */
+.DashboardPage, .scoreboard-item p, .scoreboard-item span {
+    image-rendering: pixelated;
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+}
+
+/* Add pixelated borders */
+.scoreboard-item {
+    border-radius: 0; /* No rounded corners for pixel art */
+    outline: 1px solid #888;
+}
+
+/* Text inside each item */
+.scoreboard-item p{
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+#cash {
+    font-size:2.5rem;
+}
+
+#money-out{
+    color:red;
+}
+
+#growth{
+    color:yellow;
+}
+
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .scoreboard {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}

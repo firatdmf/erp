@@ -198,7 +198,7 @@ class EquityDivident(models.Model):
     description = models.CharField(max_length=200, unique=False, blank=True)
 
 
-
+# delete below
 class IncomeCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
@@ -340,6 +340,7 @@ class Transaction(models.Model):
     # type_id = models.CharField(max_length=50, blank=True, null=True)
     account = models.ForeignKey(CashAccount, on_delete=models.CASCADE, blank=True, null=True)
     account_balance = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    # total_balance = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     # origin_account = models.ForeignKey(
     #     CashAccount, on_delete=models.CASCADE, blank=False, null=False
     # )
@@ -347,7 +348,19 @@ class Transaction(models.Model):
     #     CashAccount, on_delete=models.CASCADE, blank=False, null=False
     # )
 
-
+class Metric(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=True, null=True)
+    balance = models.DecimalField(max_digits=12, decimal_places=2)
+    money_in = models.DecimalField(max_digits=12, decimal_places=2)
+    money_out = models.DecimalField(max_digits=12, decimal_places=2)
+    burn = models.DecimalField(max_digits=12, decimal_places=2)
+    inventory = models.DecimalField(max_digits=12, decimal_places=2)
+    accounts_receivable = models.DecimalField(max_digits=12, decimal_places=2)
+    accounts_payable = models.DecimalField(max_digits=12, decimal_places=2)
+    runway = models.DecimalField(max_digits=12, decimal_places=1)
+    growth_rate = models.DecimalField(max_digits=12, decimal_places=1)
+    default_alive = models.BooleanField(default=True)
 
 
     # ----------------------------------------------------------------------

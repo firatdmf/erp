@@ -1,0 +1,48 @@
+{% comment %} {% extends 'base.html' %} {% endcomment %}
+{% load static %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'erp/css/dashboard.css' %}" />
+{% endblock %}
+
+{% block content %}
+  <div class="DashboardPage">
+    <div class="scoreboard">
+        <div class="scoreboard-item">
+            {% comment %} <p>Cash Balance</p> {% endcomment %}
+            <span id="cash">$0.00</span>
+          </div>
+      <div class="scoreboard-item">
+        <p>In</p>
+        <span id="money-in">$0.00</span>
+      </div>
+      <div class="scoreboard-item">
+        <p>Out</p>
+        <span id="money-out">$0.00</span>
+      </div>
+      <div class="scoreboard-item">
+        <p>Burn</p>
+        <span id="burn">$0.00</span>
+      </div>
+      <div class="scoreboard-item">
+        <p>A/R</p>
+        <span id="ar">$0.00</span>
+      </div>
+      <div class="scoreboard-item">
+        <p>A/P</p>
+        <span id="ap">$0.00</span>
+      </div>
+      <div class="scoreboard-item">
+        <p>Runway</p>
+        <span id="runway">16.2 months</span>
+      </div>
+      <div class="scoreboard-item">
+        <p>Growth</p>
+        <span id="growth">0</span>
+      </div>
+      <div class="scoreboard-item">
+        <p>Alive</p>
+        <span id="alive">True</span>
+      </div>
+    </div>
+  </div>
+{% endblock %}

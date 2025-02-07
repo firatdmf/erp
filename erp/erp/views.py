@@ -50,3 +50,26 @@ class task_report(View):
 
 class test_page(TemplateView):
     template_name = "test_page.html"
+
+
+# ------------------- Dashboard ------------------- below things do exactly the same thing.  Leaving this for your future reference
+
+# def dashboard(request):
+#     return render(request, "dashboard.html", {"title": "Dashboarsssd"})
+
+# class Dashboard(TemplateView):
+#     template_name = "dashboard.html"
+
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         context["title"] = "Dashboasadszortzortadsadrd"
+#         return context
+
+class Dashboard(View):
+    template_name = "dashboard.html"
+
+    def get(self, request,*args, **kwargs):
+        return render(request, self.template_name, {"title": "Dashboard"})
+    
+
+    

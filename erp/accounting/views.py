@@ -26,6 +26,7 @@ from currency_converter import CurrencyConverter
 import yfinance as yf
 from decimal import Decimal
 import math
+import time
 
 
 # Make this functional programming
@@ -129,6 +130,7 @@ class BookDetail(generic.DetailView):
     
 
     def get_context_data(self,**kwargs):
+        start_time = time.time()
         context = super().get_context_data(**kwargs)
         book = self.get_object()
         # ----------------------------
@@ -146,6 +148,8 @@ class BookDetail(generic.DetailView):
         balance = round(balance,2)
 
         context['balance'] = balance
+
+        print(f'this is how long the balance equation takes: {(time.time() - start_time)}')
 
         # ----------------------------
         now = timezone.now()
@@ -166,6 +170,7 @@ class BookDetail(generic.DetailView):
         context['Stakeholders'] = Stakeholder.objects.filter(books=book)
         print(type(Stakeholder.objects.filter(books=book)))
         # print(context['Stakeholders'])
+        print(f'this is how long the execution takes: {(time.time() - start_time)}')
         return context
 
 
@@ -184,6 +189,8 @@ class CategorySearchView(View):
 class SalesView(generic.TemplateView):
     template_name = "accounting/sales_report.html"
 
+
+# not sure if I need this
 @method_decorator(login_required, name='dispatch')
 class CreateAsset(generic.edit.CreateView):
     model = Asset
@@ -376,6 +383,7 @@ class EquityExpenseList(generic.ListView):
 class TransactionList(generic.ListView):
     model =Transaction
     template_name = "accounting/transaction_list.html"
+
 
 @method_decorator(login_required, name='dispatch')
 class PayEquityDivident(generic.edit.CreateView):

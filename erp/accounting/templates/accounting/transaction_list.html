@@ -18,6 +18,7 @@
         <th>Type #</th>
         <th>Account</th>
         <th>Account Balance</th>
+        {% comment %} <th>Total Balance</th> {% endcomment %}
       </tr>
 
       {% for transaction in object_list|dictsortreversed:'pk'|dictsortreversed:'created_at' %}
@@ -30,7 +31,8 @@
           <td>{{ transaction.type }}</td>
           <td>{{ transaction.type_pk }}</td>
           <td>{{ transaction.account.name }}</td>
-          <td>{{ transaction.account_balance }}</td>
+          <td>{{transaction.account.currency.symbol}}{{ transaction.account_balance }}</td>
+          {% comment %} <td>{{ transaction.total_balance }}</td> {% endcomment %}
 
         </tr>
       {% empty %}

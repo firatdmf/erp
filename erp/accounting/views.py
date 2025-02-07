@@ -6,10 +6,10 @@ from django.urls import reverse_lazy
 from django.views import View, generic
 
 from operating.models import Product
-from .models import EquityRevenue, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem, Stakeholder,CashAccount, EquityCapital, EquityDivident,Transaction
+from .models import EquityRevenue, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem,CashAccount, EquityCapital, EquityDivident, StakeholderBook,Transaction
 from .models import EquityExpense, AccountBalance
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
-from .forms import EquityRevenueForm, ExpenseForm, IncomeForm, AssetForm, InvoiceForm,StakeholderForm, BookForm, EquityCapitalForm, EquityExpenseForm, EquityDividentForm, InvoiceItemForm, InvoiceItemFormSet, InTransferForm
+from .forms import *
 from django.forms import modelformset_factory
 from datetime import datetime
 from django.utils.decorators import method_decorator
@@ -167,8 +167,12 @@ class BookDetail(generic.DetailView):
         # book = Book.objects.get(pk=self.kwargs.get('pk'))
         book = self.get_object()
         # print(type(book))
-        context['Stakeholders'] = Stakeholder.objects.filter(books=book)
-        print(type(Stakeholder.objects.filter(books=book)))
+        stakeholders = StakeholderBook.objects.filter(book_id=book.pk)
+        print(stakeholders)
+        # stakeholders = [stakeholder for stakeholder in stakeholders]
+        context['Stakeholders'] = stakeholders
+        # context['Stakeholders'] = [stakeholder.stakeholder for stakeholder in context['Stakeholders']]
+        # print(type(Stakeholder.objects.filter(books=book)))
         # print(context['Stakeholders'])
         print(f'this is how long the execution takes: {(time.time() - start_time)}')
         return context
@@ -338,9 +342,9 @@ class AddEquityRevenue(generic.edit.CreateView):
     
 
 @method_decorator(login_required, name='dispatch')
-class AddStakeholder(generic.edit.CreateView):
-    model = Stakeholder
-    form_class = StakeholderForm
+class AddStakeholderBook(generic.edit.CreateView):
+    model = StakeholderBook
+    form_class = StakeholderBookForm
     template_name = "accounting/add_stakeholder.html"
 
     # def get_form_kwargs(self):
@@ -350,24 +354,14 @@ class AddStakeholder(generic.edit.CreateView):
     #     print(book)
     #     kwargs['book'] = [book_pk]
     #     return kwargs
-    
-    def form_valid(self, form):
-       
-        self.object = form.save(commit=False) # Save the stakeholder instance without committing to the database
-        self.object.save() # Save the stakeholder instance first
-        # Add the selected book to the stakeholder's books field (ManyToMany)
+  
+    # below preselected the book field of the capital model
+    def get_initial(self):
+        # Get the book by primary key from the URL
         book_pk = self.kwargs.get('pk')
         book = Book.objects.get(pk=book_pk)
-        self.object.books.add(book)  # Link the stakeholder to the book
-        return super().form_valid(form)
-  
-    # # below preselected the book field of the capital model
-    # def get_initial(self):
-    #     # Get the book by primary key from the URL
-    #     book_pk = self.kwargs.get('pk')
-    #     book = Book.objects.get(pk=book_pk)
-    #     # Set the initial value of the book field to the book retrieved
-    #     return {'books': [book]}
+        # Set the initial value of the book field to the book retrieved
+        return {'book': book}
     
 
     def get_success_url(self) -> str:

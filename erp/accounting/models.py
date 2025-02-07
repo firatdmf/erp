@@ -1,9 +1,38 @@
 from django.db import models
 from crm.models import Company, Contact
+from authentication.models import Member
 # from operating.models import Product
 from django.utils import timezone
 from operating.models import Product
 # Create your models here.
+
+
+# The books is to keep the separate entities apart for accounting, and operating purposes.
+class Book(models.Model):
+    created_at = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
+# class Stakeholder(models.Model):
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     name = models.CharField(max_length=150)
+#     description = models.CharField(max_length=200, unique=False, blank=True, null=True)
+
+#     def __str__(self):
+#         return self.name
+
+class StakeholderBook(models.Model):
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True)
+    book = models.ForeignKey('Book', on_delete=models.CASCADE)
+    equity_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    class Meta:
+        unique_together = ('member', 'book')
+
+    def __str__(self):
+        return f"{self.member} - {self.book.name} - {self.equity_percentage}%"
 
 
 class CurrencyCategory(models.Model):
@@ -17,14 +46,6 @@ class CurrencyCategory(models.Model):
     class Meta:
         verbose_name_plural = "Currency Categories"
 
-
-# The books is to keep the separate entities apart for accounting, and operating purposes.
-class Book(models.Model):
-    created_at = models.DateTimeField(auto_now=True)
-    name = models.CharField(max_length=50, unique=True)
-
-    def __str__(self):
-        return self.name
 
 
 class CashAccount(models.Model):
@@ -50,26 +71,7 @@ class CashAccount(models.Model):
         )
 
 
-class Stakeholder(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    name = models.CharField(max_length=150)
-    description = models.CharField(max_length=200, unique=False, blank=True, null=True)
-    books = models.ManyToManyField(Book, related_name="stakeholders")
 
-    # Currency for the contributions
-    # currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, default=1)  # Default currency
-
-    # A stakeholder's ownership percentage is calculated by: [#shares/(Capital Stock)]*100%
-    # 100 FOR 100%
-    share = models.DecimalField(
-        max_digits=5, decimal_places=2, blank=False, null=False, default=100
-    )
-
-    def __str__(self):
-        # Books are many to many field so we need to iterate and put them here
-        book_names = ", ".join(book.name for book in self.books.all())
-        # return f"{self.name}"
-        return self.name
 
 class EquityCapital(models.Model):
     class Meta:
@@ -78,7 +80,7 @@ class EquityCapital(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     stakeholder = models.ForeignKey(
-        Stakeholder, on_delete=models.CASCADE, blank=False, null=False
+        Member, on_delete=models.CASCADE, blank=False, null=False
     )
     cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, blank=False, null=False
@@ -182,7 +184,7 @@ class EquityDivident(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     stakeholder = models.ForeignKey(
-        Stakeholder, on_delete=models.CASCADE, blank=True, null=True
+        Member, on_delete=models.CASCADE, blank=True, null=True
     )
     cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, blank=False, null=False

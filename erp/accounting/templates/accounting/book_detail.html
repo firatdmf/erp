@@ -9,26 +9,30 @@
   <p>
     <a href="{% url 'accounting:index' %}"><--- Accounting Index Page</a>
   </p>
-  <p><b>Book:</b> {{ Book.name }}</p>
+  <p>
+    <b>Book:</b> {{ Book.name }}
+  </p>
   {% if Stakeholders %}
-  <p><b>The Stakeholders:</b> {% for Stakeholder in Stakeholders %}{{ Stakeholder.name }}{% endfor %}</p> 
+    <p>
+      <b>The Stakeholders:</b> {% for Stakeholder in Stakeholders %}
+        <span class="underline">{{ Stakeholder.member.user.first_name }} {{ Stakeholder.member.user.last_name }} ({{ Stakeholder.equity_percentage }}%)</span>, 
+      {% endfor %}
+    </p>
   {% else %}
-  <p>There are no stakeholders at this company.</p>
+    <p>There are no stakeholders at this company.</p>
   {% endif %}
 
   <div class="dashboard">
     <ul>
-      <li>Balance: ${{balance}}</li>
-      <li>In:${{revenue}}</li>
-      <li>Out: ${{expense}}</li>
-      <li>Burn: ${{burn}}</li>
-      <li>Runway: {{runway}} months</li>
-      <li>Growth Rate: {{growth_rate}}</li>
-      <li>Default Alive: {{default_alive}}</li>
+      <li>Balance: ${{ balance }}</li>
+      <li>In:${{ revenue }}</li>
+      <li>Out: ${{ expense }}</li>
+      <li>Burn: ${{ burn }}</li>
+      <li>Runway: {{ runway }} months</li>
+      <li>Growth Rate: {{ growth_rate }}</li>
+      <li>Default Alive: {{ default_alive }}</li>
     </ul>
   </div>
-  
-
 
   <ul>
     <li>

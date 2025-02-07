@@ -14,15 +14,17 @@ from .models import (
     # Sale,
     Asset,
     # Equity,
-    Stakeholder,
+    # Stakeholder,
     Invoice,
     InvoiceItem,
     Transaction,
-    AccountBalance
+    AccountBalance,
+    StakeholderBook
 )
 
+from authentication.models import Member
+
 admin.site.register(CurrencyCategory)
-admin.site.register(Book)
 # admin.site.register(Source)
 
 admin.site.register(AssetCategory)
@@ -33,7 +35,6 @@ admin.site.register(Income)
 # admin.site.register(Sale)
 admin.site.register(Asset)
 # admin.site.register(Equity)
-admin.site.register(Stakeholder)
 admin.site.register(CashAccount)
 admin.site.register(EquityRevenue)
 admin.site.register(EquityCapital)
@@ -58,5 +59,25 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 admin.site.register(Invoice, InvoiceAdmin)
 admin.site.register(InvoiceItem)
+
+# -----------------------------------------------------------------------------------------------------
+
+# Below is for stakeholder book
+
+class StakeholderBookInline(admin.TabularInline):
+    model = StakeholderBook
+    extra = 1
+
+class StakeholderAdmin(admin.ModelAdmin):
+    inlines = (StakeholderBookInline,)
+
+class BookAdmin(admin.ModelAdmin):
+    inlines = (StakeholderBookInline,)
+
+
+# I register member in the authentication app, no need for this
+# admin.site.register(Member, StakeholderAdmin)
+admin.site.register(Book, BookAdmin)
+admin.site.register(StakeholderBook)
 
 # -----------------------------------------------------------------------------------------------------

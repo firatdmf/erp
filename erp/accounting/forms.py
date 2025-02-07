@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import EquityRevenue, EquityExpense, Income, Book, Asset, Stakeholder, EquityCapital, CashAccount, CurrencyCategory, EquityDivident, Invoice, InvoiceItem
+from .models import *
 from operating.models import Product
 from datetime import date
 
@@ -61,16 +61,18 @@ class AssetForm(forms.ModelForm):
         model = Asset
         fields = '__all__'
 
-class StakeholderForm(forms.ModelForm):
+class StakeholderBookForm(forms.ModelForm):
     class Meta:
-        model = Stakeholder
+        model = StakeholderBook
         fields = '__all__'
 
-        # Below creates problems for many to many fields, so we just do exclude instead
-        # widgets = {
-        #     "books" : forms.HiddenInput(),
-        # }
-        exclude = ['books', 'share']
+        # This ensures the book field is hidden, and the value is passed from the view (via pk in the url)
+        widgets = {
+            "book" : forms.HiddenInput(),
+        }
+
+        # We don't want to manually enter this data. 
+        exclude = ['equity_percentage']
 
 
 

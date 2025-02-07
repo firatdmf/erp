@@ -44,14 +44,14 @@ def signup(request):
         lname = request.POST["lname"]
         email = request.POST["email"]
         password = request.POST["password"]
-        cname = request.POST["cname"]
+        # cname = request.POST["cname"]
 
         myuser = User.objects.create_user(username, email, password)
         myuser.first_name = fname
         myuser.last_name = lname
         print(myuser)
         myuser.save()
-        mymember = Member.objects.create(user=myuser, company_name=cname)
+        mymember = Member.objects.create(user=myuser)
         mymember.save()
 
         messages.success(request, "Your acccount has been successfully created.")

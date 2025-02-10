@@ -256,7 +256,11 @@ class AddEquityCapital(generic.edit.CreateView):
             # 4 add EquityCapital
             # 5 update stakeholder total shares and percentage
 
-            transaction = Transaction.objects.create()
+            
+
+
+            transaction1 = Transaction(book=self.kwargs['book'],value = form.cleaned_data.get("amount"),currency=form.cleaned_data.get('currency').currency,type="transfer", account = from_cash_account, type_pk = None, account_balance= from_cash_account_new_balance )
+            transaction1.save()
 
             target_cash_account = form.cleaned_data.get("cash_account")
             target_cash_account = CashAccount.objects.get(pk=target_cash_account.pk)

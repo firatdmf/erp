@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='sale',
             name='products',
-            field=models.JSONField(default=accounting.models.invoice_default),
+            field=models.JSONField(default={}),
         ),
     ]

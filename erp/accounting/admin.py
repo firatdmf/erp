@@ -1,26 +1,5 @@
 from django.contrib import admin
-from .models import (
-    AssetCategory,
-    EquityRevenue,
-    EquityExpense,
-    ExpenseCategory,
-    CurrencyCategory,
-    Income,
-    IncomeCategory,
-    CashAccount,
-    EquityCapital,
-    Book,
-    # Source,
-    # Sale,
-    Asset,
-    # Equity,
-    # Stakeholder,
-    Invoice,
-    InvoiceItem,
-    Transaction,
-    AccountBalance,
-    StakeholderBook
-)
+from .models import *
 
 from authentication.models import Member
 
@@ -49,16 +28,16 @@ admin.site.register(AccountBalance)
 
 # Below is for invoice
 # -----------------------------------------------------------------------------------------------------
-class InvoiceItemInline(admin.TabularInline):
-    model = InvoiceItem
-    extra = 1  # One extra empty row for new items
+# class InvoiceItemInline(admin.TabularInline):
+#     model = InvoiceItem
+#     extra = 1  # One extra empty row for new items
 
-class InvoiceAdmin(admin.ModelAdmin):
-    inlines = [InvoiceItemInline]
-    list_display = ['invoice_number', 'company', 'due_date', 'total_amount']
+# class InvoiceAdmin(admin.ModelAdmin):
+#     inlines = [InvoiceItemInline]
+#     list_display = ['invoice_number', 'company', 'due_date', 'total_amount']
 
-admin.site.register(Invoice, InvoiceAdmin)
-admin.site.register(InvoiceItem)
+# admin.site.register(Invoice, InvoiceAdmin)
+# admin.site.register(InvoiceItem)
 
 # -----------------------------------------------------------------------------------------------------
 
@@ -68,8 +47,8 @@ class StakeholderBookInline(admin.TabularInline):
     model = StakeholderBook
     extra = 1
 
-class StakeholderAdmin(admin.ModelAdmin):
-    inlines = (StakeholderBookInline,)
+# class StakeholderBookAdmin(admin.ModelAdmin):
+#     inlines = (StakeholderBookInline,)
 
 class BookAdmin(admin.ModelAdmin):
     inlines = (StakeholderBookInline,)
@@ -79,5 +58,4 @@ class BookAdmin(admin.ModelAdmin):
 # admin.site.register(Member, StakeholderAdmin)
 admin.site.register(Book, BookAdmin)
 admin.site.register(StakeholderBook)
-
 # -----------------------------------------------------------------------------------------------------

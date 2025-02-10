@@ -6,8 +6,8 @@ from django.urls import reverse_lazy
 from django.views import View, generic
 
 from operating.models import Product
-from .models import EquityRevenue, ExpenseCategory, Income, IncomeCategory, Book, Asset, Invoice, InvoiceItem,CashAccount, EquityCapital, EquityDivident, StakeholderBook,Transaction
-from .models import EquityExpense, AccountBalance
+
+from .models import *
 # from .models import Expense, ExpenseCategory, Income, IncomeCategory
 from .forms import *
 from django.forms import modelformset_factory
@@ -27,6 +27,10 @@ import yfinance as yf
 from decimal import Decimal
 import math
 import time
+
+# def insert_transaction(book, currency, value, account, type, type_pk, account_balance ):
+#     transaction = Transaction(book,currency,value,account,type,type_pk,account_balance )
+#     transaction.save()
 
 
 # Make this functional programming
@@ -223,10 +227,8 @@ class AddEquityCapital(generic.edit.CreateView):
     model = EquityCapital
     form_class = EquityCapitalForm
     template_name = "accounting/add_equity_capital.html"
-    # fields = "__all__"
 
-    
-    # This sends to the form data on what book is this thing
+    # # This sends to the form data the book we are in. We need this so we can show the cash accounts only associated with this book.
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         book_pk = self.kwargs.get('pk')
@@ -234,8 +236,10 @@ class AddEquityCapital(generic.edit.CreateView):
         kwargs['book'] = book
         return kwargs
     
-    # below preselected the book field of the capital model
+    # below pre-selects the book field of the capital model
     def get_initial(self):
+        total_equity_capital_invested = EquityCapital.objects.aggregate(Sum('amount'))['amount__sum'] or 0
+        print(f"total investment amount is: {total_equity_capital_invested}")
         # Get the book by primary key from the URL
         book_pk = self.kwargs.get('pk')
         book = Book.objects.get(pk=book_pk)
@@ -246,6 +250,14 @@ class AddEquityCapital(generic.edit.CreateView):
     def post(self,request,*args,**kwargs):
         form = self.get_form()
         if form.is_valid():
+            # 1 Update transactions
+            # 2 add the cash to AssetCash
+            # 3 update balance on CashAccount
+            # 4 add EquityCapital
+            # 5 update stakeholder total shares and percentage
+
+            transaction = Transaction.objects.create()
+
             target_cash_account = form.cleaned_data.get("cash_account")
             target_cash_account = CashAccount.objects.get(pk=target_cash_account.pk)
             target_cash_account.balance = target_cash_account.balance + form.cleaned_data.get("amount")
@@ -519,50 +531,50 @@ class AddEquityExpense(generic.edit.CreateView):
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.kwargs.get('pk')})
     
-@method_decorator(login_required, name='dispatch')
-class InvoiceCreateView(generic.CreateView):
-    model = Invoice
-    form_class = InvoiceForm
-    template_name = 'accounting/create_invoice.html'
-    success_url = reverse_lazy('operating:index')
+# @method_decorator(login_required, name='dispatch')
+# class InvoiceCreateView(generic.CreateView):
+#     model = Invoice
+#     form_class = InvoiceForm
+#     template_name = 'accounting/create_invoice.html'
+#     success_url = reverse_lazy('operating:index')
 
-    def get_context_data(self, **kwargs):
-        # Add the invoice form and formset for items
-        context = super().get_context_data(**kwargs)
-        InvoiceItemFormSet = modelformset_factory(InvoiceItem, form=InvoiceItemForm, extra=1)
-        context['item_formset'] = InvoiceItemFormSet(queryset=InvoiceItem.objects.none())
-        return context
+#     def get_context_data(self, **kwargs):
+#         # Add the invoice form and formset for items
+#         context = super().get_context_data(**kwargs)
+#         InvoiceItemFormSet = modelformset_factory(InvoiceItem, form=InvoiceItemForm, extra=1)
+#         context['item_formset'] = InvoiceItemFormSet(queryset=InvoiceItem.objects.none())
+#         return context
 
-    def form_valid(self,form):
-        invoice = form.save()
-        # Now that the invoice is saved, it has a primary key
-        # Get the formset for invoice items
-        item_formset = InvoiceItemFormSet(self.request.POST)
-        # products = self.request.POST.getlist('products')
-        if item_formset.is_valid():
-            total_amount = 0  # Initialize total_amount to 0
-            items_to_save = []  # Collect InvoiceItem instances to save later
-            # For each form in the formset, create an InvoiceItem entry
-            for item_form in item_formset:
-                product = item_form.cleaned_data.get('product')
-                quantity = item_form.cleaned_data.get('quantity')
-                price = item_form.cleaned_data.get('price')
-                if product and quantity is not None and price is not None:
-                    item = InvoiceItem(
-                        invoice=invoice,
-                        product=product,
-                        quantity=quantity,
-                        price=price
-                    )
-                    items_to_save.append(item)
-                    # Accumulate total amount
-                    total_amount += quantity * price
+#     def form_valid(self,form):
+#         invoice = form.save()
+#         # Now that the invoice is saved, it has a primary key
+#         # Get the formset for invoice items
+#         item_formset = InvoiceItemFormSet(self.request.POST)
+#         # products = self.request.POST.getlist('products')
+#         if item_formset.is_valid():
+#             total_amount = 0  # Initialize total_amount to 0
+#             items_to_save = []  # Collect InvoiceItem instances to save later
+#             # For each form in the formset, create an InvoiceItem entry
+#             for item_form in item_formset:
+#                 product = item_form.cleaned_data.get('product')
+#                 quantity = item_form.cleaned_data.get('quantity')
+#                 price = item_form.cleaned_data.get('price')
+#                 if product and quantity is not None and price is not None:
+#                     item = InvoiceItem(
+#                         invoice=invoice,
+#                         product=product,
+#                         quantity=quantity,
+#                         price=price
+#                     )
+#                     items_to_save.append(item)
+#                     # Accumulate total amount
+#                     total_amount += quantity * price
 
                     
-            InvoiceItem.objects.bulk_create(items_to_save)
-            invoice.total_amount = total_amount
-            invoice.save()  # Save the updated invoice
-        return super().form_valid(form)
+#             InvoiceItem.objects.bulk_create(items_to_save)
+#             invoice.total_amount = total_amount
+#             invoice.save()  # Save the updated invoice
+#         return super().form_valid(form)
 
 
 @method_decorator(login_required, name='dispatch')

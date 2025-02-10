@@ -87,25 +87,27 @@ class EquityCapitalForm(forms.ModelForm):
         fields = "__all__"
         widgets = {
             "date_invested": forms.DateInput(attrs={"type": "date"}),
-            # "book": forms.HiddenInput()
+            # Hide the book field, and pass the value from the view (url)
+            "book": forms.HiddenInput()
         }
         
     def __init__(self, *args, **kwargs):
         book = kwargs.pop('book',None)
         super(EquityCapitalForm, self).__init__(*args, **kwargs)
+
         # self.fields["stakeholder"].empty_label = "Select a stakeholder"
         self.fields["date_invested"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-        # self.fields["book"].widget.attrs["value"] = book
 
-        # This ensures only the same book from the model can be selected with the cash categories (accounts)
-        if book:
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
-            # self.fields["book"].queryset = Book.objects.filter(book=book)
         
+        if book:
+            # Get the cash accounts assigned to the book
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
 
-        # print(f'yooo the book pk is {book_pk}')
-        # self.fields['CashAccount'].queryset = 
-
+            # The values_list method in Django's QuerySet API is used to create a list (or tuple) of values from the specified fields of the model.
+            # The flat=True argument ensures that the result is a flat list rather than a list of tuples.
+            members = StakeholderBook.objects.filter(book=book).values_list('member', flat=True)
+            self.fields["stakeholder"].queryset = Member.objects.filter(id__in=members)
+        
 
 class EquityRevenueForm(forms.ModelForm):
     class Meta:
@@ -172,36 +174,36 @@ class EquityDividentForm(forms.ModelForm):
 
 
 
-class InvoiceForm(forms.ModelForm):
-    class Meta:
-        model = Invoice
-        fields= ['invoice_number','company','due_date']
-        widgets = {
-            "due_date": forms.DateInput(attrs={"type":"date"}),
-        }
+# class InvoiceForm(forms.ModelForm):
+#     class Meta:
+#         model = Invoice
+#         fields= ['invoice_number','company','due_date']
+#         widgets = {
+#             "due_date": forms.DateInput(attrs={"type":"date"}),
+#         }
 
 
-class InvoiceItemForm(forms.ModelForm):
-    class Meta:
-        model = InvoiceItem
-        fields = ['product', 'quantity', 'price']
+# class InvoiceItemForm(forms.ModelForm):
+#     class Meta:
+#         model = InvoiceItem
+#         fields = ['product', 'quantity', 'price']
 
         
-    quantity = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Allow decimal quantities
-    price = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Price can also be dynamic
+#     quantity = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Allow decimal quantities
+#     price = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Price can also be dynamic
 
-class CreateInvoiceForm(forms.Form):
-    invoice = InvoiceForm()
-    items = forms.ModelMultipleChoiceField(queryset=Product.objects.all(), widget=forms.CheckboxSelectMultiple)
+# class CreateInvoiceForm(forms.Form):
+#     invoice = InvoiceForm()
+#     items = forms.ModelMultipleChoiceField(queryset=Product.objects.all(), widget=forms.CheckboxSelectMultiple)
 
 
-class InvoiceItemFormSet(forms.BaseFormSet):
-    def clean(self):
-        # Custom validation for the formset, e.g. if no items are selected
-        if any(self.errors):
-            return
-        if not any(form.cleaned_data for form in self.forms):
-            raise forms.ValidationError("At least one product must be added to the invoice.")
+# class InvoiceItemFormSet(forms.BaseFormSet):
+#     def clean(self):
+#         # Custom validation for the formset, e.g. if no items are selected
+#         if any(self.errors):
+#             return
+#         if not any(form.cleaned_data for form in self.forms):
+#             raise forms.ValidationError("At least one product must be added to the invoice.")
         
     
 

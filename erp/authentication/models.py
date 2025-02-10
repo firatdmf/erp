@@ -17,7 +17,7 @@ ACCESS_LEVEL_NAME_CHOICES = [(key, value[0]) for key, value in ACCESS_LEVEL_CHOI
 ACCESS_LEVEL_DESCRIPTION_CHOICES = [(key, value[1]) for key, value in ACCESS_LEVEL_CHOICES_DICT.items()]
 
 # Define the AccessLevel model
-class AccessLevel(models.Model):
+class Permission(models.Model):
     name = models.CharField(max_length=100, unique=True, choices=ACCESS_LEVEL_NAME_CHOICES)
     description = models.TextField(blank=True, null=True, choices=ACCESS_LEVEL_DESCRIPTION_CHOICES)
 
@@ -27,7 +27,7 @@ class AccessLevel(models.Model):
 # The reason I create another Member is because it is so unethical to change the base user model that django provides, so we clone it, sync it, and add more depth to it.
 class Member(models.Model):
     user = models.OneToOneField(User, null=True, on_delete = models.CASCADE)
-    access_levels = models.ManyToManyField(AccessLevel, related_name='members')
+    permissions = models.ManyToManyField(Permission, related_name='members', blank=True)
     # company_name = models.CharField(max_length=100)
 
     def __str__(self):

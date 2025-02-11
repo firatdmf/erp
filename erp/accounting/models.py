@@ -27,7 +27,6 @@ class StakeholderBook(models.Model):
     # This is how you link the book to the stakeholder.
     book = models.ForeignKey('Book', on_delete=models.CASCADE)
     # This is the percentage of equity the stakeholder has in the book. (This is used to calculate the equity capital)
-    equity_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     shares = models.PositiveIntegerField(default = 0)
 
 
@@ -36,7 +35,7 @@ class StakeholderBook(models.Model):
         unique_together = ('member', 'book')
 
     def __str__(self):
-        return f"{self.member} - {self.book.name} - {self.equity_percentage}%"
+        return f"{self.member.user.first_name + self.member.user.last_name} - {self.book.name} {self.shares}%"
 
 # We will use this to keep track of the currency of the cash accounts, and the transactions
 class CurrencyCategory(models.Model):
@@ -58,18 +57,18 @@ class AssetCash(models.Model):
     currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     transaction = models.ForeignKey('Transaction', on_delete=models.CASCADE, blank=True, null=True)
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    currency_balance = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     class Meta:
         verbose_name_plural = "Asset Cash"
 
     def __str__(self):
-        return f"{self.currency.symbol} {self.balance} ({self.book})"
+        return f"{self.currency.symbol} {self.currency_balance} ({self.book})"
 
 
 # List all your cash accounts: bank, and on hand. Each account has its own currency, and balance.
 class CashAccount(models.Model):
-
     class Meta:
         verbose_name_plural = "Cash Accounts"
 
@@ -78,7 +77,7 @@ class CashAccount(models.Model):
             models.UniqueConstraint(fields=['book', 'name'], name='unique_book_cashaccount')
         ]
 
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False,default=1)
 
     name = models.CharField(max_length=50, blank=False, null=False)
 
@@ -93,8 +92,6 @@ class CashAccount(models.Model):
             f"{self.name} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
         )
 
-
-
 # This is when a stakeholder makes a contribution to the business, and the cash account is credited with the amount.
 class EquityCapital(models.Model):
     class Meta:
@@ -103,8 +100,8 @@ class EquityCapital(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     
-    # For each capital received, there is a stakeholder who deposited it.
-    stakeholder = models.ForeignKey(
+    # For each capital received, there is a member (stakeholder) who deposited it.
+    member = models.ForeignKey(
         Member, on_delete=models.CASCADE, blank=False, null=False
     )
     date_invested = models.DateField()
@@ -122,12 +119,13 @@ class EquityCapital(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     new_shares_issued = models.PositiveIntegerField()
 
-    note = models.TextField()
+    note = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return (
-            self.stakeholder.name
+            self.member.user.first_name
             + " "
+            + self.member.user.last_name
             + "("
             + self.book.name
             + ")"
@@ -140,9 +138,6 @@ class EquityCapital(models.Model):
             + str(self.date_invested)
         )
         # return (self.cash_account.currency.symbol + str(self.amount))
-
-
-
 
 
 class ExpenseCategory(models.Model):
@@ -432,9 +427,9 @@ class Metric(models.Model):
     
 
 # Not used for now
-class Source(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+# class Source(models.Model):
+#     name = models.CharField(max_length=100, unique=True)
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name
     

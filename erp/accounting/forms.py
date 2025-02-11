@@ -88,7 +88,8 @@ class EquityCapitalForm(forms.ModelForm):
         widgets = {
             "date_invested": forms.DateInput(attrs={"type": "date"}),
             # Hide the book field, and pass the value from the view (url)
-            "book": forms.HiddenInput()
+            "book": forms.HiddenInput(),
+            "currency":forms.HiddenInput(),
         }
         
     def __init__(self, *args, **kwargs):
@@ -98,13 +99,13 @@ class EquityCapitalForm(forms.ModelForm):
         self.fields["date_invested"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         
         if book:
-            # Get the cash accounts assigned to the book
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
-
             # The values_list method in Django's QuerySet API is used to create a list (or tuple) of values from the specified fields of the model.
             # The flat=True argument ensures that the result is a flat list rather than a list of tuples.
             members = StakeholderBook.objects.filter(book=book).values_list('member', flat=True)
-            self.fields["stakeholder"].queryset = Member.objects.filter(id__in=members)
+            self.fields["member"].queryset = Member.objects.filter(id__in=members)
+
+            # Get the cash accounts assigned to the book
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
         
 
 class EquityRevenueForm(forms.ModelForm):

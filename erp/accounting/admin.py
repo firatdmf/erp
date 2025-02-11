@@ -14,7 +14,7 @@ admin.site.register(Income)
 # admin.site.register(Sale)
 admin.site.register(Asset)
 # admin.site.register(Equity)
-admin.site.register(CashAccount)
+# admin.site.register(CashAccount)
 admin.site.register(EquityRevenue)
 admin.site.register(EquityCapital)
 admin.site.register(Transaction)
@@ -60,3 +60,8 @@ admin.site.register(Book, BookAdmin)
 admin.site.register(StakeholderBook)
 # -----------------------------------------------------------------------------------------------------
 admin.site.register(AssetCash)
+
+@admin.register(CashAccount)
+class CashAccountAdmin(admin.ModelAdmin):
+    list_display = ('name', 'book', 'currency', 'balance')
+    search_fields = ('name', 'book__name')

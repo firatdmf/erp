@@ -95,7 +95,6 @@ class EquityCapitalForm(forms.ModelForm):
         book = kwargs.pop('book',None)
         super(EquityCapitalForm, self).__init__(*args, **kwargs)
 
-        # self.fields["stakeholder"].empty_label = "Select a stakeholder"
         self.fields["date_invested"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         
         if book:

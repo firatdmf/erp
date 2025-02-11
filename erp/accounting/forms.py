@@ -72,7 +72,7 @@ class StakeholderBookForm(forms.ModelForm):
         }
 
         # We don't want to manually enter this data. 
-        exclude = ['equity_percentage']
+        exclude = ['equity_percentage','share']
 
 
 
@@ -97,7 +97,6 @@ class EquityCapitalForm(forms.ModelForm):
 
         # self.fields["stakeholder"].empty_label = "Select a stakeholder"
         self.fields["date_invested"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-
         
         if book:
             # Get the cash accounts assigned to the book

@@ -28,7 +28,7 @@ class StakeholderBook(models.Model):
     book = models.ForeignKey('Book', on_delete=models.CASCADE)
     # This is the percentage of equity the stakeholder has in the book. (This is used to calculate the equity capital)
     equity_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    share = models.PositiveIntegerField(default = 0)
+    shares = models.PositiveIntegerField(default = 0)
 
 
     # This is to make sure that for each book, there is only one stakeholder with the same member (preventing redundancies and errors)
@@ -59,6 +59,9 @@ class AssetCash(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     transaction = models.ForeignKey('Transaction', on_delete=models.CASCADE, blank=True, null=True)
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        verbose_name_plural = "Asset Cash"
 
     def __str__(self):
         return f"{self.currency.symbol} {self.balance} ({self.book})"
@@ -369,17 +372,9 @@ class Transaction(models.Model):
     value = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
     type = models.CharField(max_length=50, blank=True, null=True)
-    type_pk = models.PositiveBigIntegerField(blank=True, null=True)
-    # type_id = models.CharField(max_length=50, blank=True, null=True)
+    type_pk = models.PositiveIntegerField(blank=True, null=True)
     account = models.ForeignKey(CashAccount, on_delete=models.CASCADE, blank=True, null=True)
     account_balance = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    # total_balance = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
-    # origin_account = models.ForeignKey(
-    #     CashAccount, on_delete=models.CASCADE, blank=False, null=False
-    # )
-    # destination_account = models.ForeignKey(
-    #     CashAccount, on_delete=models.CASCADE, blank=False, null=False
-    # )
 
 class Metric(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)

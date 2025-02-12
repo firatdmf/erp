@@ -15,7 +15,7 @@
   {% if Stakeholders %}
     <p>
       <b>The Stakeholders:</b> {% for Stakeholder in Stakeholders %}
-        <span class="underline">{{ Stakeholder.member.user.first_name }} {{ Stakeholder.member.user.last_name }} ({{ Stakeholder.equity_percentage }}%)</span>, 
+        <span class="underline">{{ Stakeholder.member.user.first_name }} {{ Stakeholder.member.user.last_name }}</span>, 
       {% endfor %}
     </p>
   {% else %}

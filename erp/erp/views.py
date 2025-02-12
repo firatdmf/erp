@@ -51,6 +51,9 @@ class task_report(View):
 class test_page(TemplateView):
     template_name = "test_page.html"
 
+class test_page2(TemplateView):
+    template_name = "test_page2.html"
+
 
 # ------------------- Dashboard ------------------- below things do exactly the same thing.  Leaving this for your future reference
 

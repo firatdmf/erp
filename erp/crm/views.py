@@ -16,7 +16,7 @@ from operator import attrgetter
 from django.db.models import Value, CharField
 from django.utils import timezone
 from django.middleware.csrf import get_token
-from accounting.models import Income
+# from accounting.models import Income
 from django.db.models import Sum
 
 
@@ -199,9 +199,9 @@ class company_detail_view(generic.DetailView):
         context["notes"] = Note.objects.filter(company=company)
         context["note_form"] = NoteForm()
 
-        revenue = Income.objects.filter(company=company).aggregate(total=Sum("amount"))["total"] or 0
+        # revenue = Income.objects.filter(company=company).aggregate(total=Sum("amount"))["total"] or 0
         delivered = 0
-        context["net_account"] = delivered - revenue
+        # context["net_account"] = delivered - revenue
         # below is to preselect the company field in the task form with the current company
         initial_task_data = {"company": company.pk}
         # below is hide some specific fields I chose in todo task form view

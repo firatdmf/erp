@@ -45,7 +45,6 @@ class index(generic.TemplateView):
         context = super().get_context_data(**kwargs)
         books = Book.objects.all()
         context["books"] = books
-        print(books)
         return context
 
 
@@ -208,7 +207,6 @@ class BookDetail(generic.DetailView):
         book = self.get_object()
         # print(type(book))
         stakeholders = StakeholderBook.objects.filter(book_id=book.pk)
-        print(stakeholders)
         # stakeholders = [stakeholder for stakeholder in stakeholders]
         context["Stakeholders"] = stakeholders
         # context['Stakeholders'] = [stakeholder.stakeholder for stakeholder in context['Stakeholders']]
@@ -275,6 +273,7 @@ class AddEquityCapital(generic.edit.CreateView):
             stakeholderbook = StakeholderBook.objects.get(member=member, book=book)
 
             # 1 adding the transaction transaction
+            # there could be possible errors here in the future.
             transaction_type = "capital"
             try:
                 latest_equity_capital_item = EquityCapital.objects.filter(
@@ -346,8 +345,131 @@ class AddEquityCapital(generic.edit.CreateView):
         return reverse_lazy(
             "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
         )
+    
+
+    
+@method_decorator(login_required, name="dispatch")
+class AddEquityRevenue(generic.edit.CreateView):
+    model = EquityRevenue
+    form_class = EquityRevenueForm
+    template_name = "accounting/add_equity_revenue.html"
+    
+    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        kwargs["book"] = book
+        return kwargs
+
+    # below preselected the book field of the capital model (independent of the above function)
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+
+        return {"book": book,}
+    
+
+    # You do this because you want to manually do some process when the expense form is submitted.
+    def post(self, request, *args, **kwargs):
+        start_time = time.time()
+
+        
+        # return(HttpResponse("now get outta here!")) 
+        # just kidding
+
+        # let's get the form values first
+        form = self.get_form()
+
+        if form.is_valid():
+            # Here is what we will do here
+            # 1 Create a Transaction model entry
+            # 2 Create a AssetCash model entry
+            # 3 Update the CashAccount balance
+            # 4 Create a EquityRevenue model entry
+
+            # Get the book id number from the kwargs
+            book_pk = self.kwargs.get("pk")
+            book = Book.objects.get(pk=book_pk)
+            # We need to find the of the last revenue item, because we need to know the pk of the next revenue item so we can put into transaction model entry as a reference
+            
+
+            # Get the next pk in the EquityRevenue
+            try:
+                latest_revenue_item = EquityRevenue.objects.filter(book=book).latest("pk")
+                type_pk = latest_revenue_item.pk + 1
+            except ObjectDoesNotExist:
+                type_pk = 1
+            
+
+            revenue_amount = form.cleaned_data.get("amount")
+
+            # Get the selected cash account from the form
+            deposited_cash_account = form.cleaned_data.get("cash_account")
+            deposited_cash_account = CashAccount.objects.get(pk=deposited_cash_account.pk)
+            new_deposited_cash_account_balance = deposited_cash_account.balance + revenue_amount
+           
+            # Set the currency to the deposited_cash_account's currency
+            currency = deposited_cash_account.currency
+
+            #1 Creating the transaction entry
+            # You need error handling here.
+            transaction = Transaction(
+                book=book,
+                value=form.cleaned_data.get("amount"),
+                currency=currency,
+                type="revenue",
+                type_pk=type_pk,
+                account=deposited_cash_account,
+                account_balance=new_deposited_cash_account_balance,
+            )
+            transaction.save()
 
 
+            #2 Add AssetCash object
+
+            new_asset_cash = AssetCash.objects.create(
+                book=book,
+                currency=currency,
+                amount=revenue_amount,
+                transaction=transaction,
+                currency_balance=new_deposited_cash_account_balance,
+            )
+
+
+            # 3
+            # Save the updated cash account
+            deposited_cash_account.balance = new_deposited_cash_account_balance
+            deposited_cash_account.save()
+
+
+            # 4 Saving the Equity Revenue entry
+            # Now you need to update the form instance before saving it
+            # Create the model instance but don't save it yet
+            my_form = form.save(commit=False)
+            # my_form.account_balance = target_cash_account.balance
+            # I handle this manually because I want to set the currency of the submitted revenue to be the same as the sent account's currency
+            my_form.currency = currency
+            my_form.save()
+            return self.form_valid(form)
+        else:
+            for field in form:
+                print("Field Error:", field.name, field.errors)
+
+    # This is probably redundant but it's ok to keep it
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
+        )
+
+
+
+# do not remember what this did
 @method_decorator(login_required, name="dispatch")
 class CategorySearchView(View):
     def get(self, request):
@@ -365,7 +487,7 @@ class SalesView(generic.TemplateView):
     template_name = "accounting/sales_report.html"
 
 
-# not sure if I need this
+# not sure if I need this, probably will delete later
 @method_decorator(login_required, name="dispatch")
 class CreateAsset(generic.edit.CreateView):
     model = Asset
@@ -392,98 +514,13 @@ class CreateAsset(generic.edit.CreateView):
         )
 
 
-@method_decorator(login_required, name="dispatch")
-class AddEquityRevenue(generic.edit.CreateView):
-    model = EquityRevenue
-    form_class = EquityRevenueForm
-    template_name = "accounting/add_equity_revenue.html"
-
-    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        kwargs["book"] = book
-        return kwargs
-
-    # below preselected the book field of the capital model (independent of the above function)
-    def get_initial(self):
-        # Get the book by primary key from the URL
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved
-        # By default make the currency US Dollars (which is 1)
-        return {"book": book, "currency": 1}
-
-    # You do this because you want to manually do some process when the expense form is submitted.
-    def post(self, request, *args, **kwargs):
-        print("you sent a post request")
-        form = self.get_form()
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        latest_revenue_item = EquityRevenue.objects.filter(book=book).latest("pk")
-        type_pk = latest_revenue_item.pk + 1
-        if form.is_valid():
-            print("hey the form is valid man!!!")
-
-            # Get the selected cash account from the form
-            target_cash_account = form.cleaned_data.get("cash_account")
-            target_cash_account = CashAccount.objects.get(pk=target_cash_account.pk)
-            # Update the balance of the cash account
-            target_cash_account.balance = (
-                target_cash_account.balance + form.cleaned_data.get("amount")
-            )
-
-            # Save the updated cash account
-            target_cash_account.save()
-
-            currency = form.cleaned_data.get("currency")
-            # You need error handling here.
-            transaction = Transaction(
-                book=book,
-                value=form.cleaned_data.get("amount"),
-                currency=currency,
-                type="revenue",
-                account=target_cash_account,
-                type_pk=type_pk,
-                account_balance=target_cash_account.balance,
-            )
-            transaction.save()
-
-            # # All cash accounts combined
-            # total_cash = CashAccount.objects.filter(book=kwargs['book'])
-
-            # Now you need to update the form instance before saving it
-            # Create the model instance but don't save it yet
-            my_form = form.save(commit=False)
-            # my_form.account_balance = target_cash_account.balance
-            # my_form.account_currency = target_cash_account.currency
-            my_form.save()
-            # my_field_value = form.cleaned_data.get('balance')
-            # form.cleaned_data['balance'] = target_cash_account.balance
-            # new_asset = Asset.objects.create(book = self.kwargs.get('pk'), )
-            # print('the form is valid')
-            # print(target_cash_account.pk)
-
-            return self.form_valid(form)
-        else:
-            for field in form:
-                print("Field Error:", field.name, field.errors)
-
-    def form_invalid(self, form):
-        return self.render_to_response(self.get_context_data(form=form))
-
-    def get_success_url(self) -> str:
-        return reverse_lazy(
-            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
-        )
 
 
 @method_decorator(login_required, name="dispatch")
 class AddStakeholderBook(generic.edit.CreateView):
     model = StakeholderBook
     form_class = StakeholderBookForm
-    template_name = "accounting/add_stakeholder.html"
+    template_name = "accounting/add_stakeholderbook.html"
 
     # def get_form_kwargs(self):
     #     kwargs = super().get_form_kwargs()

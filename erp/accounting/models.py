@@ -13,6 +13,7 @@ class Book(models.Model):
     created_at = models.DateTimeField(auto_now=True)
     # The name of the book, this is the name of the business division, or the project, or the company that the book is created for.
     name = models.CharField(max_length=50, unique=True)
+    # Number of shares available. Will be used to calculate stake of each owner based on their shares
     total_shares = models.PositiveIntegerField(default = 10000000)
 
     # This is how a data entry gets displayed in the admin panel and forms
@@ -52,16 +53,18 @@ class CurrencyCategory(models.Model):
 
 # Create cash model here, all cash transactions will be listed here.
 class AssetCash(models.Model):
+    class Meta:
+        verbose_name_plural = "Asset Cash"
+
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     transaction = models.ForeignKey('Transaction', on_delete=models.CASCADE, blank=True, null=True)
 
-    currency_balance = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    class Meta:
-        verbose_name_plural = "Asset Cash"
+    # Each currency will dictate it's own balance
+    currency_balance = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     def __str__(self):
         return f"{self.currency.symbol} {self.currency_balance} ({self.book})"
@@ -72,19 +75,21 @@ class CashAccount(models.Model):
     class Meta:
         verbose_name_plural = "Cash Accounts"
 
-        # This makes sure for each book, there are unique named cash accounts
+        # This makes sure for each book, there are unique named cash accounts, so we won't have reduntant accounts
         constraints = [
             models.UniqueConstraint(fields=['book', 'name'], name='unique_book_cashaccount')
         ]
 
+    # Each book will have its own set of cash accounts
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False,default=1)
 
-    name = models.CharField(max_length=50, blank=False, null=False)
+    name = models.CharField(max_length=50, blank=False, null=False) #Chase USD
 
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
 
+    # We will keep updating it so that the most recent entries balance will be our current cash balance of that account.
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
@@ -137,20 +142,13 @@ class EquityCapital(models.Model):
             + " "
             + str(self.date_invested)
         )
-        # return (self.cash_account.currency.symbol + str(self.amount))
 
-
-class ExpenseCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name_plural = "Expense Categories"
-
-
+# There are two types of revenues: Revenue generated from sales, and from others (refunds issued to you, and cash rewards you received etc)
 class EquityRevenue(models.Model):
+    REVENUE_TYPES = [
+        ('sales','Sales'),
+        ('other','Other')
+    ]
     class Meta:
         verbose_name_plural = "Equity Revenues"
 
@@ -172,7 +170,19 @@ class EquityRevenue(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
     description = models.CharField(max_length=200, unique=False, blank=True)
+    # you link the sales here, if it does not have invoice number, then it is other income, not sales income (could be refunds issued to you, or cash rewards you received from your bank)
     invoice_number = models.CharField(max_length=20, unique=True, blank=True,null=True)
+    revenue_type = models.CharField(choices = REVENUE_TYPES, default = 'sales' )
+
+
+class ExpenseCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = "Expense Categories"
 
 
 class EquityExpense(models.Model):
@@ -229,50 +239,8 @@ class EquityDivident(models.Model):
     description = models.CharField(max_length=200, unique=False, blank=True)
 
 
-# delete below
-class IncomeCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True)
 
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name_plural = "Income Categories"
-
-
-# delete this income model, create EquityRevenue instead. Also delete IncomeCategory and its fixture
-class Income(models.Model):
-    category = models.ForeignKey(
-        IncomeCategory, on_delete=models.CASCADE, blank=True, null=True
-    )
-    currency = models.ForeignKey(
-        CurrencyCategory,
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-    )
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateField()
-    description = models.CharField(max_length=200, unique=False, blank=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    contact = models.ForeignKey(
-        Contact, on_delete=models.CASCADE, blank=True, null=True
-    )
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, blank=True, null=True
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        # return f"{self.category.name} - {self.amount}"
-
-        try:
-            # return f"{self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')} - {self.category.name}"
-            return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%d %B, %Y')} - {self.category.name}"
-        except AttributeError:
-            return f"Book: {self.book} - {self.amount} {self.currency} - {self.date.strftime('%m/%d/%Y')}"
-
-
+# Probably need to delete below
 class AssetCategory(models.Model):
     name = models.CharField(max_length=100)
 
@@ -282,7 +250,7 @@ class AssetCategory(models.Model):
     def __str__(self):
         return self.name
 
-
+# Probably need to delete below
 # Equity: Capital + Rev - Exp - Dividends
 # Cash, Land, Furniture, Accounts Receivable, Office Supplies
 class Asset(models.Model):
@@ -322,6 +290,9 @@ class Asset(models.Model):
 #         return f"Book: {self.book.name}, Name: {self.name}, Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
     
 
+
+
+# probably will delete this one too
 # If balance is positive, then it is accounts receivable, if negative, it is accounts payable
 # set it up so you can add a contact or a company and possibly no more than one row for each contact or company, meaning each row unique contact + company
 class AccountBalance(models.Model):
@@ -334,6 +305,7 @@ class AccountBalance(models.Model):
 
 
 
+# probably delete and make a new one
 class Liability(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     name = models.CharField(max_length=100)
@@ -384,52 +356,3 @@ class Metric(models.Model):
     runway = models.DecimalField(max_digits=12, decimal_places=1)
     growth_rate = models.DecimalField(max_digits=12, decimal_places=1)
     default_alive = models.BooleanField(default=True)
-
-
-    # ----------------------------------------------------------------------
-
-# def invoice_default():
-#     return {"firat":"hello"}
-
-# def invoice_due_date():
-#     return timezone.now() + timezone.timedelta(days=30)
-
-# class Invoice(models.Model):
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     # invoice_number = models.CharField(max_length=20, unique=True)
-#     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-#     company = models.ForeignKey(Company, on_delete=models.RESTRICT, blank=False, null=False)
-#     date = models.DateField(default = timezone.now)
-#     due_date = models.DateField(default = invoice_due_date())
-#     total_amount = models.DecimalField(max_digits=10, decimal_places=2,default=0)
-#     paid = models.BooleanField(default=False)
-
-    # def save(self, *args, **kwargs):
-    #     # Calculate the total amount by summing the prices of all related InvoiceItems
-    #     self.total_amount = sum(item.quantity * item.price for item in self.invoiceitem_set.all())
-    #     super().save(*args, **kwargs)
-
-    # def __str__(self):
-    #     return f"Invoice {self.invoice_number}"
-
-# class InvoiceItem(models.Model):
-#     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE)
-#     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-#     quantity = models.DecimalField(max_digits=10, decimal_places=2)
-#     price = models.DecimalField(max_digits=10, decimal_places=2)
-
-#     def __str__(self):
-#         # return f"{self.quantity} x {self.product.name} in {self.invoice.invoice_number}"
-
-#     def get_total_price(self):
-#         return self.quantity * self.price
-
-    
-
-# Not used for now
-# class Source(models.Model):
-#     name = models.CharField(max_length=100, unique=True)
-
-#     def __str__(self):
-#         return self.name
-    

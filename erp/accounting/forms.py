@@ -33,27 +33,23 @@ class ExpenseForm(forms.ModelForm):
         self.fields["book"].empty_label = None
 
 
-class IncomeForm(forms.ModelForm):
-    class Meta:
-        model = Income
-        fields = ["book","contact","company","category", "amount", "currency", "description", "date" ]
-        widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
-            "book": forms.HiddenInput()
-        }
+# class IncomeForm(forms.ModelForm):
+#     class Meta:
+#         model = Income
+#         fields = ["book","contact","company","category", "amount", "currency", "description", "date" ]
+#         widgets = {
+#             "date": forms.DateInput(attrs={"type": "date"}),
+#             "book": forms.HiddenInput()
+#         }
 
-    def __init__(self, *args, **kwargs):
-        super(IncomeForm, self).__init__(*args, **kwargs)
-        # self.fields['date'].initial = date.today()
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-        # This removed the empty label option and preselects the 1st option (USD)
-        self.fields["currency"].empty_label = None
-        self.fields["category"].empty_label = None
-        self.fields["book"].empty_label = None
-
-
-
-
+#     def __init__(self, *args, **kwargs):
+#         super(IncomeForm, self).__init__(*args, **kwargs)
+#         # self.fields['date'].initial = date.today()
+#         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+#         # This removed the empty label option and preselects the 1st option (USD)
+#         self.fields["currency"].empty_label = None
+#         self.fields["category"].empty_label = None
+#         self.fields["book"].empty_label = None
 
 
 class AssetForm(forms.ModelForm):
@@ -72,13 +68,7 @@ class StakeholderBookForm(forms.ModelForm):
         }
 
         # We don't want to manually enter this data. 
-        exclude = ['equity_percentage','share']
-
-
-
-    # def __init__(self, *args, **kwargs):
-    #     super(StakeholderForm, self).__init__(*args, **kwargs)
-
+        exclude = ['shares']
 
 
 class EquityCapitalForm(forms.ModelForm):
@@ -114,7 +104,9 @@ class EquityRevenueForm(forms.ModelForm):
         fields = "__all__"
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
-            # "book": forms.HiddenInput(),
+            "book": forms.HiddenInput(),
+            "currency": forms.HiddenInput(),
+            "invoice_number": forms.HiddenInput(),
         }
         
     def __init__(self, *args, **kwargs):
@@ -172,54 +164,6 @@ class EquityDividentForm(forms.ModelForm):
 
 
 
-
-# class InvoiceForm(forms.ModelForm):
-#     class Meta:
-#         model = Invoice
-#         fields= ['invoice_number','company','due_date']
-#         widgets = {
-#             "due_date": forms.DateInput(attrs={"type":"date"}),
-#         }
-
-
-# class InvoiceItemForm(forms.ModelForm):
-#     class Meta:
-#         model = InvoiceItem
-#         fields = ['product', 'quantity', 'price']
-
-        
-#     quantity = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Allow decimal quantities
-#     price = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Price can also be dynamic
-
-# class CreateInvoiceForm(forms.Form):
-#     invoice = InvoiceForm()
-#     items = forms.ModelMultipleChoiceField(queryset=Product.objects.all(), widget=forms.CheckboxSelectMultiple)
-
-
-# class InvoiceItemFormSet(forms.BaseFormSet):
-#     def clean(self):
-#         # Custom validation for the formset, e.g. if no items are selected
-#         if any(self.errors):
-#             return
-#         if not any(form.cleaned_data for form in self.forms):
-#             raise forms.ValidationError("At least one product must be added to the invoice.")
-        
-    
-
-# class InTransferForm(forms.Form):
-#     from_cash_account = forms.ModelChoiceField(queryset=CashAccount.objects.all(), empty_label="Select a cash account")
-#     to_cash_account = forms.ModelChoiceField(queryset=CashAccount.objects.all(), empty_label="Select a cash account")
-#     amount = forms.DecimalField(max_digits=10, decimal_places=2, min_value=0.01)  # Allow decimal quantities
-#     date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), initial=date.today())
-
-#     def __init__(self, *args, **kwargs):
-#         book = kwargs.pop('book',None)
-#         super(InTransferForm, self).__init__(*args, **kwargs)
-#         # This ensures only the same book from the model can be selected with the cash categories (accounts)
-#         if book:
-#             self.fields["from_cash_account"].queryset = CashAccount.objects.filter(book=book)
-#             self.fields["to_cash_account"].queryset = CashAccount.objects.filter(book=book)
-#             # self.fields["book"].queryset = Book.objects.filter(book=book)
 
 
 class InTransferForm(forms.Form):

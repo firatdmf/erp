@@ -7,8 +7,8 @@ from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta
 import decimal
-from accounting.models import EquityExpense, Income, Book
-from accounting.forms import ExpenseForm, IncomeForm
+from accounting.models import EquityExpense, Book
+from accounting.forms import ExpenseForm
 import time
 
 register = template.Library()
@@ -33,8 +33,8 @@ def book_component(csrf_token,selected_book):
 
     print("now putting all in context")
     # Populate context with calculated data
-    context["expense_form"] = ExpenseForm(initial={"book":selected_book})
-    context["income_form"] = IncomeForm(initial={"book":selected_book})
+    # context["expense_form"] = ExpenseForm(initial={"book":selected_book})
+    # context["income_form"] = IncomeForm(initial={"book":selected_book})
     # context["book_selection_form"] = BookSelectionForm()
     context["csrf_token"] = csrf_token
     context["selected_book"] = selected_book

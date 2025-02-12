@@ -141,14 +141,14 @@
   },
   {
     "model": "accounting.ExpenseCategory",
-    "pk": 20,
+    "pk": 21,
     "fields": {
       "name": "Utilities"
     }
   },
   {
     "model": "accounting.ExpenseCategory",
-    "pk": 20,
+    "pk": 22,
     "fields": {
       "name": "Wages"
     }

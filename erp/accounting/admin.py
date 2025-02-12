@@ -6,17 +6,15 @@ from authentication.models import Member
 admin.site.register(CurrencyCategory)
 # admin.site.register(Source)
 
-admin.site.register(AssetCategory)
 admin.site.register(ExpenseCategory)
 admin.site.register(EquityExpense)
 # admin.site.register(Sale)
-admin.site.register(Asset)
 # admin.site.register(Equity)
 # admin.site.register(CashAccount)
 admin.site.register(EquityRevenue)
 admin.site.register(EquityCapital)
+admin.site.register(EquityDivident)
 admin.site.register(Transaction)
-admin.site.register(AccountBalance)
 
 
 # Register your models here.
@@ -57,9 +55,15 @@ class BookAdmin(admin.ModelAdmin):
 admin.site.register(Book, BookAdmin)
 admin.site.register(StakeholderBook)
 # -----------------------------------------------------------------------------------------------------
-admin.site.register(AssetCash)
+# admin.site.register(AssetCash)
 
 @admin.register(CashAccount)
 class CashAccountAdmin(admin.ModelAdmin):
     list_display = ('name', 'book', 'currency', 'balance')
     search_fields = ('name', 'book__name')
+
+
+@admin.register(AssetCash)
+class AssetCashAdmin(admin.ModelAdmin):
+    list_display = ('book','currency','amount','currency_balance')
+    search_fields =  ('currency__name','currency__code','currency__symbol','book__name')

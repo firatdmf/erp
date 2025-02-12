@@ -8,7 +8,7 @@ from django.db.models import Sum
 from datetime import timedelta
 import decimal
 from accounting.models import EquityExpense, Book
-from accounting.forms import ExpenseForm
+from accounting.forms import *
 import time
 
 register = template.Library()

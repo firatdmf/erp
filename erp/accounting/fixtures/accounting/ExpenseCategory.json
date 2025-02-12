@@ -152,5 +152,12 @@
     "fields": {
       "name": "Wages"
     }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 23,
+    "fields": {
+      "name": "Other"
+    }
   }
 ]

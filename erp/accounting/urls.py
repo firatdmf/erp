@@ -14,16 +14,14 @@ urlpatterns = [
     # path('books/<int:pk>/',login_required(BookDetail.as_view()),name="book_detail"),
     path('books/<int:pk>/',BookDetail.as_view(),name="book_detail"),
     path('books/<int:pk>/add_stakeholderbook/', AddStakeholderBook.as_view(),name="add_stakeholderbook"),
-    path('books/<int:pk>/create_asset/',CreateAsset.as_view(),name="create_asset"),
     path('books/<int:pk>/add_equity_capital/', AddEquityCapital.as_view(),name="add_equity_capital"),
     path('books/<int:pk>/add_equity_revenue/',AddEquityRevenue.as_view(),name="add_equity_revenue"),
     path('books/<int:pk>/add_equity_expense/', AddEquityExpense.as_view(),name="add_equity_expense"),
+    path('books/<int:pk>/add_equity_divident/', AddEquityDivident.as_view(),name="add_equity_divident"),
     path('books/<int:pk>/equity_expense_list/', EquityExpenseList.as_view(),name="equity_expense_list"),
-    path('books/<int:pk>/pay_equity_divident/', PayEquityDivident.as_view(),name="pay_equity_divident"),
     # path('books/<int:pk>/create_invoice/', InvoiceCreateView.as_view(),name="create_invoice"),
     path('books/<int:pk>/make_in_transfer/', MakeInTransfer.as_view(),name="make_in_transfer"),
     path('books/<int:pk>/transaction_list/', TransactionList.as_view(),name="transaction_list"),
-    path('books/<int:pk>/account_balance/', AccountBalance.as_view(),name="account_balance"),
 ]
 
 htmx_urlpatterns = [

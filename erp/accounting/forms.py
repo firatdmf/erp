@@ -10,52 +10,7 @@ class BookForm(forms.ModelForm):
         model = Book
         fields = '__all__'
 
-class ExpenseForm(forms.ModelForm):
-    # category_name = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'category-input'}))
 
-    class Meta:
-        model = EquityExpense
-        # fields = ['category','category_name', 'amount', 'currency','description','date']
-        fields = ["book","category", "amount", "currency", "description", "date"]
-        # fields = '__all__'
-        widgets = {
-            "date": forms.DateInput(attrs={"type": "date"}),
-            "book": forms.HiddenInput()
-        }
-
-    def __init__(self, *args, **kwargs):
-        super(ExpenseForm, self).__init__(*args, **kwargs)
-        # self.fields['date'].initial = date.today()
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-        # This removed the empty label option and preselects the 1st option (USD)
-        self.fields["currency"].empty_label = None
-        self.fields["category"].empty_label = None
-        self.fields["book"].empty_label = None
-
-
-# class IncomeForm(forms.ModelForm):
-#     class Meta:
-#         model = Income
-#         fields = ["book","contact","company","category", "amount", "currency", "description", "date" ]
-#         widgets = {
-#             "date": forms.DateInput(attrs={"type": "date"}),
-#             "book": forms.HiddenInput()
-#         }
-
-#     def __init__(self, *args, **kwargs):
-#         super(IncomeForm, self).__init__(*args, **kwargs)
-#         # self.fields['date'].initial = date.today()
-#         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-#         # This removed the empty label option and preselects the 1st option (USD)
-#         self.fields["currency"].empty_label = None
-#         self.fields["category"].empty_label = None
-#         self.fields["book"].empty_label = None
-
-
-class AssetForm(forms.ModelForm):
-    class Meta:
-        model = Asset
-        fields = '__all__'
 
 class StakeholderBookForm(forms.ModelForm):
     class Meta:
@@ -112,9 +67,8 @@ class EquityRevenueForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         book = kwargs.pop('book',None)
         super(EquityRevenueForm, self).__init__(*args, **kwargs)
+        # pre-populate the datefield with today's date
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-        # self.fields["stakeholder"].empty_label = "Select a stakeholder"
-        # self.fields["book"].widget.attrs["value"] = book
 
         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
@@ -129,16 +83,16 @@ class EquityExpenseForm(forms.ModelForm):
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
             "book": forms.HiddenInput(),
-            "balance":forms.HiddenInput()
+            "currency": forms.HiddenInput(),
         }
 
-
+    # This pre-populates form fields with given variables
     def __init__(self, *args, **kwargs):
+        # You get the book variable from kwargs that was sent through the views.py file
         book = kwargs.pop('book',None)
         super(EquityExpenseForm, self).__init__(*args, **kwargs)
+        # Set to today's date
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-        # self.fields["stakeholder"].empty_label = "Select a stakeholder"
-        # self.fields["book"].widget.attrs["value"] = book
 
         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
@@ -153,6 +107,7 @@ class EquityDividentForm(forms.ModelForm):
         widgets = {
             "date": forms.DateInput(attrs={"type": "date"}),
             "book": forms.HiddenInput(),
+            "currency":forms.HiddenInput(),
         }
     
     def __init__(self,*args,**kwargs):
@@ -161,6 +116,10 @@ class EquityDividentForm(forms.ModelForm):
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            # The values_list method in Django's QuerySet API is used to create a list (or tuple) of values from the specified fields of the model.
+            # The flat=True argument ensures that the result is a flat list rather than a list of tuples.
+            members = StakeholderBook.objects.filter(book=book).values_list('member', flat=True)
+            self.fields["member"].queryset = Member.objects.filter(id__in=members)
 
 
 

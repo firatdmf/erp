@@ -6,6 +6,7 @@ from authentication.models import Member
 from django.utils import timezone
 from datetime import timedelta
 from crm.models import Supplier
+from marketing.models import Product
 # from operating.models import Product
 from django.core.exceptions import ValidationError
 
@@ -172,21 +173,31 @@ class AssetInventoryRawMaterial(models.Model):
 class AssetInventoryGood(models.Model):
     class Meta:
         verbose_name_plural = "Asset Inventory Goods"
-
+    product = models.ForeignKey(Product,models.RESTRICT, blank=True, null=True)
     STATUS_CHOICES = [("wip", "Work in Progress"), ("finished", "Finished Good")]
-    UNIT_TYPE_CHOICES = [("units", "Unit"),("mt","Meter"),("kg","Kilogram")]
+    
     created_at = models.DateTimeField(auto_now_add=True)
+    # Set this to when the inventory moved from work in progress to finished.
+    # Later will be used to measure the speed and efficiency.
+    modified_at = models.DateField(blank=True,null=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     name = models.CharField(max_length=300, unique=True)
-    # This should be selectable field
-    unit_of_measurement = models.CharField(choices=UNIT_TYPE_CHOICES,null=True, blank=True, default=UNIT_TYPE_CHOICES[0])
+    
+    # Default is USD, maybe I will delete this later.
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    # Maybe you sell by the meter, or in kilograms instead of units, so this will not be an integer field.
     quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    # Unavailable (used for another order), Comitted (on the way coming), Available (ready to ship)
+    stock_type = models.CharField(null=True, blank=True)
+
+    # Product status, could be in progress, or finished. I probably will need more status 
     status = models.CharField(choices=STATUS_CHOICES)
+
+    # You can have multiple inventory entries with the same product because they might be at different warehouses or locations
     warehouse = models.CharField(null=True, blank=True)
     location = models.CharField(null=True, blank=True)
 

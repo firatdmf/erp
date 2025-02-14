@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "jquery",
     "authentication",
     "operating",
+    "marketing",
     "django_htmx",
     # below is for google auth
     # "django.contrib.sites",

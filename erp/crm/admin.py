@@ -1,8 +1,9 @@
 from django.contrib import admin
-from .models import Contact, Company, Note
+from .models import *
 # Register your models here.
 admin.site.register(Contact)
 admin.site.register(Company)
+admin.site.register(Supplier)
 # admin.site.register(Note)
 # I am doing it like this so I can see the created at and modified dates.
 @admin.register(Note)

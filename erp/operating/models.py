@@ -1,70 +1,41 @@
 from django.db import models
 from crm.models import Contact, Company
+from accounting.models import AssetInventoryRawMaterial
 from django.contrib.postgres.fields import ArrayField
+
+
+# Create your functions here.
+def product_description():
+    return {
+        "variant": [
+            {
+                "id": 123,
+                "price": 2,
+                "quantity": 20,
+            },
+            {
+                "id": 456,
+                "price": 5,
+                "quantity": 10,
+            },
+        ]
+    }
+
 # Create your models here.
 
-class RawMaterialCategory(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    unit = models.CharField(max_length=10, unique=False, default="piece")
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name_plural = "Raw Material Categories"
-    
-
-class RawMaterial(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    type = models.ForeignKey(RawMaterialCategory, on_delete=models.CASCADE, blank=False, null=False)
-    supplierContact = models.ManyToManyField(
-        Contact,
-        blank=True,
-    )
-
-    supplierCompany = models.ManyToManyField(
-        Company, 
-        blank=True,
-    )
-    cost = models.DecimalField(max_digits=6, decimal_places=2)
-
-class UnitCategory(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    decimals = models.IntegerField()
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        verbose_name_plural = "Unit Categories"
 
 class Machine(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    max_rpm  = models.PositiveIntegerField()
+    name = models.CharField(max_length=150, unique=True)
+    max_rpm = models.PositiveIntegerField()
     domain = models.DecimalField(max_digits=5, decimal_places=2)
 
-# class Product(models.Model):
-#     sku = models.CharField(max_length=50, unique=True, blank=False)
-#     name = models.CharField(max_length=50, unique=False, blank= True, null=True)
-#     description = models.CharField(max_length=250, blank= True, null=True)
-#     # variant = ArrayField(ArrayField(models.CharField()), blank=True,null=True)
-#     # machine = models.ForeignKey(Machine, on_delete=models.CASCADE, blank=False,null=False)
-#     cost = models.DecimalField(max_digits=6, decimal_places=2,unique=False, blank=True)
-#     # unit = models.CharField(max_length=10, unique=False, default="piece")
-#     unit = models.ForeignKey(UnitCategory, on_delete=models.CASCADE, blank=False, null=False )
-#     stock_quantity = models.DecimalField(max_digits=10, decimal_places=2,unique=False, blank=True)
-#     raw_materials = models.ManyToManyField(RawMaterial)
 
 class Product(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    sku = models.CharField(max_length=50, unique=False, blank=False)
-    name = models.CharField(max_length=50, unique=False, blank= True, null=True)
-    manufacturer = models.CharField(max_length=250, blank= False, null=False)
-    description = models.CharField(max_length=250, blank= True, null=True)
-    variant = models.JSONField(blank=True,null=True)
-    # machine = models.ForeignKey(Machine, on_delete=models.CASCADE, blank=False,null=False)
-    cost = models.DecimalField(max_digits=6, decimal_places=2,unique=False, blank=True)
-    # unit = models.CharField(max_length=10, unique=False, default="piece")
-    unit = models.ForeignKey(UnitCategory, on_delete=models.CASCADE, blank=False, null=False )
-    stock_quantity = models.DecimalField(max_digits=10, decimal_places=2,unique=False, blank=True)
-    raw_materials = models.ManyToManyField(RawMaterial,blank=True)
-    def __str__(self):
-        return self.name
+    name = models.CharField(max_length=300, unique=True)
+    sku = models.CharField(max_length=12, unique=True)
+    # Probably you should not allow direct materials to be used here.
+    ingredient = models.ManyToManyField(AssetInventoryRawMaterial, related_name='products')
+    # variant = 
+    # product_type = 
+
+

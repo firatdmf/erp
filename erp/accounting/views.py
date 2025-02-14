@@ -5,7 +5,7 @@ from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views import View, generic
 
-from operating.models import Product
+# from operating.models import Product
 
 from .models import *
 
@@ -73,148 +73,141 @@ class BookDetail(generic.DetailView):
 
         return get_object_or_404(Book, pk=pk)
 
-    def get_exchange_rate(self, from_currency, to_currency):
-        ticker = f"{from_currency}{to_currency}=X"
-        data = yf.Ticker(ticker)
-        exchange_rate = data.history(period="1d")["Close"][0]
-        return Decimal(exchange_rate)
+    # def get_exchange_rate(self, from_currency, to_currency):
+    #     ticker = f"{from_currency}{to_currency}=X"
+    #     data = yf.Ticker(ticker)
+    #     exchange_rate = data.history(period="1d")["Close"][0]
+    #     return Decimal(exchange_rate)
 
-    def get_monthly_revenue_in_usd(self, start_date, end_date):
-        book = self.get_object()
-        revenues = EquityRevenue.objects.filter(
-            book=book, date__gte=start_date, date__lt=end_date
-        )
-        total_revenue_usd = 0
-        for revenue in revenues:
-            if revenue.currency.code == "USD":
-                amount_in_usd = revenue.amount
-            else:
-                exchange_rate = self.get_exchange_rate(revenue.currency.code, "USD")
-                amount_in_usd = revenue.amount * exchange_rate
-            total_revenue_usd += amount_in_usd
-        return round(total_revenue_usd, 2)
+    # def get_monthly_revenue_in_usd(self, start_date, end_date):
+    #     book = self.get_object()
+    #     revenues = EquityRevenue.objects.filter(
+    #         book=book, date__gte=start_date, date__lt=end_date
+    #     )
+    #     total_revenue_usd = 0
+    #     for revenue in revenues:
+    #         if revenue.currency.code == "USD":
+    #             amount_in_usd = revenue.amount
+    #         else:
+    #             exchange_rate = self.get_exchange_rate(revenue.currency.code, "USD")
+    #             amount_in_usd = revenue.amount * exchange_rate
+    #         total_revenue_usd += amount_in_usd
+    #     return round(total_revenue_usd, 2)
 
-    def get_revenue_for_previous_months(self):
-        now = timezone.now()
-        first_day_of_current_month = datetime(now.year, now.month, 1)
-        first_day_of_last_month = first_day_of_current_month - timedelta(days=1)
-        first_day_of_last_month = datetime(
-            first_day_of_last_month.year, first_day_of_last_month.month, 1
-        )
-        first_day_of_two_months_ago = first_day_of_last_month - timedelta(days=1)
-        first_day_of_two_months_ago = datetime(
-            first_day_of_two_months_ago.year, first_day_of_two_months_ago.month, 1
-        )
+    # def get_revenue_for_previous_months(self):
+    #     now = timezone.now()
+    #     first_day_of_current_month = datetime(now.year, now.month, 1)
+    #     first_day_of_last_month = first_day_of_current_month - timedelta(days=1)
+    #     first_day_of_last_month = datetime(
+    #         first_day_of_last_month.year, first_day_of_last_month.month, 1
+    #     )
+    #     first_day_of_two_months_ago = first_day_of_last_month - timedelta(days=1)
+    #     first_day_of_two_months_ago = datetime(
+    #         first_day_of_two_months_ago.year, first_day_of_two_months_ago.month, 1
+    #     )
 
-        revenue_last_month = self.get_monthly_revenue_in_usd(
-            first_day_of_last_month, first_day_of_current_month
-        )
-        revenue_two_months_ago = self.get_monthly_revenue_in_usd(
-            first_day_of_two_months_ago, first_day_of_last_month
-        )
+    #     revenue_last_month = self.get_monthly_revenue_in_usd(
+    #         first_day_of_last_month, first_day_of_current_month
+    #     )
+    #     revenue_two_months_ago = self.get_monthly_revenue_in_usd(
+    #         first_day_of_two_months_ago, first_day_of_last_month
+    #     )
 
-        return revenue_two_months_ago, revenue_last_month
+    #     return revenue_two_months_ago, revenue_last_month
 
-    def calculate_growth_rate(self):
-        revenue_two_months_ago, revenue_last_month = (
-            self.get_revenue_for_previous_months()
-        )
-        if revenue_last_month == 0:
-            return 0  # Avoid division by zero
-        growth_rate = (
-            (revenue_last_month - revenue_two_months_ago) / revenue_last_month
-        ) * 100
-        return round(growth_rate, 2)
+    # def calculate_growth_rate(self):
+    #     revenue_two_months_ago, revenue_last_month = (
+    #         self.get_revenue_for_previous_months()
+    #     )
+    #     if revenue_last_month == 0:
+    #         return 0  # Avoid division by zero
+    #     growth_rate = (
+    #         (revenue_last_month - revenue_two_months_ago) / revenue_last_month
+    #     ) * 100
+    #     return round(growth_rate, 2)
 
-    def get_monthly_expenses_in_usd(self):
-        book = self.get_object()
-        # Get the first day of the current month
-        now = timezone.now()
-        first_day_of_month = datetime(now.year, now.month, 1)
+    # def get_monthly_expenses_in_usd(self):
+    #     book = self.get_object()
+    #     # Get the first day of the current month
+    #     now = timezone.now()
+    #     first_day_of_month = datetime(now.year, now.month, 1)
 
-        # Fetch all expenses from the beginning of the month until now
-        expenses = EquityExpense.objects.filter(book=book, date__gte=first_day_of_month)
+    #     # Fetch all expenses from the beginning of the month until now
+    #     expenses = EquityExpense.objects.filter(book=book, date__gte=first_day_of_month)
 
-        total_expense_usd = 0
-        for expense in expenses:
-            if expense.currency.code == "USD":
-                amount_in_usd = expense.amount
-            else:
-                exchange_rate = self.get_exchange_rate(expense.currency.code, "USD")
-                amount_in_usd = expense.amount * exchange_rate
-            total_expense_usd += amount_in_usd
+    #     total_expense_usd = 0
+    #     for expense in expenses:
+    #         if expense.currency.code == "USD":
+    #             amount_in_usd = expense.amount
+    #         else:
+    #             exchange_rate = self.get_exchange_rate(expense.currency.code, "USD")
+    #             amount_in_usd = expense.amount * exchange_rate
+    #         total_expense_usd += amount_in_usd
 
-        return round(total_expense_usd, 2)
+    #     return round(total_expense_usd, 2)
 
-    def get_context_data(self, **kwargs):
-        start_time = time.time()
-        context = super().get_context_data(**kwargs)
-        book = self.get_object()
-        # ----------------------------
-        # Below is for the total balance in cash accounts
-        balance_usd = Decimal(
-            CashAccount.objects.filter(book=book, currency=1).aggregate(Sum("balance"))[
-                "balance__sum"
-            ]
-            or 0
-        )
-        balance_eur = Decimal(
-            CashAccount.objects.filter(book=book, currency=2).aggregate(Sum("balance"))[
-                "balance__sum"
-            ]
-            or 0
-        )
-        balance_try = Decimal(
-            CashAccount.objects.filter(book=book, currency=3).aggregate(Sum("balance"))[
-                "balance__sum"
-            ]
-            or 0
-        )
-        eur_to_usd = self.get_exchange_rate("EUR", "USD")
-        try_to_usd = self.get_exchange_rate("TRY", "USD")
+    # def get_context_data(self, **kwargs):
+    #     start_time = time.time()
+    #     context = super().get_context_data(**kwargs)
+    #     book = self.get_object()
+    #     # ----------------------------
+    #     # Below is for the total balance in cash accounts
+    #     balance_usd = Decimal(
+    #         CashAccount.objects.filter(book=book, currency=1).aggregate(Sum("balance"))[
+    #             "balance__sum"
+    #         ]
+    #         or 0
+    #     )
+    #     balance_eur = Decimal(
+    #         CashAccount.objects.filter(book=book, currency=2).aggregate(Sum("balance"))[
+    #             "balance__sum"
+    #         ]
+    #         or 0
+    #     )
+    #     balance_try = Decimal(
+    #         CashAccount.objects.filter(book=book, currency=3).aggregate(Sum("balance"))[
+    #             "balance__sum"
+    #         ]
+    #         or 0
+    #     )
+    #     eur_to_usd = self.get_exchange_rate("EUR", "USD")
+    #     try_to_usd = self.get_exchange_rate("TRY", "USD")
 
-        balance_eur_in_usd = Decimal(balance_eur) * Decimal(eur_to_usd)
-        balance_try_in_usd = Decimal(balance_try) * Decimal(try_to_usd)
+    #     balance_eur_in_usd = Decimal(balance_eur) * Decimal(eur_to_usd)
+    #     balance_try_in_usd = Decimal(balance_try) * Decimal(try_to_usd)
 
-        balance = (
-            Decimal(balance_usd)
-            + Decimal(balance_eur_in_usd)
-            + Decimal(balance_try_in_usd)
-        )
-        balance = round(balance, 2)
+    #     balance = (
+    #         Decimal(balance_usd)
+    #         + Decimal(balance_eur_in_usd)
+    #         + Decimal(balance_try_in_usd)
+    #     )
+    #     balance = round(balance, 2)
 
-        context["balance"] = balance
+    #     context["balance"] = balance
 
-        print(
-            f"this is how long the balance equation takes: {(time.time() - start_time)}"
-        )
+    #     print(
+    #         f"this is how long the balance equation takes: {(time.time() - start_time)}"
+    #     )
 
-        # ----------------------------
-        now = timezone.now()
-        first_day_of_month = datetime(now.year, now.month, 1)
-        day_of_today = datetime(now.year, now.month, now.day)
-        context["revenue"] = self.get_monthly_revenue_in_usd(
-            first_day_of_month, day_of_today
-        )
-        context["expense"] = self.get_monthly_expenses_in_usd()
-        context["burn"] = context["revenue"] - context["expense"]
-        # Below is number of months you can survive, rounds it down to 2 decimals
-        avg_burn = -1000
-        context["runway"] = round((context["balance"] / abs(avg_burn)), 1)
-        context["growth_rate"] = self.calculate_growth_rate()
-        context["default_alive"] = ""
-        # print(f"Balance: {balance}")
-        # book = Book.objects.get(pk=self.kwargs.get('pk'))
-        book = self.get_object()
-        # print(type(book))
-        stakeholders = StakeholderBook.objects.filter(book_id=book.pk)
-        # stakeholders = [stakeholder for stakeholder in stakeholders]
-        context["Stakeholders"] = stakeholders
-        # context['Stakeholders'] = [stakeholder.stakeholder for stakeholder in context['Stakeholders']]
-        # print(type(Stakeholder.objects.filter(books=book)))
-        # print(context['Stakeholders'])
-        print(f"this is how long the execution takes: {(time.time() - start_time)}")
-        return context
+    #     # ----------------------------
+    #     now = timezone.now()
+    #     first_day_of_month = datetime(now.year, now.month, 1)
+    #     day_of_today = datetime(now.year, now.month, now.day)
+    #     context["revenue"] = self.get_monthly_revenue_in_usd(
+    #         first_day_of_month, day_of_today
+    #     )
+    #     context["expense"] = self.get_monthly_expenses_in_usd()
+    #     context["burn"] = context["revenue"] - context["expense"]
+    #     # Below is number of months you can survive, rounds it down to 2 decimals
+    #     avg_burn = -1000
+    #     context["runway"] = round((context["balance"] / abs(avg_burn)), 1)
+    #     context["growth_rate"] = self.calculate_growth_rate()
+    #     context["default_alive"] = ""
+    #     book = self.get_object()
+    #     stakeholders = StakeholderBook.objects.filter(book_id=book.pk)
+    #     context["Stakeholders"] = stakeholders
+    #     print(f"this is how long the execution takes: {(time.time() - start_time)}")
+    #     return context
 
 @method_decorator(login_required, name="dispatch")
 class AddStakeholderBook(generic.edit.CreateView):
@@ -711,8 +704,50 @@ class AddEquityDivident(generic.edit.CreateView):
 
 
 
+@method_decorator(login_required, name="dispatch")
+class AddAccountsReceivable(generic.edit.CreateView):
+    model = AssetAccountsReceivable
+    form_class = AssetAccountsReceivableForm
+    template_name = "accounting/add_accounts_receivable.html"
+    # fields = "__all__"
+
+    # below preselected the book field of the capital model (independent of the above function)
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved, and currency to usd
+        return {"book": book, "currency":1}
+
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:add_accounts_receivable", kwargs={"pk": self.kwargs.get("pk")}
+        )
+    # def get_form_kwargs(self):
+    #     book = 
+    #     self.kwargs['book'] = book
+    #     return super().get_form_kwargs()
 
 
+@method_decorator(login_required, name="dispatch")
+class AddAccountsPayable(generic.edit.CreateView):
+    model = AssetAccountsPayable
+    form_class = AssetAccountsPayableForm
+    template_name = "accounting/add_accounts_payable.html"
+    # fields = "__all__"
+
+    # below preselected the book field of the capital model (independent of the above function)
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved, and currency to usd
+        return {"book": book, "currency":1}
+
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:add_accounts_payable", kwargs={"pk": self.kwargs.get("pk")}
+        )
 
 # do not remember what this did
 @method_decorator(login_required, name="dispatch")

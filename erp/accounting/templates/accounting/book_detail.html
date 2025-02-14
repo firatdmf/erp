@@ -39,9 +39,6 @@
       <a href="{% url 'accounting:add_stakeholderbook' Book.id %}">Add Stakeholder</a>
     </li>
     <li>
-      <a href="{% url 'accounting:create_asset' Book.id %}">Create an asset</a>
-    </li>
-    <li>
       <a href="{% url 'accounting:add_equity_capital' Book.id %}">Add Capital</a>
     </li>
     <li>
@@ -57,13 +54,16 @@
       <a href="{% url 'accounting:add_equity_divident' Book.id %}">Pay Divident</a>
     </li>
     <li>
-      <a href="{% url 'accounting:transaction_list' Book.id %}">See all Transactions</a>
-    </li>
-    <li>
       <a href="{% url 'accounting:make_in_transfer' Book.id %}">Make in Transfer</a>
     </li>
     <li>
-      <a href="{% url 'accounting:account_balance' Book.id %}">Account Balance</a>
+      <a href="{% url 'accounting:add_accounts_receivable' Book.id %}">Add Accounts Receivable</a>
+    </li>
+    <li>
+      <a href="{% url 'accounting:add_accounts_payable' Book.id %}">Add Accounts Payable</a>
+    </li>
+    <li>
+      <a href="{% url 'accounting:transaction_list' Book.id %}">See all Transactions</a>
     </li>
   </ul>
 

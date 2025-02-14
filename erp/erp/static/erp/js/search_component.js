@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+  
     const addButton = document.getElementById("addButton");
     const addExpanded = document.getElementById("addExpanded");
     const recent = document.querySelector(".recent");

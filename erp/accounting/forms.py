@@ -1,7 +1,7 @@
 from django import forms
 
 from .models import *
-from operating.models import Product
+# from operating.models import Product
 from datetime import date
 
 
@@ -18,6 +18,7 @@ class StakeholderBookForm(forms.ModelForm):
         fields = '__all__'
 
         # This ensures the book field is hidden, and the value is passed from the view (via pk in the url)
+        # If I had put in the exlude array, it would have passed null which is not what we want 
         widgets = {
             "book" : forms.HiddenInput(),
         }
@@ -25,6 +26,23 @@ class StakeholderBookForm(forms.ModelForm):
         # We don't want to manually enter this data. 
         exclude = ['shares']
 
+class AssetAccountsReceivableForm(forms.ModelForm):
+    class Meta:
+        model = AssetAccountsReceivable
+        fields = "__all__"
+
+        widgets = {
+            "book" : forms.HiddenInput(),
+        }
+
+class AssetAccountsPayableForm(forms.ModelForm):
+    class Meta:
+        model = AssetAccountsPayable
+        fields = "__all__"
+
+        widgets = {
+            "book" : forms.HiddenInput(),
+        }
 
 class EquityCapitalForm(forms.ModelForm):
     class Meta:

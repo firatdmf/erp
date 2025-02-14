@@ -67,3 +67,9 @@ class CashAccountAdmin(admin.ModelAdmin):
 class AssetCashAdmin(admin.ModelAdmin):
     list_display = ('book','currency','amount','currency_balance')
     search_fields =  ('currency__name','currency__code','currency__symbol','book__name')
+
+admin.site.register(AssetAccountsReceivable)
+admin.site.register(AssetAccountsPayable)
+admin.site.register(Invoice)
+admin.site.register(AssetInventoryRawMaterial)
+admin.site.register(AssetInventoryGood)

@@ -4,7 +4,35 @@ from authentication.models import Member
 
 # from operating.models import Product
 from django.utils import timezone
-from operating.models import Product
+from datetime import timedelta
+from crm.models import Supplier
+# from operating.models import Product
+from django.core.exceptions import ValidationError
+
+# Create your functions here.
+
+
+# Define a function to calculate the default due date for the invoices
+def default_due_date():
+    return timezone.now() + timedelta(days=15)
+
+
+def invoice_items_default():
+    return {
+        "products": [
+            {
+                "id": 123,
+                "price": 2,
+                "quantity": 20,
+            },
+            {
+                "id": 456,
+                "price": 5,
+                "quantity": 10,
+            },
+        ]
+    }
+
 
 # Create your models here.
 
@@ -55,6 +83,32 @@ class CurrencyCategory(models.Model):
         verbose_name_plural = "Currency Categories"
 
 
+class Invoice(models.Model):
+    INVOICE_TYPE_CHOICES = [("proforma", "Proforma"), ("commercial", "Commercial")]
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Pass the function itself. Otherwise, If you put paranthesis after the function name, django would run it once, and set it as default for all the new objects you create in future.
+    due_cate = models.DateTimeField(default=default_due_date)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    contact = models.ForeignKey(
+        Contact, on_delete=models.CASCADE, blank=True, null=True
+    )
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, blank=True, null=True
+    )
+    items = models.JSONField("ItemsInfo", default=invoice_items_default)
+    # invoice_details = models.JSONField(_(""), encoder=, decoder=)
+    invoice_type = models.CharField(default="proforma", choices=INVOICE_TYPE_CHOICES)
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    @property
+    def balance(self):
+        return self.total - self.paid
+
+    def __str__(self):
+        return f"Invoice {self.pk} - {self.invoice_type}"
+
+
 # Create cash model here, all cash transactions will be listed here.
 class AssetCash(models.Model):
     class Meta:
@@ -76,7 +130,127 @@ class AssetCash(models.Model):
     )
 
     def __str__(self):
-        return f"{self.currency.symbol} {self.amount} balance: {self.currency_balance} | ({self.book})"
+        return f"{self.currency.symbol} {self.amount} currency's balance: {self.currency_balance} | ({self.book})"
+
+
+class AssetInventoryRawMaterial(models.Model):
+    class Meta:
+        verbose_name_plural = "Asset Inventory Raw Materials"
+        constraints = [
+            models.UniqueConstraint(fields=['name', 'supplier'], name='unique_name_supplier')
+        ]
+
+    RAW_TYPE_CHOICES = [("direct", "Direct"), ("indirect", "Indirect")]
+    UNIT_TYPE_CHOICES = [("units", "Unit"),("mt","Meter"),("kg","Kilogram")]
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    # name and supplier combination should be unique, so we won't have multiple entries of the same product.
+
+    name = models.CharField(null=False, blank=False)
+    supplier = models.ForeignKey(Supplier,on_delete=models.RESTRICT, null=True, blank=True)
+    # If the user does not enter a stockID, make the stockID equal to the id of the object created.
+    # preopulate it with the next availabe stockid
+    stock_id = models.CharField(null=True, blank=True)
+    receipt_number = models.CharField(null=True, blank=True)
+    unit_of_measurement = models.CharField(choices=UNIT_TYPE_CHOICES,null=True, blank=True, default=UNIT_TYPE_CHOICES[0])
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+    )
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    # This should be selectable field
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    warehouse = models.CharField(null=True, blank=True)
+    location = models.CharField(null=True, blank=True)
+    # Do not delete the raw material inventory if you delete the supplier model. Give a warning if there is at least one raw material from that company. Delete only if there are no raw mat. from that company
+    raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
+
+
+    def __str__(self):
+        return f"{self.book} | {self.name} - {self.supplier} - {self.quantity} {self.unit_of_measurement}"
+
+
+class AssetInventoryGood(models.Model):
+    class Meta:
+        verbose_name_plural = "Asset Inventory Goods"
+
+    STATUS_CHOICES = [("wip", "Work in Progress"), ("finished", "Finished Good")]
+    UNIT_TYPE_CHOICES = [("units", "Unit"),("mt","Meter"),("kg","Kilogram")]
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    name = models.CharField(max_length=300, unique=True)
+    # This should be selectable field
+    unit_of_measurement = models.CharField(choices=UNIT_TYPE_CHOICES,null=True, blank=True, default=UNIT_TYPE_CHOICES[0])
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+    )
+    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    status = models.CharField(choices=STATUS_CHOICES)
+    warehouse = models.CharField(null=True, blank=True)
+    location = models.CharField(null=True, blank=True)
+
+    @property
+    def unit_price(self):
+        return self.unit_cost * 2
+
+
+class AssetAccountsReceivable(models.Model):
+    class Meta:
+        verbose_name_plural = "Asset Accounts Receivables"
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    contact = models.ForeignKey(
+        Contact, on_delete=models.CASCADE, blank=True, null=True
+    )
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, blank=True, null=True
+    )
+
+    # Link the invoice that this was created for
+    invoice = models.ForeignKey(
+        Invoice, on_delete=models.CASCADE, blank=True, null=True
+    )
+
+    # Overriding the clean method that is called during the model's validation process.
+    # So we can manually add additional measures.
+    def clean(self):
+        # Ensure that you call super().clean() to maintain the default validation behavior.
+        super().clean()
+        if self.contact and self.company:
+            raise ValidationError(
+                "Only one of 'contact' or 'company' can be assigned, not both."
+            )
+
+    def __str__(self):
+        if self.company:
+            return f"{self.book} | {self.company} now owes you {self.currency.symbol}{self.amount} "
+        elif self.contact:
+            return f"{self.book} | {self.contact} now owes you {self.currency.symbol}{self.amount} "
+        else:
+            return f"{self.book} |{self.currency.symbol}{self.amount} "
+
+
+class AssetAccountsPayable(models.Model):
+    class Meta:
+        verbose_name_plural = "Asset Accounts Payables"
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    supplier = supplier = models.ForeignKey(Supplier,on_delete=models.RESTRICT, null=True, blank=True)
+    receipt = models.CharField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.book} | you now owe {self.currency.symbol}{self.amount} to {self.supplier}"
 
 
 # List all your cash accounts: bank, and on hand. Each account has its own currency, and balance.
@@ -235,7 +409,7 @@ class EquityDivident(models.Model):
         verbose_name_plural = "Equity Dividents"
 
     def __str__(self):
-        return(f"{self.book} | {self.member} is paid {self.currency.symbol}{self.amount} Divident on {self.date} ")
+        return f"{self.book} | {self.member} is paid {self.currency.symbol}{self.amount} Divident on {self.date} "
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
@@ -254,7 +428,6 @@ class EquityDivident(models.Model):
     description = models.CharField(max_length=200, unique=False, blank=True)
 
 
-
 # class AssetAccountsReceivable(models.Model):
 #     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
 #     name = models.CharField(max_length=100)
@@ -270,8 +443,6 @@ class EquityDivident(models.Model):
 #         return f"Book: {self.book.name}, Name: {self.name}, Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
 
 
-
-
 # # probably delete and make a new one
 # class Liability(models.Model):
 #     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
@@ -283,7 +454,6 @@ class EquityDivident(models.Model):
 
 #     def __str__(self):
 #         return f"{self.name} - {self.value} {self.currency.code}"
-
 
 
 # Used in transfers between cash accounts within the same book.
@@ -304,7 +474,6 @@ class InTransfer(models.Model):
         return f"{self.source.name} -> {self.destination.name} | {self.currency.symbol}{self.amount}"
 
 
-
 # Keeping logs of all transactions
 class Transaction(models.Model):
 
@@ -323,7 +492,6 @@ class Transaction(models.Model):
     account_balance = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
-
 
 
 # This model will be used to track the KPIs in real-time

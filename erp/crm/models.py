@@ -3,6 +3,7 @@ from django.db import models
 
 # To store array field use this
 from django.contrib.postgres.fields import ArrayField
+from django.forms import ValidationError
 
 # Create your models here.
 
@@ -10,10 +11,14 @@ from django.contrib.postgres.fields import ArrayField
 class Company(models.Model):
     name = models.CharField(max_length=255, verbose_name="Company Name (required)")
     email = models.EmailField(blank=True)
-    backgroundInfo = models.CharField(max_length=400,verbose_name="Background info", blank=True,)
+    backgroundInfo = models.CharField(
+        max_length=400,
+        verbose_name="Background info",
+        blank=True,
+    )
     phone = models.CharField(max_length=15, blank=True)
     # website = models.URLField(blank=True)
-    website = models.CharField(max_length=200,blank=True)
+    website = models.CharField(max_length=200, blank=True)
     address = models.CharField(max_length=255, blank=True)
     # city = models.CharField(max_length=100, blank=True)
     # state = models.CharField(max_length=100, blank=True)
@@ -54,6 +59,25 @@ class Contact(models.Model):
     class Meta:
         verbose_name_plural = "Contacts"
 
+class Supplier(models.Model):
+    # the company name or contact name should be unique, I'll set that up later.
+    company_name = models.CharField(max_length=300, null=True,blank=True)
+    contact_name = models.CharField(max_length=300,null=True,blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=15, blank=True)
+    website = models.CharField(max_length=200, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def clean(self):
+        # Ensure that you call super().clean() to maintain the default validation behavior.
+        super().clean()
+        if not self.company_name and not self.contact_name:
+            raise ValidationError(
+                "You have to enter either, company name or contact name."
+            )
+
 
 class Note(models.Model):
     # If I delete the contact, then delete the notes associated to it.
@@ -69,6 +93,6 @@ class Note(models.Model):
 
     # below is for admin view
     def __str__(self):
-        if(self.contact):
+        if self.contact:
             return f"Note for {self.contact}"
-        return  f"Note for {self.company}"
+        return f"Note for {self.company}"

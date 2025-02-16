@@ -53,7 +53,7 @@ class BookAdmin(admin.ModelAdmin):
 # I register member in the authentication app, no need for this
 # admin.site.register(Member, StakeholderAdmin)
 admin.site.register(Book, BookAdmin)
-admin.site.register(StakeholderBook)
+# admin.site.register(StakeholderBook)
 # -----------------------------------------------------------------------------------------------------
 # admin.site.register(AssetCash)
 
@@ -69,7 +69,7 @@ class AssetCashAdmin(admin.ModelAdmin):
     search_fields =  ('currency__name','currency__code','currency__symbol','book__name')
 
 admin.site.register(AssetAccountsReceivable)
-admin.site.register(AssetAccountsPayable)
+admin.site.register(LiabilityAccountsPayable)
 admin.site.register(Invoice)
 admin.site.register(AssetInventoryRawMaterial)
 admin.site.register(AssetInventoryGood)

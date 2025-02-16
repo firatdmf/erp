@@ -64,6 +64,7 @@ class StakeholderBook(models.Model):
     # This is to make sure that for each book, there is only one stakeholder with the same member (preventing redundancies and errors)
     class Meta:
         unique_together = ("member", "book")
+        verbose_name_plural = "Stakeholder Books"
 
     def __str__(self):
         return f"{self.member.user.first_name + self.member.user.last_name} - {self.book.name} {self.shares}%"
@@ -247,9 +248,9 @@ class AssetAccountsReceivable(models.Model):
             return f"{self.book} |{self.currency.symbol}{self.amount} "
 
 
-class AssetAccountsPayable(models.Model):
+class LiabilityAccountsPayable(models.Model):
     class Meta:
-        verbose_name_plural = "Asset Accounts Payables"
+        verbose_name_plural = "Liability Accounts Payables"
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)

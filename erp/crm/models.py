@@ -77,6 +77,8 @@ class Supplier(models.Model):
             raise ValidationError(
                 "You have to enter either, company name or contact name."
             )
+    def __str__(self):
+        return(f"{self.company_name}")
 
 
 class Note(models.Model):

@@ -35,9 +35,9 @@ class AssetAccountsReceivableForm(forms.ModelForm):
             "book" : forms.HiddenInput(),
         }
 
-class AssetAccountsPayableForm(forms.ModelForm):
+class LiabilityAccountsPayableForm(forms.ModelForm):
     class Meta:
-        model = AssetAccountsPayable
+        model = LiabilityAccountsPayable
         fields = "__all__"
 
         widgets = {

@@ -731,8 +731,8 @@ class AddAccountsReceivable(generic.edit.CreateView):
 
 @method_decorator(login_required, name="dispatch")
 class AddAccountsPayable(generic.edit.CreateView):
-    model = AssetAccountsPayable
-    form_class = AssetAccountsPayableForm
+    model = LiabilityAccountsPayable
+    form_class = LiabilityAccountsPayableForm
     template_name = "accounting/add_accounts_payable.html"
     # fields = "__all__"
 

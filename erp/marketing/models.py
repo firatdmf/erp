@@ -6,11 +6,18 @@ from django.contrib.postgres.fields import ArrayField
 # Create your functions here.
 
 
+# def product_variants_default():
+#     return {
+#         "variants": {
+#             "color": ["blue", "red", "green"],
+#             "size": ['84"', '95"'],
+#         }
+#     }
 def product_variants_default():
     return {
         "variants": {
-            "color": ["blue", "red", "green"],
-            "size": ['84"', '95"'],
+            "color": "champange",
+            "size": "84",
         }
     }
 
@@ -20,6 +27,9 @@ def product_variants_default():
 def product_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/products/<product_id>/<filename>
     return f"products/{instance.id}_{instance.sku}/{filename}"
+
+# def weight_unit_choices():
+#     return [('lb','lb'),('oz','oz'),('kg','kg'),('g','g')]
 
 
 def validate_file_size(file):
@@ -79,27 +89,32 @@ class Collection(models.Model):
         return(f"{self.title}")
 
 
+
 class Product(models.Model):
     created_at = models.DateTimeField(auto_now=True)
-    UNIT_TYPE_CHOICES = [("units", "Unit"), ("mt", "Meter"), ("kg", "Kilogram")]
-    # Stock Keeping Unit
-    # change to blank false later
-    sku = models.CharField(max_length=12, null=True, blank=True)
-    # Barcode (ISBN, UPC, GTIN, etc.)
-    # change to blank false later
-    barcode = models.CharField(max_length=14, null=True, blank=True)
+    QUANTITY_UNIT_TYPE_CHOICES = [("units", "Unit"), ("mt", "Meter"), ("kg", "Kilogram")]
+    WEIGHT_UNIT_TYPE_CHOICES = [('lb','lb'),('oz','oz'),('kg','kg'),('g','g')]
+
     # change to blank false later
     title = models.CharField(max_length=255, null=True, blank=True)
 
     # This can be implement and used as html later.
     description = models.TextField(null=True, blank=True)
 
-    media = models.FileField(
-        upload_to=product_directory_path,
-        null=True,
-        blank=True,
-        validators=[validate_file_size, validate_file_type],
-    )  # Field to store files
+    # Stock Keeping Unit
+    # change to blank false later, if product has variants, no sku should be set to null.
+    sku = models.CharField(max_length=12, null=True, blank=True)
+    # Barcode (ISBN, UPC, GTIN, etc.)
+    barcode = models.CharField(max_length=14, null=True, blank=True)
+    # change to blank false later
+
+
+    # media = models.FileField(
+    #     upload_to=product_directory_path,
+    #     null=True,
+    #     blank=True,
+    #     validators=[validate_file_size, validate_file_type],
+    # )  # Field to store files
 
     # Collections are defined by you.
     # If we delete the collection model,
@@ -122,23 +137,58 @@ class Product(models.Model):
     type = models.CharField(null=True, blank=True)
 
     unit_of_measurement = models.CharField(
-        choices=UNIT_TYPE_CHOICES, null=True, blank=True, default=UNIT_TYPE_CHOICES[0]
+        choices=QUANTITY_UNIT_TYPE_CHOICES, null=True, blank=True, default=QUANTITY_UNIT_TYPE_CHOICES[0]
     )
 
     # Set price of the product for online sale.
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # Set the cost, this will be fed by the operating department
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     # If true, the product will be displayed on marketing channels (website etc)
     featured = models.BooleanField(default=True)
     # If true, the product will be available for sale even if you have no stock.
     selling_while_out_of_stock = models.BooleanField(default=False)
-
     # will be calculated for shipping quotes and optional to enter
     weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-
-    variants = models.JSONField(null=True, blank=True,default=product_variants_default)
+    unit_of_weight = models.CharField(choices=WEIGHT_UNIT_TYPE_CHOICES, default=WEIGHT_UNIT_TYPE_CHOICES[0], blank=False, null=False)
 
     vendor = models.ManyToManyField(Supplier,related_name="products",blank=True)
 
     def __str__(self):
         return self.title
+
+class ProductVariant(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+    sku = models.CharField(max_length=12, null=True, blank=True)
+    # Barcode (ISBN, UPC, GTIN, etc.)
+    # change to blank false later
+    barcode = models.CharField(max_length=14, null=True, blank=True)
+    # change to blank false later
+    title = models.CharField(max_length=255, null=True, blank=True)
+
+    # This can be implement and used as html later.
+    description = models.TextField(null=True, blank=True)
+
+
+class ProductFile(models.Model):
+    # This way I could just say product.files and get the file docs
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='files')
+    file = models.FileField(
+        upload_to=product_directory_path,
+        validators=[validate_file_size, validate_file_type],
+    )
+    # This is the sequence of the files
+    sequence = models.SmallIntegerField(unique=True)
+
+    def save(self, *args, **kwargs):
+        if not self.pk:  # Only set sequence if this is a new object
+            last_sequence = ProductFile.objects.filter(product=self.product).order_by('sequence').last()
+            if last_sequence:
+                self.sequence = last_sequence.sequence + 1
+            else:
+                self.sequence = 1
+        super(ProductFile, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Media for {self.product.title}"

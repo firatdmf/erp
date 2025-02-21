@@ -108,14 +108,6 @@ class Product(models.Model):
     barcode = models.CharField(max_length=14, null=True, blank=True)
     # change to blank false later
 
-
-    # media = models.FileField(
-    #     upload_to=product_directory_path,
-    #     null=True,
-    #     blank=True,
-    #     validators=[validate_file_size, validate_file_type],
-    # )  # Field to store files
-
     # Collections are defined by you.
     # If we delete the collection model,
     collections = models.ManyToManyField(
@@ -140,9 +132,9 @@ class Product(models.Model):
         choices=QUANTITY_UNIT_TYPE_CHOICES, null=True, blank=True, default=QUANTITY_UNIT_TYPE_CHOICES[0]
     )
 
-    # Set price of the product for online sale.
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # Set price of the product for online sale. (If the product has a variant this should be null maybe)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    # Set the cost, this will be fed by the operating department
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     # If true, the product will be displayed on marketing channels (website etc)
@@ -158,22 +150,59 @@ class Product(models.Model):
     def __str__(self):
         return self.title
 
+
+
+
 class ProductVariant(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants', null=True,blank=True)
     sku = models.CharField(max_length=12, null=True, blank=True)
     # Barcode (ISBN, UPC, GTIN, etc.)
     # change to blank false later
-    barcode = models.CharField(max_length=14, null=True, blank=True)
     # change to blank false later
-    title = models.CharField(max_length=255, null=True, blank=True)
+    # title = models.CharField(max_length=255, null=True, blank=True)
 
-    # This can be implement and used as html later.
+    # This can be implement and used as html later. Show this after the parent description.
     description = models.TextField(null=True, blank=True)
+    # products = models.ManyToManyField()
+
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # Set price of the product for online sale.
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+
+    # If true, the product will be displayed on marketing channels (website etc)
+    featured = models.BooleanField(default=True)
+    barcode = models.CharField(max_length=14, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.product.title} - {self.sku}"
+
+    class Meta:
+        verbose_name = "Product Variant"
+        verbose_name_plural = "Product Variants"
+
+# Example: Size and Color Attributes
+class ProductVariantAttribute(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Attribute Name")
+    def __str__(self):
+        return self.name
+    
+class ProductVariantAttributeValue(models.Model):
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='attribute_values', null=True,blank=True)
+    attribute = models.ForeignKey(ProductVariantAttribute, on_delete=models.CASCADE)
+    value = models.CharField(max_length=255, verbose_name="Attribute Value")  # e.g., "S", "Red"
+
+    def __str__(self):
+        return f"{self.attribute.name}: {self.value}"
+
+    class Meta:
+      unique_together = ('variant', 'attribute') # A variant cannot have duplicate attribute name
 
 
 class ProductFile(models.Model):
     # This way I could just say product.files and get the file docs
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='files')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='files', null=True,blank=True)
     file = models.FileField(
         upload_to=product_directory_path,
         validators=[validate_file_size, validate_file_type],

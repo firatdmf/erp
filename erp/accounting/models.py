@@ -6,8 +6,7 @@ from authentication.models import Member
 from django.utils import timezone
 from datetime import timedelta
 from crm.models import Supplier
-from marketing.models import Product
-# from operating.models import Product
+# from marketing.models import Product
 from django.core.exceptions import ValidationError
 
 # Create your functions here.
@@ -174,7 +173,7 @@ class AssetInventoryRawMaterial(models.Model):
 class AssetInventoryGood(models.Model):
     class Meta:
         verbose_name_plural = "Asset Inventory Goods"
-    product = models.ForeignKey(Product,models.RESTRICT, blank=True, null=True)
+    # product = models.ForeignKey(Product,models.RESTRICT, blank=True, null=True)
     STATUS_CHOICES = [("wip", "Work in Progress"), ("finished", "Finished Good")]
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -480,10 +479,27 @@ class InTransfer(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
+    date = models.DateField(blank=True,null=True)
     description = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
         return f"{self.source.name} -> {self.destination.name} | {self.currency.symbol}{self.amount}"
+
+class CurrencyExchange(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    from_cash_account = models.ForeignKey(
+        CashAccount, on_delete=models.CASCADE, related_name="currency_exchange_source"
+    )
+    to_cash_account = models.ForeignKey(
+        CashAccount, on_delete=models.CASCADE, related_name="currency_exchange_destination"
+    )
+    currency_rate = amount = models.DecimalField(max_digits=10, decimal_places=5)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    date = models.DateField(blank=True,null=True)
+
+    def __str__(self):
+        return f"Exchange {self.source.name} -> {self.destination.name} | {self.currency.symbol}{self.amount}"
 
 
 # Keeping logs of all transactions

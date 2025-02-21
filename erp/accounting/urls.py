@@ -21,6 +21,7 @@ urlpatterns = [
     path('books/<int:pk>/equity_expense_list/', EquityExpenseList.as_view(),name="equity_expense_list"),
     # path('books/<int:pk>/create_invoice/', InvoiceCreateView.as_view(),name="create_invoice"),
     path('books/<int:pk>/make_in_transfer/', MakeInTransfer.as_view(),name="make_in_transfer"),
+    path('books/<int:pk>/make_currency_exchange/', MakeCurrencyExchange.as_view(),name="make_currency_exchange"),
     path('books/<int:pk>/add_accounts_receivable/', AddAccountsReceivable.as_view(),name="add_accounts_receivable"),
     path('books/<int:pk>/add_accounts_payable/', AddAccountsPayable.as_view(),name="add_accounts_payable"),
     path('books/<int:pk>/transaction_list/', TransactionList.as_view(),name="transaction_list"),

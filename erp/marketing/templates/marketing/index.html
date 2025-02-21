@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+{% load static %}
+
+{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
+{% block css %}
+<link rel="stylesheet" href="{% static 'marketing/css/index.css' %}" />
+{% endblock css %}
+<h1>Marketing Index</h1>
+<p>Welcome to the marketing homepage.</p>
+<a href={% url 'crm:index' %}>Go to your crm.</a>
+{% endblock content %}

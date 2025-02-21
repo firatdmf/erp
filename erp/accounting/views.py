@@ -838,9 +838,10 @@ class MakeInTransfer(generic.edit.FormView):
     form_class = InTransferForm
     template_name = "accounting/make_in_transfer.html"
 
-    success_url = reverse_lazy(
-        "books/2/make_in_transfer"
-    )  # Replace 'success_page' with your success URL name
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:make_in_transfer", kwargs={"pk": self.kwargs.get("pk")}
+        )
 
     # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
     def get_form_kwargs(self):
@@ -849,7 +850,7 @@ class MakeInTransfer(generic.edit.FormView):
         book = Book.objects.get(pk=book_pk)
         kwargs["book"] = book
         return kwargs
-
+    
     def form_valid(self, form):
         # Process the form data
         amount = form.cleaned_data["amount"]
@@ -889,3 +890,73 @@ class MakeInTransfer(generic.edit.FormView):
         transaction2.save()
         # Add your processing logic here
         return super().form_valid(form)
+
+@method_decorator(login_required, name="dispatch")
+class MakeCurrencyExchange(generic.edit.FormView):
+    form_class = CurrencyExchangeForm
+    template_name = 'accounting/make_currency_exchange.html'
+
+
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:make_currency_exchange", kwargs={"pk": self.kwargs.get("pk")}
+        )
+
+    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        kwargs["book"] = book
+        return kwargs
+    
+    # below preselected the book field of the capital model (independent of the above function)
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved, and currency to usd
+        return {"book": book}
+
+    def form_valid(self, form):
+        # Process the form data
+        amount = form.cleaned_data["amount"]
+        currency_rate = form.cleaned_data["currency_rate"]
+        converted_amount = currency_rate * amount
+        date = form.cleaned_data["date"]
+        from_cash_account = form.cleaned_data["from_cash_account"]
+        from_cash_account = CashAccount.objects.get(pk=from_cash_account.pk)
+        from_cash_account_new_balance = from_cash_account.balance - amount
+        from_cash_account.balance = from_cash_account_new_balance
+        from_cash_account.save()
+
+        transaction1 = Transaction(
+            book=from_cash_account.book,
+            value=amount,
+            currency=from_cash_account.currency,
+            type="exchange",
+            account=from_cash_account,
+            type_pk=None,
+            account_balance=from_cash_account_new_balance,
+        )
+        transaction1.save()
+        print(f"from cash account is: {from_cash_account}")
+        to_cash_account = form.cleaned_data["to_cash_account"]
+        to_cash_account = CashAccount.objects.get(pk=to_cash_account.pk)
+        to_cash_account_new_balance = to_cash_account.balance + converted_amount
+        to_cash_account.balance = to_cash_account_new_balance
+        to_cash_account.save()
+
+        transaction2 = Transaction(
+            book=to_cash_account.book,
+            value=converted_amount,
+            currency=to_cash_account.currency,
+            type="exchange",
+            account=to_cash_account,
+            type_pk=None,
+            account_balance=to_cash_account_new_balance,
+        )
+        transaction2.save()
+        # Add your processing logic here
+        return super().form_valid(form)
+

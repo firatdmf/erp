@@ -9,4 +9,15 @@
 <h1>Marketing Index</h1>
 <p>Welcome to the marketing homepage.</p>
 <a href={% url 'crm:index' %}>Go to your crm.</a>
+<br>
+<ul>
+    <p>Product Menu</p>
+    <li>
+        <a href={% url 'marketing:product_create' %}>Create a product</a>
+    </li>
+    <li>
+        <a href={% url 'marketing:product_list' %}>See your products.</a>
+    </li>
+</ul>
+
 {% endblock content %}

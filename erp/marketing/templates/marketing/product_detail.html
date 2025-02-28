@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% comment %} <p>
+    <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
+  </p> {% endcomment %}
+  <h1>Product Details</h1>
+  <ul>
+    <li>title:{{ product.title }}</li>
+    <li>
+      description: <br />{{ product.description }}
+    </li>
+    <li>sku:{{ product.sku }}</li>
+    <li>price:{{ product.price }}</li>
+    <li>barcode:{{ product.barcode }}</li>
+    <li>tags:{{ product.tags }}</li>
+    <li>category:{{ product.category }}</li>
+  </ul>
+
+  <h2>Your variants are listed below:</h2>
+  {% for variant in variants %}
+    <ul>
+      <li>{{ variant.variant_sku }}</li>
+    </ul>
+  {% empty %}
+    <p>This product has no variants</p>
+  {% endfor %}
+{% endblock %}

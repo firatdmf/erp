@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+{% comment %} <p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p> {% endcomment %}
+    <h1>Product List ({{ products.count }})</h1>
+    <ul>
+        {% comment %} List the company names alphabetically {% endcomment %}
+        {% for product in products|dictsort:'title' %}
+        <li><a href="{% url 'marketing:product_detail' product.id %}">{{product.sku}} | {{ product.title }}</a></li>
+        {% empty %}
+        <li>No products available.</li>
+        {% endfor %}
+    </ul>
+{% endblock content %}

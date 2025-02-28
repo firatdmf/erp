@@ -1,0 +1,38 @@
+.ProductCreatePage #variant_form {
+    padding:10px 20px;
+    background-color: lightgray;
+    border-radius:15px;
+}
+
+
+.ProductCreatePage #variant_form .option_name{
+    position: relative;
+    width: 255px;
+}
+
+.ProductCreatePage #variant_form .option_name input{
+    width: 100%;
+    padding:0 10px;
+}
+
+.ProductCreatePage #drop_down_attribute_value{
+    margin-top:2px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    display: none;
+}
+
+.ProductCreatePage #drop_down_attribute_value:hover{
+    cursor: pointer;
+}
+
+.ProductCreatePage .attribute-list li{
+    border:1px solid;
+    padding:10px;
+}
+/* .ProductCreatePage #drop_down_attribute_value{
+    display: ;
+} */

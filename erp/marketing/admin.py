@@ -5,7 +5,7 @@ from django import forms
 # Register your models here.
 
 
-admin.site.register(Collection)
+admin.site.register(ProductCollection)
 
 class ProductAdminForm(forms.ModelForm):
     tags = TagArrayField(widget=TagArrayWidget, required=False)

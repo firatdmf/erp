@@ -45,13 +45,10 @@ class ProductForm(forms.ModelForm):
     has_variants = forms.BooleanField(
         required=False, label="Does this product have variants?"
     )
-    variants = forms.CharField(widget=forms.Textarea(attrs={"rows": "5"}))
 
-    def __init__(self, *args, **kwargs):
-        super(ProductForm, self).__init__(*args, **kwargs)
-        self.fields["variants"].widget.attrs[
-            "value"
-        ] = '[{"variant_sku":"", "variant_barcode":"", "variant_quantity":"", "variant_price":"", "variant_cost":""},"variant_featured":false]'
+    # def __init__(self, *args, **kwargs):
+    #     super(ProductForm, self).__init__(*args, **kwargs)
+
 
 
 class ProductVariantForm(forms.ModelForm):

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
   {% comment %} <p>
     <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
@@ -9,17 +10,32 @@
     <li>
       description: <br />{{ product.description }}
     </li>
-    <li>sku:{{ product.sku }}</li>
-    <li>price:{{ product.price }}</li>
-    <li>barcode:{{ product.barcode }}</li>
     <li>tags:{{ product.tags }}</li>
     <li>category:{{ product.category }}</li>
+    <li>sku:{{ product.sku }}</li>
+    {% comment %} Checks if the product has variants {% endcomment %}
+    {% if product.variants.all %}
+    {% comment %} Do not show sku price and barcode {% endcomment %}
+    {% else %}
+    
+    <li>price:{{ product.price }}</li>
+    <li>barcode:{{ product.barcode }}</li>
+    {% endif %}
+
   </ul>
 
   <h2>Your variants are listed below:</h2>
-  {% for variant in variants %}
+  <img src="{% static 'marketing/media/products/' %}ready_made/RK72010/RK72010GC8/Beige-dandelion-embroidery-sheer-curtain-model-72010-photo-taken-from-far-to-display-the-both-panels-and-full-product.jpg" alt="">
+
+  {% comment %}below is a related name{% endcomment %}
+  {% for variant in product.variants.all %}
     <ul>
-      <li>{{ variant.variant_sku }}</li>
+      <li>
+        {{ variant.variant_sku }}
+        {% for attribute_value in variant.attribute_values.all %}
+          {{ attribute_value.attribute }}: {{ attribute_value.value }}
+        {% endfor %}
+      </li>
     </ul>
   {% empty %}
     <p>This product has no variants</p>

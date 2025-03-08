@@ -1,0 +1,82 @@
+#variant_component{
+    display:none;
+}
+
+.variant_component .variant_container {
+    display: flex;
+    gap: 20px;
+}
+
+.variant_component .variantCard {
+    background: lightgray;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: max-content;
+    margin: 5px 0;
+}
+
+.variant_component .variantCard input {
+    margin: 2px 0;
+}
+
+.variant_component .variantCard .optionValues {
+    display: flex;
+    flex-direction: column;
+}
+
+.variant_component .alert {
+    color: red;
+}
+
+.variant_component .add_another_value:hover,
+.variant_component .add_another_option:hover {
+    cursor: pointer;
+}
+
+.variant_component table {
+    display: none;
+}
+
+.variant_component table,
+.variant_component th,
+.variant_component td {
+    border: 1px solid black;
+
+}
+
+.variant_component table th,
+.variant_component table td {
+    padding: 5px;
+}
+
+.variant_component .displayVariantJSON {
+    display: none;
+}
+
+.variant_component button:hover {
+    cursor: pointer;
+}
+
+.variant_component .add_another_option {
+    height: max-content;
+    width: max-content;
+}
+
+.variant_component .delete_option_name{
+    float:right;
+    cursor:pointer;
+}
+
+.variant_component .delete_option_value{
+    float:right;
+    cursor:pointer;
+}
+
+.variant_component #create_table_button{
+    padding:3px;
+    background-color: lightcyan;
+    border:1px solid black;
+    border-radius:5px;
+    cursor:pointer;
+    max-width: max-content;
+}

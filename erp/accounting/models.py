@@ -494,19 +494,20 @@ class CurrencyExchange(models.Model):
     to_cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, related_name="currency_exchange_destination"
     )
-    currency_rate = amount = models.DecimalField(max_digits=10, decimal_places=5)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # currency_rate = amount = models.DecimalField(max_digits=10, decimal_places=5)
+    from_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    to_amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField(blank=True,null=True)
 
     def __str__(self):
-        return f"Exchange {self.source.name} -> {self.destination.name} | {self.currency.symbol}{self.amount}"
+        return f"Exchange {self.from_cash_account.currency.symbol}{self.from_amount} | {self.from_cash_account.name} -> {self.to_cash_account.currency.symbol}{self.to_amount} | {self.to_cash_account.name} "
 
 
 # Keeping logs of all transactions
 class Transaction(models.Model):
 
     def __str__(self):
-        return f"{self.type} | {self.currency.symbol}{self.value}"
+        return f"Books:{self.book}, {self.type} | {self.currency.symbol}{self.value}"
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)

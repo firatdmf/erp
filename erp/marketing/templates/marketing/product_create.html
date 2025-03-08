@@ -10,7 +10,7 @@
   </p> {% endcomment %}
   <div class="ProductCreatePage">
     <h1>Create Product Form</h1>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data" >
       {% csrf_token %}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 

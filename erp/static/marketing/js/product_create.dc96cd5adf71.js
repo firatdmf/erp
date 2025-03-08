@@ -255,7 +255,6 @@ let createTable = () => {
     // initialize variant array
     let variant = []
     let variant_name;
-    let variant_names = [];
     let variant_name_id;
     let variant_table_option_names = ""
     let variant_table_rows = ""
@@ -271,7 +270,6 @@ let createTable = () => {
                 if (variant_name) {
                     variant_name_id = Number(element.id.split('_').at(-1))
                     variant.push({ "name": variant_name, "values": [] })
-                    variant_names.push(variant_name)
                     variant_table_option_names += "<th>" + variant_name + "</th>"
                 }
 
@@ -312,8 +310,7 @@ let createTable = () => {
     // Let's combine the data and export it.
     const export_data = {
         "variants": variant,
-        "combinations": combinations,
-        "variant_names": variant_names
+        "combinations": combinations
     }
 
 

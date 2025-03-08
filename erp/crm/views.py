@@ -52,7 +52,7 @@ class contact_list(generic.ListView):
 
 class company_list(generic.ListView):
     model = Company
-    number_of_companies = len(Company.objects.all())
+    # number_of_companies = len(Company.objects.all())
     template_name = "crm/company_list.html"
     context_object_name = "companies"
 

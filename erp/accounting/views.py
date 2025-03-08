@@ -590,6 +590,7 @@ class AddEquityExpense(generic.edit.CreateView):
             return self.form_valid(form)
         else:
             return HttpResponse("<h1>An error occured in the server. Please email howdy@nejum.com for technical support.</h1>")
+        return self.form_invalid(form)
 
     def get_success_url(self) -> str:
         return reverse_lazy(
@@ -783,6 +784,7 @@ class TransactionList(generic.ListView):
     def get_queryset(self):
         book_pk = self.kwargs.get("pk")
         return Transaction.objects.filter(book=book_pk)
+        # return Transaction.objects.filter(book=book_pk).select_related('book', 'account').prefetch_related('related_model_name')
         # return super().get_queryset()
 
 
@@ -920,19 +922,20 @@ class MakeCurrencyExchange(generic.edit.FormView):
 
     def form_valid(self, form):
         # Process the form data
-        amount = form.cleaned_data["amount"]
-        currency_rate = form.cleaned_data["currency_rate"]
-        converted_amount = currency_rate * amount
+        from_amount = form.cleaned_data["from_amount"]
+        to_amount = form.cleaned_data["to_amount"]
+        # currency_rate = form.cleaned_data["currency_rate"]
+        # converted_amount = currency_rate * amount
         date = form.cleaned_data["date"]
         from_cash_account = form.cleaned_data["from_cash_account"]
         from_cash_account = CashAccount.objects.get(pk=from_cash_account.pk)
-        from_cash_account_new_balance = from_cash_account.balance - amount
+        from_cash_account_new_balance = from_cash_account.balance - from_amount
         from_cash_account.balance = from_cash_account_new_balance
         from_cash_account.save()
 
         transaction1 = Transaction(
             book=from_cash_account.book,
-            value=amount,
+            value=from_amount,
             currency=from_cash_account.currency,
             type="exchange",
             account=from_cash_account,
@@ -943,13 +946,13 @@ class MakeCurrencyExchange(generic.edit.FormView):
         print(f"from cash account is: {from_cash_account}")
         to_cash_account = form.cleaned_data["to_cash_account"]
         to_cash_account = CashAccount.objects.get(pk=to_cash_account.pk)
-        to_cash_account_new_balance = to_cash_account.balance + converted_amount
+        to_cash_account_new_balance = to_cash_account.balance + to_amount
         to_cash_account.balance = to_cash_account_new_balance
         to_cash_account.save()
 
         transaction2 = Transaction(
             book=to_cash_account.book,
-            value=converted_amount,
+            value=to_amount,
             currency=to_cash_account.currency,
             type="exchange",
             account=to_cash_account,

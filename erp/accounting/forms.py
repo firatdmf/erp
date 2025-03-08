@@ -68,7 +68,7 @@ class EquityCapitalForm(forms.ModelForm):
             self.fields["member"].queryset = Member.objects.filter(id__in=members)
 
             # Get the cash accounts assigned to the book
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
         
 
 class EquityRevenueForm(forms.ModelForm):
@@ -90,7 +90,7 @@ class EquityRevenueForm(forms.ModelForm):
 
         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
             # self.fields["book"].queryset = Book.objects.filter(book=book)
 
 
@@ -114,7 +114,7 @@ class EquityExpenseForm(forms.ModelForm):
 
         # # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
             # self.fields["book"].queryset = Book.objects.filter(book=book)
         
 
@@ -133,7 +133,7 @@ class EquityDividentForm(forms.ModelForm):
         super(EquityDividentForm,self).__init__(*args,**kwargs)
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         if book:
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book)
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
             # The values_list method in Django's QuerySet API is used to create a list (or tuple) of values from the specified fields of the model.
             # The flat=True argument ensures that the result is a flat list rather than a list of tuples.
             members = StakeholderBook.objects.filter(book=book).values_list('member', flat=True)
@@ -155,8 +155,8 @@ class InTransferForm(forms.Form):
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
-            self.fields["from_cash_account"].queryset = CashAccount.objects.filter(book=book)
-            self.fields["to_cash_account"].queryset = CashAccount.objects.filter(book=book)
+            self.fields["from_cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
+            self.fields["to_cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
             # self.fields["book"].queryset = Book.objects.filter(book=book)
 
 
@@ -180,6 +180,6 @@ class CurrencyExchangeForm(forms.ModelForm):
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
-            self.fields["from_cash_account"].queryset = CashAccount.objects.filter(book=book)
-            self.fields["to_cash_account"].queryset = CashAccount.objects.filter(book=book)
+            self.fields["from_cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
+            self.fields["to_cash_account"].queryset = CashAccount.objects.filter(book=book).order_by('name')
             # self.fields["book"].queryset = Book.objects.filter(book=book)

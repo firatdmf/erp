@@ -255,6 +255,7 @@ let createTable = () => {
     // initialize variant array
     let variant = []
     let variant_name;
+    let variant_names = [];
     let variant_name_id;
     let variant_table_option_names = ""
     let variant_table_rows = ""
@@ -270,6 +271,7 @@ let createTable = () => {
                 if (variant_name) {
                     variant_name_id = Number(element.id.split('_').at(-1))
                     variant.push({ "name": variant_name, "values": [] })
+                    variant_names.push(variant_name)
                     variant_table_option_names += "<th>" + variant_name + "</th>"
                 }
 
@@ -296,12 +298,12 @@ let createTable = () => {
             element_values.map((value) => { variant_table_rows += `<td>${value.split(":")[1]}</td>` })
             // Define name for below and state that the inputs are from the table.
             // Each input will refer to its combination index.
-            variant_table_rows += `<td><input type="file" name="file_${index}" id="file_${index}" multiple></td>`
-            variant_table_rows += `<td><input type="number" name="price_${index}" id="price_${index}"></td>`
-            variant_table_rows += `<td><input type="number" name="quantity_${index}" id="quantity_${index}"></td>`
-            variant_table_rows += `<td><input type="text" name="sku_${index}" id="sku_${index}"></td>`
-            variant_table_rows += `<td><input type="number" name="barcode_${index}" id="barcode_${index}"></td>`
-            variant_table_rows += `<td><input type="checkbox" name="featured_${index}" id="featured_${index}" checked></td>`
+            variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
+            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
+            variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
             variant_table_rows += `</tr>`
         })
 
@@ -310,7 +312,8 @@ let createTable = () => {
     // Let's combine the data and export it.
     const export_data = {
         "variants": variant,
-        "combinations": combinations
+        "combinations": combinations,
+        "variant_names": variant_names
     }
 
 

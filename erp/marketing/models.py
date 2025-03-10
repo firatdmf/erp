@@ -95,6 +95,8 @@ class ProductCollection(models.Model):
 
 
 class ProductCategory(models.Model):
+    class Meta:
+        verbose_name_plural = "Product Categories"
     created_at = models.DateTimeField(auto_now=True)
     name = models.CharField(max_length=255, null=True, blank=True)
 
@@ -103,7 +105,7 @@ class ProductCategory(models.Model):
 
 
 class Product(models.Model):
-    created_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now=True, blank=True, null=True)
     QUANTITY_UNIT_TYPE_CHOICES = [
         ("units", "Unit"),
         ("mt", "Meter"),
@@ -132,9 +134,10 @@ class Product(models.Model):
     )
 
     tags = ArrayField(
-        models.CharField(max_length=100, blank=False),
+        models.CharField(max_length=100, blank=True, null=True),
         default=list,
         blank=True,
+        null=True,
     )
 
     # Best to standardize with a select input like shopify.
@@ -163,19 +166,19 @@ class Product(models.Model):
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     # If true, the product will be displayed on marketing channels (website etc)
-    featured = models.BooleanField(default=True)
+    featured = models.BooleanField(default=True, blank=True, null=True)
     # If true, the product will be available for sale even if you have no stock.
-    selling_while_out_of_stock = models.BooleanField(default=False)
+    selling_while_out_of_stock = models.BooleanField(default=False, blank=True, null=True)
     # will be calculated for shipping quotes and optional to enter
     weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     unit_of_weight = models.CharField(
         choices=WEIGHT_UNIT_TYPE_CHOICES,
         default=WEIGHT_UNIT_TYPE_CHOICES[0],
-        blank=False,
-        null=False,
+        blank=True, null=True
     )
 
-    vendor = models.ManyToManyField(Supplier, related_name="products", blank=True)
+    supplier = models.ForeignKey(Supplier, related_name="products", on_delete=models.SET_NULL, blank=True, null=True)
+    # supplier = models.CharField( null=True, blank=True)
 
     # def __str__(self):
     #     return self.pk

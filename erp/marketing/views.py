@@ -22,22 +22,22 @@ import json
 class Index(generic.TemplateView):
     template_name = "marketing/index.html"
 
-    product = Product.objects.order_by("-pk").first()
+    # product = Product.objects.order_by("-pk").first()
     # print(product.variants.order_by('-pk').first())
     # print(product.variants.all())
     # print("hey this is yours:",product)
     # print(type(product.tags[0]))
     # print(product.variants)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        product = Product.objects.order_by("-pk").first()
-        # product = self.get_object()
-        if product:
-            variants = product.variants.all()
-            context["product"] = product
-            context["variants"] = variants
-        return context
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     product = Product.objects.order_by("-pk").first()
+    #     # product = self.get_object()
+    #     if product:
+    #         variants = product.variants.all()
+    #         context["product"] = product
+    #         context["variants"] = variants
+    #     return context
 
 
 class ProductList(generic.ListView):

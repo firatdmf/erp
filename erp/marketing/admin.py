@@ -35,3 +35,5 @@ admin.site.register(ProductVariant)
 
 admin.site.register(ProductVariantAttribute)
 admin.site.register(ProductVariantAttributeValue)
+
+admin.site.register(ProductCategory)

@@ -1,0 +1,158 @@
+[
+    {
+        "model": "marketing.Product",
+        "pk": 1,
+        "fields": {
+            "sku": "RK12471",
+            "title": "Weave",
+            "description": "Bring the ocean waves to your window and feel the dynamics. The panels are crafted from 100% high-grade textured fabric and feature delicate embroidery waves for a silky touch. 1.6 in (4 cm) inner grommet diameter makes the panels easier to hang on most curtain rods and enables smooth opening and closing of the curtains.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Beige\nHeader Type: Grommet\nMax Rod Diameter Allowed: 1.5-inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Abstract\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.8 lb (816 g)\n\nFeatures\n\nSoft and Decorative: Repetitive soft pattern will unlock a new look to your room.\nSheer Light Filtering: Light-weight panels provide the right balance of privacy and sunlight\u2014filtering the UV lights while enhancing your view with beautiful wavy patterns.\nEasy Hanging: Each panel conveniently features a grommet measuring 1.6 inches (4 cm) inner diameter that fits curtain rods up to 1.5 inches (3.8 cm).\nEasy Care: Easy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 2,
+        "fields": {
+            "sku": "RK24539",
+            "title": "Mariposa",
+            "description": "Description\n\nThese airy and lightweight sheer curtain panels will get butterflies in your stomach\u2014yes, pun intended. The soft fabric is so silky that it feels great against your skin, and your windows will thank you. Sparkle up your windows with butterflies\u2014ideal for youngsters or those who have not lost their youthful energy.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor: White \nHeader Type: Rod Pocket\nMax Rod Diameter Allowed: 1.5 inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Butterfly, Animal\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room, Kid's Room, Girl's Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.3 lb (590 g)\n\nFeatures\n\nJoyful Yet luxurious: Transform every room with the magical beauty of butterflies.\nSheer Light Filtering: Perfect for windows with constant exposure to sunlight\u2014filters and reduces the harmful UV lights and ensures a safe environment for you and your family.\nEasy Hanging: Each panel conveniently features a rod pocket measuring 3 inches that fit curtain rods up to 1.5 inches.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 3,
+        "fields": {
+            "sku": "RK24562",
+            "title": "Wave",
+            "description": "Description\n\nSimplicity combined with tradition. Let your windows look full and get the proper treatment. The delicate weave patterns and mesmerizing linen texture provide the right balance of light and privacy. These panels let you decorate your room and enjoy a new elegance. \n\nProduct Details\n\nPieces Included: 2 Curtain panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Beige\nHeader Type: Grommet for 95\" Panels | Rod Pocket for 84\" Panels\nMax Rod Diameter Allowed: 1.5\" (3.8 cm)\nSide Hem: 1\" (2.54 cm)\nPattern: Geometric, Morrocan Trellis. Lattice Trefoil\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 2 lbs (907 g)\n\nFeatures\n\nModish and Intrinsic: Woven sheers have the feel and look of linen\u2014which compliments any decorative style.\nSheer Light Filtering: Light-weight panels provide the right balance of privacy and sunlight\u2014filtering the UV lights while enhancing your view with beautiful wavy patterns.\nEasy Hanging: Each panel conveniently fits curtain rods up to 1.5 inches.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 4,
+        "fields": {
+            "sku": "RK48060",
+            "title": "Rose",
+            "description": "Harness the power of rose ramped up with a tightly-woven fabric that provides maximum durability that will last for years. Brighten up your room with natural light and embroidered rose motifs. These sheer panels feel extraordinarily soft and smooth to the touch and provide a fantastic additional layer to your window that acts as a natural filter and protects your family against UV lights.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Off-white\nHeader Type: Rod Pocket\nMax Rod Diameter Allowed: 1-inch (2.54 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Floral Rose\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.3 lb (589 g)\n\nFeatures\n\nElegant and Lightweight: Gorgeous textured woven fabric creates a simple yet beautiful environment.\nLight Filtering: These panels will bring a soothing accent to your windows while filtering natural light into your house.\nEasy Hanging: Each panel conveniently features a rod pocket measuring 2.25 inches that fit curtain rods up to 1.1 inches.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 5,
+        "fields": {
+            "sku": "RK48061",
+            "title": "Ethnic",
+            "description": "Discover the potential and lighten your space with this minimal yet stylish design. The one-of-a-kind linen-textured fabric will provide the treatment your windows deserve. It is ideal for windows with constant exposure to sunlight, its woven texture filters and reduces harmful UV lights, ensuring a safe environment for you and your family.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: Beige\nHeader Options: Rod Pocket | Grommet\nMax Rod Diameter Allowed: 1.5-inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Tribal, Abstract\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.8 lb (816 g)\n\nFeatures\n\nClassy Yet Breathable: These knitted sheers with floral embroidery add a soft and fresh look to any space in your home.\nSheer Light Filtering: Provides a fantastic additional layer to your window that allows sunlight to enter while still providing privacy.\nEasy Hanging: Each panel conveniently features a rod pocket measuring 3 inches that fit curtain rods up to 1.5 inches in diameter.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 6,
+        "fields": {
+            "sku": "RK48065",
+            "title": "Lattice",
+            "description": "These classic Moroccan Trellis Pattern Curtain Panels will turn the heads of every guest. Its uniquely embroidered Moroccan Trellis pattern will soften your room's aura with its eccentric and airy look. Its grommets' 1.6\" inner diameter makes them easier to hang on most curtain rods and smoothly open and close the curtains.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Beige\nHeader Type: Grommet\nMax Rod Diameter Allowed: 1.5 inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Geometric | Morrocan Trellis | Lattice | Trefoil\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 2 lb (907 g)\n\nFeatures\n\nVersatility: The perfect combination of modern and traditional that goes to all types of rooms.\nSheer Light Filtering: Provides a fantastic additional layer to your window that allows sunlight to enter while still providing privacy.\nEasy Hanging: Each panel conveniently features a grommet measuring 1.6 inches inner diameter that fits curtain rods up to 1.5 inches.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 7,
+        "fields": {
+            "sku": "RK72010",
+            "title": "Dandelion",
+            "description": "Discover the potential and lighten your space with this minimal yet stylish design. The one-of-a-kind linen-textured fabric will provide the treatment your windows deserve and catch every visitor's eye to your home decor. Ideal for windows with constant exposure to sunlight, its woven texture filters reduce harmful UV lights and ensure a safe environment for you and your family.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Beige\nHeader Type: Grommet\nMax Rod Diameter Allowed: 1.5 inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Floral Dandelion\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.8 lb (816 g)\n\n\nFeatures\n\nLarge embroidery: What is more stylish than dandelion embroidery? The bigger version! These magical panels will have a hard time not looking at them.\nSheer Light Filtering: Provides a fantastic additional layer to your window that allows sunlight to enter while still providing privacy.\nEasy Hanging: Each panel conveniently features a grommet measuring 1.6 inches inner diameter that fits curtain rods up to 1.5 inches.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 8,
+        "fields": {
+            "sku": "RN1268",
+            "title": "Branch",
+            "description": "Description\n\nThese soft-textured and beautifully embroidered sheer curtain panels with a floral pattern are made of high-quality stretchable knitted fabric that makes them ultra-durable and wrinkle-resistant. Their easy-to-wash and iron characteristics help keep them looking brand-new even after every wash. Perfect for adding style to your home, office, or guest suite. \n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Champagne\nHeader Type: Rod Pocket\nMax Rod Diameter Allowed: 1.5-inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Floral\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room,  Kid's Room, Girl's Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1 lb (453 g)\n\nFeatures\n\nClassy Yet Breathable: These knitted sheers with floral embroidery add a soft and fresh look to any space in your home.\nSheer Light Filtering: Provides a fantastic additional layer to your window that allows sunlight to enter while still providing privacy.\nEasy Hanging: Each panel conveniently features a rod pocket measuring 3 inches that fit curtain rods up to 1.5 inches in diameter.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 9,
+        "fields": {
+            "sku": "RN1337",
+            "title": "Floral",
+            "description": "Welcome in warm sunlight and decorate your room with elegant embroidery. Delicate linen-textured fabric paired with floral embroidery that winds its way from bottom to top goes with almost any room color scheme. These panels are effortless to clean; throw them in your washing machine. \n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Beige\nHeader Type: Grommet for White Panels | Rod Pocket for Beige Panels\nMax Rod Diameter Allowed: 1.5-inches (3.8 cm) for Grommet | 1-inch (2.54 cm) for Rod Pocket\nSide Hem: 1-inch (2.54 cm)\nPattern: Floral Dandelion\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 2 lb (907 g)\n\nFeatures\n\nSimple yet Stylish: Woven sheers have the feel and look of linen\u2014compliments any decorative style.\nSheer Light Filtering: Perfect for windows with constant exposure to sunlight\u2014filters and reduces the harmful UV lights and ensures a safe environment for you and your family.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 10,
+        "fields": {
+            "sku": "RN1357",
+            "title": "Peony",
+            "description": "These new stylish design sheer panels will make any room cozy. They let plenty of light in and will make you feel like you've just entered a beautiful garden. Highlight your taste with these charming floral embroidered panels. \n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor: Rose Gold and Gold\nHeader Type: Rod Pocket\nMax Rod Diameter Allowed: 1-inch (2.54 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Floral Rose\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room, Kid's Room, Girl's Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.1 lb (498 g)\n\nFeatures\n\nVibrant and Charming: Inject a splash of bold color into your house and transform any room with vibrant colors and salient patterns.\nSheer Light Filtering: These panels will bring a soothing accent to your windows while filtering natural light into your house.\nEasy Hanging: Each panel conveniently features a rod pocket measuring 2.25 inches that fit curtain rods up to 1.1 inches.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 11,
+        "fields": {
+            "sku": "RN1360",
+            "title": "Feather",
+            "description": "Delicate embroidery brightens up any room and adds style to your perfect window view. These airy curtain panels gently filter the sunlight while enhancing your privacy\u2014a bold design for courageous rooms. Explore the high chemistry of teal and white, and let it glamorize your space. The silky-soft woven panels allow in beautiful diffused light while still providing privacy.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor Options: White | Teal & Beige\nHeader Type: Grommet for White Panels | Rod Pocket for Teal Panels\nMax Rod Diameter Allowed: 1.5-inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Floral Leaf & Feather\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.5 lb (680 g)\n\nFeatures\n\nAiry & Fresh: Add a refreshing charm to your window and feel the fine weave's positivity in your room.\nSheer Light Filtering: Providing a fantastic additional layer to your window that blocks harmful UV lights and protects your home.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 12,
+        "fields": {
+            "sku": "RN1370",
+            "title": "Leather",
+            "description": "Designer-inspired floral embroidery will catch all the eyes and uncover a brand-new perspective your windows never experienced. Mind you, purchasing this product might result in overexposure to the \"Where did you get those!?\" phrase.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor: Brown | Beige\nHeader Type: Rod Pocket\nMax Rod Diameter Allowed: 1.5-inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Floral\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.3 lb (590 g)\n\nFeatures\n\nUnique & Stylish: Unique rooms require unique treatments. \nSheer Light Filtering: Adds a fantastic layer that allows sunlight to enter while providing privacy.\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    },
+    {
+        "model": "marketing.Product",
+        "pk": 13,
+        "fields": {
+            "sku": "RN1381",
+            "title": "Confetti",
+            "description": "Curtains do not have to be plain and boring; sparkle up your window with autumn confetti\u2014no amount of color is too much. This pair of panels provides a unique look that will set your windows apart from the crowd.\n\nProduct Details\n\nPieces Included: 2 Curtain Panels\nEach Panel Width: 52-Inches (132 cm)\nLength Options: 84-inches (213 cm) | 95-inches (241 cm)\nColor: Confetti\nHeader Type: Rod Pocket\nMax Rod Diameter Allowed: 1.5 inches (3.8 cm)\nSide Hem: 1-inch (2.54 cm)\nPattern: Polka Dots Confetti\nLight Filtering: Semi Sheer\nFire Retardant: Yes\nMachine Washable: Yes\nRoom type: Living Room, Dining Room, Bedroom, Kitchen, Home Office, Sunroom, Playroom, Nursery Room, Kid's Room, Girl's Room\nBrand: Pearlins Linen\nFabric Origin: Turkey\nPackage Weight: 1.2 lb (544 g)\n\nFeatures\n\nDecorative: Decorate your room with confetti particles or autumn leaves, however you imagine.\nSheer Light Filtering: Provides a fantastic additional layer to your window that allows sunlight to enter while still providing privacy.\nEasy Hanging: Each panel conveniently features a rod pocket measuring 3 inches (7.6 cm) that fit curtain rods up to 1.5 inches (3.8 cm).\nEasy Care: Machine washable cold with a laundry bag or dry clean; gentle cycle; do not bleach; tumble dry low; cool iron if needed.\nTexture: Smooth, soft, comfortable, breathable, antibacterial, eco-friendly, and durable.",
+            "category": 1,
+            "featured": true,
+            "selling_while_out_of_stock": false
+        }
+    }
+]

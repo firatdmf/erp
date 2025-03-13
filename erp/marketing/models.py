@@ -180,8 +180,8 @@ class Product(models.Model):
     supplier = models.ForeignKey(Supplier, related_name="products", on_delete=models.SET_NULL, blank=True, null=True)
     # supplier = models.CharField( null=True, blank=True)
 
-    # def __str__(self):
-    #     return self.pk
+    def __str__(self):
+        return self.sku
 
 
 class ProductVariant(models.Model):
@@ -235,7 +235,7 @@ class ProductVariantAttributeValue(models.Model):
     )  # e.g., "S", "Red"
 
     def __str__(self):
-        return f"{self.attribute.name}: {self.value}"
+        return f"{self.variant} |{self.attribute.name}: {self.value}"
 
     class Meta:
         unique_together = (

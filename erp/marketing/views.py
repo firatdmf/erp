@@ -191,3 +191,15 @@ class ProductCreate(generic.edit.CreateView):
     # Save the Product object first.
     # self.object.save()
     # return super().form_valid(form)
+
+
+def get_products(request):
+    response_data = {}
+    # response_data["products"] = list(Product.objects.all())
+    response_data = {"text":"hello my friend"}
+    print(Product.objects.all())
+    # response = HttpResponse(json.dumps(response_data), content_type="application/json")
+    response = HttpResponse(
+        json.dumps(response_data)
+    )
+    return response

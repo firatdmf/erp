@@ -97,6 +97,7 @@ class ProductCollection(models.Model):
 class ProductCategory(models.Model):
     class Meta:
         verbose_name_plural = "Product Categories"
+
     created_at = models.DateTimeField(auto_now=True)
     name = models.CharField(max_length=255, null=True, blank=True)
 
@@ -168,16 +169,25 @@ class Product(models.Model):
     # If true, the product will be displayed on marketing channels (website etc)
     featured = models.BooleanField(default=True, blank=True, null=True)
     # If true, the product will be available for sale even if you have no stock.
-    selling_while_out_of_stock = models.BooleanField(default=False, blank=True, null=True)
+    selling_while_out_of_stock = models.BooleanField(
+        default=False, blank=True, null=True
+    )
     # will be calculated for shipping quotes and optional to enter
     weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     unit_of_weight = models.CharField(
         choices=WEIGHT_UNIT_TYPE_CHOICES,
         default=WEIGHT_UNIT_TYPE_CHOICES[0],
-        blank=True, null=True
+        blank=True,
+        null=True,
     )
 
-    supplier = models.ForeignKey(Supplier, related_name="products", on_delete=models.SET_NULL, blank=True, null=True)
+    supplier = models.ForeignKey(
+        Supplier,
+        related_name="products",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
     # supplier = models.CharField( null=True, blank=True)
 
     def __str__(self):
@@ -203,8 +213,12 @@ class ProductVariant(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     # Set price of the product for online sale.
-    variant_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    variant_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    variant_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    variant_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
 
     # If true, the product will be displayed on marketing channels (website etc)
     variant_featured = models.BooleanField(default=True)
@@ -222,6 +236,13 @@ class ProductVariantAttribute(models.Model):
 
 
 class ProductVariantAttributeValue(models.Model):
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="variant_attribute_values",
+        null=True,
+        blank=True,
+    )
     variant = models.ForeignKey(
         ProductVariant,
         on_delete=models.CASCADE,
@@ -229,6 +250,7 @@ class ProductVariantAttributeValue(models.Model):
         null=True,
         blank=True,
     )
+
     attribute = models.ForeignKey(ProductVariantAttribute, on_delete=models.CASCADE)
     value = models.CharField(
         max_length=255, verbose_name="Attribute Value"
@@ -258,7 +280,7 @@ class ProductFile(models.Model):
     )
     file = models.FileField(
         # upload_to=product_directory_path,
-        upload_to='product_files/',
+        upload_to="product_files/",
         validators=[validate_file_size, validate_file_type],
     )
     # This is the sequence of the files

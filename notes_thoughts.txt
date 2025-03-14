@@ -32,6 +32,9 @@ Likewise businesses:
     pulio.com
     pulitio.com
     glean.com
+    honeywell.com
+    bedrock automation
+    
 
 
     based:

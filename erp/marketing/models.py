@@ -231,6 +231,11 @@ class ProductVariant(models.Model):
 class ProductVariantAttribute(models.Model):
     name = models.CharField(max_length=255, verbose_name="Attribute Name")
 
+    def save(self, *args, **kwargs):
+        # Convert the name to lowercase before saving
+        self.name = self.name.lower()
+        super(ProductVariantAttribute, self).save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 

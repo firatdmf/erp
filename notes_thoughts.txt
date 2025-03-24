@@ -34,7 +34,12 @@ Likewise businesses:
     glean.com
     honeywell.com
     bedrock automation
-    
+    denso (toyota uses)
+    fanuc (japanese)
+    kuka (robotics)
+    Drishti Technologies
+    abb
+    visualcomponents.com
 
 
     based:

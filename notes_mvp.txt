@@ -51,7 +51,6 @@ stay on the reporting page after pushing submit button
 record each day's KPI on a table (better for analysis, and speed)
 Deleting a transaction or expense does not adjust the account balance.
 Adjust others: exp: categories-COGS, rev: rewards-refunds-sales, Capital + Divident
-Add meal expense option
 add currency exchanged between two different accouns ib usd to ib try
 product variant names should be unique
 parent skue should be a required field, and the variant sku should contain and extend to it.

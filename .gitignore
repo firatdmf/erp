@@ -5,6 +5,9 @@ erp/.env
 *.pyc
 .env
 
+#mac stupid shit
+.DS_Store
+
 # Here's the ultimate Django gitignore#
 # Django #
 *.log

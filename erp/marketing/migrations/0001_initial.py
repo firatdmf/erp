@@ -51,7 +51,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now=True)),
                 ('title', models.CharField(blank=True, max_length=255, null=True)),
                 ('description', models.TextField(blank=True, null=True)),
-                ('image', models.FileField(blank=True, null=True, upload_to=marketing.models.product_directory_path, validators=[marketing.models.validate_file_size, marketing.models.validate_image_type])),
+                ('image', models.FileField(blank=True, null=True, upload_to=marketing.models.product_file_directory_path, validators=[marketing.models.validate_file_size, marketing.models.validate_image_type])),
             ],
         ),
         migrations.CreateModel(

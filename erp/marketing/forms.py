@@ -83,16 +83,18 @@ class ProductVariantForm(forms.ModelForm):
         }
 
 
-# class ProductFileForm(forms.ModelForm):
-#     class Meta:
-#         model = ProductFile
-#         fields = ["file", "sequence"]
+class ProductFileForm(forms.ModelForm):
+    class Meta:
+        model = ProductFile
+        fields = ["file", "sequence"]
+        # fields = "__all__"
+        # fields = ['product', 'file', 'sequence']
 
 
 # # Create the inline formset for ProductFile
-# ProductFileFormSet = inlineformset_factory(
-#     Product, ProductFile, form=ProductFileForm, extra=1, can_delete=True
-# )
+ProductFileFormSet = inlineformset_factory(
+    Product, ProductFile, form=ProductFileForm, extra=1, can_delete=True
+)
 
 
 # class ProductVariantAttributeValueForm(forms.ModelForm):

@@ -27,9 +27,16 @@ def product_variants_default():
 
 # --------------------------------------------------------------------------------------------
 # FILE SAVER FUNCTION FOR THE PRODUCTS
-def product_directory_path(instance, filename):
-    # file will be uploaded to MEDIA_ROOT/products/<product_id>/<filename>
-    return f"marketing/static/media/products/{instance.id}_{instance.sku}/{filename}"
+# def product_directory_path(instance, filename):
+#     # file will be uploaded to MEDIA_ROOT/products/<product_id>/<filename>
+#     return f"marketing/static/media/products/{instance.id}_{instance.sku}/{filename}"
+
+
+def product_file_directory_path(instance, filename):
+    # file will be uploaded to MEDIA_ROOT/product_files/<product_sku>/<filename>
+    # if(instance.product_variant):
+    #     return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}/{instance.sequence}_{filename}"
+    return f"product_files/{instance.product.sku}/{instance.sequence}_{filename}"
 
 
 # def weight_unit_choices():
@@ -84,7 +91,7 @@ class ProductCollection(models.Model):
     title = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     image = models.FileField(
-        upload_to=product_directory_path,
+        upload_to=product_file_directory_path,
         null=True,
         blank=True,
         validators=[validate_file_size, validate_image_type],
@@ -123,7 +130,7 @@ class Product(models.Model):
     # Stock Keeping Unit
     # change to blank false later, if product has variants, no sku should be set to null.
     # This should be unique also
-    sku = models.CharField(max_length=12, null=True, blank=True)
+    sku = models.CharField(max_length=12, null=False, blank=False, unique=True)
     # Barcode (ISBN, UPC, GTIN, etc.)
     barcode = models.CharField(max_length=14, null=True, blank=True)
     # change to blank false later
@@ -191,7 +198,10 @@ class Product(models.Model):
     # supplier = models.CharField( null=True, blank=True)
 
     def __str__(self):
-        return self.sku
+        if self.sku:
+            return self.sku
+        else:
+            return self.title
 
 
 class ProductVariant(models.Model):
@@ -276,16 +286,16 @@ class ProductFile(models.Model):
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name="files", null=True, blank=True
     )
-    product_variant = models.ForeignKey(
-        ProductVariant,
-        on_delete=models.CASCADE,
-        related_name="files",
-        null=True,
-        blank=True,
-    )
+    # product_variant = models.ForeignKey(
+    #     ProductVariant,
+    #     on_delete=models.CASCADE,
+    #     related_name="files",
+    #     null=True,
+    #     blank=True,
+    # )
     file = models.FileField(
         # upload_to=product_directory_path,
-        upload_to="product_files/",
+        upload_to=product_file_directory_path,
         validators=[validate_file_size, validate_file_type],
     )
     # This is the sequence of the files

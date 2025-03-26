@@ -15,6 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import path, include
 from django.http import HttpResponse
 from . import views
@@ -41,3 +43,6 @@ urlpatterns = [
     path("testpage2/",views.test_page2.as_view(),name="test_page2")
     # path('static/<path:path>',serve),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

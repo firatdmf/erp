@@ -5,12 +5,9 @@
   <link rel="stylesheet" href="{% static 'marketing/css/product_create.css' %}" />
 {% endblock %}
 {% block content %}
-  {% comment %} <p>
-    <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
-  </p> {% endcomment %}
-  <div class="ProductCreatePage">
-    <h1>Create Product Form</h1>
-    <form method="post" enctype="multipart/form-data" >
+  <div class="ProductUpdatePage">
+    <h1>Edit Product Form</h1>
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 
@@ -42,13 +39,11 @@
         <div class="displayVariantJSON" onClick=displayVariantJSON(this)>Display Variant JSON</div>
         <br />
     
-    
         <table id="variant_table">
           <!-- <button onclick=tableSubmit()>Submit</button> -->
         </table>
     
         <input type="hidden" id="variant_json" name="variant_json">
-    
       </div>
 
       <h2>Product Files</h2>
@@ -61,8 +56,6 @@
         {% endfor %}
       </div>
       <button type="button" id="add-productfile-form">Add Another File</button>
-
-      
 
       <button type="submit">Submit</button>
     </form>

@@ -32,24 +32,39 @@ Likewise businesses:
     pulio.com
     pulitio.com
     glean.com
-    honeywell.com
+
+    
     bedrock automation
     denso (toyota uses)
-    fanuc (japanese)
     kuka (robotics)
     Drishti Technologies
-    abb
+    
     visualcomponents.com
+    nanotronics.ai
 
 
     based:
     katanamrp
     craftybase.com
     recurrency.com
-    rockwell automation,plex.com by rockwell 
     close.com
     odoo.com
     nejum.com
     mrpeasy.com
-    open source
+
+
+    rockwell automation,plex.com by rockwell 
+    Schneider Electric
+    honeywell.com
+    abb
+    B&R Automation (a division of ABB)
+    Emerson Electric
+    Mitsubishi Electric
+    Omron
+    Yokogawa
+    Phoenix Contact
+    fanuc (japanese)
+    Bosch Rexroth
+        
+    GE Automation & Controls (formerly GE Intelligent Platforms)
 

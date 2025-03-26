@@ -205,6 +205,12 @@ STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+
+# Media Files (For user uploaded files (dynamic not static))
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
 # specify the URL where Django should redirect unauthenticated users:
 # LOGIN_URL = 'login'
 # LOGOUT_URL = 'logout'

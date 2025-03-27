@@ -40,4 +40,6 @@
   {% empty %}
     <p>This product has no variants</p>
   {% endfor %}
+
+  <a href="{% url 'marketing:product_edit' product.id %}">Edit Product</a>
 {% endblock %}

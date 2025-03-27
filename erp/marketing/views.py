@@ -214,10 +214,10 @@ class ProductCreate(generic.edit.CreateView):
     # return super().form_valid(form)
 
 
-class ProductUpdate(generic.edit.UpdateView):
+class ProductEdit(generic.edit.UpdateView):
     model = Product
     form_class = ProductForm
-    template_name = "marketing/product_update.html"
+    template_name = "marketing/product_edit.html"
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -227,6 +227,8 @@ class ProductUpdate(generic.edit.UpdateView):
             )
         else:
             data["productfile_formset"] = ProductFileFormSet(instance=self.object)
+        
+        return data
 
     def form_valid(self, form):
         context = self.get_context_data()

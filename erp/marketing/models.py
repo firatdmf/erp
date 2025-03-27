@@ -1,4 +1,5 @@
 from django.db import models
+import os
 
 # Standardized labels used to identify the nature and format of a file's content
 import mimetypes
@@ -301,18 +302,39 @@ class ProductFile(models.Model):
     # This is the sequence of the files
     sequence = models.SmallIntegerField(unique=True)
 
+
+
+
+    # If the file alredy exists, delete the old file and save the new one
     def save(self, *args, **kwargs):
-        if not self.pk:  # Only set sequence if this is a new object
-            last_sequence = (
-                ProductFile.objects.filter(product=self.product)
-                .order_by("sequence")
-                .last()
-            )
-            if last_sequence:
-                self.sequence = last_sequence.sequence + 1
-            else:
-                self.sequence = 1
+        # Check if the instance already exists in the database
+        if self.pk:
+            old_instance = ProductFile.objects.get(pk=self.pk)
+            # If a new file is uploaded, delete the old file
+            if old_instance.file and old_instance.file != self.file:
+                if os.path.isfile(old_instance.file.path):
+                    os.remove(old_instance.file.path)
         super(ProductFile, self).save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        # Delete the file from the filesystem
+        if self.file and os.path.isfile(self.file.path):
+            os.remove(self.file.path)
+        super(ProductFile, self).delete(*args, **kwargs)
 
     def __str__(self):
         return f"Media for {self.product.title}"
+    
+
+        # def save(self, *args, **kwargs):
+    #     if not self.pk:  # Only set sequence if this is a new object
+    #         last_sequence = (
+    #             ProductFile.objects.filter(product=self.product)
+    #             .order_by("sequence")
+    #             .last()
+    #         )
+    #         if last_sequence:
+    #             self.sequence = last_sequence.sequence + 1
+    #         else:
+    #             self.sequence = 1
+    #     super(ProductFile, self).save(*args, **kwargs)

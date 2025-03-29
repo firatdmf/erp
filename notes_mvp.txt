@@ -10,36 +10,47 @@ Accounting:
    Calculate Burn, Runway, Growth Rate, Default Alive /
    Live view of finances KPI DASHBOARD
    Show Balance Equation [after settings assets (inventory, cogs, etc)]
+   balance sheet, income statement, cash flow
+   payroll calculator
    Payment processor set up
    Generate Invoices and Receipts | [Operations]
    Every taken income should link to an invoice or receipt [After invoice]
    accounts receivable and accounts payable /
-   inventory purchases [after operation]
+   inventory purchases [after operation] (COGS AND PURCHASES)
+   SYNC WITH A BANK
 
 Marketing:
+   Display products on web
    Show all contacts and companies together both, combine contact and company models
-   Chill Todo and personal to do
+   Chill Todo and personal to do (could do)
    Classify Contacts: Lead, Prospect, Client, and Dead.
    Group Contacts: Distributors, Retailers, or a group defined by user. 
    Add Relationships between contacts.
    Task: Create Web Push Notification feature (Progressive Web App?) or Email notifications
+   Auto lead finder or generator (from biggest cities to small cities)
+   pdf catalog generator
    Create Auto follow up for leads
-   Create Auto product sender to clients
+   Create Auto product sender to clients newsletter
    Provide reports: Count Number of new leads added daily /, and how things are going / 
    Remove frictions in adding data (select contact via typo tolerant search, add existing contacts from csv)
    When creating a company or contact, dynamically check if it already exists
+   Be able to Import contacts (from expo etc) and group them
 
 Operations:
    Add Customer Order: Quotation, Waiting on Confirmation, Confirmed, In production(sub operations), Ready for Shipment, Shipped (Closed), On Hold (Closed) 
    Show what order status of a client, create a link for the order status share with client
+   Stock management via QR
+   product cost computer
    See the stock and share with clients
-   Productions today
+   Productions Leveler/Scheduler
    Raw Materials Inventory
    Calculate efficiency (Measure current status first)
    Apply Lean Six Sigma Principles — Make your IE degree talk
    Create digital twin
    Activity Report (what have you done recently)
    Put feedback mechanism
+   Generate packing list
+   Issue purchase orders (pull systems)
 
  
 ------------------------------------------------------------------------------------------------------------------

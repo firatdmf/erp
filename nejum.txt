@@ -1,5 +1,7 @@
-mission: Make Industrial Automation Accessible with simple and practical systems.
-purpose: Eliminate waste to server high quality and low cost product for us. 
+mission: Make Industrial Engineering simple, practical and accessible.
+purpose: To eliminate waste and maximize efficiency in industrial processes.
+
+How we do that: Robotics, Data Science, and seamless software integration
 
 culture: open minded, group thinking, experimantal focused, practical.
 

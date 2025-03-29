@@ -1,21 +1,3 @@
-
-Nejum.com provides industrial automation and digital transformation for businesses. 
-
-
-You make a very basic core erp: then you make it open source, providing clear documentation. That is how you can have engineers as your clients
-Share the product with community, gain audience.
-Commercial:
-Then when you implement to people, you charge with with cloud fee, or setting up their local server. 
-Priority support and custom features
-Add other products: cameras, robotics, barcode printers etc.
-
-Start with distributors, then later move to manufacturing. 
-
-1- We help people make things by optimizing their process, and minimizing their costs. 
-2- "We make factories run smoother and save cash. Think of us as the secret sauce for making awesome stuff!"
-
-
-
 Likewise businesses:
     Monday.com
     Hubspot.com

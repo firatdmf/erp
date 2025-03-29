@@ -26,7 +26,7 @@ class ProductVariantInLine(admin.TabularInline):
 
 class ProductAdmin(admin.ModelAdmin):
     inlines = [ProductFileInline, ProductVariantInLine]
-    list_display = ('title', 'sku', 'price', 'featured', 'selling_while_out_of_stock')
+    list_display = ('title', 'sku', 'price', 'featured', 'selling_while_out_of_stock', 'has_variants')
     search_fields = ('title', 'sku', 'barcode')
     list_filter = ('featured', 'selling_while_out_of_stock', 'collections')
 

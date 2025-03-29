@@ -30,7 +30,7 @@
               <div id="error_message_option_value_1" class="alert"></div>
             </div>
           </div>
-          <div id="add_another_option_2" class="add_another_option" onClick=add_another_name(this)>+ Add Another Option
+          <div id="add_another_name_2" class="add_another_option" onClick=add_another_name(this)>+ Add Another Option
           </div>
           <div id="error_message_option_name" class="alert"></div>
         </div>
@@ -38,7 +38,7 @@
     
         <br />
     
-        <div onClick=createTable() id="create_table_button">Create Table</div>
+        <div onClick=createTable() id="create_table_button">Create Variant Table</div>
         <div class="displayVariantJSON" onClick=displayVariantJSON(this)>Display Variant JSON</div>
         <br />
     
@@ -51,16 +51,19 @@
     
       </div>
 
-      <h2>Product Files</h2>
-      {{ productfile_formset.management_form }}
-      <div id="productfile-forms">
-        {% for form in productfile_formset %}
-          <div class="productfile-form">
-            {{ form.as_p }}
-          </div>
-        {% endfor %}
+      <div id="product_files_form">
+        <h2>Product Files</h2>
+        {{ productfile_formset.management_form }}
+        <div id="productfile-forms">
+          {% for form in productfile_formset %}
+            <div class="productfile-form">
+              {{ form.as_p }}
+            </div>
+          {% endfor %}
+        </div>
+        <button type="button" id="add-productfile-form">Add Another File</button>
       </div>
-      <button type="button" id="add-productfile-form">Add Another File</button>
+      
 
       
 

@@ -42,9 +42,9 @@ class ProductForm(forms.ModelForm):
         fields = "__all__"
 
     # The input id will be "id_has_variants", this won't be saved to the database, for interactions only.
-    has_variants = forms.BooleanField(
-        required=False, label="Does this product have variants?"
-    )
+    # has_variants = forms.BooleanField(
+    #     required=False, label="Does this product have variants?"
+    # )
 
     # def __init__(self, *args, **kwargs):
     #     super(ProductForm, self).__init__(*args, **kwargs)

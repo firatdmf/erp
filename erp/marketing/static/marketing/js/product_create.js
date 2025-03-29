@@ -6,15 +6,58 @@
 // Variant value deletion should only be present at the last variant value. // This is done
 // Variant value addition should only be present at the last variant value. // This is done
 
+// Checks if an object is empty
+let isEmptyObject = (obj) => {
+    return Object.keys(obj).length === 0 && obj.constructor === Object;
+}
+
+
+
+
+// console.time('doSomething')
+
+// // Initialize an object to store unique options
+// const options = {};
+
+// // Iterate through each variant
+// existing_variants.forEach((variant) => {
+//     const variantCombination = variant.variant_combination;
+
+//     // Iterate through each attribute in the variant_combination
+//     for (const [attribute, value] of Object.entries(variantCombination)) {
+//         // If the attribute is not already in the options object, initialize it as an array
+//         if (!options[attribute]) {
+//             options[attribute] = [];
+//         }
+
+//         // Add the value to the array if it's not already present
+//         if (!options[attribute].includes(value)) {
+//             options[attribute].push(value);
+//         }
+//     }
+// });
+
+// // Log the result
+// console.log(options);
+
+// console.timeEnd('doSomething')
+
 
 let hasVariantsCheckbox = document.getElementById('id_has_variants');
 let variant_component = document.getElementById('variant_component');
+let product_files_form = document.getElementById('product_files_form');
 
-let toggleVariantForm = ()=> {
+if (hasVariantsCheckbox.checked) {
+    variant_component.style.display = 'block';
+    product_files_form.style.display = 'none';
+}
+let toggleVariantForm = () => {
     if (hasVariantsCheckbox.checked) {
         variant_component.style.display = 'block';
+        product_files_form.style.display = 'none';
     } else {
         variant_component.style.display = 'none';
+        product_files_form.style.display = 'block';
     }
 }
 
@@ -107,6 +150,7 @@ let add_another_name = (el) => {
 
     // insert the new option name element before add_another_name element.
     el.before(add_option_name)
+    return add_option_name
 }
 //   ----------------------------------------------
 //   ----------------------------------------------
@@ -248,10 +292,161 @@ let add_another_value = (el, next_option_name_id) => {
 //   ----------------------------------------------
 //   ----------------------------------------------
 
+
+let variant_form_constructor = () => {
+
+    if (isEmptyObject(product_variants)) {
+        console.log("you have no variants")
+    } else {
+        product_variants = JSON.parse(product_variants); // Parse the JSON string into an object
+        console.log(product_variants)
+        // product_variant_options = JSON.parse(product_variant_options);
+
+        // console.log(product_variant_options) // Output: { color: ["white", "beige"], size: ["84", "95"] }
+        product_variant_options = { color: ["white", "beige","black"], size: ["84", "95"], "header":["rod pocket","grommet","japon"] }
+        console.log(product_variant_options.length);
+        
+        let counter = 1
+        for (const [attribute_name, attribute_values] of Object.entries(product_variant_options)) {
+            // console.log(key, values);
+            let variant_name_element = document.getElementById(`variant_name_${counter}`);
+            // Check if the element exists
+            if (variant_name_element) {
+                variant_name_element.value = attribute_name;
+                for (i = 1; i <= attribute_values.length; i++) {
+                    console.log(i)
+                    let variant_name_value_element = document.getElementById(`variant_name_${counter}_value_${i}`);
+                    if(variant_name_value_element){
+
+                        variant_name_value_element.value = attribute_values[i - 1];
+                    }else{
+                        add_another_value(document.getElementById(`variant_name_${counter+2}_add_another_value_${i}`), counter)
+                        // in here adjust the add_another_value to input the variant div and automatically add to it
+                    }
+                }
+            } else {
+                console.log(`your counter is: ${counter}`);
+                
+                add_another_option_element = document.getElementById(`add_another_name_${counter}`)
+                // console.log(add_another_option_element);
+
+                // variant_name_element = add_another_name(add_another_option_element).firstChild;
+                // variant_name_element = add_another_name(add_another_option_element).firstElementChild;
+                add_another_name(add_another_option_element)
+                variant_name_element = document.getElementById(`variant_name_${counter}`);
+                console.log(variant_name_element);
+                console.log(attribute_name);
+
+                variant_name_element.value = attribute_name;
+                for (i = 1; i <= attribute_values.length; i++) {
+                    console.log(i)
+                    let variant_name_value_element = document.getElementById(`variant_name_${counter}_value_${i}`);
+                    variant_name_value_element.value = attribute_values[i - 1];
+                }
+
+                // console.error(`Element with id variant_name_${counter} not found.`);
+            }
+
+            counter++;
+        }
+    }
+}
+variant_form_constructor();
+
+
+// // Dynamically create or retrieve an element by ID
+// const getOrCreateElement = (id, createCallback) => {
+//     let element = document.getElementById(id);
+//     if (!element && createCallback) {
+//         element = createCallback();
+//     }
+//     return element;
+// };
+
+// const createVariantNameElement = (counter) => {
+//     let addAnotherOptionElement = document.getElementById(`add_another_option_${counter}`);
+//     if (!addAnotherOptionElement) {
+//         console.warn(`add_another_option_${counter} not found. Creating it dynamically.`);
+//         // Dynamically create the element if it doesn't exist
+//         addAnotherOptionElement = document.createElement("div");
+//         addAnotherOptionElement.setAttribute("id", `add_another_option_${counter}`);
+//         addAnotherOptionElement.style.display = "none"; // Hide it if necessary
+
+//         // Append it to the correct parent container
+//         const parentContainer = document.getElementById("variant_container");
+//         if (parentContainer) {
+//             parentContainer.appendChild(addAnotherOptionElement);
+//         } else {
+//             console.error("Parent container 'variant_container' not found.");
+//             return null;
+//         }
+//     }
+
+//     // Call the function to add the variant name
+//     add_another_name(addAnotherOptionElement);
+
+//     // Return the newly created or existing variant name element
+//     return document.getElementById(`variant_name_${counter}`);
+// };
+
+// const processVariantOptions = (counter, productVariantOptions) => {
+//     // Base case: Stop recursion if counter exceeds the number of attributes
+//     if (counter > Object.keys(productVariantOptions).length) return;
+
+//     // Get the current attribute name and values
+//     const attributeName = Object.keys(productVariantOptions)[counter - 1];
+//     const attributeValues = productVariantOptions[attributeName];
+
+//     // Get or create the variant name element
+//     const variantNameElement = getOrCreateElement(`variant_name_${counter}`, () => createVariantNameElement(counter));
+//     if (variantNameElement) {
+//         variantNameElement.value = attributeName;
+
+//         // Process the attribute values
+//         attributeValues.forEach((value, index) => {
+//             const valueIndex = index + 1;
+//             const variantValueElement = getOrCreateElement(
+//                 `variant_name_${counter}_value_${valueIndex}`,
+//                 () => createVariantValueElement(counter, valueIndex)
+//             );
+//             if (variantValueElement) {
+//                 variantValueElement.value = value;
+//             }
+//         });
+//     }
+
+//     // Recursive call for the next attribute
+//     processVariantOptions(counter + 1, productVariantOptions);
+// };
+
+// const variantFormConstructor = () => {
+//     if (isEmptyObject(product_variants)) {
+//         console.log("You have no variants");
+//         return;
+//     }
+
+//     // Parse the JSON strings into objects
+//     product_variants = JSON.parse(product_variants);
+//     const productVariantOptions = { color: ["white", "beige"], size: ["84", "95"], header: ["rod pocket", "grommet"] };
+
+//     console.log(productVariantOptions); // Debugging output
+
+//     // Start processing from the first attribute
+//     processVariantOptions(1, productVariantOptions);
+// };
+
+// variantFormConstructor();
+
+
+
+// ----------------------------------------
+// ----------------------------------------
+// ----------------------------------------
+
 let createTable = () => {
     // Get all the input elements.
     let input_elements = document.getElementById('variant_container').getElementsByTagName('input');
-    
+
     // initialize variant array
     let variant = []
     let variant_name;
@@ -357,4 +552,3 @@ let createTable = () => {
     return;
 
 }
-

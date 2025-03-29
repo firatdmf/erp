@@ -17,6 +17,8 @@ from django.contrib.postgres.fields import ArrayField
 #             "size": ['84"', '95"'],
 #         }
 #     }
+
+# This is not used anywhere, just for the reference.
 def product_variants_default():
     return {
         "variants": {
@@ -197,6 +199,7 @@ class Product(models.Model):
         null=True,
     )
     # supplier = models.CharField( null=True, blank=True)
+    has_variants = models.BooleanField(default=False)
 
     def __str__(self):
         if self.sku:

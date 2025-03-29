@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load marketing_tags %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'marketing/css/product_create.css' %}" />
@@ -11,64 +12,39 @@
       {% csrf_token %}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 
-      <div class="variant_component" id="variant_component">
-        <div class="variant_container" id="variant_container">
-          <div class="variantCard" id="variantCard_1">
-            <div class="option_name">
-              <div>Option Name</div>
-              <input type="text" placeholder="Add Option Name" name="variant_name_1" id="variant_name_1">
-            </div>
-            <div class="optionValues">
-              <div>Option Values</div>
-              <input type="text" placeholder="Add Option Value 1" name="variant_name_1_value_1" id="variant_name_1_value_1">
-              <input type="text" placeholder="Add Option Value 2" name="variant_name_1_value_2" id="variant_name_1_value_2">
-              <div class="add_another_value" id="add_another_value_3" onClick=add_another_value(this)>+ Add Another Option
-                Value</div>
-              <div id="error_message_option_value_1" class="alert"></div>
-            </div>
-          </div>
-          <div id="add_another_option_2" class="add_another_option" onClick=add_another_name(this)>+ Add Another Option
-          </div>
-          <div id="error_message_option_name" class="alert"></div>
+      <div id="product_files_form">
+        <h2>Product Files</h2>
+        {{ productfile_formset.management_form }}
+        <div id="productfile-forms">
+          {% for form in productfile_formset %}
+            <div class="productfile-form">{{ form.as_p }}</div>
+          {% endfor %}
         </div>
-    
-    
-        <br />
-    
-        <div onClick=createTable() id="create_table_button">Create Table</div>
-        <div class="displayVariantJSON" onClick=displayVariantJSON(this)>Display Variant JSON</div>
-        <br />
-    
-        <table id="variant_table">
-          <!-- <button onclick=tableSubmit()>Submit</button> -->
-        </table>
-    
-        <input type="hidden" id="variant_json" name="variant_json">
+        <button type="button" id="add-productfile-form">Add Another File</button>
       </div>
-
-      <h2>Product Files</h2>
-      {{ productfile_formset.management_form }}
-      <div id="productfile-forms">
-        {% for form in productfile_formset %}
-          <div class="productfile-form">
-            {{ form.as_p }}
-          </div>
-        {% endfor %}
-      </div>
-      <button type="button" id="add-productfile-form">Add Another File</button>
 
       <button type="submit">Submit</button>
+      {% variant_form current_url=request.path product=product variants=variants %}
     </form>
+    <h1>Your variants are listed below</h1>
+    {% for variant in variants %}
+      <ul>
+        <li>{{ variant.variant_sku }}</li>
+      </ul>
+    {% endfor %}
   </div>
   {% block js %}
-    <script src="{% static 'marketing/js/product_create.js' %}"></script>
     <script>
-      document.getElementById('add-productfile-form').addEventListener('click', function() {
-        var formIdx = document.querySelectorAll('.productfile-form').length;
-        var newForm = document.querySelector('.productfile-form').cloneNode(true);
-        newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx);
-        document.getElementById('productfile-forms').appendChild(newForm);
-      });
+      {% comment %} window.variantData = JSON.parse('{{variants[0].title}}') {% endcomment %}
+      window.variantData = "hello windows"
+      {% comment %} console.log({{variants[0].title|safe}}) {% endcomment %}
+
+      document.getElementById('add-productfile-form').addEventListener('click', function () {
+        var formIdx = document.querySelectorAll('.productfile-form').length
+        var newForm = document.querySelector('.productfile-form').cloneNode(true)
+        newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx)
+        document.getElementById('productfile-forms').appendChild(newForm)
+      })
     </script>
   {% endblock %}
 {% endblock %}

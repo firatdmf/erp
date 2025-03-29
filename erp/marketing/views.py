@@ -219,16 +219,24 @@ class ProductEdit(generic.edit.UpdateView):
     form_class = ProductForm
     template_name = "marketing/product_edit.html"
 
+
+       
+
     def get_context_data(self, **kwargs):
-        data = super().get_context_data(**kwargs)
+        context = super().get_context_data(**kwargs)
         if self.request.POST:
-            data["productfile_formset"] = ProductFileFormSet(
+            context["productfile_formset"] = ProductFileFormSet(
                 self.request.POST, self.request.FILES, instance=self.object
             )
         else:
-            data["productfile_formset"] = ProductFileFormSet(instance=self.object)
+            context["productfile_formset"] = ProductFileFormSet(instance=self.object)
         
-        return data
+        # check to see if the product has variants
+        print('heck to see if the product has variants')
+        if(self.object.has_variants):
+            print('yes')
+            context["variants"] = self.object.variants.all()
+        return context
 
     def form_valid(self, form):
         context = self.get_context_data()

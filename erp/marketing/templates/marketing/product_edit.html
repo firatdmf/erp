@@ -23,15 +23,17 @@
         <button type="button" id="add-productfile-form">Add Another File</button>
       </div>
 
-      <button type="submit">Submit</button>
       {% variant_form current_url=request.path product=product variants=variants %}
+      <button type="submit" id="form_submit_button">Submit</button>
     </form>
-    <h1>Your variants are listed below</h1>
-    {% for variant in variants %}
-      <ul>
-        <li>{{ variant.variant_sku }}</li>
-      </ul>
-    {% endfor %}
+    {% if variants %}
+      <h1>Your variants are listed below</h1>
+      {% for variant in variants %}
+        <ul>
+          <li>{{ variant.variant_sku }}</li>
+        </ul>
+      {% endfor %}
+    {% endif %}
   </div>
   {% block js %}
     <script>
@@ -45,6 +47,19 @@
         newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx)
         document.getElementById('productfile-forms').appendChild(newForm)
       })
+
+      {% comment %} form_submit_button = document.getElementById('form_submit_button');
+    form_submit_button.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log("you are here")
+        // Get all the input elements. (not the table inputs)
+        // let input_elements = document.getElementById('variant_container').getElementsByTagName('input');
+        createTable();
+        e.currentTarget.form.submit();
+
+
+
+    }); {% endcomment %}
     </script>
   {% endblock %}
 {% endblock %}

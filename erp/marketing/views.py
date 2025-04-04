@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from .models import *
 from .forms import *
 import json
+import ast
 
 # Create your views here.
 
@@ -219,9 +220,6 @@ class ProductEdit(generic.edit.UpdateView):
     form_class = ProductForm
     template_name = "marketing/product_edit.html"
 
-
-       
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.request.POST:
@@ -230,15 +228,38 @@ class ProductEdit(generic.edit.UpdateView):
             )
         else:
             context["productfile_formset"] = ProductFileFormSet(instance=self.object)
-        
+
         # check to see if the product has variants
-        print('heck to see if the product has variants')
-        if(self.object.has_variants):
-            print('yes')
+        # print("heck to see if the product has variants")
+        if self.object.has_variants:
+            print("yes")
+            # This is how you pass the variants to the template, and the JS
             context["variants"] = self.object.variants.all()
         return context
 
     def form_valid(self, form):
+        print("POST data received:")
+        variant_data = {key: value for key, value in self.request.POST.items() if "variant" in key}
+        if(variant_data):
+            latest_variant_key, latest_variant_value = list(variant_data.items())[-1]
+            number_of_variants = latest_variant_key.split("_")[-1]
+            print(f"Number of variants: {number_of_variants}")
+            print(f"Latest variant key: {latest_variant_key}, Latest variant value: {latest_variant_value}")
+        # for key, value in self.request.POST.items():
+        #     if("variant" in key):
+        #         print(f"{key}: {value}")
+
+
+        # Print all FILES data (if any files are uploaded)
+        print("FILES data received:")
+        for key, value in self.request.FILES.items():
+            print(f"{key}: {value}")
+
+        # product_variants = json.loads(self.request.POST["variant_json"])[
+        #     "product_variants"
+        # ]
+        # print(product_variants)
+
         context = self.get_context_data()
         productfile_formset = context["productfile_formset"]
         if productfile_formset.is_valid():

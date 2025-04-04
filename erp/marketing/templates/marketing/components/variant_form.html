@@ -15,7 +15,7 @@
           <div>Option Values</div>
           <input type="text" placeholder="Add Option Value 1" name="variant_name_1_value_1" id="variant_name_1_value_1">
           <input type="text" placeholder="Add Option Value 2" name="variant_name_1_value_2" id="variant_name_1_value_2">
-          <div class="add_another_value" id="add_another_value_3" onClick=add_another_value(this)>+ Add Another Option Value</div>
+          <div class="add_another_value" id="variant_name_1_add_another_value_3" onClick=add_another_value(this)>+ Add Another Option Value</div>
           <div id="error_message_option_value_1" class="alert"></div>
         </div>
       </div>
@@ -32,19 +32,20 @@
     <br />
 
     <table id="variant_table">
-      <!-- <button onclick=tableSubmit()>Submit</button> -->
     </table>
 
     <input type="hidden" id="variant_json" name="variant_json">
-  </div>
+
   {% comment %} <p>{{message}}</p> {% endcomment %}
   <script>
     window.my_message = "{{ message }}";
     {% comment %} passing the variants information from backend to front end js so we can prepopulate the variant table form {% endcomment %}
     {% comment %} window.existing_variants = JSON.parse('{{ variants }}'); {% endcomment %}
+    {% comment %} product_variants variable passed from marketing_tags.py {% endcomment %}
     window.product_variants = '{{ product_variants }}';
     window.product_variant_options = '{{ product_variant_options }}';
     {% comment %} console.log('{{message}}') {% endcomment %}
   </script>
 
-  <script src="{% static 'marketing/js/product_create.js' %}"></script>
+  <script src="{% static 'marketing/js/variant_form.js' %}" defer></script>
+</div>

@@ -6,62 +6,36 @@
 // Variant value deletion should only be present at the last variant value. // This is done
 // Variant value addition should only be present at the last variant value. // This is done
 
+let export_data = {}
+
 // Checks if an object is empty
 let isEmptyObject = (obj) => {
     return Object.keys(obj).length === 0 && obj.constructor === Object;
 }
 
+let isEqualObject = (obj1, obj2) => {
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
 
-
-
-// console.time('doSomething')
-
-// // Initialize an object to store unique options
-// const options = {};
-
-// // Iterate through each variant
-// existing_variants.forEach((variant) => {
-//     const variantCombination = variant.variant_combination;
-
-//     // Iterate through each attribute in the variant_combination
-//     for (const [attribute, value] of Object.entries(variantCombination)) {
-//         // If the attribute is not already in the options object, initialize it as an array
-//         if (!options[attribute]) {
-//             options[attribute] = [];
-//         }
-
-//         // Add the value to the array if it's not already present
-//         if (!options[attribute].includes(value)) {
-//             options[attribute].push(value);
-//         }
-//     }
-// });
-
-// // Log the result
-// console.log(options);
-
-// console.timeEnd('doSomething')
-
-
-let hasVariantsCheckbox = document.getElementById('id_has_variants');
-let variant_component = document.getElementById('variant_component');
-let product_files_form = document.getElementById('product_files_form');
-
-if (hasVariantsCheckbox.checked) {
-    variant_component.style.display = 'block';
-    product_files_form.style.display = 'none';
-}
-let toggleVariantForm = () => {
-    if (hasVariantsCheckbox.checked) {
-        variant_component.style.display = 'block';
-        product_files_form.style.display = 'none';
-    } else {
-        variant_component.style.display = 'none';
-        product_files_form.style.display = 'block';
+    if (keys1.length !== keys2.length) {
+        return false;
     }
+
+    for (let key of keys1) {
+        if (obj1[key] !== obj2[key]) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
-hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
+function findKeyDifferences(obj1, obj2) {
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    return keys1.filter(key => !keys2.includes(key));
+}
 
 
 // This is to calculate the possible combinations of the variants
@@ -87,7 +61,6 @@ let getCombinations = (options) => {
 
         const currentOption = options[index];
         for (const value of currentOption.values) {
-            // console.log('hey,hey ,hey' + options[index].name, value);
             currentCombination.push(options[index].name + ":" + value);
             generateCombinations(index + 1, [...currentCombination]); // Create a copy of the array
             currentCombination.pop(); // Backtrack
@@ -96,9 +69,59 @@ let getCombinations = (options) => {
 
     generateCombinations(0, []);
 
-    combinations.forEach(combination => {
-        console.log(combination);
-    });
+
+    return combinations;
+}
+
+const getCombinations2 = (variants) => {
+    // variants:
+    // [
+    //     {
+    //         "name": "color",
+    //         "values": [
+    //             "white",
+    //             "beige"
+    //         ]
+    //     },
+    //     {
+    //         "name": "size",
+    //         "values": [
+    //             "84",
+    //             "95"
+    //         ]
+    //     }
+    // ]
+
+    if (!variants || variants.length === 0) {
+        return;
+    }
+
+    const combinations = [];
+
+    const generateCombinations = (index, variant_combination) => {
+        // variant_combination:
+        // console.log("your variant_combination is");
+        // console.log(variant_combination);
+
+        if (index === variants.length) {
+            // Push a copy of the current combination to avoid reference issues
+            combinations.push({ ...variant_combination });
+            return;
+        }
+
+        const currentOption = variants[index];
+        for (const value of currentOption.values) {
+            // value = "white" or "84"
+            // Create a new combination for each recursive call
+            const newCombination = { ...variant_combination };
+            newCombination[currentOption.name] = value;
+            generateCombinations(index + 1, newCombination); // Create a copy of the array
+            // variant_combination.pop(); // Backtrack
+        }
+    }
+
+    generateCombinations(0, {});
+
     return combinations;
 }
 
@@ -150,6 +173,10 @@ let add_another_name = (el) => {
 
     // insert the new option name element before add_another_name element.
     el.before(add_option_name)
+
+
+
+    document.getElementById("create_table_button").style.display = "block";
     return add_option_name
 }
 //   ----------------------------------------------
@@ -162,9 +189,6 @@ let delete_option_name = (el) => {
     let previous_option_name_id = option_name_id - 1;
     let previous_option_name_element = document.getElementById(`variantCard_${previous_option_name_id}`)
     let previous_option_name_title_element = previous_option_name_element.getElementsByClassName("option_name")[0].children[0]
-    console.log("here comes what you want:")
-    // console.log(previous_option_name_element.getElementsByClassName("option_name")[0].children[0])
-    console.log(previous_option_name_title_element);
 
     let add_another_name_element = document.getElementById(`add_another_name_${(Number(el.id.slice("_").at(-1)) + 1)}`);
     add_another_name_element.id = `add_another_name_${Number(el.id.slice("_").at(-1))}`
@@ -179,6 +203,9 @@ let delete_option_name = (el) => {
     }
 
     option_name_element.remove()
+
+
+    document.getElementById("create_table_button").style.display = "block";
 
 }
 
@@ -208,6 +235,11 @@ let delete_option_value = (el, next_option_name_id, next_option_value_id) => {
 
     // Just in case we have a delete option value element, we need to remove it
     el.remove()
+
+
+
+
+    document.getElementById("create_table_button").style.display = "block";
 }
 
 
@@ -217,11 +249,13 @@ let delete_option_value = (el, next_option_name_id, next_option_value_id) => {
 
 let add_another_value = (el, next_option_name_id) => {
 
-    //   Next option name id is just the current name id that is passed
+    //   Next option name id is just the current name id that is passed (the id of the variant container)
     // If no next option name id is passed, then we will just set it to 1, indicating the first option name
     if (!next_option_name_id) {
         next_option_name_id = 1
     }
+
+
     //   ----------------------------------------------
     let previous_option_value_id = Number(el.id.slice('_').at(-1)) - 1;
     // Get the element of first option name
@@ -286,156 +320,14 @@ let add_another_value = (el, next_option_name_id) => {
     add_option_value.after(delete_option_value)
     // Adjust the id of the add_another_value element
     el.setAttribute('id', `variant_name_${next_option_name_id}_add_another_value_${next_option_value_id + 1}`)
+
+    document.getElementById("create_table_button").style.display = "block";
 }
 
 //   ----------------------------------------------
 //   ----------------------------------------------
 //   ----------------------------------------------
 
-
-let variant_form_constructor = () => {
-
-    if (isEmptyObject(product_variants)) {
-        console.log("you have no variants")
-    } else {
-        product_variants = JSON.parse(product_variants); // Parse the JSON string into an object
-        console.log(product_variants)
-        // product_variant_options = JSON.parse(product_variant_options);
-
-        // console.log(product_variant_options) // Output: { color: ["white", "beige"], size: ["84", "95"] }
-        product_variant_options = { color: ["white", "beige","black"], size: ["84", "95"], "header":["rod pocket","grommet","japon"] }
-        console.log(product_variant_options.length);
-        
-        let counter = 1
-        for (const [attribute_name, attribute_values] of Object.entries(product_variant_options)) {
-            // console.log(key, values);
-            let variant_name_element = document.getElementById(`variant_name_${counter}`);
-            // Check if the element exists
-            if (variant_name_element) {
-                variant_name_element.value = attribute_name;
-                for (i = 1; i <= attribute_values.length; i++) {
-                    console.log(i)
-                    let variant_name_value_element = document.getElementById(`variant_name_${counter}_value_${i}`);
-                    if(variant_name_value_element){
-
-                        variant_name_value_element.value = attribute_values[i - 1];
-                    }else{
-                        add_another_value(document.getElementById(`variant_name_${counter+2}_add_another_value_${i}`), counter)
-                        // in here adjust the add_another_value to input the variant div and automatically add to it
-                    }
-                }
-            } else {
-                console.log(`your counter is: ${counter}`);
-                
-                add_another_option_element = document.getElementById(`add_another_name_${counter}`)
-                // console.log(add_another_option_element);
-
-                // variant_name_element = add_another_name(add_another_option_element).firstChild;
-                // variant_name_element = add_another_name(add_another_option_element).firstElementChild;
-                add_another_name(add_another_option_element)
-                variant_name_element = document.getElementById(`variant_name_${counter}`);
-                console.log(variant_name_element);
-                console.log(attribute_name);
-
-                variant_name_element.value = attribute_name;
-                for (i = 1; i <= attribute_values.length; i++) {
-                    console.log(i)
-                    let variant_name_value_element = document.getElementById(`variant_name_${counter}_value_${i}`);
-                    variant_name_value_element.value = attribute_values[i - 1];
-                }
-
-                // console.error(`Element with id variant_name_${counter} not found.`);
-            }
-
-            counter++;
-        }
-    }
-}
-variant_form_constructor();
-
-
-// // Dynamically create or retrieve an element by ID
-// const getOrCreateElement = (id, createCallback) => {
-//     let element = document.getElementById(id);
-//     if (!element && createCallback) {
-//         element = createCallback();
-//     }
-//     return element;
-// };
-
-// const createVariantNameElement = (counter) => {
-//     let addAnotherOptionElement = document.getElementById(`add_another_option_${counter}`);
-//     if (!addAnotherOptionElement) {
-//         console.warn(`add_another_option_${counter} not found. Creating it dynamically.`);
-//         // Dynamically create the element if it doesn't exist
-//         addAnotherOptionElement = document.createElement("div");
-//         addAnotherOptionElement.setAttribute("id", `add_another_option_${counter}`);
-//         addAnotherOptionElement.style.display = "none"; // Hide it if necessary
-
-//         // Append it to the correct parent container
-//         const parentContainer = document.getElementById("variant_container");
-//         if (parentContainer) {
-//             parentContainer.appendChild(addAnotherOptionElement);
-//         } else {
-//             console.error("Parent container 'variant_container' not found.");
-//             return null;
-//         }
-//     }
-
-//     // Call the function to add the variant name
-//     add_another_name(addAnotherOptionElement);
-
-//     // Return the newly created or existing variant name element
-//     return document.getElementById(`variant_name_${counter}`);
-// };
-
-// const processVariantOptions = (counter, productVariantOptions) => {
-//     // Base case: Stop recursion if counter exceeds the number of attributes
-//     if (counter > Object.keys(productVariantOptions).length) return;
-
-//     // Get the current attribute name and values
-//     const attributeName = Object.keys(productVariantOptions)[counter - 1];
-//     const attributeValues = productVariantOptions[attributeName];
-
-//     // Get or create the variant name element
-//     const variantNameElement = getOrCreateElement(`variant_name_${counter}`, () => createVariantNameElement(counter));
-//     if (variantNameElement) {
-//         variantNameElement.value = attributeName;
-
-//         // Process the attribute values
-//         attributeValues.forEach((value, index) => {
-//             const valueIndex = index + 1;
-//             const variantValueElement = getOrCreateElement(
-//                 `variant_name_${counter}_value_${valueIndex}`,
-//                 () => createVariantValueElement(counter, valueIndex)
-//             );
-//             if (variantValueElement) {
-//                 variantValueElement.value = value;
-//             }
-//         });
-//     }
-
-//     // Recursive call for the next attribute
-//     processVariantOptions(counter + 1, productVariantOptions);
-// };
-
-// const variantFormConstructor = () => {
-//     if (isEmptyObject(product_variants)) {
-//         console.log("You have no variants");
-//         return;
-//     }
-
-//     // Parse the JSON strings into objects
-//     product_variants = JSON.parse(product_variants);
-//     const productVariantOptions = { color: ["white", "beige"], size: ["84", "95"], header: ["rod pocket", "grommet"] };
-
-//     console.log(productVariantOptions); // Debugging output
-
-//     // Start processing from the first attribute
-//     processVariantOptions(1, productVariantOptions);
-// };
-
-// variantFormConstructor();
 
 
 
@@ -444,11 +336,14 @@ variant_form_constructor();
 // ----------------------------------------
 
 let createTable = () => {
-    // Get all the input elements.
-    let input_elements = document.getElementById('variant_container').getElementsByTagName('input');
+    console.log("create table has been run");
+
+    // Get all the input elements. (not the table inputs)
+    let variant_container_input_elements = document.getElementById('variant_container').getElementsByTagName('input');
+
 
     // initialize variant array
-    let variant = []
+    let variants = []
     let variant_name;
     let variant_names = [];
     let variant_name_id;
@@ -456,23 +351,31 @@ let createTable = () => {
     let variant_table_rows = ""
     // Below iterates through every input value and stores the value in the variant array
     // I do not know how this works, but it just works. Something is confusing me here with variant_name
-    Object.values(input_elements).map((element, index) => {
+    Object.values(variant_container_input_elements).map((element, index) => {
+        // an element is either:
+        // input#variant_name_1
+        // or
+        // input#variant_name_1_value_1
+
+        // If the user has not entered an option name, skip it. 
         if (variant_name === "") {
             // go to the next element
             return;
         } else {
+            // If it is an option name, and not an option's value
             if (!element.id.includes("value")) {
                 variant_name = element.value
                 if (variant_name) {
                     variant_name_id = Number(element.id.split('_').at(-1))
-                    variant.push({ "name": variant_name, "values": [] })
+                    variants.push({ "name": variant_name, "values": [] })
                     variant_names.push(variant_name)
                     variant_table_option_names += "<th>" + variant_name + "</th>"
+                } else {
+                    console.log("variant_name is empty");
                 }
-
             } else {
-                // variant.variant_name.values.push(element.value)
-                console.log(variant[variant_name_id - 1].values.push(element.value))
+                // If it is an option's value, and not an option name
+                variants[variant_name_id - 1].values.push(element.value)
             }
 
         }
@@ -480,12 +383,177 @@ let createTable = () => {
 
     });
 
+    console.log("your variant array is");
+    console.log(variants);
+
+    // variants =  [
+    // {
+    //     "name": "color",
+    //     "values": [
+    //         "white",
+    //         "beige"
+    //     ]
+    // },
+    // {
+    //     "name": "size",
+    //     "values": [
+    //         "84",
+    //         "95"
+    //     ]
+    // }
+
     // Get all combinations of the variant values
-    const combinations = getCombinations(variant)
+    const combinations = getCombinations(variants)
+    const variant_combinations = getCombinations2(variants)
+    // variant_combinations = [
+    //     {
+    //         "color": "white",
+    //         "size": "84"
+    //     },
+    //     {
+    //         "color": "white",
+    //         "size": "95"
+    //     },
+    //     {
+    //         "color": "beige",
+    //         "size": "84"
+    //     },
+    //     {
+    //         "color": "beige",
+    //         "size": "95"
+    //     }
+    // ]
+
 
     // Generate table based on the combinations
-    if (combinations) {
+    console.log("your variant combinations are:");
+    console.log(variant_combinations);
+    console.log("your product_variants are");
+    // product_variants = JSON.parse(product_variants);
+    // if(product_variants.length > 0){
+    //     console.log('shit you do have product variants');
+
+    // }
+    // this is the product_variants variable that is passed from the backend
+    console.log(product_variants);
+    let product_variants_new = product_variants
+    console.log(typeof (product_variants));
+    // product_variants = [
+    //     {
+    //         "variant_sku": "RK24562RW8",
+    //         "variant_combination": {
+    //             "color": "white",
+    //             "size": "84"
+    //         },
+    //         "variant_price": null,
+    //         "variant_quantity": 102,
+    //         "variant_barcode": "712179795204",
+    //         "variant_featured": false
+    //     },
+    //     {
+    //         "variant_sku": "RK24562GW9",
+    //         "variant_combination": {
+    //             "color": "white",
+    //             "size": "95"
+    //         },
+    //         "variant_price": null,
+    //         "variant_quantity": 48,
+    //         "variant_barcode": "712179795228",
+    //         "variant_featured": true
+    //     },
+    //     {
+    //         "variant_sku": "RK24562RC8",
+    //         "variant_combination": {
+    //             "color": "beige",
+    //             "size": "84"
+    //         },
+    //         "variant_price": null,
+    //         "variant_quantity": 98,
+    //         "variant_barcode": "712179795211",
+    //         "variant_featured": true
+    //     },
+    //     {
+    //         "variant_sku": "RK24562GC9",
+    //         "variant_combination": {
+    //             "color": "beige",
+    //             "size": "95"
+    //         },
+    //         "variant_price": null,
+    //         "variant_quantity": 46,
+    //         "variant_barcode": "712179795235",
+    //         "variant_featured": true
+    //     }
+    // ]
+
+    if (product_variants && variant_combinations ) {
+        // If we added or deleted a variant from the variants.
+        if ((variant_combinations.length !== product_variants.length)) {
+            product_variants_new = []
+            variant_combinations.map((variant_combination, index) => {
+                product_variants_new.push(
+                    {
+                        "variant_sku": "",
+                        "variant_combination": variant_combination,
+                        "variant_price": null,
+                        "variant_quantity": null,
+                        "variant_barcode": "",
+                        "variant_featured": true
+                    }
+                )
+            })
+        }else{
+            product_variants_new = variant_combinations;
+        }
+
+        // Account for if the value is null
+        // make this dynamically generated (for loop the possible product variant form inputs)
+        product_variants_new.map((product_variant, index) => {
+            // product_variant: {
+            //     "variant_sku": "RK24562RW8",
+            //     "variant_combination": {
+            //         "color": "white",
+            //         "size": "84"
+            //     },
+            //     "variant_price": null,
+            //     "variant_quantity": 102,
+            //     "variant_barcode": "712179795204",
+            //     "variant_featured": false
+            // }
+            // }
+
+            // I do this because input id's start from one, not zero.
+            index++
+            variant_table_rows += '<tr>'
+            Object.values(product_variant.variant_combination).map((value) => {
+                variant_table_rows += `<td>${value}</td>`
+            })
+
+            // if(!isEqualObject(product_variant.variant_combination, combinations2[index])){
+            //     console.log("yes this exists");
+            // }
+
+            variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity}" ></td>`
+            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode}"></td>`
+
+            // product_variant.varaint_featured returns true or false, not on or off.
+            if (product_variant.variant_featured) {
+                variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
+            } else {
+
+                variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}"></td>`
+            }
+
+            variant_table_rows += `</tr>`
+
+
+        })
+    } else if(combinations ) {
+
         combinations.map((element, index) => {
+            index++
             // Split the element and create a row for the table
             // The element is like color:white-size:84-header:grommet
             let element_values = element.split("-")
@@ -501,13 +569,12 @@ let createTable = () => {
             variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
             variant_table_rows += `</tr>`
         })
-
     }
 
     // Let's combine the data and export it.
-    const export_data = {
-        "variants": variant,
-        "combinations": combinations,
+    export_data = {
+        "variants": variants,
+        "product_variants": product_variants_new,
         "variant_names": variant_names
     }
 
@@ -547,8 +614,140 @@ let createTable = () => {
 
     variant_json_input_element = document.getElementById("variant_json");
     variant_json_input_element.value = JSON.stringify(export_data)
-    console.log('the export data is:')
-    console.log(export_data)
+    console.log("your export data is");
+    console.log(export_data);
+
+
     return;
 
 }
+
+
+// ----------------------------------------------
+// ----------------------------------------------
+// ----------------------------------------------
+
+let variant_form_constructor = () => {
+
+    // product_variants variable comes from the variant_form.html component, and from marketing_tags.py to that.
+    if (isEmptyObject(product_variants)) {
+        console.log("you have no variants")
+    } else {
+        product_variants = JSON.parse(product_variants); // Parse the JSON string into an object
+        product_variant_options = JSON.parse(product_variant_options);
+
+        let counter = 1
+        for (const [attribute_name, attribute_values] of Object.entries(product_variant_options)) {
+            let variant_name_element = document.getElementById(`variant_name_${counter}`);
+            // Check if the element exists
+            if (variant_name_element) {
+                variant_name_element.value = attribute_name;
+                for (i = 1; i <= attribute_values.length; i++) {
+                    let variant_name_value_element = document.getElementById(`variant_name_${counter}_value_${i}`);
+                    if (variant_name_value_element) {
+
+                        variant_name_value_element.value = attribute_values[i - 1];
+                    }
+                    else {
+                        let add_another_value_element = document.getElementById(`variant_name_${counter}_add_another_value_${i}`);
+
+
+                        add_another_value(add_another_value_element, counter)
+                        let new_variant_name_value = document.getElementById(`variant_name_${counter}_value_${i}`);
+                        new_variant_name_value.value = attribute_values[i - 1];
+
+                    }
+                    // else{
+                    //     add_another_value(document.getElementById(`variant_name_${counter+2}_add_another_value_${i}`), counter)
+                    //     // in here adjust the add_another_value to input the variant div and automatically add to it
+                    // }
+                }
+            } else {
+
+
+                add_another_option_element = document.getElementById(`add_another_name_${counter}`)
+
+                // variant_name_element = add_another_name(add_another_option_element).firstChild;
+                // variant_name_element = add_another_name(add_another_option_element).firstElementChild;
+                add_another_name(add_another_option_element)
+                variant_name_element = document.getElementById(`variant_name_${counter}`);
+
+                variant_name_element.value = attribute_name;
+                for (i = 1; i <= attribute_values.length; i++) {
+                    let variant_name_value_element = document.getElementById(`variant_name_${counter}_value_${i}`);
+                    if (variant_name_value_element) {
+
+                        variant_name_value_element.value = attribute_values[i - 1];
+                    }
+                    else {
+                        let add_another_value_element = document.getElementById(`variant_name_${counter}_add_another_value_${i}`);
+
+
+                        add_another_value(add_another_value_element, counter)
+                        let new_variant_name_value = document.getElementById(`variant_name_${counter}_value_${i}`);
+                        new_variant_name_value.value = attribute_values[i - 1];
+
+                    }
+                }
+
+                // console.error(`Element with id variant_name_${counter} not found.`);
+            }
+
+            counter++;
+        }
+    }
+    document.getElementById("create_table_button").style.display = "none";
+    createTable();
+
+}
+
+
+
+let hasVariantsCheckbox = document.getElementById('id_has_variants');
+let variant_component = document.getElementById('variant_component');
+let product_files_form = document.getElementById('product_files_form');
+
+if (hasVariantsCheckbox.checked) {
+    variant_component.style.display = 'block';
+    product_files_form.style.display = 'none';
+    variant_form_constructor();
+}
+let toggleVariantForm = () => {
+    if (hasVariantsCheckbox.checked) {
+        variant_component.style.display = 'block';
+        product_files_form.style.display = 'none';
+    } else {
+        variant_component.style.display = 'none';
+        product_files_form.style.display = 'block';
+    }
+}
+
+// let input_elements = document.getElementById('variant_container').getElementsByTagName('input');
+
+// input_elements.addEventListener('change',createTable)
+
+let table_input_elements = document.getElementById('variant_table').getElementsByTagName('input')
+
+const updateExportData = ()=>{
+    if(export_data === undefined){
+        export_data = {
+            "variants": [],
+            "product_variants": [],
+            "variant_names": []
+        }
+    }
+    table_input_elements.map((element,index)=>{
+        export_data.product_variants[index][element.name] = element.value
+    })
+}
+
+// Array.from(table_input_elements).forEach(function(element) {
+//     console.log(element);
+
+//     element.addEventListener('change', createTable);
+//   });
+hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
+
+
+
+

@@ -3,12 +3,12 @@
 }
 
 
-.variant_component .variant_container {
+ .variant_container {
     display: flex;
     gap: 20px;
 }
 
-.variant_component .variantCard {
+ .variantCard {
     background: lightgray;
     padding: 10px;
     border-radius: 10px;
@@ -16,68 +16,73 @@
     margin: 5px 0;
 }
 
-.variant_component .variantCard input {
+ .variantCard input {
     margin: 2px 0;
 }
 
-.variant_component .variantCard .optionValues {
+ .variantCard .optionValues {
     display: flex;
     flex-direction: column;
 }
 
-.variant_component .alert {
+ .alert {
     color: red;
 }
 
-.variant_component .add_another_value:hover,
-.variant_component .add_another_option:hover {
+ .add_another_value:hover,
+ .add_another_option:hover {
     cursor: pointer;
 }
 
-.variant_component table {
+ table {
     display: none;
 }
 
-.variant_component table,
-.variant_component th,
-.variant_component td {
+ table,
+ th,
+ td {
     border: 1px solid black;
 
 }
 
-.variant_component table th,
-.variant_component table td {
+ table th,
+ table td {
     padding: 5px;
 }
 
-.variant_component .displayVariantJSON {
+ .displayVariantJSON {
     display: none;
 }
 
-.variant_component button:hover {
+ button:hover {
     cursor: pointer;
 }
 
-.variant_component .add_another_option {
+ .add_another_option {
     height: max-content;
     width: max-content;
 }
 
-.variant_component .delete_option_name{
+ .delete_option_name{
     float:right;
     cursor:pointer;
 }
 
-.variant_component .delete_option_value{
+ .delete_option_value{
     float:right;
     cursor:pointer;
+    color: black;
 }
 
-.variant_component #create_table_button{
+ #create_table_button{
     padding:3px;
     background-color: lightcyan;
     border:1px solid black;
     border-radius:5px;
     cursor:pointer;
     max-width: max-content;
+}
+
+input, td, th {
+    text-transform:capitalize;
 }

@@ -9,7 +9,7 @@
     <meta name="description" content="Nejum is providing Digital Transformation and Industrial Automation services" />
     <meta name="keywords" content="Manufacturing, ERP, Digital Transformation" />
     <title>Nejum | The Holistic Guide to Industry</title>
-  
+
     <link rel="stylesheet" href="{% static 'erp/css/base.css' %}" />
     <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
     {% comment %} <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" /> {% endcomment %}
@@ -17,7 +17,8 @@
     {% comment %} <script src="{% static 'erp/base.js' %}"></script> {% endcomment %}
     {% comment %}below is htmx{% endcomment %}
     <script src="{% static 'erp/htmx.min.js' %}" defer></script>
-    {% block css %}{% endblock %}
+    {% block css %}
+    {% endblock %}
   </head>
   <body>
     {% with member=user.member %}
@@ -109,7 +110,7 @@
           <li class="nav-item">
             <a href="{% url 'marketing:index' %}" class="nav-link">
               {% comment %} <i class="fa fa-cogs fa-2x" aria-hidden="true"></i> {% endcomment %}
-              <i class="fa fa-solid fa-bullseye fa-2x " aria-hidden="true"></i>
+              <i class="fa fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
               <span class="link-text">Marketing</span>
             </a>
           </li>
@@ -120,7 +121,6 @@
             </a>
           </li>
 
-          
           <div class="last2items">
             <li class="nav-item">
               <a href="{% url 'reports' %}" class="nav-link">
@@ -156,14 +156,22 @@
             {% endif %}
             <span>{% now 'F j, Y' %}</span>
             {% comment %}
-             <div class="countDown">
+            <div class="countDown">
               <div class="container">
                 <div id="countdown">
                   <ul>
-                    <li><span id="days"></span>days</li>
-                    <li><span id="hours"></span>Hours</li>
-                    <li><span id="minutes"></span>Minutes</li>
-                    <li><span id="seconds"></span>Seconds</li>
+                    <li>
+                      <span id="days"></span>days
+                    </li>
+                    <li>
+                      <span id="hours"></span>Hours
+                    </li>
+                    <li>
+                      <span id="minutes"></span>Minutes
+                    </li>
+                    <li>
+                      <span id="seconds"></span>Seconds
+                    </li>
                   </ul>
                   <p>... left for my project.</p>
                 </div>
@@ -174,7 +182,7 @@
                 </div>
               </div>
             </div>
-          </div> 
+          </div>
           {% endcomment %}
         </header>
         {% block content %}

@@ -23,9 +23,9 @@ def variant_form(
     # csrf_token,
     current_url,
 ):
-    print(current_url)
-    print("your product is: ")
-    print(product)
+    # print(current_url)
+    # print("your product is: ")
+    # print(product)
 
     if variants:
         # variants_json = json.dumps(list(variants.values()), cls=DecimalEncoder)
@@ -80,10 +80,10 @@ def variant_form(
             product_variant_options, cls=DecimalEncoder
         )  # convert python dict to json
 
-        print("-----------------------------------------------")
-        print("your variant options are:")
-        print(product_variant_options)
-        print("-----------------------------------------------")
+        # print("-----------------------------------------------")
+        # print("your variant options are:")
+        # print(product_variant_options)
+        # print("-----------------------------------------------")
         # print(f"Execution time: {time.time() - start_time} seconds")
         # -------------------------------------------------------------------------
         product_variants = json.dumps(
@@ -93,7 +93,10 @@ def variant_form(
         product_variants = json.dumps(
             [], cls=DecimalEncoder
         )  # convert python dict to json
-    print(product_variants)
+        product_variant_options = json.dumps(
+            {}, cls=DecimalEncoder
+        )
+    
     return render_to_string(
         "marketing/components/variant_form.html",
         {
@@ -107,3 +110,4 @@ def variant_form(
             # "variants": variants_json,  # Mark JSON as safe
         },
     )
+

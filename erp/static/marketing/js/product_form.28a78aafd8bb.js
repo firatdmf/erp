@@ -1,90 +1,16 @@
-console.log("welcome to the variant form my fellas");
+// This is the ultimate product form JS file for the ERP marketing module.
 
-
-// ---------------------------------------------------------------------------------------------
-// below two variables are passed from marketing_tags.py to variant_form.html and from there to here
-let product_variant_options = JSON.parse(product_variant_options_data);
-console.log(product_variant_options);
-
-// product_variant_options = {"color": ["beige", "white"], "size": ["95", "84"]}
-// ---------------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------------
-let product_variants = JSON.parse(product_variants_data);
-// let product_variants_new = []
-// product_variants = 
-// [
-//     {
-//         "variant_sku": "RK24562RW8",
-//         "variant_combination": {
-//             "color": "white",
-//             "size": "84"
-//         },
-//         "variant_price": null,
-//         "variant_quantity": 102,
-//         "variant_barcode": "712179795204",
-//         "variant_featured": false
-//     },
-//     {
-//         "variant_sku": "RK24562GW9",
-//         "variant_combination": {
-//             "color": "white",
-//             "size": "95"
-//         },
-//         "variant_price": null,
-//         "variant_quantity": 48,
-//         "variant_barcode": "712179795228",
-//         "variant_featured": true
-//     },
-//     {
-//         "variant_sku": "RK24562RC8",
-//         "variant_combination": {
-//             "color": "beige",
-//             "size": "84"
-//         },
-//         "variant_price": null,
-//         "variant_quantity": 98,
-//         "variant_barcode": "712179795211",
-//         "variant_featured": true
-//     },
-//     {
-//         "variant_sku": "RK24562GC9",
-//         "variant_combination": {
-//             "color": "beige",
-//             "size": "95"
-//         },
-//         "variant_price": null,
-//         "variant_quantity": 46,
-//         "variant_barcode": "712179795235",
-//         "variant_featured": true
-//     }
-// ]
-// ---------------------------------------------------------------------------------------------
+// There shouldn't be any identical variant names.
+// There should not be identical values in the variant names
 
 // returns false if the object is empty
-let isEmptyObject = (obj) => {
+const isEmptyObject = (obj) => {
     return Object.keys(obj).length === 0 && obj.constructor === Object;
 }
 
-// if(isEmptyObject(product_variants)){
-//     console.log("you have no variants");
-// }else{
-//     console.log("you do have variants bro");
 
-// }
-
-let variants_exist = false
-
-if (product_variants.length <= 0) {
-    console.log("you have no variants");
-} else {
-    console.log("you do have variants bro");
-    variants_exist = true
-
-}
-
-// ---------------------------------------------------------------------------------------------
-const getCombinations = (variant_sets) => {
-    // variant_sets:
+const getCombinations = (variants) => {
+    // variants:
     // [
     //     {
     //         "name": "color",
@@ -102,9 +28,7 @@ const getCombinations = (variant_sets) => {
     //     }
     // ]
 
-    if (!variant_sets || variant_sets.length === 0) {
-        console.error("variant_sets is empty");
-
+    if (!variants || variants.length === 0) {
         return;
     }
 
@@ -112,14 +36,16 @@ const getCombinations = (variant_sets) => {
 
     const generateCombinations = (index, variant_combination) => {
         // variant_combination:
+        // console.log("your variant_combination is");
+        // console.log(variant_combination);
 
-        if (index === variant_sets.length) {
+        if (index === variants.length) {
             // Push a copy of the current combination to avoid reference issues
             combinations.push({ ...variant_combination });
             return;
         }
 
-        const currentOption = variant_sets[index];
+        const currentOption = variants[index];
         for (const value of currentOption.values) {
             // value = "white" or "84"
             // Create a new combination for each recursive call
@@ -133,25 +59,9 @@ const getCombinations = (variant_sets) => {
     generateCombinations(0, {});
 
     return combinations;
-    // combinations = [
-    //     {
-    //         "color": "white",
-    //         "size": "84"
-    //     },
-    //     {
-    //         "color": "white",
-    //         "size": "95"
-    //     },
-    //     {
-    //         "color": "beige",
-    //         "size": "84"
-    //     },
-    //     {
-    //         "color": "beige",
-    //         "size": "95"
-    //     }
 }
-// ---------------------------------------------------------------------------------------------
+
+
 
 
 //   ----------------------------------------------
@@ -353,8 +263,9 @@ let add_another_value = (el, next_option_name_id) => {
     document.getElementById("create_table_button").style.display = "block";
 }
 
-
-
+//   ----------------------------------------------
+//   ----------------------------------------------
+//   ----------------------------------------------
 
 
 
@@ -362,14 +273,13 @@ let add_another_value = (el, next_option_name_id) => {
 // ----------------------------------------
 // ----------------------------------------
 // ----------------------------------------
-const create_table_button = document.getElementById("create_table_button");
+
 let createTable = () => {
+    console.log("create table has been run");
 
+    // Get all the input elements. (not the table inputs)
+    let variant_container_input_elements = document.getElementById('variant_container').getElementsByTagName('input');
 
-    // Get all the input elements. (not the table inputs, just the option inputs (variant names and their values))
-    const variant_container_input_elements = document.getElementById('variant_container').getElementsByTagName('input');
-    
-    
 
     // initialize variant array
     let variants = []
@@ -385,20 +295,6 @@ let createTable = () => {
         // input#variant_name_1
         // or
         // input#variant_name_1_value_1
-        
-        // If there are empty input fields in variant_container, then prevent createing table.
-        if(element.value.trim() === ""){
-            let error_message_element = document.createElement("p")
-            console.error("you have empty input fields");
-            error_message_element.innerHTML = "Please fill all the input fields"
-            error_message_element.setAttribute('class', 'alert')
-            create_table_button.after(error_message_element)
-            // remove error message after 5 seconds
-            setTimeout(function() {
-                error_message_element.innerHTML = ""
-              }, 5000)
-            return;
-        }
 
         // If the user has not entered an option name, skip it. 
         if (variant_name === "") {
@@ -423,11 +319,11 @@ let createTable = () => {
 
         }
 
+
     });
-    console.log("your variants are");
+
+    console.log("your variant array is");
     console.log(variants);
-    
-    
 
     // variants =  [
     // {
@@ -469,20 +365,22 @@ let createTable = () => {
 
 
     // Generate table based on the combinations
-    // if (product_variants) {
-    //     console.log('you have product variants');
-    //     console.log("your product_variants are");
-    //     // product_variants = JSON.parse(product_variants);
-    //     // if(product_variants.length > 0){
-    //     //     console.log('shit you do have product variants');
+    console.log("your variant combinations are:");
+    console.log(variant_combinations);
+    if (product_variants) {
+        console.log('you have product variants');
+        console.log("your product_variants are");
+        // product_variants = JSON.parse(product_variants);
+        // if(product_variants.length > 0){
+        //     console.log('shit you do have product variants');
 
-    //     // }
-    //     // this is the product_variants variable that is passed from the backend
-    //     console.log(product_variants);
-    //     let product_variants_new = product_variants
-    //     console.log(typeof (product_variants));
+        // }
+        // this is the product_variants variable that is passed from the backend
+        console.log(product_variants);
+        let product_variants_new = product_variants
+        console.log(typeof (product_variants));
 
-    // }
+    }
 
     // product_variants = [
     //     {
@@ -492,7 +390,7 @@ let createTable = () => {
     //             "size": "84"
     //         },
     //         "variant_price": null,
-    //         "variant_": 102,
+    //         "variant_quantity": 102,
     //         "variant_barcode": "712179795204",
     //         "variant_featured": false
     //     },
@@ -503,7 +401,7 @@ let createTable = () => {
     //             "size": "95"
     //         },
     //         "variant_price": null,
-    //         "variant_": 48,
+    //         "variant_quantity": 48,
     //         "variant_barcode": "712179795228",
     //         "variant_featured": true
     //     },
@@ -514,7 +412,7 @@ let createTable = () => {
     //             "size": "84"
     //         },
     //         "variant_price": null,
-    //         "variant_": 98,
+    //         "variant_quantity": 98,
     //         "variant_barcode": "712179795211",
     //         "variant_featured": true
     //     },
@@ -525,37 +423,35 @@ let createTable = () => {
     //             "size": "95"
     //         },
     //         "variant_price": null,
-    //         "variant_": 46,
+    //         "variant_quantity": 46,
     //         "variant_barcode": "712179795235",
     //         "variant_featured": true
     //     }
     // ]
 
-    // If the product already has variants saved then show them in the table
-    if ((variants_exist && product_variants.length > 0) && (variant_combinations.length > 0)) {
-        // If we altered the existing variants (add or delete)
-        // product_variants is passed in existing variants, and the variant_combinations is generated within the form
-        if ((product_variants.length !== variant_combinations.length)) {
-            product_variants = []
+    if (product_variants && variant_combinations) {
+        // If we added or deleted a variant from the variants.
+        if ((variant_combinations.length !== product_variants.length)) {
+            product_variants_new = []
             variant_combinations.map((variant_combination, index) => {
-                product_variants.push(
+                product_variants_new.push(
                     {
                         "variant_sku": "",
                         "variant_combination": variant_combination,
                         "variant_price": null,
-                        "variant_": null,
+                        "variant_quantity": null,
                         "variant_barcode": "",
                         "variant_featured": true
                     }
                 )
             })
+        } else {
+            product_variants_new = variant_combinations;
         }
 
         // Account for if the value is null
         // make this dynamically generated (for loop the possible product variant form inputs)
-
-        // Comes from database
-        product_variants.map((product_variant, index) => {
+        product_variants_new.map((product_variant, index) => {
             // product_variant: {
             //     "variant_sku": "RK24562RW8",
             //     "variant_combination": {
@@ -563,7 +459,7 @@ let createTable = () => {
             //         "size": "84"
             //     },
             //     "variant_price": null,
-            //     "variant_": 102,
+            //     "variant_quantity": 102,
             //     "variant_barcode": "712179795204",
             //     "variant_featured": false
             // }
@@ -571,33 +467,20 @@ let createTable = () => {
 
             // I do this because input id's start from one, not zero.
             index++
-
             variant_table_rows += '<tr>'
             Object.values(product_variant.variant_combination).map((value) => {
                 variant_table_rows += `<td>${value}</td>`
             })
 
-
-            // // Object.values(product_variant.variant_combination).map((value) => {
-            // Object.values(variant_combinations).map((value) => {
-            //     console.log(value);
-
-            //     // variant_table_rows += `<td>${value}</td>`
-            // })
-
-
-
-
             // if(!isEqualObject(product_variant.variant_combination, combinations2[index])){
             //     console.log("yes this exists");
             // }
 
-            // Either we set the value to the existing value or we set it to an empty string
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
-            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}"></td>`
-            variant_table_rows += `<td><input type="number" name="variant__${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
-            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}"></td>`
-            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode || ''}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity}" ></td>`
+            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode}"></td>`
 
             // product_variant.varaint_featured returns true or false, not on or off.
             if (product_variant.variant_featured) {
@@ -611,22 +494,20 @@ let createTable = () => {
 
 
         })
-    }
-    // variant_combinations is generated from the variant names and their valus in the variant container
-    else if (variant_combinations.length > 0) {
+    } else if (combinations) {
 
-        variant_combinations.map((element, index) => {
+        combinations.map((element, index) => {
             index++
             // Split the element and create a row for the table
-            // The element is like [{"color":"white","size":"84"},{"color":"beige","size":"95"}]
-            let element_values = Object.values(element)
+            // The element is like color:white-size:84-header:grommet
+            let element_values = element.split("-")
             variant_table_rows += `<tr>`
-            element_values.map((value) => { variant_table_rows += `<td>${value}</td>` })
+            element_values.map((value) => { variant_table_rows += `<td>${value.split(":")[1]}</td>` })
             // Define name for below and state that the inputs are from the table.
             // Each input will refer to its combination index.
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
             variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}"></td>`
-            variant_table_rows += `<td><input type="number" name="variant__${index}" id="variant_quantity_${index}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}"></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
             variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
@@ -637,8 +518,8 @@ let createTable = () => {
     // Let's combine the data and export it.
     export_data = {
         "variants": variants,
-        "product_variants": product_variants,
-        // "variant_names": variant_names
+        "product_variants": product_variants_new,
+        "variant_names": variant_names
     }
 
 
@@ -646,6 +527,7 @@ let createTable = () => {
     variant_table_element = document.getElementById("variant_table")
     variant_table_element.style.display = "inline-block";
     variant_table_element.innerHTML = `
+
    <tr>
     ${variant_table_option_names}
     <th>
@@ -668,13 +550,13 @@ let createTable = () => {
     </th>
   </tr>
   ${variant_table_rows}
-  `;
+  `
     //   This shall go on the bottom of table
     //   <button onClick=submit_table(${export_data})>Submit Table</button>
     // I am not gonna put it there and handle the inputs in django because I am not sure how to handle the file inputs in js object
 
 
-    let variant_json_input_element = document.getElementById("variant_json");
+    variant_json_input_element = document.getElementById("variant_json");
     variant_json_input_element.value = JSON.stringify(export_data)
     console.log("your export data is");
     console.log(export_data);
@@ -685,20 +567,18 @@ let createTable = () => {
 }
 
 
-
 // ----------------------------------------------
 // ----------------------------------------------
 // ----------------------------------------------
-// If the variant already exists, run below to prepoulate its table with existing variant data
 
 let variant_form_constructor = () => {
 
     // product_variants variable comes from the variant_form.html component, and from marketing_tags.py to that.
-    if (product_variants.length <= 0) {
+    if (isEmptyObject(product_variants)) {
         console.log("you have no variants")
     } else {
-        // product_variants = JSON.parse(product_variants); // Parse the JSON string into an object
-        // product_variant_options = JSON.parse(product_variant_options);
+        product_variants = JSON.parse(product_variants); // Parse the JSON string into an object
+        product_variant_options = JSON.parse(product_variant_options);
 
         let counter = 1
         for (const [attribute_name, attribute_values] of Object.entries(product_variant_options)) {
@@ -767,12 +647,6 @@ let variant_form_constructor = () => {
 
 
 
-
-// 
-// 
-// 
-
-// This is input field from django marketing.models product form
 let hasVariantsCheckbox = document.getElementById('id_has_variants');
 let variant_component = document.getElementById('variant_component');
 let product_files_form = document.getElementById('product_files_form');
@@ -792,14 +666,33 @@ let toggleVariantForm = () => {
     }
 }
 
+// let input_elements = document.getElementById('variant_container').getElementsByTagName('input');
 
+// input_elements.addEventListener('change',createTable)
+
+let table_input_elements = document.getElementById('variant_table').getElementsByTagName('input')
+
+const updateExportData = () => {
+    if (export_data === undefined) {
+        export_data = {
+            "variants": [],
+            "product_variants": [],
+            "variant_names": []
+        }
+    }
+    table_input_elements.map((element, index) => {
+        export_data.product_variants[index][element.name] = element.value
+    })
+}
+
+// Array.from(table_input_elements).forEach(function(element) {
+//     console.log(element);
+
+//     element.addEventListener('change', createTable);
+//   });
 hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
 
 
-const form = document.getElementById('product_form');
-form.addEventListener('submit',(event)=>{
-    event.preventDefault();
-    console.log("Form submission prevented. Handling manually...");
 
-})
+
 

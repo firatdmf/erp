@@ -3,12 +3,12 @@
 {% load marketing_tags %}
 
 {% block css %}
-  <link rel="stylesheet" href="{% static 'marketing/css/product_create.css' %}" />
+  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
 {% endblock %}
 {% block content %}
   <div class="ProductUpdatePage">
     <h1>Edit Product Form</h1>
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" id="product_form">
       {% csrf_token %}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 
@@ -26,18 +26,19 @@
       {% variant_form current_url=request.path product=product variants=variants %}
       <button type="submit" id="form_submit_button">Submit</button>
     </form>
-    {% if variants %}
+    {% comment %} {% if variants %}
       <h1>Your variants are listed below</h1>
       {% for variant in variants %}
         <ul>
           <li>{{ variant.variant_sku }}</li>
         </ul>
       {% endfor %}
-    {% endif %}
+    {% endif %} {% endcomment %}
   </div>
   {% block js %}
     <script>
       {% comment %} window.variantData = JSON.parse('{{variants[0].title}}') {% endcomment %}
+      {% comment %} This is how you send data to js file {% endcomment %}
       window.variantData = "hello windows"
       {% comment %} console.log({{variants[0].title|safe}}) {% endcomment %}
 

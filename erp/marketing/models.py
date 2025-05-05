@@ -174,6 +174,7 @@ class Product(models.Model):
     )
     # Set price of the product for online sale. (If the product has a variant this should be null maybe)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # you may remove belows later
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     # If true, the product will be displayed on marketing channels (website etc)

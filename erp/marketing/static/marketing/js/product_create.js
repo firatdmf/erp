@@ -428,16 +428,21 @@ let createTable = () => {
     // Generate table based on the combinations
     console.log("your variant combinations are:");
     console.log(variant_combinations);
-    console.log("your product_variants are");
-    // product_variants = JSON.parse(product_variants);
-    // if(product_variants.length > 0){
-    //     console.log('shit you do have product variants');
+    if (product_variants) {
+        console.log('you have product variants');
+        console.log("your product_variants are");
+        // product_variants = JSON.parse(product_variants);
+        // if(product_variants.length > 0){
+        //     console.log('shit you do have product variants');
 
-    // }
-    // this is the product_variants variable that is passed from the backend
-    console.log(product_variants);
-    let product_variants_new = product_variants
-    console.log(typeof (product_variants));
+        // }
+        // this is the product_variants variable that is passed from the backend
+        console.log(product_variants);
+        let product_variants_new = product_variants
+        console.log(typeof (product_variants));
+
+    }
+
     // product_variants = [
     //     {
     //         "variant_sku": "RK24562RW8",
@@ -485,7 +490,7 @@ let createTable = () => {
     //     }
     // ]
 
-    if (product_variants && variant_combinations ) {
+    if (product_variants && variant_combinations) {
         // If we added or deleted a variant from the variants.
         if ((variant_combinations.length !== product_variants.length)) {
             product_variants_new = []
@@ -501,7 +506,7 @@ let createTable = () => {
                     }
                 )
             })
-        }else{
+        } else {
             product_variants_new = variant_combinations;
         }
 
@@ -550,7 +555,7 @@ let createTable = () => {
 
 
         })
-    } else if(combinations ) {
+    } else if (combinations) {
 
         combinations.map((element, index) => {
             index++
@@ -728,15 +733,15 @@ let toggleVariantForm = () => {
 
 let table_input_elements = document.getElementById('variant_table').getElementsByTagName('input')
 
-const updateExportData = ()=>{
-    if(export_data === undefined){
+const updateExportData = () => {
+    if (export_data === undefined) {
         export_data = {
             "variants": [],
             "product_variants": [],
             "variant_names": []
         }
     }
-    table_input_elements.map((element,index)=>{
+    table_input_elements.map((element, index) => {
         export_data.product_variants[index][element.name] = element.value
     })
 }

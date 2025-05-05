@@ -7,7 +7,6 @@ import time
 
 register = template.Library()
 
-
 # Custom JSON encoder to handle Decimal objects
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -97,6 +96,9 @@ def variant_form(
             {}, cls=DecimalEncoder
         )
     
+    print("product variants:")
+    print(product_variants)
+    
     return render_to_string(
         "marketing/components/variant_form.html",
         {
@@ -105,8 +107,8 @@ def variant_form(
             # "csrf_token": csrf_token,
             # "current_url": current_url,
             "message": "Im the marketing variant form",
-            "product_variants": mark_safe(product_variants),  # Mark JSON as safe
-            "product_variant_options": mark_safe(product_variant_options),
+            "product_variants_data": mark_safe(product_variants),  # Mark JSON as safe
+            "product_variant_options_data": mark_safe(product_variant_options),
             # "variants": variants_json,  # Mark JSON as safe
         },
     )

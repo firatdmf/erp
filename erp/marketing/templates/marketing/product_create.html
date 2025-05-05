@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load marketing_tags %}
 
 {% block css %}
-  <link rel="stylesheet" href="{% static 'marketing/css/product_create.css' %}" />
+  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
 {% endblock %}
 {% block content %}
   {% comment %} <p>
@@ -66,12 +67,12 @@
       
 
       
-
+      {% variant_form current_url=request.path product=product variants=variants %}
       <button type="submit">Submit</button>
     </form>
   </div>
   {% block js %}
-    <script src="{% static 'marketing/js/product_create.js' %}"></script>
+    {% comment %} <script src="{% static 'marketing/js/product_form.js' %}"></script> {% endcomment %}
     <script>
       document.getElementById('add-productfile-form').addEventListener('click', function() {
         var formIdx = document.querySelectorAll('.productfile-form').length;

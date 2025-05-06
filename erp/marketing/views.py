@@ -7,11 +7,8 @@ from django.contrib.auth.decorators import login_required
 from .models import *
 from .forms import *
 import json
-import ast
 
 # Create your views here.
-
-
 # def handle_uploaded_file(f):
 #     with open("some/file/name.txt", "wb+") as destination:
 #         # Looping over UploadedFile.chunks() instead of using read() ensures that large files don’t overwhelm your system’s memory.
@@ -232,7 +229,6 @@ class ProductEdit(generic.edit.UpdateView):
         # check to see if the product has variants
         # print("heck to see if the product has variants")
         if self.object.has_variants:
-            print("yes")
             # This is how you pass the variants to the template, and the JS
             context["variants"] = self.object.variants.all()
         return context

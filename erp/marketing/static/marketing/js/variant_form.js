@@ -65,19 +65,12 @@ let isEmptyObject = (obj) => {
     return Object.keys(obj).length === 0 && obj.constructor === Object;
 }
 
-// if(isEmptyObject(product_variants)){
-//     console.log("you have no variants");
-// }else{
-//     console.log("you do have variants bro");
-
-// }
 
 let variants_exist = false
 
 if (product_variants.length <= 0) {
     console.log("you have no variants");
 } else {
-    console.log("you do have variants bro");
     variants_exist = true
 
 }
@@ -368,8 +361,8 @@ let createTable = () => {
 
     // Get all the input elements. (not the table inputs, just the option inputs (variant names and their values))
     const variant_container_input_elements = document.getElementById('variant_container').getElementsByTagName('input');
-    
-    
+
+
 
     // initialize variant array
     let variants = []
@@ -385,18 +378,18 @@ let createTable = () => {
         // input#variant_name_1
         // or
         // input#variant_name_1_value_1
-        
+
         // If there are empty input fields in variant_container, then prevent createing table.
-        if(element.value.trim() === ""){
+        if (element.value.trim() === "") {
             let error_message_element = document.createElement("p")
             console.error("you have empty input fields");
             error_message_element.innerHTML = "Please fill all the input fields"
             error_message_element.setAttribute('class', 'alert')
             create_table_button.after(error_message_element)
             // remove error message after 5 seconds
-            setTimeout(function() {
+            setTimeout(function () {
                 error_message_element.innerHTML = ""
-              }, 5000)
+            }, 5000)
             return;
         }
 
@@ -426,8 +419,8 @@ let createTable = () => {
     });
     console.log("your variants are");
     console.log(variants);
-    
-    
+
+
 
     // variants =  [
     // {
@@ -543,7 +536,7 @@ let createTable = () => {
                         "variant_sku": "",
                         "variant_combination": variant_combination,
                         "variant_price": null,
-                        "variant_": null,
+                        "variant_quantity": null,
                         "variant_barcode": "",
                         "variant_featured": true
                     }
@@ -595,7 +588,7 @@ let createTable = () => {
             // Either we set the value to the existing value or we set it to an empty string
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
             variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}"></td>`
-            variant_table_rows += `<td><input type="number" name="variant__${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}"></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode || ''}"></td>`
 
@@ -626,7 +619,7 @@ let createTable = () => {
             // Each input will refer to its combination index.
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
             variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}"></td>`
-            variant_table_rows += `<td><input type="number" name="variant__${index}" id="variant_quantity_${index}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}"></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
             variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
@@ -795,11 +788,61 @@ let toggleVariantForm = () => {
 
 hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
 
+let manual_post_data = {}
 
 const form = document.getElementById('product_form');
-form.addEventListener('submit',(event)=>{
+
+form.addEventListener('submit', (event) => {
     event.preventDefault();
     console.log("Form submission prevented. Handling manually...");
+    const variant_table_input_elements = document.getElementById('variant_table').getElementsByTagName('input');
+
+    Object.values(variant_table_input_elements).map((element, index) => {
+        variant_row = element.id.split('_').at(-1)
+        element_name = element.name.replace(/^([^_]+)_([^_]+)_.*$/, '$1_$2');
+        console.log(`Element name: ${element_name}`);
+
+        if (element.name.includes("featured")) {
+            if (element.checked) {
+                export_data["product_variants"][variant_row - 1][element_name] = true
+            } else {
+                export_data["product_variants"][variant_row - 1][element_name] = false
+            }
+        } else if (!element_name.includes("variant_file")) {
+            console.log(element.value);
+            if (element.value !== "") {
+                if (element_name.includes("variant_barcode") || element_name.includes("variant_quantity") || element_name.includes("variant_price")) {
+                    // If the element name is variant_barcode, variant_quantity or variant_price, then convert it to a number
+                    export_data["product_variants"][variant_row - 1][element_name] = Number(element.value)
+                } else {
+                    export_data["product_variants"][variant_row - 1][element_name] = element.value
+                }
+
+            }
+
+        } else {
+            return;
+        }
+
+        const formData = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+        }).then((response) => response.json())
+            .then((data) => {
+
+                console.log("Form submitted successfully:", data);
+            })
+            .catch((error) => {
+                console.error("Error submitting form:", error);
+            });
+
+    })
+    console.log("your export data is");
+    console.log(export_data);
+
+
+
 
 })
 

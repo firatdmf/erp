@@ -96,8 +96,8 @@ def variant_form(
             {}, cls=DecimalEncoder
         )
     
-    print("product variants:")
-    print(product_variants)
+    # print("product variants:")
+    # print(product_variants)
     
     return render_to_string(
         "marketing/components/variant_form.html",

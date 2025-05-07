@@ -235,20 +235,60 @@ class ProductEdit(generic.edit.UpdateView):
 
     def form_valid(self, form):
         print("POST data received:")
-        variant_data = {key: value for key, value in self.request.POST.items() if "variant" in key}
-        if(variant_data):
-            latest_variant_key, latest_variant_value = list(variant_data.items())[-1]
-            number_of_variants = latest_variant_key.split("_")[-1]
-            print(f"Number of variants: {number_of_variants}")
-            print(f"Latest variant key: {latest_variant_key}, Latest variant value: {latest_variant_value}")
-        # for key, value in self.request.POST.items():
-        #     if("variant" in key):
-        #         print(f"{key}: {value}")
+        print("here comes your values of post")
+        # for key,value in self.request.POST.items():
+        #     print(f"{key}: {value}")
+        # return
+        export_data = self.request.POST.get("export_data")
+        if export_data:
+            export_data = json.loads(export_data)
+            product_variants = export_data["product_variants"]
+            print("product variants are:")
+            print(product_variants)
+            for index, variant in enumerate(product_variants):
+                index = index + 1
+                product_variant_object = ProductVariant.objects.get(
+                    variant_sku=variant["variant_sku"]
+                )
+                for key, value in variant.items():
+                    # if key != "variant_sku":
+                    setattr(product_variant_object, key, value)
 
+                product_files = self.request.FILES.getlist(f"variant_file_{index}")
+                for file_index, file in enumerate(product_files):
+                    ProductFile.objects.create(
+                        product=self.object,
+                        product_variant=product_variant_object,
+                        file=file,
+                        sequence=file_index,
+                    )
+                product_variant_object.save()
+                print(f"Updated variant: {product_variant_object.variant_sku}")
+
+        # return
+
+        # variant_data = {key: value for key, value in self.request.POST.items() if "variant" in key}
+        # if(variant_data):
+        #     latest_variant_key, latest_variant_value = list(variant_data.items())[-1]
+        #     number_of_variants = latest_variant_key.split("_")[-1]
+        #     print(f"Number of variants: {number_of_variants}")
+        #     print(f"Latest variant key: {latest_variant_key}, Latest variant value: {latest_variant_value}")
+        # # for key, value in self.request.POST.items():
+        # #     if("variant" in key):
+        # #         print(f"{key}: {value}")
 
         # Print all FILES data (if any files are uploaded)
         print("FILES data received:")
         for key, value in self.request.FILES.items():
+            # variant_file_1: pxfuel.jpg
+            product_variant_object = ProductVariant.object.get(
+                variant_sku=product_variants[key.split("_")[-1]]["varaint_sku"]
+            )
+            ProductFile.objects.create(
+                product=self.object,
+                product_variant=product_variant_object,
+                file=value,
+            )
             print(f"{key}: {value}")
 
         # product_variants = json.loads(self.request.POST["variant_json"])[

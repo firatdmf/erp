@@ -589,7 +589,7 @@ let createTable = () => {
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
             variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}"></td>`
             variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
-            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}"></td>`
+            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}" required></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode || ''}"></td>`
 
             // product_variant.varaint_featured returns true or false, not on or off.
@@ -620,7 +620,7 @@ let createTable = () => {
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
             variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}"></td>`
             variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
-            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}"></td>`
+            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" required></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
             variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
             variant_table_rows += `</tr>`
@@ -667,10 +667,11 @@ let createTable = () => {
     // I am not gonna put it there and handle the inputs in django because I am not sure how to handle the file inputs in js object
 
 
-    let variant_json_input_element = document.getElementById("variant_json");
-    variant_json_input_element.value = JSON.stringify(export_data)
-    console.log("your export data is");
-    console.log(export_data);
+    // This is how I got rid of variant json
+    // let variant_json_input_element = document.getElementById("variant_json");
+    // variant_json_input_element.value = JSON.stringify(export_data)
+    // console.log("your export data is");
+    // console.log(export_data);
 
 
     return;
@@ -789,60 +790,67 @@ let toggleVariantForm = () => {
 hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
 
 let manual_post_data = {}
-
 const form = document.getElementById('product_form');
 
-form.addEventListener('submit', (event) => {
-    event.preventDefault();
+form.addEventListener('submit', async (event) => {
+    event.preventDefault(); // Prevent default form submission
     console.log("Form submission prevented. Handling manually...");
-    const variant_table_input_elements = document.getElementById('variant_table').getElementsByTagName('input');
 
-    Object.values(variant_table_input_elements).map((element, index) => {
-        variant_row = element.id.split('_').at(-1)
-        element_name = element.name.replace(/^([^_]+)_([^_]+)_.*$/, '$1_$2');
+    const variant_table_input_elements = document.getElementById('variant_table').getElementsByTagName('input');
+    const export_data = { product_variants: [] };
+
+    // Iterate over input elements in the variant table
+    Array.from(variant_table_input_elements).forEach((element) => {
+        const variant_row = Number(element.id.split('_').at(-1)) - 1; // Get the row index
+        const element_name = element.name.replace(/^([^_]+)_([^_]+)_.*$/, '$1_$2'); // Extract the element name
         console.log(`Element name: ${element_name}`);
 
-        if (element.name.includes("featured")) {
-            if (element.checked) {
-                export_data["product_variants"][variant_row - 1][element_name] = true
-            } else {
-                export_data["product_variants"][variant_row - 1][element_name] = false
-            }
-        } else if (!element_name.includes("variant_file")) {
-            console.log(element.value);
-            if (element.value !== "") {
-                if (element_name.includes("variant_barcode") || element_name.includes("variant_quantity") || element_name.includes("variant_price")) {
-                    // If the element name is variant_barcode, variant_quantity or variant_price, then convert it to a number
-                    export_data["product_variants"][variant_row - 1][element_name] = Number(element.value)
-                } else {
-                    export_data["product_variants"][variant_row - 1][element_name] = element.value
-                }
-
-            }
-
-        } else {
-            return;
+        // Ensure the row exists in export_data
+        if (!export_data.product_variants[variant_row]) {
+            export_data.product_variants[variant_row] = {};
         }
 
-        const formData = new FormData(form);
-        fetch(form.action, {
-            method: 'POST',
-            body: formData,
-        }).then((response) => response.json())
-            .then((data) => {
+        // Handle "featured" checkboxes
+        if (element.name.includes("featured")) {
+            export_data.product_variants[variant_row][element_name] = element.checked;
+        }
+        // Handle other input fields (excluding file inputs)
+        else if (!element_name.includes("variant_file")) {
+            // if (element.value.trim() !== "") {
+            if (["variant_barcode", "variant_quantity", "variant_price"].some((key) => element_name.includes(key))) {
+                // Convert numeric fields to numbers
+                export_data.product_variants[variant_row][element_name] = Number(element.value);
+            } else {
+                export_data.product_variants[variant_row][element_name] = element.value;
+            }
+            // }
+        }
+    });
 
-                console.log("Form submitted successfully:", data);
-            })
-            .catch((error) => {
-                console.error("Error submitting form:", error);
-            });
-
-    })
-    console.log("your export data is");
+    console.log("Export data prepared:");
     console.log(export_data);
 
+    // Prepare the form data for submission
+    const formData = new FormData(form);
 
+    // Add the export_data JSON to the form data
+    formData.append('export_data', JSON.stringify(export_data));
 
+    try {
+        // Submit the form data using fetch
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+        });
 
-})
-
+        if (response.ok) {
+            // const data = await response.json();
+            // console.log("Form submitted successfully:", data);
+            console.log("Form submitted successfully:");
+        } else {
+            console.error("Form submission failed:", response.statusText);
+        }
+    } catch (error) {
+        console.error("Error submitting form:", error);
+    }
+});

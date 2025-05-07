@@ -178,7 +178,7 @@ class ProductCreate(generic.edit.CreateView):
                         product=self.object,
                         product_variant=product_variant,
                         file=file,
-                        sequence=file_index,
+                        # sequence=file_index,
                     )
 
                 print("the table values are:")
@@ -260,7 +260,7 @@ class ProductEdit(generic.edit.UpdateView):
                         product=self.object,
                         product_variant=product_variant_object,
                         file=file,
-                        sequence=file_index,
+                        # sequence=file_index,
                     )
                 product_variant_object.save()
                 print(f"Updated variant: {product_variant_object.variant_sku}")
@@ -280,15 +280,15 @@ class ProductEdit(generic.edit.UpdateView):
         # Print all FILES data (if any files are uploaded)
         print("FILES data received:")
         for key, value in self.request.FILES.items():
-            # variant_file_1: pxfuel.jpg
-            product_variant_object = ProductVariant.object.get(
-                variant_sku=product_variants[key.split("_")[-1]]["varaint_sku"]
-            )
-            ProductFile.objects.create(
-                product=self.object,
-                product_variant=product_variant_object,
-                file=value,
-            )
+            # # variant_file_1: pxfuel.jpg
+            # product_variant_object = ProductVariant.objects.get(
+            #     variant_sku=product_variants[key.split("_")[-1]]["varaint_sku"]
+            # )
+            # ProductFile.objects.create(
+            #     product=self.object,
+            #     product_variant=product_variant_object,
+            #     file=value,
+            # )
             print(f"{key}: {value}")
 
         # product_variants = json.loads(self.request.POST["variant_json"])[

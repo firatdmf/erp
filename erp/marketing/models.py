@@ -39,7 +39,8 @@ def product_file_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/product_files/<product_sku>/<filename>
     # if(instance.product_variant):
     #     return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}/{instance.sequence}_{filename}"
-    return f"product_files/{instance.product.sku}/{instance.sequence}_{filename}"
+    # return f"product_files/{instance.product.sku}/{instance.sequence}_{filename}"
+    return f"product_files/{instance.product.sku}/{filename}"
 
 
 # def weight_unit_choices():
@@ -175,7 +176,7 @@ class Product(models.Model):
     # Set price of the product for online sale. (If the product has a variant this should be null maybe)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     # you may remove belows later
-    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     # If true, the product will be displayed on marketing channels (website etc)
     featured = models.BooleanField(default=True, blank=True, null=True)
@@ -291,20 +292,20 @@ class ProductFile(models.Model):
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name="files", null=True, blank=True
     )
-    # product_variant = models.ForeignKey(
-    #     ProductVariant,
-    #     on_delete=models.CASCADE,
-    #     related_name="files",
-    #     null=True,
-    #     blank=True,
-    # )
+    product_variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.CASCADE,
+        related_name="files",
+        null=True,
+        blank=True,
+    )
     file = models.FileField(
         # upload_to=product_directory_path,
         upload_to=product_file_directory_path,
         validators=[validate_file_size, validate_file_type],
     )
     # This is the sequence of the files
-    sequence = models.SmallIntegerField(unique=True)
+    # sequence = models.SmallIntegerField(unique=True)
 
 
 

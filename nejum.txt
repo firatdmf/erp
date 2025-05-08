@@ -10,3 +10,5 @@ cloud software,
 hardware,
 tech support,
 consulting,
+
+Nejum is the simplest open-source platform for engineers to automate industrial workflows with custom apps, robotics, and real-time data.

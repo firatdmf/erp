@@ -161,6 +161,9 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"), # an empty string means localhost
         "PORT": config("DB_PORT"),
+        'TEST': {
+            'NAME': 'nejum_test',  # test DB
+        },
     }
 }
 

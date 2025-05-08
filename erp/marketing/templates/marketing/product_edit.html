@@ -8,7 +8,7 @@
 {% block content %}
   <div class="ProductUpdatePage">
     <h1>Edit Product Form</h1>
-    <form method="post" enctype="multipart/form-data" id="product_form">
+    <form method="post" enctype="multipart/form-data" id="product_form" action="{% url 'marketing:product_edit' product.pk %}">
       {% csrf_token %}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 
@@ -26,6 +26,10 @@
       {% variant_form current_url=request.path product=product variants=variants %}
       <button type="submit" id="form_submit_button">Submit</button>
     </form>
+    <p>
+      {{form.errors}}
+    </p>
+
     {% comment %} {% if variants %}
       <h1>Your variants are listed below</h1>
       {% for variant in variants %}

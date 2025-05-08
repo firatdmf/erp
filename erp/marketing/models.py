@@ -18,6 +18,7 @@ from django.contrib.postgres.fields import ArrayField
 #         }
 #     }
 
+
 # This is not used anywhere, just for the reference.
 def product_variants_default():
     return {
@@ -132,12 +133,28 @@ class Product(models.Model):
     description = models.TextField(null=True, blank=True)
 
     # Stock Keeping Unit
-    # change to blank false later, if product has variants, no sku should be set to null.
     # This should be unique also
-    sku = models.CharField(max_length=12, null=False, blank=False, unique=True)
+    # If the product has a variant, this should be null
+    sku = models.CharField(
+        max_length=12, null=True, blank=True, unique=True, db_index=True
+    )
     # Barcode (ISBN, UPC, GTIN, etc.)
-    barcode = models.CharField(max_length=14, null=True, blank=True)
+    barcode = models.CharField(max_length=14, null=True, blank=True, db_index=True)
     # change to blank false later
+
+    def clean(self):
+        if self.has_variants:
+            if self.sku:
+                raise ValidationError("Products with variants should not have a SKU.")
+            if self.price:
+                raise ValidationError("Products with variants should not have a price.")
+            if self.quantity:
+                raise ValidationError(
+                    "Products with variants should not have a quantity."
+                )
+        else:
+            if not self.sku:
+                raise ValidationError("Simple products must have a SKU.")
 
     # Collections are defined by you.
     # If we delete the collection model,
@@ -157,7 +174,7 @@ class Product(models.Model):
     # This is predefined and standardized accross the marketing channels like facebook etc
     # category = models.CharField(null=True, blank=True)
     category = models.ForeignKey(
-        ProductCategory, on_delete=models.SET_NULL, blank=True, null=True
+        ProductCategory, on_delete=models.SET_NULL, blank=True, null=True, db_index=True
     )
 
     # This just like category but custom, you may set it to anything you like. A product can only have one type.
@@ -173,13 +190,16 @@ class Product(models.Model):
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    minimum_inventory_level = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     # Set price of the product for online sale. (If the product has a variant this should be null maybe)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     # you may remove belows later
     # cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     # If true, the product will be displayed on marketing channels (website etc)
-    featured = models.BooleanField(default=True, blank=True, null=True)
+    featured = models.BooleanField(default=True, blank=True, null=True, db_index=True)
     # If true, the product will be available for sale even if you have no stock.
     selling_while_out_of_stock = models.BooleanField(
         default=False, blank=True, null=True
@@ -199,9 +219,11 @@ class Product(models.Model):
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
+        db_index=True,
     )
     # supplier = models.CharField( null=True, blank=True)
     has_variants = models.BooleanField(default=False)
+    datasheet_url = models.URLField(null=True, blank=True)
 
     def __str__(self):
         if self.sku:
@@ -211,6 +233,13 @@ class Product(models.Model):
 
 
 class ProductVariant(models.Model):
+
+    def clean(self):
+        if self.product and not self.product.has_variants:
+            raise ValidationError(
+                "Variants can only be associated with products that have variants."
+            )
+
     class Meta:
         verbose_name_plural = "Product Variants"
 
@@ -221,11 +250,16 @@ class ProductVariant(models.Model):
         null=True,
         blank=True,
     )
-    variant_sku = models.CharField(max_length=12, null=True, blank=True)
+    variant_sku = models.CharField(max_length=12, null=True, blank=True, db_index=True)
     # Barcode (ISBN, UPC, GTIN, etc.)
-    variant_barcode = models.CharField(max_length=14, null=True, blank=True)
+    variant_barcode = models.CharField(
+        max_length=14, null=True, blank=True, db_index=True
+    )
 
     variant_quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    variant_minimum_inventory_level = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
     # Set price of the product for online sale.
@@ -238,9 +272,18 @@ class ProductVariant(models.Model):
 
     # If true, the product will be displayed on marketing channels (website etc)
     variant_featured = models.BooleanField(default=True)
+    variant_datasheet_url = models.URLField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.product.title} - {self.variant_sku}"
+
+    @property
+    def full_name(self):
+        attribute_values = self.attribute_values.select_related("attribute")
+        values = [
+            f"{v.attribute.name.capitalize()}: {v.value}" for v in attribute_values
+        ]
+        return f"{self.product.title} - {' / '.join(values)}"
 
 
 # Example: Size and Color Attributes
@@ -274,7 +317,7 @@ class ProductVariantAttributeValue(models.Model):
 
     attribute = models.ForeignKey(ProductVariantAttribute, on_delete=models.CASCADE)
     value = models.CharField(
-        max_length=255, verbose_name="Attribute Value"
+        max_length=255, verbose_name="Attribute Value", db_index=True
     )  # e.g., "S", "Red"
 
     def __str__(self):
@@ -307,9 +350,6 @@ class ProductFile(models.Model):
     # This is the sequence of the files
     # sequence = models.SmallIntegerField(unique=True)
 
-
-
-
     # If the file alredy exists, delete the old file and save the new one
     def save(self, *args, **kwargs):
         # Check if the instance already exists in the database
@@ -329,9 +369,9 @@ class ProductFile(models.Model):
 
     def __str__(self):
         return f"Media for {self.product.title}"
-    
 
         # def save(self, *args, **kwargs):
+
     #     if not self.pk:  # Only set sequence if this is a new object
     #         last_sequence = (
     #             ProductFile.objects.filter(product=self.product)

@@ -754,7 +754,7 @@ let variant_form_constructor = () => {
             counter++;
         }
     }
-    document.getElementById("create_table_button").style.display = "none";
+    // document.getElementById("create_table_button").style.display = "none";
     createTable();
 
 }
@@ -793,62 +793,55 @@ let manual_post_data = {}
 const form = document.getElementById('product_form');
 
 form.addEventListener('submit', async (event) => {
-    event.preventDefault(); // Prevent default form submission
+    event.preventDefault();
     console.log("Form submission prevented. Handling manually...");
 
     const variant_table_input_elements = document.getElementById('variant_table').getElementsByTagName('input');
     const export_data = { product_variants: [] };
 
-    // Iterate over input elements in the variant table
     Array.from(variant_table_input_elements).forEach((element) => {
-        const variant_row = Number(element.id.split('_').at(-1)) - 1; // Get the row index
-        const element_name = element.name.replace(/^([^_]+)_([^_]+)_.*$/, '$1_$2'); // Extract the element name
-        console.log(`Element name: ${element_name}`);
+        const variant_row = Number(element.id.split('_').at(-1)) - 1;
+        const element_name = element.name.replace(/^([^_]+)_([^_]+)_.*$/, '$1_$2');
 
-        // Ensure the row exists in export_data
         if (!export_data.product_variants[variant_row]) {
             export_data.product_variants[variant_row] = {};
         }
 
-        // Handle "featured" checkboxes
         if (element.name.includes("featured")) {
             export_data.product_variants[variant_row][element_name] = element.checked;
-        }
-        // Handle other input fields (excluding file inputs)
-        else if (!element_name.includes("variant_file")) {
-            // if (element.value.trim() !== "") {
+        } else if (!element_name.includes("variant_file")) {
             if (["variant_barcode", "variant_quantity", "variant_price"].some((key) => element_name.includes(key))) {
-                // Convert numeric fields to numbers
                 export_data.product_variants[variant_row][element_name] = Number(element.value);
             } else {
                 export_data.product_variants[variant_row][element_name] = element.value;
             }
-            // }
         }
     });
 
     console.log("Export data prepared:");
     console.log(export_data);
 
-    // Prepare the form data for submission
     const formData = new FormData(form);
-
-    // Add the export_data JSON to the form data
     formData.append('export_data', JSON.stringify(export_data));
 
     try {
-        // Submit the form data using fetch
         const response = await fetch(form.action, {
             method: 'POST',
             body: formData,
         });
 
         if (response.ok) {
-            // const data = await response.json();
-            // console.log("Form submitted successfully:", data);
-            console.log("Form submitted successfully:");
+            console.log("Form submitted successfully. Reloading page to show results.");
+            console.log("your response is: ");
+            
+            console.log(response);
+            
+            // window.location.reload(); // Reload the page
         } else {
             console.error("Form submission failed:", response.statusText);
+            const errorText = await response.text();
+            console.error("Error Body:", errorText);
+            // Optionally, you could try to parse the errorText if your server sends back error details in a specific format.
         }
     } catch (error) {
         console.error("Error submitting form:", error);

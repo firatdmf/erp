@@ -36,10 +36,19 @@ class TagArrayWidget(forms.Textarea):
 
 
 class ProductForm(forms.ModelForm):
+    
     class Meta:
         model = Product
         # fields = ['title', 'description', 'sku', 'barcode', 'price', 'cost', 'featured', 'selling_while_out_of_stock', 'weight', 'unit_of_weight', 'vendor', 'has_variants']
         fields = "__all__"
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        product = self.instance
+        product.clean()  # Call the clean method to validate
+        return cleaned_data
+
+    
 
     # The input id will be "id_has_variants", this won't be saved to the database, for interactions only.
     # has_variants = forms.BooleanField(
@@ -81,6 +90,11 @@ class ProductVariantForm(forms.ModelForm):
         widgets = {
             "product": forms.HiddenInput(),
         }
+    def clean(self):
+        cleaned_data = super().clean()
+        variant = self.instance
+        variant.clean()  # Call the clean method to validate
+        return cleaned_data
 
 
 class ProductFileForm(forms.ModelForm):

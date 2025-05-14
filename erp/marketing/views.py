@@ -239,6 +239,7 @@ class ProductEdit(generic.edit.UpdateView):
         context = self.get_context_data()
         context['form'] = form
         context['productfile_formset'] = context.get('productfile_formset') # Make sure formset is also in context
+        context["error_message"] = "There was an error processing your request."
         return self.render_to_response(context) # Make sure you're re-rendering with errors
 
     def form_valid(self, form):
@@ -322,6 +323,7 @@ class ProductEdit(generic.edit.UpdateView):
                                         name=attr_name
                                     )
                                     ProductVariantAttributeValue.objects.create(
+                                        product = self.object,
                                         product_variant=product_variant_object,
                                         attribute=attribute,
                                         value=attr_value,

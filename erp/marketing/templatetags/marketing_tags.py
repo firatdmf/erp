@@ -7,6 +7,7 @@ import time
 
 register = template.Library()
 
+
 # Custom JSON encoder to handle Decimal objects
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -30,6 +31,7 @@ def variant_form(
         # variants_json = json.dumps(list(variants.values()), cls=DecimalEncoder)
         # variants_json = json.dumps(combinations, cls=DecimalEncoder)
         # print(variants_json)
+        print("yes you do have variants my friend!!")
 
         combinations = []
         for variant in variants:
@@ -53,6 +55,9 @@ def variant_form(
                     "variant_featured": variant.variant_featured,
                 }
             )
+
+        print("your combinations are:")
+        print(combinations)
 
         # -------------------------------------------------------------------------
         # start_time = time.time()
@@ -92,13 +97,11 @@ def variant_form(
         product_variants = json.dumps(
             [], cls=DecimalEncoder
         )  # convert python dict to json
-        product_variant_options = json.dumps(
-            {}, cls=DecimalEncoder
-        )
-    
-    # print("product variants:")
-    # print(product_variants)
-    
+        product_variant_options = json.dumps({}, cls=DecimalEncoder)
+
+    print("product variant options: ")
+    print(product_variant_options)
+
     return render_to_string(
         "marketing/components/variant_form.html",
         {
@@ -112,4 +115,3 @@ def variant_form(
             # "variants": variants_json,  # Mark JSON as safe
         },
     )
-

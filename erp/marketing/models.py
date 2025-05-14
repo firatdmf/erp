@@ -142,19 +142,19 @@ class Product(models.Model):
     barcode = models.CharField(max_length=14, null=True, blank=True, db_index=True)
     # change to blank false later
 
-    def clean(self):
-        if self.has_variants:
-            if self.sku:
-                raise ValidationError("Products with variants should not have a SKU.")
-            if self.price:
-                raise ValidationError("Products with variants should not have a price.")
-            if self.quantity:
-                raise ValidationError(
-                    "Products with variants should not have a quantity."
-                )
-        else:
-            if not self.sku:
-                raise ValidationError("Simple products must have a SKU.")
+    # def clean(self):
+    #     if self.has_variants:
+    #         if self.sku:
+    #             raise ValidationError("Products with variants should not have a SKU.")
+    #         if self.price:
+    #             raise ValidationError("Products with variants should not have a price.")
+    #         if self.quantity:
+    #             raise ValidationError(
+    #                 "Products with variants should not have a quantity."
+    #             )
+    #     else:
+    #         if not self.sku:
+    #             raise ValidationError("Simple products must have a SKU.")
 
     # Collections are defined by you.
     # If we delete the collection model,
@@ -234,11 +234,11 @@ class Product(models.Model):
 
 class ProductVariant(models.Model):
 
-    def clean(self):
-        if self.product and not self.product.has_variants:
-            raise ValidationError(
-                "Variants can only be associated with products that have variants."
-            )
+    # def clean(self):
+    #     if self.product and not self.product.has_variants:
+    #         raise ValidationError(
+    #             "Variants can only be associated with products that have variants."
+    #         )
 
     class Meta:
         verbose_name_plural = "Product Variants"

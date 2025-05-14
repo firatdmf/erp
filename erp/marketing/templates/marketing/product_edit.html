@@ -26,8 +26,11 @@
       {% variant_form current_url=request.path product=product variants=variants %}
       <button type="submit" id="form_submit_button">Submit</button>
     </form>
+    <p>{{ form.errors }}</p>
     <p>
-      {{form.errors}}
+      {% if error_message %}
+        <strong>{{ error_message }}</strong>
+      {% endif %}
     </p>
 
     {% comment %} {% if variants %}

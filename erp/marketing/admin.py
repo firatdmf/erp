@@ -15,11 +15,11 @@ class ProductAdminForm(forms.ModelForm):
         model = Product
         fields = '__all__'
     
-    def clean(self):
-        cleaned_data = super().clean()
-        product = self.instance
-        product.clean()  # Call the clean method to enforce model validation
-        return cleaned_data
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     product = self.instance
+    #     product.clean()  # Call the clean method to enforce model validation
+    #     return cleaned_data
 
 class ProductFileInline(admin.TabularInline):
     model = ProductFile
@@ -37,14 +37,14 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ('featured', 'selling_while_out_of_stock', 'collections')
     form = ProductAdminForm  # Use the custom form with validation
 
-    # The save_model method is overridden in ProductAdmin to call full_clean() before saving the object, ensuring the validation is triggered.
-    def save_model(self, request, obj, form, change):
-        try:
-            obj.full_clean()  # Call full_clean to ensure validation before save
-            super().save_model(request, obj, form, change)
-        except ValidationError as e:
-            # Handle the error if needed (e.g., display a message)
-            raise ValidationError(e)
+    # # The save_model method is overridden in ProductAdmin to call full_clean() before saving the object, ensuring the validation is triggered.
+    # def save_model(self, request, obj, form, change):
+    #     try:
+    #         obj.full_clean()  # Call full_clean to ensure validation before save
+    #         super().save_model(request, obj, form, change)
+    #     except ValidationError as e:
+    #         # Handle the error if needed (e.g., display a message)
+    #         raise ValidationError(e)
 
 # Custom admin for ProductVariant to include validation logic
 class ProductVariantAdminForm(forms.ModelForm):
@@ -52,11 +52,11 @@ class ProductVariantAdminForm(forms.ModelForm):
         model = ProductVariant
         fields = '__all__'
 
-    def clean(self):
-        cleaned_data = super().clean()
-        variant = self.instance
-        variant.clean()  # Call the clean method to enforce model validation
-        return cleaned_data
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     variant = self.instance
+    #     variant.clean()  # Call the clean method to enforce model validation
+    #     return cleaned_data
 
 
 # Admin for ProductVariant

@@ -16,7 +16,7 @@ def ensure_product_variant_attributes_values(sender, instance, created, **kwargs
         attributes = ProductVariantAttribute.objects.all()
         for attribute in attributes:
             ProductVariantAttributeValue.objects.get_or_create(
-                variant=instance,
-                attribute=attribute,
-                defaults={"value": "Default Value"},
+                product_variant=instance,
+                product_variant_attribute=attribute,
+                defaults={"product_variant_attribute_value": "Default Value"},
             )

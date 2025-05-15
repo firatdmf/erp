@@ -279,8 +279,8 @@ class ProductEdit(generic.edit.UpdateView):
                     ProductVariantAttributeValue.objects.create(
                         product=self.object,
                         product_variant=variant_obj,
-                        attribute=attribute,
-                        value=attr_value,
+                        product_variant_attribute=attribute,
+                        product_variant_attribute_value=attr_value,
                     )
 
             # Delete variants not included in submitted SKUs

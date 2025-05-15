@@ -43,7 +43,7 @@ def variant_form(
                 #     {attribute_value.attribute.name: attribute_value.value}
                 #     # f"{attribute_value.attribute.name}:{attribute_value.value}"
                 # )
-                variant_attribute_values[attribute_value.attribute.name] = attribute_value.value
+                variant_attribute_values[attribute_value.product_variant_attribute.name] = attribute_value.product_variant_attribute_value
             # combinations.append(variant_attribute_values)
             product_variant_list.append(
                 {

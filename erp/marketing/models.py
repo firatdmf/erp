@@ -316,18 +316,18 @@ class ProductVariantAttributeValue(models.Model):
         blank=True,
     )
 
-    attribute = models.ForeignKey(ProductVariantAttribute, on_delete=models.CASCADE)
-    value = models.CharField(
+    product_variant_attribute = models.ForeignKey(ProductVariantAttribute, on_delete=models.CASCADE)
+    product_variant_attribute_value = models.CharField(
         max_length=255, verbose_name="Attribute Value", db_index=True
     )  # e.g., "S", "Red"
 
     def __str__(self):
-        return f"{self.variant} |{self.attribute.name}: {self.value}"
+        return f"{self.product_variant} |{self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
 
     class Meta:
         unique_together = (
-            "variant",
-            "attribute",
+            "product_variant",
+            "product_variant_attribute",
         )  # A variant cannot have duplicate attribute name
 
 

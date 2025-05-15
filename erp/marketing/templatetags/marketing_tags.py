@@ -33,22 +33,22 @@ def variant_form(
         # print(variants_json)
         print("yes you do have variants my friend!!")
 
-        combinations = []
+        product_variant_list = []
         for variant in variants:
             attribute_values = variant.attribute_values.all()
             # print(f"Variant SKU: {variant.variant_sku}")
-            combination = {}
+            variant_attribute_values = {}
             for attribute_value in attribute_values:
                 # combination.append(
                 #     {attribute_value.attribute.name: attribute_value.value}
                 #     # f"{attribute_value.attribute.name}:{attribute_value.value}"
                 # )
-                combination[attribute_value.attribute.name] = attribute_value.value
-            # combinations.append(combination)
-            combinations.append(
+                variant_attribute_values[attribute_value.attribute.name] = attribute_value.value
+            # combinations.append(variant_attribute_values)
+            product_variant_list.append(
                 {
                     "variant_sku": variant.variant_sku,
-                    "variant_combination": combination,
+                    "variant_attribute_values": variant_attribute_values,
                     "variant_price": variant.variant_price,
                     "variant_quantity": variant.variant_quantity,
                     "variant_barcode": variant.variant_barcode,
@@ -56,8 +56,8 @@ def variant_form(
                 }
             )
 
-        print("your combinations are:")
-        print(combinations)
+        print("your product variant list is:")
+        print(product_variant_list)
 
         # -------------------------------------------------------------------------
         # start_time = time.time()
@@ -66,9 +66,9 @@ def variant_form(
             {}
         )  # { color: ["white", "beige"], size: ["84", "95"] }
 
-        for combination in combinations:
-            variant_combination = combination["variant_combination"]
-            for attribute, value in variant_combination.items():
+        for product_variant in product_variant_list:
+            variant_attribute_values = product_variant["variant_attribute_values"]
+            for attribute, value in variant_attribute_values.items():
                 # Add the value to the corresponding attribute in the options dictionary
                 if attribute not in product_variant_options:
                     product_variant_options[attribute] = (
@@ -90,11 +90,11 @@ def variant_form(
         # print("-----------------------------------------------")
         # print(f"Execution time: {time.time() - start_time} seconds")
         # -------------------------------------------------------------------------
-        product_variants = json.dumps(
-            combinations, cls=DecimalEncoder
+        product_variant_list = json.dumps(
+            product_variant_list, cls=DecimalEncoder
         )  # convert python dict to json
     else:
-        product_variants = json.dumps(
+        product_variant_list = json.dumps(
             [], cls=DecimalEncoder
         )  # convert python dict to json
         product_variant_options = json.dumps({}, cls=DecimalEncoder)
@@ -110,8 +110,8 @@ def variant_form(
             # "csrf_token": csrf_token,
             # "current_url": current_url,
             "message": "Im the marketing variant form",
-            "product_variants_data": mark_safe(product_variants),  # Mark JSON as safe
-            "product_variant_options_data": mark_safe(product_variant_options),
+            "product_variant_list": mark_safe(product_variant_list),  # Mark JSON as safe
+            "product_variant_options": mark_safe(product_variant_options),
             # "variants": variants_json,  # Mark JSON as safe
         },
     )

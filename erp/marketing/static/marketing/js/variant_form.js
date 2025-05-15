@@ -1,21 +1,52 @@
 console.log("welcome to the variant form my fellas");
-
+// Let's combine the data and export it.
+export_data = {
+    "product_variant_options": {},
+    // {"color": ["blue","black"]}
+    "product_variant_list": [],
+    // [
+    //  {
+    //     "variant_sku": "blue12",
+    //     "variant_attribute_values": {
+    //         "color": "blue"
+    //     },
+    //     "variant_price": 12,
+    //     "variant_quantity": 12,
+    //     "variant_barcode": 1212121212,
+    //     "variant_featured": true
+    // },
+    // {
+    //     "variant_sku": "black21",
+    //     "variant_attribute_values": {
+    //         "color": "black"
+    //     },
+    //     "variant_price": 21,
+    //     "variant_quantity": 22,
+    //     "variant_barcode": 2121212121,
+    //     "variant_featured": true
+    // }
+    // ]
+}
 
 // ---------------------------------------------------------------------------------------------
 // below two variables are passed from marketing_tags.py to variant_form.html and from there to here
-let product_variant_options = JSON.parse(product_variant_options_data);
+const product_variant_options = JSON.parse(product_variant_options_data);
+console.log("product_variant_options_data: ");
+
 console.log(product_variant_options);
 
 // product_variant_options = {"color": ["beige", "white"], "size": ["95", "84"]}
 // ---------------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------------
-let product_variants = JSON.parse(product_variants_data);
-// let product_variants_new = []
-// product_variants = 
+const product_variant_list = JSON.parse(product_variant_list_data);
+console.log("product_variant_list: ");
+
+console.log(product_variant_list);
+
+// product_variant_list = 
 // [
 //     {
 //         "variant_sku": "RK24562RW8",
-//         "variant_combination": {
+//         "variant_attribute_values": {
 //             "color": "white",
 //             "size": "84"
 //         },
@@ -26,7 +57,7 @@ let product_variants = JSON.parse(product_variants_data);
 //     },
 //     {
 //         "variant_sku": "RK24562GW9",
-//         "variant_combination": {
+//         "variant_attribute_values": {
 //             "color": "white",
 //             "size": "95"
 //         },
@@ -37,7 +68,7 @@ let product_variants = JSON.parse(product_variants_data);
 //     },
 //     {
 //         "variant_sku": "RK24562RC8",
-//         "variant_combination": {
+//         "variant_attribute_values": {
 //             "color": "beige",
 //             "size": "84"
 //         },
@@ -48,7 +79,7 @@ let product_variants = JSON.parse(product_variants_data);
 //     },
 //     {
 //         "variant_sku": "RK24562GC9",
-//         "variant_combination": {
+//         "variant_attribute_values": {
 //             "color": "beige",
 //             "size": "95"
 //         },
@@ -60,91 +91,34 @@ let product_variants = JSON.parse(product_variants_data);
 // ]
 // ---------------------------------------------------------------------------------------------
 
-// returns false if the object is empty
-let isEmptyObject = (obj) => {
-    return Object.keys(obj).length === 0 && obj.constructor === Object;
-}
+// optionsObj = { "color": ["beige", "white"], "size": ["95", "84"] }
+let getCombinations = (optionsObj) => {
 
+    const optionNames = Object.keys(optionsObj);
+    if (optionNames.length === 0) return [];
 
-let variants_exist = false
+    // Start with an array with one empty object
+    let combinations = [{}];
 
-if (product_variants.length <= 0) {
-    console.log("you have no variants");
-} else {
-    variants_exist = true
-
-}
-
-// ---------------------------------------------------------------------------------------------
-const getCombinations = (variant_sets) => {
-    // variant_sets:
-    // [
-    //     {
-    //         "name": "color",
-    //         "values": [
-    //             "white",
-    //             "beige"
-    //         ]
-    //     },
-    //     {
-    //         "name": "size",
-    //         "values": [
-    //             "84",
-    //             "95"
-    //         ]
-    //     }
-    // ]
-
-    if (!variant_sets || variant_sets.length === 0) {
-        console.error("variant_sets is empty");
-
-        return;
-    }
-
-    const combinations = [];
-
-    const generateCombinations = (index, variant_combination) => {
-        // variant_combination:
-
-        if (index === variant_sets.length) {
-            // Push a copy of the current combination to avoid reference issues
-            combinations.push({ ...variant_combination });
-            return;
-        }
-
-        const currentOption = variant_sets[index];
-        for (const value of currentOption.values) {
-            // value = "white" or "84"
-            // Create a new combination for each recursive call
-            const newCombination = { ...variant_combination };
-            newCombination[currentOption.name] = value;
-            generateCombinations(index + 1, newCombination); // Create a copy of the array
-            // variant_combination.pop(); // Backtrack
-        }
-    }
-
-    generateCombinations(0, {});
+    optionNames.forEach(optionName => {
+        const values = optionsObj[optionName];
+        // For each existing combination, add each value of this option
+        combinations = combinations.flatMap(combination =>
+            values.map(value => ({
+                ...combination,
+                [optionName]: value
+            }))
+        );
+    });
 
     return combinations;
     // combinations = [
-    //     {
-    //         "color": "white",
-    //         "size": "84"
-    //     },
-    //     {
-    //         "color": "white",
-    //         "size": "95"
-    //     },
-    //     {
-    //         "color": "beige",
-    //         "size": "84"
-    //     },
-    //     {
-    //         "color": "beige",
-    //         "size": "95"
-    //     }
+    //   { color: "beige", size: "95" },
+    //   { color: "beige", size: "84" },
+    //   { color: "white", size: "95" },
+    //   { color: "white", size: "84" }
+    // ]
 }
-// ---------------------------------------------------------------------------------------------
 
 
 //   ----------------------------------------------
@@ -358,17 +332,12 @@ let add_another_value = (el, next_option_name_id) => {
 const create_table_button = document.getElementById("create_table_button");
 let createTable = () => {
 
-
     // Get all the input elements. (not the table inputs, just the option inputs (variant names and their values))
     const variant_container_input_elements = document.getElementById('variant_container').getElementsByTagName('input');
 
-
-
     // initialize variant array
-    let variants = []
-    let variant_name;
-    let variant_names = [];
-    let variant_name_id;
+    let new_product_variant_options = {};
+    let variant_name = "";
     let variant_table_option_names = ""
     let variant_table_rows = ""
     // Below iterates through every input value and stores the value in the variant array
@@ -379,7 +348,7 @@ let createTable = () => {
         // or
         // input#variant_name_1_value_1
 
-        // If there are empty input fields in variant_container, then prevent createing table.
+        // If there are empty input fields in variant_container, then stop createing table, and alert user.
         if (element.value.trim() === "") {
             let error_message_element = document.createElement("p")
             console.error("you have empty input fields");
@@ -393,54 +362,34 @@ let createTable = () => {
             return;
         }
 
-        // If the user has not entered an option name, skip it. 
-        if (variant_name === "") {
-            // go to the next element
-            return;
-        } else {
-            // If it is an option name, and not an option's value
-            if (!element.id.includes("value")) {
-                variant_name = element.value
-                if (variant_name) {
-                    variant_name_id = Number(element.id.split('_').at(-1))
-                    variants.push({ "name": variant_name, "values": [] })
-                    variant_names.push(variant_name)
-                    variant_table_option_names += "<th>" + variant_name + "</th>"
-                } else {
-                    console.log("variant_name is empty");
-                }
-            } else {
-                // If it is an option's value, and not an option name
-                variants[variant_name_id - 1].values.push(element.value)
+        // If it is an option name (not a value)
+        if (!element.id.includes("value")) {
+            variant_name = element.value;
+            variant_name_id = Number(element.id.split('_').at(-1));
+            if (variant_name) {
+                new_product_variant_options[variant_name] = [];
+                variant_table_option_names += "<th>" + variant_name + "</th>";
             }
-
+        } else {
+            // If it is an option's value, add it to the correct variant_name
+            // Find the corresponding option name's id
+            let name_id = Number(element.id.split('_')[2]);
+            // Find the corresponding option name by id
+            let option_name_element = document.getElementById(`variant_name_${name_id}`);
+            if (option_name_element && option_name_element.value) {
+                let option_name = option_name_element.value;
+                new_product_variant_options[option_name].push(element.value);
+            }
         }
-
     });
-    console.log("your variants are");
-    console.log(variants);
-
-
-
-    // variants =  [
-    // {
-    //     "name": "color",
-    //     "values": [
-    //         "white",
-    //         "beige"
-    //     ]
-    // },
-    // {
-    //     "name": "size",
-    //     "values": [
-    //         "84",
-    //         "95"
-    //     ]
-    // }
+    // console.log("your new_product_variant_options are");
+    // console.log(new_product_variant_options);
+    export_data.product_variant_options = new_product_variant_options;
+    // variants = { "color": ["beige", "white"], "size": ["95", "84"] }
 
     // Get all combinations of the variant values
-    // const combinations = getCombinations(variants)
-    const variant_combinations = getCombinations(variants)
+    const variant_combinations = getCombinations(new_product_variant_options)
+
     // variant_combinations = [
     //     {
     //         "color": "white",
@@ -461,153 +410,11 @@ let createTable = () => {
     // ]
 
 
-    // Generate table based on the combinations
-    // if (product_variants) {
-    //     console.log('you have product variants');
-    //     console.log("your product_variants are");
-    //     // product_variants = JSON.parse(product_variants);
-    //     // if(product_variants.length > 0){
-    //     //     console.log('shit you do have product variants');
 
-    //     // }
-    //     // this is the product_variants variable that is passed from the backend
-    //     console.log(product_variants);
-    //     let product_variants_new = product_variants
-    //     console.log(typeof (product_variants));
-
-    // }
-
-    // product_variants = [
-    //     {
-    //         "variant_sku": "RK24562RW8",
-    //         "variant_combination": {
-    //             "color": "white",
-    //             "size": "84"
-    //         },
-    //         "variant_price": null,
-    //         "variant_": 102,
-    //         "variant_barcode": "712179795204",
-    //         "variant_featured": false
-    //     },
-    //     {
-    //         "variant_sku": "RK24562GW9",
-    //         "variant_combination": {
-    //             "color": "white",
-    //             "size": "95"
-    //         },
-    //         "variant_price": null,
-    //         "variant_": 48,
-    //         "variant_barcode": "712179795228",
-    //         "variant_featured": true
-    //     },
-    //     {
-    //         "variant_sku": "RK24562RC8",
-    //         "variant_combination": {
-    //             "color": "beige",
-    //             "size": "84"
-    //         },
-    //         "variant_price": null,
-    //         "variant_": 98,
-    //         "variant_barcode": "712179795211",
-    //         "variant_featured": true
-    //     },
-    //     {
-    //         "variant_sku": "RK24562GC9",
-    //         "variant_combination": {
-    //             "color": "beige",
-    //             "size": "95"
-    //         },
-    //         "variant_price": null,
-    //         "variant_": 46,
-    //         "variant_barcode": "712179795235",
-    //         "variant_featured": true
-    //     }
-    // ]
-
-    // If the product already has variants saved then show them in the table
-    if ((variants_exist && product_variants.length > 0) && (variant_combinations.length > 0)) {
-        // If we altered the existing variants (add or delete)
-        // product_variants is passed in existing variants, and the variant_combinations is generated within the form
-        if ((product_variants.length !== variant_combinations.length)) {
-            product_variants = []
-            variant_combinations.map((variant_combination, index) => {
-                product_variants.push(
-                    {
-                        "variant_sku": "",
-                        "variant_combination": variant_combination,
-                        "variant_price": null,
-                        "variant_quantity": null,
-                        "variant_barcode": "",
-                        "variant_featured": true
-                    }
-                )
-            })
-        }
-
-        // Account for if the value is null
-        // make this dynamically generated (for loop the possible product variant form inputs)
-
-        // Comes from database
-        product_variants.map((product_variant, index) => {
-            // product_variant: {
-            //     "variant_sku": "RK24562RW8",
-            //     "variant_combination": {
-            //         "color": "white",
-            //         "size": "84"
-            //     },
-            //     "variant_price": null,
-            //     "variant_": 102,
-            //     "variant_barcode": "712179795204",
-            //     "variant_featured": false
-            // }
-            // }
-
-            // I do this because input id's start from one, not zero.
-            index++
-
-            variant_table_rows += '<tr>'
-            Object.values(product_variant.variant_combination).map((value) => {
-                variant_table_rows += `<td>${value}</td>`
-            })
-
-
-            // // Object.values(product_variant.variant_combination).map((value) => {
-            // Object.values(variant_combinations).map((value) => {
-            //     console.log(value);
-
-            //     // variant_table_rows += `<td>${value}</td>`
-            // })
-
-
-
-
-            // if(!isEqualObject(product_variant.variant_combination, combinations2[index])){
-            //     console.log("yes this exists");
-            // }
-
-            // Either we set the value to the existing value or we set it to an empty string
-            variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
-            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}"></td>`
-            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
-            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}" required></td>`
-            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode || ''}"></td>`
-
-            // product_variant.varaint_featured returns true or false, not on or off.
-            if (product_variant.variant_featured) {
-                variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
-            } else {
-
-                variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}"></td>`
-            }
-
-            variant_table_rows += `</tr>`
-
-
-        })
-    }
     // variant_combinations is generated from the variant names and their valus in the variant container
-    else if (variant_combinations.length > 0) {
+    if (variant_combinations.length > 0) {
 
+        let new_product_variant_list = []
         variant_combinations.map((element, index) => {
             index++
             // Split the element and create a row for the table
@@ -624,20 +431,32 @@ let createTable = () => {
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
             variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
             variant_table_rows += `</tr>`
+
+            new_product_variant_list.push(
+                {
+                    "variant_sku": "",
+                    "variant_attribute_values": element,
+                    "variant_price": null,
+                    "variant_quantity": null,
+                    "variant_barcode": "",
+                    "variant_featured": true
+                }
+            )
         })
+        export_data.product_variant_list = new_product_variant_list
     }
 
     // Let's combine the data and export it.
-    export_data = {
-        "variants": variants,
-        "product_variants": product_variants,
-        // "variant_names": variant_names
-    }
+    // export_data = {
+    //     "variants": variants,
+    //     "product_variant_list": product_variant_list,
+    //     // "variant_names": variant_names
+    // }
 
-    console.log("your export data is:");
+    console.log("your initial export data is");
+
     console.log(export_data);
-    
-    
+
 
 
     // Get the table element and insert the values in it.
@@ -686,19 +505,122 @@ let createTable = () => {
 
 
 // ----------------------------------------------
+
+let prepopulate_table = () => {
+
+    // If the product already has variants in the database then show them in the table
+    // else skip to the next else if statement
+    if (product_variant_list.length > 0) {
+        // let new_product_variant_options = {};
+        // let variant_name = "";
+        let variant_table_option_names = ""
+        let variant_table_rows = ""
+        export_data.product_variant_list = product_variant_list
+        // If we altered the existing variants (add or delete)
+        // product_variants is passed in existing variants, and the variant_combinations is generated within the form
+
+        // I don't think below does anything
+        // if ((product_variant_list.length !== variant_combinations.length)) {
+        //     product_variant_list = []
+        //     variant_combinations.map((variant_combination, index) => {
+        //         product_variant_list.push(
+        //             {
+        //                 "variant_sku": "",
+        //                 "variant_attribute_values": variant_combination,
+        //                 "variant_price": null,
+        //                 "variant_quantity": null,
+        //                 "variant_barcode": "",
+        //                 "variant_featured": true
+        //             }
+        //         )
+        //     })
+        // }
+
+        // Account for if the value is null
+        // make this dynamically generated (for loop the possible product variant form inputs)
+
+        // Comes from database
+        product_variant_list.map((product_variant, index) => {
+            // product_variant: {
+            //     "variant_sku": "RK24562RW8",
+            //     "variant_attribute_values": {
+            //         "color": "white",
+            //         "size": "84"
+            //     },
+            //     "variant_price": null,
+            //     "variant_": 102,
+            //     "variant_barcode": "712179795204",
+            //     "variant_featured": false
+            // }
+            // }
+
+            // I do this because input id's start from one, not zero.
+            index++
+
+            variant_table_rows += '<tr>'
+            Object.values(product_variant.variant_attribute_values).map((value) => {
+                variant_table_rows += `<td>${value}</td>`
+            })
+            // Either we set the value to the existing value or we set it to an empty string
+            variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
+            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}" required></td>`
+            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode || ''}"></td>`
+
+            // product_variant.varaint_featured returns true or false, not on or off.
+            // so we need to alter it manually
+            if (product_variant.variant_featured) {
+                variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
+            } else {
+
+                variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}"></td>`
+            }
+
+            variant_table_rows += `</tr>`
+
+
+        })
+
+        // Get the table element and insert the values in it.
+        variant_table_element = document.getElementById("variant_table")
+        variant_table_element.style.display = "inline-block";
+        variant_table_element.innerHTML = `
+   <tr>
+    ${variant_table_option_names}
+    <th>
+      Photo
+    </th>
+    <th>
+      Price
+    </th>
+    <th>
+      Quantity
+    </th>
+    <th>
+      SKU
+    </th>
+    <th>
+      BARCODE
+    </th>
+     <th>
+      FEATURED
+    </th>
+  </tr>
+  ${variant_table_rows}
+  `;
+    }
+}
 // ----------------------------------------------
 // ----------------------------------------------
 // If the variant already exists, run below to prepoulate its table with existing variant data
-
+// This function only runs if the product already has variants in the database
 let variant_form_constructor = () => {
 
     // product_variants variable comes from the variant_form.html component, and from marketing_tags.py to that.
-    if (product_variants.length <= 0) {
+    if (product_variant_list.length <= 0) {
         console.log("you have no variants")
     } else {
-        // product_variants = JSON.parse(product_variants); // Parse the JSON string into an object
-        // product_variant_options = JSON.parse(product_variant_options);
-
         let counter = 1
         for (const [attribute_name, attribute_values] of Object.entries(product_variant_options)) {
             let variant_name_element = document.getElementById(`variant_name_${counter}`);
@@ -760,16 +682,9 @@ let variant_form_constructor = () => {
         }
     }
     // document.getElementById("create_table_button").style.display = "none";
-    createTable();
+    prepopulate_table();
 
 }
-
-
-
-
-// 
-// 
-// 
 
 // This is input field from django marketing.models product form
 let hasVariantsCheckbox = document.getElementById('id_has_variants');
@@ -802,29 +717,38 @@ form.addEventListener('submit', async (event) => {
     console.log("Form submission prevented. Handling manually...");
 
     const variant_table_input_elements = document.getElementById('variant_table').getElementsByTagName('input');
-    const export_data = { product_variants: [] };
+    // const variant_data = { product_variant_list: [] };
+    // let variant_data = export_data;
 
-    Array.from(variant_table_input_elements).forEach((element) => {
+    Array.from(variant_table_input_elements).forEach((element, index) => {
+        // splits the elements id string by underscores resulting in an array. Than we select the last element of that array which starts with 1. But index in js starts with 0 so we substract one from each. 
         const variant_row = Number(element.id.split('_').at(-1)) - 1;
         const element_name = element.name.replace(/^([^_]+)_([^_]+)_.*$/, '$1_$2');
 
-        if (!export_data.product_variants[variant_row]) {
-            export_data.product_variants[variant_row] = {};
+
+        // for safetey, check if the element is not already in the export_data
+        // I am not sure if this is needed, but I am doing it just in case
+        if (!export_data.product_variant_list[variant_row]) {
+            export_data.product_variant_list[variant_row] = {};
+            // Add the combination for this row
+            if (typeof variant_combinations !== "undefined" && variant_combinations[variant_row]) {
+                export_data.product_variants[variant_row]["variant_attribute_values"] = variant_combinations[variant_row];
+            }
         }
 
         if (element.name.includes("featured")) {
-            export_data.product_variants[variant_row][element_name] = element.checked;
+            export_data.product_variant_list[variant_row][element_name] = element.checked;
         } else if (!element_name.includes("variant_file")) {
             if (["variant_barcode", "variant_quantity", "variant_price"].some((key) => element_name.includes(key))) {
-                export_data.product_variants[variant_row][element_name] = Number(element.value);
+                export_data.product_variant_list[variant_row][element_name] = Number(element.value);
             } else {
-                export_data.product_variants[variant_row][element_name] = element.value;
+                export_data.product_variant_list[variant_row][element_name] = element.value;
             }
         }
     });
 
-    console.log("Export data prepared:");
-    console.log(export_data);
+    // console.log("Export data prepared:");
+    // console.log(export_data);
 
     const formData = new FormData(form);
     formData.append('export_data', JSON.stringify(export_data));
@@ -838,9 +762,9 @@ form.addEventListener('submit', async (event) => {
     //     if (response.ok) {
     //         console.log("Form submitted successfully. Reloading page to show results.");
     //         console.log("your response is: ");
-            
+
     //         console.log(response);
-            
+
     //         // window.location.reload(); // Reload the page
     //     } else {
     //         console.error("Form submission failed:", response.statusText);
@@ -852,8 +776,74 @@ form.addEventListener('submit', async (event) => {
     //     console.error("Error submitting form:", error);
     // }
 
-    console.log("your export data is: ");
+    console.log("your export data is");
     console.log(export_data);
-    
-    
+
+
+    // export_data = 
+    // 
+    // {
+    //     "product_variant_options": {
+    //         "color": [
+    //             "blue",
+    //             "black"
+    //         ],
+    //         "size": [
+    //             "84",
+    //             "95"
+    //         ]
+    //     },
+    //     "product_variant_list": [
+    //         {
+    //             "variant_sku": "1",
+    //             "variant_attribute_values": {
+    //                 "color": "blue",
+    //                 "size": "84"
+    //             },
+    //             "variant_price": 1,
+    //             "variant_quantity": 1,
+    //             "variant_barcode": 11111,
+    //             "variant_featured": true
+    //         },
+    //         {
+    //             "variant_sku": "2",
+    //             "variant_attribute_values": {
+    //                 "color": "blue",
+    //                 "size": "95"
+    //             },
+    //             "variant_price": 2,
+    //             "variant_quantity": 2,
+    //             "variant_barcode": 22222,
+    //             "variant_featured": false
+    //         },
+    //         {
+    //             "variant_sku": "3",
+    //             "variant_attribute_values": {
+    //                 "color": "black",
+    //                 "size": "84"
+    //             },
+    //             "variant_price": 3,
+    //             "variant_quantity": 3,
+    //             "variant_barcode": 33333,
+    //             "variant_featured": false
+    //         },
+    //         {
+    //             "variant_sku": "4",
+    //             "variant_attribute_values": {
+    //                 "color": "black",
+    //                 "size": "95"
+    //             },
+    //             "variant_price": 4,
+    //             "variant_quantity": 4,
+    //             "variant_barcode": 44444,
+    //             "variant_featured": true
+    //         }
+    //     ]
+    // }
+
 });
+
+
+// if I change variant container, and click on create table, it does not update the table.
+
+// I need to seperate initializing variant table, and createTable function

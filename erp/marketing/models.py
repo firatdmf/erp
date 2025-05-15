@@ -287,6 +287,7 @@ class ProductVariant(models.Model):
 
 
 # Example: Size and Color Attributes
+# Make this unique and do get or create when creating the product variant
 class ProductVariantAttribute(models.Model):
     name = models.CharField(max_length=255, verbose_name="Attribute Name")
 

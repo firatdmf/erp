@@ -42,8 +42,8 @@
     {% comment %} passing the variants information from backend to front end js so we can prepopulate the variant table form {% endcomment %}
     {% comment %} window.existing_variants = JSON.parse('{{ variants }}'); {% endcomment %}
     {% comment %} product_variants variable passed from marketing_tags.py {% endcomment %}
-    window.product_variants_data = '{{ product_variants_data }}';
-    window.product_variant_options_data = '{{ product_variant_options_data }}';
+    window.product_variant_list_data = '{{ product_variant_list }}';
+    window.product_variant_options_data = '{{ product_variant_options }}';
     {% comment %} console.log('{{message}}') {% endcomment %}
   </script>
 

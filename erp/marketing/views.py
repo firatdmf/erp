@@ -232,15 +232,20 @@ class ProductEdit(generic.edit.UpdateView):
             # This is how you pass the variants to the template, and the JS
             context["variants"] = self.object.variants.all()
         return context
-    
-    def form_invalid(self,form):
+
+    # This might be unnnessary to have, but just in case we need to handle the form invalidation
+    def form_invalid(self, form):
         print("Form is invalid!")
         print(form.errors)
         context = self.get_context_data()
-        context['form'] = form
-        context['productfile_formset'] = context.get('productfile_formset') # Make sure formset is also in context
+        context["form"] = form
+        context["productfile_formset"] = context.get(
+            "productfile_formset"
+        )  # Make sure formset is also in context
         context["error_message"] = "There was an error processing your request."
-        return self.render_to_response(context) # Make sure you're re-rendering with errors
+        return self.render_to_response(
+            context
+        )  # Make sure you're re-rendering with errors
 
     def form_valid(self, form):
         # for key,value in self.request.POST.items():
@@ -294,6 +299,7 @@ class ProductEdit(generic.edit.UpdateView):
                             )  # add product=self.object
                             # update existing variant
                             for key, value in variant_data.items():
+                                # skip the keys that are not needed for update: sku and combination
                                 if key not in ("variant_sku", "variant_combination"):
                                     setattr(product_variant_object, key, value)
                             product_variant_object.save()
@@ -304,6 +310,7 @@ class ProductEdit(generic.edit.UpdateView):
                                 product=self.object, variant_sku=variant_sku
                             )
                             for key, value in variant_data.items():
+                                # skip the keys that are not needed for update: sku and combination
                                 if key not in ("variant_sku", "variant_combination"):
                                     setattr(new_variant, key, value)
                             new_variant.save()
@@ -323,7 +330,7 @@ class ProductEdit(generic.edit.UpdateView):
                                         name=attr_name
                                     )
                                     ProductVariantAttributeValue.objects.create(
-                                        product = self.object,
+                                        product=self.object,
                                         product_variant=product_variant_object,
                                         attribute=attribute,
                                         value=attr_value,

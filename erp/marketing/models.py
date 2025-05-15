@@ -308,7 +308,7 @@ class ProductVariantAttributeValue(models.Model):
         null=True,
         blank=True,
     )
-    variant = models.ForeignKey(
+    product_variant = models.ForeignKey(
         ProductVariant,
         on_delete=models.CASCADE,
         related_name="attribute_values",

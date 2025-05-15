@@ -219,205 +219,127 @@ class ProductEdit(generic.edit.UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.request.POST:
-            context["productfile_formset"] = ProductFileFormSet(
-                self.request.POST, self.request.FILES, instance=self.object
-            )
-        else:
-            context["productfile_formset"] = ProductFileFormSet(instance=self.object)
-
-        # check to see if the product has variants
-        # print("heck to see if the product has variants")
+        context["productfile_formset"] = ProductFileFormSet(
+            self.request.POST or None, self.request.FILES or None, instance=self.object
+        )
         if self.object.has_variants:
-            # This is how you pass the variants to the template, and the JS
             context["variants"] = self.object.variants.all()
         return context
 
-    # This might be unnnessary to have, but just in case we need to handle the form invalidation
     def form_invalid(self, form):
-        print("Form is invalid!")
-        print(form.errors)
         context = self.get_context_data()
         context["form"] = form
-        context["productfile_formset"] = context.get(
-            "productfile_formset"
-        )  # Make sure formset is also in context
         context["error_message"] = "There was an error processing your request."
-        return self.render_to_response(
-            context
-        )  # Make sure you're re-rendering with errors
+        return self.render_to_response(context)
 
     def form_valid(self, form):
-        # for key,value in self.request.POST.items():
-        #     print(f"{key}: {value}")
-        # return
-        print("Received POST data:")
-        print(self.request.POST)
+        self.object = form.save(commit=False)
+        context = self.get_context_data()
+        productfile_formset = context["productfile_formset"]
+
         export_data = self.request.POST.get("export_data")
-        print("export_data JSON:")
-        print(export_data)  # Print the raw JSON string
         if export_data:
             try:
                 export_data = json.loads(export_data)
-                print("Parsed export_data:")
-                print(export_data)  # Print the Python dictionary
             except json.JSONDecodeError:
-                print("Error decoding JSON in export_data")
-                # Handle the error appropriately (e.g., set a form error, return an HttpResponseBadRequest)
                 return self.form_invalid(form)
 
-            # ---------------
-            # now handling the deleting part
-            product_variants_data = export_data.get("product_variants", [])
-            if product_variants_data:
-                existing_variant_skus = set(
-                    self.object.variants.values_list("variant_sku", flat=True)
+            submitted_skus = set()
+            for variant_data in export_data.get("product_variant_list", []):
+                variant_sku = variant_data.get("variant_sku")
+                submitted_skus.add(variant_sku)
+
+                if not variant_sku:
+                    continue
+
+                # Get or create the variant
+                variant_obj, created = ProductVariant.objects.get_or_create(
+                    product=self.object, variant_sku=variant_sku
                 )
-                submitted_variant_skus = {
-                    v["variant_sku"]
-                    for v in product_variants_data
-                    if v.get("variant_sku")
-                }
 
-                variants_to_delete = existing_variant_skus - submitted_variant_skus
-                ProductVariant.objects.filter(
-                    product=self.object, variant_sku__in=variants_to_delete
+                # Update fields
+                variant_obj.variant_price = variant_data.get("variant_price")
+                variant_obj.variant_quantity = variant_data.get("variant_quantity")
+                variant_obj.variant_barcode = variant_data.get("variant_barcode")
+                variant_obj.variant_featured = variant_data.get(
+                    "variant_featured", False
+                )
+                variant_obj.save()
+
+                # Clear and recreate attribute values
+                ProductVariantAttributeValue.objects.filter(
+                    product_variant=variant_obj
                 ).delete()
-                print(f"Deleted variants: {variants_to_delete}")
-            # ---------------
-            product_variants = export_data["product_variants"]
-            # Check if product_variants list is not empty
-            if product_variants:
-                print("product variants are:")
-                print(product_variants)
-                for variant_data in product_variants:
-                    variant_sku = variant_data.get("variant_sku")
-                    if variant_sku:
-                        try:
-                            product_variant_object = ProductVariant.objects.get(
-                                variant_sku=variant_sku, product=self.object
-                            )  # add product=self.object
-                            # update existing variant
-                            for key, value in variant_data.items():
-                                # skip the keys that are not needed for update: sku and combination
-                                if key not in ("variant_sku", "variant_combination"):
-                                    setattr(product_variant_object, key, value)
-                            product_variant_object.save()
-                            print(f"Updated variant: {variant_sku}")
-                        except ProductVariant.DoesNotExist:
-                            # Create new variant
-                            new_variant = ProductVariant(
-                                product=self.object, variant_sku=variant_sku
-                            )
-                            for key, value in variant_data.items():
-                                # skip the keys that are not needed for update: sku and combination
-                                if key not in ("variant_sku", "variant_combination"):
-                                    setattr(new_variant, key, value)
-                            new_variant.save()
-                            print(f"Created new variant: {variant_sku}")
+                for attr_name, attr_value in variant_data.get(
+                    "variant_attribute_values", {}
+                ).items():
+                    attribute, _ = ProductVariantAttribute.objects.get_or_create(
+                        name=attr_name.lower()
+                    )
+                    ProductVariantAttributeValue.objects.create(
+                        product=self.object,
+                        product_variant=variant_obj,
+                        attribute=attribute,
+                        value=attr_value,
+                    )
 
-                        # now let's handle the variant combination
-                        variant_combination = variant_data.get("variant_combination")
-                        if variant_combination:
-                            # Clear existing attribute values for this variant
-                            ProductVariantAttributeValue.objects.filter(
-                                product_variant=product_variant_object
-                            ).delete()
+            # Delete variants not included in submitted SKUs
+            existing_skus = set(
+                self.object.variants.values_list("variant_sku", flat=True)
+            )
+            skus_to_delete = existing_skus - submitted_skus
+            ProductVariant.objects.filter(
+                product=self.object, variant_sku__in=skus_to_delete
+            ).delete()
 
-                            for attr_name, attr_value in variant_combination.items():
-                                try:
-                                    attribute = ProductVariantAttribute.objects.get(
-                                        name=attr_name
-                                    )
-                                    ProductVariantAttributeValue.objects.create(
-                                        product=self.object,
-                                        product_variant=product_variant_object,
-                                        attribute=attribute,
-                                        value=attr_value,
-                                    )
-                                except ProductVariantAttribute.DoesNotExist:
-                                    print(
-                                        f"ProductVariantAttribute with name '{attr_name}' does not exist."
-                                    )
-                                    new_attribute = (
-                                        ProductVariantAttribute.objects.create(
-                                            name=attr_name
-                                        )
-                                    )
-                                    ProductVariantAttributeValue.objects.create(
-                                        product=self.object,
-                                        product_variant=product_variant_object,
-                                        attribute=new_attribute,
-                                        value=attr_value,
-                                    )
-                                    print(f"Created new attribute: {attr_name}")
-                                    #  Ideally, handle this error, maybe create the attribute, or add an error to the form
-
-                    else:
-                        print(
-                            "variant_sku is missing for a variant.  Skipping."
-                        )  # important
-
-            # for index, variant in enumerate(product_variants):
-            #     index = index + 1
-            #     product_variant_object = ProductVariant.objects.get(
-            #         variant_sku=variant["variant_sku"]
-            #     )
-            #     for key, value in variant.items():
-            #         # if key != "variant_sku":
-            #         setattr(product_variant_object, key, value)
-
-            #     product_files = self.request.FILES.getlist(f"variant_file_{index}")
-            #     for file_index, file in enumerate(product_files):
-            #         ProductFile.objects.create(
-            #             product=self.object,
-            #             product_variant=product_variant_object,
-            #             file=file,
-            #             # sequence=file_index,
-            #         )
-            #     product_variant_object.save()
-            #     print(f"Updated variant: {product_variant_object.variant_sku}")
-
-        # return
-
-        # variant_data = {key: value for key, value in self.request.POST.items() if "variant" in key}
-        # if(variant_data):
-        #     latest_variant_key, latest_variant_value = list(variant_data.items())[-1]
-        #     number_of_variants = latest_variant_key.split("_")[-1]
-        #     print(f"Number of variants: {number_of_variants}")
-        #     print(f"Latest variant key: {latest_variant_key}, Latest variant value: {latest_variant_value}")
-        # # for key, value in self.request.POST.items():
-        # #     if("variant" in key):
-        # #         print(f"{key}: {value}")
-
-        # Print all FILES data (if any files are uploaded)
-        print("FILES data received:")
-        for key, value in self.request.FILES.items():
-            # # variant_file_1: pxfuel.jpg
-            # product_variant_object = ProductVariant.objects.get(
-            #     variant_sku=product_variants[key.split("_")[-1]]["varaint_sku"]
-            # )
-            # ProductFile.objects.create(
-            #     product=self.object,
-            #     product_variant=product_variant_object,
-            #     file=value,
-            # )
-            print(f"{key}: {value}")
-
-        # product_variants = json.loads(self.request.POST["variant_json"])[
-        #     "product_variants"
-        # ]
-        # print(product_variants)
-
-        context = self.get_context_data()
-        productfile_formset = context["productfile_formset"]
         if productfile_formset.is_valid():
-            self.object = form.save()
+            self.object.save()
             productfile_formset.instance = self.object
             productfile_formset.save()
             return redirect(self.get_success_url())
-        else:
-            return self.form_invalid(form)
+
+        return self.form_invalid(form)
+
+    def _process_variants(self, data):
+        variants_data = data.get("product_variants", [])
+        existing_skus = set(self.object.variants.values_list("variant_sku", flat=True))
+        submitted_skus = {
+            v["variant_sku"] for v in variants_data if v.get("variant_sku")
+        }
+
+        ProductVariant.objects.filter(
+            product=self.object, variant_sku__in=(existing_skus - submitted_skus)
+        ).delete()
+
+        for variant_data in variants_data:
+            sku = variant_data.get("variant_sku")
+            if not sku:
+                continue
+
+            variant, created = ProductVariant.objects.get_or_create(
+                product=self.object, variant_sku=sku
+            )
+
+            for key, value in variant_data.items():
+                if key not in ("variant_sku", "variant_attribute_values"):
+                    setattr(variant, key, value)
+            variant.save()
+
+            ProductVariantAttributeValue.objects.filter(
+                product_variant=variant
+            ).delete()
+            combination = variant_data.get("variant_attribute_values", {})
+
+            for attr_name, attr_value in combination.items():
+                attribute, _ = ProductVariantAttribute.objects.get_or_create(
+                    name=attr_name
+                )
+                ProductVariantAttributeValue.objects.create(
+                    product=self.object,
+                    product_variant=variant,
+                    attribute=attribute,
+                    value=attr_value,
+                )
 
     def get_success_url(self):
         return reverse_lazy("marketing:product_detail", kwargs={"pk": self.object.pk})

@@ -321,12 +321,6 @@ let add_another_value = (el, next_option_name_id) => {
 }
 
 
-
-
-
-
-
-// ----------------------------------------
 // ----------------------------------------
 // ----------------------------------------
 const create_table_button = document.getElementById("create_table_button");
@@ -506,7 +500,7 @@ let createTable = () => {
 
 // ----------------------------------------------
 
-let prepopulate_table = () => {
+let prepopulate_variant_table = () => {
 
     // If the product already has variants in the database then show them in the table
     // else skip to the next else if statement
@@ -615,7 +609,7 @@ let prepopulate_table = () => {
 // ----------------------------------------------
 // If the variant already exists, run below to prepoulate its table with existing variant data
 // This function only runs if the product already has variants in the database
-let variant_form_constructor = () => {
+let prepopulate_variant_containers = () => {
 
     // product_variants variable comes from the variant_form.html component, and from marketing_tags.py to that.
     if (product_variant_list.length <= 0) {
@@ -682,7 +676,7 @@ let variant_form_constructor = () => {
         }
     }
     // document.getElementById("create_table_button").style.display = "none";
-    prepopulate_table();
+    prepopulate_variant_table();
 
 }
 
@@ -694,7 +688,7 @@ let product_files_form = document.getElementById('product_files_form');
 if (hasVariantsCheckbox.checked) {
     variant_component.style.display = 'block';
     product_files_form.style.display = 'none';
-    variant_form_constructor();
+    prepopulate_variant_containers();
 }
 let toggleVariantForm = () => {
     if (hasVariantsCheckbox.checked) {
@@ -753,28 +747,28 @@ form.addEventListener('submit', async (event) => {
     const formData = new FormData(form);
     formData.append('export_data', JSON.stringify(export_data));
 
-    // try {
-    //     const response = await fetch(form.action, {
-    //         method: 'POST',
-    //         body: formData,
-    //     });
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+        });
 
-    //     if (response.ok) {
-    //         console.log("Form submitted successfully. Reloading page to show results.");
-    //         console.log("your response is: ");
+        if (response.ok) {
+            console.log("Form submitted successfully. Reloading page to show results.");
+            console.log("your response is: ");
 
-    //         console.log(response);
+            console.log(response);
 
-    //         // window.location.reload(); // Reload the page
-    //     } else {
-    //         console.error("Form submission failed:", response.statusText);
-    //         const errorText = await response.text();
-    //         console.error("Error Body:", errorText);
-    //         // Optionally, you could try to parse the errorText if your server sends back error details in a specific format.
-    //     }
-    // } catch (error) {
-    //     console.error("Error submitting form:", error);
-    // }
+            window.location.reload(); // Reload the page
+        } else {
+            console.error("Form submission failed:", response.statusText);
+            const errorText = await response.text();
+            console.error("Error Body:", errorText);
+            // Optionally, you could try to parse the errorText if your server sends back error details in a specific format.
+        }
+    } catch (error) {
+        console.error("Error submitting form:", error);
+    }
 
     console.log("your export data is");
     console.log(export_data);
@@ -843,7 +837,7 @@ form.addEventListener('submit', async (event) => {
 
 });
 
-
-// if I change variant container, and click on create table, it does not update the table.
-
-// I need to seperate initializing variant table, and createTable function
+// auto generate variant_sku based on the parent sku and the variant_attribute_values
+// TSHIRT001-BLK-95
+// Enfore sku to be unique
+// make the sure option values are unique within the same option name

@@ -28,15 +28,22 @@ def variant_form(
     # print("your product is: ")
     # print(product)
     product_variant_list = []
-    product_variant_files = {}
+    # product_variant_files = {}
     variant_files_dict = {}
     if variants:
         for variant in variants:
             files = variant.files.all()
-            product_variant_files[variant.pk] = list(files)
+            # product_variant_files[variant.pk] = list(files)
             variant_files_dict[str(variant.variant_sku)] = [
-                {"url": f.file.url, "name": f.file.name} for f in files
+                # this id is the product file's id in django
+                {"id": f.id, "url": f.file.url, "name": f.file.name} for f in files
             ]
+
+#             variant_files_dict["12471"]={
+            #   id: 42,
+            #   url: "/media/files/abc.jpg",
+            #   name: "abc.jpg"
+            # }
 
             # collect attribute values
             attribute_values = variant.attribute_values.all()
@@ -142,7 +149,7 @@ def variant_form(
                 product_variant_list
             ),  # Mark JSON as safe
             "product_variant_options": mark_safe(product_variant_options),
-            "product_variant_files": mark_safe(product_variant_files),
+            # "product_variant_files": mark_safe(product_variant_files),
             "variant_files_json": mark_safe(variant_files_json),
             # "variants": variants_json,  # Mark JSON as safe
         },

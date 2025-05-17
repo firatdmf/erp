@@ -328,6 +328,28 @@ let add_another_value = (el, next_option_name_id) => {
     document.getElementById("create_table_button").style.display = "block";
 }
 
+const render_file_row = (file, variantIndex) => {
+    const wrapper = document.createElement("div");
+
+    wrapper.id = `variant-file-${file.id}`;
+    wrapper.classList.add("variant-file-row");
+
+    wrapper.innerHTML = `
+    <a href="${file.url}" target="_blank">${file.name}</a>
+    <form 
+      method="POST" 
+      hx-post="/marketing/delete-variant-file/"
+      hx-target="#variant-file-${file.id}"
+      hx-swap="outerHTML remove"
+    >
+      <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
+      <input type="hidden" name="file_id" value="${file.id}">
+      <button type="submit">🗑</button>
+    </form>
+  `;
+    return wrapper;
+}
+
 
 // ----------------------------------------
 // ----------------------------------------
@@ -540,7 +562,6 @@ let prepopulate_variant_table = () => {
         // 
 
 
-        console.log("here it comes:");
         Object.keys(product_variant_options).forEach((key) => {
             variant_table_option_names += `<th>${key}</th>`
         })
@@ -576,18 +597,33 @@ let prepopulate_variant_table = () => {
             // ------------------------------------------------------------------------
             variant_table_rows += "<td>"
             variant_table_rows += `<input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple>`;
-            const variant_file_input_element = document.getElementById(`variant_file_${index}`)
-            console.log("your element variant_file_input_element is this:");
-            console.log(variant_file_input_element);
-            
-            
             if (files && files.length > 0) {
                 files.forEach((file) => {
-                    const link = document.createElement("a");
-                    link.href = file.url;
-                    link.textContent = file.name;
-                    link.target = "_blank";
+                    // const link = document.createElement("a");
+                    // link.href = file.url;
+                    // link.textContent = file.name;
+                    // link.target = "_blank";
                     // variant_file_input_element.after(link);
+
+                    variant_table_rows += `
+                    <div id="variant-file-{{ file.id }}">
+                    <p>
+                        <a href=${file.url} target="_blank" >${file.name}</a>
+                            <form 
+                                hx-post="{% url 'delete_variant_file' %}" 
+                                hx-include="this"
+                                hx-target="#variant-file-{{ file.id }}"
+                                hx-swap="outerHTML remove"
+                                method="POST"
+                                id="delete_variant_file_form"
+                            >
+                                {% csrf_token %}
+                                <input type="hidden" name="file_id" value="{{ file.id }}">
+                                <button type="submit" id="delete_variant_file_form_button">🗑</button>
+                            </form>
+                    </p>
+                    </div>
+                    `
                 })
             }
             variant_table_rows += "</td>"
@@ -743,8 +779,11 @@ hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
 
 let manual_post_data = {}
 const form = document.getElementById('product_form');
+const form_submit_button = document.getElementById("form_submit_button")
 
 form.addEventListener('submit', async (event) => {
+    // If the event is not from the original form, then ignore the request (needed for htmx)
+    if (!form.contains(event.target) || event.target !== form) return;
     event.preventDefault();
     loading.style.display = 'block';
     console.log("Form submission prevented. Handling manually...");

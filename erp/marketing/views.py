@@ -1,4 +1,4 @@
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.views import View, generic
@@ -225,7 +225,6 @@ class ProductEdit(generic.edit.UpdateView):
             self.request.POST or None, self.request.FILES or None, instance=self.object
         )
 
-        
         print(self)
         if self.object.has_variants:
             context["variants"] = self.object.variants.all()
@@ -339,6 +338,11 @@ class ProductFileCreate(generic.edit.CreateView):
         return reverse_lazy("marketing:product_file_create")
 
 
+# ------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+# -------------------------------------- API SECTION ---------------------------------------------
+
 # This is just to try if I can make api calls from my next js application, and it works.
 def get_products(request):
     response_data = {}
@@ -348,3 +352,23 @@ def get_products(request):
     # response = HttpResponse(json.dumps(response_data), content_type="application/json")
     response = HttpResponse(json.dumps(response_data))
     return response
+
+
+# This is for htmx
+# ------------------------------------------------------------------------------------------------
+class DeleteVariantFile(View):
+    def post(self, request, *args, **kwargs):
+        print("you are hitting here y ")
+        file_id = request.POST.get("file_id")
+        if not file_id:
+            return HttpResponseBadRequest("Missing file ID")
+
+        try:
+            file = ProductFile.objects.get(pk=file_id)
+            file.delete()
+            return HttpResponse(status=204)  # HTMX expects empty on success
+        except ProductFile.DoesNotExist:
+            return HttpResponseBadRequest("File not found")
+
+
+# ------------------------------------------------------------------------------------------------

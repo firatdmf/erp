@@ -3,6 +3,7 @@
     <link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}" />
 {% endblock css %}
 
+<div class="loading" id="loading">Loading&#8230;</div>
 
 <div class="variant_component" id="variant_component">
     <div class="variant_container" id="variant_container">
@@ -33,6 +34,7 @@
 
     <table id="variant_table">
     </table>
+    <p>{{variant_files_json}}</p>
 
     {% comment %} <input type="hidden" id="variant_json" name="variant_json"> {% endcomment %}
 
@@ -44,6 +46,11 @@
     {% comment %} product_variants variable passed from marketing_tags.py {% endcomment %}
     window.product_variant_list_data = '{{ product_variant_list }}';
     window.product_variant_options_data = '{{ product_variant_options }}';
+    window.product_variant_files = '{{ product_variant_files }}';
+    window.variant_files_json_data = '{{ variant_files_json }}';
+    console.log("your variant files are")
+    console.log(product_variant_files);
+
     {% comment %} console.log('{{message}}') {% endcomment %}
   </script>
 

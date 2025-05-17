@@ -11,7 +11,7 @@
   </p> {% endcomment %}
   <div class="ProductCreatePage">
     <h1>Create Product Form</h1>
-    <form method="post" enctype="multipart/form-data" >
+    <form id="product_form" method="post" enctype="multipart/form-data">
       {% csrf_token %}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 
@@ -54,6 +54,7 @@
 
       <div id="product_files_form">
         <h2>Product Files</h2>
+        {% comment %} ManagementForm form is used by the formset to manage the collection of forms contained in the formset. {% endcomment %}
         {{ productfile_formset.management_form }}
         <div id="productfile-forms">
           {% for form in productfile_formset %}

@@ -41,6 +41,14 @@ const product_variant_list = JSON.parse(product_variant_list_data);
 console.log("product_variant_list: ");
 
 console.log(product_variant_list);
+// ---------------------------------------------------------------------------------------------
+const variant_files_json = JSON.parse(variant_files_json_data);
+console.log("variant_files_json: ");
+console.log(variant_files_json);
+
+
+
+
 
 // product_variant_list = 
 // [
@@ -529,12 +537,20 @@ let prepopulate_variant_table = () => {
         //         )
         //     })
         // }
+        // 
+
+
+        console.log("here it comes:");
+        Object.keys(product_variant_options).forEach((key) => {
+            variant_table_option_names += `<th>${key}</th>`
+        })
 
         // Account for if the value is null
         // make this dynamically generated (for loop the possible product variant form inputs)
 
         // Comes from database
         product_variant_list.map((product_variant, index) => {
+
             // product_variant: {
             //     "variant_sku": "RK24562RW8",
             //     "variant_attribute_values": {
@@ -550,13 +566,33 @@ let prepopulate_variant_table = () => {
 
             // I do this because input id's start from one, not zero.
             index++
-
+            const variantSKU = product_variant.variant_sku;
+            const files = variant_files_json[variantSKU];
             variant_table_rows += '<tr>'
             Object.values(product_variant.variant_attribute_values).map((value) => {
                 variant_table_rows += `<td>${value}</td>`
             })
             // Either we set the value to the existing value or we set it to an empty string
-            variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
+            // ------------------------------------------------------------------------
+            variant_table_rows += "<td>"
+            variant_table_rows += `<input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple>`;
+            const variant_file_input_element = document.getElementById(`variant_file_${index}`)
+            console.log("your element variant_file_input_element is this:");
+            console.log(variant_file_input_element);
+            
+            
+            if (files && files.length > 0) {
+                files.forEach((file) => {
+                    const link = document.createElement("a");
+                    link.href = file.url;
+                    link.textContent = file.name;
+                    link.target = "_blank";
+                    // variant_file_input_element.after(link);
+                })
+            }
+            variant_table_rows += "</td>"
+
+            // ------------------------------------------------------------------------
             variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}"></td>`
             variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}" required></td>`
@@ -700,6 +736,8 @@ let toggleVariantForm = () => {
     }
 }
 
+let loading = document.getElementById('loading');
+
 
 hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
 
@@ -708,6 +746,7 @@ const form = document.getElementById('product_form');
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    loading.style.display = 'block';
     console.log("Form submission prevented. Handling manually...");
 
     const variant_table_input_elements = document.getElementById('variant_table').getElementsByTagName('input');
@@ -768,6 +807,9 @@ form.addEventListener('submit', async (event) => {
         }
     } catch (error) {
         console.error("Error submitting form:", error);
+        loading.style.display = 'none';
+        alert("An error occurred while submitting the form. Please try again.");
+
     }
 
     console.log("your export data is");

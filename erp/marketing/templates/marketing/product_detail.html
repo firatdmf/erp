@@ -33,7 +33,7 @@
       <li>
         {{ variant.variant_sku }}
         {% for attribute_value in variant.attribute_values.all %}
-          {{ attribute_value.attribute }}: {{ attribute_value.value }}
+          {{ attribute_value.product_variant_attribute }}: {{ attribute_value.product_variant_attribute_value }}
         {% endfor %}
       </li>
     </ul>

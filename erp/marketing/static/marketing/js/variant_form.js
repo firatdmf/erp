@@ -4,6 +4,7 @@ export_data = {
     "product_variant_options": {},
     // {"color": ["blue","black"]}
     "product_variant_list": [],
+    "deleted_files": [],
     // [
     //  {
     //     "variant_sku": "blue12",
@@ -45,6 +46,7 @@ console.log(product_variant_list);
 const variant_files_json = JSON.parse(variant_files_json_data);
 console.log("variant_files_json: ");
 console.log(variant_files_json);
+
 
 
 
@@ -98,7 +100,24 @@ console.log(variant_files_json);
 //     }
 // ]
 // ---------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+// ---------------------------------------------------------------------------------------------
+const handleFileDelete = (fileID) => {
+    const fileRow = document.getElementById(`variant-file-${fileID}`);
+    if (fileRow) {
+        fileRow.remove();
+    }
 
+    // Track the deleted file in export_data
+    if (!export_data.deleted_files) {
+        export_data.deleted_files = [];
+    }
+    export_data.deleted_files.push(fileID);
+}
+// ---------------------------------------------------------------------------------------------
 // optionsObj = { "color": ["beige", "white"], "size": ["95", "84"] }
 let getCombinations = (optionsObj) => {
 
@@ -327,29 +346,6 @@ let add_another_value = (el, next_option_name_id) => {
 
     document.getElementById("create_table_button").style.display = "block";
 }
-
-const render_file_row = (file, variantIndex) => {
-    const wrapper = document.createElement("div");
-
-    wrapper.id = `variant-file-${file.id}`;
-    wrapper.classList.add("variant-file-row");
-
-    wrapper.innerHTML = `
-    <a href="${file.url}" target="_blank">${file.name}</a>
-    <form 
-      method="POST" 
-      hx-post="/marketing/delete-variant-file/"
-      hx-target="#variant-file-${file.id}"
-      hx-swap="outerHTML remove"
-    >
-      <input type="hidden" name="csrfmiddlewaretoken" value="${getCSRFToken()}">
-      <input type="hidden" name="file_id" value="${file.id}">
-      <button type="submit">🗑</button>
-    </form>
-  `;
-    return wrapper;
-}
-
 
 // ----------------------------------------
 // ----------------------------------------
@@ -606,21 +602,10 @@ let prepopulate_variant_table = () => {
                     // variant_file_input_element.after(link);
 
                     variant_table_rows += `
-                    <div id="variant-file-{{ file.id }}">
+                    <div id="variant-file-${file.id}" class="variant-file" >
                     <p>
                         <a href=${file.url} target="_blank" >${file.name}</a>
-                            <form 
-                                hx-post="{% url 'delete_variant_file' %}" 
-                                hx-include="this"
-                                hx-target="#variant-file-{{ file.id }}"
-                                hx-swap="outerHTML remove"
-                                method="POST"
-                                id="delete_variant_file_form"
-                            >
-                                {% csrf_token %}
-                                <input type="hidden" name="file_id" value="{{ file.id }}">
-                                <button type="submit" id="delete_variant_file_form_button">🗑</button>
-                            </form>
+                        <button class="delete_button" onClick="handleFileDelete(${file.id})">Delete</button>
                     </p>
                     </div>
                     `
@@ -783,7 +768,11 @@ const form_submit_button = document.getElementById("form_submit_button")
 
 form.addEventListener('submit', async (event) => {
     // If the event is not from the original form, then ignore the request (needed for htmx)
-    if (!form.contains(event.target) || event.target !== form) return;
+
+    if (event.target !== form) return;
+    if (event.submitter?.hasAttribute('hx-post')) {
+        return; // Let HTMX handle it
+    }
     event.preventDefault();
     loading.style.display = 'block';
     console.log("Form submission prevented. Handling manually...");

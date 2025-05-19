@@ -12,6 +12,16 @@
   right: 0;
 }
 
+.delete_button{
+  color:red;
+}
+
+.variant-file p{
+  display:flex;
+  flex-direction: row;
+  gap:10px;
+}
+
 /* Transparent Overlay */
 .loading:before {
   content: '';

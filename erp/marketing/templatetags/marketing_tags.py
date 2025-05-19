@@ -36,10 +36,11 @@ def variant_form(
             # product_variant_files[variant.pk] = list(files)
             variant_files_dict[str(variant.variant_sku)] = [
                 # this id is the product file's id in django
-                {"id": f.id, "url": f.file.url, "name": f.file.name} for f in files
+                {"id": f.id, "url": f.file.url, "name": f.file.name}
+                for f in files
             ]
 
-#             variant_files_dict["12471"]={
+            #             variant_files_dict["12471"]={
             #   id: 42,
             #   url: "/media/files/abc.jpg",
             #   name: "abc.jpg"
@@ -118,6 +119,30 @@ def variant_form(
         product_variant_options = {
             key: list(value) for key, value in product_variant_options.items()
         }
+
+        # print("-----------------------------------------------")
+        # now let's order product_variant_list so in the product form both variants and table look aligned in terms of the orders.
+
+        def variant_sort_key(variant, attribute_order):
+            values = variant.get("variant_attribute_values", {})
+            sort_key = []
+
+            for attr_name in attribute_order:
+                attr_value = values.get(attr_name)
+                try:
+                    index = attribute_order[attr_name].index(attr_value)
+                except ValueError:
+                    index = len(attribute_order[attr_name])
+                sort_key.append(index)
+
+            return tuple(sort_key)
+
+        product_variant_list.sort(
+            key=lambda v: variant_sort_key(v, product_variant_options)
+        )
+
+        # -------------------------------------------------------------------------
+
         product_variant_options = json.dumps(
             product_variant_options, cls=DecimalEncoder
         )  # convert python dict to json
@@ -127,7 +152,7 @@ def variant_form(
         # print(product_variant_options)
         # print("-----------------------------------------------")
         # print(f"Execution time: {time.time() - start_time} seconds")
-        # -------------------------------------------------------------------------
+
         product_variant_list = json.dumps(
             product_variant_list, cls=DecimalEncoder
         )  # convert python dict to json

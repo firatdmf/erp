@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.views import View, generic
 from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.decorators import login_required
 from .models import *
 from .forms import *
@@ -242,6 +243,57 @@ class ProductEdit(generic.edit.UpdateView):
         export_data = self.request.POST.get("export_data")
 
         if export_data:
+            print("your export data is: ")
+            print(export_data)
+            # {
+            #           "product_variant_options": {},
+            #           "product_variant_list": [
+            #         {
+            #             "variant_sku": "RK24562GC9",
+            #             "variant_attribute_values": {
+            #                 "color": "beige",
+            #                 "size": "95"
+            #             },
+            #             "variant_price": 0,
+            #             "variant_quantity": 46,
+            #             "variant_barcode": 712179795235,
+            #             "variant_featured": true
+            #         },
+            #         {
+            #             "variant_sku": "RK24562RC8",
+            #             "variant_attribute_values": {
+            #                 "color": "beige",
+            #                 "size": "84"
+            #             },
+            #             "variant_price": 0,
+            #             "variant_quantity": 98,
+            #             "variant_barcode": 712179795211,
+            #             "variant_featured": false
+            #         },
+            #         {
+            #             "variant_sku": "RK24562GW9",
+            #             "variant_attribute_values": {
+            #                 "color": "white",
+            #                 "size": "95"
+            #             },
+            #             "variant_price": 20,
+            #             "variant_quantity": 48,
+            #             "variant_barcode": 712179795228,
+            #             "variant_featured": false
+            #         },
+            #         {
+            #             "variant_sku": "RK24562RW8",
+            #             "variant_attribute_values": {
+            #                 "color": "white",
+            #                 "size": "84"
+            #             },
+            #             "variant_price": 10,
+            #             "variant_quantity": 102,
+            #             "variant_barcode": 712179795204,
+            #             "variant_featured": false
+            #         }
+            #     ]
+            # }
             try:
                 export_data = json.loads(export_data)
             except json.JSONDecodeError:
@@ -249,8 +301,20 @@ class ProductEdit(generic.edit.UpdateView):
 
             self._process_variants(export_data)
 
+            # perform deletion of files, if the user deleted any.
+            deleted_files = export_data.get("deleted_files", [])
+            if deleted_files:
+                for fileID in deleted_files:
+                    file_to_delete = ProductFile.objects.get(pk=fileID)
+                    file_to_delete.delete()
+                    print(f"{file_to_delete} has been deleted.")
+                # ProductFile.objects.filter(id__in=deleted_files).delete()
+
             # 🧩 Attach uploaded files to correct variants
+            print("now printing your files")
+            print(self.request.FILES)
             for key in self.request.FILES:
+                print(key)
                 if key.startswith("variant_file_"):
                     try:
                         index = int(key.split("_")[-1]) - 1
@@ -343,6 +407,7 @@ class ProductFileCreate(generic.edit.CreateView):
 # ------------------------------------------------------------------------------------------------
 # -------------------------------------- API SECTION ---------------------------------------------
 
+
 # This is just to try if I can make api calls from my next js application, and it works.
 def get_products(request):
     response_data = {}
@@ -356,7 +421,8 @@ def get_products(request):
 
 # This is for htmx
 # ------------------------------------------------------------------------------------------------
-class DeleteVariantFile(View):
+@method_decorator(csrf_protect, name="dispatch")
+class ProductFileDelete(View):
     def post(self, request, *args, **kwargs):
         print("you are hitting here y ")
         file_id = request.POST.get("file_id")

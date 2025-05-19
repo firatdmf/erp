@@ -44,18 +44,12 @@
   </div>
   {% block js %}
     <script>
-      {% comment %} window.variantData = JSON.parse('{{variants[0].title}}') {% endcomment %}
-      {% comment %} This is how you send data to js file {% endcomment %}
-      window.variantData = "hello windows"
-      {% comment %} console.log({{variants[0].title|safe}}) {% endcomment %}
-
       document.getElementById('add-productfile-form').addEventListener('click', function () {
         var formIdx = document.querySelectorAll('.productfile-form').length
         var newForm = document.querySelector('.productfile-form').cloneNode(true)
         newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx)
         document.getElementById('productfile-forms').appendChild(newForm)
       })
-
     </script>
   {% endblock %}
 {% endblock %}

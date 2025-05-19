@@ -11,6 +11,6 @@ urlpatterns = [
     path("product_edit/<int:pk>/",views.ProductEdit.as_view(),name="product_edit"),
     path("product_file_create/",views.ProductFileCreate.as_view(),name="product_file_create"),
     path("api/get_products",views.get_products,name="get_products"),
-    path("api/delete-variant-file/",views.DeleteVariantFile.as_view(),name="delete_variant_file"),
+    path("api/product_file_delete/",views.ProductFileDelete.as_view(),name="product_file_delete"),
 
 ]

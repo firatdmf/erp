@@ -41,6 +41,8 @@ def product_file_directory_path(instance, filename):
     # if(instance.product_variant):
     #     return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}/{instance.sequence}_{filename}"
     # return f"product_files/{instance.product.sku}/{instance.sequence}_{filename}"
+    if instance.product_variant:
+        return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}_{filename}"
     return f"product_files/{instance.product.sku}/{filename}"
 
 

@@ -161,6 +161,7 @@ def variant_form(
             [], cls=DecimalEncoder
         )  # convert python dict to json
         product_variant_options = json.dumps({}, cls=DecimalEncoder)
+        variant_files_json = json.dumps({}, cls=DecimalEncoder)
 
     return render_to_string(
         "marketing/components/variant_form.html",

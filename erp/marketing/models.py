@@ -42,8 +42,9 @@ def product_file_directory_path(instance, filename):
     #     return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}/{instance.sequence}_{filename}"
     # return f"product_files/{instance.product.sku}/{instance.sequence}_{filename}"
     if instance.product_variant:
-        return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}_{filename}"
-    return f"product_files/{instance.product.sku}/{filename}"
+        return f"product_files/productSKU_{instance.product.sku}/images/productSKU_{instance.product.sku}_variantSKU_{instance.product_variant.variant_sku}_{filename}"
+    else:
+        return f"product_files/productSKU_{instance.product.sku}/images/productSKU_{instance.product.sku}_{filename}"
 
 
 # def weight_unit_choices():
@@ -318,7 +319,9 @@ class ProductVariantAttributeValue(models.Model):
         blank=True,
     )
 
-    product_variant_attribute = models.ForeignKey(ProductVariantAttribute, on_delete=models.CASCADE)
+    product_variant_attribute = models.ForeignKey(
+        ProductVariantAttribute, on_delete=models.CASCADE
+    )
     product_variant_attribute_value = models.CharField(
         max_length=255, verbose_name="Attribute Value", db_index=True
     )  # e.g., "S", "Red"
@@ -371,7 +374,7 @@ class ProductFile(models.Model):
         super(ProductFile, self).delete(*args, **kwargs)
 
     def __str__(self):
-        return f"Media for {self.product.title}"
+        return f"Media for {self.product.sku}|{self.product.title}"
 
         # def save(self, *args, **kwargs):
 

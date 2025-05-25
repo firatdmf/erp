@@ -1,4 +1,5 @@
 from django.http import HttpResponse, HttpResponseBadRequest
+from django.core import serializers
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.views import View, generic
@@ -242,7 +243,12 @@ class ProductEdit(generic.edit.UpdateView):
         context = self.get_context_data()
         export_data = self.request.POST.get("export_data")
 
-        if export_data:
+        print("checking to see if you have variants")
+        # print(self.request.POST.get("has_variants")==None)
+
+        # below is equal to "on" if it has variants, and equal to None if it does not.
+        # self.request.POST.get("has_variants")
+        if export_data and self.request.POST.get("has_variants") == "on":
             print("your export data is: ")
             print(export_data)
             # {
@@ -337,9 +343,19 @@ class ProductEdit(generic.edit.UpdateView):
                         ProductVariant.DoesNotExist,
                     ) as e:
                         print(f"Error processing files for {key}: {e}")
+        else:
+            # deleted_files_raw = self.request.POST.get("deleted_files")
+            # print("your deleted files are:")
+            # print(deleted_files_raw)
 
-        self.object.save()
-        return redirect(self.get_success_url())
+            self.object.save()
+
+            # Let's delete files if the user requested any from the productfile_formset
+            context = self.get_context_data()
+            productfile_formset = context["productfile_formset"]
+            productfile_formset.instance = self.object
+            productfile_formset.save()  # <-- This will delete files marked for deletion
+            return redirect(self.get_success_url())
 
     def _process_variants(self, data):
         variants_data = data.get("product_variant_list", [])
@@ -410,12 +426,15 @@ class ProductFileCreate(generic.edit.CreateView):
 
 # This is just to try if I can make api calls from my next js application, and it works.
 def get_products(request):
-    response_data = {}
     # response_data["products"] = list(Product.objects.all())
-    response_data = {"text": "hello my friend"}
-    print(Product.objects.all())
+    # response_data = {"text": "hello my friend"}
+    # You're getting a bad request because you can't directly serialize a Django QuerySet (like Product.objects.all()) with json.dumps(). Django models and QuerySets are not JSON serializable by default.
+    products = Product.objects.all()
+    # you need this to convert it
+    data = serializers.serialize("json",products)
     # response = HttpResponse(json.dumps(response_data), content_type="application/json")
-    response = HttpResponse(json.dumps(response_data))
+    # response = HttpResponse(json.dumps(response_data))
+    response = HttpResponse(data, content_type="application/json")
     return response
 
 

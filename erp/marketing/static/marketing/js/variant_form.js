@@ -773,6 +773,11 @@ form.addEventListener('submit', async (event) => {
     if (event.submitter?.hasAttribute('hx-post')) {
         return; // Let HTMX handle it
     }
+    if (!hasVariantsCheckbox.checked) {
+        console.log("you have no variants so we will not do this");
+
+        return;
+    }
     event.preventDefault();
     loading.style.display = 'block';
     console.log("Form submission prevented. Handling manually...");

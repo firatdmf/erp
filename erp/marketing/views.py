@@ -343,6 +343,7 @@ class ProductEdit(generic.edit.UpdateView):
                         ProductVariant.DoesNotExist,
                     ) as e:
                         print(f"Error processing files for {key}: {e}")
+                return redirect(self.get_success_url())
         else:
             # deleted_files_raw = self.request.POST.get("deleted_files")
             # print("your deleted files are:")
@@ -431,7 +432,7 @@ def get_products(request):
     # You're getting a bad request because you can't directly serialize a Django QuerySet (like Product.objects.all()) with json.dumps(). Django models and QuerySets are not JSON serializable by default.
     products = Product.objects.all()
     # you need this to convert it
-    data = serializers.serialize("json",products)
+    data = serializers.serialize("json", products)
     # response = HttpResponse(json.dumps(response_data), content_type="application/json")
     # response = HttpResponse(json.dumps(response_data))
     response = HttpResponse(data, content_type="application/json")

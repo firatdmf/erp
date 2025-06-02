@@ -42,9 +42,13 @@ def product_file_directory_path(instance, filename):
     #     return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}/{instance.sequence}_{filename}"
     # return f"product_files/{instance.product.sku}/{instance.sequence}_{filename}"
     if instance.product_variant:
-        return f"product_files/productSKU_{instance.product.sku}/images/productSKU_{instance.product.sku}_variantSKU_{instance.product_variant.variant_sku}_{filename}"
+        return f"product_files/{instance.product.sku}/images/productSKU_{instance.product.sku}_variantSKU_{instance.product_variant.variant_sku}_{filename}"
     else:
-        return f"product_files/productSKU_{instance.product.sku}/images/productSKU_{instance.product.sku}_{filename}"
+        return f"product_files/{instance.product.sku}/images/{filename}"
+
+
+def product_category_directory_path(instance, filename):
+    return f"product_categories/{instance.name}/{filename}"
 
 
 # def weight_unit_choices():
@@ -67,6 +71,7 @@ def validate_file_type(file):
         "image/png",
         "image/gif",
         "image/webp",
+        "image/avif",
         "video/mp4",
         "video/hls",
         "audio/mpeg",
@@ -74,19 +79,35 @@ def validate_file_type(file):
     mime_type, encoding = mimetypes.guess_type(file.name)
     if mime_type not in valid_mime_types:
         raise ValidationError(
-            "Unsupported file type. Allowed types are: jpg, png, gif, webp, mp4, hls, mp3."
+            "Unsupported file type. Allowed types are: jpg, png, gif, webp, avif, mp4, hls, mp3."
         )
     return file
 
 
 def validate_image_type(image):
-    valid_mime_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    valid_mime_types = [
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/avif",
+    ]
     mime_type, encoding = mimetypes.guess_type(image.name)
     if mime_type not in valid_mime_types:
         raise ValidationError(
-            "Unsupported file type. Allowed types are: jpg, png, gif, webp, mp4, hls, mp3."
+            "Unsupported file type. Allowed types are: jpg, png, gif, webp, avif, mp4, hls, mp3."
         )
     return image
+
+
+@classmethod
+def bulk_delete_with_files(cls, queryset):
+    """
+    Deletes all ProductFile instances in the queryset,
+    ensuring files are removed from the filesystem.
+    """
+    for obj in queryset:
+        obj.delete()
 
 
 # ---------------------------------------------------------------------------------------------
@@ -115,6 +136,13 @@ class ProductCategory(models.Model):
 
     created_at = models.DateTimeField(auto_now=True)
     name = models.CharField(max_length=255, null=True, blank=True)
+
+    image = models.FileField(
+        upload_to=product_category_directory_path,
+        null=True,
+        blank=True,
+        validators=[validate_file_size, validate_image_type],
+    )
 
     def __str__(self):
         return f"{self.name}"
@@ -176,6 +204,7 @@ class Product(models.Model):
     # classify this by processing the image file with AI
     # This is predefined and standardized accross the marketing channels like facebook etc
     # category = models.CharField(null=True, blank=True)
+    # this should be mandatory later
     category = models.ForeignKey(
         ProductCategory, on_delete=models.SET_NULL, blank=True, null=True, db_index=True
     )
@@ -372,6 +401,16 @@ class ProductFile(models.Model):
         if self.file and os.path.isfile(self.file.path):
             os.remove(self.file.path)
         super(ProductFile, self).delete(*args, **kwargs)
+
+    # below is needed to delete the files in bulk
+    @classmethod
+    def bulk_delete_with_files(cls, queryset):
+        """
+        Deletes all ProductFile instances in the queryset,
+        ensuring files are removed from the filesystem.
+        """
+        for obj in queryset:
+            obj.delete()
 
     def __str__(self):
         return f"Media for {self.product.sku}|{self.product.title}"

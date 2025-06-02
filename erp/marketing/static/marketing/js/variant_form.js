@@ -770,9 +770,9 @@ form.addEventListener('submit', async (event) => {
     // If the event is not from the original form, then ignore the request (needed for htmx)
 
     if (event.target !== form) return;
-    if (event.submitter?.hasAttribute('hx-post')) {
-        return; // Let HTMX handle it
-    }
+    // if (event.submitter?.hasAttribute('hx-post')) {
+    //     return; // Let HTMX handle it
+    // }
     if (!hasVariantsCheckbox.checked) {
         console.log("you have no variants so we will not do this");
 
@@ -818,6 +818,10 @@ form.addEventListener('submit', async (event) => {
 
     const formData = new FormData(form);
     formData.append('export_data', JSON.stringify(export_data));
+    // console.log("your export data is");
+    // console.log(export_data);
+    
+    
 
     try {
         const response = await fetch(form.action, {

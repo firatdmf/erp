@@ -1,4 +1,4 @@
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.core import serializers
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from .models import *
 from .forms import *
 import json
+import time
 
 # Create your views here.
 # def handle_uploaded_file(f):
@@ -239,6 +240,11 @@ class ProductEdit(generic.edit.UpdateView):
         return self.render_to_response(context)
 
     def form_valid(self, form):
+        # for debug
+        # if has_variants is missing from the post request then set it to 'off'
+        has_variants = self.request.POST.get("has_variants", "off")
+        # print("POST data:", self.request.POST)
+        # print("has_variants:", self.request.POST.get("has_variants"))
         self.object = form.save(commit=False)
         context = self.get_context_data()
         export_data = self.request.POST.get("export_data")
@@ -343,7 +349,7 @@ class ProductEdit(generic.edit.UpdateView):
                         ProductVariant.DoesNotExist,
                     ) as e:
                         print(f"Error processing files for {key}: {e}")
-                return redirect(self.get_success_url())
+            return redirect(self.get_success_url())
         else:
             # deleted_files_raw = self.request.POST.get("deleted_files")
             # print("your deleted files are:")
@@ -355,7 +361,12 @@ class ProductEdit(generic.edit.UpdateView):
             context = self.get_context_data()
             productfile_formset = context["productfile_formset"]
             productfile_formset.instance = self.object
-            productfile_formset.save()  # <-- This will delete files marked for deletion
+            if productfile_formset.is_valid():
+                productfile_formset.save()  # <-- This will delete files marked for deletion
+            else:
+                # Handle formset errors, e.g. re-render the form with errors
+                return self.form_invalid(form)
+
             return redirect(self.get_success_url())
 
     def _process_variants(self, data):
@@ -425,17 +436,70 @@ class ProductFileCreate(generic.edit.CreateView):
 # -------------------------------------- API SECTION ---------------------------------------------
 
 
+def get_product_categories(request):
+    product_categories = ProductCategory.objects.all()
+    # data = list(product_categories)
+    data = [
+        {
+            "id": category.id,
+            "name": category.name,
+            "image": category.image.url if category.image else None,
+            # Add other fields you want to expose
+        }
+        for category in product_categories
+    ]
+    # Your put safe=false, this is required for lists! If it was a dictionary then you wouldn't need it.
+    return JsonResponse(data, safe=False)
+
+    # data = {"categories": [...]}
+    # return JsonResponse(data)
+
+
 # This is just to try if I can make api calls from my next js application, and it works.
 def get_products(request):
+    product_category = request.GET.get("product_category", None)
+    if(product_category):
+        products = Product.objects.filter(category__id=product_category)
+    else:
+        products = Product.objects.all()
+        print("you are getting all products without category filter")
+    start = time.time()
     # response_data["products"] = list(Product.objects.all())
     # response_data = {"text": "hello my friend"}
     # You're getting a bad request because you can't directly serialize a Django QuerySet (like Product.objects.all()) with json.dumps(). Django models and QuerySets are not JSON serializable by default.
     products = Product.objects.all()
     # you need this to convert it
-    data = serializers.serialize("json", products)
-    # response = HttpResponse(json.dumps(response_data), content_type="application/json")
-    # response = HttpResponse(json.dumps(response_data))
-    response = HttpResponse(data, content_type="application/json")
+    # data = serializers.serialize("json", products)
+    # response = HttpResponse(data, content_type="application/json")
+
+    # below is for faster data processing.
+    products_data = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "sku": p.sku,
+            # Add only the fields you need
+        }
+        for p in products
+    ]
+    product_variant_attributes = ProductVariantAttribute.objects.all()
+    product_variant_attribute_values = ProductVariantAttributeValue.objects.all()
+
+    attributes_data = []
+    for attr in product_variant_attributes:
+        values = (
+            product_variant_attribute_values.filter(product_variant_attribute=attr)
+            .values_list("product_variant_attribute_value", flat=True)
+            .distinct()
+        )
+        attributes_data.append(
+            {"id": attr.id, "name": attr.name, "values": list(values)}
+        )
+    response = JsonResponse({"products": products_data, "attributes": attributes_data})
+    print("your response is:")
+    print(response)
+    end = time.time()
+    print(f"Time taken to get products: {end - start} seconds")
     return response
 
 

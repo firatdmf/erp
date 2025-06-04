@@ -105,6 +105,8 @@ def variant_form(
             {}
         )  # { color: ["white", "beige"], size: ["84", "95"] }
 
+        print("your product variant list is:")
+        print(product_variant_list)
         for product_variant in product_variant_list:
             variant_attribute_values = product_variant["variant_attribute_values"]
             for attribute, value in variant_attribute_values.items():
@@ -162,6 +164,9 @@ def variant_form(
         )  # convert python dict to json
         product_variant_options = json.dumps({}, cls=DecimalEncoder)
         variant_files_json = json.dumps({}, cls=DecimalEncoder)
+
+    print("your product variant options data is")
+    print(product_variant_options)
 
     return render_to_string(
         "marketing/components/variant_form.html",

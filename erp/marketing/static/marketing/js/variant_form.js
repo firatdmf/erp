@@ -5,6 +5,7 @@ export_data = {
     // {"color": ["blue","black"]}
     "product_variant_list": [],
     "deleted_files": [],
+    "delete_all_variants": false,
     // [
     //  {
     //     "variant_sku": "blue12",
@@ -774,10 +775,28 @@ form.addEventListener('submit', async (event) => {
     //     return; // Let HTMX handle it
     // }
     if (!hasVariantsCheckbox.checked) {
-        console.log("you have no variants so we will not do this");
-
-        return;
+        export_data.delete_all_variants = true;
+        export_data.product_variant_list = [];
     }
+
+
+    // might delete below later:
+    // ----------------------------------------------------------------------------------------
+
+    if (!hasVariantsCheckbox.checked) {
+        Object.keys(export_data).forEach((key) => {
+            if (key === "product_variant_list") {
+                export_data[key] = [];
+            }
+        });
+
+        // Optionally, remove file inputs from DOM if they exist
+        document.querySelectorAll("input[type='file'][name^='variant_file_']").forEach(input => {
+            input.value = null;
+        });
+    }
+    // ----------------------------------------------------------------------------------------
+
     event.preventDefault();
     loading.style.display = 'block';
     console.log("Form submission prevented. Handling manually...");
@@ -818,10 +837,7 @@ form.addEventListener('submit', async (event) => {
 
     const formData = new FormData(form);
     formData.append('export_data', JSON.stringify(export_data));
-    // console.log("your export data is");
-    // console.log(export_data);
-    
-    
+
 
     try {
         const response = await fetch(form.action, {

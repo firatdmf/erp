@@ -48,12 +48,18 @@ class ProductForm(forms.ModelForm):
         product.clean()  # Call the clean method to validate
         return cleaned_data
 
-    
+
 
     # The input id will be "id_has_variants", this won't be saved to the database, for interactions only.
-    # has_variants = forms.BooleanField(
-    #     required=False, label="Does this product have variants?"
-    # )
+    has_variants = forms.BooleanField(
+        required=False, label="Does this product have variants?"
+    )
+    # If it has variants, this field will be set to True, otherwise False.
+    def __init__(self, *args, **kwargs):
+        super(ProductForm, self).__init__(*args, **kwargs)
+        # If the instance has variants, set the has_variants field to True
+        if self.instance and self.instance.variants.exists():
+            self.fields['has_variants'].initial = True
 
     # def __init__(self, *args, **kwargs):
     #     super(ProductForm, self).__init__(*args, **kwargs)

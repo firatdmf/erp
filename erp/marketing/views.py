@@ -100,14 +100,7 @@ class ProductCreate(generic.edit.CreateView):
 
         #   -----------------  This is the old way of saving the variant form -----------------
 
-        has_variants = form.cleaned_data["has_variants"]
-        if has_variants:
-            # self.object.save()
 
-            print("has variants")
-            # print(self.request.POST.items())
-            for key, value in self.request.POST.items():
-                print(f"Key: {key}, Value: {value}")
         # else:
         #     self.object.save()
         #     return super().form_valid(form)
@@ -229,7 +222,7 @@ class ProductEdit(generic.edit.UpdateView):
         )
 
         print(self)
-        if self.object.has_variants:
+        if self.object.variants.exists():
             context["variants"] = self.object.variants.all()
         return context
 
@@ -242,10 +235,15 @@ class ProductEdit(generic.edit.UpdateView):
     def form_valid(self, form):
         # for debug
         # if has_variants is missing from the post request then set it to 'off'
-        has_variants = self.request.POST.get("has_variants", "off")
+        # has_variants = self.request.POST.get("has_variants", "off")
+
+
         # print("POST data:", self.request.POST)
         # print("has_variants:", self.request.POST.get("has_variants"))
-        self.object = form.save(commit=False)
+        self.object = form.save(commit=True)
+        # If the object does not have variants, then delete all variants associated with it, and their files.
+        # if not self.object.variants.exists():
+        #     ProductVariant.objects.filter(product=self.object).delete()
         context = self.get_context_data()
         export_data = self.request.POST.get("export_data")
 
@@ -254,7 +252,7 @@ class ProductEdit(generic.edit.UpdateView):
 
         # below is equal to "on" if it has variants, and equal to None if it does not.
         # self.request.POST.get("has_variants")
-        if export_data and self.request.POST.get("has_variants") == "on":
+        if export_data:
             print("your export data is: ")
             print(export_data)
             # {

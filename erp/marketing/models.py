@@ -254,7 +254,7 @@ class Product(models.Model):
         db_index=True,
     )
     # supplier = models.CharField( null=True, blank=True)
-    has_variants = models.BooleanField(default=False)
+    # has_variants = models.BooleanField(default=False)
     datasheet_url = models.URLField(null=True, blank=True)
 
     def __str__(self):
@@ -262,6 +262,16 @@ class Product(models.Model):
             return self.sku
         else:
             return self.title
+
+    # def save(self, *args, **kwargs):
+    #     # Convert the title to lowercase before saving
+    #     super(Product, self).save(
+    #         *args, **kwargs
+    #     )  # Save first to ensure self.pk exists
+    #     if not self.variants.exists():
+    #         if self.has_variants:
+    #             self.has_variants = False
+    #             super().save(update_fields=["has_variants"])
 
 
 class ProductVariant(models.Model):
@@ -413,7 +423,7 @@ class ProductFile(models.Model):
             obj.delete()
 
     def __str__(self):
-        return f"Media for {self.product.sku}|{self.product.title}"
+        return f"Media for {self.product.sku} | {self.product.title}"
 
         # def save(self, *args, **kwargs):
 

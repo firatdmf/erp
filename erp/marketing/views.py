@@ -454,22 +454,19 @@ def get_product_categories(request):
 # This is just to try if I can make api calls from my next js application, and it works.
 def get_products(request):
     start = time.time()
-    print("you have requested products")
     product_category = request.GET.get("product_category", None)
     if product_category:
-        print(f"Product category filter: {product_category}")
         try:
-            # products = Product.objects.filter(category__id=product_category)
             category = ProductCategory.objects.get(name=product_category)
         except ProductCategory.DoesNotExist:
-            print(f'Category "{product_category}" does not exist.')
-            # raise Http404(f"The {product_category} category does not exist.")
-            return JsonResponse({"message": f"The {product_category} category does not exist."}, status=404)
+            return JsonResponse(
+                {"message": f"The {product_category} category does not exist."},
+                status=404,
+            )
         products = Product.objects.filter(category=category, featured=True)
-        if not products.exists():
-            return JsonResponse({"message": f"There are no available products in {product_category} category."}, status=404)
-        print("your products are:")
-        print(products)
+    else:
+        products = Product.objects.all(featured=True)
+
         # return JsonResponse(
         #     {
         #         "products": [
@@ -485,75 +482,73 @@ def get_products(request):
         #     }
         # )
 
-        
         # 1. Get all variants for these products
-        variant_ids = ProductVariant.objects.filter(product__in=products).values_list('id', flat=True)
+    product_variants = ProductVariant.objects.filter(product__in=products)
+    # 2. Get all attribute values for these variants
+    product_variant_attribute_values = ProductVariantAttributeValue.objects.filter(
+        product_variant__in=product_variants
+    )
+    # 3. Get all unique attributes used by these variants
+    attribute_ids = product_variant_attribute_values.values_list(
+        "product_variant_attribute_id", flat=True
+    ).distinct()
+    product_variant_attributes = ProductVariantAttribute.objects.filter(
+        id__in=attribute_ids
+    )
 
-        # 2. Get all attribute values for these variants
-        attribute_values = ProductVariantAttributeValue.objects.filter(product_variant_id__in=variant_ids)
+    # 4. Build the lists for JSON
+    products_data = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "sku": p.sku,
+            "price": p.price,
+            # "primary_image": p.primary_image.file.url if p.primary_image else None,
+            "primary_image": p.get_primary_image(),
+            # Add other fields you want to expose
+        }
+        for p in products
+    ]
+    print("your sent producs_data is")
+    print(products_data)
+    product_variants_data = [
+        {
+            "id": v.id,
+            "product_id": v.product_id,
+            "variant_sku": v.variant_sku,
+            "variant_price": v.variant_price,
+            "variant_quantity": v.variant_quantity,
+            "primary_image": v.get_primary_image()
+            # Add other fields you want to expose
+        }
+        for v in product_variants
+    ]
+    product_variant_attributes_data = [
+        {
+            "id": a.id,
+            "name": a.name,
+        }
+        for a in product_variant_attributes
+    ]
+    product_variant_attribute_values_data = [
+        {
+            "id": av.id,
+            "product_variant_id": av.product_variant_id,
+            "product_variant_attribute_id": av.product_variant_attribute_id,
+            "product_variant_attribute_value": av.product_variant_attribute_value,
+            "product_id": av.product_variant.product_id,  # for easier filtering in frontend
+        }
+        for av in product_variant_attribute_values
+    ]
 
-        # 3. Get all unique attributes used by these variants
-        attribute_ids = attribute_values.values_list('product_variant_attribute_id', flat=True).distinct()
-        attributes = ProductVariantAttribute.objects.filter(id__in=attribute_ids)
-
-        # product_variant_attributes = ProductVariantAttribute.objects.all()
-        # product_variant_attribute_values = ProductVariantAttributeValue.objects.all()
-
-        # 4. Build the attributes_data list
-        attributes_data = []
-        for attr in attributes:
-            values = (
-                attribute_values.filter(product_variant_attribute=attr)
-                .values_list("product_variant_attribute_value", flat=True)
-                .distinct()
-            )
-            attributes_data.append(
-                {"id": attr.id, "name": attr.name, "values": list(values)}
-            )
-
-        # 5. Build your products_data as before
-        products_data = [
-            {
-                "id": p.id,
-                "title": p.title,
-                "sku": p.sku,
-                "price": p.price,
-                # Add other fields you want to expose
-            }
-            for p in products
-        ]
-
-        # 6. Return the response
-        return JsonResponse({"products": products_data, "attributes": attributes_data})
-        # response = JsonResponse({"products": 
-        #                          [
-        #             {
-        #                 "id": p.id,
-        #                 "title": p.title,
-        #                 "sku": p.sku,
-        #                 "price":p.price,
-        #                 # Add other fields you want to expose
-        #             }
-        #             for p in products
-        #         ], "attributes": attributes_data})
-
-    else:
-        # RAISE an error and catch it in the frontend.
-        products = Product.objects.all()
-        print("you are getting all products without category filter")
-        return JsonResponse({
-            "message": "You have not specified a product category, so you are getting all products.",
-            "products":[
-                    {
-                        "id": p.id,
-                        "title": p.title,
-                        "sku": p.sku,
-                        "price":p.price,
-                        # Add other fields you want to expose
-                    }
-                    for p in products
-                ]
-            }, status=100)
+    return JsonResponse(
+        {
+            "products": products_data,
+            "product_variants": product_variants_data,
+            "product_variant_attributes": product_variant_attributes_data,
+            "product_variant_attribute_values": product_variant_attribute_values_data,
+        }
+    )
 
     # print("your response is:")
     # print(response)

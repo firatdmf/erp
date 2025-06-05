@@ -8,8 +8,6 @@ from crm.models import Supplier
 from django.contrib.postgres.fields import ArrayField
 
 # Create your functions here.
-
-
 # def product_variants_default():
 #     return {
 #         "variants": {
@@ -257,6 +255,16 @@ class Product(models.Model):
     # has_variants = models.BooleanField(default=False)
     datasheet_url = models.URLField(null=True, blank=True)
 
+    # this is for displaying the product on the website's products grid.
+    primary_image = models.ForeignKey(
+        # quote the model name as a string to avoid circular import issues
+        "ProductFile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="primary_for_products",
+    )
+
     def __str__(self):
         if self.sku:
             return self.sku
@@ -272,6 +280,16 @@ class Product(models.Model):
     #         if self.has_variants:
     #             self.has_variants = False
     #             super().save(update_fields=["has_variants"])
+
+    def get_primary_image(self):
+        primary_image = self.files.filter(is_primary=True).first()
+        if primary_image:
+            return primary_image.file.url
+        return (
+            self.files.order_by("sequence").first().file.url
+            if self.files.exists()
+            else None
+        )
 
 
 class ProductVariant(models.Model):
@@ -327,6 +345,16 @@ class ProductVariant(models.Model):
         ]
         return f"{self.product.title} - {' / '.join(values)}"
 
+    def get_primary_image(self):
+        primary_image = self.files.filter(is_primary=True).first()
+        if primary_image:
+            return primary_image.file.url
+        return (
+            self.files.order_by("sequence").first().file.url
+            if self.files.exists()
+            else None
+        )
+
 
 # Example: Size and Color Attributes
 # Make this unique and do get or create when creating the product variant
@@ -376,6 +404,8 @@ class ProductVariantAttributeValue(models.Model):
 
 
 class ProductFile(models.Model):
+    sequence = models.PositiveIntegerField(default=0)
+    is_primary = models.BooleanField(default=False)
     # This way I could just say product.files and get the file docs
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name="files", null=True, blank=True
@@ -392,19 +422,47 @@ class ProductFile(models.Model):
         upload_to=product_file_directory_path,
         validators=[validate_file_size, validate_file_type],
     )
-    # This is the sequence of the files
-    # sequence = models.SmallIntegerField(unique=True)
 
     # If the file alredy exists, delete the old file and save the new one
+
     def save(self, *args, **kwargs):
-        # Check if the instance already exists in the database
+        self.full_clean()  # this will trigger clean()
+        # If updating an existing instance, remove old file
         if self.pk:
             old_instance = ProductFile.objects.get(pk=self.pk)
-            # If a new file is uploaded, delete the old file
             if old_instance.file and old_instance.file != self.file:
                 if os.path.isfile(old_instance.file.path):
                     os.remove(old_instance.file.path)
-        super(ProductFile, self).save(*args, **kwargs)
+
+        # Auto-assign is_primary if not already set and no primary exists
+        if not self.is_primary:
+            if (
+                self.product
+                and not self.product.files.filter(is_primary=True)
+                .exclude(pk=self.pk)
+                .exists()
+            ):
+                self.is_primary = True
+            elif (
+                self.product_variant
+                and not self.product_variant.files.filter(is_primary=True)
+                .exclude(pk=self.pk)
+                .exists()
+            ):
+                self.is_primary = True
+
+        super().save(*args, **kwargs)
+
+    # Cannot be both product and product_variant image.
+    def clean(self):
+        if self.product and self.product_variant:
+            raise ValidationError(
+                "A file cannot be attached to both a product and a variant."
+            )
+        if not self.product and not self.product_variant:
+            raise ValidationError(
+                "A file must be attached to either a product or a variant."
+            )
 
     def delete(self, *args, **kwargs):
         # Delete the file from the filesystem

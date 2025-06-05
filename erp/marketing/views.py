@@ -1,4 +1,4 @@
-from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, Http404
 from django.core import serializers
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
@@ -99,7 +99,6 @@ class ProductCreate(generic.edit.CreateView):
             productfile_formset.save()
 
         #   -----------------  This is the old way of saving the variant form -----------------
-
 
         # else:
         #     self.object.save()
@@ -236,7 +235,6 @@ class ProductEdit(generic.edit.UpdateView):
         # for debug
         # if has_variants is missing from the post request then set it to 'off'
         # has_variants = self.request.POST.get("has_variants", "off")
-
 
         # print("POST data:", self.request.POST)
         # print("has_variants:", self.request.POST.get("has_variants"))
@@ -431,7 +429,7 @@ class ProductFileCreate(generic.edit.CreateView):
 # ------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------------------------
-# -------------------------------------- API SECTION ---------------------------------------------
+# -------------------------------------- API CALLS SECTION ---------------------------------------
 
 
 def get_product_categories(request):
@@ -455,53 +453,116 @@ def get_product_categories(request):
 
 # This is just to try if I can make api calls from my next js application, and it works.
 def get_products(request):
+    start = time.time()
+    print("you have requested products")
     product_category = request.GET.get("product_category", None)
-    if(product_category):
-        products = Product.objects.filter(category__id=product_category)
+    if product_category:
+        print(f"Product category filter: {product_category}")
+        try:
+            # products = Product.objects.filter(category__id=product_category)
+            category = ProductCategory.objects.get(name=product_category)
+        except ProductCategory.DoesNotExist:
+            print(f'Category "{product_category}" does not exist.')
+            # raise Http404(f"The {product_category} category does not exist.")
+            return JsonResponse({"message": f"The {product_category} category does not exist."}, status=404)
+        products = Product.objects.filter(category=category, featured=True)
+        if not products.exists():
+            return JsonResponse({"message": f"There are no available products in {product_category} category."}, status=404)
+        print("your products are:")
+        print(products)
+        # return JsonResponse(
+        #     {
+        #         "products": [
+        #             {
+        #                 "id": p.id,
+        #                 "title": p.title,
+        #                 "sku": p.sku,
+        #                 "price":p.price,
+        #                 # Add other fields you want to expose
+        #             }
+        #             for p in products
+        #         ]
+        #     }
+        # )
+
+        
+        # 1. Get all variants for these products
+        variant_ids = ProductVariant.objects.filter(product__in=products).values_list('id', flat=True)
+
+        # 2. Get all attribute values for these variants
+        attribute_values = ProductVariantAttributeValue.objects.filter(product_variant_id__in=variant_ids)
+
+        # 3. Get all unique attributes used by these variants
+        attribute_ids = attribute_values.values_list('product_variant_attribute_id', flat=True).distinct()
+        attributes = ProductVariantAttribute.objects.filter(id__in=attribute_ids)
+
+        # product_variant_attributes = ProductVariantAttribute.objects.all()
+        # product_variant_attribute_values = ProductVariantAttributeValue.objects.all()
+
+        # 4. Build the attributes_data list
+        attributes_data = []
+        for attr in attributes:
+            values = (
+                attribute_values.filter(product_variant_attribute=attr)
+                .values_list("product_variant_attribute_value", flat=True)
+                .distinct()
+            )
+            attributes_data.append(
+                {"id": attr.id, "name": attr.name, "values": list(values)}
+            )
+
+        # 5. Build your products_data as before
+        products_data = [
+            {
+                "id": p.id,
+                "title": p.title,
+                "sku": p.sku,
+                "price": p.price,
+                # Add other fields you want to expose
+            }
+            for p in products
+        ]
+
+        # 6. Return the response
+        return JsonResponse({"products": products_data, "attributes": attributes_data})
+        # response = JsonResponse({"products": 
+        #                          [
+        #             {
+        #                 "id": p.id,
+        #                 "title": p.title,
+        #                 "sku": p.sku,
+        #                 "price":p.price,
+        #                 # Add other fields you want to expose
+        #             }
+        #             for p in products
+        #         ], "attributes": attributes_data})
+
     else:
+        # RAISE an error and catch it in the frontend.
         products = Product.objects.all()
         print("you are getting all products without category filter")
-    start = time.time()
-    # response_data["products"] = list(Product.objects.all())
-    # response_data = {"text": "hello my friend"}
-    # You're getting a bad request because you can't directly serialize a Django QuerySet (like Product.objects.all()) with json.dumps(). Django models and QuerySets are not JSON serializable by default.
-    products = Product.objects.all()
-    # you need this to convert it
-    # data = serializers.serialize("json", products)
-    # response = HttpResponse(data, content_type="application/json")
+        return JsonResponse({
+            "message": "You have not specified a product category, so you are getting all products.",
+            "products":[
+                    {
+                        "id": p.id,
+                        "title": p.title,
+                        "sku": p.sku,
+                        "price":p.price,
+                        # Add other fields you want to expose
+                    }
+                    for p in products
+                ]
+            }, status=100)
 
-    # below is for faster data processing.
-    products_data = [
-        {
-            "id": p.id,
-            "title": p.title,
-            "sku": p.sku,
-            # Add only the fields you need
-        }
-        for p in products
-    ]
-    product_variant_attributes = ProductVariantAttribute.objects.all()
-    product_variant_attribute_values = ProductVariantAttributeValue.objects.all()
-
-    attributes_data = []
-    for attr in product_variant_attributes:
-        values = (
-            product_variant_attribute_values.filter(product_variant_attribute=attr)
-            .values_list("product_variant_attribute_value", flat=True)
-            .distinct()
-        )
-        attributes_data.append(
-            {"id": attr.id, "name": attr.name, "values": list(values)}
-        )
-    response = JsonResponse({"products": products_data, "attributes": attributes_data})
-    print("your response is:")
-    print(response)
-    end = time.time()
-    print(f"Time taken to get products: {end - start} seconds")
-    return response
+    # print("your response is:")
+    # print(response)
+    # end = time.time()
+    # print(f"Time taken to get products: {end - start} seconds")
+    # return response
 
 
-# This is for htmx
+# I am not sure if below is needed, but I will leave it here for now.
 # ------------------------------------------------------------------------------------------------
 @method_decorator(csrf_protect, name="dispatch")
 class ProductFileDelete(View):

@@ -446,7 +446,7 @@ let createTable = () => {
             // Define name for below and state that the inputs are from the table.
             // Each input will refer to its combination index.
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
-            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index} step=".01"></td>`
             variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" required></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
@@ -615,7 +615,7 @@ let prepopulate_variant_table = () => {
             variant_table_rows += "</td>"
 
             // ------------------------------------------------------------------------
-            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}" step=".01"></td>`
             variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}" required></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode || ''}"></td>`
@@ -746,15 +746,30 @@ let product_files_form = document.getElementById('product_files_form');
 if (hasVariantsCheckbox.checked) {
     variant_component.style.display = 'block';
     product_files_form.style.display = 'none';
+    document.getElementById("id_quantity").setAttribute('disabled', true)
+    document.getElementById("id_barcode").setAttribute('disabled', true)
+    document.getElementById("id_price").setAttribute('disabled', true)
+    document.getElementById("id_quantity").value = "";
+    document.getElementById("id_price").value = "";
+    document.getElementById("id_barcode").value = "";
+
+
     prepopulate_variant_containers();
 }
 let toggleVariantForm = () => {
     if (hasVariantsCheckbox.checked) {
         variant_component.style.display = 'block';
         product_files_form.style.display = 'none';
+        document.getElementById("id_quantity").setAttribute('disabled', true)
+        document.getElementById("id_barcode").setAttribute('disabled', true)
+        document.getElementById("id_price").setAttribute('disabled', true)
+
     } else {
         variant_component.style.display = 'none';
         product_files_form.style.display = 'block';
+        document.getElementById("id_quantity").removeAttribute('disabled');
+        document.getElementById("id_barcode").removeAttribute('disabled');
+        document.getElementById("id_price").removeAttribute('disabled')
     }
 }
 
@@ -797,6 +812,8 @@ form.addEventListener('submit', async (event) => {
     }
     // ----------------------------------------------------------------------------------------
 
+    // ----------------------------------------------------------------------------------------
+
     event.preventDefault();
     loading.style.display = 'block';
     console.log("Form submission prevented. Handling manually...");
@@ -832,11 +849,16 @@ form.addEventListener('submit', async (event) => {
         }
     });
 
-    // console.log("Export data prepared:");
-    // console.log(export_data);
+    console.log("Export data prepared:");
+    console.log(export_data);
+
+
+
 
     const formData = new FormData(form);
     formData.append('export_data', JSON.stringify(export_data));
+    console.log("your form data is");
+    console.log(formData);
 
 
     try {

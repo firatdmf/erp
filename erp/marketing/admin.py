@@ -16,27 +16,27 @@ class ProductFileInlineForm(forms.ModelForm):
         model = ProductFile
         fields = "__all__"
 
-    def clean(self):
-        cleaned_data = super().clean()
-        is_primary = cleaned_data.get("is_primary")
-        product = cleaned_data.get("product")
-        product_variant = cleaned_data.get("product_variant")
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     is_primary = cleaned_data.get("is_primary")
+    #     product = cleaned_data.get("product")
+    #     product_variant = cleaned_data.get("product_variant")
 
-        # If this one is set as primary, check for duplicates
-        if is_primary:
-            qs = ProductFile.objects.all()
-            if self.instance.pk:
-                qs = qs.exclude(pk=self.instance.pk)
+    #     # If this one is set as primary, check for duplicates
+    #     if is_primary:
+    #         qs = ProductFile.objects.all()
+    #         if self.instance.pk:
+    #             qs = qs.exclude(pk=self.instance.pk)
 
-            if product:
-                qs = qs.filter(product=product, is_primary=True)
-            elif product_variant:
-                qs = qs.filter(product_variant=product_variant, is_primary=True)
+    #         if product:
+    #             qs = qs.filter(product=product, is_primary=True)
+    #         elif product_variant:
+    #             qs = qs.filter(product_variant=product_variant, is_primary=True)
 
-            if qs.exists():
-                raise ValidationError("Only one image can be marked as primary.")
+    #         if qs.exists():
+    #             raise ValidationError("Only one image can be marked as primary.")
 
-        return cleaned_data
+    #     return cleaned_data
 
 
 
@@ -58,7 +58,8 @@ class ProductFileInline(admin.TabularInline):
     model = ProductFile
     form = ProductFileInlineForm
     extra = 1  # Number of extra forms to display
-    fields = ("file", "sequence", "is_primary")
+    # fields = ("file", "sequence", "is_primary")
+    fields = ("file", "sequence")
     ordering = ['sequence']
 
 

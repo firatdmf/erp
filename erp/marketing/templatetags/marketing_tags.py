@@ -149,10 +149,6 @@ def variant_form(
             product_variant_options, cls=DecimalEncoder
         )  # convert python dict to json
 
-        # print("-----------------------------------------------")
-        # print("your variant options are:")
-        # print(product_variant_options)
-        # print("-----------------------------------------------")
         # print(f"Execution time: {time.time() - start_time} seconds")
 
         product_variant_list = json.dumps(
@@ -165,8 +161,13 @@ def variant_form(
         product_variant_options = json.dumps({}, cls=DecimalEncoder)
         variant_files_json = json.dumps({}, cls=DecimalEncoder)
 
-    print("your product variant options data is")
+    # print("-----------------------------------------------")
+    print("your variant options are:")
     print(product_variant_options)
+    # print("-----------------------------------------------")F
+
+    # print("your product variant options data is")
+    # print(product_variant_options)
 
     return render_to_string(
         "marketing/components/variant_form.html",

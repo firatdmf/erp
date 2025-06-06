@@ -217,10 +217,9 @@ class ProductEdit(generic.edit.UpdateView):
         context = super().get_context_data(**kwargs)
         # Below is for when there are no variants, for variants it is handled in the marketing_tags.py
         context["productfile_formset"] = ProductFileFormSet(
-            self.request.POST or None, self.request.FILES or None, instance=self.object
+            # Only display the files that are related to this product, not the variants.
+            self.request.POST or None, self.request.FILES or None, instance=self.object, queryset=ProductFile.objects.filter(product=self.object, product_variant__isnull=True)
         )
-
-        print(self)
         if self.object.variants.exists():
             context["variants"] = self.object.variants.all()
         return context
@@ -232,25 +231,24 @@ class ProductEdit(generic.edit.UpdateView):
         return self.render_to_response(context)
 
     def form_valid(self, form):
-        # for debug
-        # if has_variants is missing from the post request then set it to 'off'
-        # has_variants = self.request.POST.get("has_variants", "off")
-
         # print("POST data:", self.request.POST)
-        # print("has_variants:", self.request.POST.get("has_variants"))
+        # Save the product object first, so we can access it in the formset.
         self.object = form.save(commit=True)
-        # If the object does not have variants, then delete all variants associated with it, and their files.
-        # if not self.object.variants.exists():
-        #     ProductVariant.objects.filter(product=self.object).delete()
-        context = self.get_context_data()
+
+        # This is the data sent from JS.
         export_data = self.request.POST.get("export_data")
 
-        print("checking to see if you have variants")
-        # print(self.request.POST.get("has_variants")==None)
+        try:
+            export_data = json.loads(export_data)
+        except json.JSONDecodeError:
+            return self.form_invalid(form)
 
-        # below is equal to "on" if it has variants, and equal to None if it does not.
-        # self.request.POST.get("has_variants")
-        if export_data:
+        # print("your export data is")
+        # print(export_data["product_variant_list"])
+        # return HttpResponse("<p>Hello</p>")
+
+        if export_data and (len(export_data["product_variant_list"]) > 0):
+            self._process_variants(export_data)
             print("your export data is: ")
             print(export_data)
             # {
@@ -302,12 +300,6 @@ class ProductEdit(generic.edit.UpdateView):
             #         }
             #     ]
             # }
-            try:
-                export_data = json.loads(export_data)
-            except json.JSONDecodeError:
-                return self.form_invalid(form)
-
-            self._process_variants(export_data)
 
             # perform deletion of files, if the user deleted any.
             deleted_files = export_data.get("deleted_files", [])
@@ -318,7 +310,7 @@ class ProductEdit(generic.edit.UpdateView):
                     print(f"{file_to_delete} has been deleted.")
                 # ProductFile.objects.filter(id__in=deleted_files).delete()
 
-            # 🧩 Attach uploaded files to correct variants
+            # Attach uploaded files to correct variants
             print("now printing your files")
             print(self.request.FILES)
             for key in self.request.FILES:
@@ -345,8 +337,17 @@ class ProductEdit(generic.edit.UpdateView):
                         ProductVariant.DoesNotExist,
                     ) as e:
                         print(f"Error processing files for {key}: {e}")
+                    # ): continue
             return redirect(self.get_success_url())
+
+        # if productfile_formset.is_valid():
+        #     productfile_formset.save()
+        # else:
+        #     return self.form_invalid(form)
+
+        # return redirect(self.get_success_url())
         else:
+            print("yes you are hitting here myyyy frieeend")
             # deleted_files_raw = self.request.POST.get("deleted_files")
             # print("your deleted files are:")
             # print(deleted_files_raw)
@@ -503,8 +504,8 @@ def get_products(request):
             "title": p.title,
             "sku": p.sku,
             "price": p.price,
-            # "primary_image": p.primary_image.file.url if p.primary_image else None,
-            "primary_image": p.get_primary_image(),
+            "primary_image": p.primary_image.file.url if p.primary_image else None,
+            # "primary_image": p.get_primary_image(),
             # Add other fields you want to expose
         }
         for p in products
@@ -518,7 +519,8 @@ def get_products(request):
             "variant_sku": v.variant_sku,
             "variant_price": v.variant_price,
             "variant_quantity": v.variant_quantity,
-            "primary_image": v.get_primary_image()
+            # "primary_image": v.primary_image.file.url if v.primary_image else None,
+            # "primary_image": v.get_primary_image(),
             # Add other fields you want to expose
         }
         for v in product_variants

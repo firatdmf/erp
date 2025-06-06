@@ -60,6 +60,12 @@ class ProductForm(forms.ModelForm):
         # If the instance has variants, set the has_variants field to True
         if self.instance and self.instance.variants.exists():
             self.fields['has_variants'].initial = True
+        if(self.instance):
+            self.fields["primary_image"].queryset = (
+                ProductFile.objects.filter(product=self.instance)
+            )
+
+        
 
     # def __init__(self, *args, **kwargs):
     #     super(ProductForm, self).__init__(*args, **kwargs)

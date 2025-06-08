@@ -218,7 +218,12 @@ class ProductEdit(generic.edit.UpdateView):
         # Below is for when there are no variants, for variants it is handled in the marketing_tags.py
         context["productfile_formset"] = ProductFileFormSet(
             # Only display the files that are related to this product, not the variants.
-            self.request.POST or None, self.request.FILES or None, instance=self.object, queryset=ProductFile.objects.filter(product=self.object, product_variant__isnull=True)
+            self.request.POST or None,
+            self.request.FILES or None,
+            instance=self.object,
+            queryset=ProductFile.objects.filter(
+                product=self.object, product_variant__isnull=True
+            ),
         )
         if self.object.variants.exists():
             context["variants"] = self.object.variants.all()
@@ -557,6 +562,141 @@ def get_products(request):
     # end = time.time()
     # print(f"Time taken to get products: {end - start} seconds")
     # return response
+
+
+# ------------------------------------------------------------------------------------------------
+def get_product(request):
+    product_sku = request.GET.get("product_sku", None)
+    try:
+        product = Product.objects.get(sku=product_sku, featured=True)
+    except Product.DoesNotExist:
+        return JsonResponse({"error": "Product not found"}, status=404)
+
+    product_category = {
+        "id": product.category.id,
+        "name": product.category.name,
+        "created_at": product.category.created_at,
+        "image": product.category.image.url if product.category.image else None,
+    }
+
+    # Product fields for Product_API
+    product_fields = {
+        "id": product.id,
+        "pk": product.pk,
+        "created_at": product.created_at,
+        "title": product.title,
+        "description": product.description,
+        "sku": product.sku,
+        "barcode": product.barcode,
+        "tags": product.tags,
+        "type": product.type,
+        "unit_of_measurement": product.unit_of_measurement,
+        "quantity": product.quantity,
+        "price": product.price,
+        "featured": product.featured,
+        "selling_while_out_of_stock": product.selling_while_out_of_stock,
+        "weight": product.weight,
+        "unit_of_weight": product.unit_of_weight,
+        "category_id": product.category_id,
+        "supplier_id": product.supplier_id,
+        # "has_variants": product.has_variants,  # REMOVE THIS LINE
+        # "has_variants": product.variants.exists(),  # ADD THIS LINE
+        "datasheet_url": product.datasheet_url,
+        "minimum_inventory_level": getattr(product, "minimum_inventory_level", None),
+        "primary_image": (
+            product.primary_image.file.url
+            if getattr(product, "primary_image", None)
+            else None
+        ),
+    }
+
+    # product_api = {
+    #     "model": "Product",
+    #     "pk": product.pk,
+    #     "fields": product_fields,
+    # }
+
+    # All product files (main and variant)
+    product_files_qs = product.files.all()
+    product_files = [
+        {
+            "id": pf.id,
+            "file": pf.file.url,
+            "product_id": pf.product_id,
+            "product_variant_id": pf.product_variant_id,
+        }
+        for pf in product_files_qs
+    ]
+
+    # Variants
+    variants = product.variants.all()
+    variants_data = []
+    for variant in variants:
+        # Find primary image for variant (if any)
+        variant_primary_file = variant.files.first()
+        variants_data.append(
+            {
+                "id": variant.id,
+                "variant_sku": variant.variant_sku,
+                "variant_barcode": variant.variant_barcode,
+                "variant_quantity": variant.variant_quantity,
+                "variant_price": variant.variant_price,
+                "variant_cost": getattr(variant, "variant_cost", None),
+                "variant_featured": variant.variant_featured,
+                "product_id": variant.product_id,
+                "primary_image": (
+                    variant_primary_file.file.url if variant_primary_file else None
+                ),
+            }
+        )
+
+    # Attribute values
+    attribute_values = ProductVariantAttributeValue.objects.filter(product=product)
+    attribute_values_data = [
+        {
+            "id": av.id,
+            "product_variant_attribute_value": av.product_variant_attribute_value,
+            "product_variant_attribute_id": av.product_variant_attribute_id,
+            "product_variant_id": av.product_variant_id,
+            "product_id": av.product_id,
+        }
+        for av in attribute_values
+    ]
+
+    # Attributes
+    attribute_ids = attribute_values.values_list(
+        "product_variant_attribute_id", flat=True
+    ).distinct()
+    attributes = ProductVariantAttribute.objects.filter(id__in=attribute_ids)
+    attributes_data = [
+        {
+            "id": attr.id,
+            "name": attr.name,
+        }
+        for attr in attributes
+    ]
+    print("here comes the response")
+    print(
+        {
+            "product_category": product_category,
+            "product": product_fields,
+            "variants": variants_data,
+            "product_files": product_files,
+            "product_variant_attributes": attributes_data,
+            "product_variant_attribute_values": attribute_values_data,
+        }
+    )
+
+    return JsonResponse(
+        {
+            "product_category": product_category,
+            "product": product_fields,
+            "variants": variants_data,
+            "product_files": product_files,
+            "product_variant_attributes": attributes_data,
+            "product_variant_attribute_values": attribute_values_data,
+        }
+    )
 
 
 # I am not sure if below is needed, but I will leave it here for now.

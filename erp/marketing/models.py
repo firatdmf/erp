@@ -355,6 +355,18 @@ class ProductVariant(models.Model):
     #         else None
     #     )
 
+    # --------------
+    # This is to record the attributes of the product variant and show them in the admin panel.
+    def attribute_summary(self):
+        # Get all attribute values for this variant
+        values = self.attribute_values.select_related("product_variant_attribute")
+        return ", ".join(
+            f"{v.product_variant_attribute.name}: {v.product_variant_attribute_value}"
+            for v in values
+        )
+    attribute_summary.short_description = "Attributes"
+    # --------------
+
 
 # Example: Size and Color Attributes
 # Make this unique and do get or create when creating the product variant

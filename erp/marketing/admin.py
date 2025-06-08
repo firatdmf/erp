@@ -39,7 +39,6 @@ class ProductFileInlineForm(forms.ModelForm):
     #     return cleaned_data
 
 
-
 class ProductAdminForm(forms.ModelForm):
     tags = TagArrayField(widget=TagArrayWidget, required=False)
 
@@ -60,7 +59,7 @@ class ProductFileInline(admin.TabularInline):
     extra = 1  # Number of extra forms to display
     # fields = ("file", "sequence", "is_primary")
     fields = ("file", "sequence")
-    ordering = ['sequence']
+    ordering = ["sequence"]
 
 
 class ProductVariantInLine(admin.TabularInline):
@@ -109,8 +108,10 @@ class ProductVariantAdmin(admin.ModelAdmin):
         "variant_quantity",
         "product",
         "variant_featured",
+        "attribute_summary",
     )
     search_fields = ("variant_sku", "product__sku", "variant_barcode")
+    readonly_fields = ("attribute_summary",)
 
 
 admin.site.register(Product, ProductAdmin)

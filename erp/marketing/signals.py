@@ -4,6 +4,7 @@ from .models import (
     ProductVariant,
     ProductVariantAttribute,
     ProductVariantAttributeValue,
+    ProductFile,
 )
 
 
@@ -20,3 +21,13 @@ def ensure_product_variant_attributes_values(sender, instance, created, **kwargs
                 product_variant_attribute=attribute,
                 defaults={"product_variant_attribute_value": "Default Value"},
             )
+
+
+@receiver(post_save, sender=ProductFile)
+def set_primary_image_on_first_upload(sender, instance, created, **kwargs):
+    # Only for main product images (not variant images)
+    if created and instance.product:
+        product = instance.product
+        if not product.primary_image:
+            product.primary_image = instance
+            product.save(update_fields=["primary_image"])

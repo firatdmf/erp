@@ -446,7 +446,7 @@ let createTable = () => {
             // Define name for below and state that the inputs are from the table.
             // Each input will refer to its combination index.
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
-            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index} step=".01"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" step="0.01"></td>`
             variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" required></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
@@ -777,6 +777,17 @@ let loading = document.getElementById('loading');
 
 
 hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
+
+const MAX_FILES = 7; // Set your desired limit
+
+document.addEventListener('change', function (e) {
+    if (e.target && e.target.type === 'file' && e.target.multiple) {
+        if (e.target.files.length > MAX_FILES) {
+            alert(`You can only upload up to ${MAX_FILES} files.`);
+            e.target.value = ""; // Clear the input
+        }
+    }
+});
 
 let manual_post_data = {}
 const form = document.getElementById('product_form');

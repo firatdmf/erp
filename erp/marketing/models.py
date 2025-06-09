@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from crm.models import Supplier
 from django.contrib.postgres.fields import ArrayField
 
+
 # Create your functions here.
 # def product_variants_default():
 #     return {
@@ -364,6 +365,7 @@ class ProductVariant(models.Model):
             f"{v.product_variant_attribute.name}: {v.product_variant_attribute_value}"
             for v in values
         )
+
     attribute_summary.short_description = "Attributes"
     # --------------
 
@@ -371,7 +373,7 @@ class ProductVariant(models.Model):
 # Example: Size and Color Attributes
 # Make this unique and do get or create when creating the product variant
 class ProductVariantAttribute(models.Model):
-    name = models.CharField(max_length=255, verbose_name="Attribute Name")
+    name = models.CharField(max_length=255, verbose_name="Attribute Name", unique=True)
 
     def save(self, *args, **kwargs):
         # Convert the name to lowercase before saving
@@ -387,15 +389,15 @@ class ProductVariantAttributeValue(models.Model):
         Product,
         on_delete=models.CASCADE,
         related_name="variant_attribute_values",
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
     product_variant = models.ForeignKey(
         ProductVariant,
         on_delete=models.CASCADE,
         related_name="attribute_values",
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
 
     product_variant_attribute = models.ForeignKey(

@@ -247,6 +247,10 @@ class ProductEdit(generic.edit.UpdateView):
             export_data = json.loads(export_data)
         except json.JSONDecodeError:
             return self.form_invalid(form)
+        
+        # MAX_FILES = 7
+        # if len(self.request.FILES.getlist('your_file_field_name')) > MAX_FILES:
+        #     form.add_error('your_file_field_name', f'You can only upload up to {MAX_FILES} files.')
 
         # print("your export data is")
         # print(export_data["product_variant_list"])
@@ -572,12 +576,7 @@ def get_product(request):
     except Product.DoesNotExist:
         return JsonResponse({"error": "Product not found"}, status=404)
 
-    product_category = {
-        "id": product.category.id,
-        "name": product.category.name,
-        "created_at": product.category.created_at,
-        "image": product.category.image.url if product.category.image else None,
-    }
+    product_category = product.category.name if product.category else None
 
     # Product fields for Product_API
     product_fields = {
@@ -618,6 +617,7 @@ def get_product(request):
 
     # All product files (main and variant)
     product_files_qs = product.files.all()
+    print("your product files",product_files_qs)
     product_files = [
         {
             "id": pf.id,
@@ -627,6 +627,7 @@ def get_product(request):
         }
         for pf in product_files_qs
     ]
+    
 
     # Variants
     variants = product.variants.all()
@@ -652,6 +653,7 @@ def get_product(request):
 
     # Attribute values
     attribute_values = ProductVariantAttributeValue.objects.filter(product=product)
+
     attribute_values_data = [
         {
             "id": av.id,
@@ -676,22 +678,24 @@ def get_product(request):
         for attr in attributes
     ]
     print("here comes the response")
-    print(
-        {
-            "product_category": product_category,
-            "product": product_fields,
-            "variants": variants_data,
-            "product_files": product_files,
-            "product_variant_attributes": attributes_data,
-            "product_variant_attribute_values": attribute_values_data,
-        }
-    )
+    print(product_files)
+    # print(
+    #     {
+    #         "product_category": product_category,
+    #         "product": product_fields,
+    #         "product_variants": variants_data,
+    #         "product_files": product_files,
+    #         "product_variant_attributes": attributes_data,
+    #         "product_variant_attribute_values": attribute_values_data,
+    #     }
+    # )
+    
 
     return JsonResponse(
         {
             "product_category": product_category,
             "product": product_fields,
-            "variants": variants_data,
+            "product_variants": variants_data,
             "product_files": product_files,
             "product_variant_attributes": attributes_data,
             "product_variant_attribute_values": attribute_values_data,

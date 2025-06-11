@@ -1,4 +1,5 @@
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, Http404
+from django.db import IntegrityError, transaction
 from django.core import serializers
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
@@ -247,7 +248,7 @@ class ProductEdit(generic.edit.UpdateView):
             export_data = json.loads(export_data)
         except json.JSONDecodeError:
             return self.form_invalid(form)
-        
+
         # MAX_FILES = 7
         # if len(self.request.FILES.getlist('your_file_field_name')) > MAX_FILES:
         #     form.add_error('your_file_field_name', f'You can only upload up to {MAX_FILES} files.')
@@ -255,6 +256,8 @@ class ProductEdit(generic.edit.UpdateView):
         # print("your export data is")
         # print(export_data["product_variant_list"])
         # return HttpResponse("<p>Hello</p>")
+
+
 
         if export_data and (len(export_data["product_variant_list"]) > 0):
             self._process_variants(export_data)
@@ -347,6 +350,19 @@ class ProductEdit(generic.edit.UpdateView):
                     ) as e:
                         print(f"Error processing files for {key}: {e}")
                     # ): continue
+
+
+            # If the user wants us to delete all variants by clicking on there are no variants checkbox, then you do it here.
+            if(export_data["delete_all_variants"]):
+                print("yes we got your message")
+                print(f"your object is: {self.object}")
+                ProductVariant.objects.filter(product=self.object).delete()
+                # for variant in ProductVariant.objects.filter(product=self.object):
+                #     variant.files.all().delete()
+                #     variant.attribute_values.all().delete()
+                # ProductVariant.objects.filter(product=self.object).delete()
+            else:
+                print("none message received.")
             return redirect(self.get_success_url())
 
         # if productfile_formset.is_valid():
@@ -374,6 +390,7 @@ class ProductEdit(generic.edit.UpdateView):
                 return self.form_invalid(form)
 
             return redirect(self.get_success_url())
+
 
     def _process_variants(self, data):
         variants_data = data.get("product_variant_list", [])
@@ -406,9 +423,18 @@ class ProductEdit(generic.edit.UpdateView):
             combination = variant_data.get("variant_attribute_values", {})
 
             for attr_name, attr_value in combination.items():
-                attribute, _ = ProductVariantAttribute.objects.get_or_create(
-                    name=attr_name
-                )
+                # attribute, _ = ProductVariantAttribute.objects.get_or_create(
+                #     name=attr_name
+                # )
+                try:
+                    attribute, created = ProductVariantAttribute.objects.get_or_create(
+                        name=attr_name
+                    )
+                except IntegrityError:
+                    # If a duplicate is attempted, fetch the existing one
+                    transaction.rollback()  # Rollback the failed transaction
+                    attribute = ProductVariantAttribute.objects.get(name=attr_name)
+
                 ProductVariantAttributeValue.objects.create(
                     product=self.object,
                     product_variant=variant,
@@ -617,7 +643,7 @@ def get_product(request):
 
     # All product files (main and variant)
     product_files_qs = product.files.all()
-    print("your product files",product_files_qs)
+    print("your product files", product_files_qs)
     product_files = [
         {
             "id": pf.id,
@@ -627,7 +653,6 @@ def get_product(request):
         }
         for pf in product_files_qs
     ]
-    
 
     # Variants
     variants = product.variants.all()
@@ -689,7 +714,6 @@ def get_product(request):
     #         "product_variant_attribute_values": attribute_values_data,
     #     }
     # )
-    
 
     return JsonResponse(
         {

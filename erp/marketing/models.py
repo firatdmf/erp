@@ -148,7 +148,7 @@ class ProductCategory(models.Model):
 
 
 class Product(models.Model):
-    created_at = models.DateTimeField(auto_now=True, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now=True, blank=False, null=False)
     QUANTITY_UNIT_TYPE_CHOICES = [
         ("units", "Unit"),
         ("mt", "Meter"),
@@ -156,7 +156,6 @@ class Product(models.Model):
     ]
     WEIGHT_UNIT_TYPE_CHOICES = [("lb", "lb"), ("oz", "oz"), ("kg", "kg"), ("g", "g")]
 
-    # change to blank false later
     title = models.CharField(max_length=255, null=False, blank=False)
 
     # This can be implement and used as html later.
@@ -308,10 +307,10 @@ class ProductVariant(models.Model):
         Product,
         on_delete=models.CASCADE,
         related_name="variants",
-        null=True,
-        blank=True,
+        null=False,
+        blank=False,
     )
-    variant_sku = models.CharField(max_length=12, null=True, blank=True, db_index=True)
+    variant_sku = models.CharField(max_length=12, null=False, blank=False, db_index=True)
     # Barcode (ISBN, UPC, GTIN, etc.)
     variant_barcode = models.CharField(
         max_length=14, null=True, blank=True, db_index=True

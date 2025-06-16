@@ -44,6 +44,7 @@ ALLOWED_HOSTS = [
     "app.nejum.com",
     "www.nejum.com",
     "nejum.com",
+    "erp-2hs3.onrender.com"
 ]
 
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']

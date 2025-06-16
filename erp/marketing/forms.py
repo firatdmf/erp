@@ -112,8 +112,8 @@ class ProductVariantForm(forms.ModelForm):
 class ProductFileForm(forms.ModelForm):
     class Meta:
         model = ProductFile
-        fields = ["file"]
-        # fields = "__all__"
+        # fields = ["file"]
+        fields = "__all__"
         # fields = ['product', 'file', 'sequence']
 
 

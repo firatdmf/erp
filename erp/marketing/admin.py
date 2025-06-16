@@ -121,3 +121,37 @@ admin.site.register(ProductVariantAttribute)
 admin.site.register(ProductVariantAttributeValue)
 
 admin.site.register(ProductCategory)
+
+
+class ProductFileAdminForm(forms.ModelForm):
+    upload = forms.ImageField(required=False, label="Upload Image")
+
+    class Meta:
+        model = ProductFile
+        fields = ["product", "product_variant", "is_primary", "sequence", "upload"]
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        upload_file = self.cleaned_data.get("upload")
+        if upload_file:
+            instance.upload = upload_file  # Set the temporary attribute
+        if commit:
+            instance.save()
+        return instance
+
+
+from django.contrib import admin
+
+
+class ProductFileAdmin(admin.ModelAdmin):
+    form = ProductFileAdminForm
+    list_display = (
+        "id",
+        "product",
+        "product_variant",
+        "file_url",
+        "is_primary",
+        "sequence",
+    )
+
+

@@ -7,6 +7,11 @@ from django.core.exceptions import ValidationError
 from crm.models import Supplier
 from django.contrib.postgres.fields import ArrayField
 
+# cdn for media
+from cloudinary.uploader import upload as cloudinary_upload
+from cloudinary.utils import cloudinary_url
+from cloudinary.exceptions import Error as CloudinaryError
+
 
 # Create your functions here.
 # def product_variants_default():
@@ -50,6 +55,8 @@ def product_category_directory_path(instance, filename):
     return f"product_categories/{instance.name}/{filename}"
 
 
+
+# -----------------------------------------------------------------
 # def weight_unit_choices():
 #     return [('lb','lb'),('oz','oz'),('kg','kg'),('g','g')]
 
@@ -136,12 +143,36 @@ class ProductCategory(models.Model):
     created_at = models.DateTimeField(auto_now=True)
     name = models.CharField(max_length=255, null=True, blank=True)
 
-    image = models.FileField(
-        upload_to=product_category_directory_path,
-        null=True,
-        blank=True,
-        validators=[validate_file_size, validate_image_type],
-    )
+    # image = models.FileField(
+    #     upload_to=product_category_directory_path,
+    #     null=True,
+    #     blank=True,
+    #     validators=[validate_file_size, validate_image_type],
+    # )
+
+    image = models.URLField(null=True, blank=True)  # Store Cloudinary URL
+
+    def save(self, *args, **kwargs):
+        # _image_file is a temporary attribute (not a model field) used to hold the uploaded file just long enough to upload it to Cloudinary in the save() method.
+        image_file = getattr(self, '_image_file', None)
+        # When you upload an image via a form, the file comes in as a file object (not a URL).
+        # You need to upload this file to Cloudinary, get the resulting URL, and then store that URL in the image field.
+        if image_file:
+            try:
+                # Set folder and public_id for Cloudinary
+                folder = f"product_categories/{self.name}"
+                public_id = os.path.splitext(image_file.name)[0]  # filename without extension
+                result = cloudinary_upload(
+                    image_file,
+                    folder=folder,
+                    public_id=public_id,
+                    overwrite=True,  # Overwrite if same name
+                    resource_type="image"
+                )
+                self.image = result.get("secure_url")
+            except CloudinaryError as e:
+                raise ValidationError(f"Cloudinary upload failed: {e}")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name}"
@@ -310,7 +341,9 @@ class ProductVariant(models.Model):
         null=False,
         blank=False,
     )
-    variant_sku = models.CharField(max_length=12, null=False, blank=False, db_index=True)
+    variant_sku = models.CharField(
+        max_length=12, null=False, blank=False, db_index=True
+    )
     # Barcode (ISBN, UPC, GTIN, etc.)
     variant_barcode = models.CharField(
         max_length=14, null=True, blank=True, db_index=True
@@ -417,95 +450,59 @@ class ProductVariantAttributeValue(models.Model):
 
 
 class ProductFile(models.Model):
-    sequence = models.PositiveIntegerField(default=0)
-    # is_primary = models.BooleanField(default=False)
-    # This way I could just say product.files and get the file docs
+    file_path = models.CharField(max_length=500, blank=True, null=True)
+    # file = models.FileField(upload_to="uploads/")  # this triggers Django file handling
+    file_url = models.URLField(blank=True, null=True)
+
     product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, related_name="files", null=True, blank=True
+        'Product', on_delete=models.CASCADE, related_name='files',
+        null=True, blank=True
     )
     product_variant = models.ForeignKey(
-        ProductVariant,
-        on_delete=models.CASCADE,
-        related_name="files",
-        null=True,
-        blank=True,
-    )
-    file = models.FileField(
-        # upload_to=product_directory_path,
-        upload_to=product_file_directory_path,
-        validators=[validate_file_size, validate_file_type],
+        'ProductVariant', on_delete=models.CASCADE, related_name='files',
+        null=True, blank=True
     )
 
-    # If the file alredy exists, delete the old file and save the new one
+    is_primary = models.BooleanField(default=False)
+    sequence = models.PositiveIntegerField(default=0)
 
+
+    upload = None  # Placeholder for the uploaded file (not a DB field)
     def save(self, *args, **kwargs):
-        # self.full_clean()  # this will trigger clean()
-        # If updating an existing instance, remove old file
-        if self.pk:
-            old_instance = ProductFile.objects.get(pk=self.pk)
-            if old_instance.file and old_instance.file != self.file:
-                if os.path.isfile(old_instance.file.path):
-                    os.remove(old_instance.file.path)
-
-        # # Auto-assign is_primary if not already set and no primary exists
-        # if not self.is_primary:
-        #     if (
-        #         self.product
-        #         and not self.product.files.filter(is_primary=True)
-        #         .exclude(pk=self.pk)
-        #         .exists()
-        #     ):
-        #         self.is_primary = True
-        #     elif (
-        #         self.product_variant
-        #         and not self.product_variant.files.filter(is_primary=True)
-        #         .exclude(pk=self.pk)
-        #         .exists()
-        #     ):
-        #         self.is_primary = True
-
+        # If an upload is present, upload to Cloudinary
+        upload_file = getattr(self, 'upload', None)
+        if upload_file:
+            from cloudinary.uploader import upload as cloudinary_upload
+            from cloudinary.exceptions import Error as CloudinaryError
+            import os
+            try:
+                folder = f"product_files/{self.product.sku}/images"
+                public_id = os.path.splitext(upload_file.name)[0]
+                result = cloudinary_upload(
+                    upload_file,
+                    folder=folder,
+                    public_id=public_id,
+                    overwrite=True,
+                    resource_type="image"
+                )
+                self.file_url = result.get("secure_url")
+            except CloudinaryError as e:
+                raise ValidationError(f"Cloudinary upload failed: {e}")
         super().save(*args, **kwargs)
 
-    # # Cannot be both product and product_variant image.
-    # def clean(self):
-    #     if self.product and self.product_variant:
-    #         raise ValidationError(
-    #             "A file cannot be attached to both a product and a variant."
-    #         )
-    #     if not self.product and not self.product_variant:
-    #         raise ValidationError(
-    #             "A file must be attached to either a product or a variant."
-    #         )
+    # def save(self, *args, **kwargs):
+    #     if self.file and not self.file_url:
+    #         try:
+    #             result = cloudinary_upload(self.file)
+    #             self.file_url = result.get("secure_url")
+    #         except CloudinaryError as e:
+    #             print(f"Cloudinary upload failed: {e}")
+    #     super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        # Delete the file from the filesystem
-        if self.file and os.path.isfile(self.file.path):
-            os.remove(self.file.path)
-        super(ProductFile, self).delete(*args, **kwargs)
-
-    # below is needed to delete the files in bulk
-    @classmethod
-    def bulk_delete_with_files(cls, queryset):
-        """
-        Deletes all ProductFile instances in the queryset,
-        ensuring files are removed from the filesystem.
-        """
-        for obj in queryset:
-            obj.delete()
+        if self.file and self.file.path and os.path.isfile(self.file.path):
+            os.remove(self.file.path)  # only relevant if using local storage
+        super().delete(*args, **kwargs)
 
     def __str__(self):
-        return f"Media for {self.product.sku} | {self.product.title} | {self.file.name}"
-
-        # def save(self, *args, **kwargs):
-
-    #     if not self.pk:  # Only set sequence if this is a new object
-    #         last_sequence = (
-    #             ProductFile.objects.filter(product=self.product)
-    #             .order_by("sequence")
-    #             .last()
-    #         )
-    #         if last_sequence:
-    #             self.sequence = last_sequence.sequence + 1
-    #         else:
-    #             self.sequence = 1
-    #     super(ProductFile, self).save(*args, **kwargs)
+        return f"{self.product or self.product_variant}"

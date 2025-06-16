@@ -17,6 +17,9 @@ import os
 # from dotenv import load_dotenv
 from decouple import config
 
+# cloud cdn provider
+import cloudinary, cloudinary.uploader, cloudinary.api
+
 # load_dotenv()
 # print(os.getenv('DATABASE'))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -40,7 +43,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "app.nejum.com",
     "www.nejum.com",
-    "nejum.com"
+    "nejum.com",
 ]
 
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
@@ -71,6 +74,9 @@ INSTALLED_APPS = [
     "operating",
     "marketing",
     "django_htmx",
+    # below is to host images
+    "cloudinary",
+    "cloudinary_storage",
     # below is for google auth
     # "django.contrib.sites",
     # "allauth",  # this allows us to do other authentications beside the standard one (like google)
@@ -128,7 +134,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 # The below helps to put the view function variable global in all templates
-                'erp.context_processors.last_five_entities',
+                "erp.context_processors.last_five_entities",
             ],
         },
     },
@@ -149,20 +155,19 @@ WSGI_APPLICATION = "erp.wsgi.app"
 # }
 
 
-
 DATABASES = {
     "default": {
-        "ENGINE": config('DB_ENGINE'),
+        "ENGINE": config("DB_ENGINE"),
         # name of database
         "NAME": config("DB_NAME"),
         # user that created the database, or have access to it
         "USER": config("DB_USER"),
         # user password
         "PASSWORD": config("DB_PASSWORD"),
-        "HOST": config("DB_HOST"), # an empty string means localhost
+        "HOST": config("DB_HOST"),  # an empty string means localhost
         "PORT": config("DB_PORT"),
-        'TEST': {
-            'NAME': 'nejum_test',  # test DB
+        "TEST": {
+            "NAME": "nejum_test",  # test DB
         },
     }
 }
@@ -193,11 +198,12 @@ LANGUAGE_CODE = "en-us"
 
 # TIME_ZONE = 'UTC'
 # TIME_ZONE = "US/Pacific"
-TIME_ZONE = 'Europe/Istanbul'
+TIME_ZONE = "Europe/Istanbul"
 
 USE_I18N = True
 
 USE_TZ = True
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -210,8 +216,24 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
 # Media Files (For user uploaded files (dynamic not static))
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# Cloud CDN solution
+
+cloudinary.config(
+    cloud_name=config("cloudinary_cloud_name"),
+    api_key=config("cloudinary_api_key"),
+    api_secret=config("cloudinary_api_secret"),
+    secure=True,
+)
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config("cloudinary_cloud_name"),
+    'API_KEY': config("cloudinary_api_key"),
+    'API_SECRET': config("cloudinary_api_secret"),
+}
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 
 # specify the URL where Django should redirect unauthenticated users:
@@ -220,7 +242,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 if not DEBUG:
@@ -243,6 +265,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # )
 
 # LOGIN_REDIRECT_URL = ""
-LOGIN_URL = '/authentication/signin'
+LOGIN_URL = "/authentication/signin"
 LOGOUT_REDIRECT_URL = "/authentication/index"
 # LOGOUT_REDIRECT_URL = "/"

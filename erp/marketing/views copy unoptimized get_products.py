@@ -370,7 +370,7 @@ def get_product_categories(request):
         {
             "id": category.id,
             "name": category.name,
-            "image": category.image if category.image else None,
+            "image": category.image.url if category.image else None,
             # Add other fields you want to expose
         }
         for category in product_categories
@@ -386,8 +386,6 @@ def get_product_categories(request):
 def get_products(request):
     start = time.time()
     product_category = request.GET.get("product_category", None)
-    # ...existing code...
-
     if product_category:
         try:
             category = ProductCategory.objects.get(name=product_category)
@@ -400,19 +398,27 @@ def get_products(request):
     else:
         products = Product.objects.all(featured=True)
 
-    # Optimize: select_related for primary_image
-    products = products.select_related("primary_image")
+        # return JsonResponse(
+        #     {
+        #         "products": [
+        #             {
+        #                 "id": p.id,
+        #                 "title": p.title,
+        #                 "sku": p.sku,
+        #                 "price":p.price,
+        #                 # Add other fields you want to expose
+        #             }
+        #             for p in products
+        #         ]
+        #     }
+        # )
 
-    # Optimize: select_related for product in variants
-    product_variants = ProductVariant.objects.filter(
-        product__in=products
-    ).select_related("product")
-
-    # Optimize: select_related for product_variant in attribute values
+        # 1. Get all variants for these products
+    product_variants = ProductVariant.objects.filter(product__in=products)
+    # 2. Get all attribute values for these variants
     product_variant_attribute_values = ProductVariantAttributeValue.objects.filter(
         product_variant__in=product_variants
-    ).select_related("product_variant")
-
+    )
     # 3. Get all unique attributes used by these variants
     attribute_ids = product_variant_attribute_values.values_list(
         "product_variant_attribute_id", flat=True
@@ -421,7 +427,7 @@ def get_products(request):
         id__in=attribute_ids
     )
 
-    # Optimize: build products_data
+    # 4. Build the lists for JSON
     products_data = [
         {
             "id": p.id,
@@ -429,11 +435,16 @@ def get_products(request):
             "sku": p.sku,
             "price": p.price,
             "primary_image": p.primary_image.file_url if p.primary_image else None,
+            # "primary_image": p.get_primary_image(),
             # Add other fields you want to expose
         }
         for p in products
     ]
-
+    print("your sent producs_data is")
+    print(products_data)
+    stop = time.time()
+    time_took = stop - start
+    print("it took", time_took, "to process")
     product_variants_data = [
         {
             "id": v.id,
@@ -441,11 +452,12 @@ def get_products(request):
             "variant_sku": v.variant_sku,
             "variant_price": v.variant_price,
             "variant_quantity": v.variant_quantity,
+            # "primary_image": v.primary_image.file.url if v.primary_image else None,
+            # "primary_image": v.get_primary_image(),
             # Add other fields you want to expose
         }
         for v in product_variants
     ]
-
     product_variant_attributes_data = [
         {
             "id": a.id,
@@ -453,18 +465,16 @@ def get_products(request):
         }
         for a in product_variant_attributes
     ]
-
     product_variant_attribute_values_data = [
         {
             "id": av.id,
             "product_variant_id": av.product_variant_id,
             "product_variant_attribute_id": av.product_variant_attribute_id,
             "product_variant_attribute_value": av.product_variant_attribute_value,
-            "product_id": av.product_variant.product_id,  # Now this is fast!
+            "product_id": av.product_variant.product_id,  # for easier filtering in frontend
         }
         for av in product_variant_attribute_values
     ]
-
     end = time.time()
     print(f"Time taken to get products: {end - start} seconds")
 
@@ -476,6 +486,12 @@ def get_products(request):
             "product_variant_attribute_values": product_variant_attribute_values_data,
         }
     )
+
+    # print("your response is:")
+    # print(response)
+    # end = time.time()
+    # print(f"Time taken to get products: {end - start} seconds")
+    # return response
 
 
 # ------------------------------------------------------------------------------------------------
@@ -513,7 +529,7 @@ def get_product(request):
         "datasheet_url": product.datasheet_url,
         "minimum_inventory_level": getattr(product, "minimum_inventory_level", None),
         "primary_image": (
-            product.primary_image.file_url
+            product.primary_image.file.url
             if getattr(product, "primary_image", None)
             else None
         ),
@@ -531,7 +547,7 @@ def get_product(request):
     product_files = [
         {
             "id": pf.id,
-            "file": pf.file_url,
+            "file": pf.file.url,
             "product_id": pf.product_id,
             "product_variant_id": pf.product_variant_id,
         }
@@ -555,7 +571,7 @@ def get_product(request):
                 "variant_featured": variant.variant_featured,
                 "product_id": variant.product_id,
                 "primary_image": (
-                    variant_primary_file.file_url if variant_primary_file else None
+                    variant_primary_file.file.url if variant_primary_file else None
                 ),
             }
         )

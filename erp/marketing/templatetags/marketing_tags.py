@@ -36,7 +36,7 @@ def variant_form(
             # product_variant_files[variant.pk] = list(files)
             variant_files_dict[str(variant.variant_sku)] = [
                 # this id is the product file's id in django
-                {"id": f.id, "url": f.file_url, "name": "placeholder"}
+                {"id": f.id, "url": f.file_url, "name": "hello"}
                 for f in files
             ]
 

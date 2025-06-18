@@ -605,7 +605,9 @@ let prepopulate_variant_table = () => {
                     variant_table_rows += `
                     <div id="variant-file-${file.id}" class="variant-file" >
                     <p>
-                        <a href=${file.url} target="_blank" >${file.name}</a>
+                        <a href="${file.url}" target="_blank">
+                            <img src="${file.url}" alt="${file.name}" style="max-width:60px; max-height:60px; vertical-align:middle; margin-right:8px;">
+                        </a>
                         <button class="delete_button" onClick="handleFileDelete(${file.id})">Delete</button>
                     </p>
                     </div>

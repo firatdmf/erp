@@ -499,10 +499,10 @@ class ProductFile(models.Model):
     #             print(f"Cloudinary upload failed: {e}")
     #     super().save(*args, **kwargs)
 
-    def delete(self, *args, **kwargs):
-        if self.file and self.file.path and os.path.isfile(self.file.path):
-            os.remove(self.file.path)  # only relevant if using local storage
-        super().delete(*args, **kwargs)
+    # def delete(self, *args, **kwargs):
+    #     if self.file and self.file.path and os.path.isfile(self.file.path):
+    #         os.remove(self.file.path)  # only relevant if using local storage
+    #     super().delete(*args, **kwargs)
 
     def __str__(self):
         return f"{self.product or self.product_variant}"

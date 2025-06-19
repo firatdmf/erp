@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>Order #{{ order.pk }}</h1>
+
+  <p>
+    Status: <strong>{{ order.get_status_display }}</strong>
+  </p>
+  <p>Created At: {{ order.created_at }}</p>
+
+  {% if order.contact %}
+    <p>Contact: {{ order.contact.name }}</p>
+  {% endif %}
+  {% if order.company %}
+    <p>Company: {{ order.company.name }}</p>
+  {% endif %}
+
+  <p>Notes: {{ order.notes|default:'-' }}</p>
+
+  <h3>Order Items:</h3>
+  <ul>
+    {% for item in order.items.all %}
+      <li>{{ item.product.title }} — {{ item.quantity }} pcs @ {{ item.unit_price }} USD — Status: {{ item.get_status_display }}</li>
+    {% empty %}
+      <li>No items in this order.</li>
+    {% endfor %}
+  </ul>
+
+  <p>
+    <strong>Total Value:</strong> ${{ order.total_value }}
+  </p>
+
+  {% if order.qr_code_url %}
+    <h3>Order QR Code:</h3>
+    <img src="{{ order.qr_code_url }}" alt="QR Code for Order" style="max-width: 200px;" />
+  {% endif %}
+
+  {% if order.status != 'completed' %}
+    <a href="{% url 'operating:order_edit' order.pk %}" class="btn btn-primary">Edit Order</a>
+  {% else %}
+    <button class="btn btn-secondary" disabled>Order Completed</button>
+  {% endif %}
+
+  <p>
+    <a href="{% url 'operating:order_list' %}">← Back to Orders</a>
+  </p>
+{% endblock %}

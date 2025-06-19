@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Orders</h1>
+
+  <table border="1" cellpadding="8" cellspacing="0">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Status</th>
+        <th>Created At</th>
+        <th>Contact</th>
+        <th>Company</th>
+        <th>Total Value</th>
+        <th>QR</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+        <tr>
+          <td>{{ order.pk }}</td>
+          <td>{{ order.get_status_display }}</td>
+          <td>{{ order.created_at }}</td>
+          <td>{{ order.contact.name|default:"—" }}</td>
+          <td>{{ order.company.name|default:"—" }}</td>
+          <td>${{ order.total_value }}</td>
+          <td>
+            {% if order.qr_code_url %}
+              <img src="{{ order.qr_code_url }}" style="height: 50px;" />
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'operating:order_detail' order.pk %}">View</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8">No orders found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p><a href="{% url 'operating:order_create' %}">➕ Create New Order</a></p>
+{% endblock %}

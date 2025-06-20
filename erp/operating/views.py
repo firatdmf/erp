@@ -5,13 +5,16 @@ from .forms import OrderForm, OrderItemFormSet
 from django.views.generic.edit import UpdateView
 from django.views.generic.detail import DetailView
 from django.views.generic import ListView
-from .models import generate_machine_qr_for_order  # if it's not already in __init__.py
+from .models import OrderItem, generate_machine_qr_for_order  # if it's not already in __init__.py
 from django.http import HttpResponse, HttpResponseForbidden
 from django.contrib import messages
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
+from .utils import get_machine_from_api_key
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
 # Create your views here.
 
@@ -131,3 +134,34 @@ def machine_update_status(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
+    
+# machines should not need csrf 
+@method_decorator(csrf_exempt, name='dispatch')
+class MachineStatusUpdate(View):
+    def post(self, request, item_id):
+        api_key = request.headers.get("X-API-KEY")
+        if not api_key:
+            return JsonResponse({"error": "API key missing"}, status=400)
+
+        machine = get_machine_from_api_key(api_key)
+        if not machine:
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+
+        try:
+            data = json.loads(request.body)
+            new_status = data.get("new_status")
+            if not new_status:
+                return JsonResponse({"error": "Missing 'new_status'"}, status=400)
+
+            item = OrderItem.objects.get(pk=item_id)
+            item.status = new_status
+            item.save()
+
+            item.order.update_status_from_items()
+
+            return JsonResponse({"message": f"Status updated to '{new_status}' by machine '{machine.name}'"})
+
+        except OrderItem.DoesNotExist:
+            return JsonResponse({"error": "OrderItem not found"}, status=404)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)

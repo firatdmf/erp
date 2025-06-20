@@ -8,3 +8,4 @@ from .models import *
 admin.site.register(Machine)
 admin.site.register(Order)
 admin.site.register(OrderItem)
+admin.site.register(MachineCredential)

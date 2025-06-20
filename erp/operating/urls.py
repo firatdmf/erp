@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 
+
 app_name = "operating"
 urlpatterns = [
     path("", views.index.as_view(), name="index"),
@@ -12,7 +13,8 @@ urlpatterns = [
     # path("product_list/",views.Product.as_view(),name="product_list"),
 
     # below are for api paths
-    path("api/order/machine-update/", views.machine_update_status, name="machine_update")
+    path("api/order/machine-update/", views.machine_update_status, name="machine_update"),
+    path("machine/update-item/<int:item_id>/", views.MachineStatusUpdate.as_view(), name="machine-status-update"),
 ]
 htmx_urlpatterns = []
 

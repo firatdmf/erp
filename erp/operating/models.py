@@ -1,12 +1,17 @@
 from django.db import models
 from crm.models import Contact, Company
 from marketing.models import Product
+
 # segno is for making qr codes.
 from decouple import config
 import segno
 import tempfile
 import cloudinary.uploader
 import json
+
+# below is to assign api_keys to machines
+import secrets
+
 
 # Create your functions here.
 def product_description():
@@ -24,6 +29,7 @@ def product_description():
             },
         ]
     }
+
 
 # def generate_qr_for_order(order):
 #     CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL")
@@ -47,10 +53,7 @@ def product_description():
 
 
 def generate_machine_qr_for_order(order):
-    payload = {
-        "order_id": order.pk,
-        "action": "update_status"
-    }
+    payload = {"order_id": order.pk, "action": "update_status"}
 
     qr = segno.make(payload)
 
@@ -62,11 +65,12 @@ def generate_machine_qr_for_order(order):
             folder=f"media/orders/{order.pk}",
             public_id=f"qr_order_{order.pk}",
             overwrite=True,
-            resource_type="image"
+            resource_type="image",
         )
 
     order.qr_code_url = result["secure_url"]
     order.save(update_fields=["qr_code_url"])
+
 
 # Create your models here.
 
@@ -99,6 +103,7 @@ class Order(models.Model):
 
         # Now whenever an OrderItem is added, updated, or deleted, the overall Order.status will update automatically.
 
+    # below function is used in signals.py
     def update_status_from_items(self):
         item_statuses = list(self.items.values_list("status", flat=True))
 
@@ -132,6 +137,7 @@ class OrderItem(models.Model):
         ("completed", "Completed"),
         ("cancelled", "Cancelled"),
     ]
+
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField(default=1)
@@ -154,3 +160,17 @@ class Machine(models.Model):
     name = models.CharField(max_length=150, unique=True)
     max_rpm = models.PositiveIntegerField()
     domain = models.DecimalField(max_digits=5, decimal_places=2)
+
+
+class MachineCredential(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    api_key = models.CharField(max_length=64, unique=True, editable=False)
+    is_active = models.BooleanField(default=True)
+
+    def save(self, *args, **kwargs):
+        if not self.api_key:
+            self.api_key = secrets.token_hex(32)  # Generates a 64-character hex key
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name

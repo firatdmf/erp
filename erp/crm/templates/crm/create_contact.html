@@ -1,11 +1,16 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block content %}
-<p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
-    <h1>Create Contact Form</h1>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }} {# Render each form field as a paragraph #}
-        <button type="submit">Submit</button>
-    </form>
-
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'crm/css/create_form.css' %}" />
+  {% endblock %}
+  <p>
+    <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
+  </p>
+  <h1>Create Contact Form</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }} {# Render each form field as a paragraph #}
+    <button type="submit">Submit</button>
+  </form>
 {% endblock %}

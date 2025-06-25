@@ -14,11 +14,22 @@
 
   <form>
     {% csrf_token %}
-    <input type="text" hx-post="{% url 'crm:search_contact' %}" hx-target="#results" hx-trigger="keyup changed delay:500ms" name="searchInput" id="searchInput" placeholder="Search for a name, email, phone number, etc." />
+    <input type="text" hx-post="{% url 'crm:search_contact' %}" hx-target="#results" hx-trigger="keyup changed delay:500ms" name="searchInput" id="searchInput" placeholder="Search for a name, email, phone number, etc." hx-indicator="#spinner" />
   </form>
 
-  <div class="searchResults" id="results">
-    <p>This is where the results will be displayed</p>
+  <div id="spinner" class="htmx-indicator">
+    <div class="loader"></div>
+    <p>Loading...</p>
   </div>
+
+  {% comment %} <div id="spinner2">
+    <span class="loading loading-spinner loading-xl htmx-indicator" id="spinner"></span>
+  </div> {% endcomment %}
+  <div class="searchResults" id="results"></div>
 </div>
 
+<script>
+  document.body.addEventListener('htmx:configRequest', function (evt) {
+    console.log('HTMX request triggered')
+  })
+</script>

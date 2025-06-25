@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'crm/css/create_form.css' %}" />
+  {% endblock %}
+  <p>
+    <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
+  </p>
+  <h1>Create {{ model_type }}</h1>
+  {% comment %} {% if model_type == 'contact' %}
+    <label for="company_name">Company Name</label>
+    <input type="text" id="company_name" name="company_name" autocomplete="off" hx-get="{% url 'crm:company_search' %}" hx-trigger="keyup changed delay:300ms" hx-target="#company-suggestions" hx-params="*" />
+    <div id="company-suggestions"></div>
+  {% endif %} {% endcomment %}
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }} {# Render each form field as a paragraph #}
+      <div id="company-suggestions"></div>
+    <button type="submit">Submit</button>
+  </form>
+{% endblock %}

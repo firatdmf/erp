@@ -1,6 +1,6 @@
 from django.db import models
 from crm.models import Contact, Company
-from marketing.models import Product
+from marketing.models import Product, ProductVariant
 
 # segno is for making qr codes.
 from decouple import config
@@ -140,6 +140,7 @@ class OrderItem(models.Model):
 
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    product_variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT, blank=True, null=True)
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
@@ -147,6 +148,13 @@ class OrderItem(models.Model):
 
     def subtotal(self):
         return self.unit_price * self.quantity
+
+    def display_name(self):
+        if self.variant:
+            return f"{self.variant.product.title} [{self.variant.variant_sku}]"
+        elif self.product:
+            return self.product.title
+        return "Unknown item"
 
     def __str__(self):
         if self.contact:

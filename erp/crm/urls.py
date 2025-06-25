@@ -25,6 +25,8 @@ htmx_urlpatterns = [
 path('search_contact/',views.search_contact,name="search_contact"),
 path('search_contacts_only/',views.search_contacts_only,name="search_contacts_only"),
 path('add_contact_to_company/<int:company_pk>/<int:contact_pk>/',views.add_contact_to_company.as_view(),name="add_contact_to_company"),
+path('company_search/', views.company_search, name='company_search'),
 ]
+
 
 urlpatterns += htmx_urlpatterns

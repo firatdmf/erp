@@ -10,3 +10,7 @@ admin.site.register(Supplier)
 class NoteAdmin(admin.ModelAdmin):
     # list_display = ('__all__',)
     list_display = ('id', 'contact', 'company', 'content', 'created_at', 'modified_date')
+
+
+class CompanyAdmin(admin.ModelAdmin):
+    search_fields = ["name", "email", "phone"]

@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load todo_filters %}
+  {% load todo_tags %}
+  {% load crm_tags %}
+  {% load static %}
+
+  {% comment %}Below is to use unique css for each file as in this case here{% endcomment %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'crm/css/detail.css' %}" />
+  {% endblock %}
+  {% block js %}
+    <script src="{% static 'crm/js/detail.js' %}" defer></script>
+  {% endblock %}
+
+  <!-- below is for ajax so the page does not have to refresh when I add or delete notes -->
+  {% comment %} {% block js %}
+    {% endcomment %}
+    {% comment %} <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {% endcomment %}
+    {% comment %} <script src="{% static 'crm/js/detailPages.js' %}"></script> {% endcomment %}
+    {% comment %}
+  {% endblock %} {% endcomment %}
+
+  {% if model_type == 'company' %}
+    <a href="{% url 'crm:company_list' %}">&lt;--- Go to Company List page</a>
+  {% elif model_type == 'contact' %}
+    <a href="{% url 'crm:contact_list' %}">&lt;--- Go to Contact List page</a>
+  {% endif %}
+  {% comment %} <form action="{% url 'crm:delete_company' company.pk %}" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="company_id" value="{{ company.pk }}" />
+    <button type="submit">Delete Company</button>
+    <br />
+  </form> {% endcomment %}
+
+  <ul>
+    {% for field in fields %}
+      <li>
+        <strong>{{ field.verbose_name|capfirst }}:</strong>
+        {{ field.name }}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <!-- Add other fields as needed -->
+  <!-- Note submission form -->
+  {% if model_type == 'company' %}
+    <div class="whoWorksHere">
+      {% if contacts %}
+        <h2>Contacts</h2>
+
+        {% for contact in contacts %}
+          <ul>
+            <li>
+              <a href="{% url 'crm:contact_detail' contact.pk %}"><i><b>{{ contact.name }}</b></i></a> <span>Works here</span>
+
+              <form action="{% url 'crm:delete_company_from_contact' contact.pk %}" method="POST">
+                {% csrf_token %}
+                <button type="submit">Delete this contact</button>
+              </form>
+            </li>
+          </ul>
+        {% endfor %}
+      {% else %}
+        <p>No contacts found for this company.</p>
+      {% endif %}
+    </div>
+    <div class="addContacts">
+      <p class="addContact" onclick="openAddContactForm()">Add a contact</p>
+      <div class="addContactForm">
+        <form>
+          {% csrf_token %}
+          <input type="hidden" name="company_id" value="{{ company.pk }}" />
+          <input type="text" hx-post="{% url 'crm:search_contacts_only' %}" hx-target="#results2" hx-trigger="keyup changed delay:500ms" name="searchInput" placeholder="Type contact name" />
+        </form>
+        <br />
+      </div>
+      <div id="results2" class="searchResults"></div>
+      <div id="results3"></div>
+    </div>
+  {% endif %}
+  <h2>Add a Task</h2>
+  <form method="post">
+    {% csrf_token %} {{ task_form.as_p }}
+    <button type="submit">Add Task</button>
+  </form>
+
+  {% comment %} {% greeting 'Firat' %} {% endcomment %}
+  {% comment %}The notes and tasks come from the views.py from crm app{% endcomment %}
+  {% if model_type == 'company' %}
+    <h2>Tasks</h2>
+    {% tasks_component csrf_token=csrf_token page_type='detail' company=company contact=None sort_type='dictsortreversed' %}
+    {% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
+    <p>
+      <a href="{% url 'crm:update_company' company.pk %}?next_url={{ request.path|urlencode }}">Update Company Information</a>
+    </p>
+    <form action="{% url 'crm:delete_company' company.pk %}" method="post">
+      {% csrf_token %}
+      <button type="submit" class="deleteButton">Delete Company</button><br />
+    </form>
+  {% elif model_type == 'contact' %}
+    {% tasks_component csrf_token=csrf_token page_type='detail' company=None contact=contact sort_type='dictsortreversed' %}
+    {% history_component company=None contact=contact note_form=note_form csrf_token=csrf_token current_url=request.path %}
+    <p>
+      <a href="{% url 'crm:update_contact' contact.pk %}?next_url={{ request.path|urlencode }}">Update Contact Information</a>
+    </p>
+    <form action="{% url 'crm:delete_contact' contact.pk %}" method="post">
+      {% csrf_token %}
+      <button type="submit" class="deleteButton">Delete Company</button><br />
+    </form>
+  {% endif %}
+{% endblock %}

@@ -15,24 +15,24 @@ class Task(models.Model):
     # blank=True affects form validation.
     # null=True affects the database schema.
     
-    task_name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200)
     due_date = models.DateField()
     description = models.TextField(blank=True,null=True)
     completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(auto_now_add=True,editable=True)
+    # make it either a company or contact
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE,blank=True,  null=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE,blank=True,  null=True)
 
 
     def __str__(self):
         if(self.company):
-            # return(self.task_name + "|"+self.company+"|")
-            return f"{self.task_name} for | {self.company}"
+            return f"{self.name} for | {self.company}"
         elif (self.contact):
-            return f"{self.task_name} for | {self.contact}"
+            return f"{self.name} for | {self.contact}"
         else:
-            return self.task_name
+            return self.name
 
     #  Add a delete_url field to your Todo model to store the URL that will be used to delete the todo item.
     #  You can use the reverse function to generate this URL.

@@ -12,6 +12,10 @@ from operator import attrgetter
 from django.db.models import Value, CharField
 from django.middleware.csrf import get_token
 
+# we need the below library to avoid saving any database queries in case there are any errors in view functions.
+# so it never saves anything partially, and saves when everything runs smoothly.
+from django.db import transaction
+
 # from accounting.models import Income
 from django.db.models import Q
 
@@ -40,56 +44,65 @@ class index(View):
     #     # return HttpResponse(json.dumps(response_data), content_type='application/json')
 
 
-class contact_list(generic.ListView):
+class ContactList(generic.ListView):
     model = Contact
     template_name = "crm/contact_list.html"
     context_object_name = "contacts"
 
 
-class company_list(generic.ListView):
+class CompanyList(generic.ListView):
     model = Company
     # number_of_companies = len(Company.objects.all())
     template_name = "crm/company_list.html"
     context_object_name = "companies"
 
 
-# def create_contact(request):
-#     if request.method == 'POST':
-#         form = ContactForm(request.POST)
-#         if form.is_valid():
-#             form.save()
-#             # Process the form data (e.g., save to the database)
-#             # Redirect to a success page or return a response
-#             # return redirect('success_page')
-#             return HttpResponse('Success Page')
-#     else:
-#         form = ContactForm()
-#     return render(request,'crm/create_contact.html', {'form':form})
-
-
-class contact_create(generic.edit.CreateView):
+# *
+class ContactCreate(generic.edit.CreateView):
     model = Contact
     form_class = ContactForm
     template_name = "crm/create_form.html"
-    success_url = "/crm/contact_list/"
+    # success_url = "/crm/contact/"
 
+    # This method is used to provide additional context data to the template.
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["model_type"] = "contact"
         return context
 
     def form_valid(self, form):
-        # Check if a company name is provided in the form data
-        company_name = form.cleaned_data.get("company_name")
-        if company_name:
-            # Create a new Company entry or retrieve an existing one
-            company, created = Company.objects.get_or_create(name=company_name)
-            # Assign the created/selected company to the contact
-            form.instance.company = company
-        else:
-            company_name = None
+        try:
+            # Below starts a database transaction block.
+            # All database operations inside this block are treated as a single transaction.
+            # If something fails (e.g., a database error), you won’t end up with a partially saved contact or company.
+            with transaction.atomic():
+                company_name = form.cleaned_data.get("company_name")
+                if company_name:
+                    # get the company object from database or create a new one if it does not exist.
+                    company, created = Company.objects.get_or_create(name=company_name)
+                    # set contact's company to the created or existing company.
+                    form.instance.company = company
 
-        return super().form_valid(form)
+                return super().form_valid(form)
+        except Exception as e:
+            form.add_error(None, f"An unexpected error occurred: {e}")
+            return self.form_invalid(form)
+        
+        
+        # # Check if a company name is provided in the form data
+        # company_name = form.cleaned_data.get("company_name")
+        # if company_name:
+        #     # Create a new Company entry or retrieve an existing one
+        #     company, created = Company.objects.get_or_create(name=company_name)
+        #     # Assign the created/selected company to the contact
+        #     form.instance.company = company
+        # else:
+        #     company_name = None
+
+        # return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("crm:contact_detail", args=[self.object.pk])
 
 
 class EditContactView(generic.edit.UpdateView):
@@ -104,7 +117,7 @@ class EditContactView(generic.edit.UpdateView):
         return super().form_valid(form)
 
 
-class company_create(generic.edit.CreateView):
+class CompanyCreate(generic.edit.CreateView):
     model = Company
     form_class = CompanyForm
     template_name = "crm/create_form.html"
@@ -131,7 +144,7 @@ class company_create(generic.edit.CreateView):
         if task_name and due_date:
             task_description = form.cleaned_data.get("task_description", "")
             Task.objects.create(
-                task_name=task_name,
+                name=task_name,
                 due_date=due_date,
                 description=task_description,
                 company=self.object,
@@ -156,16 +169,18 @@ class EditCompanyView(generic.edit.UpdateView):
         return super().form_valid(form)
 
 
-class contact_detail_view(generic.DetailView):
+class ContactDetail(generic.DetailView):
     model = Contact
     # Create this template
-    template_name = "crm/contact_detail.html"
+    template_name = "crm/detail.html"
     # This sets the variable name in the template
     # context_object_name = 'contact'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         contact = self.get_object()
+        context["model_type"] = "contact"
+        context["fields"] = self.object._meta.fields
         context["notes"] = Note.objects.filter(contact=contact)
         context["note_form"] = NoteForm()
         context["tasks"] = Task.objects.filter(contact=contact)
@@ -188,7 +203,7 @@ class contact_detail_view(generic.DetailView):
         return self.render_to_response(context)
 
 
-class company_detail_view(generic.DetailView):
+class CompanyDetail(generic.DetailView):
     model = Company
     # Create this template
     template_name = "crm/company_detail.html"
@@ -199,6 +214,7 @@ class company_detail_view(generic.DetailView):
     # The get_context_data() method is overridden to provide additional context data to the template.
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context["fields"] = self.object._meta.fields
         # It retrieves the Company object using self.get_object().
         company = self.get_object()
         # Get the contacts for the current company
@@ -300,6 +316,11 @@ def delete_company(request, pk):
         # below line brings back the user to the current page
         # return render(request,'crm/index.html',{"message":f"Company, {company_name}, has been successfully deleted."})
         return redirect("crm:index")
+    
+def delete_contact(request,pk):
+    contact = get_object_or_404(Contact, pk=pk)
+    contact.delete()
+    return redirect("crm:contact_list")
 
 
 from django.db.models import Q, Value, CharField
@@ -328,7 +349,7 @@ def search_contact(request):
         # Find Contacts with matching Tasks
         task_contact_ids = Task.objects.filter(
             Q(description__icontains=search_text)
-            | Q(task_name__icontains=search_text) & Q(contact__isnull=False)
+            | Q(name__icontains=search_text) & Q(contact__isnull=False)
         ).values_list("contact_id", flat=True)
 
         # 3. Combine Contact IDs
@@ -359,7 +380,7 @@ def search_contact(request):
         # Find Contacts with matching Tasks
         task_company_ids = Task.objects.filter(
             Q(description__icontains=search_text)
-            | Q(task_name__icontains=search_text) & Q(company__isnull=False)
+            | Q(name__icontains=search_text) & Q(company__isnull=False)
         ).values_list("company_id", flat=True)
 
         all_company_ids = (
@@ -480,7 +501,8 @@ def company_search(request):
     if companies:
         html = "<ul>"
         for company in companies:
-           html += f'<li hx-get="#" hx-trigger="click" hx-swap="none" onclick="document.getElementById(\'company_name\').value = \'{company.name}\'; document.getElementById(\'company-suggestions\').innerHTML = \'\';">{company.name}</li>'
+            # this does not send a get request
+            html += f"<li hx-get='#' hx-trigger='click' hx-swap='none' onclick=\"document.getElementById('company_name').value = '{company.name}'; document.getElementById('company-suggestions').innerHTML = '';\">{company.name}</li>"
         html += "</ul>"
     else:
         if q == "":

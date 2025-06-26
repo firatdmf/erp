@@ -153,7 +153,7 @@
     {% for task in tasks|dictsortreversed:'due_date' %}
       {% if task.completed == False %}
         <li class="taskComponent">
-          <p class="taskName">{{ task.task_name }}</p>
+          <p class="taskName">{{ task.name }}</p>
           {% if task.description %}
             <p class="taskDescription">{{ task.description }}</p>
           {% endif %}

@@ -46,7 +46,7 @@ class Contact(models.Model):
         blank=True,
     )
     phone = models.CharField(max_length=15, blank=True)
-    address = models.CharField(max_length=255, blank=True)
+    address = models.TextField(max_length=255, blank=True)
     country = models.CharField(max_length=50, blank=True)
     birthday = models.DateField(null=True, blank=True)
 

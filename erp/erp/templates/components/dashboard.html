@@ -1,25 +1,21 @@
 {% load static %}
 {% load todo_tags %}
 {% block css %}
-  <link rel="stylesheet"
-        href="{% static 'erp/css/components/dashboard.css' %}" />
-{% endblock css %}
+  <link rel="stylesheet" href="{% static 'erp/css/components/dashboard.css' %}" />
+{% endblock %}
 {% block js %}
-
-<script src="{% static 'erp/js/dashboard.js' %}"></script>
-{% endblock js %}
+  <script src="{% static 'erp/js/dashboard.js' %}"></script>
+{% endblock %}
 <div class="dashboardComponent">
   <h2>New leads added today: {{ number_of_leads_added }}</h2>
   {% if country_of_the_day %}
-  <h2>Country of the day: {{country_of_the_day}}</h2>
+    <h2>Country of the day: {{ country_of_the_day }}</h2>
   {% endif %}
   <div class="dashboardContainer">
     <div class="tasks">
-      <h3>
-        Tasks that are due <a target='_blank' title="Task Report" href="{% url 'task_report' %}"><i class="fa fa-external-link fa-xs" aria-hidden="true"></i></a>
-      </h3>
-      {% comment %} <p>Task content</p> {% endcomment %}
-      {% task_component sort_type="dictsortreversed" page_type="dashboard" csrf_token=csrf_token %}
+      <h3>Tasks that are due <a target="_blank" title="Task Report" href="{% url 'task_report' %}"><i class="fa fa-external-link fa-xs" aria-hidden="true"></i></a></h3>
+
+      {% tasks_component csrf_token=csrf_token page_type='dashboard' contact=None company=None sort_type='dictsortreversed' %}
     </div>
     <div class="activityReport">
       <h3>Activity Report</h3>
@@ -27,4 +23,3 @@
     </div>
   </div>
 </div>
-

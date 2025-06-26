@@ -14,7 +14,7 @@ class HiddenInputWithStyle(forms.HiddenInput):
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ['task_name', 'due_date', 'contact','company','description',]  # Specify the fields you want to include in the form
+        fields = ['name', 'due_date', 'contact','company','description',]  # Specify the fields you want to include in the form
         widgets = {
             'due_date': forms.DateInput(attrs={'type': 'date'}),
             # 'due_date': forms.DateField(label="Due Date", widget=forms.DateInput(attrs={'type': 'date'}), required=False,initial=date.today()),

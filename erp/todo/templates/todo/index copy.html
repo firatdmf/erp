@@ -39,7 +39,7 @@
                             <li>
                                 <p>{{ days_since }}</p>
                                 <p>
-                                    <strong>{{ task.task_name }}</strong><br/>
+                                    <strong>{{ task.name }}</strong><br/>
                                     <span>Due: {{ task.due_date }}</span>
                                 </p>
                                 {% if task.description %}<p>{{ task.description }}</p>{% endif %}
@@ -82,7 +82,7 @@
                     {% for task in tasks|dictsortreversed:"completed_at"|slice:"-18:" %}
                         {% if task.completed == True %}
                             <li>
-                                <strong>{{ task.task_name }}</strong>
+                                <strong>{{ task.name }}</strong>
                                 <br />
                                 {{ task.description }}
                                 <br />

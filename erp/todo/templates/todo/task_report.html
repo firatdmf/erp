@@ -12,7 +12,7 @@
         {% else %}
         <li>
             <!-- today's date: {% now "SHORT_DATETIME_FORMAT" %} -->
-            <p><strong>{{ task.task_name }}</strong> <br/>Due: {{ task.due_date }}
+            <p><strong>{{ task.name }}</strong> <br/>Due: {{ task.due_date }}
                 <span>{{ task.due_date|days_since }}d</span>
             </p>
             {% if task.description %}

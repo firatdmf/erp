@@ -1,84 +1,69 @@
 {% load static %}
 {% block css %}
-    <link rel="stylesheet" href="{% static 'crm/css/components/history.css' %}" />
-{% endblock css %}
+  <link rel="stylesheet" href="{% static 'crm/css/components/history.css' %}" />
+{% endblock %}
 <div class="history_component">
-    <h2>History</h2>
-    <div class="historyEntries">
-        <ul>
-            <li>
-                <h2>Add a Note</h2>
-                <form method="post">
-                    {% csrf_token %}
-                    {{ note_form.content }}
-                    <div class="addNoteButton">
-                        <button type="submit">Add Note</button>
-                    </div>
-                </form>
-            </li>
-            <!-- Iterate over both notes and completed tasks -->
-            {% for entry in history_entries %}
-                <li>
-                    {% if entry.completed_at %}
-                    You completed this task. {{ entry.completed_at }}
-                        <br/>
-                    {% elif entry.created_at %}
-                        {{ entry.created_at }}
-                        <br/>
-                    {% endif %}
-                    {% comment %} If it is a note {% endcomment %}
-                    {% if entry.content %}
-                        <i class="fa fa-file-text-o" aria-hidden="true"></i> {{ entry.content }}
-                        <br />
-                        <div class="buttons">
-                            <a href="{% url 'crm:update_note' entry.id %}?next_url={{ current_url|urlencode }}">
-                                <button>Edit Note</button>
-                            </a>
-                            <form action="{% url 'crm:delete_note' entry.id %}"
-                                  method="post"
-                                  class="delete-note-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="note_id" value="{{ entry.id }}" />
-                                <button type="submit" class="deleteButton">Delete Note</button>
-                            </form>
-                        </div>
-                    {% elif entry.task_name %}
-                        <p><i class="fa fa-check-circle-o" aria-hidden="true"></i> {{ entry.task_name }}</p>
-                        {% if entry.description %}
-                        {{ entry.description }}</br>
-                        {% endif %}
-                        <div class="buttons">
-                            <a href="{% url 'todo:update_task' entry.id %}?next_url={{ current_url|urlencode }}">
-                                <button>Edit Task</button>
-                            </a>
-                            {% comment %} I guess I do not need deleting and completing in history view {% endcomment %}
-                            {% comment %} <form action="{% url 'todo:complete_task' entry.id %}" method="post">
-                                {% csrf_token %}
-                                <input type="hidden" name="task_id" value="{{ entry.id }}" />
-                                <button type="submit" class="completeTaskButton">Complete Task</button>
-                            </form> {% endcomment %}
-                            {% comment %} <form action="{% url 'todo:delete_task' entry.id %}" method="post" class="delete-task-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="task_id" value="{{ entry.id }}" />
-                                <button type="submit" class="deleteButton">Delete Task</button>
-                            </form> {% endcomment %}
-                        </div>
-                    {% endif %}
-                </li>
-            {% empty %}
-                <li>No history available.</li>
-            {% endfor %}
-            <li>
-                {% if contact is none %}
-                {{ company.created_at }}
-                <br />
-                <i class="fa fa-plus-circle" aria-hidden="true"></i> {{ company.name }} was added to the CRM
-                {% else %}
-                {{ contact.created_at }}
-                <br />
-                <i class="fa fa-plus-circle" aria-hidden="true"></i> {{ contact.name }} was added to the CRM
-                {% endif %}
-            </li>
-        </ul>
-    </div>
+  <h2>History</h2>
+  <div class="historyEntries">
+    <ul>
+      <li>
+        <h2>Add a Note</h2>
+        <form method="post">
+          {% csrf_token %}
+          {{ note_form.content }}
+          <div class="addNoteButton">
+            <button type="submit">Add Note</button>
+          </div>
+        </form>
+      </li>
+      <!-- Iterate over both notes and completed tasks -->
+      {% for entry in history_entries %}
+        <li>
+          {% if entry.completed_at %}
+            You completed this task. {{ entry.completed_at }}
+            <br />
+          {% elif entry.created_at %}
+            {{ entry.created_at }}
+            <br />
+          {% endif %}
+          {% comment %}If it is a note{% endcomment %}
+          {% if entry.content %}
+            <i class="fa fa-file-text-o" aria-hidden="true"></i> {{ entry.content }}
+            <br />
+            <div class="buttons">
+              <a href="{% url 'crm:update_note' entry.id %}?next_url={{ current_url|urlencode }}"><button>Edit Note</button></a>
+              <form action="{% url 'crm:delete_note' entry.id %}" method="post" class="delete-note-form">
+                {% csrf_token %}
+                <input type="hidden" name="note_id" value="{{ entry.id }}" />
+                <button type="submit" class="deleteButton">Delete Note</button>
+              </form>
+            </div>
+          {% elif entry.name %}
+            <p>
+              <i class="fa fa-check-circle-o" aria-hidden="true"></i> {{ entry.name }}
+            </p>
+            {% if entry.description %}
+              {{ entry.description }}
+            {% endif %}
+            <div class="buttons">
+              <a href="{% url 'todo:update_task' entry.id %}?next_url={{ current_url|urlencode }}"><button>Edit Task</button></a>
+            </div>
+          {% endif %}
+        </li>
+      {% empty %}
+        <li>No history available.</li>
+      {% endfor %}
+      <li>
+        {% if company %}
+          {{ company.created_at }}
+          <br />
+          <i class="fa fa-plus-circle" aria-hidden="true"></i> {{ company.name }} was added to the CRM
+        {% elif contact %}
+          {{ contact.created_at }}
+          <br />
+          <i class="fa fa-plus-circle" aria-hidden="true"></i> {{ contact.name }} was added to the CRM
+        {% endif %}
+      </li>
+    </ul>
+  </div>
 </div>

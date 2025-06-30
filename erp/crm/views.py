@@ -5,7 +5,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.views import View, generic
 from .models import Contact, Company, Note
 from todo.models import Task
-from .forms import ContactCreateForm,ContactUpdateForm, NoteForm, CompanyForm
+from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm
 from todo.forms import TaskForm
 from itertools import chain
 from operator import attrgetter
@@ -113,11 +113,9 @@ class ContactUpdate(generic.edit.UpdateView):
         # next_url = self.request.POST.get("next_url")
         # self.success_url = next_url
         return super().form_valid(form)
-    
+
     def get_success_url(self) -> str:
         return reverse_lazy("crm:contact_detail", kwargs={"pk": self.object.pk})
-    
-
 
 
 class CompanyCreate(generic.edit.CreateView):
@@ -207,7 +205,7 @@ class ContactDetail(generic.DetailView):
             #     note.company = contact.company
             note.save()
             return redirect(f"/crm/contact/detail/{contact.pk}")
-        
+
         if task_form.is_valid():
             task = task_form.save(commit=False)
             task.contact = contact
@@ -532,5 +530,37 @@ def company_search(request):
             html = (
                 "<div>No matching company found. A new company will be created.</div>"
             )
+
+    return HttpResponse(html)
+
+
+# returns a list of customers (contacts or clients) that match the query
+def customer_autocomplete(request):
+    query = request.GET.get("customer", "")
+    if query == "":
+        return HttpResponse("")
+    contacts = Contact.objects.filter(name__icontains=query)[:5]
+    companies = Company.objects.filter(name__icontains=query)[:5]
+
+    html = "<ul class='customer-autocomplete-list'>"
+    for contact in contacts:
+        html += (
+            f"<li style='cursor:pointer;'  onclick=\"document.getElementById('customer-input').value = '{contact.name}'; document.getElementById('customer-search-results').innerHTML = '';\">"
+            f"<i class='fa fa-user'></i> {contact.name}"
+            f"<input type='hidden' name='customer_type' value='contact'>"
+            f"<input type='hidden' name='contact_pk' value='{contact.pk}'>"
+            f"</li>"
+        )
+    for company in companies:
+        html += (
+            f"<li style='cursor:pointer;' onclick=\"document.getElementById('customer-input').value = '{company.name}'; document.getElementById('customer-search-results').innerHTML = '';\">"
+            f"<input type='hidden' name='customer_type' value='company'>"
+            f"<input type='hidden' name='company_pk' value='{company.pk}'>"
+            f"<i class='fa fa-briefcase'></i> {company.name}"
+            f"</li>"
+        )
+    if not contacts and not companies:
+        html += "<li>No results found.</li>"
+    html += "</ul>"
 
     return HttpResponse(html)

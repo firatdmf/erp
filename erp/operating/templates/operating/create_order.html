@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'operating/css/index.css' %}" />
+  {% endblock %}
+  <h1>Create Order</h1>
+  <form method="post">
+    {% csrf_token %}
+    
+    <div id="customer-fields">
+      <label for="customer">Customer</label>
+      <input id="customer-input" name="customer" type="text" hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms" hx-target="#customer-search-results" hx-swap="innerHTML" autocomplete="off" />
+      <input type='hidden' name='customer_type' value='placeholder'>"
+      <input type='hidden' name='customer' value='placeholder.pk'>"
+    </div>
+    <div id="customer-search-results"></div>
+
+    <div id="product-fields">
+      <label for="product">Product</label>
+    </div>
+    {{ form.as_p }}
+    {{ formset.management_form }}
+    {% for form in formset %}
+      {{ form.as_p }}
+    {% endfor %}
+
+    <button type="submit">Create Order</button>
+  </form>
+{% endblock %}

@@ -39,12 +39,17 @@ class OrderCreate(View):
         form = OrderForm()
         formset = OrderItemFormSet()
         return render(
-            request, "operating/order_form.html", {"form": form, "formset": formset}
+            request, "operating/create_order.html", {"form": form, "formset": formset}
         )
 
     def post(self, request):
         form = OrderForm(request.POST)
         formset = OrderItemFormSet(request.POST)
+
+        customer = request.POST.get("customer")
+        customer_type = request.POST.get("customer_type")
+
+        print("your customer is: ", customer, "is of type: ", customer_type)
 
         if form.is_valid() and formset.is_valid():
             order = form.save()
@@ -57,14 +62,14 @@ class OrderCreate(View):
             return redirect("operating:order_detail", pk=order.pk)
 
         return render(
-            request, "operating/order_form.html", {"form": form, "formset": formset}
+            request, "operating/create_order.html", {"form": form, "formset": formset}
         )
 
 
 class OrderEdit(UpdateView):
     model = Order
     form_class = OrderForm
-    template_name = "operating/order_form.html"
+    template_name = "operating/create_order.html"
 
     # prevent editing completed orders.
     def dispatch(self, request, *args, **kwargs):
@@ -165,3 +170,12 @@ class MachineStatusUpdate(View):
             return JsonResponse({"error": "OrderItem not found"}, status=404)
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
+        
+def delete_order(request,pk):
+    try:
+        order = Order.objects.get(pk=pk)
+        order.delete()
+        messages.success(request, "Order deleted successfully.")
+    except Order.DoesNotExist:
+        messages.error(request, "Order not found.")
+    return redirect("operating:order_list")

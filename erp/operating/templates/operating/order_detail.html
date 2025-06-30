@@ -1,5 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
+<style>
+  #delete_order_button{
+    color:red;
+  
+  }
+  button{
+    cursor:pointer;
+  }
+</style>
   <h1>Order #{{ order.pk }}</h1>
 
   <p>
@@ -43,4 +52,8 @@
   <p>
     <a href="{% url 'operating:order_list' %}">← Back to Orders</a>
   </p>
+        <form action="{% url 'operating:delete_order' order.pk %}" method="post">
+        {% csrf_token %}
+        <button type="submit" id="delete_order_button">Delete Order</button><br />
+      </form>
 {% endblock %}

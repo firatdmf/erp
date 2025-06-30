@@ -20,8 +20,8 @@ Accounting:
    SYNC WITH A BANK -
 
 Marketing:
-   Display products on web
-   Show all contacts and companies together both, combine contact and company models
+   Display products on web /
+   Show all contacts and companies together both /
    Chill Todo and personal to do (could do) -
    Classify Contacts: Lead, Prospect, Client, and Dead.
    Group Contacts: Distributors, Retailers, or a group defined by user. 

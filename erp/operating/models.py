@@ -1,55 +1,17 @@
 from django.db import models
 from crm.models import Contact, Company
 from marketing.models import Product, ProductVariant
+from django.core.exceptions import ValidationError
 
 # segno is for making qr codes.
 from decouple import config
 import segno
+# cloudinary is for uploading images to the cloud.
 import tempfile
 import cloudinary.uploader
-import json
 
 # below is to assign api_keys to machines
 import secrets
-
-
-# Create your functions here.
-def product_description():
-    return {
-        "variant": [
-            {
-                "id": 123,
-                "price": 2,
-                "quantity": 20,
-            },
-            {
-                "id": 456,
-                "price": 5,
-                "quantity": 10,
-            },
-        ]
-    }
-
-
-# def generate_qr_for_order(order):
-#     CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL")
-#     qr_data = f"{CLIENT_PUBLIC_URL}/order/{order.pk}/status"
-#     qr = segno.make(qr_data)
-
-#     # create the file temporarily and save it here.
-#     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-#         qr.save(temp_file.name, scale=5)
-
-#         result = cloudinary.uploader.upload(
-#             temp_file.name,
-#             folder=f"media/orders/{order.pk}",  # ⬅️ This puts the image in qr_codes/orders/
-#             public_id=f"qr_order_{order.pk}",  # ⬅️ Custom filename
-#             overwrite=True,
-#             resource_type="image"
-#         )
-
-#     order.qr_code_url = result["secure_url"]
-#     order.save(update_fields=["qr_code_url"])
 
 
 def generate_machine_qr_for_order(order):
@@ -73,9 +35,8 @@ def generate_machine_qr_for_order(order):
 
 
 # Create your models here.
-
-
 class Order(models.Model):
+
     STATUS_CHOICES = [
         ("pending", "Pending"),
         ("in_production", "In Production"),
@@ -140,7 +101,9 @@ class OrderItem(models.Model):
 
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    product_variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT, blank=True, null=True)
+    product_variant = models.ForeignKey(
+        ProductVariant, on_delete=models.PROTECT, blank=True, null=True
+    )
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
@@ -164,10 +127,22 @@ class OrderItem(models.Model):
         return f"Order #{self.pk}"
 
 
+# GEMBA
+class WorkStation(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+
+
+# A machine is a physical or virtual device that performs tasks in a workstation.
 class Machine(models.Model):
     name = models.CharField(max_length=150, unique=True)
+    # maximum revolutions per minute
     max_rpm = models.PositiveIntegerField()
+    # domain is the maximum number of items that can be processed in a single run
     domain = models.DecimalField(max_digits=5, decimal_places=2)
+    # A machine belongs to a workstation and can have multiple machines in a workstation.
+    workstation = models.ForeignKey(
+        WorkStation, on_delete=models.CASCADE, related_name="machines"
+    )
 
 
 class MachineCredential(models.Model):

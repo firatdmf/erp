@@ -5,10 +5,11 @@ from . import views
 app_name = "operating"
 urlpatterns = [
     path("", views.index.as_view(), name="index"),
-    path("orders/create",views.OrderCreate.as_view(),name="order_create"),
+    path("orders/create",views.OrderCreate.as_view(),name="create_order"),
     path("orders/<int:pk>/edit",views.OrderEdit.as_view(),name="order_edit"),
     path("orders/<int:pk>/", views.OrderDetail.as_view(),name="order_detail"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
+    path("orders/delete/<int:pk>/",views.delete_order,name="delete_order"),
     # path("create_product/",views.CreateProduct.as_view(),name="create_product"),
     # path("product_list/",views.Product.as_view(),name="product_list"),
 

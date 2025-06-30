@@ -31,6 +31,15 @@
 } */
 .tasks_component .taskComponent{
     background-color: #F8FAFC;
+    width: max-content;
+    padding:20px;
+    border-radius: 20px;
+    margin:10px 5px;
+}
+
+.tasks_component ul {
+    list-style-type: none;
+    padding: 0;
 }
 
 .tasks_component .taskComponent a:hover {
@@ -56,6 +65,7 @@
 } */
 .tasks_component .taskDescription{
     color:rgba(0, 0, 0, 0.7);
+    font-style: italic;
 }
 .tasks_component .taskDueDate{
     color:rgba(0, 0, 0, 0.8);

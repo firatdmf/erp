@@ -10,7 +10,7 @@
         <h2>Add a Note</h2>
         <form method="post">
           {% csrf_token %}
-          {{ note_form.content }}
+          {{ note_form.as_p }}
           <div class="addNoteButton">
             <button type="submit">Add Note</button>
           </div>

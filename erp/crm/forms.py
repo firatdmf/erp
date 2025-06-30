@@ -10,7 +10,7 @@ from django.forms import ModelForm
 from django import forms
 from collections import OrderedDict
 
-class ContactForm(ModelForm):
+class ContactCreateForm(ModelForm):
 
     # This is to allow user the enter company name so we can display matching companies in the DB, if it does not exist, we create a new company in the Database
     company_name = forms.CharField(
@@ -35,7 +35,7 @@ class ContactForm(ModelForm):
 
     task_name = forms.CharField(max_length=200, label="Task Name", required=False)
     task_due_date = forms.DateField(
-        label="Due Date",
+        label="Task Due Date",
         widget=forms.DateInput(attrs={"type": "date"}),
         required=False,
         initial=date.today(),
@@ -85,6 +85,11 @@ class ContactForm(ModelForm):
                     description=self.cleaned_data["task_description"],
                 )
         return instance
+    
+class ContactUpdateForm(ModelForm):
+    class Meta:
+        model = Contact
+        fields = "__all__"
 
 
 class CompanyForm(ModelForm):
@@ -92,8 +97,8 @@ class CompanyForm(ModelForm):
         label="Initial Note", widget=forms.Textarea, required=False
     )
     task_name = forms.CharField(max_length=200, label="Task Name", required=False)
-    due_date = forms.DateField(
-        label="Due Date",
+    task_due_date = forms.DateField(
+        label="Task Due Date",
         widget=forms.DateInput(attrs={"type": "date"}),
         required=False,
         initial=date.today(),

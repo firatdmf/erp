@@ -448,7 +448,7 @@ class ProductVariantAttributeValue(models.Model):
             "product_variant_attribute",
         )  # A variant cannot have duplicate attribute name
 
-
+# This is to save image files.
 class ProductFile(models.Model):
     file_path = models.CharField(max_length=500, blank=True, null=True)
     # file = models.FileField(upload_to="uploads/")  # this triggers Django file handling
@@ -476,7 +476,7 @@ class ProductFile(models.Model):
             from cloudinary.exceptions import Error as CloudinaryError
             import os
             try:
-                folder = f"product_files/{self.product.sku}/images"
+                folder = f"media/product_images/{self.product.sku}/images"
                 public_id = os.path.splitext(upload_file.name)[0]
                 result = cloudinary_upload(
                     upload_file,
@@ -489,20 +489,6 @@ class ProductFile(models.Model):
             except CloudinaryError as e:
                 raise ValidationError(f"Cloudinary upload failed: {e}")
         super().save(*args, **kwargs)
-
-    # def save(self, *args, **kwargs):
-    #     if self.file and not self.file_url:
-    #         try:
-    #             result = cloudinary_upload(self.file)
-    #             self.file_url = result.get("secure_url")
-    #         except CloudinaryError as e:
-    #             print(f"Cloudinary upload failed: {e}")
-    #     super().save(*args, **kwargs)
-
-    # def delete(self, *args, **kwargs):
-    #     if self.file and self.file.path and os.path.isfile(self.file.path):
-    #         os.remove(self.file.path)  # only relevant if using local storage
-    #     super().delete(*args, **kwargs)
 
     def __str__(self):
         # return f"{self.product or self.product_variant}"

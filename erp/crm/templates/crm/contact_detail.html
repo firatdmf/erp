@@ -1,108 +1,48 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% block content %}
-    {% load todo_filters %}
-    {% load crm_tags %}
-    {% load static %}
-    {% block css %}
-        <link rel="stylesheet" href="{% static 'crm/css/detailPages.css' %}" />
-    {% endblock css %}
+  {% load todo_filters %}
+  {% load todo_tags %}
+  {% load crm_tags %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'crm/css/contact_detail.css' %}" />
+  {% endblock %}
+  <div class="contact_detail_page">
     <p>
-        <a href="{% url 'crm:contact_list' %}"><--- Go to Contact List page</a>
+      <a href="{% url 'crm:contact_list' %}"><--- Go to Contact List page</a>
     </p>
     <h1>Contact Details</h1>
     <p>
-        <strong>Name:</strong> {{ contact.name }}
+      <strong>Name:</strong> {{ contact.name|capfirst }}
     </p>
     {% if contact.email %}
-        <p>
-            <strong>Email:</strong> {{ contact.email }}
-        </p>
+      <p>
+        <strong>Email:</strong> {{ contact.email }}
+      </p>
     {% endif %}
     {% if contact.company %}
-        <p>
-            {% comment %} {{ contact.company.id }} {% endcomment %}
-            <strong>Company:</strong>
-            <a href="{% url 'crm:company_detail' contact.company.id %}"> {{ contact.company }} <a/>
-        </p>
-        <!-- Assuming you have a ForeignKey to Company -->
+      <p>
+        <strong>Company:</strong>
+        <a class="link" href="{% url 'crm:company_detail' contact.company.id %}">{{ contact.company }}</a>
+      </p>
+      <!-- Assuming you have a ForeignKey to Company -->
     {% endif %}
     <!-- Add other fields as needed -->
     <!-- Note submission form -->
-    <h2>Add a Note</h2>
+    <h2>Add a Task</h2>
     <form method="post">
-        {% csrf_token %}
-        {{ note_form.as_p }}
-        <button type="submit">Add Note</button>
+      {% csrf_token %} {{ task_form.as_p }}
+      <button type="submit">Add Task</button>
     </form>
-    <h2>Notes</h2>
-    <!-- <ul>
-        {% for note in notes %}
-        {% if note.modified_date == note.created_at%}
-        <li>{{ note.content }} ({{ note.created_at }})</li>
-        {% else %}
-        <li>{{ note.content }} ({{note.modified_date}})</li>
-        {% endif %}
-        <a href="{% url 'crm:update_note' note.id %}">Edit Note</a>
-
-        {% empty %}
-        <li>No notes available.</li>
-        {% endfor %}
-    </ul> -->
-    <ul>
-        {% for note in notes|dictsortreversed:"modified_date" %}
-            <li>
-                {{ note.content }} (
-                {% if note.modified_date %}
-                    {{ note.modified_date }}
-                {% else %}
-                    {{ note.created_at }}
-                {% endif %})
-                <a href="{% url 'crm:update_note' note.id %}">Edit Note</a>
-            </li>
-        {% empty %}
-            <li>No notes available.</li>
-        {% endfor %}
-    </ul>
     <h2>Tasks</h2>
-        <ul>
-            {% for task in tasks|dictsortreversed:"created_at" %}
-                {% if task.completed == False and task.due_date|is_past_due %}
-                    <!-- {% if task.completed == False %} -->
-                    <li>
-                        <p>
-                            <strong>{{ task.task_name }}</strong>
-                            {% if task.days_since_due > 0 %}
-                                <span style="color:red">{{ task.days_since_due }}d</span>
-                            {% else %}
-                                <p>what is wrong</p>
-                            {% endif %}
-                        </p>
-                        {% if task.description %}<p>{{ task.description }}</p>{% endif %}
-                        {% if task.contact %}
-                            <a href="{% url 'crm:contact_detail' task.contact.id %}"
-                               style="color:blue">{{ task.contact }}</a>
-                        {% endif %}
-                        {% if task.company %}
-                            <a href="{% url 'crm:company_detail' task.company.id %}"
-                               style="color:blue">{{ task.company }}</a>
-                        {% endif %}
-                    </li>
-                    <form action="{% url 'todo:complete_task' task.id %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit" style="color:green">Complete Task</button>
-                        <br />
-                    </form>
-                    <form action="{% url 'todo:delete_task' task.id %}" method="post">
-                        {% csrf_token %}
-                        <button type="submit" style="color:red">Delete Task</button>
-                        <br />
-                    </form>
-                {% endif %}
-            {% endif %}
-        {% empty %}
-            <li>No tasks available.</li>
-        {% endfor %}
-    </ul>
-
-    <a href="{% url 'crm:update_contact' contact.id %}?next_url={{ request.path|urlencode }}">Edit Contact</a>
+    {% tasks_component company=None contact=contact csrf_token=csrf_token page_type='report_detail' sort_type='dictsortreversed' %}
+    {% history_component company=None contact=contact csrf_token=csrf_token note_form=note_form current_url=request.path %}
+    <div class="contact_actions">
+      <a href="{% url 'crm:update_contact' contact.id %}?next_url={{ request.path|urlencode }}">Update Contact Information</a>
+      <form action="{% url 'crm:delete_contact' contact.id %}" method="post">
+        {% csrf_token %}
+        <button type="submit" id="delete_contact_button">Delete Contact</button><br />
+      </form>
+    </div>
+  </div>
 {% endblock %}

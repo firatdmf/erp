@@ -1,8 +1,8 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load static %}
 {% load todo_tags %}
 {% block content %}
-<p>This is Task report page</p>
-{% comment %} <p>{{my_variable}}</p> {% endcomment %}
-{% task_component sort_type='dictsort' csrf_token=csrf_token page_type="report" %}
-{% endblock content %}
+  <p>This is Task report page</p>
+  {% comment %} <p>{{ my_variable }}</p> {% endcomment %}
+  {% tasks_component sort_type='dictsort' csrf_token=csrf_token page_type='report' company=None contact=None %}
+{% endblock %}

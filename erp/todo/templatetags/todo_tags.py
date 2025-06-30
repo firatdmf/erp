@@ -2,6 +2,7 @@ from django import template
 from django.template.loader import render_to_string
 from todo.models import Task
 from .todo_filters import days_since, is_past_due
+from django.utils import timezone
 
 register = template.Library()
 
@@ -13,12 +14,21 @@ def update_task(task_id):
 
 @register.simple_tag
 def tasks_component(sort_type, csrf_token, page_type, contact, company):
-    if contact:
-        tasks = Task.objects.filter(contact=contact)
-    elif company:
-        tasks = Task.objects.filter(company=company)
+    today = timezone.now().date()
+    if page_type == "dashboard":
+        if contact:
+            tasks = Task.objects.filter(contact=contact,completed=False)
+        elif company:
+            tasks = Task.objects.filter(company=company,completed=False)
+        else:
+            tasks = Task.objects.filter(completed=False)
     else:
-        tasks = Task.objects.all()
+        if contact:
+            tasks = Task.objects.filter(contact=contact)
+        elif company:
+            tasks = Task.objects.filter(company=company)
+        else:
+            tasks = Task.objects.all()
 
     # if page_type=="report":
     #     print("report")

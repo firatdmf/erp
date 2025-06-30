@@ -5,7 +5,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.views import View, generic
 from .models import Contact, Company, Note
 from todo.models import Task
-from .forms import ContactForm, NoteForm, CompanyForm
+from .forms import ContactCreateForm,ContactUpdateForm, NoteForm, CompanyForm
 from todo.forms import TaskForm
 from itertools import chain
 from operator import attrgetter
@@ -57,10 +57,9 @@ class CompanyList(generic.ListView):
     context_object_name = "companies"
 
 
-# *
 class ContactCreate(generic.edit.CreateView):
     model = Contact
-    form_class = ContactForm
+    form_class = ContactCreateForm
     template_name = "crm/create_form.html"
     # success_url = "/crm/contact/"
 
@@ -87,8 +86,7 @@ class ContactCreate(generic.edit.CreateView):
         except Exception as e:
             form.add_error(None, f"An unexpected error occurred: {e}")
             return self.form_invalid(form)
-        
-        
+
         # # Check if a company name is provided in the form data
         # company_name = form.cleaned_data.get("company_name")
         # if company_name:
@@ -105,16 +103,21 @@ class ContactCreate(generic.edit.CreateView):
         return reverse("crm:contact_detail", args=[self.object.pk])
 
 
-class EditContactView(generic.edit.UpdateView):
+class ContactUpdate(generic.edit.UpdateView):
     model = Contact
-    form_class = ContactForm  # Your form class for editing the entry
-    template_name = "crm/update_note.html"  # Template for editing an entry
+    form_class = ContactUpdateForm  # Your form class for editing the entry
+    template_name = "crm/update_contact.html"  # Template for editing an entry
 
     # success_url = "/crm/"  # URL to redirect after successfully editing an entry
     def form_valid(self, form):
-        next_url = self.request.POST.get("next_url")
-        self.success_url = next_url
+        # next_url = self.request.POST.get("next_url")
+        # self.success_url = next_url
         return super().form_valid(form)
+    
+    def get_success_url(self) -> str:
+        return reverse_lazy("crm:contact_detail", kwargs={"pk": self.object.pk})
+    
+
 
 
 class CompanyCreate(generic.edit.CreateView):
@@ -140,12 +143,12 @@ class CompanyCreate(generic.edit.CreateView):
 
         # Save the task if all required fields are provided
         task_name = form.cleaned_data.get("task_name")
-        due_date = form.cleaned_data.get("due_date")
-        if task_name and due_date:
+        task_due_date = form.cleaned_data.get("task_due_date")
+        if task_name and task_due_date:
             task_description = form.cleaned_data.get("task_description", "")
             Task.objects.create(
                 name=task_name,
-                due_date=due_date,
+                due_date=task_due_date,
                 description=task_description,
                 company=self.object,
             )
@@ -171,35 +174,52 @@ class EditCompanyView(generic.edit.UpdateView):
 
 class ContactDetail(generic.DetailView):
     model = Contact
-    # Create this template
-    template_name = "crm/detail.html"
+    template_name = "crm/contact_detail.html"
     # This sets the variable name in the template
-    # context_object_name = 'contact'
+    context_object_name = "contact"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         contact = self.get_object()
-        context["model_type"] = "contact"
-        context["fields"] = self.object._meta.fields
         context["notes"] = Note.objects.filter(contact=contact)
         context["note_form"] = NoteForm()
         context["tasks"] = Task.objects.filter(contact=contact)
+        initial_task_data = {"contact": contact.pk}
+        # below is hide some specific fields I chose in todo task form view
+        context["task_form"] = TaskForm(
+            initial=initial_task_data, hide_fields=True
+        )  # Add task form to context
         return context
 
+    # Normally detail pages do not have post requests, but in here the client can add notes or tasks to the contact.
+    # In post requests you need to manually set the object to self.object
     def post(self, request, *args, **kwargs):
-        contact = self.get_object()
-        form = NoteForm(request.POST)
-        if form.is_valid():
-            note = form.save(commit=False)
+        self.object = self.get_object()
+        contact = self.object
+        note_form = NoteForm(request.POST)
+        task_form = TaskForm(request.POST)
+        print("Note form data:", request.POST)
+        print(note_form)
+        if note_form.is_valid():
+            note = note_form.save(commit=False)
             note.contact = contact
+            # if contact.company:
+            #     note.company = contact.company
             note.save()
-            return redirect(f"/crm/contact_detail/{contact.pk}")
+            return redirect(f"/crm/contact/detail/{contact.pk}")
+        
+        if task_form.is_valid():
+            task = task_form.save(commit=False)
+            task.contact = contact
+            task.save()
+            return redirect(f"/crm/contact/detail/{contact.pk}")
+
         # If the form is not valid, you can handle the error case here.
         # You might want to add error handling or return an error message.
 
         # You can also pass the form with errors back to the template.
         context = self.get_context_data()
-        context["note_form"] = form
+        context["note_form"] = note_form
         return self.render_to_response(context)
 
 
@@ -251,12 +271,12 @@ class CompanyDetail(generic.DetailView):
             note = note_form.save(commit=False)
             note.company = company
             note.save()
-            return redirect(f"/crm/company_detail/{company.pk}")
+            return redirect(f"/crm/company/detail/{company.pk}")
         elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.company = company
             task.save()
-            return redirect(f"/crm/company_detail/{company.pk}")
+            return redirect(f"/crm/company/detail/{company.pk}")
         # If the form data is valid, it saves the new note associated with the company and redirects to the company detail page.
         # If the form data is invalid, it adds the form with errors to the context and renders the page again with the form and errors displayed.        # You might want to add error handling or return an error message.
         context = self.get_context_data()
@@ -315,9 +335,10 @@ def delete_company(request, pk):
         company.delete()
         # below line brings back the user to the current page
         # return render(request,'crm/index.html',{"message":f"Company, {company_name}, has been successfully deleted."})
-        return redirect("crm:index")
-    
-def delete_contact(request,pk):
+        return redirect("crm:company_list")
+
+
+def delete_contact(request, pk):
     contact = get_object_or_404(Contact, pk=pk)
     contact.delete()
     return redirect("crm:contact_list")

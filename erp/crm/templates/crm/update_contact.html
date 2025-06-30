@@ -1,11 +1,36 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% load static %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'crm/css/update_contact.css' %}" />
+{% endblock %}
 {% block content %}
-{% comment %} <p>{{ request.GET.next_url }}</p> {% endcomment %}
-<form method="post" action="{% url 'crm:update_contact' contact.id %}">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <input type="hidden" name="next_url" value="{{ request.GET.next_url }}">
-  <button type="submit" class="btn btn-primary">Update</button>
-</form>
-
-{% endblock content %}
+  {% comment %} <p>{{ request.GET.next_url }}</p> {% endcomment %}
+  {% comment %} <form method="post" action="{% url 'crm:update_contact' contact.id %}">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="hidden" name="next_url" value="{{ request.GET.next_url }}" />
+    <button type="submit" class="btn btn-primary">Update</button>
+  </form> {% endcomment %}
+  <div id="UpdateContactPage">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        {% if field.name == 'company_suggestions' %}
+          <div id="company-suggestions"></div>
+        {% else %}
+          <p>
+            {{ field.label_tag }}<br />
+            {{ field }}
+            {% if field.help_text %}
+              <small>{{ field.help_text }}</small>
+            {% endif %}
+          </p>
+          {% for error in field.errors %}
+            <div class="error">{{ error }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+{% endblock %}

@@ -25,24 +25,6 @@ from cloudinary.uploader import upload as cloudinary_upload
 class Index(generic.TemplateView):
     template_name = "marketing/index.html"
 
-    # product = Product.objects.order_by("-pk").first()
-    # print(product.variants.order_by('-pk').first())
-    # print(product.variants.all())
-    # print("hey this is yours:",product)
-    # print(type(product.tags[0]))
-    # print(product.variants)
-
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     product = Product.objects.order_by("-pk").first()
-    #     # product = self.get_object()
-    #     if product:
-    #         variants = product.variants.all()
-    #         context["product"] = product
-    #         context["variants"] = variants
-    #     return context
-
-
 class ProductList(generic.ListView):
     model = Product
     template_name = "marketing/product_list.html"
@@ -54,25 +36,90 @@ class ProductDetail(generic.DetailView):
     template_name = "marketing/product_detail.html"
     context_object_name = "product"
 
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     product = self.get_object()
-    #     return context
+from django.views.generic.edit import ModelFormMixin
+
+# this is a base class for product views that handles common functionality
+class BaseProductView(ModelFormMixin):
+    model = Product
+    form_class = ProductForm
+
+    def get_variant_data(self):
+        export_data = self.request.POST.get("export_data")
+        if not export_data:
+            return None
+        try:
+            return json.loads(export_data)
+        except json.JSONDecodeError:
+            return None
+
+    def save_product_files(self, form, productfile_formset):
+        if productfile_formset.is_valid():
+            productfile_formset.instance = form.instance
+            productfile_formset.save()
+
+    def handle_variants(self, export_data):
+        from .models import ProductVariant, ProductVariantAttribute, ProductVariantAttributeValue, ProductFile
+        if not export_data or not export_data.get("product_variant_list"):
+            return
+
+        product = self.object
+        variant_list = export_data["product_variant_list"]
+
+        # Save or update variants
+        for variant_data in variant_list:
+            sku = variant_data.get("variant_sku")
+            if not sku:
+                continue
+
+            variant, _ = ProductVariant.objects.get_or_create(
+                product=product, variant_sku=sku
+            )
+
+            for key, value in variant_data.items():
+                if key not in ("variant_sku", "variant_attribute_values"):
+                    setattr(variant, key, value)
+            variant.save()
+
+            ProductVariantAttributeValue.objects.filter(product_variant=variant).delete()
+            for attr_name, attr_value in variant_data.get("variant_attribute_values", {}).items():
+                attribute, _ = ProductVariantAttribute.objects.get_or_create(name=attr_name)
+                ProductVariantAttributeValue.objects.create(
+                    product=product,
+                    product_variant=variant,
+                    product_variant_attribute=attribute,
+                    product_variant_attribute_value=attr_value,
+                )
+
+        # Handle uploads
+        for key in self.request.FILES:
+            if key.startswith("variant_file_"):
+                index = int(key.split("_")[-1]) - 1
+                variant_data = variant_list[index]
+                variant = ProductVariant.objects.get(
+                    product=product, variant_sku=variant_data["variant_sku"]
+                )
+                for file in self.request.FILES.getlist(key):
+                    upload_result = cloudinary_upload(file)
+                    url = upload_result.get("secure_url")
+                    if url:
+                        ProductFile.objects.create(
+                            product=product, product_variant=variant, file_url=url
+                        )
+
+        # Deletion
+        to_delete = export_data.get("deleted_files", [])
+        if to_delete:
+            ProductFile.objects.filter(pk__in=to_delete).delete()
+
+        if export_data.get("delete_all_variants"):
+            product.variants.all().delete()
+
 
 
 class ProductCreate(generic.edit.CreateView):
     model = Product
     form_class = ProductForm
     template_name = "marketing/product_create.html"
-
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     return context
-
-    # def form_invalid(self, form):
-    #     context = self.get_context_data()
-    #     context['form'] = form
-    #     return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
@@ -85,11 +132,7 @@ class ProductCreate(generic.edit.CreateView):
         return data
 
     def form_valid(self, form):
-        # Get the default form response
-        # response = super().form_valid(form)
         self.object = form.save(commit=False)
-        # attribute  = self.request.POST.get("attribute")
-        # print(attribute)
         self.object.save()  # This is how you get the pk of the newly saved product element
 
         # This is for saving the product files
@@ -100,33 +143,13 @@ class ProductCreate(generic.edit.CreateView):
             productfile_formset.instance = self.object
             productfile_formset.save()
 
-        #   -----------------  This is the old way of saving the variant form -----------------
-
-        # else:
-        #     self.object.save()
-        #     return super().form_valid(form)
-
-        # return HttpResponseRedirect(self.get_success_url())
-        # This is passed from the client js as an input field with name variant_json that is just text for json
-        # bring the same form with the same data, without saving to database.
         variant_json = self.request.POST.get("variant_json")
 
         if variant_json:
 
             variant_json = json.loads(variant_json)
             variant_names = variant_json["variant_names"]
-            print("the variant names are:")
-            print(variant_names)
-            # for variant_name in variant_names:
-            #     product_variant_attribute = ProductVariantAttribute.objects.get_or_create(name=variant_name)
 
-            # for key in variants:
-            #     print(f"Key: {key}, Value: {variants[key]}")
-            # for variant in variants:
-            #     variant_attribute = ProductVariantAttribute.objects.create(
-            #         product=self.object,
-            #         attribute_name=variant["attribute_name"],
-            # number_of_combinations = len(variant_json["combinations"])
             for index, combination in enumerate(variant_json["combinations"]):
                 if self.request.POST.get(f"variant_featured_{index}") == "on":
                     variant_featured = True
@@ -198,6 +221,11 @@ class ProductCreate(generic.edit.CreateView):
             )
         else:
             return reverse_lazy("marketing:product_create")
+        
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['is_update'] = False
+        return kwargs
 
     #     self.object = form.save(commit=False)
     #     if not (has_variants):
@@ -339,6 +367,11 @@ class ProductEdit(generic.edit.UpdateView):
 
     def get_success_url(self):
         return reverse_lazy("marketing:product_detail", kwargs={"pk": self.object.pk})
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['is_update'] = True
+        return kwargs
 
 
 class ProductFileCreate(generic.edit.CreateView):

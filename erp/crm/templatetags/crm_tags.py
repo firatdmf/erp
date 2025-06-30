@@ -36,7 +36,6 @@ def history_component(contact, company, note_form, csrf_token, current_url):
         notes = Note.objects.filter(company=company)
         completed_tasks = Task.objects.filter(completed=True, company=company)
     else:
-        print("hello2")
         notes = Note.objects.filter(contact=contact)
         completed_tasks = Task.objects.filter(completed=True, contact=contact)
     # notes = Note.objects.filter(company=company)

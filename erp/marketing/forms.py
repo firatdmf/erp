@@ -1,16 +1,3 @@
-# This is for the uniquness of the tag field
-
-# class ProductForm(forms.ModelForm):
-#     class Meta:
-#         model = Product
-#         fields = ['sku', 'barcode', 'title', 'description', 'media', 'collections', 'tags', 'category', 'type', 'unit_of_measurement', 'price', 'featured', 'selling_while_out_of_stock', 'weight', 'variants', 'vendor']
-
-#     def clean_tags(self):
-#         tags = self.cleaned_data.get('tags', [])
-#         if len(tags) != len(set(tags)):
-#             raise forms.ValidationError("Tags must be unique.")
-#         return tags
-
 from django import forms
 from django.contrib.postgres.forms import SimpleArrayField
 from django.forms import inlineformset_factory
@@ -36,63 +23,33 @@ class TagArrayWidget(forms.Textarea):
 
 
 class ProductForm(forms.ModelForm):
-    
     class Meta:
         model = Product
         # fields = ['title', 'description', 'sku', 'barcode', 'price', 'cost', 'featured', 'selling_while_out_of_stock', 'weight', 'unit_of_weight', 'vendor', 'has_variants']
         fields = "__all__"
-    
+
     def clean(self):
         cleaned_data = super().clean()
         product = self.instance
         product.clean()  # Call the clean method to validate
         return cleaned_data
 
-
-
     # The input id will be "id_has_variants", this won't be saved to the database, for interactions only.
     has_variants = forms.BooleanField(
         required=False, label="Does this product have variants?"
     )
+
     # If it has variants, this field will be set to True, otherwise False.
     def __init__(self, *args, **kwargs):
+        is_update = kwargs.pop("is_update", False)
         super(ProductForm, self).__init__(*args, **kwargs)
         # If the instance has variants, set the has_variants field to True
-        if self.instance and self.instance.variants.exists():
-            self.fields['has_variants'].initial = True
-        if(self.instance):
-            self.fields["primary_image"].queryset = (
-                ProductFile.objects.filter(product=self.instance)
+        if self.instance:
+            if is_update and self.instance.variants.exists():
+                self.fields["has_variants"].initial = True
+            self.fields["primary_image"].queryset = ProductFile.objects.filter(
+                product=self.instance
             )
-
-        
-
-    # def __init__(self, *args, **kwargs):
-    #     super(ProductForm, self).__init__(*args, **kwargs)
-
-
-    # below are added later
-    # def __init__(self, *args, **kwargs):
-    #     super(ProductForm, self).__init__(*args, **kwargs)
-    #     self.product_file_formset = ProductFileFormSet(instance=self.instance)
-
-    # def save(self, commit=True):
-    #     instance = super(ProductForm, self).save(commit=False)
-    #     if commit:
-    #         instance.save()
-    #         self.product_file_formset.save()
-    #     return instance
-
-    # def is_valid(self):
-    #     return (
-    #         super(ProductForm, self).is_valid() and self.product_file_formset.is_valid()
-    #     )
-
-    # def clean(self):
-    #     cleaned_data = super(ProductForm, self).clean()
-    #     self.product_file_formset.clean()
-    #     return cleaned_data
-
 
 class ProductVariantForm(forms.ModelForm):
     class Meta:
@@ -102,6 +59,7 @@ class ProductVariantForm(forms.ModelForm):
         widgets = {
             "product": forms.HiddenInput(),
         }
+
     def clean(self):
         cleaned_data = super().clean()
         variant = self.instance
@@ -122,12 +80,3 @@ ProductFileFormSet = inlineformset_factory(
     Product, ProductFile, form=ProductFileForm, extra=1, can_delete=True
 )
 
-
-# class ProductVariantAttributeValueForm(forms.ModelForm):
-#     class Meta:
-#         model = ProductVariantAttributeValue
-#         fields = ['attribute', 'value']
-
-
-# ProductVariantFormSet = inlineformset_factory(Product, ProductVariant, form=ProductVariantForm, extra=1, can_delete=True)
-# ProductVariantAttributeValueFormSet = inlineformset_factory(ProductVariant, ProductVariantAttributeValue, form=ProductVariantAttributeValueForm, extra=1, can_delete=True)

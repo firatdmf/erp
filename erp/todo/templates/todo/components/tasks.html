@@ -7,17 +7,19 @@
   {% comment %} {{ page_type }} {% endcomment %}
   <ul>
     {% for task in tasks|task_sort:sort_type %}
-      {% if page_type == 'report' %}
+      {% if 'report' in page_type %}
         {% if not task.completed %}
           <li class="taskComponent">
             <p class="taskName">
               {{ task.name }}
-              {% if task.contact %}
-                -
-                <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
-              {% elif task.company %}
-                -
-                <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
+              {% if not 'detail' in page_type %}
+                {% if task.contact %}
+                  -
+                  <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
+                {% elif task.company %}
+                  -
+                  <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
+                {% endif %}
               {% endif %}
             </p>
             {% if task.description %}
@@ -25,10 +27,17 @@
             {% endif %}
             <p class="taskDueDate">
               Due: {{ task.due_date }}
-              {% if task.due_date|days_since == 'today' %}
+              {% if task.due_date|days_since == False %}
+                <span></span>
+              {% elif task.due_date|days_since == 'today' %}
                 <span class="daysDueToday">{{ task.due_date|days_since }}</span>
+              {% elif task.due_date|days_since != 'today' %}
+                <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
               {% endif %}
             </p>
+            {% if not 'detail' in page_type %}
+            {{task.completed}}
+            {% endif %}
             <div class="task_buttons">
               <form action="{% url 'todo:complete_task' task.id %}" method="post">
                 {% csrf_token %}
@@ -46,13 +55,15 @@
           </li>
         {% endif %}
       {% else %}
+        {% comment %} {% if not task.completed and task.due_date|is_past_due %} {% endcomment %}
+        {% comment %} is_past_due so we won't see tasks due in future days than today in the dashboard {% endcomment %}
         {% if not task.completed and task.due_date|is_past_due %}
           <li class="taskComponent">
             <p class="taskName">
               {{ task.name }}
               {% if task.contact %}
                 -
-                <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
+                <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact.name }}</a></b>
               {% elif task.company %}
                 -
                 <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
@@ -63,7 +74,9 @@
             {% endif %}
             <p class="taskDueDate">
               Due: {{ task.due_date }}
-              {% if task.due_date|days_since == 'today' %}
+              {% if task.due_date|days_since == False %}
+                <span></span>
+              {% elif task.due_date|days_since == 'today' %}
                 <span class="daysDueToday">{{ task.due_date|days_since }}</span>
               {% elif task.due_date|days_since != 'today' %}
                 <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
@@ -84,6 +97,8 @@
               </form>
             </div>
           </li>
+        {% else %}
+          {% comment %} <a href="{% url 'todo:update_task' task.pk %}"><p class="error" style="color:red;">{{ task.name }}</p></a> {% endcomment %}
         {% endif %}
       {% endif %}
     {% empty %}

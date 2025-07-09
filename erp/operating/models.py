@@ -9,6 +9,8 @@ import segno
 # cloudinary is for uploading images to the cloud.
 import tempfile
 import cloudinary.uploader
+# make the qr codes json objects
+import json
 
 # below is to assign api_keys to machines
 import secrets
@@ -17,7 +19,7 @@ import secrets
 def generate_machine_qr_for_order(order):
     payload = {"order_id": order.pk, "action": "update_status"}
 
-    qr = segno.make(payload)
+    qr = segno.make(json.dumps(payload)) # Convert dict to JSON string
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
         qr.save(temp_file.name, scale=5)

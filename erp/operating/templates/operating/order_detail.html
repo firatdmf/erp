@@ -1,14 +1,13 @@
 {% extends 'base.html' %}
 {% block content %}
-<style>
-  #delete_order_button{
-    color:red;
-  
-  }
-  button{
-    cursor:pointer;
-  }
-</style>
+  <style>
+    #delete_order_button {
+      color: red;
+    }
+    button {
+      cursor: pointer;
+    }
+  </style>
   <h1>Order #{{ order.pk }}</h1>
 
   <p>
@@ -17,13 +16,19 @@
   <p>Created At: {{ order.created_at }}</p>
 
   {% if order.contact %}
-    <p>Contact: {{ order.contact.name }}</p>
+    <p>
+      Contact: <a href="{% url 'crm:contact_detail' order.contact.pk %}">{{ order.contact.name }}</a>
+    </p>
   {% endif %}
   {% if order.company %}
-    <p>Company: {{ order.company.name }}</p>
+    <p>
+      Company: <a href="{% url 'crm:company_detail' order.company.pk %}">{{ order.company.name }}</a>
+    </p>
   {% endif %}
 
-  <p>Notes: {{ order.notes|default:'-' }}</p>
+  {% if order.notes %}
+    <p>Notes: {{ order.notes|default:'-' }}</p>
+  {% endif %}
 
   <h3>Order Items:</h3>
   <ul>
@@ -44,7 +49,9 @@
   {% endif %}
 
   {% if order.status != 'completed' %}
-    <a href="{% url 'operating:order_edit' order.pk %}" class="btn btn-primary">Edit Order</a>
+  <p>
+    <a href="{% url 'operating:update_order' order.pk %}" class="btn btn-primary">Edit Order</a>
+  </p>
   {% else %}
     <button class="btn btn-secondary" disabled>Order Completed</button>
   {% endif %}
@@ -52,8 +59,8 @@
   <p>
     <a href="{% url 'operating:order_list' %}">← Back to Orders</a>
   </p>
-        <form action="{% url 'operating:delete_order' order.pk %}" method="post">
-        {% csrf_token %}
-        <button type="submit" id="delete_order_button">Delete Order</button><br />
-      </form>
+  <form action="{% url 'operating:delete_order' order.pk %}" method="post">
+    {% csrf_token %}
+    <button type="submit" id="delete_order_button">Delete Order</button><br />
+  </form>
 {% endblock %}

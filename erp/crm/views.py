@@ -545,17 +545,23 @@ def customer_autocomplete(request):
     html = "<ul class='customer-autocomplete-list'>"
     for contact in contacts:
         html += (
-            f"<li style='cursor:pointer;'  onclick=\"document.getElementById('customer-input').value = '{contact.name}'; document.getElementById('customer-search-results').innerHTML = '';\">"
+            f"<li style='cursor:pointer;' onclick=\""
+            f"document.getElementById('customer-input').value = '{contact.name}'; "
+            f"document.getElementById('customer-search-results').innerHTML = ''; "
+            f"document.getElementById('customer-type').value = 'contact'; "
+            f"document.getElementById('customer-pk').value = '{contact.pk}';"
+            f'">'
             f"<i class='fa fa-user'></i> {contact.name}"
-            f"<input type='hidden' name='customer_type' value='contact'>"
-            f"<input type='hidden' name='contact_pk' value='{contact.pk}'>"
             f"</li>"
         )
     for company in companies:
         html += (
-            f"<li style='cursor:pointer;' onclick=\"document.getElementById('customer-input').value = '{company.name}'; document.getElementById('customer-search-results').innerHTML = '';\">"
-            f"<input type='hidden' name='customer_type' value='company'>"
-            f"<input type='hidden' name='company_pk' value='{company.pk}'>"
+            f"<li style='cursor:pointer;' onclick=\""
+            f"document.getElementById('customer-input').value = '{company.name}'; "
+            f"document.getElementById('customer-search-results').innerHTML = ''; "
+            f"document.getElementById('customer-type').value = 'company'; "
+            f"document.getElementById('customer-pk').value = '{company.pk}';"
+            f'">'
             f"<i class='fa fa-briefcase'></i> {company.name}"
             f"</li>"
         )

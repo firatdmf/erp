@@ -282,7 +282,8 @@ class Product(models.Model):
         null=True,
         db_index=True,
     )
-    # supplier = models.CharField( null=True, blank=True)
+
+    # supplier_lead_time = models.PositiveIntegerField(null=True, blank=True)
     # has_variants = models.BooleanField(default=False)
     datasheet_url = models.URLField(null=True, blank=True)
 

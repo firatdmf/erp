@@ -1,20 +1,34 @@
 from django.shortcuts import render, redirect
 from django.views import View
 from .models import Order
-from .forms import OrderForm, OrderItemFormSet
+from .forms import OrderForm
 from django.views.generic.edit import UpdateView
 from django.views.generic.detail import DetailView
 from django.views.generic import ListView
-from .models import OrderItem, generate_machine_qr_for_order  # if it's not already in __init__.py
+
+from django.utils.html import escape
+from .models import (
+    OrderItem,
+    generate_machine_qr_for_order,
+)  # if it's not already in __init__.py
 from django.http import HttpResponse, HttpResponseForbidden
 from django.contrib import messages
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
 from .utils import get_machine_from_api_key
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+
+# to filter products by multiple fields
+from django.db.models import Q
+
+
+from marketing.models import Product
+
+
+from crm.models import Contact, Company
 
 # Create your views here.
 
@@ -37,24 +51,57 @@ class OrderDetail(DetailView):
 class OrderCreate(View):
     def get(self, request):
         form = OrderForm()
-        formset = OrderItemFormSet()
+        # order_item_formset = OrderItemFormSet()
         return render(
-            request, "operating/create_order.html", {"form": form, "formset": formset}
+            request,
+            "operating/create_order.html",
+            {"form": form},
         )
 
     def post(self, request):
         form = OrderForm(request.POST)
-        formset = OrderItemFormSet(request.POST)
+        # order_item_formset = OrderItemFormSet(request.POST)
 
         customer = request.POST.get("customer")
+        customer_pk = request.POST.get("customer_pk")
         customer_type = request.POST.get("customer_type")
+        product_json_input = request.POST.get("product_json_input")
+        print("product_json_input is:", product_json_input)
 
-        print("your customer is: ", customer, "is of type: ", customer_type)
+        print("post data is:", request.POST)
 
-        if form.is_valid() and formset.is_valid():
-            order = form.save()
-            formset.instance = order
-            formset.save()
+        print(
+            "your customer is:",
+            customer,
+            "is of type:",
+            customer_type,
+            "with pk:",
+            customer_pk,
+        )
+
+        if form.is_valid():
+            order = form.save(commit=False)
+            if customer_type == "contact" and customer_pk:
+                try:
+                    order.contact = Contact.objects.get(pk=customer_pk)
+                    order.company = None
+                except Contact.DoesNotExist:
+                    order.contact = None
+            elif customer_type == "company" and customer_pk:
+                try:
+                    order.company = Company.objects.get(pk=customer_pk)
+                    order.contact = None
+                except Company.DoesNotExist:
+                    order.company = None
+            else:
+                order.contact = None
+                order.company = None
+
+            order.save()
+
+            # product = Product.objects.filter()
+            # order_item_formset.instance = order
+            # order_item_formset.save()
 
             # Generate QR code after saving
             generate_machine_qr_for_order(order)
@@ -62,14 +109,16 @@ class OrderCreate(View):
             return redirect("operating:order_detail", pk=order.pk)
 
         return render(
-            request, "operating/create_order.html", {"form": form, "formset": formset}
+            request,
+            "operating/create_order.html",
+            {"form": form}
         )
 
 
 class OrderEdit(UpdateView):
     model = Order
     form_class = OrderForm
-    template_name = "operating/create_order.html"
+    template_name = "operating/update_order.html"
 
     # prevent editing completed orders.
     def dispatch(self, request, *args, **kwargs):
@@ -79,15 +128,15 @@ class OrderEdit(UpdateView):
             return HttpResponseForbidden("You cannot edit a completed order.")
         return super().dispatch(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        if self.request.POST:
-            context["item_formset"] = OrderItemFormSet(
-                self.request.POST, instance=self.object
-            )
-        else:
-            context["item_formset"] = OrderItemFormSet(instance=self.object)
-        return context
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     # if self.request.POST:
+    #     #     context["item_formset"] = OrderItemFormSet(
+    #     #         self.request.POST, instance=self.object
+    #     #     )
+    #     # else:
+    #     #     context["item_formset"] = OrderItemFormSet(instance=self.object)
+    #     # return context
 
     def form_valid(self, form):
         context = self.get_context_data()
@@ -111,7 +160,6 @@ class OrderList(ListView):
     template_name = "operating/order_list.html"
     context_object_name = "orders"
     ordering = ["-created_at"]
-
 
 
 # This is how machines read and update the order status.
@@ -139,9 +187,10 @@ def machine_update_status(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)
-    
-# machines should not need csrf 
-@method_decorator(csrf_exempt, name='dispatch')
+
+
+# machines should not need csrf
+@method_decorator(csrf_exempt, name="dispatch")
 class MachineStatusUpdate(View):
     def post(self, request, item_id):
         api_key = request.headers.get("X-API-KEY")
@@ -164,14 +213,19 @@ class MachineStatusUpdate(View):
 
             item.order.update_status_from_items()
 
-            return JsonResponse({"message": f"Status updated to '{new_status}' by machine '{machine.name}'"})
+            return JsonResponse(
+                {
+                    "message": f"Status updated to '{new_status}' by machine '{machine.name}'"
+                }
+            )
 
         except OrderItem.DoesNotExist:
             return JsonResponse({"error": "OrderItem not found"}, status=404)
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
-        
-def delete_order(request,pk):
+
+
+def delete_order(request, pk):
     try:
         order = Order.objects.get(pk=pk)
         order.delete()
@@ -179,3 +233,123 @@ def delete_order(request,pk):
     except Order.DoesNotExist:
         messages.error(request, "Order not found.")
     return redirect("operating:order_list")
+
+
+# escape(product.title) will turn < into &lt;, > into &gt;, & into &amp;, etc.
+# This ensures that if a product title or variant SKU contains special characters (like <, >, &, or quotes), they won't break your HTML or allow malicious code to run.
+# def product_autocomplete(request):
+#     query = request.GET.get("product", "").strip()
+#     if not query:
+#         return HttpResponse("")
+
+#     products = (
+#         Product.objects.filter(
+#             Q(title__icontains=query)
+#             | Q(sku__icontains=query)
+#             | Q(variants__variant_sku__icontains=query)
+#         )
+#         .distinct()
+#         .prefetch_related("variants")[:10]  # Limit results
+#     )
+
+#     html = "<div class='product_autocomplete_list'><ul>"
+#     for product in products:
+#         variants = product.variants.all()
+
+#         if not variants.exists():
+#             # Show parent only if no variants
+#             if (
+#                 query.lower() in (product.title or "").lower()
+#                 or query.lower() in (product.sku or "").lower()
+#             ):
+#                 html += (
+#                     f"<li data-product-id='{product.pk}' onclick='selectProduct({product.pk})'>"
+#                     f"➕{escape(product.title)}"
+#                     f"</li>"
+#                 )
+#         else:
+#             # If parent matches, show all variants
+#             if (
+#                 query.lower() in (product.title or "").lower()
+#                 or query.lower() in (product.sku or "").lower()
+#             ):
+#                 for variant in variants:
+#                     html += (
+#                         f"<li data-product-id='{product.pk}' data-variant-id='{variant.pk}'>"
+#                         f"➕{escape(product.title)} - {escape(variant.variant_sku)}"
+#                         f"</li>"
+#                     )
+#             else:
+#                 # Otherwise show only matching variants
+#                 for variant in variants:
+#                     if query.lower() in (variant.variant_sku or "").lower():
+#                         html += (
+#                             f"<li data-product-id='{product.pk}' data-variant-id='{variant.pk}'>"
+#                             f"➕{escape(product.title)} - {escape(variant.variant_sku)}"
+#                             f"</li>"
+#                         )
+#     html += "</ul>"
+#     return HttpResponse(html)
+
+
+# escape(product.title) will turn < into &lt;, > into &gt;, & into &amp;, etc.
+# This ensures that if a product title or variant SKU contains special characters (like <, >, &, or quotes), they won't break your HTML or allow malicious code to run.
+def product_autocomplete(request):
+    query = request.GET.get("product", "").strip().lower()
+    if not query:
+        return HttpResponse("")
+
+    products = (
+        Product.objects.filter(
+            Q(title__icontains=query)
+            | Q(sku__icontains=query)
+            | Q(variants__variant_sku__icontains=query)
+        )
+        .distinct()
+        .prefetch_related("variants")[:10]
+    )
+
+    def render_item(product, variant=None):
+        title = escape(product.title or "")
+        if variant:
+            sku = escape(variant.variant_sku or "")
+            return (
+                # True because this is a variant
+                f"<li data-product-id='{product.pk}' data-variant-id='{variant.pk}' onclick=\"selectProduct('{sku}',variant=true)\">"
+                f"➕ {title} - {sku}</li>"
+            )
+        else:
+            sku = escape(product.sku or "")
+            return (
+                # False because this is a parent product
+                f"<li data-product-id='{product.pk}' onclick=\"selectProduct('{sku}',variant=false)\">"
+                f"➕ {title} - {sku}</li>"
+            )
+
+    items = []
+
+    for product in products:
+        variants = list(product.variants.all())
+
+        matches_parent = (
+            query in (product.title or "").lower()
+            or query in (product.sku or "").lower()
+        )
+
+        if not variants:
+            if matches_parent:
+                items.append(render_item(product))
+        else:
+            if matches_parent:
+                for variant in variants:
+                    items.append(render_item(product, variant))
+            else:
+                for variant in variants:
+                    if query in (variant.variant_sku or "").lower():
+                        items.append(render_item(product, variant))
+
+    if not items:
+        items.append("<p>No product matches found</p>")
+
+    html = f"<div class='product_autocomplete_list'><ul>{''.join(items)}</ul></div>"
+    return HttpResponse(html)

@@ -8,15 +8,16 @@ The key is to start with the core functionality that solves a specific problem f
 Accounting:
    Show Money Coming in and Coming Out (Categorize expenses) / 
    Calculate Burn, Runway, Growth Rate, Default Alive /
-   Live view of finances KPI DASHBOARD -
-   Show Balance Equation [after settings assets (inventory, cogs, etc)] -
-   balance sheet, income statement, cash flow -
-   payroll calculator -
-   Payment processor set up
-   Generate Invoices and Receipts | [Operations] -
-   Every taken income should link to an invoice or receipt [After invoice] -> - just write the invoice number to the sales object
    accounts receivable and accounts payable /
    inventory purchases [after operation] (COGS AND PURCHASES)
+   Payment processor set up
+
+   Every taken income should link to an invoice or receipt [After invoice] -> - just write the invoice number to the sales object
+   Show Balance Equation [after settings assets (inventory, cogs, etc)] -
+   Generate Invoices and Receipts | [Operations] -
+   balance sheet, income statement, cash flow -
+   Live view of finances KPI DASHBOARD -
+   payroll calculator -
    SYNC WITH A BANK -
 
 Marketing:

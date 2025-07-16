@@ -95,7 +95,8 @@ def process_qr_payload_view(request):
         data = json.loads(request.body)
         order_id = data.get("order_id")
         order_item_id = data.get("order_item_id")
-        new_status = data.get("status")
+        # new_status = data.get("status")
+        new_status = "in_production"
 
         item = OrderItem.objects.get(pk=order_item_id)
         item.status = new_status

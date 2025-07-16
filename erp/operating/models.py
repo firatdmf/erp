@@ -80,6 +80,10 @@ class OrderItem(models.Model):
         ("completed", "Completed"),
         ("cancelled", "Cancelled"),
     ]
+    # an item can added to the order later
+    created_at = models.DateTimeField(auto_now_add=True)
+    # we should check when the status is updated
+    updated_at = models.DateTimeField(auto_now=True)
 
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)

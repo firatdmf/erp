@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'operating/css/edit_order.css' %}" />
+  {% endblock %}
+
+  <div class="edit_order_page">
+    <h1>Edit Order #{{ order.pk }}</h1>
+
+    <form method="post" action="{% url 'operating:edit_order' order.pk %}">
+      {% csrf_token %}
+
+      <div id="customer-fields">
+        <label for="customer">Customer</label>
+        <input id="customer-input"
+          name="customer"
+          type="text"
+          value="{% if order.contact %}
+            {{ order.contact.name }}
+          {% elif order.company %}
+            {{ order.company.name }}
+          {% endif %}"
+          hx-get="{% url 'crm:customer_autocomplete' %}"
+          hx-trigger="keyup changed delay:300ms"
+          hx-target="#customer-search-results"
+          hx-swap="innerHTML"
+          placeholder="Search by contact or company name"
+          autocomplete="off" />
+        <input type="hidden"
+          id="customer-type"
+          name="customer_type"
+          value="{% if order.contact %}
+            
+            contact
+
+          {% elif order.company %}
+            
+            company
+
+          {% endif %}" />
+        <input type="hidden"
+          id="customer-pk"
+          name="customer_pk"
+          value="{% if order.contact %}
+            {{ order.contact.pk }}
+          {% elif order.company %}
+            {{ order.company.pk }}
+          {% endif %}" />
+      </div>
+      <div id="customer-search-results"></div>
+
+      <br />
+
+      <div id="product-fields">
+        <label for="product">Add New Product</label>
+        <input class="border px-2 py-1 rounded w-full" id="product-input" name="product" type="text" autocomplete="off" placeholder="Search by name, SKU, or variant SKU..." hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms" hx-target="#product-search-results" hx-swap="innerHTML" />
+      </div>
+      <div id="product-search-results" class="relative z-10"></div>
+      <div id="product_autocomplete_error"></div>
+
+      {{ form.as_p }}
+
+      <table id="order_items_table">
+        <tr>
+          <th>Item No</th>
+          <th>Product</th>
+          <th>Description</th>
+          <th>Quantity</th>
+          <th>Unit Price</th>
+          <th>Total</th>
+          <th>Delete</th>
+        </tr>
+        {% for item in order_items %}
+          <tr data-item-id="{{ item.pk }}">
+            <td>{{ forloop.counter }}</td>
+            <td>
+              <input type="text"
+                readonly
+                value="{% if item.product_variant %}
+                  {{ item.product_variant.variant_sku }}
+                {% else %}
+                  {{ item.product.sku }}
+                {% endif %}"
+                id="sku_{{ forloop.counter }}" />
+              <input type="hidden"
+                name="variant_{{ forloop.counter }}"
+                id="variant_{{ forloop.counter }}"
+                value="{% if item.product_variant %}
+                  
+                  true
+
+                {% else %}
+                  
+                  false
+
+                {% endif %}" />
+              <input type="hidden" name="item_id_{{ forloop.counter }}" id="item_id_{{ forloop.counter }}" value="{{ item.pk }}" />
+            </td>
+            <td>
+              <input type="text" name="description_{{ forloop.counter }}" id="description_{{ forloop.counter }}" value="{{ item.description|default:'' }}" />
+            </td>
+            <td>
+              <input type="number" name="quantity_{{ forloop.counter }}" id="quantity_{{ forloop.counter }}" class="quantity-input" data-index="{{ forloop.counter }}" value="{{ item.quantity }}" min="0" step="0.01" />
+            </td>
+            <td>
+              <input type="number" name="price_{{ forloop.counter }}" id="price_{{ forloop.counter }}" class="price-input" data-index="{{ forloop.counter }}" value="{{ item.price }}" min="0" step="0.01" />
+            </td>
+            <td>
+              <input type="number" name="total_{{ forloop.counter }}" id="total_{{ forloop.counter }}" class="total-input" data-index="{{ forloop.counter }}" value="{{ item.subtotal }}" readonly />
+            </td>
+            <td>
+              <div class="delete-row-btn" style="cursor:pointer;">❌</div>
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+
+      <input type="hidden" id="product_json_input" name="product_json_input" />
+      <input type="hidden" id="deleted_items" name="deleted_items" />
+
+      <button type="submit" id="submit_order_button" class="btn btn-primary">Update Order</button>
+    </form>
+  </div>
+
+  {% block js %}
+    <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
+    <script>
+      // Initialize order_data with existing items
+      order_data.order_items = [
+        {% for item in order_items %}
+        {
+          "item_id": {{ item.pk }},
+          "sku": "{% if item.product_variant %}{{ item.product_variant.variant_sku }}{% else %}{{ item.product.sku }}{% endif %}",
+          "variant": {% if item.product_variant %}true{% else %}false{% endif %},
+          "description": "{{ item.description|default:''|escapejs }}",
+          "quantity": {{ item.quantity }},
+          "price": {{ item.price }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ];
+      
+      // Track deleted items
+      let deletedItems = [];
+      
+      // Override the delete row functionality to track deleted items
+      document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('delete-row-btn')) {
+          const tr = e.target.closest('tr');
+          if (tr) {
+            const itemIdInput = tr.querySelector('input[name^="item_id_"]');
+            if (itemIdInput && itemIdInput.value) {
+              deletedItems.push(parseInt(itemIdInput.value));
+              document.getElementById('deleted_items').value = JSON.stringify(deletedItems);
+            }
+            tr.remove();
+            
+            // Remove from order_data
+            const skuInput = tr.querySelector('input[readonly]');
+            if (skuInput) {
+              order_data.order_items = order_data.order_items.filter(item => item.sku !== skuInput.value);
+            }
+            
+            // Remove table header if no more order items
+            const rows = document.getElementById('order_items_table').querySelectorAll('tr');
+            if (order_data.order_items.length === 0) {
+              const header = document.getElementById('order_items_table').querySelector('tr');
+              if (header) header.remove();
+            }
+          }
+        }
+      });
+      
+      // Override the submit button to include deleted items
+      document.getElementById('submit_order_button').addEventListener('click', function(e) {
+        e.preventDefault();
+        order_data.order_items = collectOrderItemsFromTable();
+        const product_json = JSON.stringify(order_data.order_items);
+        document.getElementById('product_json_input').value = product_json;
+        console.log("Final order data to submit:", order_data);
+        console.log("Deleted items:", deletedItems);
+        
+        // Submit the form programmatically
+        this.form.submit();
+      });
+    </script>
+  {% endblock %}
+{% endblock %}

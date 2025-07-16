@@ -7,11 +7,11 @@ let order_data = {
 
 const order_items_table = document.getElementById("order_items_table");
 
-const generate_order_item_row = (index, sku, variant) => {
+// index starts from 1, so the first row will be 1
+const generate_order_item_row = (index, sku, variant, itemId = null) => {
   console.log("your index is", index);
 
-  // index starts from 1
-  // sku is passed from the product_autocomplete function in the views.py
+  // sku, and variant are passed from the product_autocomplete function in the views.py
   let table_header = "";
   // if it is the first row, we need to add the table header
   if (index == 1) {
@@ -25,6 +25,9 @@ const generate_order_item_row = (index, sku, variant) => {
           <th>Delete</th>
         </tr>`
   }
+  
+  const itemIdField = itemId ? `<input type="hidden" name="item_id_${index}" id="item_id_${index}" value="${itemId}" />` : '';
+  
   return `
     ${table_header}
       <tr>
@@ -32,6 +35,7 @@ const generate_order_item_row = (index, sku, variant) => {
         <td>
           <input type="text" readonly value="${sku}" id="sku_${index}" />
           <input type="hidden" name="variant_${index}" id="variant_${index}" value="${variant}" />
+          ${itemIdField}
         </td>
         <td>
           <input type="text" name="description_${index}" id="description_${index}" />
@@ -65,52 +69,64 @@ const selectProduct = (sku, variant) => {
     }, 3000);
     return;
   }
-  order_data.order_items.push({
+  
+  const newItem = {
     "sku": sku,
     "variant": variant, // true if it is a variant, false if it is a parent product
-    "quantity": 1
-  });
+    "quantity": 1,
+    "price": 0
+  };
+  
+  order_data.order_items.push(newItem);
 
   console.log("order_data.order_items", order_data.order_items);
-
 
   const row = generate_order_item_row(index = order_data.order_items.length, sku = sku, variant = variant);
   order_items_table.insertAdjacentHTML("beforeend", row);
 
+  // Add event listeners for the new row
+  addRowEventListeners(order_data.order_items.length);
+}
 
-  // --------------------------------------------------------------------------------------------------------
-  // Add event listeners for quantity and price
+// Function to add event listeners to a specific row
+const addRowEventListeners = (index) => {
   const qtyInput = order_items_table.querySelector(`.quantity-input[data-index="${index}"]`);
   const priceInput = order_items_table.querySelector(`.price-input[data-index="${index}"]`);
   const totalInput = order_items_table.querySelector(`.total-input[data-index="${index}"]`);
 
-
   function updateTotal() {
     const qty = parseFloat(qtyInput.value) || 0;
-    order_data.order_items[index - 1].quantity = qty; // Update order_data with the new quantity
     const price = parseFloat(priceInput.value) || 0;
-    order_data.order_items[index - 1].price = price; // Update order_data with the new price
+    
+    // Update order_data with the new values
+    if (order_data.order_items[index - 1]) {
+      order_data.order_items[index - 1].quantity = qty;
+      order_data.order_items[index - 1].price = price;
+    }
+    
     totalInput.value = (qty * price).toFixed(2);
-
-
   }
 
   qtyInput.addEventListener('input', updateTotal);
   priceInput.addEventListener('input', updateTotal);
 
-
   // Initialize total
   updateTotal();
-  console.log("here comes your order items");
+}
 
-  console.log(order_data.order_items);
-
-  // --------------------------------------------------------------------------------------------------------
+// Function to initialize event listeners for existing items (edit mode)
+const initializeExistingItems = () => {
+  const rows = order_items_table.querySelectorAll('tr');
+  rows.forEach((row, index) => {
+    if (index > 0) { // Skip header row
+      addRowEventListeners(index);
+    }
+  });
 }
 
 
 
-
+// This is to handle product row deletions
 order_items_table.addEventListener('click', function (e) {
   if (e.target.classList.contains('delete-row-btn')) {
     const tr = e.target.closest('tr');
@@ -151,21 +167,30 @@ const collectOrderItemsFromTable = () => {
     const quantityInput = document.getElementById(`quantity_${index}`);
     const priceInput = document.getElementById(`price_${index}`);
     const variantInput = document.getElementById(`variant_${index}`);
+    const itemIdInput = document.getElementById(`item_id_${index}`);
 
     const sku = skuInput.value || "";
     const description = descriptionInput ? descriptionInput.value : "";
     const quantity = quantityInput ? parseFloat(quantityInput.value) || 0 : 0;
     const price = priceInput ? parseFloat(priceInput.value) || 0 : 0;
     const variant = variantInput ? (variantInput.value === "true" || variantInput.value === "1") : false;
+    const itemId = itemIdInput ? parseInt(itemIdInput.value) : null;
 
     if (sku) {
-      items.push({
+      const item = {
         item_no: index,
         product: { sku: sku, variant: variant },
         description: description,
         quantity: quantity,
         price: price
-      });
+      };
+      
+      // Include item_id for existing items (edit mode)
+      if (itemId) {
+        item.item_id = itemId;
+      }
+      
+      items.push(item);
     }
     index++;
     if (index > 1000) break; // safety to avoid infinite loop
@@ -176,7 +201,7 @@ const collectOrderItemsFromTable = () => {
 const submit_order_button = document.getElementById("submit_order_button");
 
 
-const generate_order_list_button = document.getElementById("generate_order_list_button");
+// const generate_order_list_button = document.getElementById("generate_order_list_button");
 // generate_order_list_button.addEventListener("click", (e) => {
 //   // e.preventDefault();
 //   // order_data.order_items = collectOrderItemsFromTable();
@@ -192,4 +217,14 @@ submit_order_button.addEventListener("click", (e) => {
   const product_json_input = document.getElementById("product_json_input");
   product_json_input.value = product_json;
   console.log("Final order data to submit:", order_data);
+
+  // Submit the form programmatically
+  submit_order_button.form.submit();
+});
+
+// Initialize event listeners for existing items when page loads (for edit mode)
+document.addEventListener('DOMContentLoaded', function() {
+  if (order_items_table && order_items_table.querySelectorAll('tr').length > 1) {
+    initializeExistingItems();
+  }
 });

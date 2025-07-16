@@ -3,37 +3,11 @@ from crm.models import Contact, Company
 from marketing.models import Product, ProductVariant
 from django.core.exceptions import ValidationError
 
-# segno is for making qr codes.
-from decouple import config
-import segno
-# cloudinary is for uploading images to the cloud.
-import tempfile
-import cloudinary.uploader
-# make the qr codes json objects
-import json
+# uuid is used to generate unique identifiers for models.
+import uuid
 
 # below is to assign api_keys to machines
 import secrets
-
-
-def generate_machine_qr_for_order(order):
-    payload = {"order_id": order.pk, "action": "update_status"}
-
-    qr = segno.make(json.dumps(payload)) # Convert dict to JSON string
-
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-        qr.save(temp_file.name, scale=5)
-
-        result = cloudinary.uploader.upload(
-            temp_file.name,
-            folder=f"media/orders/{order.pk}",
-            public_id=f"qr_order_{order.pk}",
-            overwrite=True,
-            resource_type="image",
-        )
-
-    order.qr_code_url = result["secure_url"]
-    order.save(update_fields=["qr_code_url"])
 
 
 # Create your models here.
@@ -60,9 +34,15 @@ class Order(models.Model):
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     notes = models.TextField(blank=True, null=True)
     qr_code_url = models.URLField(blank=True, null=True)  # ✅ Add this line
+    
+
+    # balance = models.DecimalField(
+    #     max_digits=10, decimal_places=2, default=0.00, editable=False
+    # )
 
     def total_value(self):
-        return sum(item.subtotal() for item in self.items.all())
+        # round makes it have two decimals
+        return round(sum(item.subtotal() for item in self.items.all()), 2)
 
         # Now whenever an OrderItem is added, updated, or deleted, the overall Order.status will update automatically.
 
@@ -106,13 +86,15 @@ class OrderItem(models.Model):
     product_variant = models.ForeignKey(
         ProductVariant, on_delete=models.PROTECT, blank=True, null=True
     )
-    quantity = models.PositiveIntegerField(default=1)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
-    notes = models.TextField(blank=True, null=True)
+    # qr to update order item status
+    qr_code_url = models.URLField(null=True, blank=True)
 
     def subtotal(self):
-        return self.unit_price * self.quantity
+        return self.price * self.quantity
 
     def display_name(self):
         if self.variant:
@@ -121,12 +103,16 @@ class OrderItem(models.Model):
             return self.product.title
         return "Unknown item"
 
+    # def __str__(self):
+    #     if self.contact:
+    #         return f"Order #{self.pk} - {self.contact.full_name}"
+    #     elif self.company:
+    #         return f"Order #{self.pk} - {self.company.name}"
+    #     return f"Order #{self.pk}"
     def __str__(self):
-        if self.contact:
-            return f"Order #{self.pk} - {self.contact.full_name}"
-        elif self.company:
-            return f"Order #{self.pk} - {self.company.name}"
-        return f"Order #{self.pk}"
+        if self.product_variant:
+            return f"{self.product.title} [{self.product_variant.variant_sku}] - {self.quantity} pcs"
+        return f"{self.product.title} - {self.quantity} pcs"
 
 
 # GEMBA

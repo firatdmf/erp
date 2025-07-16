@@ -7,7 +7,7 @@ from django.views.generic.detail import DetailView
 from django.views.generic import ListView
 from django.db import transaction
 
-# from accounting.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
+from accounting.models import Book,CurrencyCategory,AssetAccountsReceivable
 
 
 # segno is for making qr codes, and it is cleaner and more efficient than qrcode.
@@ -130,6 +130,7 @@ class OrderDetail(DetailView):
 class OrderCreate(View):
     def get(self, request):
         form = OrderForm()
+        # order_item_formset = OrderItemFormSet()
         return render(
             request,
             "operating/create_order.html",
@@ -145,11 +146,24 @@ class OrderCreate(View):
         customer_type = request.POST.get("customer_type")
         product_json_input = request.POST.get("product_json_input")
         if product_json_input:
+            print("your product json input is:", product_json_input)
             try:
                 product_json_input = json.loads(product_json_input)
+                print("your product json input json is:", product_json_input)
             except json.JSONDecodeError:
                 messages.error(request, "Invalid product data format.")
                 return render(request, "operating/create_order.html", {"form": form})
+        # print("product_json_input is:", product_json_input)
+        # print("post data is:", request.POST)
+
+        print(
+            "your customer is:",
+            customer,
+            "is of type:",
+            customer_type,
+            "with pk:",
+            customer_pk,
+        )
 
         if form.is_valid():
             try:
@@ -160,34 +174,12 @@ class OrderCreate(View):
                         try:
                             order.contact = Contact.objects.get(pk=customer_pk)
                             order.company = None
-                            # invoice = Invoice(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     order=order,
-                            #     contact=order.contact,
-                            # )
-                            # asset_accounts_receivable = AssetAccountsReceivable(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     contact=order.contact,
-                            # )
                         except Contact.DoesNotExist:
                             order.contact = None
                     elif customer_type == "company" and customer_pk:
                         try:
                             order.company = Company.objects.get(pk=customer_pk)
                             order.contact = None
-                            # invoice = Invoice(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     order=order,
-                            #     company=order.company,
-                            # )
-                            # asset_accounts_receivable = AssetAccountsReceivable(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     company=order.company,
-                            # )
                         except Company.DoesNotExist:
                             order.company = None
                     else:
@@ -227,13 +219,7 @@ class OrderCreate(View):
                     # Generate QR codes for each order item
                     for item in order.items.all():
                         if not item.qr_code_url:
-                            generate_qr_for_order_item(item, status="pending")
-
-                    # invoice.total = order.total_value()
-                    # invoice.save()
-                    # asset_accounts_receivable.amount = order.total_value()
-                    # asset_accounts_receivable.invoice = invoice
-                    # asset_accounts_receivable.save()
+                            generate_qr_for_order_item(item)
 
                 return redirect("operating:order_detail", pk=order.pk)
             except Exception as e:
@@ -275,7 +261,6 @@ class OrderEdit(UpdateView):
             with transaction.atomic():
                 # Save the order
                 self.object = form.save()
-                # order = self.object
 
                 # Handle customer update
                 customer = self.request.POST.get("customer")
@@ -283,33 +268,24 @@ class OrderEdit(UpdateView):
                 customer_type = self.request.POST.get("customer_type")
 
                 if customer_pk and customer_type:
+                    print("your customer type is:", customer_type)
                     if customer_type == "contact":
+                       
+                        print("your total is:", self.object.total_value())
                         self.object.contact = get_object_or_404(Contact, pk=customer_pk)
                         self.object.company = None
                         # change later: book, currency
-                        # accounts_receivable = AssetAccountsReceivable(
-                        #     book=Book.objects.get(pk=1),
-                        #     currency=CurrencyCategory.objects.get(pk=1),
-                        #     amount=self.object.total_value(),
-                        #     contact=self.object.contact,
-                        # )
-                        # invoice = Invoice(
-                        #     book=Book.objects.get(pk=1),
-                        #     currency=CurrencyCategory.objects.get(code="usd"),
-                        #     order=order,
-                        #     contact=order.contact,
-                        # )
-                        # invoice = Invoice.objects.get_or_create(order=order, book=Book.objects.get(pk=1),currency=CurrencyCategory.objects.get(code="usd"), contact=order.contact,)
-                        # asset_accounts_receivable = AssetAccountsReceivable(
-                        #     book=Book.objects.get(pk=1),
-                        #     currency=CurrencyCategory.objects.get(code="usd"),
-                        #     contact=order.contact,
-                        # )
+                        accounts_receivable = AssetAccountsReceivable(
+                            book=Book.objects.get(pk=1),
+                            currency=CurrencyCategory.objects.get(pk=1),
+                            amount=self.object.total_value(),
+                            contact=self.object.contact,
+                        )
+                        # accounts_receivable.full_clean()  # Will raise ValidationError if something is wrong
+                        accounts_receivable.save()
                     elif customer_type == "company":
                         self.object.company = get_object_or_404(Company, pk=customer_pk)
                         self.object.contact = None
-                        # invoice = Invoice.objects.get_or_create(order=order, book=Book.objects.get(pk=1),currency=CurrencyCategory.objects.get(code="usd"), company=order.company,)
-
                         # accounts_receivable = AssetAccountsReceivable(
                         #     book=1,
                         #     currency=1,

@@ -6,6 +6,13 @@
   {% endblock %}
 
   <div class="create_order_page">
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
     <h1>Create Order</h1>
 
     <form method="post">
@@ -15,7 +22,7 @@
 
       <div id="customer-fields">
         <label for="customer">Customer</label>
-        <input id="customer-input" name="customer" type="text" hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms" hx-target="#customer-search-results" hx-swap="innerHTML" autocomplete="off" />
+        <input id="customer-input" name="customer" type="text" hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms" hx-target="#customer-search-results" hx-swap="innerHTML" autocomplete="off" placeholder="Search by contact or company name" />
         <input type="hidden" id="customer-type" name="customer_type" />
         <input type="hidden" id="customer-pk" name="customer_pk" />
       </div>
@@ -30,45 +37,15 @@
       <div id="product-search-results" class="relative z-10"></div>
       <div id="product_autocomplete_error"></div>
 
+      {% comment %}order form{% endcomment %}
       {{ form.as_p }}
-      <table class="hidden" id="order_items_table">
-        {% comment %} <tr>
-          <th>Item No</th>
-          <th>Product</th>
-          <th>Description</th>
-          <th>Quantity</th>
-          <th>Unit Price</th>
-          <th>Total</th>
-          <th>Delete</th>
-        </tr>
-        <tr>
-          <td id="item_0">1</td>
-          <td id="sku_0">
-            <input type="text" readonly />
-          </td>
-          <td id="description_0">
-            <input type="text" name="" id="" />
-          </td>
-          <td id="quantity_0">
-            <input type="number" name="" id="" />
-          </td>
-          <td id="price_0">
-            <input type="number" name="" id="" />
-          </td>
-          <td id="total_0">
-            <input type="number" name="" id="" />
-          </td>
-          <td id="delete_0">
-            <button>Delete</button>
-          </td>
-        </tr> {% endcomment %}
-      </table>
-      <input type="hidden" id="product_json_input" name="product_json">
+      <table class="hidden" id="order_items_table"></table>
+      <input type="hidden" id="product_json_input" name="product_json_input" />
       <button type="submit" id="submit_order_button">Submit Order</button>
-      <div id="generate_order_list_button">Generate order list</div>
+      {% comment %} <div id="generate_order_list_button">Generate order list</div> {% endcomment %}
     </form>
   </div>
   {% block js %}
-    <script src="{% static 'operating/js/create_update_order.js' %}"></script>
+    <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
   {% endblock %}
 {% endblock %}

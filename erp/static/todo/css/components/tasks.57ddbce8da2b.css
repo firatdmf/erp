@@ -1,0 +1,80 @@
+.tasks_component .daysDuePast{
+    color:#801919;
+    padding:3px 6px;
+    background-color: #FACDCD;
+    border-radius: 15px;
+}
+
+.tasks_component .daysDueToday{
+    color:rgb(46, 107, 49);
+    padding:3px 6px;
+    background-color:rgb(193, 234, 197);
+    border-radius: 15px;
+}
+
+/* .tasks_component li{
+    list-style-type: none;
+} */
+.tasks_component button:hover{
+    cursor: pointer;
+}
+/* .tasks_component .taskComponent{
+    padding:20px 20px;
+    width: 15%;
+    border-radius: 30px;
+    margin:10px 5px;
+    background-color: #F8FAFC;
+    font-size:15px;
+    line-height: 21px;
+    border:0.5px solid;
+    border-color: rgba(0, 0, 0, 0.6);
+} */
+.tasks_component .taskComponent{
+    background-color: #F8FAFC;
+    width: max-content;
+    padding:20px;
+    border-radius: 20px;
+    margin:10px 5px;
+}
+
+.tasks_component ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.tasks_component .taskComponent a:hover {
+    text-decoration: underline;
+}
+/* .tasks_component ul {
+    border:1px dashed;
+} */
+
+.tasks_component .task_buttons{
+    display: inline-flex;
+}
+
+.tasks_component .task_buttons > *{
+    margin:0 3px;
+}
+
+.tasks_component .task_buttons button{
+    padding:10px;
+}
+/* .taskName{
+    font-weight: bold;
+} */
+.tasks_component .taskDescription{
+    color:rgba(0, 0, 0, 0.7);
+    font-style: italic;
+}
+.tasks_component .taskDueDate{
+    color:rgba(0, 0, 0, 0.8);
+}
+
+.tasks_component .deleteTaskButton{
+    color:red;
+}
+
+.tasks_component .completeTaskButton{
+    color:green;
+}

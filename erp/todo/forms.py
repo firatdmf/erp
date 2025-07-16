@@ -30,6 +30,7 @@ class TaskForm(forms.ModelForm):
         super(TaskForm, self).__init__(*args, **kwargs)
         # Initialize the due date as today's date
         self.fields['due_date'].widget.attrs['value'] = date.today().strftime('%Y-%m-%d')
+        self.fields['name'].label = "Task name"
         if hide_fields:
             # Remove Contact and Company fields from the form
             self.fields.pop('contact', None)

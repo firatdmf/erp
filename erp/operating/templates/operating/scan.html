@@ -1,0 +1,33 @@
+<!-- templates/scan.html -->
+{% extends "base.html" %}
+{% block content %}
+  <h2>Scan Order Item QR</h2>
+  <div id="qr-reader" style="width: 300px"></div>
+  <div id="qr-result"></div>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script>
+    function handleQRData(data) {
+      const payload = JSON.parse(data);
+      fetch("{% url 'operating:process_qr_payload' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token }}",
+        },
+        body: JSON.stringify(payload),
+      })
+      .then(response => response.json())
+      .then(res => {
+        document.getElementById("qr-result").innerText = res.message || res.error;
+      });
+    }
+
+    const qrReader = new Html5Qrcode("qr-reader");
+    qrReader.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      handleQRData
+    );
+  </script>
+{% endblock %}

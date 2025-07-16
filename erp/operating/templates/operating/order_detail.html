@@ -1,57 +1,105 @@
 {% extends 'base.html' %}
 {% block content %}
-  <style>
-    #delete_order_button {
-      color: red;
-    }
-    button {
-      cursor: pointer;
-    }
-  </style>
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'operating/css/order_detail.css' %}" />
+  {% endblock %}
+
   <h1>Order #{{ order.pk }}</h1>
 
   <p>
-    Status: <strong>{{ order.get_status_display }}</strong>
+    Status:
+    <strong>{{ order.status }}</strong>
   </p>
   <p>Created At: {{ order.created_at }}</p>
 
   {% if order.contact %}
     <p>
-      Contact: <a href="{% url 'crm:contact_detail' order.contact.pk %}">{{ order.contact.name }}</a>
+      Client: <a href="{% url 'crm:contact_detail' order.contact.pk %}"><i class="fa fa-user"></i> {{ order.contact.name|capfirst }}</a>
     </p>
   {% endif %}
   {% if order.company %}
     <p>
-      Company: <a href="{% url 'crm:company_detail' order.company.pk %}">{{ order.company.name }}</a>
+      Client: <a href="{% url 'crm:company_detail' order.company.pk %}"><i class="fa fa-briefcase"></i> {{ order.company.name|capfirst }}</a>
     </p>
   {% endif %}
 
   {% if order.notes %}
     <p>Notes: {{ order.notes|default:'-' }}</p>
   {% endif %}
-
-  <h3>Order Items:</h3>
-  <ul>
-    {% for item in order.items.all %}
-      <li>{{ item.product.title }} — {{ item.quantity }} pcs @ {{ item.unit_price }} USD — Status: {{ item.get_status_display }}</li>
-    {% empty %}
-      <li>No items in this order.</li>
-    {% endfor %}
-  </ul>
-
-  <p>
-    <strong>Total Value:</strong> ${{ order.total_value }}
-  </p>
-
   {% if order.qr_code_url %}
     <h3>Order QR Code:</h3>
     <img src="{{ order.qr_code_url }}" alt="QR Code for Order" style="max-width: 200px;" />
   {% endif %}
 
-  {% if order.status != 'completed' %}
-  <p>
-    <a href="{% url 'operating:update_order' order.pk %}" class="btn btn-primary">Edit Order</a>
+  <h3>Order Items:</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Description</th>
+        <th>Quantity</th>
+        {% comment %} <th>Unit</th> {% endcomment %}
+        <th>Price (USD)</th>
+        <th>Total (USD)</th>
+        <th>Status</th>
+        <th>QR Code</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order.items.all %}
+        <tr>
+          <td>
+            <a href="{% url 'marketing:product_detail' item.product.pk %}">{{ item.product.title }}</a>
+            {% if item.product.description %}
+              <br /><small>{{ item.product.description|truncatewords:5 }}</small>
+            {% endif %}
+          </td>
+          {% comment %} <td>{{ item.product.title }}</td> {% endcomment %}
+          <td>
+            {% if item.description %}
+              {{ item.description }}
+            {% else %}
+              <small style="color:lightgrey;">N/A</small>
+            {% endif %}
+          </td>
+          <td>
+            {{ item.quantity }}
+            {% if item.product.unit_of_measurement %}
+              {{ item.product.unit_of_measurement }}
+            {% endif %}
+          </td>
+          <td>${{ item.price }}</td>
+          <td>
+            ${{ item.subtotal|floatformat:2 }}
+          </td>
+          <td>
+            <span class="status-badge status-{{ item.status_class }}">{{ item.status|capfirst }}</span>
+          </td>
+          <td style="items-center justify-center">
+            {% if item.qr_code_url %}
+              <img src="{{ item.qr_code_url }}" alt="QR Code for {{ item.product.title }}" class="qr-code-img" style="max-width:100px; margin:auto;" />
+            {% else %}
+              <em>No QR code</em>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;">No items in this order.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="float:right;">
+    <strong>Total Order Value:</strong> <em style="color:teal;">${{ order.total_value|floatformat:2 }}</em>
   </p>
+
+  {% if order.status != 'completed' %}
+    <p>
+      <a href="{% url 'operating:edit_order' order.pk %}" class="btn btn-primary">Edit Order</a>
+    </p>
   {% else %}
     <button class="btn btn-secondary" disabled>Order Completed</button>
   {% endif %}
@@ -59,8 +107,9 @@
   <p>
     <a href="{% url 'operating:order_list' %}">← Back to Orders</a>
   </p>
-  <form action="{% url 'operating:delete_order' order.pk %}" method="post">
+
+  <form action="{% url 'operating:delete_order' order.pk %}" method="post" style="margin-top: 1em;">
     {% csrf_token %}
-    <button type="submit" id="delete_order_button">Delete Order</button><br />
+    <button type="submit" id="delete_order_button">Delete Order</button>
   </form>
 {% endblock %}

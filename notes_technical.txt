@@ -108,4 +108,5 @@ Model->Form->Template->View->Url
 Dumping your database:
 your username is postgres
 
-pg_dump -f "dump_file.sql" -h "aws-0-eu-west-1.pooler.supabase.com" -U postgres.eyzefiawzpxtwzqymyph "postgres"
+pg_dump -f "dump_file_firat.sql" -h "aws-0-eu-west-1.pooler.supabase.com" -U postgres.eyzefiawzpxtwzqymyph "postgres"
+pg_dumpall -h aws-0-eu-west-1.pooler.supabase.com -U postgres.eyzefiawzpxtwzqymyph -f full_dump_firat.sql

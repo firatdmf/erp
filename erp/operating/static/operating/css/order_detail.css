@@ -1,0 +1,59 @@
+#delete_order_button {
+  color: white;
+  background-color: red;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+#delete_order_button:hover {
+  background-color: darkred;
+}
+button {
+  cursor: pointer;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1em;
+}
+th,
+td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+th {
+  background-color: #f4f4f4;
+}
+.qr-code-img {
+  max-width: 100px;
+  height: auto;
+  display: block;
+  margin-top: 5px;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  display: inline-block;
+  background-color: #ccc; /* fallback background */
+  color: #000; /* fallback text color */
+  color:darkgoldenrod;
+}
+
+.status-pending {
+  background-color: #f0ad4e;
+  color: white;
+}
+.status-in_progress {
+  background-color: #5bc0de;
+  color: white;
+}
+.status-done {
+  background-color: #5cb85c;
+  color: white;
+}

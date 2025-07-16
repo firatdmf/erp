@@ -11,6 +11,7 @@ Accounting:
    accounts receivable and accounts payable /
    inventory purchases [after operation] (COGS AND PURCHASES)
    Payment processor set up
+   get rid of book based Accounting
 
    Every taken income should link to an invoice or receipt [After invoice] -> - just write the invoice number to the sales object
    Show Balance Equation [after settings assets (inventory, cogs, etc)] -

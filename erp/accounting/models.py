@@ -6,6 +6,7 @@ from authentication.models import Member
 from django.utils import timezone
 from datetime import timedelta
 from crm.models import Supplier
+from operating.models import Order
 # from marketing.models import Product
 from django.core.exceptions import ValidationError
 
@@ -83,28 +84,35 @@ class CurrencyCategory(models.Model):
     class Meta:
         verbose_name_plural = "Currency Categories"
 
-
+# I do not think you need this model anymore.
 class Invoice(models.Model):
     INVOICE_TYPE_CHOICES = [("proforma", "Proforma"), ("commercial", "Commercial")]
     created_at = models.DateTimeField(auto_now_add=True)
     # Pass the function itself. Otherwise, If you put paranthesis after the function name, django would run it once, and set it as default for all the new objects you create in future.
-    due_cate = models.DateTimeField(default=default_due_date)
+    due_date = models.DateTimeField(default=default_due_date)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    currency = models.ForeignKey(CurrencyCategory, on_delete=models.PROTECT)
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True
     )
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True
     )
-    items = models.JSONField("ItemsInfo", default=invoice_items_default)
+    # items = models.JSONField("ItemsInfo", default=invoice_items_default)
+    order = models.OneToOneField(Order,on_delete=models.RESTRICT, blank=True, null=False, primary_key=True)
     # invoice_details = models.JSONField(_(""), encoder=, decoder=)
-    invoice_type = models.CharField(default="proforma", choices=INVOICE_TYPE_CHOICES)
+    invoice_type = models.CharField(max_length=20,default="proforma", choices=INVOICE_TYPE_CHOICES)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # AssetAccountsReceivable = models.ForeignKey(AssetAccountsReceivable)
 
     @property
     def balance(self):
         return self.total - self.paid
+    
+    @property
+    def client(self):
+        return self.contact or self.company
 
     def __str__(self):
         return f"Invoice {self.pk} - {self.invoice_type}"
@@ -138,22 +146,28 @@ class AssetInventoryRawMaterial(models.Model):
     class Meta:
         verbose_name_plural = "Asset Inventory Raw Materials"
         constraints = [
-            models.UniqueConstraint(fields=['name', 'supplier'], name='unique_name_supplier')
+            models.UniqueConstraint(
+                fields=["name", "supplier"], name="unique_name_supplier"
+            )
         ]
 
     RAW_TYPE_CHOICES = [("direct", "Direct"), ("indirect", "Indirect")]
-    UNIT_TYPE_CHOICES = [("units", "Unit"),("mt","Meter"),("kg","Kilogram")]
+    UNIT_TYPE_CHOICES = [("units", "Unit"), ("mt", "Meter"), ("kg", "Kilogram")]
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     # name and supplier combination should be unique, so we won't have multiple entries of the same product.
 
     name = models.CharField(null=False, blank=False)
-    supplier = models.ForeignKey(Supplier,on_delete=models.RESTRICT, null=True, blank=True)
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.RESTRICT, null=True, blank=True
+    )
     # If the user does not enter a stockID, make the stockID equal to the id of the object created.
     # preopulate it with the next availabe stockid
     stock_id = models.CharField(null=True, blank=True)
     receipt_number = models.CharField(null=True, blank=True)
-    unit_of_measurement = models.CharField(choices=UNIT_TYPE_CHOICES,null=True, blank=True, default=UNIT_TYPE_CHOICES[0])
+    unit_of_measurement = models.CharField(
+        choices=UNIT_TYPE_CHOICES, null=True, blank=True, default=UNIT_TYPE_CHOICES[0]
+    )
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
@@ -165,7 +179,6 @@ class AssetInventoryRawMaterial(models.Model):
     # Do not delete the raw material inventory if you delete the supplier model. Give a warning if there is at least one raw material from that company. Delete only if there are no raw mat. from that company
     raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
 
-
     def __str__(self):
         return f"{self.book} | {self.name} - {self.supplier} - {self.quantity} {self.unit_of_measurement}"
 
@@ -173,16 +186,17 @@ class AssetInventoryRawMaterial(models.Model):
 class AssetInventoryGood(models.Model):
     class Meta:
         verbose_name_plural = "Asset Inventory Goods"
+
     # product = models.ForeignKey(Product,models.RESTRICT, blank=True, null=True)
     STATUS_CHOICES = [("wip", "Work in Progress"), ("finished", "Finished Good")]
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     # Set this to when the inventory moved from work in progress to finished.
     # Later will be used to measure the speed and efficiency.
-    modified_at = models.DateField(blank=True,null=True)
+    modified_at = models.DateField(blank=True, null=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     name = models.CharField(max_length=300, unique=True)
-    
+
     # Default is USD, maybe I will delete this later.
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
@@ -194,7 +208,7 @@ class AssetInventoryGood(models.Model):
     # Unavailable (used for another order), Comitted (on the way coming), Available (ready to ship)
     stock_type = models.CharField(null=True, blank=True)
 
-    # Product status, could be in progress, or finished. I probably will need more status 
+    # Product status, could be in progress, or finished. I probably will need more status
     status = models.CharField(choices=STATUS_CHOICES)
 
     # You can have multiple inventory entries with the same product because they might be at different warehouses or locations
@@ -213,19 +227,27 @@ class AssetAccountsReceivable(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     contact = models.ForeignKey(
-        Contact, on_delete=models.CASCADE, blank=True, null=True
+        Contact,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="accounts_receivable",
     )
     company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, blank=True, null=True
+        Company,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="accounts_receivable",
     )
 
     # Link the invoice that this was created for
     invoice = models.ForeignKey(
-        Invoice, on_delete=models.CASCADE, blank=True, null=True
+        Invoice, on_delete=models.CASCADE, blank=False, null=False,related_name="accounts_receivables"
     )
 
     # Overriding the clean method that is called during the model's validation process.
@@ -257,7 +279,9 @@ class LiabilityAccountsPayable(models.Model):
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    supplier = supplier = models.ForeignKey(Supplier,on_delete=models.RESTRICT, null=True, blank=True)
+    supplier = supplier = models.ForeignKey(
+        Supplier, on_delete=models.RESTRICT, null=True, blank=True
+    )
     receipt = models.CharField(null=True, blank=True)
 
     def __str__(self):
@@ -479,11 +503,12 @@ class InTransfer(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
-    date = models.DateField(blank=True,null=True)
+    date = models.DateField(blank=True, null=True)
     description = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
         return f"{self.source.name} -> {self.destination.name} | {self.currency.symbol}{self.amount}"
+
 
 class CurrencyExchange(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -492,12 +517,14 @@ class CurrencyExchange(models.Model):
         CashAccount, on_delete=models.CASCADE, related_name="currency_exchange_source"
     )
     to_cash_account = models.ForeignKey(
-        CashAccount, on_delete=models.CASCADE, related_name="currency_exchange_destination"
+        CashAccount,
+        on_delete=models.CASCADE,
+        related_name="currency_exchange_destination",
     )
     # currency_rate = amount = models.DecimalField(max_digits=10, decimal_places=5)
     from_amount = models.DecimalField(max_digits=10, decimal_places=2)
     to_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateField(blank=True,null=True)
+    date = models.DateField(blank=True, null=True)
 
     def __str__(self):
         return f"Exchange {self.from_cash_account.currency.symbol}{self.from_amount} | {self.from_cash_account.name} -> {self.to_cash_account.currency.symbol}{self.to_amount} | {self.to_cash_account.name} "

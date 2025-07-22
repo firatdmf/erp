@@ -1,4 +1,4 @@
-#delete_order_button {
+#order_detail_page #delete_order_button {
   color: white;
   background-color: red;
   border: none;
@@ -8,34 +8,34 @@
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
-#delete_order_button:hover {
+#order_detail_page #delete_order_button:hover {
   background-color: darkred;
 }
-button {
+#order_detail_page button {
   cursor: pointer;
 }
-table {
+#order_detail_page table {
   border-collapse: collapse;
   width: 100%;
   margin-top: 1em;
 }
-th,
-td {
+#order_detail_page th,
+#order_detail_page td {
   padding: 10px;
   border: 1px solid #ddd;
   text-align: center;
 }
-th {
+#order_detail_page th {
   background-color: #f4f4f4;
 }
-.qr-code-img {
+#order_detail_page .qr-code-img {
   max-width: 100px;
   height: auto;
   display: block;
   margin-top: 5px;
 }
 
-.status-badge {
+#order_detail_page .status-badge {
   padding: 4px 8px;
   border-radius: 12px;
   font-weight: 600;
@@ -45,15 +45,25 @@ th {
   color:darkgoldenrod;
 }
 
-.status-pending {
+#order_detail_page .status-pending {
   background-color: #f0ad4e;
   color: white;
 }
-.status-in_progress {
+#order_detail_page .status-in_progress {
   background-color: #5bc0de;
   color: white;
 }
-.status-done {
+#order_detail_page .status-done {
   background-color: #5cb85c;
   color: white;
+}
+
+
+#order_detail_page #production_button a{
+  padding:10px;
+  background-color:teal;
+  color:white;
+  max-width: fit-content;
+  border-radius: 3px;
+
 }

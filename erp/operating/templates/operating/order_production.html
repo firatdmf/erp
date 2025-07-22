@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'operating/css/order_production.css' %}" />
+  {% endblock %}
+
+  <div id="order_production_page">
+    <h2>Start Production for <a href="{% url 'operating:order_detail' order.pk %}">Order #{{ order.pk }}</a></h2>
+
+    <form method="post">
+      {% csrf_token %}
+      {{ formset.management_form }}
+
+      <table id="production_table">
+        <thead>
+          <tr>
+            <th>Order Item</th>
+            <th>Order Quantity</th>
+            <th>Target Quantity per Pack</th>
+            <th>Pack Count</th>
+            <th>Tag</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for form in formset %}
+            <tr id="row-{{ forloop.counter0 }}">
+              <td>{{ form.initial.order_item.display_name }}
+                {{ form.order_item.as_hidden }}</td>
+              <td id="order_quantity_{{ forloop.counter0 }}">{{ form.initial.order_item.quantity }}</td>
+              <td>{{ form.target_quantity_per_pack }}</td>
+              <td id="pack_count_{{ forloop.counter0 }}"></td>
+              <td>
+                <div hx-post="{% url 'operating:start_production' %}" hx-include="#row-{{ forloop.counter0 }} input" hx-target="#response_{{ forloop.counter0 }}" hx-swap="outerHTML">
+                  {% csrf_token %}
+                  <input type="hidden" name="pack_count" id="hidden_pack_count_{{ forloop.counter0 }}" value="" />
+                  <button type="button" class="print_barcode_button" id="start_and_tag_{{ forloop.counter0 }}">Start & Tag</button>
+                </div>
+                <div id="response_{{ forloop.counter0 }}"></div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="submit">Submit All</button>
+    </form>
+  </div>
+
+  {% block js %}
+    <script src="{% static 'operating/js/order_production.js' %}"></script>
+  {% endblock %}
+{% endblock %}

@@ -43,6 +43,7 @@ const generate_order_item_row = (index, sku, variant, itemId = null) => {
         <td>
           <input type="number" name="quantity_${index}" id="quantity_${index}" class="quantity-input" data-index="${index}" value="1" min="0" step="0.01"/>
         </td>
+
         <td>
           <input type="number" name="price_${index}" id="price_${index}" class="price-input" data-index="${index}" value="0" min="0" step="0.01" />
         </td>

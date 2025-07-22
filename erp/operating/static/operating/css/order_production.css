@@ -1,0 +1,47 @@
+#order_production_page .table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-family: Arial, sans-serif;
+}
+#order_production_page th,
+#order_production_page td {
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+#order_production_page th {
+  background-color: #f8f8f8;
+  font-weight: bold;
+}
+#order_production_page tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+#order_production_page input[type='number'] {
+  width: 100%;
+  padding: 6px;
+  box-sizing: border-box;
+}
+#order_production_page button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#order_production_page button:hover {
+  background-color: #0056b3;
+}
+
+#order_production_page .print_barcode_button {
+  padding: 10px;
+  cursor: pointer;
+  background-color: #007bff;
+  color: white;
+}
+
+#order_production_page .print_barcode_button:hover {
+  background-color: teal;
+}

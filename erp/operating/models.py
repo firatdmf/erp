@@ -34,11 +34,6 @@ class Order(models.Model):
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     notes = models.TextField(blank=True, null=True)
     qr_code_url = models.URLField(blank=True, null=True)  # ✅ Add this line
-    
-
-    # balance = models.DecimalField(
-    #     max_digits=10, decimal_places=2, default=0.00, editable=False
-    # )
 
     def total_value(self):
         # round makes it have two decimals
@@ -63,7 +58,7 @@ class Order(models.Model):
         else:
             self.status = "pending"
 
-            self.save()
+        self.save()
 
     def __str__(self):
         return f"Order #{self.pk} - {self.contact or self.company} "
@@ -72,6 +67,7 @@ class Order(models.Model):
 class OrderItem(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),
+        ("scheduled", "Scheduled"),
         ("in_production", "In Production"),
         ("quality_check", "Quality Check"),
         ("in_repair", "In Repair"),
@@ -90,19 +86,19 @@ class OrderItem(models.Model):
     product_variant = models.ForeignKey(
         ProductVariant, on_delete=models.PROTECT, blank=True, null=True
     )
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
-    # qr to update order item status
-    qr_code_url = models.URLField(null=True, blank=True)
 
     def subtotal(self):
         return self.price * self.quantity
 
     def display_name(self):
-        if self.variant:
-            return f"{self.variant.product.title} [{self.variant.variant_sku}]"
+        if self.product_variant:
+            return f"{self.product_variant.product.title} [{self.product_variant.variant_sku}]"
         elif self.product:
             return self.product.title
         return "Unknown item"
@@ -118,10 +114,27 @@ class OrderItem(models.Model):
             return f"{self.product.title} [{self.product_variant.variant_sku}] - {self.quantity} pcs"
         return f"{self.product.title} - {self.quantity} pcs"
 
+# This will be created when the machining starts
+class OrderItemUnit(models.Model):
+    # an item can added to the order later
+    created_at = models.DateTimeField(auto_now_add=True)
+    # we should check when the status is updated
+    updated_at = models.DateTimeField(auto_now=True)
+    order_item = models.ForeignKey(
+        OrderItem, related_name="units", on_delete=models.CASCADE
+    )
+    # this is the actual quantity 
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    qr_code_url = models.URLField(blank=True, null=True)
+    status = models.CharField(max_length=32, default="pending")
+
+class Production(models.Model):
+    order = models.ForeignKey(Order,related_name="production", on_delete=models.CASCADE)
 
 # GEMBA
 class WorkStation(models.Model):
     name = models.CharField(max_length=150, unique=True)
+
 
 
 # A machine is a physical or virtual device that performs tasks in a workstation.

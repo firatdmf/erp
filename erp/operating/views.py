@@ -1,11 +1,13 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views import View
-from .models import Order
-from .forms import OrderForm
-from django.views.generic.edit import UpdateView
+from .models import Order, OrderItemUnit
+from .forms import OrderForm, OrderItemUnitForm
+from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.detail import DetailView
 from django.views.generic import ListView
 from django.db import transaction
+from django.forms import formset_factory
+from django.views.decorators.http import require_POST
 
 # from accounting.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
 
@@ -66,23 +68,25 @@ def generate_machine_qr_for_order(order):
     order.save(update_fields=["qr_code_url"])
 
 
-def generate_qr_for_order_item(order_item, status):
+def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
     payload = {
-        "order_id": order_item.order.pk,
-        "order_item_id": order_item.pk,
-        "action": "update_status",
+        "order_id": order_item_unit.order_item.order.pk,
+        "order_item_id": order_item_unit.order_item.pk,
+        "order_item_unit_id": order_item_unit.pk,
         "status": status,
     }
 
+    # this is how you make the qr with json data
     qr = segno.make(json.dumps(payload))
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+        # saves the qr code as a png image file, scale 5 makes it 5x5 pixels. If you need distance scanning, increase this.
         qr.save(temp_file.name, scale=5)
 
         result = cloudinary.uploader.upload(
             temp_file.name,
-            folder=f"media/orders/{order_item.order.pk}/items",
-            public_id=f"qr_order_{order_item.order.pk}_orderitem_{order_item.pk}_{status}",
+            folder=f"media/orders/{order_item_unit.order_item.order.pk}/items",
+            public_id=f"qr_order_{order_item_unit.order_item.order.pk}_order_item_unit_{order_item_unit.pk}_{status}",
             overwrite=True,
             resource_type="image",
         )
@@ -90,6 +94,7 @@ def generate_qr_for_order_item(order_item, status):
     return result["secure_url"]
 
 
+# This is for reading the QR code on mobile.
 def process_qr_payload_view(request):
     try:
         data = json.loads(request.body)
@@ -226,9 +231,9 @@ class OrderCreate(View):
                     # Generate QR code after saving
                     generate_machine_qr_for_order(order)
                     # Generate QR codes for each order item
-                    for item in order.items.all():
-                        if not item.qr_code_url:
-                            generate_qr_for_order_item(item, status="pending")
+                    # for item in order.items.all():
+                    #     if not item.qr_code_url:
+                    #         generate_qr_for_order_item(item, status="pending")
 
                     # invoice.total = order.total_value()
                     # invoice.save()
@@ -419,11 +424,11 @@ class OrderEdit(UpdateView):
                                         self.request, f"Failed to save order item: {e}"
                                     )
                                     return self.form_invalid(form)
-                                qr_code_url = generate_qr_for_order_item(
-                                    order_item, "pending"
-                                )
-                                order_item.qr_code_url = qr_code_url
-                                order_item.save()
+                                # qr_code_url = generate_qr_for_order_item(
+                                #     order_item, "pending"
+                                # )
+                                # order_item.qr_code_url = qr_code_url
+                                # order_item.save()
                     except json.JSONDecodeError:
                         messages.error(self.request, "Invalid product data format.")
                         return self.form_invalid(form)
@@ -445,6 +450,62 @@ class OrderList(ListView):
     template_name = "operating/order_list.html"
     context_object_name = "orders"
     ordering = ["-created_at"]
+
+
+class OrderProduction(View):
+    template_name = "operating/order_production.html"
+
+    # below is not used yet
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # order_pk = self.kwargs.get("pk")
+        order = Order.objects.get(pk=self.kwargs.get("pk"))
+        kwargs["order"] = order
+        return kwargs
+
+    def get(self, request, pk):
+        order = get_object_or_404(Order, pk=pk)
+
+        formset_data = []
+        for item in order.items.all():
+            formset_data.append(
+                {
+                    "order_item": item,
+                    "quantity": 10,
+                    "status": "pending",
+                    "max_value": 10,
+                }
+            )
+        FormSet = formset_factory(OrderItemUnitForm, extra=0)
+        formset = FormSet(initial=formset_data)
+
+        return render(request, self.template_name, {"order": order, "formset": formset})
+
+    def post(self, request, pk):
+        order = get_object_or_404(Order, id=pk)
+        FormSet = formset_factory(OrderItemUnitForm, extra=0)
+        formset = FormSet(request.POST)
+
+        if formset.is_valid():
+            for key, value in request.POST.items():
+                print(f"key: {key}")
+                print(f"value: {value}")
+            # for item, form in zip(order.items.all(), formset.cleaned_data):
+            #     pack_count = form["pack_count"]
+            #     quantity_per_pack = form["quantity_per_pack"]
+
+            #     for _ in range(pack_count):
+            #         unit = OrderItemUnit.objects.create(
+            #             order_item=item,
+            #             planned_quantity=quantity_per_pack,
+            #         )
+            #         qr_url = generate_qr_for_order_item_unit(unit)
+            #         unit.qr_code_url = qr_url
+            #         unit.save()
+
+            return redirect("operating:order_detail", pk=order.id)
+
+        return render(request, self.template_name, {"order": order, "formset": formset})
 
 
 # This is how machines read and update the order status.
@@ -638,3 +699,41 @@ def product_autocomplete(request):
 
     html = f"<div class='product_autocomplete_list'><ul>{''.join(items)}</ul></div>"
     return HttpResponse(html)
+
+
+@require_POST
+def start_production(request):
+    try:
+        print("got your post request bro")
+        for key, value in request.POST.items():
+            print(f"{key}: {value}")
+        return HttpResponse("<span>Your post request</span>")
+        order_item_id = request.POST.get("order_item")
+        target_quantity = float(request.POST.get("target_quantity_per_pack"))
+        pack_count = int(request.POST.get("pack_count"))
+
+        if target_quantity <= 0 or pack_count <= 0:
+            return HttpResponse(
+                "<span style='color:red;'>❌ Invalid values</span>", status=400
+            )
+
+        order_item = OrderItem.objects.get(pk=order_item_id)
+
+        units = []
+        for _ in range(pack_count):
+            unit = OrderItemUnit.objects.create(
+                order_item=order_item,
+                planned_quantity=target_quantity,
+                status="scheduled",
+            )
+            unit.qr_code_url = generate_qr_for_order_item_unit(unit, "scheduled")
+            unit.save()
+            units.append(unit)
+
+        return HttpResponse(
+            f"<span style='color:green;'>✅ {pack_count} units created for {order_item.display_name}</span>"
+        )
+    except Exception as e:
+        return HttpResponse(
+            f"<span style='color:red;'>❌ Error: {str(e)}</span>", status=500
+        )

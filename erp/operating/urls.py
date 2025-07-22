@@ -11,6 +11,11 @@ urlpatterns = [
     path("orders/<int:pk>/", views.OrderDetail.as_view(), name="order_detail"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
     path("orders/delete/<int:pk>/", views.delete_order, name="delete_order"),
+    path(
+        "orders/<int:pk>/production/",
+        views.OrderProduction.as_view(),
+        name="order_production",
+    ),
     # path("create_product/",views.CreateProduct.as_view(),name="create_product"),
     # path("product_list/",views.Product.as_view(),name="product_list"),
     # below are for api paths
@@ -22,13 +27,18 @@ urlpatterns = [
         views.MachineStatusUpdate.as_view(),
         name="machine-status-update",
     ),
-    path("scan/", TemplateView.as_view(template_name="operating/scan.html"), name="qr_scan"),
+    path(
+        "scan/",
+        TemplateView.as_view(template_name="operating/scan.html"),
+        name="qr_scan",
+    ),
     path("process-qr/", views.process_qr_payload_view, name="process_qr_payload"),
 ]
 htmx_urlpatterns = [
     path(
         "product_autocomplete/", views.product_autocomplete, name="product_autocomplete"
     ),
+    path("start_production/", views.start_production, name="start_production"),
 ]
 
 urlpatterns += htmx_urlpatterns

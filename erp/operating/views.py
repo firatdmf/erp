@@ -69,10 +69,13 @@ def generate_machine_qr_for_order(order):
 
 
 def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
+    order_id = order_item_unit.order_item.order.pk
+    order_item_id = order_item_unit.order_item.pk,
+    order_item_unit_id = order_item_unit.pk,
     payload = {
-        "order_id": order_item_unit.order_item.order.pk,
-        "order_item_id": order_item_unit.order_item.pk,
-        "order_item_unit_id": order_item_unit.pk,
+        "order_id": order_id,
+        "order_item_id": order_item_id,
+        "order_item_unit_id": order_item_unit_id,
         "status": status,
     }
 
@@ -85,7 +88,7 @@ def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
 
         result = cloudinary.uploader.upload(
             temp_file.name,
-            folder=f"media/orders/{order_item_unit.order_item.order.pk}/items",
+            folder=f"media/orders/{order_item_unit.order_item.order.pk}/items/order",
             public_id=f"qr_order_{order_item_unit.order_item.order.pk}_order_item_unit_{order_item_unit.pk}_{status}",
             overwrite=True,
             resource_type="image",
@@ -455,57 +458,13 @@ class OrderList(ListView):
 class OrderProduction(View):
     template_name = "operating/order_production.html"
 
-    # below is not used yet
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        # order_pk = self.kwargs.get("pk")
-        order = Order.objects.get(pk=self.kwargs.get("pk"))
-        kwargs["order"] = order
-        return kwargs
-
     def get(self, request, pk):
         order = get_object_or_404(Order, pk=pk)
+        order_items = OrderItem.objects.filter(order=order)
 
-        formset_data = []
-        for item in order.items.all():
-            formset_data.append(
-                {
-                    "order_item": item,
-                    "quantity": 10,
-                    "status": "pending",
-                    "max_value": 10,
-                }
-            )
-        FormSet = formset_factory(OrderItemUnitForm, extra=0)
-        formset = FormSet(initial=formset_data)
-
-        return render(request, self.template_name, {"order": order, "formset": formset})
-
-    def post(self, request, pk):
-        order = get_object_or_404(Order, id=pk)
-        FormSet = formset_factory(OrderItemUnitForm, extra=0)
-        formset = FormSet(request.POST)
-
-        if formset.is_valid():
-            for key, value in request.POST.items():
-                print(f"key: {key}")
-                print(f"value: {value}")
-            # for item, form in zip(order.items.all(), formset.cleaned_data):
-            #     pack_count = form["pack_count"]
-            #     quantity_per_pack = form["quantity_per_pack"]
-
-            #     for _ in range(pack_count):
-            #         unit = OrderItemUnit.objects.create(
-            #             order_item=item,
-            #             planned_quantity=quantity_per_pack,
-            #         )
-            #         qr_url = generate_qr_for_order_item_unit(unit)
-            #         unit.qr_code_url = qr_url
-            #         unit.save()
-
-            return redirect("operating:order_detail", pk=order.id)
-
-        return render(request, self.template_name, {"order": order, "formset": formset})
+        return render(
+            request, self.template_name, {"order": order, "order_items": order_items}
+        )
 
 
 # This is how machines read and update the order status.
@@ -704,35 +663,58 @@ def product_autocomplete(request):
 @require_POST
 def start_production(request):
     try:
-        print("got your post request bro")
-        for key, value in request.POST.items():
-            print(f"{key}: {value}")
-        return HttpResponse("<span>Your post request</span>")
-        order_item_id = request.POST.get("order_item")
-        target_quantity = float(request.POST.get("target_quantity_per_pack"))
-        pack_count = int(request.POST.get("pack_count"))
+        with transaction.atomic():
+            print("your row index")
+            print("got your post request bro")
+            # for key, value in request.POST.items():
+            #     print(f"{key}: {value}")
+            print("pack count is:", request.POST["pack_count"])
+            pack_count = request.POST.get("pack_count")
+            order_item_id = request.POST.get("order_item_id")
+            order_item = OrderItem.objects.get(pk=order_item_id)
 
-        if target_quantity <= 0 or pack_count <= 0:
+            target_quantity_per_pack = request.POST.get("target_quantity_per_pack")
+            print("target_quantity_per_pack:", target_quantity_per_pack)
+            order_item.target_quantity_per_pack = target_quantity_per_pack
+            order_item.save(update_fields=["target_quantity_per_pack"])
+
+            print("your order item id is:", order_item_id)
+            for i in range(int(pack_count)):
+                order_item_unit = OrderItemUnit(
+                    order_item=order_item,
+                    quantity=target_quantity_per_pack,
+                    status="scheduled",
+                )
+                order_item_unit.qr_code_url = generate_qr_for_order_item_unit(
+                    order_item_unit, status=order_item_unit.status
+                )
+                order_item_unit.save()
+            return HttpResponse("<span>Your post request</span>")
+            order_item_id = request.POST.get("order_item")
+            target_quantity = float(request.POST.get("target_quantity_per_pack"))
+            pack_count = int(request.POST.get("pack_count"))
+
+            if target_quantity <= 0 or pack_count <= 0:
+                return HttpResponse(
+                    "<span style='color:red;'>❌ Invalid values</span>", status=400
+                )
+
+            order_item = OrderItem.objects.get(pk=order_item_id)
+
+            units = []
+            for _ in range(pack_count):
+                unit = OrderItemUnit.objects.create(
+                    order_item=order_item,
+                    planned_quantity=target_quantity,
+                    status="scheduled",
+                )
+                unit.qr_code_url = generate_qr_for_order_item_unit(unit, "scheduled")
+                unit.save()
+                units.append(unit)
+
             return HttpResponse(
-                "<span style='color:red;'>❌ Invalid values</span>", status=400
+                f"<span style='color:green;'>✅ {pack_count} units created for {order_item.display_name}</span>"
             )
-
-        order_item = OrderItem.objects.get(pk=order_item_id)
-
-        units = []
-        for _ in range(pack_count):
-            unit = OrderItemUnit.objects.create(
-                order_item=order_item,
-                planned_quantity=target_quantity,
-                status="scheduled",
-            )
-            unit.qr_code_url = generate_qr_for_order_item_unit(unit, "scheduled")
-            unit.save()
-            units.append(unit)
-
-        return HttpResponse(
-            f"<span style='color:green;'>✅ {pack_count} units created for {order_item.display_name}</span>"
-        )
     except Exception as e:
         return HttpResponse(
             f"<span style='color:red;'>❌ Error: {str(e)}</span>", status=500

@@ -89,6 +89,9 @@ class OrderItem(models.Model):
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
+    target_quantity_per_pack = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")

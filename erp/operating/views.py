@@ -88,7 +88,7 @@ def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
 
         result = cloudinary.uploader.upload(
             temp_file.name,
-            folder=f"media/orders/{order_item_unit.order_item.order.pk}/items/order",
+            folder=f"media/orders/{order_id}/items/{order_item_id}/units/{order_item_unit_id}",
             public_id=f"qr_order_{order_item_unit.order_item.order.pk}_order_item_unit_{order_item_unit.pk}_{status}",
             overwrite=True,
             resource_type="image",

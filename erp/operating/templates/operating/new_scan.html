@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Scan Order Item QR</h2>
+  <div id="qr-reader" style="width: 300px"></div>
+
+  <!-- This div will be updated by htmx with the server response -->
+  <div id="qr-result" hx-swap-oob="true"></div>
+
+  <!-- html5-qrcode lib -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <script>
+    function handleQRData(data) {
+      const payload = JSON.parse(data);
+
+      // Instead of fetch, create a hidden form and submit it via htmx
+      let form = document.createElement("form");
+      form.method = "POST";
+      form.action = "{% url 'operating:process_qr_payload' %}";
+      form.setAttribute("hx-target", "#qr-result");
+      form.setAttribute("hx-swap", "innerHTML");
+
+      // Add CSRF token input
+      let csrfInput = document.createElement("input");
+      csrfInput.type = "hidden";
+      csrfInput.name = "csrfmiddlewaretoken";
+      csrfInput.value = "{{ csrf_token }}";
+      form.appendChild(csrfInput);
+
+      // Add hidden inputs for each key-value in payload
+      for (const key in payload) {
+        if (Object.hasOwnProperty.call(payload, key)) {
+          let input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = payload[key];
+          form.appendChild(input);
+        }
+      }
+
+      document.body.appendChild(form);
+
+      // Submit form via htmx
+      htmx.process(form);
+      form.remove(); // Clean up the DOM
+    }
+
+    const qrReader = new Html5Qrcode('qr-reader');
+    qrReader.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, handleQRData);
+  </script>
+{% endblock %}

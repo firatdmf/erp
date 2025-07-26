@@ -9,13 +9,11 @@
   <div id="order_production_page">
     <h2>Start Production for <a href="{% url 'operating:order_detail' order.pk %}">Order #{{ order.pk }}</a></h2>
 
-      {% csrf_token %}
-      {{ formset.management_form }}
-
       <table id="production_table">
         <thead>
           <tr>
             <th>Order Item</th>
+            <th>Item Status</th>
             <th>Order Quantity</th>
             <th>Target Quantity per Pack</th>
             <th>Pack Count</th>
@@ -26,41 +24,43 @@
           {% for item in order_items %}
             <tr id="row-{{ forloop.counter0 }}">
               <td>{{ item.display_name}}</td>
+              <td>{{item.status}}</td>
               <td id="order_quantity_{{ forloop.counter0 }}">{{ item.quantity }}</td>
-
-              {% comment %} <div hx-post="{% url 'operating:start_production' %}" hx-include="#row-{{ forloop.counter0 }} input" hx-target="#response_{{ forloop.counter0 }}" hx-swap="outerHTML"> {% endcomment %}
+              {% comment %} if there are order item units {% endcomment %}
               {% if item.units.all %}
-              <td ><input type="number" id="target_quantity_per_pack_{{ forloop.counter0 }}" value="{{item.target_quantity_per_pack}}" readonly></td>
-              <td id="pack_count_{{ forloop.counter0 }}">{{item.units.count}}</td>
-
               <td>
-                
-                <span> Scheduled and Tagged {{item.units.count}} units</span>
-                <button type="button" class="print_barcode_button">Print QR</button>
-                <button type="button">Delete</button>
-
+                {% if item.target_quantity_per_pack%}
+                <input type="number" id="target_quantity_per_pack_{{ forloop.counter0 }}" value="{{item.target_quantity_per_pack}}" readonly>
                 {% else %}
-                <td ><input type="number" id="target_quantity_per_pack_{{ forloop.counter0 }}"></td>
-                <td id="pack_count_{{ forloop.counter0 }}"></td>
-                <td>
-
-                
-
-              <form hx-post="{% url 'operating:start_production' %}" hx-target="#response_{{ forloop.counter0 }}" hx-swap="outerHTML" >
-                {% csrf_token %}
-                <input type="hidden" name="target_quantity_per_pack" id="hidden_target_quantity_per_pack_{{ forloop.counter0 }}" value="" />
-                <input type="hidden" name="pack_count" id="hidden_pack_count_{{ forloop.counter0 }}" value="" />
-                <input type="hidden" name="order_item_id" value="{{ item.pk }}" />
-                <button type="submit" class="print_barcode_button" id="start_and_tag_{{ forloop.counter0 }}">Start & Tag</button>
-              </form>
-
-                <div id="response_{{ forloop.counter0 }}"></div>
+                <input type="number" id="target_quantity_per_pack_{{ forloop.counter0 }}" value="">
                 {% endif %}
+              </td>
+              <td id="pack_count_{{ forloop.counter0 }}">{{item.units.count}}</td>
+              <td>
+                  <a href="{% url 'operating:generate_pdf_qr_for_order_item_units' item.pk %}" class="print_barcode_button" target="_blank">Print QR Labels</a>
+              {% else %}
+              <td ><input type="number" id="target_quantity_per_pack_{{ forloop.counter0 }}"></td>
+              <td id="pack_count_{{ forloop.counter0 }}"></td>
+              <td id="tag_{{forloop.counter0}}">
+                <form hx-post="{% url 'operating:start_production' %}" hx-target="#tag_{{ forloop.counter0 }}" hx-swap="innerHTML" hx-indicator="#spinner_{{forloop.counter0}}" onsubmit="makeInputReadonly({{ forloop.counter0 }})" >
+                  {% csrf_token %}
+                  <input type="hidden" name="target_quantity_per_pack" id="hidden_target_quantity_per_pack_{{ forloop.counter0 }}" value="" />
+                  <input type="hidden" name="pack_count" id="hidden_pack_count_{{ forloop.counter0 }}" value="" />
+                  <input type="hidden" name="order_item_id" value="{{ item.pk }}" />
+                  <button type="submit" class="print_barcode_button" id="start_and_tag_{{ forloop.counter0 }}">Start & Tag</button>
+                </form>
+              {% endif %}
+                <div id="spinner_{{forloop.counter0}}" class="htmx-indicator">
+                  <div class="loader"></div>
+                  <p>Loading...</p>
+                </div>
+                <div id="response_{{ forloop.counter0 }}"></div>
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
+      <a href="{% url 'operating:edit_order' order.pk%}">Add new item</a>
   </div>
 
   {% block js %}

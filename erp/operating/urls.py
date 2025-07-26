@@ -33,6 +33,11 @@ urlpatterns = [
         name="qr_scan",
     ),
     path("process-qr/", views.process_qr_payload_view, name="process_qr_payload"),
+    path(
+        "generate_pdf_qr_for_order_item_units/<int:pk>/",
+        views.generate_pdf_qr_for_order_item_units,
+        name="generate_pdf_qr_for_order_item_units",
+    ),
 ]
 htmx_urlpatterns = [
     path(

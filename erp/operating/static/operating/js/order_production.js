@@ -1,6 +1,15 @@
+function makeInputReadonly(index) {
+  const input = document.getElementById(`target_quantity_per_pack_${index}`);
+  if (input) {
+    input.readOnly = true;
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const table = document.getElementById("production_table");
   const rowCount = document.querySelectorAll("#production_table tbody tr").length;
+
+
 
   function updatePackCount(i) {
     const orderQtyEl = document.getElementById(`order_quantity_${i}`);
@@ -11,20 +20,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (orderQtyEl && packQtyInput && packCountEl) {
       const orderQty = parseFloat(orderQtyEl.textContent.trim());
+
+
       const packQty = parseFloat(packQtyInput.value);
+      console.log("packQty is:", packQty);
+
 
       if (!isNaN(orderQty) && !isNaN(packQty) && packQty > 0) {
+        console.log("yes you hit here")
         const packCount = Math.ceil(orderQty / packQty);
-        packCountEl.textContent = packCount;
-        packCountInput.value = packCount;
-        target_quantity_per_pack.value = packQty;
+        console.log("your packCount is:", packCount);
+
+        if (packCountEl && packCountInput) {
+          packCountEl.textContent = packCount;
+          packCountInput.value = packCount;
+          target_quantity_per_pack.value = packQty;
+        }
+
       } else {
         packCountEl.textContent = 0;
       }
     }
   }
+  console.log("your row count is: ", rowCount);
 
   for (let i = 0; i < rowCount; i++) {
+    console.log("running for: ", i);
+
     const packQtyInput = document.getElementById(`target_quantity_per_pack_${i}`);
     if (packQtyInput) {
       packQtyInput.addEventListener("input", () => updatePackCount(i));

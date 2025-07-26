@@ -45,3 +45,35 @@
 #order_production_page .print_barcode_button:hover {
   background-color: teal;
 }
+
+
+
+/* below is for spinner */
+
+#order_production_page .loader {
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #3498db;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 40px auto;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+#order_production_page .htmx-indicator {
+  display: none;
+}
+
+/* HTMX adds htmx-request to the element receiving the request and toggles the spinner by combining it with .htmx-indicator. So: */
+/* Show this element only when it is both .htmx-request and .htmx-indicator. */
+#order_production_page .htmx-request.htmx-indicator {
+  display: inline;
+}

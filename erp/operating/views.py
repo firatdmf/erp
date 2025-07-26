@@ -1,3 +1,4 @@
+import traceback
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views import View
 from .models import Order, OrderItemUnit
@@ -6,7 +7,7 @@ from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.detail import DetailView
 from django.views.generic import ListView
 from django.db import transaction
-from django.forms import formset_factory
+from django.forms import ValidationError, formset_factory
 from django.views.decorators.http import require_POST
 
 # from accounting.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
@@ -27,7 +28,7 @@ from django.utils.html import escape
 from .models import (
     OrderItem,
 )  # if it's not already in __init__.py
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.contrib import messages
 from django.urls import reverse, reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
@@ -70,8 +71,8 @@ def generate_machine_qr_for_order(order):
 
 def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
     order_id = order_item_unit.order_item.order.pk
-    order_item_id = order_item_unit.order_item.pk,
-    order_item_unit_id = order_item_unit.pk,
+    order_item_id = order_item_unit.order_item.pk
+    order_item_unit_id = order_item_unit.pk
     payload = {
         "order_id": order_id,
         "order_item_id": order_item_id,
@@ -668,54 +669,135 @@ def start_production(request):
             print("got your post request bro")
             # for key, value in request.POST.items():
             #     print(f"{key}: {value}")
-            print("pack count is:", request.POST["pack_count"])
+            print("pack count is:", request.POST.get("pack_count"))
             pack_count = request.POST.get("pack_count")
             order_item_id = request.POST.get("order_item_id")
-            order_item = OrderItem.objects.get(pk=order_item_id)
-
             target_quantity_per_pack = request.POST.get("target_quantity_per_pack")
             print("target_quantity_per_pack:", target_quantity_per_pack)
+
+            if not pack_count or not target_quantity_per_pack or not order_item_id:
+                return HttpResponseBadRequest("Missing required fields")
+
+            try:
+                pack_count = int(pack_count)
+                target_quantity_per_pack = int(target_quantity_per_pack)
+            except (ValueError, TypeError):
+                return HttpResponseBadRequest("Invalid number format")
+
+            order_item = OrderItem.objects.get(pk=order_item_id)
+
             order_item.target_quantity_per_pack = target_quantity_per_pack
             order_item.save(update_fields=["target_quantity_per_pack"])
 
             print("your order item id is:", order_item_id)
-            for i in range(int(pack_count)):
+            for _ in range(pack_count):
                 order_item_unit = OrderItemUnit(
                     order_item=order_item,
                     quantity=target_quantity_per_pack,
                     status="scheduled",
                 )
-                order_item_unit.qr_code_url = generate_qr_for_order_item_unit(
-                    order_item_unit, status=order_item_unit.status
-                )
-                order_item_unit.save()
-            return HttpResponse("<span>Your post request</span>")
-            order_item_id = request.POST.get("order_item")
-            target_quantity = float(request.POST.get("target_quantity_per_pack"))
-            pack_count = int(request.POST.get("pack_count"))
-
-            if target_quantity <= 0 or pack_count <= 0:
-                return HttpResponse(
-                    "<span style='color:red;'>❌ Invalid values</span>", status=400
-                )
-
-            order_item = OrderItem.objects.get(pk=order_item_id)
-
-            units = []
-            for _ in range(pack_count):
-                unit = OrderItemUnit.objects.create(
-                    order_item=order_item,
-                    planned_quantity=target_quantity,
-                    status="scheduled",
-                )
-                unit.qr_code_url = generate_qr_for_order_item_unit(unit, "scheduled")
-                unit.save()
-                units.append(unit)
-
+                # order_item_unit.save()
+                # order_item_unit.qr_code_url = generate_qr_for_order_item_unit(
+                #     order_item_unit, status=order_item_unit.status
+                # )
+                # order_item_unit.save(update_fields="qr_code_url")
+                try:
+                    order_item_unit.full_clean()  # Trigger model field validation
+                    order_item_unit.save()
+                    order_item_unit.qr_code_url = generate_qr_for_order_item_unit(
+                        order_item_unit, status=order_item_unit.status
+                    )
+                    order_item_unit.save(update_fields=["qr_code_url"])
+                except ValidationError as ve:
+                    print("💥 Validation Error on OrderItemUnit:")
+                    print(ve.message_dict)
+                    traceback.print_exc()
+                    return HttpResponse(
+                        f"<span style='color:red;'>❌ Validation Error: {ve.message_dict}</span>",
+                        status=400,
+                    )
+            qr_url = reverse(
+                "operating:generate_pdf_qr_for_order_item_units", args=[order_item.pk]
+            )
             return HttpResponse(
-                f"<span style='color:green;'>✅ {pack_count} units created for {order_item.display_name}</span>"
+                # '<a href="{% url \'operating:generate_pdf_qr_for_order_item_units\' item.pk %}" class="print_barcode_button" target="_blank">Print QR Labels</a>'
+                f'<a href="{qr_url}" class="print_barcode_button" target="_blank">Print QR Labels</a>'
+                # "<span>Hello</span>"
             )
     except Exception as e:
         return HttpResponse(
             f"<span style='color:red;'>❌ Error: {str(e)}</span>", status=500
         )
+
+
+from io import BytesIO
+from PIL import Image
+import requests
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+import os
+
+
+def generate_pdf_qr_for_order_item_units(request, pk):
+    order_item = OrderItem.objects.get(pk=pk)
+    order_item_units = order_item.units.all()
+
+    # This object is an in-memory buffer that will hold the file content. It acts as a stream, allowing us to read from or write to it as if it were a file on disk.
+    buffer = BytesIO()
+    # page_width, page_height = letter
+    # page_width = 2 * inch
+    # page_height = 3 * inch
+    # 2 by 3 inches
+    width, height = 2 * inch, 3 * inch
+    pdf = canvas.Canvas(buffer, pagesize=(width, height))
+
+    for unit in order_item_units:
+        # load qr image from url
+        qr_url = unit.qr_code_url
+        try:
+            qr_response = requests.get(qr_url)
+            qr_response.raise_for_status()
+            qr_image_pil = Image.open(BytesIO(qr_response.content)).convert("RGB")
+        except Exception as e:
+            # continue  # Skip this unit if QR can't be loaded
+            return HttpResponse('<p class="error">something went wrong</p>')
+
+        # # save temporarily to save into PDF
+        # temp_path = f"/tmp/temp_qr_pdf_{unit.pk}.png"
+        # qr_img.save(temp_path)
+        qr_width, qr_height = qr_image_pil.size
+        scale = (1.6 * inch) / qr_width  # scale to fit
+        qr_width_scaled = qr_width * scale
+        qr_height_scaled = qr_height * scale
+
+        # Draw QR image
+        pdf.drawInlineImage(
+            qr_image_pil,
+            x=(width - qr_width_scaled) / 2,
+            y=height - qr_height_scaled - 0.7 * inch,
+            width=qr_width_scaled,
+            height=qr_height_scaled,
+        )
+
+        # Add OrderItem display name
+        pdf.setFont("Helvetica", 9)
+        pdf.drawCentredString(width / 2, 0.7 * inch, order_item.display_name())
+
+        # Add Unit ID
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawCentredString(width / 2, 0.5 * inch, f"Unit #{unit.pk}")
+
+        pdf.showPage()
+
+    pdf.save()
+    buffer.seek(0)
+
+    return HttpResponse(
+        buffer,
+        content_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="order_item_{pk}_qr.pdf"'
+        },
+    )

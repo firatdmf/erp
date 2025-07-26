@@ -1,3 +1,4 @@
+import traceback
 from django.db import models
 from crm.models import Contact, Company
 from marketing.models import Product, ProductVariant
@@ -117,6 +118,7 @@ class OrderItem(models.Model):
             return f"{self.product.title} [{self.product_variant.variant_sku}] - {self.quantity} pcs"
         return f"{self.product.title} - {self.quantity} pcs"
 
+
 # This will be created when the machining starts
 class OrderItemUnit(models.Model):
     # an item can added to the order later
@@ -126,18 +128,33 @@ class OrderItemUnit(models.Model):
     order_item = models.ForeignKey(
         OrderItem, related_name="units", on_delete=models.CASCADE
     )
-    # this is the actual quantity 
+    # this is the actual quantity
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     qr_code_url = models.URLField(blank=True, null=True)
     status = models.CharField(max_length=32, default="pending")
 
+    # print save errors
+    def save(self, *args, **kwargs):
+        try:
+            self.full_clean()  # validate fields before saving
+        except ValidationError as e:
+            print("💥 Validation error on OrderItemUnit:")
+            print(e.message_dict)  # print field-specific errors
+            traceback.print_exc()
+            raise  # re-raise the error so it doesn’t fail silently
+
+        super().save(*args, **kwargs)
+
+
 class Production(models.Model):
-    order = models.ForeignKey(Order,related_name="production", on_delete=models.CASCADE)
+    order = models.ForeignKey(
+        Order, related_name="production", on_delete=models.CASCADE
+    )
+
 
 # GEMBA
 class WorkStation(models.Model):
     name = models.CharField(max_length=150, unique=True)
-
 
 
 # A machine is a physical or virtual device that performs tasks in a workstation.

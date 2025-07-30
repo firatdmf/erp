@@ -46,12 +46,14 @@ ALLOWED_HOSTS = [
     "nejum.com",
     "erp-2hs3.onrender.com",
     '192.168.1.106',
+    '2d0820bfb4f1.ngrok-free.app',
 ]
 
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
 CSRF_TRUSTED_ORIGINS = [
     "https://*.demfirat.com",
     "https://*.vercel.app",
+    'https://2d0820bfb4f1.ngrok-free.app',
 ]
 
 # Below is added for django OAuth

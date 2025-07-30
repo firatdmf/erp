@@ -1,0 +1,41 @@
+<!-- templates/scan.html -->
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Scan Order Item QR</h2>
+  <label for="status">Choose a status</label>
+  <select name="status" id="select_status">
+    {% for choice in choices %}
+      <option value="{{ choice.0 }}">{{ choice.1 }}</option>
+    {% endfor %}
+  </select>
+  <div id="qr-reader" style="width: 300px"></div>
+  <div id="qr-result"></div>
+  {% comment %}This line loads the html5-qrcode JavaScript library. It uses your device’s camera to scan QR codes.{% endcomment %}
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  {% comment %}// parse string content inside the QR code{% endcomment %}
+  <script>
+    function handleQRData(data) {
+      const payload = JSON.parse(data)
+      const status = document.getElementById('select_status').value;
+      payload.status = status;
+      fetch("{% url 'operating:process_qr_payload' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(payload)
+      })
+        .then((response) => response.json())
+        .then((res) => {
+          document.getElementById('qr-result').innerText = res.message || res.error
+        })
+    }
+    
+    const qrReader = new Html5Qrcode('qr-reader')
+    
+    qrReader.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, handleQRData)
+  </script>
+  {% comment %}qrReader.start{% endcomment %}
+  {% comment %}This tells the browser to: Open the camera, Continuously scan for QR codes, When a QR code is detected, run handleQRData(data){% endcomment %}
+{% endblock %}

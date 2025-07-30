@@ -10,21 +10,25 @@ import uuid
 # below is to assign api_keys to machines
 import secrets
 
+STATUS_CHOICES = [
+    ("pending", "Pending"),
+    ("scheduled", "Scheduled"),
+    ("in_production", "In Production"),
+    ("quality_check", "Quality Check"),
+    ("in_repair", "In Repair"),
+    ("ready", "Ready for Shipment"),
+    ("shipped", "Shipped"),
+    ("completed", "Completed"),
+    ("cancelled", "Cancelled"),
+]
+
 
 # Create your models here.
 class Order(models.Model):
 
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("in_production", "In Production"),
-        ("quality_check", "Quality Check"),
-        ("in_repair", "In Repair"),
-        ("ready", "Ready for Shipment"),
-        ("shipped", "Shipped"),
-        ("completed", "Completed"),
-        ("cancelled", "Cancelled"),
-    ]
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     # should be linked to an either contact or company
     contact = models.ForeignKey(
         Contact, on_delete=models.SET_NULL, blank=True, null=True
@@ -66,17 +70,7 @@ class Order(models.Model):
 
 
 class OrderItem(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("scheduled", "Scheduled"),
-        ("in_production", "In Production"),
-        ("quality_check", "Quality Check"),
-        ("in_repair", "In Repair"),
-        ("ready", "Ready for Shipment"),
-        ("shipped", "Shipped"),
-        ("completed", "Completed"),
-        ("cancelled", "Cancelled"),
-    ]
+
     # an item can added to the order later
     created_at = models.DateTimeField(auto_now_add=True)
     # we should check when the status is updated
@@ -96,6 +90,28 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
+
+    def display_status(self):
+        return self.status
+
+    def update_status_from_units(self):
+        print("this has been called")
+        unit_statuses = list(self.units.values_list("status", flat=True))
+
+        if all(s == "completed" for s in unit_statuses):
+            self.status = "completed"
+        elif all(s == "ready" for s in unit_statuses):
+            self.status = "ready"
+        elif "in_production" in unit_statuses:
+            self.status = "in_production"
+        elif "pending" in unit_statuses:
+            self.status = "pending"
+        elif any(s == "ready" for s in unit_statuses):
+            self.status = "partially_ready"
+        else:
+            self.status = "pending"
+
+        self.save()
 
     def subtotal(self):
         return self.price * self.quantity
@@ -131,7 +147,7 @@ class OrderItemUnit(models.Model):
     # this is the actual quantity
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     qr_code_url = models.URLField(blank=True, null=True)
-    status = models.CharField(max_length=32, default="pending")
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
 
     # print save errors
     def save(self, *args, **kwargs):
@@ -182,3 +198,26 @@ class MachineCredential(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Pack(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="packs")
+    pack_number = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ("order", "pack_number")  # prevent duplicates
+
+
+class PackedItem(models.Model):
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="items")
+
+    # One-to-One between PackItem and OrderItemUnit ensures that a unit can only be in one pack.
+    order_item_unit = models.OneToOneField(OrderItemUnit, on_delete=models.CASCADE)
+
+    # when we save the pack item, we need to update the status of the order item unit
+    def save(self, *args, **kwargs):
+        self.order_item_unit.status = STATUS_CHOICES[6] #ready
+        self.order_item_unit.save(update_fields=["status"])
+        super().save(*args, **kwargs)

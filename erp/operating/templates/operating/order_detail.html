@@ -10,7 +10,7 @@
 
     <p>
       Status:
-      <strong>{{ order.status }}</strong>
+      <strong>{{ order.get_status_display}}</strong>
     </p>
     <p>Created At: {{ order.created_at }}</p>
 

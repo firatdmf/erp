@@ -2,6 +2,12 @@
 {% extends 'base.html' %}
 {% block content %}
   <h2>Scan Order Item QR</h2>
+  <label for="pack_number">Choose pack number</label>
+  <select name="pack_number" id="select_pack_number">
+    {% for i in max_pack_range %}
+      <option value="{{ i }}">{{ i }}</option>
+    {% endfor %}
+  </select>
   <div id="qr-reader" style="width: 300px"></div>
   <div id="qr-result"></div>
   {% comment %}This line loads the html5-qrcode JavaScript library. It uses your device’s camera to scan QR codes.{% endcomment %}
@@ -10,7 +16,9 @@
   <script>
     function handleQRData(data) {
       const payload = JSON.parse(data)
-      fetch("{% url 'operating:process_qr_payload' %}", {
+      const pack_number = document.getElementById('select_pack_number').value
+      payload.pack_number = pack_number
+      fetch("{% url 'operating:process_qr_payload_pack' %}", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

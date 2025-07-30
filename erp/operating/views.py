@@ -1,7 +1,7 @@
 import traceback
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views import View
-from .models import Order, OrderItemUnit
+from .models import Order, OrderItemUnit, Pack, PackedItem
 from .forms import OrderForm, OrderItemUnitForm
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.detail import DetailView
@@ -10,11 +10,12 @@ from django.db import transaction
 from django.forms import ValidationError, formset_factory
 from django.views.decorators.http import require_POST
 
+from .models import STATUS_CHOICES
+
 # from accounting.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
 
 
 # segno is for making qr codes, and it is cleaner and more efficient than qrcode.
-from decouple import config
 import segno
 
 # cloudinary is for uploading images to the cloud.
@@ -98,22 +99,54 @@ def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
     return result["secure_url"]
 
 
-# This is for reading the QR code on mobile.
-def process_qr_payload_view(request):
+# This is for reading the QR code on mobile for order_item_unit status updates.
+def process_qr_payload(request):
     try:
         data = json.loads(request.body)
         order_id = data.get("order_id")
         order_item_id = data.get("order_item_id")
+        order_item_unit_pk = data.get("order_item_unit_id")
         # new_status = data.get("status")
-        new_status = "in_production"
+        new_status = data.get(
+            "status", "pending"
+        )  # Default to 'pending' if not provided
 
-        item = OrderItem.objects.get(pk=order_item_id)
-        item.status = new_status
-        item.save()
+        # item = OrderItem.objects.get(pk=order_item_id)
+        # item.status = new_status
+        # item.save()
+        order_item_unit = OrderItemUnit.objects.get(pk=order_item_unit_pk)
+        order_item_unit.status = new_status
+        order_item_unit.save(update_fields=["status"])
 
         return JsonResponse(
-            {"success": True, "message": f"Item {item.pk} updated to {new_status}"}
+            {
+                "success": True,
+                "message": f"Item {order_item_unit.pk} updated to {new_status}",
+            }
         )
+
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
+def process_qr_payload_pack(request):
+    try:
+        with transaction.atomic():
+            data = json.loads(request.body)
+            order_id = data.get("order_id")
+            order_item_id = data.get("order_item_id")
+            order_item_unit_pk = data.get("order_item_unit_id")
+            pack_number = data.get("pack_number")
+
+            order = get_object_or_404(Order, pk=order_id)
+            order_item_unit = OrderItemUnit.objects.get(pk=order_item_unit_pk)
+            if order:
+                pack = Pack.objets.get_or_create(order=order, pack_number=pack_number)
+                packed_item = PackedItem.objects.create(
+                    pack=pack, order_item_unit=order_item_unit
+                )
+            # order_item_unit.status = "ready"
+            # order_item_unit.save(update_fields=["status"])
 
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
@@ -531,6 +564,27 @@ class MachineStatusUpdate(View):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
 
+class OrderItemUnitScan(View):
+    choices = STATUS_CHOICES
+    template_name = "operating/scan_order_item_unit.html"
+
+    def get(self, request):
+        # return render(request,"")
+        return render(request, self.template_name, {"choices": STATUS_CHOICES})
+
+
+class OrderItemUnitScanPack(View):
+
+    template_name = "operating/scan_order_item_unit_pack.html"
+
+    def get(self, request):
+        context = {"max_pack_range": range(0, 50)}  # loops from 0 to 49
+        return render(request, self.template_name, context)
+
+
+# -------------------------------- function based views
+
+
 def delete_order(request, pk):
     try:
         order = Order.objects.get(pk=pk)
@@ -801,3 +855,34 @@ def generate_pdf_qr_for_order_item_units(request, pk):
             "Content-Disposition": f'attachment; filename="order_item_{pk}_qr.pdf"'
         },
     )
+
+
+def get_order_status(request, order_id):
+
+    try:
+        order = Order.objects.get(pk=order_id)
+        return JsonResponse(
+            {
+                "id": order.pk,
+                "status": order.get_status_display(),
+                "created_at": order.created_at.isoformat(),
+                "updated_at": order.updated_at.isoformat(),
+                "items": [
+                    {
+                        "id": item.pk,
+                        "product_category": (
+                            item.product.category.name if item.product else ""
+                        ),
+                        "product_sku": item.product.sku,
+                        "product_title": item.product.title,
+                        "description": item.description,
+                        "quantity": str(item.quantity),
+                        "status": item.get_status_display(),
+                        "unit_of_measurement": item.product.unit_of_measurement,
+                    }
+                    for item in order.items.all()
+                ],
+            }
+        )
+    except Order.DoesNotExist:
+        return JsonResponse({"error": "Order not found"}, status=404)

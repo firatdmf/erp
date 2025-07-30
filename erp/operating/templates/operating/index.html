@@ -1,12 +1,19 @@
 {% extends 'base.html' %}
 {% block content %}
-{% load static %}
+  {% load static %}
 
-{% comment %} Below is to use unique css for each file as in this case here {% endcomment %} 
-{% block css %}
-<link rel="stylesheet" href="{% static 'operating/css/index.css' %}" />
-{% endblock css %}
-<h1>Operating Index</h1>
-<p class="OperatingMessage">{{ message }}</p>
-<a href="{% url 'operating:order_list' %}">Orders</a>
-{% endblock content %}
+  {% comment %}Below is to use unique css for each file as in this case here{% endcomment %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'operating/css/index.css' %}" />
+  {% endblock %}
+  <h1>Operating Index</h1>
+  <p class="OperatingMessage">{{ message }}</p>
+  <ul>
+    <li>
+      <a href="{% url 'operating:order_list' %}">Orders</a>
+    </li>
+    <li>
+      <a href="{% url 'operating:scan_order_item_unit' %}">Qr Scan</a>
+    </li>
+  </ul>
+{% endblock %}

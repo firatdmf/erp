@@ -12,3 +12,5 @@ you add cash accounts
 then add capital or set percentages (that way the percentages gets determined
 
 
+
+

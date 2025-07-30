@@ -41,7 +41,7 @@ Marketing:
 Operations:
    Add Customer Order: Quotation, Waiting on Confirmation, Confirmed, In production(sub operations), Ready for Shipment, Shipped (Closed), On Hold (Closed) 
    Show what order status of a client, create a link for the order status share with client
-   Stock management via QR
+   Stock management via QR /
    product cost computer
    See the stock and share with clients
    Productions Leveler/Scheduler

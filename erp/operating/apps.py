@@ -6,6 +6,6 @@ class OperatingConfig(AppConfig):
     name = 'operating'
 
 
-# Below added for signals.py
-def ready(self):
-    import operating.signals
+    # Below added for signals.py
+    def ready(self):
+        import operating.signals

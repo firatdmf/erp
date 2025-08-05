@@ -102,6 +102,12 @@
       <div id="production_button">
         <a href="{% url 'operating:order_production' order.pk %}">See Production</a>
       </div>
+      
+      <p>
+        <a href="{% url 'operating:order_packing_list' order.pk %}" class="btn btn-secondary">Packing List</a>
+
+      </p>
+
     {% else %}
       <button class="btn btn-secondary" disabled>Order Completed</button>
     {% endif %}

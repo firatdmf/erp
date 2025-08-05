@@ -33,7 +33,8 @@ Likewise businesses:
     odoo.com
     nejum.com
     mrpeasy.com
-
+    /www.firstresonance.io
+    www.zebra.com
 
     rockwell automation,plex.com by rockwell 
     Schneider Electric
@@ -47,6 +48,7 @@ Likewise businesses:
     Phoenix Contact
     fanuc (japanese)
     Bosch Rexroth
+    
         
     GE Automation & Controls (formerly GE Intelligent Platforms)
 

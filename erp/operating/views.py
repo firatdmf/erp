@@ -140,13 +140,23 @@ def process_qr_payload_pack(request):
 
             order = get_object_or_404(Order, pk=order_id)
             order_item_unit = OrderItemUnit.objects.get(pk=order_item_unit_pk)
-            if order:
-                pack = Pack.objets.get_or_create(order=order, pack_number=pack_number)
-                packed_item = PackedItem.objects.create(
-                    pack=pack, order_item_unit=order_item_unit
-                )
-            # order_item_unit.status = "ready"
-            # order_item_unit.save(update_fields=["status"])
+            pack, created = Pack.objects.get_or_create(
+                order=order, pack_number=pack_number
+            )
+
+            try:
+                packed_item = PackedItem.objects.get(order_item_unit=order_item_unit)
+                # Already packed: move to new pack
+                packed_item.pack = pack
+                packed_item.save()
+                message = f"Unit {order_item_unit_pk} moved to pack {pack_number}."
+
+            except PackedItem.DoesNotExist:
+                # Not packed: create new PackedItem
+                PackedItem.objects.create(pack=pack, order_item_unit=order_item_unit)
+                message = f"Unit {order_item_unit_pk} packed in pack {pack_number}."
+
+            return JsonResponse({"success": True, "message": message})
 
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
@@ -578,11 +588,131 @@ class OrderItemUnitScanPack(View):
     template_name = "operating/scan_order_item_unit_pack.html"
 
     def get(self, request):
-        context = {"max_pack_range": range(0, 50)}  # loops from 0 to 49
+        context = {"max_pack_range": range(1, 51)}  # loops from 1 to 50
+        return render(request, self.template_name, context)
+
+
+class OrderPackingList(ListView):
+    # model = Pack
+    template_name = "operating/order_packing_list.html"
+
+    # context_object_name = "packs"
+
+    def get(self, request, pk):
+        order = Order.objects.get(pk=pk)
+        packs = Pack.objects.filter(order=order).order_by("pack_number")
+        context = {"order": order, "packs": packs}
         return render(request, self.template_name, context)
 
 
 # -------------------------------- function based views
+
+import openpyxl
+from openpyxl.styles import Font, Border, Side, Alignment
+from openpyxl.utils import get_column_letter
+
+
+def export_packing_list_excel(request, pk):
+    print("export packing list excel for order with pk: ", pk)
+    order = Order.objects.get(pk=pk)
+    packs = order.packs.prefetch_related("items__order_item_unit__order_item")
+
+    # create excel workbook and worksheet
+    wb = openpyxl.Workbook()
+    # select the active worksheet
+    ws = wb.active
+    ws.title = f"Packing List - Order {pk}"
+
+    # write the title row
+    ws.merge_cells("A1:F1")
+    ws["A1"] = f"Packing List for Order #{pk} — {order.get_client()} "
+    ws["A1"].font = Font(size=14, bold=True)
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+
+    # Headers
+    headers = [
+        "Pack Number",
+        "SKU",
+        "Description",
+        "Quantity",
+        "Unit of Measure",
+        "Unit ID",
+    ]
+    header_font = Font(bold=True)
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=col_num, value=header)
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+    thick_border = Border(
+        left=Side(style="thick"),
+        right=Side(style="thick"),
+        top=Side(style="thick"),
+        bottom=Side(style="thick"),
+    )
+
+    # End of first rows.
+    row = 3
+    for pack in packs:
+        pack_start_row = row
+
+        for packed_item in pack.items.all():
+            unit = packed_item.order_item_unit
+            order_item = unit.order_item
+
+            values = [
+                pack.pack_number,
+                order_item.display_sku(),
+                order_item.description or "N/A",
+                unit.quantity,
+                order_item.product.unit_of_measurement or "units",
+                unit.pk,
+            ]
+
+            for col_index, value in enumerate(values, start=1):
+                cell = ws.cell(row=row, column=col_index, value=value)
+                cell.border = thin_border
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            row += 1
+
+        # Add thick border around entire pack row range
+
+        # Add thick border around entire pack row range
+        for r in range(pack_start_row, row):
+            for c in range(1, 7):
+                ws.cell(row=r, column=c).border = thick_border
+
+        # Merge cells in "Pack Number" column (A) for the same pack
+        if row - pack_start_row > 1:
+            ws.merge_cells(
+                start_row=pack_start_row, start_column=1, end_row=row - 1, end_column=1
+            )
+            merged_cell = ws.cell(row=pack_start_row, column=1)
+            merged_cell.alignment = Alignment(horizontal="center", vertical="center")
+            # merged_cell.alignment = Alignment(vertical="center", horizontal="center")
+
+    # Adjust column widths
+    for col in range(1, 7):
+        ws.column_dimensions[get_column_letter(col)].width = 22
+
+    # Export
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    filename = f"packing_list_order_{pk}.xlsx"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    # ws.cell().alignment = Alignment(horizontal="center", vertical="center")
+    wb.save(response)
+    return response
+
+    # return HttpResponse("Packing list export is not implemented yet.")
 
 
 def delete_order(request, pk):

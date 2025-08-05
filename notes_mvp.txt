@@ -80,3 +80,8 @@ click on transaction to see details does not yet work
 when expenses etc adjusted manually, it might mess up the whole system.
 
 --------
+
+
+
+product and variant both should be unique 
+initialize currencies, expense categories, warehouse, accounting book

@@ -16,8 +16,10 @@ urlpatterns = [
         views.OrderProduction.as_view(),
         name="order_production",
     ),
+    path("orders/<int:pk>/packing_list/",views.OrderPackingList.as_view(),name="order_packing_list"),
     # path("create_product/",views.CreateProduct.as_view(),name="create_product"),
     # path("product_list/",views.Product.as_view(),name="product_list"),
+    path("orders/<int:pk>/packing_list/export_excel/", views.export_packing_list_excel, name="export_packing_list_excel"),
     # below are for api paths
     path(
         "api/order/machine-update/", views.machine_update_status, name="machine_update"
@@ -34,6 +36,7 @@ urlpatterns = [
     # ),
     path("scan_order_item_unit/",views.OrderItemUnitScan.as_view(),name="scan_order_item_unit"),
     path("scan_order_item_unit_pack/",views.OrderItemUnitScanPack.as_view(),name="scan_order_item_unit_pack"),
+    path("prcocess_qr_payload_pack/", views.process_qr_payload_pack, name="process_qr_payload_pack"),
     path("process-qr/", views.process_qr_payload, name="process_qr_payload"),
     path(
         "generate_pdf_qr_for_order_item_units/<int:pk>/",

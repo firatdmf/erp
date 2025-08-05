@@ -3,7 +3,7 @@ from django.db import models
 from crm.models import Contact, Company
 from marketing.models import Product, ProductVariant
 from django.core.exceptions import ValidationError
-
+# from accounting.models import AssetInventoryRawMaterial
 # uuid is used to generate unique identifiers for models.
 import uuid
 
@@ -45,6 +45,13 @@ class Order(models.Model):
         return round(sum(item.subtotal() for item in self.items.all()), 2)
 
         # Now whenever an OrderItem is added, updated, or deleted, the overall Order.status will update automatically.
+
+    def get_client(self):
+        if self.contact:
+            return self.contact
+        elif self.company:
+            return self.company
+        return "Unknown Client"
 
     # below function is used in signals.py
     def update_status_from_items(self):
@@ -123,6 +130,13 @@ class OrderItem(models.Model):
             return self.product.title
         return "Unknown item"
 
+    def display_sku(self):
+        if self.product_variant:
+            return self.product_variant.variant_sku
+        elif self.product:
+            return self.product.sku
+        return "Unknown item SKU"
+
     # def __str__(self):
     #     if self.contact:
     #         return f"Order #{self.pk} - {self.contact.full_name}"
@@ -173,6 +187,15 @@ class WorkStation(models.Model):
     name = models.CharField(max_length=150, unique=True)
 
 
+class Warehouse(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    location = models.CharField(max_length=255, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+
 # A machine is a physical or virtual device that performs tasks in a workstation.
 class Machine(models.Model):
     name = models.CharField(max_length=150, unique=True)
@@ -216,8 +239,13 @@ class PackedItem(models.Model):
     # One-to-One between PackItem and OrderItemUnit ensures that a unit can only be in one pack.
     order_item_unit = models.OneToOneField(OrderItemUnit, on_delete=models.CASCADE)
 
-    # when we save the pack item, we need to update the status of the order item unit
+    # when we save the pack item, we need to update the status of the order item unit to be ready for shipping
     def save(self, *args, **kwargs):
-        self.order_item_unit.status = STATUS_CHOICES[6] #ready
+        self.order_item_unit.status = STATUS_CHOICES[5][0]  # ready
         self.order_item_unit.save(update_fields=["status"])
         super().save(*args, **kwargs)
+
+
+# class RawMaterialUnit(models.Model):
+#     raw_material = models.ForeignKey(
+#         AssetInventoryRawMaterial, on_delete=models.RESTRICT, related_name="units")

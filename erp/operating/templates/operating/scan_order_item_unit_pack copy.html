@@ -1,0 +1,73 @@
+<!-- templates/scan.html -->
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Scan Order Item QR</h2>
+  <label for="pack_number">Choose pack number</label>
+  <select name="pack_number" id="select_pack_number">
+    {% for i in max_pack_range %}
+      <option value="{{ i }}">{{ i }}</option>
+    {% endfor %}
+  </select>
+  <div id="qr-reader" style="width: 300px"></div>
+  <div id="qr-result"></div>
+  <button id="scan-next-button" style="display:none;">Scan Next</button>
+  {% comment %}This line loads the html5-qrcode JavaScript library. It uses your device’s camera to scan QR codes.{% endcomment %}
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  {% comment %}// parse string content inside the QR code{% endcomment %}
+  <script>
+    let qrReader = null
+    
+    function handleQRData(data) {
+      // Stop scanning immediately to avoid multiple triggers
+      qrReader
+        .stop()
+        .then(() => {
+          const payload = JSON.parse(data)
+          const pack_number = document.getElementById('select_pack_number').value
+          payload.pack_number = pack_number
+    
+          fetch("{% url 'operating:process_qr_payload_pack' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(payload)
+          })
+            .then((response) => response.json())
+            .then((res) => {
+              document.getElementById('qr-result').innerText = res.message || res.error
+              document.getElementById('scan-next-button').style.display = 'inline-block'
+            })
+        })
+        .catch((err) => {
+          document.getElementById('qr-result').innerText = 'Failed to submit QR data.'
+          console.error('Failed to stop scanner:', err)
+        })
+    }
+    
+    function startQRScanner() {
+      qrReader
+        .start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, handleQRData)
+        .then(() => {
+          document.getElementById('scan-next-button').style.display = 'none'
+          document.getElementById('qr-result').innerText = 'Scanning...'
+        })
+        .catch((err) => {
+          console.error('Failed to start scanner:', err)
+        })
+    }
+    
+    window.addEventListener('DOMContentLoaded', () => {
+      qrReader = new Html5Qrcode('qr-reader')
+      startQRScanner()
+    
+      document.getElementById('scan-next-button').addEventListener('click', () => {
+        startQRScanner()
+      })
+    })
+  </script>
+
+  {% comment %}qrReader.start{% endcomment %}
+  {% comment %}This tells the browser to: Open the camera, Continuously scan for QR codes, When a QR code is detected, run handleQRData(data){% endcomment %}
+{% endblock %}

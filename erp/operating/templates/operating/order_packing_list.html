@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'operating/css/order_packing_list.css' %}" />
+  {% endblock %}
+  <div id="order_packing_list_page">
+    <h1>Order Packing List for Order <a href="{% url 'operating:order_detail' order.pk %}">#{{ order.pk }}</a></h1>
+    <h2>Client: {{ order.get_client }}</h2>
+    <p>Last updated date in here:</p>
+    <p>Number of more items to pack in here:</p>
+    <a href="{% url 'operating:export_packing_list_excel' order.pk %}" target="_blank"><p>Export to Excel</p></a>
+
+    {% if packs %}
+      <table style="border-collapse: collapse; width: 100%; margin-top: 2rem; font-family: sans-serif;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="border: 2px solid #333; padding: 8px;">Pack Number</th>
+            <th style="border: 2px solid #333; padding: 8px;">SKU</th>
+            <th style="border: 2px solid #333; padding: 8px;">Description</th>
+            <th style="border: 2px solid #333; padding: 8px;">Quantity</th>
+            <th style="border: 2px solid #333; padding: 8px;">Unit of Measure</th>
+            <th style="border: 2px solid #333; padding: 8px;">Unit ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pack in packs %}
+            {% for packed_item in pack.items.all %}
+              <tr class="pack-group {% if forloop.first %}first-row{% endif %} {% if forloop.last %}last-row{% endif %}">
+                {% if forloop.first %}
+                  <td rowspan="{{ pack.items.count }}" style="padding: 8px; vertical-align: middle; text-align: center; font-weight: bold;">{{ pack.pack_number }}</td>
+                {% endif %}
+                <td style="padding: 8px; text-align: center;">{{ packed_item.order_item_unit.order_item.display_sku }}</td>
+                <td style="padding: 8px; text-align: center;">{{ packed_item.order_item_unit.order_item.description|default:'' }}</td>
+                <td style="padding: 8px; text-align: center;">{{ packed_item.order_item_unit.quantity }}</td>
+                <td style="padding: 8px; text-align: center;">{{ packed_item.order_item_unit.order_item.product.unit_of_measurement|default:'units' }}</td>
+                <td style="padding: 8px; text-align: center;">{{ packed_item.order_item_unit.pk }}</td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+      <p>Total contents here: </p>
+    {% else %}
+      <p>No packs for this order.</p>
+    {% endif %}
+  </div>
+{% endblock %}

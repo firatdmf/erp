@@ -9,33 +9,83 @@
     {% endfor %}
   </select>
   <div id="qr-reader" style="width: 300px"></div>
-  <div id="qr-result"></div>
+  <div id="qr-result" style="margin-top: 1rem; font-weight: bold;"></div>
+  <button id="scan-next-button" style="display:none; margin-top: 1rem;">Scan Next</button>
   {% comment %}This line loads the html5-qrcode JavaScript library. It uses your device’s camera to scan QR codes.{% endcomment %}
   <script src="https://unpkg.com/html5-qrcode"></script>
-  {% comment %}// parse string content inside the QR code{% endcomment %}
   <script>
+    let qrReader = null
+    
+    function showResultMessage(message, isError = false) {
+      const resultEl = document.getElementById('qr-result')
+      resultEl.innerText = message
+      resultEl.style.color = isError ? 'red' : 'green'
+    }
+    
     function handleQRData(data) {
-      const payload = JSON.parse(data)
-      const pack_number = document.getElementById('select_pack_number').value
-      payload.pack_number = pack_number
-      fetch("{% url 'operating:process_qr_payload_pack' %}", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify(payload)
+      // Stop scanning to prevent multiple reads
+      qrReader.stop().then(() => {
+        let payload
+        try {
+          payload = JSON.parse(data)
+        } catch (e) {
+          showResultMessage('❌ Invalid QR code format.', true)
+          document.getElementById('scan-next-button').style.display = 'inline-block'
+          return
+        }
+    
+        const pack_number = document.getElementById('select_pack_number').value
+        payload.pack_number = pack_number
+    
+        fetch("{% url 'operating:process_qr_payload_pack' %}", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+          },
+          body: JSON.stringify(payload)
+        })
+          .then((response) => response.json())
+          .then((res) => {
+            if (res.success === false) {
+              showResultMessage(`❌ ${res.error || 'Packing failed.'}`, true)
+            } else {
+              showResultMessage(`✅ ${res.message}`)
+            }
+            document.getElementById('scan-next-button').style.display = 'inline-block'
+          })
+          .catch((err) => {
+            console.error('Fetch failed:', err)
+            showResultMessage('❌ Failed to contact server.', true)
+            document.getElementById('scan-next-button').style.display = 'inline-block'
+          })
       })
-        .then((response) => response.json())
-        .then((res) => {
-          document.getElementById('qr-result').innerText = res.message || res.error
+    }
+    
+    function startQRScanner() {
+      qrReader
+        .start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, handleQRData)
+        .then(() => {
+          showResultMessage('📷 Scanning...')
+          document.getElementById('scan-next-button').style.display = 'none'
+        })
+        .catch((err) => {
+          console.error('Failed to start scanner:', err)
+          showResultMessage('❌ Could not start camera', true)
         })
     }
     
-    const qrReader = new Html5Qrcode('qr-reader')
+    window.addEventListener('DOMContentLoaded', () => {
+      qrReader = new Html5Qrcode('qr-reader')
+      startQRScanner()
     
-    qrReader.start({ facingMode: 'environment' }, { fps: 10, qrbox: 250 }, handleQRData)
+      document.getElementById('scan-next-button').addEventListener('click', () => {
+        document.getElementById('select_pack_number').disabled = false;
+        startQRScanner()
+      })
+    })
   </script>
+
   {% comment %}qrReader.start{% endcomment %}
   {% comment %}This tells the browser to: Open the camera, Continuously scan for QR codes, When a QR code is detected, run handleQRData(data){% endcomment %}
 {% endblock %}

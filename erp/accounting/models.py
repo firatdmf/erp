@@ -6,7 +6,8 @@ from authentication.models import Member
 from django.utils import timezone
 from datetime import timedelta
 from crm.models import Supplier
-from operating.models import Order
+from operating.models import Order, Warehouse
+
 # from marketing.models import Product
 from django.core.exceptions import ValidationError
 
@@ -84,7 +85,8 @@ class CurrencyCategory(models.Model):
     class Meta:
         verbose_name_plural = "Currency Categories"
 
-# I do not think you need this model anymore.
+
+# I do not think you need this model anymore. but might use it later.
 class Invoice(models.Model):
     INVOICE_TYPE_CHOICES = [("proforma", "Proforma"), ("commercial", "Commercial")]
     created_at = models.DateTimeField(auto_now_add=True)
@@ -99,9 +101,13 @@ class Invoice(models.Model):
         Company, on_delete=models.CASCADE, blank=True, null=True
     )
     # items = models.JSONField("ItemsInfo", default=invoice_items_default)
-    order = models.OneToOneField(Order,on_delete=models.RESTRICT, blank=True, null=False, primary_key=True)
+    order = models.OneToOneField(
+        Order, on_delete=models.RESTRICT, blank=True, null=False, primary_key=True
+    )
     # invoice_details = models.JSONField(_(""), encoder=, decoder=)
-    invoice_type = models.CharField(max_length=20,default="proforma", choices=INVOICE_TYPE_CHOICES)
+    invoice_type = models.CharField(
+        max_length=20, default="proforma", choices=INVOICE_TYPE_CHOICES
+    )
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     # AssetAccountsReceivable = models.ForeignKey(AssetAccountsReceivable)
@@ -109,7 +115,7 @@ class Invoice(models.Model):
     @property
     def balance(self):
         return self.total - self.paid
-    
+
     @property
     def client(self):
         return self.contact or self.company
@@ -142,6 +148,35 @@ class AssetCash(models.Model):
         return f"{self.currency.symbol} {self.amount} currency's balance: {self.currency_balance} | ({self.book})"
 
 
+class GoodsReceipt(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.RESTRICT, null=False, blank=False
+    )
+    date = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.book} | {self.supplier} | {self.date.strftime('%d %B, %Y') if self.date else 'No Date'}"
+
+
+class GoodsReceiptItem(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    goods_receipt = models.ForeignKey(
+        GoodsReceipt, on_delete=models.CASCADE, related_name="items"
+    )
+    raw_material = models.ForeignKey(
+        "AssetInventoryRawMaterial", on_delete=models.RESTRICT, blank=True, null=True
+    )
+    finished_goods = models.ForeignKey(
+        "AssetInventoryFinishedGood", on_delete=models.RESTRICT, blank=True, null=True
+    )
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return f"{self.book} | {self.raw_material.name} - {self.quantity} units"
+
+
 class AssetInventoryRawMaterial(models.Model):
     class Meta:
         verbose_name_plural = "Asset Inventory Raw Materials"
@@ -154,17 +189,18 @@ class AssetInventoryRawMaterial(models.Model):
     RAW_TYPE_CHOICES = [("direct", "Direct"), ("indirect", "Indirect")]
     UNIT_TYPE_CHOICES = [("units", "Unit"), ("mt", "Meter"), ("kg", "Kilogram")]
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     # name and supplier combination should be unique, so we won't have multiple entries of the same product.
 
     name = models.CharField(null=False, blank=False)
+    sku = models.CharField(null=True, blank=True)
     supplier = models.ForeignKey(
         Supplier, on_delete=models.RESTRICT, null=True, blank=True
     )
-    # If the user does not enter a stockID, make the stockID equal to the id of the object created.
-    # preopulate it with the next availabe stockid
-    stock_id = models.CharField(null=True, blank=True)
-    receipt_number = models.CharField(null=True, blank=True)
+    supplier_sku = models.CharField(null=True, blank=True)
+
+    # receipt_number = models.CharField(null=True, blank=True)
     unit_of_measurement = models.CharField(
         choices=UNIT_TYPE_CHOICES, null=True, blank=True, default=UNIT_TYPE_CHOICES[0]
     )
@@ -173,17 +209,31 @@ class AssetInventoryRawMaterial(models.Model):
     )
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     # This should be selectable field
-    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    warehouse = models.CharField(null=True, blank=True)
-    location = models.CharField(null=True, blank=True)
+    # quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    # warehouse = models.CharField(null=True, blank=True)
+    # location = models.CharField(null=True, blank=True)
+    # warehouse = models.ForeignKey(
+    #     Warehouse, on_delete=models.RESTRICT, null=True, blank=True
+    # )
     # Do not delete the raw material inventory if you delete the supplier model. Give a warning if there is at least one raw material from that company. Delete only if there are no raw mat. from that company
     raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
 
+    # purchase_order = models
+
+    # If the user does not enter a sku, make the sku equal to the id of the object created.
+    # preopulate it with the next available sku
+    def save(self, *args, **kwargs):
+        is_new_instance = self.pk is None
+        super().save(*args, **kwargs)  # Save first to get an ID
+        if is_new_instance and not self.sku:
+            self.sku = str(self.pk)
+            super().save(update_fields=["sku"])  # Save again with sku set
+
     def __str__(self):
-        return f"{self.book} | {self.name} - {self.supplier} - {self.quantity} {self.unit_of_measurement}"
+        return f"{self.book} | {self.name} - {self.supplier} - {self.unit_of_measurement}"
 
 
-class AssetInventoryGood(models.Model):
+class AssetInventoryFinishedGood(models.Model):
     class Meta:
         verbose_name_plural = "Asset Inventory Goods"
 
@@ -247,7 +297,11 @@ class AssetAccountsReceivable(models.Model):
 
     # Link the invoice that this was created for
     invoice = models.ForeignKey(
-        Invoice, on_delete=models.CASCADE, blank=False, null=False,related_name="accounts_receivables"
+        Invoice,
+        on_delete=models.CASCADE,
+        blank=False,
+        null=False,
+        related_name="accounts_receivables",
     )
 
     # Overriding the clean method that is called during the model's validation process.

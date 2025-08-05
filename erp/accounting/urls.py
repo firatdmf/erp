@@ -25,6 +25,9 @@ urlpatterns = [
     path('books/<int:pk>/add_accounts_receivable/', AddAccountsReceivable.as_view(),name="add_accounts_receivable"),
     path('books/<int:pk>/add_accounts_payable/', AddAccountsPayable.as_view(),name="add_accounts_payable"),
     path('books/<int:pk>/transaction_list/', TransactionList.as_view(),name="transaction_list"),
+    path('books/<int:pk>/create_asset_inventory_raw_material/', CreateAssetInventoryRawMaterial.as_view(),name="create_asset_inventory_raw_material"),
+    path('books/<int:pk>/goods_receipt/',GoodsReceipt.as_view(),name="goods_receipt"),
+
 ]
 
 htmx_urlpatterns = [

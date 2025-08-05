@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'operating/css/order_packing_list.css' %}" />
+  {% endblock %}
+  <div id="order_packing_list_page">
+    <h1>Order Packing List for Order <a href="{% url 'operating:order_detail' order.pk %}">#{{ order.pk }}</a></h1>
+    <h2>Client: {{ order.get_client }}</h2>
+    <p>Last updated date in here:</p>
+    <p>Number of more items to pack in here: </p>
+    <a href="{% url 'operating:export_packing_list_excel' order.pk %}" target="_blank"><p>Export to Excel</p></a>
+    
+
+    {% if packs %}
+      <table class="packing-list-table">
+        <thead>
+          <tr>
+            <th>Pack Number</th>
+            {% comment %} <th>Created At</th> {% endcomment %}
+            <th>Items in Pack</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pack in packs %}
+            <tr>
+              <td>{{ pack.pack_number }}</td>
+              {% comment %} <td>{{ pack.created_at|date:'Y-m-d H:i' }}</td> {% endcomment %}
+              <td>
+                <ul>
+                  {% for packed_item in pack.items.all %}
+                    <li>
+                      #{{ packed_item.order_item_unit.pk }} | {{packed_item.order_item_unit.order_item.display_name}}
+                      {% if packed_item.order_item_unit.order_item %}
+                        {% if packed_item.order_item_unit.order_item.description %}
+                          — {{ packed_item.order_item_unit.order_item.description }}
+                        {% endif %}
+                      {% endif %}
+                    </li>
+                  {% empty %}
+                    <li>No items in this pack.</li>
+                  {% endfor %}
+                </ul>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No packs for this order.</p>
+    {% endif %}
+  </div>
+{% endblock %}

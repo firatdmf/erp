@@ -3,7 +3,7 @@
     "model": "accounting.CashAccount",
     "pk": 1,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "CB",
       "currency": 1,
       "balance":0
@@ -13,7 +13,7 @@
     "model": "accounting.CashAccount",
     "pk": 2,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "CP",
       "currency": 1,
       "balance":0
@@ -23,7 +23,7 @@
     "model": "accounting.CashAccount",
     "pk": 3,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "IB-USD",
       "currency": 1,
       "balance":0
@@ -33,7 +33,7 @@
     "model": "accounting.CashAccount",
     "pk": 4,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "IB-EUR",
       "currency": 2,
       "balance":0
@@ -43,7 +43,7 @@
     "model": "accounting.CashAccount",
     "pk": 5,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "IB-TRY",
       "currency": 3,
       "balance":0
@@ -53,7 +53,7 @@
     "model": "accounting.CashAccount",
     "pk": 6,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "ZB",
       "currency": 3,
       "balance":0
@@ -63,7 +63,7 @@
     "model": "accounting.CashAccount",
     "pk": 7,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "AB",
       "currency": 3,
       "balance":0
@@ -73,7 +73,7 @@
     "model": "accounting.CashAccount",
     "pk": 8,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "EP",
       "currency": 3,
       "balance":0
@@ -83,7 +83,7 @@
     "model": "accounting.CashAccount",
     "pk": 9,
     "fields": {
-      "book": 2,
+      "book": 1,
       "name": "OnHand",
       "currency": 1,
       "balance":0

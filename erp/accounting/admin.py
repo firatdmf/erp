@@ -72,6 +72,8 @@ admin.site.register(AssetAccountsReceivable)
 admin.site.register(LiabilityAccountsPayable)
 admin.site.register(Invoice)
 admin.site.register(AssetInventoryRawMaterial)
+admin.site.register(RawGoodsReceiptItem)
+admin.site.register(RawGoodsReceipt)
 admin.site.register(AssetInventoryFinishedGood)
 
 admin.site.register(CurrencyExchange)

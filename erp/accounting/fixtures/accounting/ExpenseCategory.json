@@ -157,6 +157,13 @@
     "model": "accounting.ExpenseCategory",
     "pk": 23,
     "fields": {
+      "name": "COGS: Cost of Goods Sold"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 24,
+    "fields": {
       "name": "Other"
     }
   }

@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load accounting_tags %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'accounting/css/goods_receipt.css' %}" />
+{% endblock %}
+{% block content %}
+  {% if error_message %}
+    <p style="color:red;">{{ error_message }}</p>
+  {% elif message %}
+    <p style="color:teal;">{{ message }}</p>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+
+    <fieldset>
+      <legend>Receipt Info</legend>
+      {{ form.as_p }}
+    </fieldset>
+
+    <fieldset>
+      <legend>Received Items</legend>
+      {{ formset.management_form }}
+      {{ formset.non_form_errors }}
+
+      <table>
+        <thead>
+          <tr>
+            {% for field in formset.empty_form.visible_fields %}
+              <th>{{ field.label }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for form in formset.forms %}
+            <tr>
+              {% for field in form.visible_fields %}
+                <td>
+                  <span style="color:red;">{{ field.errors }}</span>
+                  {{ field }}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <button type="button" id="add-form">Add another item</button>
+    </fieldset>
+
+    <button type="submit">Submit</button>
+  </form>
+
+  <script>
+    const addFormBtn = document.getElementById('add-form')
+    const formsetTotal = document.querySelector('#id_receiveditem_set-TOTAL_FORMS')
+    const tbody = document.querySelector('tbody')
+    
+    const emptyFormRow = `
+                        <tr>
+                          {% for field in formset.empty_form.visible_fields %}
+                            <td>{{ field.as_widget|escapejs }}</td>
+                          {% endfor %}
+                        </tr>
+                      `
+    
+    addFormBtn.addEventListener('click', () => {
+      const newFormIdx = parseInt(formsetTotal.value)
+      const newRowHtml = emptyFormRow.replace(/__prefix__/g, newFormIdx)
+      const tempRow = document.createElement('tr')
+      tempRow.innerHTML = newRowHtml
+      tbody.appendChild(tempRow)
+      formsetTotal.value = newFormIdx + 1
+    })
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log('run this')
+      const paymentStatus = document.getElementById('id_payment_status');
+      const paymentTypeContainer = document.getElementById('id_cash_account').parentElement;
+    
+      function togglePaymentType() {
+        if (paymentStatus.checked) {
+          paymentTypeContainer.style.display = 'block'
+        } else {
+          paymentTypeContainer.style.display = 'none'
+          // Optionally clear the selection if unchecked
+          const paymentTypeField = paymentTypeContainer.querySelector('select')
+          if (paymentTypeField) {
+            paymentTypeField.value = ''
+          }
+        }
+      }
+    
+      paymentStatus.addEventListener('change', togglePaymentType)
+      togglePaymentType() // run on page load
+    })
+  </script>
+{% endblock %}

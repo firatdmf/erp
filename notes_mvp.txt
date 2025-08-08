@@ -83,5 +83,4 @@ when expenses etc adjusted manually, it might mess up the whole system.
 
 
 
-product and variant both should be unique 
-initialize currencies, expense categories, warehouse, accounting book
+product and variant sku s should be unique

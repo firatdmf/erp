@@ -1,0 +1,21 @@
+{% comment %} not in use partial {% endcomment %}
+{% load static %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'accounting/css/partials/asset_inventory_raw_material_suggestions.css' %}" />
+{% endblock %}
+{% block content %}
+  <div id="asset_inventory_raw_material_suggestions_partial">
+    {% if materials %}
+      <ul class="suggestion-list">
+        {% for name in materials %}
+          <li hx-get="" hx-swap="none" onclick="this.closest('td').querySelector('input').value = '{{ name }}'; this.parentElement.innerHTML = '';">{{ name }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="no-match">
+        <span>No match found.</span>
+        <button type="button" class="add-material-btn" onclick="openMaterialModal()">➕ Add "{{ query }}"</button>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

@@ -234,35 +234,102 @@ class AssetInventoryRawMaterialForm(forms.ModelForm):
             self.fields["book"].queryset = Book.objects.filter(pk=book.pk)
 
 
-class GoodsReceiptForm(forms.ModelForm):
+# below is for finished goods receipt
+
+class RawGoodsReceiptForm(forms.ModelForm):
     class Meta:
-        model = GoodsReceipt
+        model = RawGoodsReceipt
         fields = "__all__"
+        exclude = ["book"]
+        labels = {"payment_status": "Paid"}
         widgets = {
-            "book": forms.Select(
-                attrs={"disabled": "disabled"}
-            ),  # dropdown, but uneditable
+            # "book": forms.Select(
+            #     attrs={"disabled": "disabled"}
+            # ),  # dropdown, but uneditable
+            "date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        print("your book in the form is:", kwargs.get("book"))
+        book = kwargs.pop("book", None)
+        super(RawGoodsReceiptForm, self).__init__(*args, **kwargs)
+        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+
+        if book:
+            print("your book pk is 2,", book.pk)
+            self.initial["book"] = book.pk
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by("name")
+
+
+class RawGoodsReceiptItemForm(forms.ModelForm):
+    # artificial field to replace the original raw_material field (to implement dynamic dropdown selection from database)
+    # raw_material_name = forms.CharField(label="Raw Material")
+
+    class Meta:
+        model = RawGoodsReceiptItem
+        fields = "__all__"
+        
+        # exclude the original raw_material field
+        # exclude = ["raw_material"]
+
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     name = cleaned_data.get("raw_material_name")
+    #     try:
+    #         material = AssetInventoryRawMaterial.objects.get(name__iexact=name)
+    #     except AssetInventoryRawMaterial.DoesNotExist:
+    #         material = AssetInventoryRawMaterial.objects.create(name=name)
+    #     cleaned_data["raw_material"] = material
+    #     return cleaned_data
+
+
+RawGoodsReceiptItemFormSet = inlineformset_factory(
+    parent_model=RawGoodsReceipt,
+    model=RawGoodsReceiptItem,
+    form=RawGoodsReceiptItemForm,
+    extra=1,
+    can_delete=True,
+)
+
+
+# below is for finished goods receipt
+
+class FinishedGoodsReceiptForm(forms.ModelForm):
+    class Meta:
+        model = FinishedGoodsReceipt
+        fields = "__all__"
+        exclude = ["book"]
+        labels = {"payment_status": "Paid"}
+        widgets = {
+            # "book": forms.Select(
+            #     attrs={"disabled": "disabled"}
+            # ),  # dropdown, but uneditable
             "date": forms.DateInput(attrs={"type": "date"}),
         }
 
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
-        super(GoodsReceiptForm, self).__init__(*args, **kwargs)
+        super(FinishedGoodsReceiptForm, self).__init__(*args, **kwargs)
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+
         if book:
-            self.fields["book"].queryset = Book.objects.filter(pk=book.pk)
+            print("your book pk is 2,", book.pk)
+            self.initial["book"] = book.pk
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by("name")
 
 
-class GoodsReceiptItemForm(forms.ModelForm):
+class FinishedGoodsReceiptItemForm(forms.ModelForm):
+
     class Meta:
-        model = GoodsReceiptItem
+        model = FinishedGoodsReceiptItem
         fields = "__all__"
 
 
-GoodsReceiptItemFormSet = inlineformset_factory(
-    parent_model=GoodsReceipt,
-    model=GoodsReceiptItem,
-    form=GoodsReceiptItemForm,
+
+FinishedGoodsReceiptItemFormSet = inlineformset_factory(
+    parent_model=FinishedGoodsReceipt,
+    model=FinishedGoodsReceiptItem,
+    form=FinishedGoodsReceiptItemForm,
     extra=1,
     can_delete=True,
 )

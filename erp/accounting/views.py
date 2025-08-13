@@ -2,9 +2,9 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse
 
 # from django.views.generic import TemplateView
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views import View, generic
-from django.db import transaction
+from django.db import transaction, IntegrityError, DatabaseError, OperationalError
 
 # from operating.models import Product
 
@@ -24,18 +24,40 @@ from django.db.models import Sum
 from django.utils import timezone
 from datetime import timedelta
 import decimal
-import yfinance as yf
+
+# import yfinance as yf
 from decimal import Decimal
 import math
 import time
 from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.contenttypes.models import ContentType
+
+# add functions here
 
 
-def get_exchange_rate(self, from_currency, to_currency):
-    ticker = f"{from_currency}{to_currency}=X"
-    data = yf.Ticker(ticker)
-    exchange_rate = data.history(period="1d")["Close"][0]
-    return Decimal(exchange_rate)
+# def get_total_base_currency_balance():
+#     currency_categories = CurrencyCategory.objects.all()
+#     base_currency = get_base_currency()
+#     total = 0
+#     for currency_category in currency_categories:
+#         currency_cash_account = CashAccount.objects.filter(currency=currency_category)
+#         currency = currency_cash_account.currency
+#         balance = currency_cash_account.balance
+#         if currency != base_currency:
+#             rate = get_exchange_rate(currency.code, base_currency.code)
+#             converted_balance = 0
+#             if rate:
+#                 # quantize() method is used to round or format a decimal number to a specific number of decimal places while following a chosen rounding rule.
+#                 converted_balance = (balance * rate).quantize(Decimal("0.01"))
+#             total += converted_balance
+#     return total
+
+
+# def get_exchange_rate(self, from_currency, to_currency):
+#     ticker = f"{from_currency}{to_currency}=X"
+#     data = yf.Ticker(ticker)
+#     exchange_rate = data.history(period="1d")["Close"][0]
+#     return Decimal(exchange_rate)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -64,7 +86,12 @@ class CreateBook(generic.edit.CreateView):
 class BookDetail(generic.DetailView):
     model = Book
     template_name = "accounting/book_detail.html"
-    context_object_name = "Book"
+    context_object_name = "book"
+
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     context[""] =
+    #     return context
 
     def get_object(self):
         # Get the primary key from the URL
@@ -216,14 +243,6 @@ class AddStakeholderBook(generic.edit.CreateView):
     form_class = StakeholderBookForm
     template_name = "accounting/add_stakeholderbook.html"
 
-    # def get_form_kwargs(self):
-    #     kwargs = super().get_form_kwargs()
-    #     book_pk = self.kwargs.get('pk')
-    #     book = Book.objects.get(pk=book_pk)
-    #     print(book)
-    #     kwargs['book'] = [book_pk]
-    #     return kwargs
-
     # below preselected the book field of the capital model
     def get_initial(self):
         # Get the book by primary key from the URL
@@ -236,6 +255,55 @@ class AddStakeholderBook(generic.edit.CreateView):
         return reverse_lazy(
             "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
         )
+
+
+# ------------------------------------------------------------------------------------------------
+# equity functions:
+@transaction.atomic
+def handle_equity_transaction(
+    book, amount, currency, equity_instance, equity_pk, cash_account
+):
+    # 1 Add Transaction
+    # 2 Adjust Asset Cash
+    # 3 adjust cashaccount balance
+    print("your equity model is:", equity_instance)
+    is_amount_positive = True
+    # 1
+    cash_account = CashAccount.objects.get(pk=cash_account.pk)
+    if isinstance(equity_instance, (EquityCapital, EquityRevenue)):
+        cash_account.balance += amount
+        is_amount_positive = True
+    elif isinstance(equity_instance, (EquityExpense, EquityDivident)):
+        cash_account.balance -= amount
+        is_amount_positive = False
+    else:
+        raise ValidationError({"cash_account": "cash_account balance failed to update"})
+    cash_account.save(update_fields=["balance"])
+
+    # # 2
+    # asset_cash, created = AssetCash.objects.get_or_create(book=book, currency=currency)
+    # if created:
+    #     asset_cash.balance = 0
+    # asset_cash.balance += amount
+    # asset_cash.save(update_fields=["balance"])
+
+    # 3
+    content_type = ContentType.objects.get_for_model(equity_instance)
+    cash_transaction_entry = CashTransactionEntry.objects.create(
+        book=book,
+        content_type=content_type,
+        content_pk=equity_pk,
+        amount=amount,
+        is_amount_positive=is_amount_positive,
+        currency=currency,
+        cash_account=cash_account,
+        cash_account_balance=cash_account.balance,
+    )
+
+    return True
+
+
+# -------
 
 
 @method_decorator(login_required, name="dispatch")
@@ -259,113 +327,71 @@ class AddEquityCapital(generic.edit.CreateView):
         # Get the book by primary key from the URL
         book_pk = self.kwargs.get("pk")
         book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved
-        # below basically sets self.kwargs['book'] to the book object we retrieved
-        return {"book": book}
+        return {
+            "book": book,
+        }
 
-    # You do this because you want to manually do some process before saving the Equity Capital when the capital form is submitted.
-    def post(self, request, *args, **kwargs):
-        form = self.get_form()
-        if form.is_valid():
-            # 1 Add the transaction
-            # 2 add the cash to AssetCash
-            # 3 update balance on CashAccount
-            # 4 update stakeholder total shares
-            # 5 add EquityCapital
+    # revert back all db changes if any errors while in form_valid
+    @transaction.atomic
+    def form_valid(self, form):
 
-            # Setting up the variables from the form input
-            book_pk = self.kwargs.get("pk")
-            book = Book.objects.get(pk=book_pk)
-            transaction_value = form.cleaned_data.get("amount")
-            # transaction_currency = form.cleaned_data.get("currency")
-            deposited_cash_account = form.cleaned_data.get("cash_account")
-            deposited_cash_account = get_object_or_404(
-                CashAccount, pk=deposited_cash_account.pk
-            )
-            currency = deposited_cash_account.currency
+        # get the book pk from the url:
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
 
-            new_deposited_cash_account_balance = (
-                deposited_cash_account.balance + transaction_value
-            )
+        # get the capital amount from form post data
+        amount = form.cleaned_data.get("amount")
+        cash_account = form.cleaned_data.get("cash_account")
+        if not cash_account:
+            form.add_error("cash_account", "Please select a valid cash account.")
+            return self.form_invalid(form)
 
-            member = form.cleaned_data.get("member")
-            member = Member.objects.get(pk=member.pk)
-            new_shares_issued = form.cleaned_data.get("new_shares_issued")
+        # Set the currency to the deposited_cash_account's currency
+        currency = cash_account.currency
+
+        # Example: update stakeholder shares
+        member = form.cleaned_data["member"]
+        # a stakeholderbook object has a book and a member
+        try:
             stakeholderbook = StakeholderBook.objects.get(member=member, book=book)
+            stakeholderbook.shares += form.cleaned_data["new_shares_issued"]
+            stakeholderbook.save(update_fields=["shares"])
+        except ObjectDoesNotExist:
+            form.add_error("member", "Couldn't fetch the member properly")
+            return self.form_invalid(form)
 
-            # 1 adding the transaction transaction
-            # there could be possible errors here in the future.
-            transaction_type = "capital"
-            try:
-                latest_equity_capital_item = EquityCapital.objects.filter(
-                    book=book
-                ).latest("created_at")
-                type_pk = latest_equity_capital_item.pk + 1
-            except self.model.DoesNotExist:
-                type_pk = 1
+        # get the new created object (EquityCapital)
+        # form.save(commit=False) creates a model instance before saving it to the database
+        self.object = form.save(commit=False)
+        self.object.currency = currency
+        # now save to the database
+        self.object.save()
+        equity_pk = self.object.pk
+        equity_instance = self.object
+        result = handle_equity_transaction(
+            book, amount, currency, equity_instance, equity_pk, cash_account
+        )
+        if result is not True:
+            form.add_error(None, "Form error: in handle_equity_transaction function")
+            return self.form_invalid(form)
 
-            # 1 Creating the new transaction entry into the database
-            transaction = Transaction.objects.create(
-                book=book,
-                value=transaction_value,
-                currency=currency,
-                type=transaction_type,
-                type_pk=type_pk,
-                account=deposited_cash_account,
-                account_balance=new_deposited_cash_account_balance,
-            )
-
-            # ---------------------------------------------------------------
-            # 2 adding the cash to AssetCash
-            # Get the current balance inside the cash account
-            try:
-                asset_cash = AssetCash.objects.filter(
-                    book=book, currency=currency
-                ).latest("created_at")
-                asset_cash_balance = asset_cash.currency_balance
-            except ObjectDoesNotExist:
-                asset_cash_balance = 0
-
-            asset_cash_balance += transaction_value
-
-            new_asset_cash = AssetCash.objects.create(
-                book=book,
-                currency=currency,
-                amount=transaction_value,
-                transaction=transaction,
-                currency_balance=asset_cash_balance,
-            )
-            # ---------------------------------------------------------------
-            # 3 now updating cash balance on cash account
-
-            # get the current balance and add the transaction value to it
-            deposited_cash_account.balance = new_deposited_cash_account_balance
-            deposited_cash_account.save()
-
-            # new_asset = Asset.objects.create(book = self.kwargs.get('pk'), )
-
-            # ---------------------------------------------------------------
-            # 4 update stakeholder total shares
-            stakeholderbook.shares += new_shares_issued
-            stakeholderbook.save()
-            # ---------------------------------------------------------------
-            # 5 save the form
-            # create the form object but do not save yet
-            my_form = form.save(commit=False)
-            # submit the capital form currency input the same as the selected deposit account's currency
-            my_form.currency = currency
-            my_form.save()
-
-            # This method saves the form instance to the database and then redirects the user to a success URL.
-            return self.form_valid(form)
-        else:
-            for field in form:
-                print("Field Error:", field.name, field.errors)
+        # This method saves the form instance to the database and then redirects the user to a success URL.
+        return super().form_valid(form)
 
     def get_success_url(self) -> str:
-        return reverse_lazy(
+        return reverse(
             "accounting:add_equity_capital", kwargs={"pk": self.kwargs.get("pk")}
         )
+
+    # what happens when form validation fails
+    def form_invalid(self, form):
+        # Optionally log errors here
+        for field in form:
+            for error in field.errors:
+                print(f"Error in field {field.name}: {error}")
+        for error in form.non_field_errors():
+            print(f"Form error: {error}")
+        return super().form_invalid(form)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -388,105 +414,56 @@ class AddEquityRevenue(generic.edit.CreateView):
         book_pk = self.kwargs.get("pk")
         book = Book.objects.get(pk=book_pk)
         # Set the initial value of the book field to the book retrieved
-
         return {
             "book": book,
         }
 
-    # You do this because you want to manually do some process when the expense form is submitted.
-    def post(self, request, *args, **kwargs):
-        start_time = time.time()
+    # revert back all db changes if any errors while in form_valid
+    @transaction.atomic
+    def form_valid(self, form):
 
-        # return(HttpResponse("now get outta here!"))
-        # just kidding
+        # get the book pk from the url:
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # revenue amount
+        amount = form.cleaned_data.get("amount")
 
-        # let's get the form values first
-        form = self.get_form()
+        # Get the selected cash account from the form
+        cash_account = form.cleaned_data.get("cash_account")
+        if not cash_account:
+            form.add_error("cash_account", "Please select a valid cash account.")
+            return self.form_invalid(form)
+        # Set the currency to the deposited_cash_account's currency
+        currency = cash_account.currency
+        self.object = form.save(commit=False)
+        self.object.currency = currency
+        self.object.save()
+        equity_pk = self.object.pk
+        equity_instance = self.object
+        result = handle_equity_transaction(
+            book, amount, currency, equity_instance, equity_pk, cash_account
+        )
+        if result is not True:
+            form.add_error(None, "Form error: in handle_equity_transaction function")
+            return self.form_invalid(form)
 
-        if form.is_valid():
-            # Here is what we will do here
-            # 1 Create a Transaction model entry
-            # 2 Create a AssetCash model entry
-            # 3 Update the CashAccount balance
-            # 4 Create a EquityRevenue model entry
-
-            # Get the book id number from the kwargs
-            book_pk = self.kwargs.get("pk")
-            book = Book.objects.get(pk=book_pk)
-            # We need to find the of the last revenue item, because we need to know the pk of the next revenue item so we can put into transaction model entry as a reference
-
-            # Get the next pk in the EquityRevenue
-            try:
-                latest_revenue_item = EquityRevenue.objects.filter(book=book).latest(
-                    "pk"
-                )
-                type_pk = latest_revenue_item.pk + 1
-            except ObjectDoesNotExist:
-                type_pk = 1
-
-            revenue_amount = form.cleaned_data.get("amount")
-
-            # Get the selected cash account from the form
-            deposited_cash_account = form.cleaned_data.get("cash_account")
-            deposited_cash_account = CashAccount.objects.get(
-                pk=deposited_cash_account.pk
-            )
-            new_deposited_cash_account_balance = (
-                deposited_cash_account.balance + revenue_amount
-            )
-
-            # Set the currency to the deposited_cash_account's currency
-            currency = deposited_cash_account.currency
-            transaction_type = "revenue"
-            # 1 Creating the transaction entry
-            # You need error handling here.
-            transaction = Transaction(
-                book=book,
-                value=form.cleaned_data.get("amount"),
-                currency=currency,
-                type=transaction_type,
-                type_pk=type_pk,
-                account=deposited_cash_account,
-                account_balance=new_deposited_cash_account_balance,
-            )
-            transaction.save()
-
-            # 2 Add AssetCash object
-
-            new_asset_cash = AssetCash.objects.create(
-                book=book,
-                currency=currency,
-                amount=revenue_amount,
-                transaction=transaction,
-                currency_balance=new_deposited_cash_account_balance,
-            )
-
-            # 3
-            # Save the updated cash account
-            deposited_cash_account.balance = new_deposited_cash_account_balance
-            deposited_cash_account.save()
-
-            # 4 Saving the Equity Revenue entry
-            # Now you need to update the form instance before saving it
-            # Create the model instance but don't save it yet
-            my_form = form.save(commit=False)
-            # my_form.account_balance = target_cash_account.balance
-            # I handle this manually because I want to set the currency of the submitted revenue to be the same as the sent account's currency
-            my_form.currency = currency
-            my_form.save()
-            return self.form_valid(form)
-        else:
-            for field in form:
-                print("Field Error:", field.name, field.errors)
-
-    # This is probably redundant but it's ok to keep it
-    def form_invalid(self, form):
-        return self.render_to_response(self.get_context_data(form=form))
+        # This method saves the form instance to the database and then redirects the user to a success URL.
+        return super().form_valid(form)
 
     def get_success_url(self) -> str:
-        return reverse_lazy(
+        return reverse(
             "accounting:add_equity_revenue", kwargs={"pk": self.kwargs.get("pk")}
         )
+
+    # what happens when form validation fails
+    def form_invalid(self, form):
+        # Optionally log errors here
+        for field in form:
+            for error in field.errors:
+                print(f"Error in field {field.name}: {error}")
+        for error in form.non_field_errors():
+            print(f"Form error: {error}")
+        return super().form_invalid(form)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -513,97 +490,48 @@ class AddEquityExpense(generic.edit.CreateView):
         # By default make the currency US Dollars (which is 1)
         return {"book": book}
 
-    # You do this because you want to manually do some process when the expense form is submitted.
-    def post(self, request, *args, **kwargs):
-        # get the form object after the user hits submit
-        form = self.get_form()
-        # validate the form
-        print("helo my friend")
-        if form.is_valid():
-            # 1 Add Transaction
-            # 2 Add CashAsset
-            # 3 Update CashAccount
-            # 4 Add EquityExpense
+    @transaction.atomic
+    def form_valid(self, form):
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
 
-            book_pk = self.kwargs.get("pk")
-            book = Book.objects.get(pk=book_pk)
+        # expense amount
+        amount = form.cleaned_data.get("amount")
+        cash_account = form.cleaned_data.get("cash_account")
+        if not cash_account:
+            form.add_error("cash_account", "Please select a valid cash account.")
+            return self.form_invalid(form)
+            # Set the currency to the deposited_cash_account's currency
+        currency = cash_account.currency
+        self.object = form.save(commit=False)
+        self.object.currency = currency
+        self.object.save()
+        equity_pk = self.object.pk
+        equity_instance = self.object
+        result = handle_equity_transaction(
+            book, amount, currency, equity_instance, equity_pk, cash_account
+        )
+        if result is not True:
+            form.add_error(None, "Form error: in handle_equity_transaction function")
+            return self.form_invalid(form)
 
-            expense_amount = form.cleaned_data.get("amount")
-            withdrawn_cash_account = form.cleaned_data.get("cash_account")
-            withdrawn_cash_account = CashAccount.objects.get(
-                pk=withdrawn_cash_account.pk
-            )
-            new_withdrawn_cash_account_balance = (
-                withdrawn_cash_account.balance - expense_amount
-            )
-            currency = withdrawn_cash_account.currency
-            # print('withdrawn cash account currency is:', currency)
-            # return JsonResponse(currency, safe=False)
-            # return(HttpResponse(f"<p>withdrawn cash account currency is:, {currency}</p>"))
-
-            # 1 Add the transaction
-            # We are going to need this to find the next expense item's pk, and save in transaction entry
-            try:
-                latest_equity_expense_item = EquityExpense.objects.filter(
-                    book=book
-                ).latest("pk")
-                type_pk = latest_equity_expense_item.pk + 1
-            except ObjectDoesNotExist:
-                type_pk = 1
-
-            transaction_type = "expense"
-
-            transaction = Transaction(
-                book=book,
-                value=expense_amount,
-                currency=currency,
-                type=transaction_type,
-                account=withdrawn_cash_account,
-                type_pk=type_pk,
-                account_balance=new_withdrawn_cash_account_balance,
-            )
-            transaction.save()
-
-            # 2 Add AssetCash object
-            try:
-                latest_asset_cash_object = AssetCash.objects.filter(
-                    book=book, currency=currency
-                ).latest("pk")
-                currency_balance = latest_asset_cash_object.currency_balance
-                # currency_balance += expense_amount
-            except ObjectDoesNotExist:
-                currency_balance = 0
-
-            currency_balance -= expense_amount
-            new_asset_cash = AssetCash.objects.create(
-                book=book,
-                currency=currency,
-                amount=expense_amount,
-                transaction=transaction,
-                currency_balance=currency_balance,
-            )
-
-            # 3 Update the cash account object
-            withdrawn_cash_account.balance = new_withdrawn_cash_account_balance
-            withdrawn_cash_account.save()
-
-            # 4  Save the Equity Expense object
-            # Now you need to update the form instance before saving it
-            # Create the model instance but don't save it yet
-            my_form = form.save(commit=False)
-            my_form.currency = currency
-            my_form.save()
-            return self.form_valid(form)
-        else:
-            return HttpResponse(
-                "<h1>An error occured in the server. Please email howdy@nejum.com for technical support.</h1>"
-            )
-        return self.form_invalid(form)
+        # This method saves the form instance to the database and then redirects the user to a success URL.
+        return super().form_valid(form)
 
     def get_success_url(self) -> str:
-        return reverse_lazy(
+        return reverse(
             "accounting:add_equity_expense", kwargs={"pk": self.kwargs.get("pk")}
         )
+
+    # what happens when form validation fails
+    def form_invalid(self, form):
+        # Optionally log errors here
+        for field in form:
+            for error in field.errors:
+                print(f"Error in field {field.name}: {error}")
+        for error in form.non_field_errors():
+            print(f"Form error: {error}")
+        return super().form_invalid(form)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -628,91 +556,48 @@ class AddEquityDivident(generic.edit.CreateView):
         # Set the initial value of the book field to the book retrieved
         return {"book": book}
 
-    # You do this because you want to manually do some process when the expense form is submitted.
-    def post(self, request, *args, **kwargs):
+    @transaction.atomic
+    def form_valid(self, form):
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
 
-        form = self.get_form()
-        if form.is_valid():
-            # 1 Add Transaction
-            # 2 Add CashAsset
-            # 3 Update CashAccount
-            # 4 Add EquityExpense
+        # divident amount given to stakeholder
+        amount = form.cleaned_data.get("amount")
+        cash_account = form.cleaned_data.get("cash_account")
+        if not cash_account:
+            form.add_error("cash_account", "Please select a valid cash account.")
+            return self.form_invalid(form)
+            # Set the currency to the deposited_cash_account's currency
+        currency = cash_account.currency
+        self.object = form.save(commit=False)
+        self.object.currency = currency
+        self.object.save()
+        equity_pk = self.object.pk
+        equity_instance = self.object
+        result = handle_equity_transaction(
+            book, amount, currency, equity_instance, equity_pk, cash_account
+        )
+        if result is not True:
+            form.add_error(None, "Form error: in handle_equity_transaction function")
+            return self.form_invalid(form)
 
-            book_pk = self.kwargs.get("pk")
-            book = Book.objects.get(pk=book_pk)
-
-            # Set up the variables from the form
-            withdrawn_cash_account = form.cleaned_data.get("cash_account")
-            withdrawn_cash_account = CashAccount.objects.get(
-                pk=withdrawn_cash_account.pk
-            )
-            divident_amount = form.cleaned_data.get("amount")
-            member = form.cleaned_data.get("member")
-            member = Member.objects.get(pk=member.pk)
-            new_withdrawn_cash_account_balance = (
-                withdrawn_cash_account.balance - divident_amount
-            )
-            currency = withdrawn_cash_account.currency
-
-            # 1 Add Transaction
-
-            # Getting the next EquityDivident object's pk
-            try:
-                latest_equity_expense_item = EquityDivident.objects.filter(
-                    book=book
-                ).latest("pk")
-                type_pk = latest_equity_expense_item.pk + 1
-            except ObjectDoesNotExist:
-                type_pk = 1
-
-            transaction_type = "divident"
-
-            transaction = Transaction(
-                book=book,
-                value=divident_amount,
-                currency=currency,
-                type=transaction_type,
-                account=withdrawn_cash_account,
-                type_pk=type_pk,
-                account_balance=new_withdrawn_cash_account_balance,
-            )
-            transaction.save()
-
-            # 2 Substract CashAsset
-            try:
-                latest_asset_cash_object = AssetCash.objects.filter(
-                    book=book, currency=currency
-                ).latest("pk")
-                currency_balance = latest_asset_cash_object.currency_balance
-                # currency_balance += expense_amount
-            except ObjectDoesNotExist:
-                currency_balance = 0
-
-            currency_balance -= divident_amount
-            new_asset_cash = AssetCash.objects.create(
-                book=book,
-                currency=currency,
-                amount=divident_amount,
-                transaction=transaction,
-                currency_balance=currency_balance,
-            )
-
-            # 3 Update the balance of the cash account
-            # Save the updated cash account
-            withdrawn_cash_account.balance = new_withdrawn_cash_account_balance
-            withdrawn_cash_account.save()
-
-            # Now you need to update the form instance before saving it
-            # Create the model instance but don't save it yet
-            my_form = form.save(commit=False)
-            my_form.currency = currency
-            my_form.save()
-            return self.form_valid(form)
+        # This method saves the form instance to the database and then redirects the user to a success URL.
+        return super().form_valid(form)
 
     def get_success_url(self) -> str:
-        return reverse_lazy(
+        return reverse(
             "accounting:add_equity_divident", kwargs={"pk": self.kwargs.get("pk")}
         )
+
+    # what happens when form validation fails
+    def form_invalid(self, form):
+        # Optionally log errors here
+        for field in form:
+            for error in field.errors:
+                print(f"Error in field {field.name}: {error}")
+        for error in form.non_field_errors():
+            print(f"Form error: {error}")
+        return super().form_invalid(form)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -787,15 +672,18 @@ class EquityExpenseList(generic.ListView):
 
 
 @method_decorator(login_required, name="dispatch")
-class TransactionList(generic.ListView):
-    model = Transaction
-    template_name = "accounting/transaction_list.html"
+class CashTransactionEntryList(generic.ListView):
+    model = CashTransactionEntry
+    template_name = "accounting/cash_transaction_entry_list.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["base_currency_symbol"] = str(get_base_currency().symbol)
+        return context
 
     def get_queryset(self):
         book_pk = self.kwargs.get("pk")
-        return Transaction.objects.filter(book=book_pk)
-        # return Transaction.objects.filter(book=book_pk).select_related('book', 'account').prefetch_related('related_model_name')
-        # return super().get_queryset()
+        return CashTransactionEntry.objects.filter(book=book_pk)
 
 
 # @method_decorator(login_required, name='dispatch')
@@ -845,14 +733,10 @@ class TransactionList(generic.ListView):
 
 
 @method_decorator(login_required, name="dispatch")
-class MakeInTransfer(generic.edit.FormView):
+class MakeInTransfer(generic.edit.CreateView):
+    model = InTransfer
     form_class = InTransferForm
     template_name = "accounting/make_in_transfer.html"
-
-    def get_success_url(self) -> str:
-        return reverse_lazy(
-            "accounting:make_in_transfer", kwargs={"pk": self.kwargs.get("pk")}
-        )
 
     # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
     def get_form_kwargs(self):
@@ -862,45 +746,82 @@ class MakeInTransfer(generic.edit.FormView):
         kwargs["book"] = book
         return kwargs
 
+    # below preselected the book field of the capital model (independent of the above function)
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        return {"book": book}
+
+    @transaction.atomic
     def form_valid(self, form):
         # Process the form data
+        # get the book pk from the url:
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # transfer amount
         amount = form.cleaned_data["amount"]
-        date = form.cleaned_data["date"]
+
         from_cash_account = form.cleaned_data["from_cash_account"]
-        from_cash_account = CashAccount.objects.get(pk=from_cash_account.pk)
-        from_cash_account_new_balance = from_cash_account.balance - amount
-        from_cash_account.balance = from_cash_account_new_balance
-        from_cash_account.save()
-
-        transaction1 = Transaction(
-            book=from_cash_account.book,
-            value=amount,
-            currency=from_cash_account.currency,
-            type="transfer",
-            account=from_cash_account,
-            type_pk=None,
-            account_balance=from_cash_account_new_balance,
-        )
-        transaction1.save()
-        print(f"from cash account is: {from_cash_account}")
         to_cash_account = form.cleaned_data["to_cash_account"]
-        to_cash_account = CashAccount.objects.get(pk=to_cash_account.pk)
-        to_cash_account_new_balance = to_cash_account.balance + amount
-        to_cash_account.balance = to_cash_account_new_balance
-        to_cash_account.save()
+        if not from_cash_account or not to_cash_account:
+            form.add_error(
+                "Cash Account",
+                "Please select a valid cash accounts for the in transfer.",
+            )
+            return self.form_invalid(form)
+        # from_cash_account = CashAccount.objects.get(pk=from_cash_account.pk)
 
-        transaction2 = Transaction(
-            book=to_cash_account.book,
-            value=amount,
-            currency=to_cash_account.currency,
-            type="transfer",
-            account=to_cash_account,
-            type_pk=None,
-            account_balance=to_cash_account_new_balance,
+        from_cash_account.balance -= amount
+        from_cash_account.save(update_fields=["balance"])
+
+        to_cash_account.balance += amount
+        to_cash_account.save(update_fields=["balance"])
+
+        self.object = form.save(commit=False)
+        self.object.currency = from_cash_account.currency
+        self.object = form.save()
+
+        content_instance = self.object
+        content_pk = self.object.pk
+        content_type = ContentType.objects.get_for_model(content_instance)
+
+        from_cash_account_transaction_entry = CashTransactionEntry.objects.create(
+            book=book,
+            content_type=content_type,
+            content_pk=content_pk,
+            amount=amount,
+            is_amount_positive=False,
+            currency=from_cash_account.currency,
+            cash_account=from_cash_account,
         )
-        transaction2.save()
-        # Add your processing logic here
+
+        to_cash_account_transaction_entry = CashTransactionEntry.objects.create(
+            book=book,
+            content_type=content_type,
+            content_pk=content_pk,
+            amount=amount,
+            is_amount_positive=True,
+            currency=to_cash_account.currency,
+            cash_account=to_cash_account,
+        )
+        # cash_transaction_entry_2.save()
         return super().form_valid(form)
+
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:make_in_transfer", kwargs={"pk": self.kwargs.get("pk")}
+        )
+
+    def form_invalid(self, form):
+        # Optionally log errors here
+        for field in form:
+            for error in field.errors:
+                print(f"Error in field {field.name}: {error}")
+        for error in form.non_field_errors():
+            print(f"Form error: {error}")
+        return super().form_invalid(form)
 
 
 @method_decorator(login_required, name="dispatch")
@@ -929,46 +850,48 @@ class MakeCurrencyExchange(generic.edit.FormView):
         # Set the initial value of the book field to the book retrieved, and currency to usd
         return {"book": book}
 
+    @transaction.atomic
     def form_valid(self, form):
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
         # Process the form data
         from_amount = form.cleaned_data["from_amount"]
         to_amount = form.cleaned_data["to_amount"]
-        # currency_rate = form.cleaned_data["currency_rate"]
-        # converted_amount = currency_rate * amount
-        date = form.cleaned_data["date"]
+
         from_cash_account = form.cleaned_data["from_cash_account"]
-        from_cash_account = CashAccount.objects.get(pk=from_cash_account.pk)
-        from_cash_account_new_balance = from_cash_account.balance - from_amount
-        from_cash_account.balance = from_cash_account_new_balance
-        from_cash_account.save()
+        from_cash_account.balance -= from_amount
+        from_cash_account.save(update_fields=["balance"])
 
-        transaction1 = Transaction(
-            book=from_cash_account.book,
-            value=from_amount,
-            currency=from_cash_account.currency,
-            type="exchange",
-            account=from_cash_account,
-            type_pk=None,
-            account_balance=from_cash_account_new_balance,
-        )
-        transaction1.save()
-        print(f"from cash account is: {from_cash_account}")
         to_cash_account = form.cleaned_data["to_cash_account"]
-        to_cash_account = CashAccount.objects.get(pk=to_cash_account.pk)
-        to_cash_account_new_balance = to_cash_account.balance + to_amount
-        to_cash_account.balance = to_cash_account_new_balance
-        to_cash_account.save()
+        to_cash_account.balance += to_amount
+        to_cash_account.save(update_fields=["balance"])
 
-        transaction2 = Transaction(
-            book=to_cash_account.book,
-            value=to_amount,
-            currency=to_cash_account.currency,
-            type="exchange",
-            account=to_cash_account,
-            type_pk=None,
-            account_balance=to_cash_account_new_balance,
+        self.object = form.save()
+
+        content_instance = self.object
+        content_pk = self.object.pk
+        content_type = ContentType.objects.get_for_model(content_instance)
+
+        from_cash_account_transaction_entry = CashTransactionEntry.objects.create(
+            book=book,
+            content_type=content_type,
+            content_pk=content_pk,
+            amount=from_amount,
+            is_amount_positive=False,
+            currency=from_cash_account.currency,
+            cash_account=from_cash_account,
         )
-        transaction2.save()
+
+        to_cash_account_transaction_entry = CashTransactionEntry.objects.create(
+            book=book,
+            content_type=content_type,
+            content_pk=content_pk,
+            amount=to_amount,
+            is_amount_positive=True,
+            currency=to_cash_account.currency,
+            cash_account=to_cash_account,
+        )
+
         # Add your processing logic here
         return super().form_valid(form)
 
@@ -1051,7 +974,7 @@ class RawGoodsReceipt(View):
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-                    # Process the form and formset data
+                    # tz the form and formset data
                     # Save the raw goods receipt and items
                     raw_goods_receipt = form.save(commit=False)
                     raw_goods_receipt.book = book
@@ -1074,20 +997,24 @@ class RawGoodsReceipt(View):
                         )
                         cash_account.balance = new_cash_account_balance
                         cash_account.save(update_fields=["balance"])
-                        transaction_object = Transaction.objects.create(
-                            book=book,
-                            value=receipt_total_cost,
-                            type="purchase",
-                            account=cash_account,
-                            account_balance=cash_account.balance,
+                        CashTransactionEntry_object = (
+                            CashTransactionEntry.objects.create(
+                                book=book,
+                                value=receipt_total_cost,
+                                is_amount_positive=False,
+                                type="purchase",
+                                account=cash_account,
+                                account_balance=cash_account.balance,
+                            )
                         )
-                        transaction_object.save()
+                        CashTransactionEntry_object.save()
                     else:
 
                         liability_accounts_payable = LiabilityAccountsPayable.objects.create(
                             supplier=raw_goods_receipt.supplier,
                             book=book,
                             amount=receipt_total_cost,
+                            is_amount_positive=False,
                             raw_goods_receipt=raw_goods_receipt,
                             # invoice
                             # currency=raw_goods_receipt.currency,
@@ -1175,19 +1102,23 @@ class FinishedGoodsReceipt(View):
                         )
                         cash_account.balance = new_cash_account_balance
                         cash_account.save(update_fields=["balance"])
-                        transaction_object = Transaction.objects.create(
-                            book=book,
-                            value=receipt_total_cost,
-                            type="purchase",
-                            account=cash_account,
-                            account_balance=cash_account.balance,
+                        CashTransactionEntry_object = (
+                            CashTransactionEntry.objects.create(
+                                book=book,
+                                value=receipt_total_cost,
+                                is_amount_positive=False,
+                                type="purchase",
+                                account=cash_account,
+                                account_balance=cash_account.balance,
+                            )
                         )
-                        transaction_object.save()
+                        CashTransactionEntry_object.save()
                     else:
                         liability_accounts_payable = LiabilityAccountsPayable.objects.create(
                             supplier=finished_goods_receipt.supplier,
                             book=book,
                             amount=receipt_total_cost,
+                            is_amount_positive=False,
                             finished_goods_receipt=finished_goods_receipt,
                             # invoice
                             # currency=raw_goods_receipt.currency,

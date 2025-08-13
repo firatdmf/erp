@@ -72,7 +72,7 @@ class EquityCapitalForm(forms.ModelForm):
             members = StakeholderBook.objects.filter(book=book).values_list(
                 "member", flat=True
             )
-            self.fields["member"].queryset = Member.objects.filter(id__in=members)
+            self.fields["member"].queryset = Member.objects.filter(pk__in=members)
 
             # Get the cash accounts assigned to the book
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
@@ -88,7 +88,7 @@ class EquityRevenueForm(forms.ModelForm):
             "date": forms.DateInput(attrs={"type": "date"}),
             "book": forms.HiddenInput(),
             "currency": forms.HiddenInput(),
-            "invoice_number": forms.HiddenInput(),
+            # "invoice_number": forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -157,24 +157,22 @@ class EquityDividentForm(forms.ModelForm):
             self.fields["member"].queryset = Member.objects.filter(id__in=members)
 
 
-class InTransferForm(forms.Form):
-    from_cash_account = forms.ModelChoiceField(
-        queryset=CashAccount.objects.filter(), empty_label="Select a cash account"
-    )
-    to_cash_account = forms.ModelChoiceField(
-        queryset=CashAccount.objects.all(), empty_label="Select a cash account"
-    )
-    amount = forms.DecimalField(
-        max_digits=10, decimal_places=2, min_value=0.01
-    )  # Allow decimal quantities
-    date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date"}), initial=date.today()
-    )
+class InTransferForm(forms.ModelForm):
+    class Meta:
+        model = InTransfer
+        fields = "__all__"
+        # exclude = ["currency"]
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}),
+            "book": forms.HiddenInput(),
+            "currency": forms.HiddenInput(),
+        }
 
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
         super(InTransferForm, self).__init__(*args, **kwargs)
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # self.fields["currency"].value = 
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
             self.fields["from_cash_account"].queryset = CashAccount.objects.filter(
@@ -183,7 +181,7 @@ class InTransferForm(forms.Form):
             self.fields["to_cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).order_by("name")
-            # self.fields["book"].queryset = Book.objects.filter(book=book)
+
 
 
 class CurrencyExchangeForm(forms.ModelForm):
@@ -236,6 +234,7 @@ class AssetInventoryRawMaterialForm(forms.ModelForm):
 
 # below is for finished goods receipt
 
+
 class RawGoodsReceiptForm(forms.ModelForm):
     class Meta:
         model = RawGoodsReceipt
@@ -258,7 +257,9 @@ class RawGoodsReceiptForm(forms.ModelForm):
         if book:
             print("your book pk is 2,", book.pk)
             self.initial["book"] = book.pk
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by("name")
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(
+                book=book
+            ).order_by("name")
 
 
 class RawGoodsReceiptItemForm(forms.ModelForm):
@@ -268,7 +269,7 @@ class RawGoodsReceiptItemForm(forms.ModelForm):
     class Meta:
         model = RawGoodsReceiptItem
         fields = "__all__"
-        
+
         # exclude the original raw_material field
         # exclude = ["raw_material"]
 
@@ -294,6 +295,7 @@ RawGoodsReceiptItemFormSet = inlineformset_factory(
 
 # below is for finished goods receipt
 
+
 class FinishedGoodsReceiptForm(forms.ModelForm):
     class Meta:
         model = FinishedGoodsReceipt
@@ -315,7 +317,9 @@ class FinishedGoodsReceiptForm(forms.ModelForm):
         if book:
             print("your book pk is 2,", book.pk)
             self.initial["book"] = book.pk
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(book=book).order_by("name")
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(
+                book=book
+            ).order_by("name")
 
 
 class FinishedGoodsReceiptItemForm(forms.ModelForm):
@@ -323,7 +327,6 @@ class FinishedGoodsReceiptItemForm(forms.ModelForm):
     class Meta:
         model = FinishedGoodsReceiptItem
         fields = "__all__"
-
 
 
 FinishedGoodsReceiptItemFormSet = inlineformset_factory(

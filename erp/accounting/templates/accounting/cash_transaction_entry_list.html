@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+  {% load static %}
+  {% load accounting_tags %}
+  {% block css %}
+    <link rel="stylesheet" href="{% static 'accounting/css/cash_transaction_entry_list.css' %}" />
+  {% endblock %}
+
+  <div class="cash_transaction_entry_list_page">
+    <h1>Transaction Table</h1>
+    <table>
+      <tr>
+        <th>Transaction #</th>
+        {% comment %} <th>Transaction #</th> {% endcomment %}
+        <th>Date</th>
+        {% comment %} <th>Currency</th> {% endcomment %}
+        <th>Amount</th>
+        <th>Content Type</th>
+        <th>Content Type #</th>
+        <th>Account</th>
+        <th>Account Balance</th>
+        <th>Total Balance in {{base_currency_symbol}} </th>
+        {% comment %} <th>Total Balance</th> {% endcomment %}
+      </tr>
+
+      {% for transaction in object_list|dictsortreversed:'pk'|dictsortreversed:'created_at' %}
+        <tr>
+          <td>{{ transaction.pk }}</td>
+
+          {% comment %} <td>2</td> {% endcomment %}
+          <td>{{ transaction.created_at }}</td>
+          {% comment %} <td>{{ expense.currency }}</td> {% endcomment %}
+          
+          {% if transaction.is_amount_positive or  transaction.content_type.model == 'equitycapital' or transaction.content_type.model == 'equityrevenue'%}
+          {% comment %} {% if transaction.is_amount_positive  %} {% endcomment %}
+            <td style="color:green;">{{ transaction.currency.symbol }}{{ transaction.amount|format_money }}</td>
+          {% elif not transaction.is_amount_positive or transaction.content_type.model == 'equityexpense' or transaction.content_type.model == 'equitydivident' %}
+          {% comment %} {% elif not transaction.is_amount_positive %} {% endcomment %}
+            <td style="color:red;">{{ transaction.currency.symbol }}{{ transaction.amount|format_money }}</td>
+          {% else %}
+            <td>{{ transaction.currency.symbol }}{{ transaction.amount|format_money }}</td>
+          {% endif %}
+          <td>{{ transaction.content_type }}</td>
+          <td>{{ transaction.content_pk }}</td>
+          <td>{{ transaction.cash_account.name }}</td>
+          <td>{{ transaction.cash_account.currency.symbol }}{{ transaction.cash_account_balance|format_money }}</td>
+          <td>{{ base_currency_symbol }}{{ transaction.total_base_currency_balance }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td>N/A</td>
+          {% comment %} <td>N/A</td> {% endcomment %}
+          <td>N/A</td>
+          <td>N/A</td>
+          {% comment %} <td>N/A</td> {% endcomment %}
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+          <td>N/A</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endblock %}

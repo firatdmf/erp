@@ -12,12 +12,15 @@
   <p>
     <b>Book:</b> {{ Book.name }}
   </p>
-  {% if Stakeholders %}
-    <p>
-      <b>The Stakeholders:</b> {% for Stakeholder in Stakeholders %}
-        <span class="underline">{{ Stakeholder.member.user.first_name }} {{ Stakeholder.member.user.last_name }}</span>, 
+  {% if book.stakeholders %}
+    <ul>
+      <b>The Stakeholders:</b>
+      {% for stakeholder in book.stakeholders.all %}
+        <li>
+          <span class="underline">{{ stakeholder.member.user.first_name }} {{ Stakeholder.member.user.last_name }}</span>
+        </li>
       {% endfor %}
-    </p>
+    </ul>
   {% else %}
     <p>There are no stakeholders at this company.</p>
   {% endif %}
@@ -36,37 +39,37 @@
 
   <ul>
     <li>
-      <a href="{% url 'accounting:add_stakeholderbook' Book.id %}">Add Stakeholder</a>
+      <a href="{% url 'accounting:add_stakeholderbook' book.id %}">Add Stakeholder</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_equity_capital' Book.id %}">Add Capital</a>
+      <a href="{% url 'accounting:add_equity_capital' book.id %}">Add Capital</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_equity_revenue' Book.id %}">Add Revenue</a>
+      <a href="{% url 'accounting:add_equity_revenue' book.id %}">Add Revenue</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_equity_expense' Book.id %}">Add Expense</a>
+      <a href="{% url 'accounting:add_equity_expense' book.id %}">Add Expense</a>
     </li>
     <li>
-      <a href="{% url 'accounting:equity_expense_list' Book.id %}">See Expenses</a>
+      <a href="{% url 'accounting:equity_expense_list' book.id %}">See Expenses</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_equity_divident' Book.id %}">Pay Divident</a>
+      <a href="{% url 'accounting:add_equity_divident' book.id %}">Pay Divident</a>
     </li>
     <li>
-      <a href="{% url 'accounting:make_in_transfer' Book.id %}">Make in Transfer</a>
+      <a href="{% url 'accounting:make_in_transfer' book.id %}">Make in Transfer</a>
     </li>
     <li>
-      <a href="{% url 'accounting:make_currency_exchange' Book.id %}">Make Currency Exchange</a>
+      <a href="{% url 'accounting:make_currency_exchange' book.id %}">Make Currency Exchange</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_accounts_receivable' Book.id %}">Add Accounts Receivable</a>
+      <a href="{% url 'accounting:add_accounts_receivable' book.id %}">Add Accounts Receivable</a>
     </li>
     <li>
-      <a href="{% url 'accounting:add_accounts_payable' Book.id %}">Add Accounts Payable</a>
+      <a href="{% url 'accounting:add_accounts_payable' book.id %}">Add Accounts Payable</a>
     </li>
     <li>
-      <a href="{% url 'accounting:transaction_list' Book.id %}">See all Transactions</a>
+      <a href="{% url 'accounting:cash_transaction_entry_list' book.id %}">See all Transactions</a>
     </li>
   </ul>
 

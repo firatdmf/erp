@@ -14,7 +14,7 @@ admin.site.register(EquityExpense)
 admin.site.register(EquityRevenue)
 admin.site.register(EquityCapital)
 admin.site.register(EquityDivident)
-admin.site.register(Transaction)
+admin.site.register(CashTransactionEntry)
 
 
 # Register your models here.
@@ -55,7 +55,7 @@ class BookAdmin(admin.ModelAdmin):
 admin.site.register(Book, BookAdmin)
 # admin.site.register(StakeholderBook)
 # -----------------------------------------------------------------------------------------------------
-# admin.site.register(AssetCash)
+admin.site.register(AssetCash)
 
 @admin.register(CashAccount)
 class CashAccountAdmin(admin.ModelAdmin):
@@ -63,14 +63,14 @@ class CashAccountAdmin(admin.ModelAdmin):
     search_fields = ('name', 'book__name')
 
 
-@admin.register(AssetCash)
-class AssetCashAdmin(admin.ModelAdmin):
-    list_display = ('book','currency','amount','currency_balance')
-    search_fields =  ('currency__name','currency__code','currency__symbol','book__name')
+# @admin.register(AssetCash)
+# class AssetCashAdmin(admin.ModelAdmin):
+#     list_display = ('book','currency','amount','currency_balance')
+#     search_fields =  ('currency__name','currency__code','currency__symbol','book__name')
 
 admin.site.register(AssetAccountsReceivable)
 admin.site.register(LiabilityAccountsPayable)
-admin.site.register(Invoice)
+# admin.site.register(Invoice)
 admin.site.register(AssetInventoryRawMaterial)
 admin.site.register(RawGoodsReceiptItem)
 admin.site.register(RawGoodsReceipt)

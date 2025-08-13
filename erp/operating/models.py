@@ -1,14 +1,50 @@
 import traceback
 from django.db import models
 from crm.models import Contact, Company
+from accounting.models import Book
 from marketing.models import Product, ProductVariant
 from django.core.exceptions import ValidationError
+
 # from accounting.models import AssetInventoryRawMaterial
 # uuid is used to generate unique identifiers for models.
 import uuid
 
 # below is to assign api_keys to machines
 import secrets
+
+
+class FinishedGood(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateField(blank=True, null=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        blank=False,
+        null=False,
+        related_name="finished_goods",
+    )
+    product_variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="finished_goods",
+    )
+    warehouse = models.ForeignKey(
+        "Warehouse", on_delete=models.RESTRICT, blank=True, null=True, related_name="finished_goods"
+    )
+
+class WorkInProgressGood(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateField(blank=True, null=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="wip_goods")
+    product_variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, blank=True, null=True, related_name="wip_goods")
+    order = models.ForeignKey("Order", on_delete=models.CASCADE, related_name="wip_goods")
+
+
+
 
 STATUS_CHOICES = [
     ("pending", "Pending"),
@@ -176,6 +212,7 @@ class OrderItemUnit(models.Model):
         super().save(*args, **kwargs)
 
 
+# not used yet
 class Production(models.Model):
     order = models.ForeignKey(
         Order, related_name="production", on_delete=models.CASCADE
@@ -197,6 +234,7 @@ class Warehouse(models.Model):
 
 
 # A machine is a physical or virtual device that performs tasks in a workstation.
+# not used yet
 class Machine(models.Model):
     name = models.CharField(max_length=150, unique=True)
     # maximum revolutions per minute
@@ -209,6 +247,7 @@ class Machine(models.Model):
     )
 
 
+# not used yet
 class MachineCredential(models.Model):
     name = models.CharField(max_length=150, unique=True)
     api_key = models.CharField(max_length=64, unique=True, editable=False)
@@ -221,6 +260,9 @@ class MachineCredential(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# Below is for packing
 
 
 class Pack(models.Model):

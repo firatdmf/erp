@@ -1,20 +1,82 @@
-from django.db import models
+from django.db import models, transaction
 from crm.models import Company, Contact
 from authentication.models import Member
 
 # from operating.models import Product
 from django.utils import timezone
+from decimal import Decimal
 from datetime import timedelta
 from crm.models import Supplier
-from operating.models import Order, Warehouse
+
+from django.conf import settings
 
 # from marketing.models import Product
 from django.core.exceptions import ValidationError
 
+# below two are for to make one model to point to different types of models.
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+
 # Create your functions here.
 
 
+def get_base_currency():
+    BASE_CURRENCY_CODE = getattr(
+        settings, "BASE_CURRENCY_CODE", "USD"
+    )  # if default currency is not defined in settings.py then set it to USD
+    currency_category, created = CurrencyCategory.objects.get_or_create(
+        code=BASE_CURRENCY_CODE
+    )
+    return currency_category
+
+
 # Define a function to calculate the default due date for the invoices
+
+
+from django.db.models import Sum
+from decimal import Decimal
+
+
+# def get_total_base_currency_balance():
+#     base_currency = get_base_currency()
+#     total_in_base = Decimal("0.00")
+
+#     # Sum all cash accounts already in the base currency
+#     base_currency_accounts = CashAccount.objects.filter(currency=base_currency)
+#     base_currency_total = base_currency_accounts.aggregate(Sum("balance"))[
+#         "balance__sum"
+#     ] or Decimal("0.00")
+#     total_in_base += base_currency_total
+
+#     # Get a list of all non-base currency accounts
+#     other_currency_accounts = CashAccount.objects.exclude(currency=base_currency)
+#     for account in other_currency_accounts:
+#         rate = get_exchange_rate(account.currency.code, base_currency.code)
+#         if rate:
+#             converted_balance = (account.balance * rate).quantize(Decimal("0.01"))
+#             total_in_base += converted_balance
+
+#     return total_in_base
+
+
+def allowed_equity_models():
+    # When filtering ContentType, use the lowercase model_name
+    allowed_models = [
+        "equitycapital",
+        "equityrevenue",
+        "equityexpense",
+        "equitydivident",
+        # "intransfer",
+        # "currencyexchange",
+    ]
+    # allowed_cts = ContentType.objects.filter(model__in=allowed_models)
+    return {
+        "pk__in": ContentType.objects.filter(model__in=allowed_models).values_list(
+            "pk", flat=True
+        )
+    }
+
+
 def default_due_date():
     return timezone.now() + timedelta(days=15)
 
@@ -39,6 +101,20 @@ def invoice_items_default():
 # Create your models here.
 
 
+# Fetch currency rates daily via services.py (runs when we save a CashTransactionEntry)
+class CurrencyExchangeRate(models.Model):
+    from_currency = models.CharField(max_length=3)  # e.g. 'USD'
+    to_currency = models.CharField(max_length=3)  # e.g. 'EUR'
+    rate = models.DecimalField(max_digits=20, decimal_places=6)
+    date = models.DateField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("from_currency", "to_currency", "date")
+
+    def __str__(self):
+        return f"1 {self.from_currency} = {self.rate} {self.to_currency} on {self.date}"
+
+
 # The books is to keep the separate entities apart for accounting, and operating purposes. Each business division can have its own book, and the accounting is done separately for each book.
 class Book(models.Model):
     # Saving when the book was created
@@ -58,7 +134,9 @@ class StakeholderBook(models.Model):
     # A stakeholder has to be a member (An employee or a partner that is registered in the system, and has a user account)
     member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True)
     # This is how you link the book to the stakeholder.
-    book = models.ForeignKey("Book", on_delete=models.CASCADE)
+    book = models.ForeignKey(
+        "Book", on_delete=models.CASCADE, related_name="stakeholders"
+    )
     # This is the percentage of equity the stakeholder has in the book. (This is used to calculate the equity capital)
     shares = models.PositiveIntegerField(default=0)
 
@@ -86,66 +164,31 @@ class CurrencyCategory(models.Model):
         verbose_name_plural = "Currency Categories"
 
 
-# I do not think you need this model anymore. but might use it later.
-class Invoice(models.Model):
-    INVOICE_TYPE_CHOICES = [("proforma", "Proforma"), ("commercial", "Commercial")]
-    created_at = models.DateTimeField(auto_now_add=True)
-    # Pass the function itself. Otherwise, If you put paranthesis after the function name, django would run it once, and set it as default for all the new objects you create in future.
-    due_date = models.DateTimeField(default=default_due_date)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    currency = models.ForeignKey(CurrencyCategory, on_delete=models.PROTECT)
-    contact = models.ForeignKey(
-        Contact, on_delete=models.CASCADE, blank=True, null=True
-    )
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, blank=True, null=True
-    )
-    # items = models.JSONField("ItemsInfo", default=invoice_items_default)
-    order = models.OneToOneField(
-        Order, on_delete=models.RESTRICT, blank=True, null=False, primary_key=True
-    )
-    # invoice_details = models.JSONField(_(""), encoder=, decoder=)
-    invoice_type = models.CharField(
-        max_length=20, default="proforma", choices=INVOICE_TYPE_CHOICES
-    )
-    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    # AssetAccountsReceivable = models.ForeignKey(AssetAccountsReceivable)
-
-    @property
-    def balance(self):
-        return self.total - self.paid
-
-    @property
-    def client(self):
-        return self.contact or self.company
-
-    def __str__(self):
-        return f"Invoice {self.pk} - {self.invoice_type}"
-
-
 # Create cash model here, all cash transactions will be listed here.
+# I do not think I need this model anymore
 class AssetCash(models.Model):
     class Meta:
         verbose_name_plural = "Asset Cash"
+        # ensuring there are no duplicate book and currency entries
+        unique_together = ("book", "currency")
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     currency = models.ForeignKey(
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False
     )
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    transaction = models.ForeignKey(
-        "Transaction", on_delete=models.CASCADE, blank=True, null=True
-    )
 
     # Each currency will dictate it's own balance
-    currency_balance = models.DecimalField(
+    balance = models.DecimalField(
         max_digits=10, decimal_places=2, blank=True, null=True
     )
 
+    # total_base_currency_balance = models.DecimalField(
+    #     max_digits=10, decimal_places=2, blank=True, null=True
+    # )
+
     def __str__(self):
-        return f"{self.currency.symbol} {self.amount} currency's balance: {self.currency_balance} | ({self.book})"
+        return f"Balance: {self.currency.symbol}{self.balance} | ({self.book})"
 
 
 # ------- Raw Material -------
@@ -182,18 +225,8 @@ class AssetInventoryRawMaterial(models.Model):
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    # This should be selectable field
-    # quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    # warehouse = models.CharField(null=True, blank=True)
-    # location = models.CharField(null=True, blank=True)
-    # warehouse = models.ForeignKey(
-    #     Warehouse, on_delete=models.RESTRICT, null=True, blank=True
-    # )
-    # Do not delete the raw material inventory if you delete the supplier model. Give a warning if there is at least one raw material from that company. Delete only if there are no raw mat. from that company
-    raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
-    # quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
 
-    # purchase_order = models
+    raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
 
     # If the user does not enter a sku, make the sku equal to the id of the object created.
     # preopulate it with the next available sku
@@ -421,18 +454,6 @@ class AssetAccountsReceivable(models.Model):
         related_name="accounts_receivable",
     )
 
-    # Link the invoice that this was created for
-    invoice = models.ForeignKey(
-        Invoice,
-        on_delete=models.CASCADE,
-        blank=False,
-        null=False,
-        related_name="accounts_receivables",
-    )
-    # order = models.OneToOneField(
-    #     Order, on_delete=models.CASCADE, blank=False, null=False
-    # )
-
     # Overriding the clean method that is called during the model's validation process.
     # So we can manually add additional measures.
     def clean(self):
@@ -469,11 +490,27 @@ class LiabilityAccountsPayable(models.Model):
         Supplier, on_delete=models.RESTRICT, null=True, blank=True
     )
     # receipt = models.CharField(null=True, blank=True)
-    raw_goods_receipt = models.ForeignKey(RawGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True)
-    finished_goods_receipt = models.ForeignKey(FinishedGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True)
+    raw_goods_receipt = models.ForeignKey(
+        RawGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
+    )
+    finished_goods_receipt = models.ForeignKey(
+        FinishedGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
+    )
 
     def __str__(self):
         return f"{self.book} | you now owe {self.currency.symbol}{self.amount} to {self.supplier}"
+
+    def clean(self):
+        if self.raw_goods_receipt and self.finished_goods_receipt:
+            raise ValidationError(
+                {
+                    "receipt": "You cannot submit two different types of receipts at once. Pick either raw goods, or finished goods."
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, *kwargs)
 
 
 # List all your cash accounts: bank, and on hand. Each account has its own currency, and balance.
@@ -507,8 +544,17 @@ class CashAccount(models.Model):
             f"{self.name} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
         )
 
+    def clean(self):
+        if self.balance < 0:
+            raise ValidationError({"balance": "balance cannot be less than zero."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 # This is when a stakeholder makes a contribution to the business, and the cash account is credited with the amount.
+# test with negative numbers,
 class EquityCapital(models.Model):
     class Meta:
         verbose_name_plural = "Equity Capitals"
@@ -532,31 +578,31 @@ class EquityCapital(models.Model):
         blank=True,
         null=True,
     )
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+    )
     new_shares_issued = models.PositiveIntegerField()
 
     note = models.TextField(null=True, blank=True)
 
+    def clean(self):
+        super().clean()
+        if self.amount <= 0:
+            raise ValidationError({"amount": "Amount must be greater than 0."})
+
     def __str__(self):
-        return (
-            self.member.user.first_name
-            + " "
-            + self.member.user.last_name
-            + "("
-            + self.book.name
-            + ")"
-            + " "
-            + self.cash_account.name
-            + " "
-            + self.cash_account.currency.symbol
-            + str(self.amount)
-            + " "
-            + str(self.date_invested)
-        )
+        return f"Capital | {self.currency}{self.amount} {self.member}"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 # There are two types of revenues: Revenue generated from sales, and from others (refunds issued to you, and cash rewards you received etc)
 class EquityRevenue(models.Model):
+    from operating.models import Order
+
     REVENUE_TYPES = [("sales", "Sales"), ("other", "Other")]
 
     class Meta:
@@ -580,7 +626,7 @@ class EquityRevenue(models.Model):
     date = models.DateField()
     description = models.CharField(max_length=200, unique=False, blank=True)
     # you link the sales here, if it does not have invoice number, then it is other income, not sales income (could be refunds issued to you, or cash rewards you received from your bank)
-    invoice_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    order = models.ForeignKey(Order, on_delete=models.RESTRICT, blank=True, null=True)
     revenue_type = models.CharField(choices=REVENUE_TYPES, default="sales")
 
 
@@ -651,51 +697,56 @@ class EquityDivident(models.Model):
     description = models.CharField(max_length=200, unique=False, blank=True)
 
 
-# class AssetAccountsReceivable(models.Model):
-#     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-#     name = models.CharField(max_length=100)
-#     value = models.DecimalField(max_digits=10, decimal_places=2)
-#     currency = models.ForeignKey(
-#         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
-#     )
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     due_date = models.DateField()
-#     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, blank=True, null=True)
-
-#     def __str__(self):
-#         return f"Book: {self.book.name}, Name: {self.name}, Value: {self.currency}{'{:20,.2f}'.format(self.value)}"
-
-
-# # probably delete and make a new one
-# class Liability(models.Model):
-#     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-#     name = models.CharField(max_length=100)
-#     description = models.CharField(max_length=200, blank=True, null=True)
-#     value = models.DecimalField(max_digits=12, decimal_places=2)
-#     currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
-#     due_date = models.DateField()
-
-#     def __str__(self):
-#         return f"{self.name} - {self.value} {self.currency.code}"
-
-
 # Used in transfers between cash accounts within the same book.
 class InTransfer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    source = models.ForeignKey(
+    from_cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, related_name="source"
     )
-    destination = models.ForeignKey(
+    to_cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, related_name="destination"
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE)
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, default=get_base_currency
+    )
     date = models.DateField(blank=True, null=True)
     description = models.CharField(max_length=200, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.source.name} -> {self.destination.name} | {self.currency.symbol}{self.amount}"
+        return f"{self.from_cash_account.name} -> {self.to_cash_account.name} | {self.currency.symbol}{self.amount}"
+
+    def clean(self):
+
+        self.currency = self.from_cash_account.currency
+        if self.from_cash_account and self.to_cash_account:
+            currency = CurrencyCategory.objects.get(
+                pk=self.from_cash_account.currency.pk
+            )
+            self.currency = currency
+            if self.from_cash_account.currency != self.to_cash_account.currency:
+                raise ValidationError(
+                    "The currencies of the source and destination accounts must match."
+                )
+
+        # return cleaned_data
+        # return super().clean()
+
+        # # if isinstance(self.from_cash_account, int):
+        # #     self.from_cash_account = CashAccount.objects.get(pk=self.from_cash_account)
+        # if self.from_cash_account and not self.currency_id:
+        #     self.currency = self.from_cash_account.currency
+        # if self.from_cash_account.currency.code != self.to_cash_account.currency.code:
+        #     raise ValidationError(
+        #         {
+        #             "currency": "The currencies of the accounts must be same to make in transfer"
+        #         }
+        #     )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class CurrencyExchange(models.Model):
@@ -717,28 +768,148 @@ class CurrencyExchange(models.Model):
     def __str__(self):
         return f"Exchange {self.from_cash_account.currency.symbol}{self.from_amount} | {self.from_cash_account.name} -> {self.to_cash_account.currency.symbol}{self.to_amount} | {self.to_cash_account.name} "
 
+    def clean(self):
+        # Validation check
+        if self.from_cash_account == self.to_cash_account:
+            raise ValidationError(
+                {
+                    "cash_account": "You cannot pick the same cash account for both accounts"
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 # Keeping logs of all transactions
-class Transaction(models.Model):
+class CashTransactionEntry(models.Model):
 
-    def __str__(self):
-        return f"Books:{self.book}, {self.type} | {self.currency.symbol}{self.value}"
+    class Meta:
+        verbose_name_plural = "Cash Transaction Entries"
+
+    # content_type stores which model it points to (EquityCapital, EquityRevenue, etc).
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        limit_choices_to=allowed_equity_models,
+        null=False,
+        blank=False,
+    )
+    # object_id stores the primary key of that model instance.
+    content_pk = models.PositiveIntegerField(null=False, blank=False)
+    # related_object lets you access the actual related instance.
+    content = GenericForeignKey("content_type", "content_pk")
+
+    # you assign like this:
+    # entry.equity = some_equity_capital_instance
+    # entry.save()
+
+    # and you filter like this:
+    # TransactionEntry.objects.filter(content_type=ContentType.objects.get_for_model(EquityCapital), equity_pk=some_id)
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    value = models.DecimalField(max_digits=12, decimal_places=2)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    is_amount_positive = models.BooleanField()
     currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, default=1)
-    type = models.CharField(max_length=50, blank=True, null=True)
-    type_pk = models.PositiveIntegerField(blank=True, null=True)
-    account = models.ForeignKey(
+    cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, blank=True, null=True
     )
-    account_balance = models.DecimalField(
+    cash_account_balance = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
 
+    # # getting it from the get_base_currency function
+    BASE_CURRENCY = (
+        get_base_currency()
+    )  # if base currency code is not defined, then make it just usd
 
-# This model will be used to track the KPIs in real-time
+    # for amount normalized to base currency (e.g. USD)
+    amount_in_base_currency = models.DecimalField(
+        max_digits=12, decimal_places=2, blank=True, null=True
+    )
+    total_base_currency_balance = models.DecimalField(
+        max_digits=12, decimal_places=2, blank=True, null=True
+    )
+
+    def __str__(self):
+        return (
+            f"Books:{self.book}, {self.content} | {self.currency.symbol}{self.amount}"
+        )
+
+    def get_base_currency_symbol_for_template():
+        # return str(get_base_currency().symbol)
+        return "hello"
+
+    def save(self, *args, **kwargs):
+
+        # self.total_base_currency_balance = get_total_base_currency_balance()
+
+        if self.currency.code != self.BASE_CURRENCY.code:
+            from .services import get_exchange_rate
+
+            rate = get_exchange_rate(self.currency.code, self.BASE_CURRENCY.code)
+            if rate:
+                # quantize() method is used to round or format a decimal number to a specific number of decimal places while following a chosen rounding rule.
+                self.amount_in_base_currency = (self.amount * rate).quantize(
+                    Decimal("0.01")
+                )
+                try:
+                    latest_cash_transaction_entry = CashTransactionEntry.objects.latest(
+                        "pk"
+                    )
+                    if latest_cash_transaction_entry.total_base_currency_balance:
+
+                        if self.is_amount_positive:
+                            self.total_base_currency_balance = (
+                                latest_cash_transaction_entry.total_base_currency_balance
+                                + self.amount_in_base_currency
+                            )
+                        else:
+                            self.total_base_currency_balance = (
+                                latest_cash_transaction_entry.total_base_currency_balance
+                                - self.amount_in_base_currency
+                            )
+                        # round down to zero if it is a too small number
+                        if self.total_base_currency_balance < 0.1:
+                            self.total_base_currency_balance = 0
+                    else:
+                        self.total_base_currency_balance = self.amount_in_base_currency
+                except Exception as e:
+                    print({"Exception error:": e})
+                    self.total_base_currency_balance = self.amount_in_base_currency
+                    pass
+
+            else:
+                self.amount_in_base_currency = None
+        else:
+            self.amount_in_base_currency = self.amount
+            from django.core.exceptions import ObjectDoesNotExist
+
+            try:
+                latest_cash_transaction_entry = CashTransactionEntry.objects.latest(
+                    "pk"
+                )
+                if self.is_amount_positive:
+                    self.total_base_currency_balance = (
+                        latest_cash_transaction_entry.total_base_currency_balance
+                        + self.amount
+                    )
+                else:
+                    self.total_base_currency_balance = (
+                        latest_cash_transaction_entry.total_base_currency_balance
+                        - self.amount
+                    )
+            except ObjectDoesNotExist:
+                self.total_base_currency_balance = self.amount
+        if not self.cash_account_balance:
+            self.cash_account_balance = self.cash_account.balance
+
+        super().save(*args, **kwargs)
+
+
+# This model will be used to track the KPIs daily
 class Metric(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=True, null=True)

@@ -42,3 +42,10 @@ def book_component(csrf_token,selected_book):
     print(f"Total time it took: {ending_time-starting_time}")
     print("done")
     return render_to_string('accounting/components/book_component.html',context) 
+
+@register.filter
+# makes 10000 to 10,000.00
+def format_money(value):
+    if not isinstance(value, (int, float, Decimal)):
+        return value
+    return f"{value:,.2f}"

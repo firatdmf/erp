@@ -1,0 +1,23 @@
+.cash_transaction_entry_list_page table,
+th,
+td {
+  border: 1px solid black;
+}
+
+.cash_transaction_entry_list_page table{
+  text-align: center;
+}
+
+.cash_transaction_entry_list_page th,
+.cash_transaction_entry_list_page td {
+  padding: 10px;
+  text-align: center;
+}
+
+.cash_transaction_entry_list_page tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.cash_transaction_entry_list_page h1 {
+  color: saddlebrown;
+}

@@ -272,3 +272,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/authentication/signin"
 LOGOUT_REDIRECT_URL = "/authentication/index"
 # LOGOUT_REDIRECT_URL = "/"
+
+
+# for accounting model
+BASE_CURRENCY_CODE = "USD"

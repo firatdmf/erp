@@ -17,6 +17,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
+
 # Create your functions here.
 
 
@@ -195,60 +196,18 @@ class AssetCash(models.Model):
 
 
 class AssetInventoryRawMaterial(models.Model):
-    class Meta:
-        verbose_name_plural = "Asset Inventory Raw Materials"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["name", "supplier"], name="unique_name_supplier"
-            )
-        ]
-
-    RAW_TYPE_CHOICES = [("direct", "Direct"), ("indirect", "Indirect")]
-    UNIT_TYPE_CHOICES = [("units", "Unit"), ("mt", "Meter"), ("kg", "Kilogram")]
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    # name and supplier combination should be unique, so we won't have multiple entries of the same product.
-
-    name = models.CharField(null=False, blank=False)
-    sku = models.CharField(null=True, blank=True)
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.RESTRICT, null=True, blank=True
-    )
-    supplier_sku = models.CharField(null=True, blank=True)
-
-    # receipt_number = models.CharField(null=True, blank=True)
-    unit_of_measurement = models.CharField(
-        choices=UNIT_TYPE_CHOICES, null=True, blank=True, default=UNIT_TYPE_CHOICES[0]
-    )
-    currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
-    )
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=True, null=True)
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
-    raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
 
-    # If the user does not enter a sku, make the sku equal to the id of the object created.
-    # preopulate it with the next available sku
-    def save(self, *args, **kwargs):
-        is_new_instance = self.pk is None
-        super().save(*args, **kwargs)  # Save first to get an ID
-        if is_new_instance and not self.sku:
-            self.sku = str(self.pk)
-            super().save(update_fields=["sku"])  # Save again with sku set
-
-    def __str__(self):
-        return f"{self.name} | {self.sku or self.supplier_sku} | Supplier: {self.supplier.company_name[:15] if self.supplier else ''}"
-
-
-class RawGoodsReceipt(models.Model):
-    # class Meta:
-    #     constraints = [
-    #         models.UniqueConstraint(
-    #             fields=["supplier", "receipt_number"],
-    #             name="unique_supplier_receipt_number",
-    #         )
-    #     ]
+class RawMaterialGoodsReceipt(models.Model):
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["supplier", "receipt_number"],
+                name="unique_supplier_receipt_number",
+            )
+        ]
 
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
@@ -273,15 +232,18 @@ class RawGoodsReceipt(models.Model):
                 }
             )
 
+        # Call the parent's clean() method to run other validations
+        super().clean()
+
     def save(self, *args, **kwargs):
+        # Ensure validations run
+        self.full_clean()
+
         # Automatically set the date to today if not provided
         if not self.date:
             self.date = timezone.now().date()
         if self.payment_status == False:
             self.cash_account = None
-
-        # Ensure validations run
-        self.full_clean()
 
         super().save(*args, **kwargs)
 
@@ -294,23 +256,6 @@ class RawGoodsReceipt(models.Model):
     def __str__(self):
         return f"{self.book} | {self.supplier} | {self.date.strftime('%d %B, %Y') if self.date else 'No Date'}"
 
-
-class RawGoodsReceiptItem(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    goods_receipt = models.ForeignKey(
-        RawGoodsReceipt, on_delete=models.CASCADE, related_name="items"
-    )
-    raw_material = models.ForeignKey(
-        AssetInventoryRawMaterial, on_delete=models.RESTRICT, blank=True, null=True
-    )
-    # finished_goods = models.ForeignKey(
-    #     "AssetInventoryFinishedGood", on_delete=models.RESTRICT, blank=True, null=True
-    # )
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-
-    def __str__(self):
-        return f"{self.goods_receipt.book or ""} | {self.raw_material.name} - {self.quantity} {self.raw_material.unit_of_measurement or ''}"
 
 
 # ------- Finished Goods -------
@@ -491,7 +436,7 @@ class LiabilityAccountsPayable(models.Model):
     )
     # receipt = models.CharField(null=True, blank=True)
     raw_goods_receipt = models.ForeignKey(
-        RawGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
+        RawMaterialGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
     )
     finished_goods_receipt = models.ForeignKey(
         FinishedGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True

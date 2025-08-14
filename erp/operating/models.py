@@ -1,9 +1,10 @@
 import traceback
 from django.db import models
 from crm.models import Contact, Company
-from accounting.models import Book
-from marketing.models import Product, ProductVariant
+from accounting.models import AssetInventoryRawMaterial, RawMaterialGoodsReceipt, Book
+from marketing.models import Product, ProductVariant, Supplier
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 # from accounting.models import AssetInventoryRawMaterial
 # uuid is used to generate unique identifiers for models.
@@ -13,37 +14,105 @@ import uuid
 import secrets
 
 
-class FinishedGood(models.Model):
+# class FinishedGood(models.Model):
+#     # book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="finished_goods")
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     modified_at = models.DateField(blank=True, null=True)
+#     order = models.ForeignKey(
+#         "Order", on_delete=models.CASCADE, related_name="finished_goods"
+#     )
+#     product = models.ForeignKey(
+#         Product,
+#         on_delete=models.CASCADE,
+#         blank=False,
+#         null=False,
+#         related_name="finished_goods",
+#     )
+#     product_variant = models.ForeignKey(
+#         ProductVariant,
+#         on_delete=models.CASCADE,
+#         blank=True,
+#         null=True,
+#         related_name="finished_goods",
+#     )
+#     quantity = models.DecimalField(
+#         max_digits=10, decimal_places=2, null=True, blank=True
+#     )
+#     warehouse = models.ForeignKey(
+#         "Warehouse",
+#         on_delete=models.RESTRICT,
+#         blank=True,
+#         null=True,
+#         related_name="finished_goods",
+#     )
+
+
+class WorkInProgressGood(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateField(blank=True, null=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE,
-        blank=False,
-        null=False,
-        related_name="finished_goods",
+        Product, on_delete=models.CASCADE, related_name="wip_goods"
     )
     product_variant = models.ForeignKey(
         ProductVariant,
         on_delete=models.CASCADE,
         blank=True,
         null=True,
-        related_name="finished_goods",
+        related_name="wip_goods",
     )
-    warehouse = models.ForeignKey(
-        "Warehouse", on_delete=models.RESTRICT, blank=True, null=True, related_name="finished_goods"
+    order = models.ForeignKey(
+        "Order", on_delete=models.CASCADE, related_name="wip_goods"
     )
 
-class WorkInProgressGood(models.Model):
+
+class RawMaterialGood(models.Model):
+    RAW_TYPE_CHOICES = [("direct", "Direct"), ("indirect", "Indirect")]
+    UNIT_TYPE_CHOICES = [
+        ("units", "Unit"),
+        ("mt", "Meter"),
+        ("kg", "Kilogram"),
+        ("l", "Liter"),
+        ("bx", "Box"),
+    ]
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateField(blank=True, null=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="wip_goods")
-    product_variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, blank=True, null=True, related_name="wip_goods")
-    order = models.ForeignKey("Order", on_delete=models.CASCADE, related_name="wip_goods")
+    name = models.CharField(null=False, blank=False)
+    asset_inventory_raw_material_good = models.ForeignKey(
+        AssetInventoryRawMaterial, on_delete=models.RESTRICT, related_name="items"
+    )
+    supplier_sku = models.CharField(null=True, blank=True)
+    sku = models.CharField(null=False, blank=False)
+    unit_of_measurement = models.CharField(
+        choices=UNIT_TYPE_CHOICES, null=True, blank=True, default=UNIT_TYPE_CHOICES[0]
+    )
+    raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
+    quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+
+    # If the user does not enter a sku, make the sku equal to the id of the object created.
+    # preopulate it with the next available sku
+    def save(self, *args, **kwargs):
+        is_new_instance = self.pk is None
+        super().save(*args, **kwargs)  # Save first to get an ID
+        if is_new_instance and not self.sku:
+            self.sku = str(self.pk)
+            super().save(update_fields=["sku"])  # Save again with sku set
+
+    def __str__(self):
+        return f"{self.name} | {(self.sku) if self.sku != self.pk else self.supplier_sku} | Supplier: {self.supplier.company_name[:15] if self.supplier else ''}"
 
 
+
+
+class RawMaterialGoodItem(models.Model):
+    quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=False, blank=False
+    )
+    # supplier = models.ForeignKey(
+    #     Supplier, on_delete=models.RESTRICT, null=True, blank=True
+    # )
+    raw_material_good_receipt = models.ForeignKey(RawMaterialGoodsReceipt, on_delete=models.CASCADE, related_name="items")
 
 
 STATUS_CHOICES = [

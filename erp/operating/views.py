@@ -160,6 +160,24 @@ def process_qr_payload_pack(request):
 
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
+    
+
+def process_qr_payload_goods_received(request):
+    try:
+        with transaction.atomic():
+            data = json.loads(request.body)
+            receipt_number = data.get("receipt_number") # this would be the ideal case to have.
+            item_name = data.get("name")
+            item_sku = data.get("sku")
+            item_serial = data.get("serial")
+            item_batch = data.get("batch")
+
+            
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
+
 
 
 # Create your views here.

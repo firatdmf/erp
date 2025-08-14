@@ -25,8 +25,8 @@ urlpatterns = [
     path('books/<int:pk>/add_accounts_receivable/', AddAccountsReceivable.as_view(),name="add_accounts_receivable"),
     path('books/<int:pk>/add_accounts_payable/', AddAccountsPayable.as_view(),name="add_accounts_payable"),
     path('books/<int:pk>/cash_transaction_entry_list/', CashTransactionEntryList.as_view(),name="cash_transaction_entry_list"),
-    path('books/<int:pk>/create_asset_inventory_raw_material/', CreateAssetInventoryRawMaterial.as_view(),name="create_asset_inventory_raw_material"),
-    path('books/<int:pk>/raw_goods_receipt/',RawGoodsReceipt.as_view(),name="raw_goods_receipt"),
+    path('books/<int:pk>/create_asset_inventory_raw_material_good/', CreateAssetInventoryRawMaterialGood.as_view(),name="create_asset_inventory_raw_material_good"),
+    # path('books/<int:pk>/raw_goods_receipt/',RawMaterialGoodsReceipt.as_view(),name="raw_goods_receipt"),
     path('books/<int:pk>/finished_goods_receipt/',FinishedGoodsReceipt.as_view(),name="finished_goods_receipt"),
     # path("books/<int:pk>/material_lookup/", asset_inventory_raw_material_lookup, name="material_lookup"),
 

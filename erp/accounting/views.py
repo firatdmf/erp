@@ -901,12 +901,12 @@ class MakeCurrencyExchange(generic.edit.FormView):
 # accounting.py (or similar location)
 
 
-class CreateAssetInventoryRawMaterial(generic.CreateView):
+class CreateAssetInventoryRawMaterialGood(generic.CreateView):
     model = AssetInventoryRawMaterial
-    form_class = AssetInventoryRawMaterialForm
-    template_name = "accounting/create_asset_inventory_raw_material.html"
+    form_class = AssetInventoryRawMaterialGoodForm
+    template_name = "accounting/create_asset_inventory_raw_material_good.html"
     success_url = reverse_lazy(
-        "accounting:create_asset_inventory_raw_material", kwargs={"pk": "pk"}
+        "accounting:create_asset_inventory_raw_material_good", kwargs={"pk": "pk"}
     )
 
     # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
@@ -931,118 +931,118 @@ class CreateAssetInventoryRawMaterial(generic.CreateView):
     #     )
 
 
-class RawGoodsReceipt(View):
-    template_name = "accounting/raw_goods_receipt.html"
+# class RawGoodsReceipt(View):
+#     template_name = "accounting/raw_goods_receipt.html"
 
-    def form_invalid(self, request, form, formset, error_message=None):
-        return render(
-            request,
-            self.template_name,
-            {
-                "form": form,
-                "formset": formset,
-                "error_message": error_message
-                or "There were errors in your submission.",
-            },
-        )
+#     def form_invalid(self, request, form, formset, error_message=None):
+#         return render(
+#             request,
+#             self.template_name,
+#             {
+#                 "form": form,
+#                 "formset": formset,
+#                 "error_message": error_message
+#                 or "There were errors in your submission.",
+#             },
+#         )
 
-    # *args is tuple
-    # **kwargs is dictionary
-    def get(self, request, *args, **kwargs):
-        # print("your user information is:", request.user.member)
-        book_pk = kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        form = RawGoodsReceiptForm(book=book)
-        # formset = GoodsReceiptItemFormSet()
-        formset = RawGoodsReceiptItemFormSet(prefix="receiveditem_set")
-        return render(request, self.template_name, {"form": form, "formset": formset})
+#     # *args is tuple
+#     # **kwargs is dictionary
+#     def get(self, request, *args, **kwargs):
+#         # print("your user information is:", request.user.member)
+#         book_pk = kwargs.get("pk")
+#         book = Book.objects.get(pk=book_pk)
+#         form = RawMaterialGoodsReceiptForm(book=book)
+#         # formset = GoodsReceiptItemFormSet()
+#         formset = RawGoodsReceiptItemFormSet(prefix="receiveditem_set")
+#         return render(request, self.template_name, {"form": form, "formset": formset})
 
-    def post(self, request, *args, **kwargs):
-        # self is the instance of the view, handling the request.
-        # CBVs are just Python classes, and self lets you access all the class's methods and attributes (e.g., self.model, self.template_name, self.object etc).
-        # Without it, your method wouldn’t be able to store or reuse data across other methods of the same view.
+#     def post(self, request, *args, **kwargs):
+#         # self is the instance of the view, handling the request.
+#         # CBVs are just Python classes, and self lets you access all the class's methods and attributes (e.g., self.model, self.template_name, self.object etc).
+#         # Without it, your method wouldn’t be able to store or reuse data across other methods of the same view.
 
-        # request is the HttpRequest object that contains metadata about the request, such as form data, user information, and more.
-        # for example, request.POST contains the data submitted in a POST request.
-        # request.FILES, request.user, request.method (Session data, cookies, headers, etc.)
-        # You literally can’t process form submissions without it.
+#         # request is the HttpRequest object that contains metadata about the request, such as form data, user information, and more.
+#         # for example, request.POST contains the data submitted in a POST request.
+#         # request.FILES, request.user, request.method (Session data, cookies, headers, etc.)
+#         # You literally can’t process form submissions without it.
 
-        book_pk = kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        form = RawGoodsReceiptForm(request.POST, book=book)
-        formset = RawGoodsReceiptItemFormSet(request.POST, prefix="receiveditem_set")
-        if form.is_valid() and formset.is_valid():
-            try:
-                with transaction.atomic():
-                    # tz the form and formset data
-                    # Save the raw goods receipt and items
-                    raw_goods_receipt = form.save(commit=False)
-                    raw_goods_receipt.book = book
-                    raw_goods_receipt.save()
-                    items = formset.save(commit=False)
-                    # asset_accounts_receivable = AssetAccountsReceivable(book=book,)
-                    for item in items:
-                        item.goods_receipt = raw_goods_receipt
-                        item.raw_material.unit_cost = item.unit_cost
-                        item.raw_material.save(update_fields=["unit_cost"])
-                        item.save()
-                    payment_status = form.cleaned_data.get("payment_status")
-                    receipt_total_cost = raw_goods_receipt.total_cost()
-                    if payment_status:
-                        # If the payment status is paid, update the cash account
-                        cash_account = form.cleaned_data.get("cash_account")
-                        # cash_account = CashAccount.objects.get(cash_account)
-                        new_cash_account_balance = (
-                            cash_account.balance - receipt_total_cost
-                        )
-                        cash_account.balance = new_cash_account_balance
-                        cash_account.save(update_fields=["balance"])
-                        CashTransactionEntry_object = (
-                            CashTransactionEntry.objects.create(
-                                book=book,
-                                value=receipt_total_cost,
-                                is_amount_positive=False,
-                                type="purchase",
-                                account=cash_account,
-                                account_balance=cash_account.balance,
-                            )
-                        )
-                        CashTransactionEntry_object.save()
-                    else:
+#         book_pk = kwargs.get("pk")
+#         book = Book.objects.get(pk=book_pk)
+#         form = RawMaterialGoodsReceiptForm(request.POST, book=book)
+#         formset = RawGoodsReceiptItemFormSet(request.POST, prefix="receiveditem_set")
+#         if form.is_valid() and formset.is_valid():
+#             try:
+#                 with transaction.atomic():
+#                     # tz the form and formset data
+#                     # Save the raw goods receipt and items
+#                     raw_goods_receipt = form.save(commit=False)
+#                     raw_goods_receipt.book = book
+#                     raw_goods_receipt.save()
+#                     items = formset.save(commit=False)
+#                     # asset_accounts_receivable = AssetAccountsReceivable(book=book,)
+#                     for item in items:
+#                         item.goods_receipt = raw_goods_receipt
+#                         item.raw_material.unit_cost = item.unit_cost
+#                         item.raw_material.save(update_fields=["unit_cost"])
+#                         item.save()
+#                     payment_status = form.cleaned_data.get("payment_status")
+#                     receipt_total_cost = raw_goods_receipt.total_cost()
+#                     if payment_status:
+#                         # If the payment status is paid, update the cash account
+#                         cash_account = form.cleaned_data.get("cash_account")
+#                         # cash_account = CashAccount.objects.get(cash_account)
+#                         new_cash_account_balance = (
+#                             cash_account.balance - receipt_total_cost
+#                         )
+#                         cash_account.balance = new_cash_account_balance
+#                         cash_account.save(update_fields=["balance"])
+#                         CashTransactionEntry_object = (
+#                             CashTransactionEntry.objects.create(
+#                                 book=book,
+#                                 value=receipt_total_cost,
+#                                 is_amount_positive=False,
+#                                 type="purchase",
+#                                 account=cash_account,
+#                                 account_balance=cash_account.balance,
+#                             )
+#                         )
+#                         CashTransactionEntry_object.save()
+#                     else:
 
-                        liability_accounts_payable = LiabilityAccountsPayable.objects.create(
-                            supplier=raw_goods_receipt.supplier,
-                            book=book,
-                            amount=receipt_total_cost,
-                            is_amount_positive=False,
-                            raw_goods_receipt=raw_goods_receipt,
-                            # invoice
-                            # currency=raw_goods_receipt.currency,
-                        )
-                        liability_accounts_payable.save()
+#                         liability_accounts_payable = LiabilityAccountsPayable.objects.create(
+#                             supplier=raw_goods_receipt.supplier,
+#                             book=book,
+#                             amount=receipt_total_cost,
+#                             is_amount_positive=False,
+#                             raw_goods_receipt=raw_goods_receipt,
+#                             # invoice
+#                             # currency=raw_goods_receipt.currency,
+#                         )
+#                         liability_accounts_payable.save()
 
-                    return render(
-                        request,
-                        self.template_name,
-                        {
-                            "form": form,
-                            "formset": formset,
-                            "message": "Receipt created successfully!",
-                        },
-                    )
-            except Exception as e:
-                form.add_error(None, f"An unexpected error occurred: {e}")
-                return self.form_invalid(
-                    request,
-                    form,
-                    formset,
-                    error_message="An unexpected error occurred while processing your request.",
-                )
+#                     return render(
+#                         request,
+#                         self.template_name,
+#                         {
+#                             "form": form,
+#                             "formset": formset,
+#                             "message": "Receipt created successfully!",
+#                         },
+#                     )
+#             except Exception as e:
+#                 form.add_error(None, f"An unexpected error occurred: {e}")
+#                 return self.form_invalid(
+#                     request,
+#                     form,
+#                     formset,
+#                     error_message="An unexpected error occurred while processing your request.",
+#                 )
 
-        # If invalid, print errors for debugging
-        print("Form errors:", form.errors)
-        print("Formset errors:", formset.errors)
-        return self.form_invalid(request, form, formset)
+#         # If invalid, print errors for debugging
+#         print("Form errors:", form.errors)
+#         print("Formset errors:", formset.errors)
+#         return self.form_invalid(request, form, formset)
 
 
 class FinishedGoodsReceipt(View):

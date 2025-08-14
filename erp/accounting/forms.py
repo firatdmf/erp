@@ -215,7 +215,7 @@ class CurrencyExchangeForm(forms.ModelForm):
 
 # ----------------------------------------------------------------------------------------------------------------
 # below are added after august 4, 2025 and for the new cogs system
-class AssetInventoryRawMaterialForm(forms.ModelForm):
+class AssetInventoryRawMaterialGoodForm(forms.ModelForm):
     class Meta:
         model = AssetInventoryRawMaterial
         fields = "__all__"
@@ -226,7 +226,7 @@ class AssetInventoryRawMaterialForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
-        super(AssetInventoryRawMaterialForm, self).__init__(*args, **kwargs)
+        super(AssetInventoryRawMaterialGoodForm, self).__init__(*args, **kwargs)
         # self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         if book:
             self.fields["book"].queryset = Book.objects.filter(pk=book.pk)
@@ -235,9 +235,9 @@ class AssetInventoryRawMaterialForm(forms.ModelForm):
 # below is for finished goods receipt
 
 
-class RawGoodsReceiptForm(forms.ModelForm):
+class RawMaterialGoodsReceiptForm(forms.ModelForm):
     class Meta:
-        model = RawGoodsReceipt
+        model = RawMaterialGoodsReceipt
         fields = "__all__"
         exclude = ["book"]
         labels = {"payment_status": "Paid"}
@@ -251,51 +251,48 @@ class RawGoodsReceiptForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         print("your book in the form is:", kwargs.get("book"))
         book = kwargs.pop("book", None)
-        super(RawGoodsReceiptForm, self).__init__(*args, **kwargs)
+        super(RawMaterialGoodsReceiptForm, self).__init__(*args, **kwargs)
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
 
         if book:
-            print("your book pk is 2,", book.pk)
             self.initial["book"] = book.pk
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).order_by("name")
 
 
-class RawGoodsReceiptItemForm(forms.ModelForm):
-    # artificial field to replace the original raw_material field (to implement dynamic dropdown selection from database)
-    # raw_material_name = forms.CharField(label="Raw Material")
+# class RawMaterialGoodsReceiptItemForm(forms.ModelForm):
+#     # artificial field to replace the original raw_material field (to implement dynamic dropdown selection from database)
+#     # raw_material_name = forms.CharField(label="Raw Material")
 
-    class Meta:
-        model = RawGoodsReceiptItem
-        fields = "__all__"
+#     class Meta:
+#         model = RawGoodsReceiptItem
+#         fields = "__all__"
 
-        # exclude the original raw_material field
-        # exclude = ["raw_material"]
+#         # exclude the original raw_material field
+#         # exclude = ["raw_material"]
 
-    # def clean(self):
-    #     cleaned_data = super().clean()
-    #     name = cleaned_data.get("raw_material_name")
-    #     try:
-    #         material = AssetInventoryRawMaterial.objects.get(name__iexact=name)
-    #     except AssetInventoryRawMaterial.DoesNotExist:
-    #         material = AssetInventoryRawMaterial.objects.create(name=name)
-    #     cleaned_data["raw_material"] = material
-    #     return cleaned_data
+#     # def clean(self):
+#     #     cleaned_data = super().clean()
+#     #     name = cleaned_data.get("raw_material_name")
+#     #     try:
+#     #         material = AssetInventoryRawMaterial.objects.get(name__iexact=name)
+#     #     except AssetInventoryRawMaterial.DoesNotExist:
+#     #         material = AssetInventoryRawMaterial.objects.create(name=name)
+#     #     cleaned_data["raw_material"] = material
+#     #     return cleaned_data
 
 
-RawGoodsReceiptItemFormSet = inlineformset_factory(
-    parent_model=RawGoodsReceipt,
-    model=RawGoodsReceiptItem,
-    form=RawGoodsReceiptItemForm,
-    extra=1,
-    can_delete=True,
-)
+# RawGoodsReceiptItemFormSet = inlineformset_factory(
+#     parent_model=RawMaterialGoodsReceiptForm,
+#     model=RawMaterialGoodsReceiptItem,
+#     form=RawMaterialGoodsReceiptItemForm,
+#     extra=1,
+#     can_delete=True,
+# )
 
 
 # below is for finished goods receipt
-
-
 class FinishedGoodsReceiptForm(forms.ModelForm):
     class Meta:
         model = FinishedGoodsReceipt

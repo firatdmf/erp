@@ -1,8 +1,21 @@
 import traceback
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views import View
-from .models import Order, OrderItemUnit, Pack, PackedItem
-from .forms import OrderForm, OrderItemUnitForm
+from .models import (
+    Order,
+    OrderItemUnit,
+    Pack,
+    PackedItem,
+    RawMaterialGood,
+    RawMaterialGoodReceipt,
+    RawMaterialGoodItem,
+)
+from .forms import (
+    OrderForm,
+    OrderItemUnitForm,
+    RawMaterialGoodReceiptForm,
+    RawMaterialGoodItemForm,
+)
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.detail import DetailView
 from django.views.generic import ListView
@@ -160,24 +173,22 @@ def process_qr_payload_pack(request):
 
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
-    
+
 
 def process_qr_payload_goods_received(request):
     try:
         with transaction.atomic():
             data = json.loads(request.body)
-            receipt_number = data.get("receipt_number") # this would be the ideal case to have.
+            receipt_number = data.get(
+                "receipt_number"
+            )  # this would be the ideal case to have.
             item_name = data.get("name")
             item_sku = data.get("sku")
             item_serial = data.get("serial")
             item_batch = data.get("batch")
 
-            
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
-
-
-
 
 
 # Create your views here.
@@ -623,7 +634,31 @@ class OrderPackingList(ListView):
         return render(request, self.template_name, context)
 
 
-# -------------------------------- function based views
+# below is for receiving goods
+# In future you need to combine them
+class RawMaterialGoodCreate(CreateView):
+    model = RawMaterialGood
+    fields = "__all__"
+    # form_class = RawMaterialGoodReceiptForm
+    template_name = "operating/create_raw_material_good.html"
+    success_url = reverse_lazy("operating:index")
+
+
+class RawMaterialGoodReceiptCreate(CreateView):
+    model = RawMaterialGoodReceipt
+    form_class = RawMaterialGoodReceiptForm
+    template_name = "operating/create_raw_material_good_receipt.html"
+    success_url = reverse_lazy("operating:create_raw_material_good_receipt")
+
+
+class RawMaterialGoodItemCreate(CreateView):
+    model = RawMaterialGoodItem
+    form_class = RawMaterialGoodItemForm
+    template_name = "operating/create_raw_material_good_item.html"
+    success_url = reverse_lazy("operating:create_raw_material_good_item")
+
+
+# -------------------------------- function based views  -------------------------------- #
 
 import openpyxl
 from openpyxl.styles import Font, Border, Side, Alignment
@@ -742,62 +777,6 @@ def delete_order(request, pk):
         messages.error(request, "Order not found.")
     return redirect("operating:order_list")
 
-
-# escape(product.title) will turn < into &lt;, > into &gt;, & into &amp;, etc.
-# This ensures that if a product title or variant SKU contains special characters (like <, >, &, or quotes), they won't break your HTML or allow malicious code to run.
-# def product_autocomplete(request):
-#     query = request.GET.get("product", "").strip()
-#     if not query:
-#         return HttpResponse("")
-
-#     products = (
-#         Product.objects.filter(
-#             Q(title__icontains=query)
-#             | Q(sku__icontains=query)
-#             | Q(variants__variant_sku__icontains=query)
-#         )
-#         .distinct()
-#         .prefetch_related("variants")[:10]  # Limit results
-#     )
-
-#     html = "<div class='product_autocomplete_list'><ul>"
-#     for product in products:
-#         variants = product.variants.all()
-
-#         if not variants.exists():
-#             # Show parent only if no variants
-#             if (
-#                 query.lower() in (product.title or "").lower()
-#                 or query.lower() in (product.sku or "").lower()
-#             ):
-#                 html += (
-#                     f"<li data-product-id='{product.pk}' onclick='selectProduct({product.pk})'>"
-#                     f"➕{escape(product.title)}"
-#                     f"</li>"
-#                 )
-#         else:
-#             # If parent matches, show all variants
-#             if (
-#                 query.lower() in (product.title or "").lower()
-#                 or query.lower() in (product.sku or "").lower()
-#             ):
-#                 for variant in variants:
-#                     html += (
-#                         f"<li data-product-id='{product.pk}' data-variant-id='{variant.pk}'>"
-#                         f"➕{escape(product.title)} - {escape(variant.variant_sku)}"
-#                         f"</li>"
-#                     )
-#             else:
-#                 # Otherwise show only matching variants
-#                 for variant in variants:
-#                     if query.lower() in (variant.variant_sku or "").lower():
-#                         html += (
-#                             f"<li data-product-id='{product.pk}' data-variant-id='{variant.pk}'>"
-#                             f"➕{escape(product.title)} - {escape(variant.variant_sku)}"
-#                             f"</li>"
-#                         )
-#     html += "</ul>"
-#     return HttpResponse(html)
 
 
 # escape(product.title) will turn < into &lt;, > into &gt;, & into &amp;, etc.

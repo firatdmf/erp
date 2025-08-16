@@ -194,68 +194,96 @@ class AssetCash(models.Model):
 
 # ------- Raw Material -------
 
-
+from operating.models import RawMaterialGood
 class AssetInventoryRawMaterial(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=True, null=True)
-    unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-
-
-class RawMaterialGoodsReceipt(models.Model):
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["supplier", "receipt_number"],
-                name="unique_supplier_receipt_number",
-            )
-        ]
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.RESTRICT, null=False, blank=False
-    )
-    receipt_number = models.CharField(blank=False, null=False, max_length=50)
-    date = models.DateField(blank=True, null=True)
-    # True if paid
-    payment_status = models.BooleanField(default=False)
-    cash_account = models.ForeignKey(
-        "CashAccount", on_delete=models.CASCADE, blank=True, null=True
-    )
-
-    # make custom validation for payment type
-    def clean(self):
-        # Validation check
-        if self.payment_status and not self.cash_account:
-            raise ValidationError(
-                {
-                    "cash_account": "You must select a cash account when payment status is marked as paid."
-                }
-            )
-
-        # Call the parent's clean() method to run other validations
-        super().clean()
-
-    def save(self, *args, **kwargs):
-        # Ensure validations run
-        self.full_clean()
-
-        # Automatically set the date to today if not provided
-        if not self.date:
-            self.date = timezone.now().date()
-        if self.payment_status == False:
-            self.cash_account = None
-
-        super().save(*args, **kwargs)
-
-    def total_cost(self):
-        total = 0
-        for item in self.items.all():
-            total += item.unit_cost * item.quantity
-        return total
+    # from operating module
+    raw_material_good = models.ForeignKey(RawMaterialGood, on_delete=models.CASCADE)
+    
+    @property
+    def total_value(self):
+        # e.g. FIFO/average calculation using related items
+        return sum([item.unit_cost * item.quantity for item in self.raw_material_good.items.all()])
+    
+    # def __str__(self):
+    #     return self.raw_material_good_item.raw_material_good.name
 
     def __str__(self):
-        return f"{self.book} | {self.supplier} | {self.date.strftime('%d %B, %Y') if self.date else 'No Date'}"
+        try:
+            return self.raw_material_good.name
+        except AttributeError:
+            return f"Raw Material #{self.pk or 'unsaved'}"
 
+
+# class RawMaterialGoodsReceipt(models.Model):
+#     class Meta:
+#         constraints = [
+#             models.UniqueConstraint(
+#                 fields=["supplier", "receipt_number"],
+#                 name="unique_supplier_receipt_number",
+#             )
+#         ]
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
+#     supplier = models.ForeignKey(
+#         Supplier, on_delete=models.RESTRICT, null=False, blank=False
+#     )
+#     receipt_number = models.CharField(blank=False, null=False, max_length=50)
+#     date = models.DateField(blank=True, null=True)
+#     # True if paid
+#     payment_status = models.BooleanField(default=False)
+#     cash_account = models.ForeignKey(
+#         "CashAccount", on_delete=models.CASCADE, blank=True, null=True
+#     )
+
+#     # make custom validation for payment type
+#     def clean(self):
+#         # Validation check
+#         if self.payment_status and not self.cash_account:
+#             raise ValidationError(
+#                 {
+#                     "cash_account": "You must select a cash account when payment status is marked as paid."
+#                 }
+#             )
+
+#         # Call the parent's clean() method to run other validations
+#         super().clean()
+
+#     def save(self, *args, **kwargs):
+#         # Ensure validations run
+#         self.full_clean()
+
+#         # Automatically set the date to today if not provided
+#         if not self.date:
+#             self.date = timezone.now().date()
+#         if self.payment_status == False:
+#             self.cash_account = None
+
+#         super().save(*args, **kwargs)
+
+#     def total_cost(self):
+#         total = 0
+#         for item in self.items.all():
+#             total += item.cost()
+#         return total
+
+#     def __str__(self):
+#         return f"{self.book} | {self.supplier} | {self.date.strftime('%d %B, %Y') if self.date else 'No Date'}"
+
+
+# class RawMaterialGoodsReceiptItem(models.Model):
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     receipt = models.ForeignKey(RawMaterialGoodsReceipt, on_delete=models.CASCADE, related_name="items")
+#     raw_material = models.ForeignKey(AssetInventoryRawMaterial,on_delete=models.CASCADE)
+#     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+#     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+#     def cost(self):
+#         return self.quantity * self.unit_cost
+
+#     def __str__(self):
+#         return f"{self.raw_material.book} | {self.raw_material.name} - {self.quantity} units"
 
 
 # ------- Finished Goods -------
@@ -339,6 +367,7 @@ class FinishedGoodsReceipt(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    @property
     def total_cost(self):
         total = 0
         for item in self.items.all():
@@ -435,9 +464,9 @@ class LiabilityAccountsPayable(models.Model):
         Supplier, on_delete=models.RESTRICT, null=True, blank=True
     )
     # receipt = models.CharField(null=True, blank=True)
-    raw_goods_receipt = models.ForeignKey(
-        RawMaterialGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
-    )
+    # raw_goods_receipt = models.ForeignKey(
+    #     RawMaterialGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
+    # )
     finished_goods_receipt = models.ForeignKey(
         FinishedGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
     )

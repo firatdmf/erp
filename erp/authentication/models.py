@@ -36,7 +36,6 @@ class Permission(models.Model):
     def __str__(self):
         return self.get_name_display()
 
-
 # The reason I create another Member is because it is so unethical to change the base user model that django provides, so we clone it, sync it, and add more depth to it.
 class Member(models.Model):
     user = models.OneToOneField(User, null=True, on_delete=models.CASCADE)

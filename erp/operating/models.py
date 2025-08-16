@@ -1,7 +1,14 @@
 import traceback
 from django.db import models
+from django.shortcuts import get_object_or_404
 from crm.models import Contact, Company
-from accounting.models import AssetInventoryRawMaterial, RawMaterialGoodsReceipt, Book
+
+# from accounting.models import (
+#     AssetInventoryRawMaterial,
+#     # RawMaterialGoodsReceipt,
+#     Book,
+#     # RawMaterialGoodsReceiptItem,
+# )
 from marketing.models import Product, ProductVariant, Supplier
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -65,27 +72,33 @@ class WorkInProgressGood(models.Model):
     )
 
 
+# Raw material
 class RawMaterialGood(models.Model):
-    RAW_TYPE_CHOICES = [("direct", "Direct"), ("indirect", "Indirect")]
-    UNIT_TYPE_CHOICES = [
-        ("units", "Unit"),
-        ("mt", "Meter"),
-        ("kg", "Kilogram"),
-        ("l", "Liter"),
-        ("bx", "Box"),
-    ]
     created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateField(blank=True, null=True)
-    name = models.CharField(null=False, blank=False)
-    asset_inventory_raw_material_good = models.ForeignKey(
-        AssetInventoryRawMaterial, on_delete=models.RESTRICT, related_name="items"
+    modified_at = models.DateField(auto_now=True)
+
+    raw_type = models.CharField(
+        choices=[("direct", "Direct"), ("indirect", "Indirect")],
+        default=("direct", "Direct"),
     )
+
+    name = models.CharField(null=False, blank=False)
+
     supplier_sku = models.CharField(null=True, blank=True)
     sku = models.CharField(null=False, blank=False)
     unit_of_measurement = models.CharField(
-        choices=UNIT_TYPE_CHOICES, null=True, blank=True, default=UNIT_TYPE_CHOICES[0]
+        choices=[
+            ("units", "Unit"),
+            ("mt", "Meter"),
+            ("kg", "Kilogram"),
+            ("l", "Liter"),
+            ("bx", "Box"),
+        ],
+        null=True,
+        blank=True,
+        default=("units", "Unit"),
     )
-    raw_type = models.CharField(choices=RAW_TYPE_CHOICES, default=RAW_TYPE_CHOICES[0])
+
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
@@ -100,19 +113,88 @@ class RawMaterialGood(models.Model):
             super().save(update_fields=["sku"])  # Save again with sku set
 
     def __str__(self):
-        return f"{self.name} | {(self.sku) if self.sku != self.pk else self.supplier_sku} | Supplier: {self.supplier.company_name[:15] if self.supplier else ''}"
+        return f"{self.name} | {(self.sku) if self.sku != self.pk else self.supplier_sku}"
 
 
+from accounting.models import Book
+
+
+class RawMaterialGoodReceipt(models.Model):
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["supplier", "receipt_number"],
+                name="unique_supplier_receipt_number",
+            )
+        ]
+
+    # should be approved by accounting, and operating supervisor for quality.
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, null=True, blank=True)
+    date = models.DateField(blank=True, null=True)
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.RESTRICT, null=False, blank=False
+    )
+    receipt_number = models.CharField(blank=False, null=False, max_length=50)
+    approved = models.BooleanField(default=False)
+
+    @property
+    def amount(self):
+        total = 0
+        for item in self.items:
+            total += item.cost
+        return total
+
+    def __str__(self):
+        return f"{self.book} | on: {self.date} From: {self.supplier} with Receipt #: {self.receipt_number} | Approved: {self.approved}"
 
 
 class RawMaterialGoodItem(models.Model):
+
+    raw_material_good = models.ForeignKey(
+        RawMaterialGood,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="items",
+    )
+    receipt = models.ForeignKey(
+        RawMaterialGoodReceipt,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="items",
+    )
+
+    # this should be invisible field to the staff.
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=False, blank=False
     )
-    # supplier = models.ForeignKey(
-    #     Supplier, on_delete=models.RESTRICT, null=True, blank=True
-    # )
-    raw_material_good_receipt = models.ForeignKey(RawMaterialGoodsReceipt, on_delete=models.CASCADE, related_name="items")
+    unit_cost = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+
+    def save(self, *args, **kwargs):
+        from accounting.models import AssetInventoryRawMaterial
+
+        self.full_clean()
+        try:
+            # asset_inventory_raw_material = get_object_or_404(AssetInventoryRawMaterial, sku=self.raw_material_good.sku)
+            asset_inventory_raw_material = AssetInventoryRawMaterial.objects.get(
+                sku=self.raw_material_good.sku
+            )
+        except AssetInventoryRawMaterial.DoesNotExist:
+            asset_inventory_raw_material = AssetInventoryRawMaterial.objects.create(
+                sku=self.raw_material_good.sku,
+                book=self.receipt.book,
+                unit_cost=self.unit_cost,
+            )
+
+        try:
+            self.raw_material_good.quantity += self.quantity
+        except Exception as e:
+            raise ValueError({"error":"raw_material_good quantity did not update"})
+
+        return super().save(*args, **kwargs)
 
 
 STATUS_CHOICES = [

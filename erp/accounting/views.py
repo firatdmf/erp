@@ -1091,7 +1091,7 @@ class FinishedGoodsReceipt(View):
                         item.save()
 
                     payment_status = form.cleaned_data.get("payment_status")
-                    receipt_total_cost = finished_goods_receipt.total_cost()
+                    receipt_total_cost = finished_goods_receipt.total_cost
                     if payment_status:
                         # If the payment status is paid, update the cash account
                         cash_account = form.cleaned_data.get("cash_account")

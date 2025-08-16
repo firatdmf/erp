@@ -141,7 +141,7 @@ class ProductCategory(models.Model):
         verbose_name_plural = "Product Categories"
 
     created_at = models.DateTimeField(auto_now=True)
-    name = models.CharField(max_length=255, null=True, blank=True)
+    name = models.CharField(max_length=255, null=True, blank=True, unique=True)
 
     # image = models.FileField(
     #     upload_to=product_category_directory_path,
@@ -153,6 +153,8 @@ class ProductCategory(models.Model):
     image = models.URLField(null=True, blank=True)  # Store Cloudinary URL
 
     def save(self, *args, **kwargs):
+
+        self.name = self.name.lower()
         # _image_file is a temporary attribute (not a model field) used to hold the uploaded file just long enough to upload it to Cloudinary in the save() method.
         image_file = getattr(self, '_image_file', None)
         # When you upload an image via a form, the file comes in as a file object (not a URL).
@@ -198,7 +200,7 @@ class Product(models.Model):
     sku = models.CharField(
         max_length=12, null=True, blank=True, unique=True, db_index=True
     )
-    # Barcode (ISBN, UPC, GTIN, etc.)
+    # Barcode (ISBN, UPC, GTIN, etc.) might delete this later
     barcode = models.CharField(max_length=14, null=True, blank=True, db_index=True)
     # change to blank false later
 
@@ -303,35 +305,9 @@ class Product(models.Model):
         else:
             return self.title
 
-    # def save(self, *args, **kwargs):
-    #     # Convert the title to lowercase before saving
-    #     super(Product, self).save(
-    #         *args, **kwargs
-    #     )  # Save first to ensure self.pk exists
-    #     if not self.variants.exists():
-    #         if self.has_variants:
-    #             self.has_variants = False
-    #             super().save(update_fields=["has_variants"])
-
-    # def get_primary_image(self):
-    #     primary_image = self.files.filter(is_primary=True).first()
-    #     if primary_image:
-    #         return primary_image.file.url
-    #     return (
-    #         self.files.order_by("sequence").first().file.url
-    #         if self.files.exists()
-    #         else None
-    #     )
 
 
 class ProductVariant(models.Model):
-
-    # def clean(self):
-    #     if self.product and not self.product.has_variants:
-    #         raise ValidationError(
-    #             "Variants can only be associated with products that have variants."
-    #         )
-
     class Meta:
         verbose_name_plural = "Product Variants"
 

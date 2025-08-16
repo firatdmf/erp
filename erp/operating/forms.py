@@ -2,7 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 from .models import *
 from crm.views import search_contact
-
+from datetime import date
 # to order the fields in the form, we can use OrderedDict
 # from collections import OrderedDict
 
@@ -21,7 +21,9 @@ class OrderForm(forms.ModelForm):
 
 class OrderItemUnitForm(forms.ModelForm):
     target_quantity_per_pack = forms.DecimalField(
-        min_value=0.01, required=True, label="Quantity per Pack",
+        min_value=0.01,
+        required=True,
+        label="Quantity per Pack",
     )
     pack_count = forms.IntegerField(min_value=1, required=True, label="Number of Packs")
 
@@ -30,6 +32,37 @@ class OrderItemUnitForm(forms.ModelForm):
         fields = (
             []
         )  # We will manually handle setting model fields like `order_item` in the view
+
+
+class RawMaterialGoodReceiptForm(forms.ModelForm):
+    class Meta:
+        model = RawMaterialGoodReceipt
+        fields = "__all__"
+        widgets = {
+            "date": forms.DateInput(attrs={"type": "date"}),
+        }
+    def __init__(self, *args, **kwargs):
+        # book = kwargs.pop("book", None)
+        super(RawMaterialGoodReceiptForm, self).__init__(*args, **kwargs)
+        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+    
+
+    
+
+
+class RawMaterialGoodItemForm(forms.ModelForm):
+    class Meta:
+        model = RawMaterialGoodItem
+        fields="__all__"
+
+
+# RawMaterialGoodReceiptItemFormSet = inlineformset_factory(
+#     parent_model=RawMaterialGoodReceipt,
+#     model=RawMaterialGoodItem,
+#     form=RawMaterialGoodItemForm,
+#     extra=1,
+#     can_delete=True,
+# )
 
 
 # class OrderItemForm(forms.ModelForm):

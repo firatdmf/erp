@@ -235,30 +235,30 @@ class AssetInventoryRawMaterialGoodForm(forms.ModelForm):
 # below is for finished goods receipt
 
 
-class RawMaterialGoodsReceiptForm(forms.ModelForm):
-    class Meta:
-        model = RawMaterialGoodsReceipt
-        fields = "__all__"
-        exclude = ["book"]
-        labels = {"payment_status": "Paid"}
-        widgets = {
-            # "book": forms.Select(
-            #     attrs={"disabled": "disabled"}
-            # ),  # dropdown, but uneditable
-            "date": forms.DateInput(attrs={"type": "date"}),
-        }
+# class RawMaterialGoodsReceiptForm(forms.ModelForm):
+#     class Meta:
+#         model = RawMaterialGoodsReceipt
+#         fields = "__all__"
+#         exclude = ["book"]
+#         labels = {"payment_status": "Paid"}
+#         widgets = {
+#             # "book": forms.Select(
+#             #     attrs={"disabled": "disabled"}
+#             # ),  # dropdown, but uneditable
+#             "date": forms.DateInput(attrs={"type": "date"}),
+#         }
 
-    def __init__(self, *args, **kwargs):
-        print("your book in the form is:", kwargs.get("book"))
-        book = kwargs.pop("book", None)
-        super(RawMaterialGoodsReceiptForm, self).__init__(*args, **kwargs)
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+#     def __init__(self, *args, **kwargs):
+#         print("your book in the form is:", kwargs.get("book"))
+#         book = kwargs.pop("book", None)
+#         super(RawMaterialGoodsReceiptForm, self).__init__(*args, **kwargs)
+#         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
 
-        if book:
-            self.initial["book"] = book.pk
-            self.fields["cash_account"].queryset = CashAccount.objects.filter(
-                book=book
-            ).order_by("name")
+#         if book:
+#             self.initial["book"] = book.pk
+#             self.fields["cash_account"].queryset = CashAccount.objects.filter(
+#                 book=book
+#             ).order_by("name")
 
 
 # class RawMaterialGoodsReceiptItemForm(forms.ModelForm):

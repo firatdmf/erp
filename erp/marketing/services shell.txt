@@ -1,0 +1,4 @@
+py manage.py shell
+from marketing.services import import_stock_from_excel
+file_path = "/Users/muhammed/Code/erp/playground/karven_stock.xlsx"
+import_stock_from_excel(file_path)

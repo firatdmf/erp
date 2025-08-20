@@ -195,16 +195,23 @@ class AssetCash(models.Model):
 # ------- Raw Material -------
 
 from operating.models import RawMaterialGood
+
+
 class AssetInventoryRawMaterial(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=True, null=True)
     # from operating module
     raw_material_good = models.ForeignKey(RawMaterialGood, on_delete=models.CASCADE)
-    
+
     @property
     def total_value(self):
         # e.g. FIFO/average calculation using related items
-        return sum([item.unit_cost * item.quantity for item in self.raw_material_good.items.all()])
-    
+        return sum(
+            [
+                item.unit_cost * item.quantity
+                for item in self.raw_material_good.items.all()
+            ]
+        )
+
     # def __str__(self):
     #     return self.raw_material_good_item.raw_material_good.name
 
@@ -451,6 +458,8 @@ class AssetAccountsReceivable(models.Model):
 
 
 class LiabilityAccountsPayable(models.Model):
+    from operating.models import RawMaterialGoodReceipt
+
     class Meta:
         verbose_name_plural = "Liability Accounts Payables"
 
@@ -460,13 +469,21 @@ class LiabilityAccountsPayable(models.Model):
         CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    # balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    paid = models.BooleanField(default=False)
+    paid_with_cash_account = models.ForeignKey(
+        "CashAccount", on_delete=models.CASCADE, blank=True, null=True
+    )
     supplier = supplier = models.ForeignKey(
-        Supplier, on_delete=models.RESTRICT, null=True, blank=True
+        Supplier, on_delete=models.RESTRICT, null=False, blank=False
     )
     # receipt = models.CharField(null=True, blank=True)
     # raw_goods_receipt = models.ForeignKey(
     #     RawMaterialGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
     # )
+    raw_material_good_receipt = models.ForeignKey(
+        RawMaterialGoodReceipt, on_delete=models.CASCADE, blank=True, null=True
+    )
     finished_goods_receipt = models.ForeignKey(
         FinishedGoodsReceipt, on_delete=models.CASCADE, blank=True, null=True
     )
@@ -475,16 +492,31 @@ class LiabilityAccountsPayable(models.Model):
         return f"{self.book} | you now owe {self.currency.symbol}{self.amount} to {self.supplier}"
 
     def clean(self):
-        if self.raw_goods_receipt and self.finished_goods_receipt:
+        super().clean()  # run parent first
+        if self.raw_material_good_receipt and self.finished_goods_receipt:
             raise ValidationError(
                 {
                     "receipt": "You cannot submit two different types of receipts at once. Pick either raw goods, or finished goods."
                 }
             )
 
+        if self.paid:
+            if not self.paid_with_cash_account:
+                raise ValidationError(
+                    {
+                        "CashAccount": "You cannot alter balance without specifying a valid cash account that makes the payment."
+                    }
+                )
+            elif self.paid_with_cash_account.currency != self.currency:
+                raise ValidationError(
+                    {
+                        "CashAccount": "Paid with Cash Account does not match the receipts currency."
+                    }
+                )
+
     def save(self, *args, **kwargs):
         self.full_clean()
-        super().save(*args, *kwargs)
+        super().save(*args, **kwargs)
 
 
 # List all your cash accounts: bank, and on hand. Each account has its own currency, and balance.
@@ -495,7 +527,8 @@ class CashAccount(models.Model):
         # This makes sure for each book, there are unique named cash accounts, so we won't have reduntant accounts
         constraints = [
             models.UniqueConstraint(
-                fields=["book", "name"], name="unique_book_cashaccount"
+                fields=["book", "name", "currency"],
+                name="unique_book_cashaccount_currency",
             )
         ]
 
@@ -514,9 +547,7 @@ class CashAccount(models.Model):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
-        return (
-            f"{self.name} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
-        )
+        return f"{self.name} | {self.currency.code} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
 
     def clean(self):
         if self.balance < 0:
@@ -790,6 +821,8 @@ class CashTransactionEntry(models.Model):
     cash_account = models.ForeignKey(
         CashAccount, on_delete=models.CASCADE, blank=True, null=True
     )
+
+    # ------------------- below are calculated automatically. -------------------------
     cash_account_balance = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
@@ -806,6 +839,8 @@ class CashTransactionEntry(models.Model):
     total_base_currency_balance = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
+
+    # --------------------------------------------
 
     def __str__(self):
         return (
@@ -865,16 +900,20 @@ class CashTransactionEntry(models.Model):
                 latest_cash_transaction_entry = CashTransactionEntry.objects.latest(
                     "pk"
                 )
-                if self.is_amount_positive:
-                    self.total_base_currency_balance = (
-                        latest_cash_transaction_entry.total_base_currency_balance
-                        + self.amount
-                    )
-                else:
-                    self.total_base_currency_balance = (
-                        latest_cash_transaction_entry.total_base_currency_balance
-                        - self.amount
-                    )
+                latest_total_base_currency_balance = (
+                    latest_cash_transaction_entry.total_base_currency_balance
+                )
+                if latest_total_base_currency_balance:
+                    if self.is_amount_positive:
+                        self.total_base_currency_balance = (
+                            latest_cash_transaction_entry.total_base_currency_balance
+                            + self.amount
+                        )
+                    else:
+                        self.total_base_currency_balance = (
+                            latest_cash_transaction_entry.total_base_currency_balance
+                            - self.amount
+                        )
             except ObjectDoesNotExist:
                 self.total_base_currency_balance = self.amount
         if not self.cash_account_balance:

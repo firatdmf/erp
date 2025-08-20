@@ -8,4 +8,4 @@ class OperatingConfig(AppConfig):
 
     # Below added for signals.py
     def ready(self):
-        import operating.signals
+        import operating.signals # ensures signals are registered

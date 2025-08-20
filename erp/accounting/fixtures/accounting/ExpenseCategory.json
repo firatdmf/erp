@@ -164,6 +164,13 @@
     "model": "accounting.ExpenseCategory",
     "pk": 24,
     "fields": {
+      "name": "Overhead"
+    }
+  },
+  {
+    "model": "accounting.ExpenseCategory",
+    "pk": 25,
+    "fields": {
       "name": "Other"
     }
   }

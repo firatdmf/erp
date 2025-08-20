@@ -299,7 +299,7 @@ def handle_equity_transaction(
         cash_account=cash_account,
         cash_account_balance=cash_account.balance,
     )
-
+    print("all done")
     return True
 
 
@@ -1162,3 +1162,69 @@ class FinishedGoodsReceipt(View):
 #             {"materials": matches, "query": query},
 #         )
 #     return HttpResponse("<p class='error'>Invalid request method</p>", status=400)
+
+
+
+# create pay accounts payable
+# add transaction
+# deduct from cash account.
+
+class PayLiabilityAccountsPayable(generic.edit.FormView):
+    # book = self.kwargs.get()
+    # model = LiabilityAccountsPayable
+    form_class = PayLiabilityAccountsPayableForm
+    template_name = "accounting/pay_liability_accounts_payable.html"
+
+
+    # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        kwargs["book"] = book
+        return kwargs
+
+    # below pre-selecting the book field in the form according to the pk in the url
+    # get initial is a function that is applicable to update and create views like these forms.
+    def get_initial(self):
+        # Get the book by primary key from the URL
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        # Set the initial value of the book field to the book retrieved
+        # By default make the currency US Dollars (which is 1)
+        return {"book": book}
+
+    def form_valid(self, form):
+        with transaction.atomic():
+            try:
+                liability_accounts_payable = form.cleaned_data["liability_accounts_payable"]
+                cash_account = form.cleaned_data["cash_account"]
+            except KeyError as e:
+                raise ValidationError({str(e): "This field is required."})
+            except LiabilityAccountsPayable.DoesNotExist:
+                raise ValidationError({"liability_accounts_payable": "Liability record not found."})
+            except CashAccount.DoesNotExist:
+                raise ValidationError({"cash_account": "Cash account not found."})
+            
+            liability_accounts_payable.paid = True
+            cash_account.balance -= liability_accounts_payable.amount
+
+            # later add cash_transaction_entry
+
+
+
+            # continue logic...
+            return super().form_valid(form)
+            
+
+
+
+
+    # Takes you to the newly created book's detail page
+    def get_success_url(self) -> str:
+        return reverse_lazy("accounting:index", kwargs={"pk": self.object.pk})
+
+
+# create get accounts receivable
+# add transaction
+# add to cash account.

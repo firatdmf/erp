@@ -1,5 +1,5 @@
 import traceback
-from django.db import models
+from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from crm.models import Contact, Company
 
@@ -19,39 +19,6 @@ import uuid
 
 # below is to assign api_keys to machines
 import secrets
-
-
-# class FinishedGood(models.Model):
-#     # book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="finished_goods")
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     modified_at = models.DateField(blank=True, null=True)
-#     order = models.ForeignKey(
-#         "Order", on_delete=models.CASCADE, related_name="finished_goods"
-#     )
-#     product = models.ForeignKey(
-#         Product,
-#         on_delete=models.CASCADE,
-#         blank=False,
-#         null=False,
-#         related_name="finished_goods",
-#     )
-#     product_variant = models.ForeignKey(
-#         ProductVariant,
-#         on_delete=models.CASCADE,
-#         blank=True,
-#         null=True,
-#         related_name="finished_goods",
-#     )
-#     quantity = models.DecimalField(
-#         max_digits=10, decimal_places=2, null=True, blank=True
-#     )
-#     warehouse = models.ForeignKey(
-#         "Warehouse",
-#         on_delete=models.RESTRICT,
-#         blank=True,
-#         null=True,
-#         related_name="finished_goods",
-#     )
 
 
 class WorkInProgressGood(models.Model):
@@ -79,10 +46,16 @@ class RawMaterialGood(models.Model):
 
     raw_type = models.CharField(
         choices=[("direct", "Direct"), ("indirect", "Indirect")],
-        default=("direct", "Direct"),
+        default=("direct"),
     )
 
     name = models.CharField(null=False, blank=False)
+    # later add image
+    # image = models.ImageField(
+    #     upload_to="raw_materials/",  # folder inside MEDIA_ROOT
+    #     null=True,
+    #     blank=True,
+    # )
 
     supplier_sku = models.CharField(null=True, blank=True)
     sku = models.CharField(null=False, blank=False)
@@ -96,7 +69,7 @@ class RawMaterialGood(models.Model):
         ],
         null=True,
         blank=True,
-        default=("units", "Unit"),
+        default=("units"),
     )
 
     quantity = models.DecimalField(
@@ -113,13 +86,15 @@ class RawMaterialGood(models.Model):
             super().save(update_fields=["sku"])  # Save again with sku set
 
     def __str__(self):
-        return f"{self.name} | {(self.sku) if self.sku != self.pk else self.supplier_sku}"
+        return (
+            f"{self.name} | {(self.sku) if self.sku != self.pk else self.supplier_sku}"
+        )
 
 
-from accounting.models import Book
-
-
+# when we save this model, we create an libability accounts payable
 class RawMaterialGoodReceipt(models.Model):
+    from accounting.models import Book, CurrencyCategory
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -130,25 +105,29 @@ class RawMaterialGoodReceipt(models.Model):
 
     # should be approved by accounting, and operating supervisor for quality.
     book = models.ForeignKey(Book, on_delete=models.CASCADE, null=True, blank=True)
+    currency = models.ForeignKey(
+        CurrencyCategory, on_delete=models.CASCADE, null=True, blank=True
+    )
     date = models.DateField(blank=True, null=True)
     supplier = models.ForeignKey(
         Supplier, on_delete=models.RESTRICT, null=False, blank=False
     )
-    receipt_number = models.CharField(blank=False, null=False, max_length=50)
-    approved = models.BooleanField(default=False)
+    receipt_number = models.CharField(blank=True, null=True, max_length=50)
+    invoice_number = models.CharField(blank=True, null=True, max_length=50)
+    # approved = models.BooleanField(default=False)
 
+    # commented out because currencies might change
     @property
     def amount(self):
-        total = 0
-        for item in self.items:
-            total += item.cost
-        return total
+        return sum(item.quantity * item.unit_cost for item in self.items.all())
 
     def __str__(self):
-        return f"{self.book} | on: {self.date} From: {self.supplier} with Receipt #: {self.receipt_number} | Approved: {self.approved}"
+        return f"{self.book} | on: {self.date} From: {self.supplier} with Receipt #: {self.receipt_number}"
 
 
 class RawMaterialGoodItem(models.Model):
+
+    # asset_inventory_raw_material = models.ForeignKey(AssetInventoryRawMaterial, on_delete=models.CASCADE, related_name="items")
 
     raw_material_good = models.ForeignKey(
         RawMaterialGood,
@@ -169,30 +148,56 @@ class RawMaterialGoodItem(models.Model):
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=False, blank=False
     )
+
     unit_cost = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True
+        max_digits=10, decimal_places=2, null=False, blank=False
     )
 
+    def __str__(self):
+        return f"{self.raw_material_good.name } from {self.receipt.supplier} | {self.quantity}@{self.receipt.currency.symbol if (self.receipt.currency) else "" }{self.unit_cost}"
+
     def save(self, *args, **kwargs):
-        from accounting.models import AssetInventoryRawMaterial
 
         self.full_clean()
-        try:
-            # asset_inventory_raw_material = get_object_or_404(AssetInventoryRawMaterial, sku=self.raw_material_good.sku)
-            asset_inventory_raw_material = AssetInventoryRawMaterial.objects.get(
-                sku=self.raw_material_good.sku
-            )
-        except AssetInventoryRawMaterial.DoesNotExist:
-            asset_inventory_raw_material = AssetInventoryRawMaterial.objects.create(
-                sku=self.raw_material_good.sku,
-                book=self.receipt.book,
-                unit_cost=self.unit_cost,
-            )
+        # try:
+        #     # asset_inventory_raw_material = get_object_or_404(AssetInventoryRawMaterial, sku=self.raw_material_good.sku)
+        #     asset_inventory_raw_material = AssetInventoryRawMaterial.objects.get(
+        #         sku=self.raw_material_good.sku
+        #     )
+        # except AssetInventoryRawMaterial.DoesNotExist:
+        #     asset_inventory_raw_material = AssetInventoryRawMaterial.objects.create(
+        #         sku=self.raw_material_good.sku,
+        #         book=self.receipt.book,
+        #         unit_cost=self.unit_cost,
+        #     )
+        # if self.raw_material_good.raw_type == "direct":
+        # asset_inventory_raw_material, created = (
+        #     AssetInventoryRawMaterial.objects.update_or_create(
+        #         sku=self.raw_material_good.sku,
+        #         defaults={
+        #             "sku": self.raw_material_good.sku,
+        #             "book": self.receipt.book,
+        #             "unit_cost": self.unit_cost,
+        #         },
+        #     )
+        # )
+        # elif self.raw_material_good.raw_type == "indirect":
+        #     from accounting.models import EquityExpense, ExpenseCategory
+
+        #     expense_category = ExpenseCategory.objects.get(name="Overhead")
+        #     equity_expense, created = EquityExpense.objects.create(
+        #         book=self.receipt.book,
+        #         category=expense_category,
+        #     )
 
         try:
-            self.raw_material_good.quantity += self.quantity
+            if self.raw_material_good.quantity is None:
+                self.raw_material_good.quantity = self.quantity
+            else:
+                self.raw_material_good.quantity += self.quantity
+            self.raw_material_good.save(update_fields=["quantity"])
         except Exception as e:
-            raise ValueError({"error":"raw_material_good quantity did not update"})
+            raise ValueError({"error": "raw_material_good quantity did not update"})
 
         return super().save(*args, **kwargs)
 

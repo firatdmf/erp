@@ -44,6 +44,7 @@ class LiabilityAccountsPayableForm(forms.ModelForm):
 
         widgets = {
             "book": forms.HiddenInput(),
+            "balance": forms.HiddenInput(),
         }
 
 
@@ -172,7 +173,7 @@ class InTransferForm(forms.ModelForm):
         book = kwargs.pop("book", None)
         super(InTransferForm, self).__init__(*args, **kwargs)
         self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
-        # self.fields["currency"].value = 
+        # self.fields["currency"].value =
         # This ensures only the same book from the model can be selected with the cash categories (accounts)
         if book:
             self.fields["from_cash_account"].queryset = CashAccount.objects.filter(
@@ -181,7 +182,6 @@ class InTransferForm(forms.ModelForm):
             self.fields["to_cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).order_by("name")
-
 
 
 class CurrencyExchangeForm(forms.ModelForm):
@@ -333,3 +333,28 @@ FinishedGoodsReceiptItemFormSet = inlineformset_factory(
     extra=1,
     can_delete=True,
 )
+
+
+class PayLiabilityAccountsPayableForm(forms.Form):
+    liability_accounts_payable = forms.ModelChoiceField(
+        queryset=LiabilityAccountsPayable.objects.all(), label="Liability to Pay"
+    )
+    cash_account = forms.ModelChoiceField(
+        queryset=CashAccount.objects.all(), label="Cash Account Used"
+    )
+
+    # This pre-populates form fields with given variables
+    def __init__(self, *args, **kwargs):
+        # You get the book variable from kwargs that was sent through the views.py file
+        book = kwargs.pop("book", None)
+        super(PayLiabilityAccountsPayableForm, self).__init__(*args, **kwargs)
+
+        # # This ensures only the same book from the model can be selected with the cash categories (accounts)
+        if book:
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(
+                book=book
+            ).order_by("name")
+            self.fields["liability_accounts_payable"].queryset = LiabilityAccountsPayable.objects.filter(
+                book=book
+            ).order_by(("-pk"))
+            # self.fields["book"].queryset = Book.objects.filter(book=book)

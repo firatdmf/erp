@@ -434,6 +434,8 @@ class AssetAccountsReceivable(models.Model):
         null=True,
         related_name="accounts_receivable",
     )
+    paid = models.BooleanField(default=False)
+    paid_to_cash_account = models.ForeignKey("CashAccount",on_delete=models.CASCADE, blank=True, null=True)
 
     # Overriding the clean method that is called during the model's validation process.
     # So we can manually add additional measures.

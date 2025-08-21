@@ -355,6 +355,30 @@ class PayLiabilityAccountsPayableForm(forms.Form):
                 book=book
             ).order_by("name")
             self.fields["liability_accounts_payable"].queryset = LiabilityAccountsPayable.objects.filter(
+                book=book, paid=False
+            ).order_by(("-pk"))
+            # self.fields["book"].queryset = Book.objects.filter(book=book)
+
+class GetAssetAccountsReceivableForm(forms.Form):
+    asset_accounts_receivable = forms.ModelChoiceField(
+        queryset=AssetAccountsReceivable.objects.all(), label="Receivable to get"
+    )
+    cash_account = forms.ModelChoiceField(
+        queryset=CashAccount.objects.all(), label="Cash Account to deposit"
+    )
+
+    # This pre-populates form fields with given variables
+    def __init__(self, *args, **kwargs):
+        # You get the book variable from kwargs that was sent through the views.py file
+        book = kwargs.pop("book", None)
+        super(GetAssetAccountsReceivableForm, self).__init__(*args, **kwargs)
+
+        # # This ensures only the same book from the model can be selected with the cash categories (accounts)
+        if book:
+            self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
+            ).order_by("name")
+            self.fields["asset_accounts_receivable"].queryset = AssetAccountsReceivable.objects.filter(
+                book=book, paid=False
             ).order_by(("-pk"))
             # self.fields["book"].queryset = Book.objects.filter(book=book)

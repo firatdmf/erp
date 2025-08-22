@@ -44,7 +44,7 @@
           <td>{{ transaction.content_pk }}</td>
           <td>{{ transaction.cash_account.name }}</td>
           <td>{{ transaction.cash_account.currency.symbol }}{{ transaction.cash_account_balance|format_money }}</td>
-          <td>{{ base_currency_symbol }}{{ transaction.total_base_currency_balance }}</td>
+          <td>{{ base_currency_symbol }}{{ transaction.total_base_currency_balance|format_money }}</td>
         </tr>
       {% empty %}
         <tr>

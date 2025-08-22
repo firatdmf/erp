@@ -26,16 +26,7 @@
   {% endif %}
 
   <div class="dashboard">
-    <ul>
-      <li>Balance: ${{ balance }}</li>
-      <li>In:${{ revenue }}</li>
-      <li>Out: ${{ expense }}</li>
-      <li>Burn: ${{ burn }}</li>
-      <li>Runway: {{ runway }} months</li>
-      <li>Growth Rate: {{ growth_rate }}</li>
-      <li>Default Alive: {{ default_alive }}</li>
-    </ul>
-  </div>
+    {% kpi_dashboard_component book_pk=book.pk %}
 
   <ul>
     <li>

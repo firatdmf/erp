@@ -35,22 +35,40 @@ from django.contrib.contenttypes.models import ContentType
 # add functions here
 
 
-# def get_total_base_currency_balance():
-#     currency_categories = CurrencyCategory.objects.all()
-#     base_currency = get_base_currency()
-#     total = 0
-#     for currency_category in currency_categories:
-#         currency_cash_account = CashAccount.objects.filter(currency=currency_category)
-#         currency = currency_cash_account.currency
-#         balance = currency_cash_account.balance
-#         if currency != base_currency:
-#             rate = get_exchange_rate(currency.code, base_currency.code)
-#             converted_balance = 0
-#             if rate:
-#                 # quantize() method is used to round or format a decimal number to a specific number of decimal places while following a chosen rounding rule.
-#                 converted_balance = (balance * rate).quantize(Decimal("0.01"))
-#             total += converted_balance
-#     return total
+def get_total_base_currency_balance(book_pk):
+    base_currency = get_base_currency()
+    total = Decimal("0.00")
+
+    for currency_category in CurrencyCategory.objects.all():
+        # sum all accounts of this currency
+        cash_accounts = CashAccount.objects.filter(
+            book=book_pk,
+            currency=currency_category,
+        )
+        balance = sum(ca.balance for ca in cash_accounts)
+
+        if balance == 0:
+            continue
+
+        if currency_category != base_currency:
+            from .services import get_exchange_rate
+
+            rate = get_exchange_rate(currency_category.code, base_currency.code)
+            if not rate:
+                raise ValidationError(
+                    {
+                        "currency_rate": f"Failed to get rate {currency_category.code} → {base_currency.code}"
+                    }
+                )
+            balance = Decimal(balance)
+            rate = Decimal(rate)
+
+            total += (balance * rate).quantize(Decimal("0.01"))
+        else:
+            balance = Decimal(balance)
+            total += balance
+
+    return total
 
 
 # def get_exchange_rate(self, from_currency, to_currency):
@@ -1337,3 +1355,67 @@ class GetAssetAccountsReceivable(generic.edit.FormView):
     # Takes you to the newly created book's detail page
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:index")
+
+
+# def kpi_dashboard(request, pk):
+#     # gets it from urls.py
+#     book = Book.objects.get(pk=pk)
+#     today = timezone.now().date()
+#     start_of_month = today.replace(day=1)
+
+#     # Total balance (all cash accounts)
+#     # balance = CashAccount.objects.filter(book=book).aggregate(
+#     #     total_balance=Sum("balance")
+#     # )["total_balance"] or Decimal("0.00")
+#     balance = get_total_base_currency_balance(book_pk=pk)
+
+#     # Transactions for this book between start of month and today
+#     transactions = CashTransactionEntry.objects.filter(
+#         book=book,
+#         created_at__date__gte=start_of_month,
+#         created_at__date__lte=today
+#     )
+
+#     money_in = sum(t.amount for t in transactions if t.is_amount_positive)
+#     money_out = sum(t.amount for t in transactions if not t.is_amount_positive)
+
+#     # Money in and out (all transactions)
+#     # money_in = CashTransactionEntry.objects.filter(
+#     #     book=book, is_amount_positive=True
+#     # ).aggregate(total_in=Sum("amount"))["total_in"] or Decimal("0.00")
+
+#     # money_out = CashTransactionEntry.objects.filter(
+#     #     book=book, is_amount_positive=False
+#     # ).aggregate(total_out=Sum("amount"))["total_out"] or Decimal("0.00")
+
+#     # Burn = Money Out - Money In (or just Money Out if you prefer)
+
+#     burn = money_out - money_in
+#     avg_burn = 5000 #usd per month
+#     # Runway = balance / burn (months), avoid division by zero
+#     runway = (
+#         (balance / avg_burn ).quantize(Decimal("0.1")) if avg_burn > 0 else None
+#     )
+
+#     # Growth rate (optional, example: (balance + money_in) / balance)
+#     growth_rate = (
+#         ((balance + money_in) / balance * 100 - 100).quantize(Decimal("0.1"))
+#         if balance > 0
+#         else None
+#     )
+
+#     # Default alive = True if balance > 0
+#     default_alive = balance > 0
+
+#     context = {
+#         "balance": balance,
+#         "money_in": money_in,
+#         "money_out": money_out,
+#         "burn": burn,
+#         "runway": runway,
+#         "growth_rate": growth_rate,
+#         "default_alive": default_alive,
+#     }
+
+#     return render(request, "accounting/kpi_dashboard.html", context)
+

@@ -651,8 +651,6 @@ class EquityRevenue(models.Model):
     order = models.ForeignKey(Order, on_delete=models.RESTRICT, blank=True, null=True)
     revenue_type = models.CharField(choices=REVENUE_TYPES, default="sales")
 
-    # def delete(*args,**kwargs):
-
 
 class ExpenseCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -866,63 +864,84 @@ class CashTransactionEntry(models.Model):
     #     return "hello"
 
     def save(self, *args, **kwargs):
-        base_currency = get_base_currency()  # always get fresh
+        BASE_CURRENCY = get_base_currency()
 
-        # set account balance if not provided
+        # if we did not pass cash_account_balance then compute automatically.
         if self.cash_account_balance is None:
             self.cash_account_balance = self.cash_account.balance
 
-        # normalize amount to base currency
-        if self.currency.code != base_currency.code:
+
+        # self.total_base_currency_balance = get_total_base_currency_balance()
+
+        if self.currency.code != self.BASE_CURRENCY.code:
             from .services import get_exchange_rate
 
-            rate = get_exchange_rate(self.currency.code, base_currency.code)
-            if not rate:
+            rate = get_exchange_rate(self.currency.code, self.BASE_CURRENCY.code)
+            if rate:
+                # quantize() method is used to round or format a decimal number to a specific number of decimal places while following a chosen rounding rule.
+                self.amount_in_base_currency = (self.amount * rate).quantize(
+                    Decimal("0.01")
+                )
+                try:
+                    latest_cash_transaction_entry = CashTransactionEntry.objects.latest(
+                        "pk"
+                    )
+                    if latest_cash_transaction_entry.total_base_currency_balance is not None:
+
+                        if self.is_amount_positive:
+                            self.total_base_currency_balance = (
+                                latest_cash_transaction_entry.total_base_currency_balance
+                                + self.amount_in_base_currency
+                            )
+                        else:
+                            self.total_base_currency_balance = (
+                                latest_cash_transaction_entry.total_base_currency_balance
+                                - self.amount_in_base_currency
+                            )
+                        # round down to zero if it is a too small number
+                        if self.total_base_currency_balance < 0.1:
+                            self.total_base_currency_balance = 0
+                    else:
+                        self.total_base_currency_balance = self.amount_in_base_currency
+                # if there is no previous transaction history
+                except Exception as e:
+                    print({"Exception error:": e})
+                    self.total_base_currency_balance = self.amount_in_base_currency
+                    pass
+
+            else:
                 raise ValidationError(
                     {"currency_rate": "Currency rate failed to compute."}
                 )
-            self.amount_in_base_currency = (self.amount * rate).quantize(
-                Decimal("0.01")
-            )
         else:
             self.amount_in_base_currency = self.amount
+            from django.core.exceptions import ObjectDoesNotExist
 
-        # update running balance
-        try:
-            from .views import get_total_base_currency_balance
-
-            latest_entry = CashTransactionEntry.objects.filter(book=self.book).latest(
-                "pk"
-            )
-            prev_balance = (
-                latest_entry.total_base_currency_balance
-                or get_total_base_currency_balance(book_pk=self.book.pk)
-            )
-            if self.is_amount_positive:
-                self.total_base_currency_balance = (
-                    prev_balance + self.amount_in_base_currency
+            try:
+                latest_cash_transaction_entry = CashTransactionEntry.objects.latest(
+                    "pk"
                 )
-            else:
-                self.total_base_currency_balance = (
-                    prev_balance - self.amount_in_base_currency
+                latest_total_base_currency_balance = (
+                    latest_cash_transaction_entry.total_base_currency_balance
                 )
-        except CashTransactionEntry.DoesNotExist:
-            # prev_balance = get_total_base_currency_balance(book_pk=self.book.pk)
-            # prev_balance = Decimal("0.00")
-            self.total_base_currency_balance = get_total_base_currency_balance(
-                book_pk=self.book.pk
-            )
+                if latest_total_base_currency_balance:
+                    if self.is_amount_positive:
+                        self.total_base_currency_balance = (
+                            latest_total_base_currency_balance + self.amount
+                        )
+                    else:
+                        self.total_base_currency_balance = (
+                            latest_total_base_currency_balance - self.amount
+                        )
+            except ObjectDoesNotExist:
+                self.total_base_currency_balance = self.amount
 
-        # round down very small numbers
-        if self.total_base_currency_balance < Decimal("0.01"):
-            self.total_base_currency_balance = Decimal("0.00")
+
 
         super().save(*args, **kwargs)
 
 
 # This model will be used to track the KPIs daily
-# not working yet.
-# later
 class Metric(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=True, null=True)

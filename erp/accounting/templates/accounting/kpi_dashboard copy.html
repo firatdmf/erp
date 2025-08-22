@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block css %}
+  {% comment %} <link rel="stylesheet" href="{% static 'accounting/index.css' %}" /> {% endcomment %}
+{% endblock %}
+{% block content %}
+  <h1>KPI Dashboard</h1>
+  <ul>
+    <li>Balance: ${{ balance }}</li>
+    <li>In: ${{ money_in }}</li>
+    <li>Out: ${{ money_out }}</li>
+    <li>Burn: ${{ burn }}</li>
+    <li>Runway: {{ runway }} months</li>
+    <li>Growth Rate: {{ growth_rate }}%</li>
+    <li>Default Alive: {{ default_alive }}</li>
+  </ul>
+{% endblock %}

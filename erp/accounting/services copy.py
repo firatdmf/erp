@@ -1,12 +1,11 @@
-# from forex_python.converter import CurrencyRates
-from currency_converter import CurrencyConverter
+from forex_python.converter import CurrencyRates
 from datetime import date
 from decimal import Decimal
 from .models import CurrencyExchangeRate, CashTransactionEntry
 from .views import get_total_base_currency_balance
 
 
-# c = CurrencyRates()
+c = CurrencyRates()
 
 
 def get_exchange_rate(from_currency: str, to_currency: str) -> Decimal:
@@ -17,16 +16,13 @@ def get_exchange_rate(from_currency: str, to_currency: str) -> Decimal:
         rate_obj = CurrencyExchangeRate.objects.get(
             from_currency=from_currency, to_currency=to_currency, date=today
         )
-        print(f"from {from_currency} to {to_currency} rate is: {rate_obj.rate} ")
         return rate_obj.rate
     except CurrencyExchangeRate.DoesNotExist:
 
         # Fetch from forex-python
         try:
-            # rate_float = c.get_rate(from_currency, to_currency)
-            rate_float = CurrencyConverter().convert(1, from_currency, to_currency)
+            rate_float = c.get_rate(from_currency, to_currency)
             rate = Decimal(str(rate_float))
-            print(f"from {from_currency} to {to_currency} rate is: {rate} ")
             # Save to cache
             CurrencyExchangeRate.objects.create(
                 from_currency=from_currency, to_currency=to_currency, rate=rate

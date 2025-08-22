@@ -1,0 +1,66 @@
+{% comment %} {% extends 'base.html' %} {% endcomment %}
+{% load static %}
+{% load accounting_tags %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'accounting/css/components/kpi_dashboard_component.css' %}" />
+{% endblock %}
+{% block content %}
+  <div class="container mt-4">
+    <h2>Accounting KPIs</h2>
+
+    <div class="mb-4">
+      <h4>Total Balance ({{ base_currency }})</h4>
+      <p class="lead">{{base_currency.symbol}}{{ total_balance|format_money }}</p>
+      <h4>Base runway</h4>
+      <p>{{base_runway|floatformat:2}} months</p>
+    </div>
+
+    <h4>Per-Currency Breakdown</h4>
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>Currency</th>
+          <th>Balance</th>
+          <th>Money In</th>
+          <th>Money Out</th>
+          <th>Burn</th>
+          <th>Runway (months)</th>
+          <th>Growth Rate (%)</th>
+          <th>Default Alive?</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for kpi in currency_kpis %}
+          <tr>
+            <td>{{ kpi.currency.code }}</td>
+            <td>{{kpi.currency.symbol}}{{ kpi.balance|format_money }}</td>
+            <td class="text-success">{{kpi.currency.symbol}}{{ kpi.money_in|format_money }}</td>
+            <td class="text-danger">{{kpi.currency.symbol}}{{ kpi.money_out|format_money }}</td>
+            <td>{{kpi.currency.symbol}}{{ kpi.burn|format_money }}</td>
+            <td>
+              {% if kpi.runway %}
+                {{ kpi.runway }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if kpi.growth_rate %}
+                {{ kpi.growth_rate }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if kpi.default_alive %}
+                ✅ Yes
+              {% else %}
+                ❌ No
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

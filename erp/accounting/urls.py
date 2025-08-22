@@ -30,6 +30,7 @@ urlpatterns = [
     path('books/<int:pk>/finished_goods_receipt/',FinishedGoodsReceipt.as_view(),name="finished_goods_receipt"),
     path('books/<int:pk>/pay_liability_accounts_payable/',PayLiabilityAccountsPayable.as_view(),name="pay_liability_accounts_payable"),
     path('books/<int:pk>/get_asset_accounts_receivable/',GetAssetAccountsReceivable.as_view(),name="get_asset_accounts_receivable"),
+    # path('books/<int:pk>/kpi_dashboard/',kpi_dashboard,name="kpi_dashboard"),
     # path("books/<int:pk>/material_lookup/", asset_inventory_raw_material_lookup, name="material_lookup"),
 
 ]

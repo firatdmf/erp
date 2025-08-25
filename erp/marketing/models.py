@@ -14,31 +14,8 @@ from cloudinary.exceptions import Error as CloudinaryError
 
 
 # Create your functions here.
-# def product_variants_default():
-#     return {
-#         "variants": {
-#             "color": ["blue", "red", "green"],
-#             "size": ['84"', '95"'],
-#         }
-#     }
-
-
-# This is not used anywhere, just for the reference.
-def product_variants_default():
-    return {
-        "variants": {
-            "color": "champange",
-            "size": "84",
-        }
-    }
-
-
 # --------------------------------------------------------------------------------------------
 # FILE SAVER FUNCTION FOR THE PRODUCTS
-# def product_directory_path(instance, filename):
-#     # file will be uploaded to MEDIA_ROOT/products/<product_id>/<filename>
-#     return f"marketing/static/media/products/{instance.id}_{instance.sku}/{filename}"
-
 
 def product_file_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/product_files/<product_sku>/<filename>
@@ -53,7 +30,6 @@ def product_file_directory_path(instance, filename):
 
 def product_category_directory_path(instance, filename):
     return f"product_categories/{instance.name}/{filename}"
-
 
 
 # -----------------------------------------------------------------
@@ -156,20 +132,22 @@ class ProductCategory(models.Model):
 
         self.name = self.name.lower()
         # _image_file is a temporary attribute (not a model field) used to hold the uploaded file just long enough to upload it to Cloudinary in the save() method.
-        image_file = getattr(self, '_image_file', None)
+        image_file = getattr(self, "_image_file", None)
         # When you upload an image via a form, the file comes in as a file object (not a URL).
         # You need to upload this file to Cloudinary, get the resulting URL, and then store that URL in the image field.
         if image_file:
             try:
                 # Set folder and public_id for Cloudinary
                 folder = f"product_categories/{self.name}"
-                public_id = os.path.splitext(image_file.name)[0]  # filename without extension
+                public_id = os.path.splitext(image_file.name)[
+                    0
+                ]  # filename without extension
                 result = cloudinary_upload(
                     image_file,
                     folder=folder,
                     public_id=public_id,
                     overwrite=True,  # Overwrite if same name
-                    resource_type="image"
+                    resource_type="image",
                 )
                 self.image = result.get("secure_url")
             except CloudinaryError as e:
@@ -306,7 +284,6 @@ class Product(models.Model):
             return self.title
 
 
-
 class ProductVariant(models.Model):
     class Meta:
         verbose_name_plural = "Product Variants"
@@ -343,6 +320,9 @@ class ProductVariant(models.Model):
     # If true, the product will be displayed on marketing channels (website etc)
     variant_featured = models.BooleanField(default=True)
     variant_datasheet_url = models.URLField(null=True, blank=True)
+    product_variant_attribute_values = models.ManyToManyField(
+        "ProductVariantAttributeValue", related_name="variants"
+    )
 
     def __str__(self):
         return f"{self.product.title} - {self.variant_sku}"
@@ -394,36 +374,65 @@ class ProductVariantAttribute(models.Model):
 
 
 class ProductVariantAttributeValue(models.Model):
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.CASCADE,
-        related_name="variant_attribute_values",
-        null=False,
-        blank=False,
-    )
-    product_variant = models.ForeignKey(
-        ProductVariant,
-        on_delete=models.CASCADE,
-        related_name="attribute_values",
-        null=False,
-        blank=False,
-    )
-
     product_variant_attribute = models.ForeignKey(
         ProductVariantAttribute, on_delete=models.CASCADE
     )
     product_variant_attribute_value = models.CharField(
         max_length=255, verbose_name="Attribute Value", db_index=True
     )  # e.g., "S", "Red"
+    code = models.CharField(max_length=255, unique=True, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.product_variant} |{self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
+        return f"{self.code} | {self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
 
     class Meta:
         unique_together = (
-            "product_variant",
             "product_variant_attribute",
-        )  # A variant cannot have duplicate attribute name
+            "product_variant_attribute_value",
+        )
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            attr_code = str(self.product_variant_attribute.pk)
+            value_code = (
+                self.product_variant_attribute_value.strip().upper().replace(" ", "_")
+            )
+            self.code = f"{attr_code}_{value_code}"
+        super().save(*args, **kwargs)
+
+
+# class ProductVariantAttributeValue(models.Model):
+#     product = models.ForeignKey(
+#         Product,
+#         on_delete=models.CASCADE,
+#         related_name="variant_attribute_values",
+#         null=False,
+#         blank=False,
+#     )
+#     product_variant = models.ForeignKey(
+#         ProductVariant,
+#         on_delete=models.CASCADE,
+#         related_name="attribute_values",
+#         null=False,
+#         blank=False,
+#     )
+
+#     product_variant_attribute = models.ForeignKey(
+#         ProductVariantAttribute, on_delete=models.CASCADE
+#     )
+#     product_variant_attribute_value = models.CharField(
+#         max_length=255, verbose_name="Attribute Value", db_index=True
+#     )  # e.g., "S", "Red"
+
+#     def __str__(self):
+#         return f"{self.product_variant} |{self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
+
+#     class Meta:
+#         unique_together = (
+#             "product_variant",
+#             "product_variant_attribute",
+#         )  # A variant cannot have duplicate attribute name
+
 
 # This is to save image files.
 class ProductFile(models.Model):
@@ -432,26 +441,29 @@ class ProductFile(models.Model):
     file_url = models.URLField(blank=True, null=True)
 
     product = models.ForeignKey(
-        'Product', on_delete=models.CASCADE, related_name='files',
-        null=True, blank=True
+        "Product", on_delete=models.CASCADE, related_name="files", null=True, blank=True
     )
     product_variant = models.ForeignKey(
-        'ProductVariant', on_delete=models.CASCADE, related_name='files',
-        null=True, blank=True
+        "ProductVariant",
+        on_delete=models.CASCADE,
+        related_name="files",
+        null=True,
+        blank=True,
     )
 
     is_primary = models.BooleanField(default=False)
     sequence = models.PositiveIntegerField(default=0)
 
-
     upload = None  # Placeholder for the uploaded file (not a DB field)
+
     def save(self, *args, **kwargs):
         # If an upload is present, upload to Cloudinary
-        upload_file = getattr(self, 'upload', None)
+        upload_file = getattr(self, "upload", None)
         if upload_file:
             from cloudinary.uploader import upload as cloudinary_upload
             from cloudinary.exceptions import Error as CloudinaryError
             import os
+
             try:
                 folder = f"media/product_images/{self.product.sku}/images"
                 public_id = os.path.splitext(upload_file.name)[0]
@@ -460,7 +472,7 @@ class ProductFile(models.Model):
                     folder=folder,
                     public_id=public_id,
                     overwrite=True,
-                    resource_type="image"
+                    resource_type="image",
                 )
                 self.file_url = result.get("secure_url")
             except CloudinaryError as e:

@@ -17,44 +17,27 @@ class DecimalEncoder(json.JSONEncoder):
 
 
 @register.simple_tag
-def variant_form(
-    variants,
-    product,
-    # csrf_token,
-    current_url,
-):
-
-    # print(current_url)
-    # print("your product is: ")
-    # print(product)
+def variant_form(variants, product, current_url):
     product_variant_list = []
-    # product_variant_files = {}
     variant_files_dict = {}
+
     if variants:
         for variant in variants:
+            # Collect files
             files = variant.files.all()
-            # product_variant_files[variant.pk] = list(files)
             variant_files_dict[str(variant.variant_sku)] = [
-                # this id is the product file's id in django
-                {"id": f.id, "url": f.file_url, "name": "hello"}
+                {"id": f.id, "url": f.file_url, "name": f.file_url.split("/")[-1]}
                 for f in files
             ]
 
-            #             variant_files_dict["12471"]={
-            #   id: 42,
-            #   url: "/media/files/abc.jpg",
-            #   name: "abc.jpg"
-            # }
-
-            # collect attribute values
-            attribute_values = variant.attribute_values.all()
-            # print(f"Variant SKU: {variant.variant_sku}")
-
+            # Collect attribute values
+            attribute_values = variant.product_variant_attribute_values.all()
             variant_attribute_values = {
                 av.product_variant_attribute.name: av.product_variant_attribute_value
                 for av in attribute_values
             }
 
+            # Build the variant dict
             product_variant_list.append(
                 {
                     "variant_sku": variant.variant_sku,
@@ -65,125 +48,54 @@ def variant_form(
                     "variant_featured": variant.variant_featured,
                 }
             )
-            # variant_attribute_values = {}
-            # for attribute_value in attribute_values:
-            #     # combination.append(
-            #     #     {attribute_value.attribute.name: attribute_value.value}
-            #     #     # f"{attribute_value.attribute.name}:{attribute_value.value}"
-            #     # )
-            #     variant_attribute_values[
-            #         attribute_value.product_variant_attribute.name
-            #     ] = attribute_value.product_variant_attribute_value
-            # # combinations.append(variant_attribute_values)
-            # product_variant_list.append(
-            #     {
-            #         "variant_sku": variant.variant_sku,
-            #         "variant_attribute_values": variant_attribute_values,
-            #         "variant_price": variant.variant_price,
-            #         "variant_quantity": variant.variant_quantity,
-            #         "variant_barcode": variant.variant_barcode,
-            #         "variant_featured": variant.variant_featured,
-            #     }
-            # )
 
+        # Prepare JSON
         variant_files_json = json.dumps(variant_files_dict)
-        # variant_files_json = {
-        #     "1": [
-        #         { "url": "/media/path/file1.jpg", "name": "file1.jpg" },
-        #         { "url": "/media/path/file2.jpg", "name": "file2.jpg" }
-        #     ],
-        #     "2": [...]
-        # }
+        product_variant_options = {}
+        for pv in product_variant_list:
+            for attr, val in pv["variant_attribute_values"].items():
+                product_variant_options.setdefault(attr, set()).add(val)
 
-        # print("your product variant list is:")
-        # print(product_variant_list)
-
-        # -------------------------------------------------------------------------
-        # start_time = time.time()
-        # Extract unique attribute values for each attribute
-        product_variant_options = (
-            {}
-        )  # { color: ["white", "beige"], size: ["84", "95"] }
-
-        print("your product variant list is:")
-        print(product_variant_list)
-        for product_variant in product_variant_list:
-            variant_attribute_values = product_variant["variant_attribute_values"]
-            for attribute, value in variant_attribute_values.items():
-                # Add the value to the corresponding attribute in the options dictionary
-                if attribute not in product_variant_options:
-                    product_variant_options[attribute] = (
-                        set()
-                    )  # Use a set to avoid duplicates
-                product_variant_options[attribute].add(value)
-
-        # Convert sets to lists for the final result
+        # Convert sets to lists
         product_variant_options = {
-            key: list(value) for key, value in product_variant_options.items()
+            k: list(v) for k, v in product_variant_options.items()
         }
 
-        # print("-----------------------------------------------")
-        # now let's order product_variant_list so in the product form both variants and table look aligned in terms of the orders.
-
+        # Sort variants by attribute order
         def variant_sort_key(variant, attribute_order):
-            values = variant.get("variant_attribute_values", {})
-            sort_key = []
-
+            key = []
             for attr_name in attribute_order:
-                attr_value = values.get(attr_name)
                 try:
-                    index = attribute_order[attr_name].index(attr_value)
+                    index = attribute_order[attr_name].index(
+                        variant["variant_attribute_values"].get(attr_name)
+                    )
                 except ValueError:
                     index = len(attribute_order[attr_name])
-                sort_key.append(index)
-
-            return tuple(sort_key)
+                key.append(index)
+            return tuple(key)
 
         product_variant_list.sort(
             key=lambda v: variant_sort_key(v, product_variant_options)
         )
 
-        # -------------------------------------------------------------------------
-
+        # Convert to JSON for template
+        product_variant_list = json.dumps(product_variant_list, cls=DecimalEncoder)
         product_variant_options = json.dumps(
             product_variant_options, cls=DecimalEncoder
-        )  # convert python dict to json
+        )
 
-        # print(f"Execution time: {time.time() - start_time} seconds")
-
-        product_variant_list = json.dumps(
-            product_variant_list, cls=DecimalEncoder
-        )  # convert python dict to json
     else:
-        product_variant_list = json.dumps(
-            [], cls=DecimalEncoder
-        )  # convert python dict to json
+        product_variant_list = json.dumps([], cls=DecimalEncoder)
         product_variant_options = json.dumps({}, cls=DecimalEncoder)
         variant_files_json = json.dumps({}, cls=DecimalEncoder)
-
-    # print("-----------------------------------------------")
-    print("your variant options are:")
-    print(product_variant_options)
-    # print("-----------------------------------------------")F
-
-    # print("your product variant options data is")
-    # print(product_variant_options)
 
     return render_to_string(
         "marketing/components/variant_form.html",
         {
-            # "variant": variant,
-            # "product": product,
-            # "csrf_token": csrf_token,
-            # "current_url": current_url,
-            "message": "Im the marketing variant form",
-            "product_variant_list": mark_safe(
-                product_variant_list
-            ),  # Mark JSON as safe
+            "message": "I'm the marketing variant form",
+            "product_variant_list": mark_safe(product_variant_list),
             "product_variant_options": mark_safe(product_variant_options),
-            # "product_variant_files": mark_safe(product_variant_files),
             "variant_files_json": mark_safe(variant_files_json),
-            # "variants": variants_json,  # Mark JSON as safe
         },
     )
 

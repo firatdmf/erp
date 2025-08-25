@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load marketing_tags %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
+{% endblock %}
+
+{% block content %}
+  <div id="Product_Form_Page">
+    {% if not is_update %}
+      <h1>Product Create Form</h1>
+    {% else %}
+      <h1>Product Edit Form</h1>
+    {% endif %}
+    <form method="post" id="product_form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.as_p }}
+      <div id="product_files_form">I am product files form.</div>
+      {% variant_form current_url=request.path product=product variants=variants %}
+      <input type="submit" id="product_form_submit_button" />
+    </form>
+  </div>
+{% endblock %}

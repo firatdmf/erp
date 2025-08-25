@@ -6,13 +6,11 @@
   <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
 {% endblock %}
 {% block content %}
-  {% comment %} <p>
-    <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
-  </p> {% endcomment %}
   <div class="ProductCreatePage">
     <h1>Create Product Form</h1>
     <form id="product_form" method="post" enctype="multipart/form-data">
       {% csrf_token %}
+       {{ form.non_field_errors }}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 
       <div class="variant_component" id="variant_component">
@@ -59,6 +57,7 @@
         <div id="productfile-forms">
           {% for form in productfile_formset %}
             <div class="productfile-form">
+              {{ form.errors }}
               {{ form.as_p }}
             </div>
           {% endfor %}

@@ -75,103 +75,39 @@ class BaseProductView(ModelFormMixin):
             return
 
         try:
-            variants_json = json.loads(variants_json)
+            variants_data = json.loads(variants_json)
         except json.JSONDecodeError:
-            raise ValueError(
-                {"JSON": "failed to parse json: variants.json from variant_form.js"}
-            )
+            return
 
-        variants_data = variants_json.get("product_variant_list", [])
-        # product's existing variants' SKUs
-        existing_skus = set(self.object.variants.values_list("variant_sku", flat=True))
-        # SKU's submitted in the form
-        submitted_skus = {
-            v["variant_sku"] for v in variants_data if v.get("variant_sku")
-        }
-        # delete variants that are no longer with us.
-        ProductVariant.objects.filter(
-            product=self.object, variant_sku__in=(existing_skus - submitted_skus)
-        ).delete()
-
-        for variant_data in variants_data:
-            variant_sku = variant_data.get("variant_sku")
+        for variant_info in variants_data.get("combinations", []):
+            variant_sku = variant_info.get("sku")
             if not variant_sku:
                 continue
 
             variant, _ = ProductVariant.objects.get_or_create(
-                product=self.object, variant_sku=variant_sku
+                product=product, variant_sku=variant_sku
             )
+            variant.variant_price = variant_info.get("price")
+            variant.variant_quantity = variant_info.get("quantity")
+            variant.variant_barcode = variant_info.get("barcode")
+            variant.variant_featured = variant_info.get("featured", True)
+            variant.save()
 
-            # variant_data.items() produces key-value pairs like:
-            # ("variant_sku", "1")
-            # ("variant_attribute_values", {"color": "blue", "size": "84"})
-            # ("variant_price", 1)
-            # ("variant_quantity", 1)
-            # ("variant_barcode", 11111)
-            # ("variant_featured", True)
-            for key, value in variant_data.items():
-                if key not in ("variant_sku", "variant_attribute_values"):
-                    setattr(variant, key, value)
-            variant.save()  # this gets you the pk of the variant object
-
-            # "variant_attribute_values": { "color": "black", "size": "95" }
-            variant_attribute_values_dict = variant_data.get(
-                "variant_attribute_values", {}
-            )
-
-            # clear old M2M links, deletes all linked manytomany relationship for attribute value
+            # Clear existing attribute links
             variant.product_variant_attribute_values.clear()
 
-            for attr_name, attr_value in variant_attribute_values_dict.items():
+            # Add shared attribute values
+            for attr_name, attr_value in variant_info.get("attributes", {}).items():
                 attribute, _ = ProductVariantAttribute.objects.get_or_create(
-                    name=attr_name
+                    name=attr_name.lower()
                 )
                 value_obj, _ = ProductVariantAttributeValue.objects.get_or_create(
                     product_variant_attribute=attribute,
                     product_variant_attribute_value=attr_value,
                 )
-                # link it to the variant
                 variant.product_variant_attribute_values.add(value_obj)
 
-            # for variant_info in variants_data.get("combinations", []):
-            #     variant_sku = variant_info.get("sku")
-            #     if not variant_sku:
-            #         continue
-
-            #     variant, _ = ProductVariant.objects.get_or_create(
-            #         product=product, variant_sku=variant_sku
-            #     )
-            #     variant.variant_price = variant_info.get("price")
-            #     variant.variant_quantity = variant_info.get("quantity")
-            #     variant.variant_barcode = variant_info.get("barcode")
-            #     variant.variant_featured = variant_info.get("featured", True)
-            #     variant.save()
-
-            #     # Clear existing attribute links
-            #     variant.product_variant_attribute_values.clear()
-
-            #     # Add shared attribute values
-            #     for attr_name, attr_value in variant_info.get("attributes", {}).items():
-            #         attribute, _ = ProductVariantAttribute.objects.get_or_create(
-            #             name=attr_name.lower()
-            #         )
-            #         value_obj, _ = ProductVariantAttributeValue.objects.get_or_create(
-            #             product_variant_attribute=attribute,
-            #             product_variant_attribute_value=attr_value,
-            #         )
-            #         variant.product_variant_attribute_values.add(value_obj)
-
-            #     # Handle variant files
-            #     for file_obj in self.request.FILES.getlist(f"variant_file_{variant_sku}"):
-            #         try:
-            #             upload_result = cloudinary_upload(file_obj)
-            #             url = upload_result.get("secure_url")
-            #             if url:
-            #                 ProductFile.objects.create(
-            #                     product=product, product_variant=variant, file_url=url
-            #                 )
-            #         except CloudinaryError:
-            #             continue
+            # Handle variant files
             for file_obj in self.request.FILES.getlist(f"variant_file_{variant_sku}"):
                 try:
                     upload_result = cloudinary_upload(file_obj)
@@ -181,18 +117,7 @@ class BaseProductView(ModelFormMixin):
                             product=product, product_variant=variant, file_url=url
                         )
                 except CloudinaryError:
-                    print(
-                        f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
-                    )
                     continue
-
-        # Handle deletion passed via json data.
-        to_delete = variants_json.get("deleted_files", [])
-        if len(to_delete) > 0:
-            ProductFile.objects.filter(pk__in=to_delete).delete()
-        delete_all_variants = variants_json.get("delete_all_variants", False)
-        if delete_all_variants:
-            product.variants.all().delete()
 
 
 # ----------------------------------------------
@@ -232,9 +157,8 @@ class ProductEdit(BaseProductView, generic.UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["is_update"] = True
-        # pass the variants if product variants exist
         if self.object.variants.exists():
-            context["variants"] = self.object.variants.all()
+            context["variants"] = self.object.variants
         return context
 
     # # This sends data to the form.
@@ -245,13 +169,11 @@ class ProductEdit(BaseProductView, generic.UpdateView):
 
     def form_valid(self, form):
         with transaction.atomic():
-            print(self.request.POST)
             self.object = form.save()
             context = self.get_context_data()
             self.save_product_files(self.object, context["productfile_formset"])
 
-            variants_json = self.request.POST.get("variants_json", "[]")
-            # print("your variants json is, ", variants_json)
+            variants_json = self.request.POST.get("variants_json")
             self.handle_variants(self.object, variants_json)
         return super().form_valid(form)
 

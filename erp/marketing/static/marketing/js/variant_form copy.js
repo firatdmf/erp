@@ -865,15 +865,13 @@ form.addEventListener('submit', async (event) => {
     console.log("Export data prepared:");
     console.log(export_data);
 
-    // let variants_json = document.getElementById("variants_json");
-    // variants_json.value = JSON.stringify(export_data);
+
 
 
     const formData = new FormData(form);
-    formData.append('variants_json', JSON.stringify(export_data));
+    formData.append('export_data', JSON.stringify(export_data));
     console.log("your form data is");
     console.log(formData);
-
 
 
     try {
@@ -966,9 +964,7 @@ form.addEventListener('submit', async (event) => {
     //             "variant_barcode": 44444,
     //             "variant_featured": true
     //         }
-    //     ],
-    // "deleted_files": [],
-    // "delete_all_variants": false,
+    //     ]
     // }
 
 });

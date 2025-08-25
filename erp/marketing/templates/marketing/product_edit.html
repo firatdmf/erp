@@ -10,6 +10,7 @@
     <h1>Edit Product Form</h1>
     <form method="post" enctype="multipart/form-data" id="product_form" action="{% url 'marketing:product_edit' product.pk %}">
       {% csrf_token %}
+      {{ form.non_field_errors }}
       {{ form.as_p }} {# Render each form field as a paragraph #}
 
       <div id="product_files_form">
@@ -17,6 +18,7 @@
         {{ productfile_formset.management_form }}
         <div id="productfile-forms">
           {% for form in productfile_formset %}
+            {{ form.errors }}
             <div class="productfile-form">{{ form.as_p }}</div>
           {% endfor %}
         </div>

@@ -27,3 +27,21 @@ def set_primary_image_on_first_upload(sender, instance, created, **kwargs):
         if not product.primary_image:
             product.primary_image = instance
             product.save(update_fields=["primary_image"])
+
+
+
+# ------ below is when we do bulk deletion, we still delete the cloudinary image
+from django.db.models.signals import pre_delete
+from cloudinary.uploader import destroy as cloudinary_destroy
+import re
+
+@receiver(pre_delete, sender=ProductFile)
+def delete_cloudinary_file(sender, instance, **kwargs):
+    if instance.file_url:
+        match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", instance.file_url)
+        if match:
+            public_id = match.group(1)
+            try:
+                cloudinary_destroy(public_id)
+            except Exception as e:
+                print(f"Failed to delete Cloudinary resource {public_id}: {e}")

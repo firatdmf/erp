@@ -17,6 +17,7 @@ from cloudinary.exceptions import Error as CloudinaryError
 # --------------------------------------------------------------------------------------------
 # FILE SAVER FUNCTION FOR THE PRODUCTS
 
+
 def product_file_directory_path(instance, filename):
     # file will be uploaded to MEDIA_ROOT/product_files/<product_sku>/<filename>
     # if(instance.product_variant):
@@ -433,11 +434,18 @@ class ProductVariantAttributeValue(models.Model):
 #             "product_variant_attribute",
 #         )  # A variant cannot have duplicate attribute name
 
+import re  # regex
+from cloudinary.uploader import destroy as cloudinary_destroy
+
 
 # This is to save image files.
 class ProductFile(models.Model):
+
+    # no need for this anymore since we are not storing the file physically.
     file_path = models.CharField(max_length=500, blank=True, null=True)
     # file = models.FileField(upload_to="uploads/")  # this triggers Django file handling
+
+    # this is the cloudinary url
     file_url = models.URLField(blank=True, null=True)
 
     product = models.ForeignKey(
@@ -454,30 +462,25 @@ class ProductFile(models.Model):
     is_primary = models.BooleanField(default=False)
     sequence = models.PositiveIntegerField(default=0)
 
-    upload = None  # Placeholder for the uploaded file (not a DB field)
+    # only works on single delete, not bulk delete. For bulk we use signals.py
+    def delete(self, *args, **kwargs):
+        print("now deleting the file with pk:",self.pk)
+        """
+        Extracts public_id from a Cloudinary URL and deletes it.
+        """
+        if self.file_url:
+            match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", self.file_url)
+            if match:
+                public_id = match.group(1)  # e.g. "media/product_images/sku123/file1"
+                try:
+                    cloudinary_destroy(public_id)
+                except Exception as e:
+                    print(f"Failed to delete Cloudinary resource {public_id}: {e}")
+            else:
+                print("Could not extract public_id from URL")
 
-    def save(self, *args, **kwargs):
-        # If an upload is present, upload to Cloudinary
-        upload_file = getattr(self, "upload", None)
-        if upload_file:
-            from cloudinary.uploader import upload as cloudinary_upload
-            from cloudinary.exceptions import Error as CloudinaryError
-            import os
-
-            try:
-                folder = f"media/product_images/{self.product.sku}/images"
-                public_id = os.path.splitext(upload_file.name)[0]
-                result = cloudinary_upload(
-                    upload_file,
-                    folder=folder,
-                    public_id=public_id,
-                    overwrite=True,
-                    resource_type="image",
-                )
-                self.file_url = result.get("secure_url")
-            except CloudinaryError as e:
-                raise ValidationError(f"Cloudinary upload failed: {e}")
-        super().save(*args, **kwargs)
+        # finally delete the DB record
+        super().delete(*args, **kwargs)
 
     def __str__(self):
         # return f"{self.product or self.product_variant}"

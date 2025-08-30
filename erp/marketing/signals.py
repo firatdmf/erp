@@ -19,6 +19,7 @@ from .models import (
 #                 defaults={"product_variant_attribute_value": "Default Value"},
 #             )
 
+
 @receiver(post_save, sender=ProductFile)
 def set_primary_image_on_first_upload(sender, instance, created, **kwargs):
     # Only for main product images (not variant images)
@@ -29,14 +30,18 @@ def set_primary_image_on_first_upload(sender, instance, created, **kwargs):
             product.save(update_fields=["primary_image"])
 
 
-
 # ------ below is when we do bulk deletion, we still delete the cloudinary image
 from django.db.models.signals import pre_delete
 from cloudinary.uploader import destroy as cloudinary_destroy
 import re
 
+
 @receiver(pre_delete, sender=ProductFile)
 def delete_cloudinary_file(sender, instance, **kwargs):
+    product = instance.product
+    if product and product.primary_image_id == instance.pk:
+        product.primary_image = None
+        product.save(update_fields=["primary_image"])
     if instance.file_url:
         match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", instance.file_url)
         if match:

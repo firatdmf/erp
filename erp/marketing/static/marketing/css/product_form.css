@@ -1,88 +1,88 @@
-#variant_component{
-    display:none;
+#Product_Form_Page #variant_component {
+  display: none;
 }
 
-
- .variant_container {
-    display: flex;
-    gap: 20px;
+#Product_Form_Page .variant_container {
+  display: flex;
+  gap: 20px;
 }
 
- .variantCard {
-    background: lightgray;
-    padding: 10px;
-    border-radius: 10px;
-    max-width: max-content;
-    margin: 5px 0;
+#Product_Form_Page .variantCard {
+  background: lightgray;
+  padding: 10px;
+  border-radius: 10px;
+  max-width: max-content;
+  margin: 5px 0;
 }
 
- .variantCard input {
-    margin: 2px 0;
+#Product_Form_Page .variantCard input {
+  margin: 2px 0;
 }
 
- .variantCard .optionValues {
-    display: flex;
-    flex-direction: column;
+#Product_Form_Page .variantCard .optionValues {
+  display: flex;
+  flex-direction: column;
 }
 
- .alert {
-    color: red;
+#Product_Form_Page .alert {
+  color: red;
 }
 
- .add_another_value:hover,
- .add_another_option:hover {
-    cursor: pointer;
+#Product_Form_Page .add_another_value:hover,
+#Product_Form_Page .add_another_option:hover {
+  cursor: pointer;
 }
 
- table {
-    display: none;
+#Product_Form_Page table {
+  display: none;
 }
 
- table,
- th,
- td {
-    border: 1px solid black;
-
+#Product_Form_Page table,
+#Product_Form_Page th,
+#Product_Form_Page td {
+  border: 1px solid black;
 }
 
- table th,
- table td {
-    padding: 5px;
+#Product_Form_Page table th,
+#Product_Form_Page table td {
+  padding: 5px;
 }
 
- .displayVariantJSON {
-    display: none;
+#Product_Form_Page .displayVariantJSON {
+  display: none;
 }
 
- button:hover {
-    cursor: pointer;
+#Product_Form_Page button:hover {
+  cursor: pointer;
 }
 
- .add_another_option {
-    height: max-content;
-    width: max-content;
+#Product_Form_Page .add_another_option {
+  height: max-content;
+  width: max-content;
 }
 
- .delete_option_name{
-    float:right;
-    cursor:pointer;
+#Product_Form_Page .delete_option_name {
+  float: right;
+  cursor: pointer;
 }
 
- .delete_option_value{
-    float:right;
-    cursor:pointer;
-    color: black;
+#Product_Form_Page .delete_option_value {
+  float: right;
+  cursor: pointer;
+  color: black;
 }
 
- #create_table_button{
-    padding:3px;
-    background-color: lightcyan;
-    border:1px solid black;
-    border-radius:5px;
-    cursor:pointer;
-    max-width: max-content;
+#Product_Form_Page #create_table_button {
+  padding: 3px;
+  background-color: lightcyan;
+  border: 1px solid black;
+  border-radius: 5px;
+  cursor: pointer;
+  max-width: max-content;
 }
 
-input, td, th {
-    text-transform:capitalize;
+#Product_Form_Page input,
+#Product_Form_Page td,
+#Product_Form_Page th {
+  text-transform: capitalize;
 }

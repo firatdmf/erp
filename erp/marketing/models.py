@@ -120,18 +120,11 @@ class ProductCategory(models.Model):
     created_at = models.DateTimeField(auto_now=True)
     name = models.CharField(max_length=255, null=True, blank=True, unique=True)
 
-    # image = models.FileField(
-    #     upload_to=product_category_directory_path,
-    #     null=True,
-    #     blank=True,
-    #     validators=[validate_file_size, validate_image_type],
-    # )
-
-    image = models.URLField(null=True, blank=True)  # Store Cloudinary URL
+    image_url = models.URLField(null=True, blank=True)  # Store Cloudinary URL
 
     def save(self, *args, **kwargs):
 
-        self.name = self.name.lower()
+        self.name = self.name.lower().strip().replace(" ", "_")
         # _image_file is a temporary attribute (not a model field) used to hold the uploaded file just long enough to upload it to Cloudinary in the save() method.
         image_file = getattr(self, "_image_file", None)
         # When you upload an image via a form, the file comes in as a file object (not a URL).
@@ -139,7 +132,7 @@ class ProductCategory(models.Model):
         if image_file:
             try:
                 # Set folder and public_id for Cloudinary
-                folder = f"product_categories/{self.name}"
+                folder = f"media/product_categories/{self.name}"
                 public_id = os.path.splitext(image_file.name)[
                     0
                 ]  # filename without extension
@@ -150,7 +143,7 @@ class ProductCategory(models.Model):
                     overwrite=True,  # Overwrite if same name
                     resource_type="image",
                 )
-                self.image = result.get("secure_url")
+                self.image_url = result.get("secure_url")
             except CloudinaryError as e:
                 raise ValidationError(f"Cloudinary upload failed: {e}")
         super().save(*args, **kwargs)
@@ -177,7 +170,7 @@ class Product(models.Model):
     # This should be unique also
     # If the product has a variant, this should be null
     sku = models.CharField(
-        max_length=12, null=True, blank=True, unique=True, db_index=True
+        max_length=20, null=True, blank=True, unique=True, db_index=True
     )
     # Barcode (ISBN, UPC, GTIN, etc.) might delete this later
     barcode = models.CharField(max_length=14, null=True, blank=True, db_index=True)
@@ -297,7 +290,7 @@ class ProductVariant(models.Model):
         blank=False,
     )
     variant_sku = models.CharField(
-        max_length=12, null=False, blank=False, db_index=True
+        max_length=20, null=False, blank=False, db_index=True
     )
     # Barcode (ISBN, UPC, GTIN, etc.)
     variant_barcode = models.CharField(
@@ -367,7 +360,7 @@ class ProductVariantAttribute(models.Model):
 
     def save(self, *args, **kwargs):
         # Convert the name to lowercase before saving
-        self.name = self.name.lower()
+        self.name = self.name.lower().replace(" ", "")
         super(ProductVariantAttribute, self).save(*args, **kwargs)
 
     def __str__(self):
@@ -375,30 +368,33 @@ class ProductVariantAttribute(models.Model):
 
 
 class ProductVariantAttributeValue(models.Model):
-    product_variant_attribute = models.ForeignKey(
-        ProductVariantAttribute, on_delete=models.CASCADE
-    )
-    product_variant_attribute_value = models.CharField(
-        max_length=255, verbose_name="Attribute Value", db_index=True
-    )  # e.g., "S", "Red"
-    code = models.CharField(max_length=255, unique=True, blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.code} | {self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
-
     class Meta:
         unique_together = (
             "product_variant_attribute",
             "product_variant_attribute_value",
         )
 
+    product_variant_attribute = models.ForeignKey(
+        ProductVariantAttribute, on_delete=models.CASCADE
+    )
+    product_variant_attribute_value = models.CharField(
+        max_length=255, verbose_name="Attribute Value", db_index=True, unique=True
+    )  # e.g., "S", "Red"
+    # code = models.CharField(max_length=255, unique=True, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
+
     def save(self, *args, **kwargs):
-        if not self.code:
-            attr_code = str(self.product_variant_attribute.pk)
-            value_code = (
-                self.product_variant_attribute_value.strip().upper().replace(" ", "_")
-            )
-            self.code = f"{attr_code}_{value_code}"
+        self.product_variant_attribute_value = (
+            self.product_variant_attribute_value.lower().replace(" ", "_")
+        )
+        # if not self.code:
+        #     attr_code = str(self.product_variant_attribute.pk)
+        #     value_code = (
+        #         self.product_variant_attribute_value.strip().upper().replace(" ", "_")
+        #     )
+        #     self.code = f"{attr_code}_{value_code}"
         super().save(*args, **kwargs)
 
 
@@ -436,7 +432,7 @@ class ProductVariantAttributeValue(models.Model):
 
 import re  # regex
 from cloudinary.uploader import destroy as cloudinary_destroy
-
+from urllib.parse import urlparse, urlunparse
 
 # This is to save image files.
 class ProductFile(models.Model):
@@ -462,9 +458,23 @@ class ProductFile(models.Model):
     is_primary = models.BooleanField(default=False)
     sequence = models.PositiveIntegerField(default=0)
 
+    @property
+    def optimized_url(self):
+        """
+        Returns the Cloudinary URL with automatic format and quality.
+        Example: https://res.cloudinary.com/.../upload/f_auto,q_auto/.../file.png
+        """
+        if not self.file_url:
+            return None
+
+        parts = urlparse(self.file_url)
+        # Insert transformations right after /upload/
+        optimized_path = parts.path.replace("/upload/", "/upload/f_auto,q_auto/")
+        return urlunparse(parts._replace(path=optimized_path))
+
     # only works on single delete, not bulk delete. For bulk we use signals.py
     def delete(self, *args, **kwargs):
-        print("now deleting the file with pk:",self.pk)
+        print("now deleting the file with pk:", self.pk)
         """
         Extracts public_id from a Cloudinary URL and deletes it.
         """

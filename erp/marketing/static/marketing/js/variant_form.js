@@ -606,7 +606,7 @@ let prepopulate_variant_table = () => {
                     <div id="variant-file-${file.id}" class="variant-file" >
                     <p>
                         <a href="${file.url}" target="_blank">
-                            <img src="${file.url}" alt="${file.name}" style="max-width:60px; max-height:60px; vertical-align:middle; margin-right:8px;">
+                            <img src="${file.url}" alt="product_image_${file.id}" style="max-width:60px; max-height:60px; vertical-align:middle; margin-right:8px;">
                         </a>
                         <button class="delete_button" onClick="handleFileDelete(${file.id})">Delete</button>
                     </p>
@@ -743,11 +743,11 @@ let prepopulate_variant_containers = () => {
 // This is input field from django marketing.models product form
 let hasVariantsCheckbox = document.getElementById('id_has_variants');
 let variant_component = document.getElementById('variant_component');
-let product_files_form = document.getElementById('product_files_form');
+let no_variant_product_files_form = document.getElementById('no_variant_product_files_form');
 
 if (hasVariantsCheckbox.checked) {
     variant_component.style.display = 'block';
-    product_files_form.style.display = 'none';
+    no_variant_product_files_form.style.display = 'none';
     document.getElementById("id_quantity").setAttribute('disabled', true)
     document.getElementById("id_barcode").setAttribute('disabled', true)
     document.getElementById("id_price").setAttribute('disabled', true)
@@ -761,14 +761,14 @@ if (hasVariantsCheckbox.checked) {
 let toggleVariantForm = () => {
     if (hasVariantsCheckbox.checked) {
         variant_component.style.display = 'block';
-        product_files_form.style.display = 'none';
+        no_variant_product_files_form.style.display = 'none';
         document.getElementById("id_quantity").setAttribute('disabled', true)
         document.getElementById("id_barcode").setAttribute('disabled', true)
         document.getElementById("id_price").setAttribute('disabled', true)
 
     } else {
         variant_component.style.display = 'none';
-        product_files_form.style.display = 'block';
+        no_variant_product_files_form.style.display = 'block';
         document.getElementById("id_quantity").removeAttribute('disabled');
         document.getElementById("id_barcode").removeAttribute('disabled');
         document.getElementById("id_price").removeAttribute('disabled')

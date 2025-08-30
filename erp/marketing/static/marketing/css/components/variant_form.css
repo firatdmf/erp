@@ -14,6 +14,7 @@
 
 .delete_button{
   color:red;
+  cursor: pointer;
 }
 
 .variant-file p{

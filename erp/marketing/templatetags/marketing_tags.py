@@ -100,7 +100,7 @@ def variant_form(variants, product, current_url):
     )
 
 
-# no need for below
-@register.filter
-def get_item(dictionary, key):
-    return dictionary.get(key)
+# # no need for below
+# @register.filter
+# def get_item(dictionary, key):
+#     return dictionary.get(key)

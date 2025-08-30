@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load marketing_tags %}
+{% block css %}
+  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
+{% endblock %}
+
+{% block content %}
+  <div id="Product_Form_Page">
+    {% if not is_update %}
+      <h1>Product Create Form</h1>
+    {% else %}
+      <h1>Product Edit Form</h1>
+    {% endif %}
+
+    <form method="post" id="product_form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.as_p }}
+      <div id="no_variant_product_files_form">
+        <input type="file" name="no_variant_file" id="no_variant_file" multiple />
+        {% if not variants %}
+        <div id="variant-file-{{ file.pk }}" class="variant-file">
+          {% for file in product.files.all %}
+<p id="file-{{ file.pk }}">
+  <a href="{{ file.optimized_url }}" target="_blank">
+    <img src="{{ file.optimized_url }}" width="60" />
+  </a>
+  <button
+    hx-post="{% url 'marketing:product_file_delete' %}"
+    hx-vals='{"product_file_pk":"{{ file.pk }}"}'
+    hx-trigger="click"
+    hx-target="#file-{{ file.pk }}"
+    hx-swap="outerHTML"
+  >
+    Delete
+  </button>
+</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      {% variant_form current_url=request.path product=product variants=variants %}
+      <input type="submit" id="product_form_submit_button" />
+    </form>
+  </div>
+  <script>
+  document.body.addEventListener("htmx:configRequest", function(evt) {
+    console.log("HTMX request starting:", evt);
+  });
+</script>
+{% endblock %}

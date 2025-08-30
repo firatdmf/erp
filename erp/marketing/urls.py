@@ -16,4 +16,5 @@ urlpatterns = [
     path("api/get_product",views.get_product,name="get_product"),
     path("api/product_file_delete/",views.ProductFileDelete.as_view(),name="product_file_delete"),
 
+
 ]

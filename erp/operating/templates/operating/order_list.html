@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load accounting_tags %}
 {% block content %}
   <h1>Orders</h1>
 
@@ -9,7 +11,7 @@
         <th>Status</th>
         <th>Created At</th>
         <th>Client</th>
-        <th>Total Value</th>
+        <th>Order Value</th>
         <th>QR</th>
         <th>Actions</th>
       </tr>
@@ -30,7 +32,7 @@
 
           {% comment %} <td>{{ order.contact.name|default:'—' }}</td> {% endcomment %}
           {% comment %} <td>{{ order.company.name|default:'—' }}</td> {% endcomment %}
-          <td>${{ order.total_value|floatformat:2 }}</td>
+          <td>${{ order.total_value|format_money }}</td>
           <td>
             {% if order.qr_code_url %}
               <img src="{{ order.qr_code_url }}" style="height: 50px;" />

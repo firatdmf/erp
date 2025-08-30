@@ -12,13 +12,43 @@
     {% else %}
       <h1>Product Edit Form</h1>
     {% endif %}
+
     <form method="post" id="product_form">
       {% csrf_token %}
       {{ form.non_field_errors }}
       {{ form.as_p }}
-      <div id="product_files_form">I am product files form.</div>
+      <div id="no_variant_product_files_form">
+        <input type="file" name="no_variant_file" id="no_variant_file" multiple />
+        {% if not variants %}
+          {% comment %} <div id="no_variant_file_{{ file.pk }}" class="variant-file">
+            {% endcomment %}
+            {% for file in product.files.all %}
+              <p id="no_variant_file_{{ file.pk }}">
+                <a href="{{ file.optimized_url }}" target="_blank"><img src="{{ file.optimized_url }}" width="60" /></a>
+                <button onclick="handle_no_variant_file_delete({{ file.pk }})">Delete</button>
+              </p>
+            {% endfor %}
+            {% comment %}
+          </div> {% endcomment %}
+        {% endif %}
+      </div>
+
       {% variant_form current_url=request.path product=product variants=variants %}
       <input type="submit" id="product_form_submit_button" />
     </form>
   </div>
+  <script>
+    const handle_no_variant_file_delete = (file_pk) => {
+      const fileRow = document.getElementById(`no_variant_file_${file_pk}`)
+      if (fileRow) {
+        fileRow.remove()
+      }
+    
+      // Track the deleted file in export_data
+      if (!export_data.deleted_files) {
+        export_data.deleted_files = []
+      }
+      export_data.deleted_files.push(file_pk)
+    }
+  </script>
 {% endblock %}

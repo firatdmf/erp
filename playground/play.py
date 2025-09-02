@@ -1,18 +1,16 @@
-# from currency_converter import CurrencyConverter
-# from forex_python.converter import CurrencyRates
-# from google_currency import convert  
-# c = CurrencyConverter()
-# c2 = CurrencyRates()
-
-# print(c.convert(1, "EUR", "USD"))
-# print(c.convert(1, "TRY", "USD"))
-
-# try:
-#     rate = c2.get_rate("USD", "TRY")
-#     print(f"USD → TRY rate: {rate}")
-# except Exception as e:
-#     print(f"Failed to get rate: {e}")
+import pandas as pd
 
 
-# print(convert('EUR', 'USD', 1))
+def play():
+    karven_stock_file = "/Users/muhammed/Code/erp/playground/karven_stock.xlsx"
+    stock_df = pd.read_excel(karven_stock_file)
+    stock_df = stock_df[stock_df["quantity"].astype(float) >= 100].reset_index(
+        drop=True
+    )
+    stock_df = stock_df[stock_df["client"] != "FIRAT TEKSTİL ve DERİ ÜRÜNLERİ SAN.TİC.LTD.ŞTİ"].reset_index(drop=True)
+    print(stock_df.head(20))
+    # price_df =
+    print(stock_df.shape[0])
 
+
+play()

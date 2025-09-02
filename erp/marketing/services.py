@@ -5,9 +5,11 @@ from marketing.models import (
     ProductVariantAttribute,
     ProductVariantAttributeValue,
     ProductCategory,
+    ProductFile
 )
 from django.db import transaction
 import unicodedata
+import json
 
 
 # we do this, so we clean data strings, so special characters won't mess up our logic
@@ -19,8 +21,20 @@ def normalize_value(value):
     value = value.lower().replace(" ", "_")
     return value
 
+# def get_files_for_design(json_path, design):
+
 
 def import_stock_from_excel(file_path=None):
+
+    product_image_folder = "/Users/muhammed/Code/demfirat/public/media/products/embroidered_sheer_curtain_fabrics"
+    product_image_json = "/Users/muhammed/Code/demfirat/src/vir_db/products_embroidered_sheer_curtain_fabrics.json"
+    with open(product_image_json, "r",encoding="utf-8") as f:
+        image_data = pd.read_json(f)
+        image_data = json.load(f)
+
+    # print(image_data.head())
+    # return
+
     """
     Import products, variants, categories, and attributes from an Excel file.
     Assumes the Excel has columns like:
@@ -54,9 +68,10 @@ def import_stock_from_excel(file_path=None):
     with transaction.atomic():
         # _ stands for index
         for _, row in df.iterrows():
-            # if _ == 4:
-            #     print("now returned")
-            #     return
+            # only the first 5 for testing
+            if _ == 4:
+                print("now returned")
+                return
             print("now performing: ", str(_ + 1) + "/" + str(number_of_products))
             # Handle category
             category = None
@@ -80,6 +95,8 @@ def import_stock_from_excel(file_path=None):
                     "type": "embroidery",
                 },
             )
+            product.tags = ["stock_imported", "embroidery"]
+            product.save()
 
             # Handle variants
             variant = None

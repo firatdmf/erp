@@ -611,7 +611,7 @@ def get_product(request):
 
     # All product files (main and variant)
     product_files_qs = product.files.all()
-    print("your product files", product_files_qs)
+    # print("your product files", product_files_qs)
     product_files = [
         {
             "id": pf.id,
@@ -625,9 +625,16 @@ def get_product(request):
     # Variants
     variants = product.variants.all()
     variants_data = []
+    unique_attribute_value_pks = set()
     for variant in variants:
         # Find primary image for variant (if any)
         variant_primary_file = variant.files.first()
+        # product_variant_attribute_values = variant.product_variant_attribute_values.all().values_list("pk", flat=True)
+        product_variant_attribute_values_pk_list = list(
+            variant.product_variant_attribute_values.values_list("pk", flat=True)
+        )
+        unique_attribute_value_pks.update(product_variant_attribute_values_pk_list)
+        print("Unique attribute value pks:", unique_attribute_value_pks)
         variants_data.append(
             {
                 "id": variant.id,
@@ -641,8 +648,12 @@ def get_product(request):
                 "primary_image": (
                     variant_primary_file.file_url if variant_primary_file else None
                 ),
+                "product_variant_attribute_values": list(unique_attribute_value_pks),
+                # "product_variant_attribute_values":variant.product_variant_attribute_values,
+                # product_variant_attribute_values: variant.product_variant_attribute_values,
             }
         )
+        unique_attribute_value_pks = set()
 
     # Attribute values
     # attribute_values = ProductVariantAttributeValue.objects.filter(product=product)
@@ -672,8 +683,8 @@ def get_product(request):
         }
         for attr in attributes
     ]
-    print("here comes the response")
-    print(product_files)
+    # print("here comes the response")
+    # print(product_files)
     # print(
     #     {
     #         "product_category": product_category,

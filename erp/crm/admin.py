@@ -14,3 +14,5 @@ class NoteAdmin(admin.ModelAdmin):
 
 class CompanyAdmin(admin.ModelAdmin):
     search_fields = ["name", "email", "phone"]
+
+admin.site.register(ClientGroup)

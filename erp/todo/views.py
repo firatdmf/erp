@@ -134,11 +134,13 @@ class EditTaskView(generic.edit.UpdateView):
     # Instead of doing like above, let's get the url to go to from the get variable in the url. 
     # To accomplish this I will pass the variable from the update_task.html template and set it equal to the success_url 
     def form_valid(self, form):
-        next_url = self.request.POST.get('next_url')
+        next_url = self.request.GET.get('next_url')
         if(next_url):
             self.success_url = next_url
+            print("next_url",next_url)
         else:
             self.success_url = '/todo/'
+            print("no next_url")
         return super().form_valid(form)
 
 

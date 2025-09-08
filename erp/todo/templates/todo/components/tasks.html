@@ -23,7 +23,7 @@
               {% endif %}
             </p>
             {% if task.description %}
-              <p class="taskDescription">{{ task.description }}</p>
+              <p class="taskDescription">{{ task.description|linebreaksbr }}</p>
             {% endif %}
             <p class="taskDueDate">
               Due: {{ task.due_date }}
@@ -44,7 +44,7 @@
                 <input type="hidden" name="task_id" value="{{ task.id }}" />
                 <button type="submit" class="completeTaskButton">Complete Task</button>
               </form>
-              <a href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}"><button>Update Task</button></a>
+              <a href="{% url 'todo:update_task' task.id %}?next_url={{ path|urlencode }}"><button>Update Task</button></a>
               <form action="{% url 'todo:delete_task' task.id %}" method="post">
                 {% csrf_token %}
                 <input type="hidden" name="company_id" value="{{ company.id }}" />
@@ -70,7 +70,7 @@
               {% endif %}
             </p>
             {% if task.description %}
-              <p class="taskDescription">{{ task.description }}</p>
+              <p class="taskDescription">{{ task.description|linebreaksbr }}</p>
             {% endif %}
             <p class="taskDueDate">
               Due: {{ task.due_date }}
@@ -88,7 +88,7 @@
                 <input type="hidden" name="task_id" value="{{ task.id }}" />
                 <button type="submit" class="completeTaskButton">Complete Task</button>
               </form>
-              <a href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}"><button>Update Task</button></a>
+              <a href="{% url 'todo:update_task' task.id %}?next_url={{ path|urlencode }}"><button>Update Task</button></a>
               <form action="{% url 'todo:delete_task' task.id %}" method="post">
                 {% csrf_token %}
                 <input type="hidden" name="company_id" value="{{ company.id }}" />

@@ -11,8 +11,8 @@ register = template.Library()
 
 
 @register.simple_tag
-def dashboard_component(csrf_token):
-
+def dashboard_component(csrf_token,path):
+    print("Path in dashboard component:", path)
 
     # Below two lines result in the same thing but they give naive time warning so we fix it by setting the timezone
     # today = timezone.localtime(timezone.now()).date()
@@ -48,6 +48,7 @@ def dashboard_component(csrf_token):
         'csrf_token':csrf_token,
         'number_of_leads_added':number_of_leads_added,
         'country_of_the_day':country_of_the_day,
+        'path':path,
     })
 
 @register.simple_tag

@@ -15,7 +15,7 @@
       Contact: <strong><a href="{% url 'crm:contact_detail' task.contact.pk %}">{{ task.contact }}</a></strong>
     </p>
   {% endif %}
-  <form method="post" action="{% url 'todo:update_task' task.id %}">
+  <form method="post" action="{% url 'todo:update_task' task.id %}?next_url={{ request.GET.next_url }}">
     {% csrf_token %}
     {{ form.as_p }}
     <input type="hidden" name="next_url" value="{{ request.GET.next_url }}" />

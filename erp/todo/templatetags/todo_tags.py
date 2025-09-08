@@ -13,7 +13,7 @@ def update_task(task_id):
 
 
 @register.simple_tag
-def tasks_component(sort_type, csrf_token, page_type, contact, company):
+def tasks_component(sort_type, csrf_token, page_type, contact, company, path):
     today = timezone.now().date()
     if page_type == "dashboard":
         if contact:
@@ -42,6 +42,7 @@ def tasks_component(sort_type, csrf_token, page_type, contact, company):
             # page type can be 'dashboard', 'report', 'crm:detail', etc.
             "page_type": page_type,
             "csrf_token": csrf_token,
+            "path": path,
             # 'company': company,
             # 'contact':contact,
             # 'note_form': note_form,

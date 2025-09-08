@@ -6,6 +6,15 @@ from django.forms import ValidationError
 
 # Create your models here.
 
+# group: tech
+class ClientGroup(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(max_length=200, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 
 class Company(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -20,6 +29,7 @@ class Company(models.Model):
     website = models.CharField(max_length=100, blank=True)
     address = models.CharField(max_length=255, blank=True)
     country = models.CharField(max_length=50, blank=True)
+    group = models.ForeignKey(ClientGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name="companies")
 
     def __str__(self):
         return self.name
@@ -45,6 +55,7 @@ class Contact(models.Model):
     address = models.TextField(max_length=255, blank=True)
     country = models.CharField(max_length=50, blank=True)
     birthday = models.DateField(null=True, blank=True)
+    group = models.ForeignKey(ClientGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name="contacts")
 
     def __str__(self):
         if self.company:

@@ -5,7 +5,7 @@ from marketing.models import (
     ProductVariantAttribute,
     ProductVariantAttributeValue,
     ProductCategory,
-    ProductFile
+    ProductFile,
 )
 from django.db import transaction
 import unicodedata
@@ -21,6 +21,7 @@ def normalize_value(value):
     value = value.lower().replace(" ", "_")
     return value
 
+
 # def get_files_for_design(json_path, design):
 
 
@@ -28,7 +29,7 @@ def import_stock_from_excel(file_path=None):
 
     product_image_folder = "/Users/muhammed/Code/demfirat/public/media/products/embroidered_sheer_curtain_fabrics"
     product_image_json = "/Users/muhammed/Code/demfirat/src/vir_db/products_embroidered_sheer_curtain_fabrics.json"
-    with open(product_image_json, "r",encoding="utf-8") as f:
+    with open(product_image_json, "r", encoding="utf-8") as f:
         image_data = pd.read_json(f)
         image_data = json.load(f)
 
@@ -172,3 +173,67 @@ def import_attr_value_from_csv(file_path=None):
             )
             variant.save()
     print("Import complete.")
+
+
+import os, re
+
+images_directory_in_str = "/Users/muhammed/Code/demfirat/public/media/products/embroidered_sheer_curtain_fabrics"
+karven_stock_file_path = "/Users/muhammed/Code/karven_stock/karven_stock.xlsx"  # ******
+
+
+def import_photos_from_folder(images_folder_path=None, karven_stock_file_path=None):
+
+    stock_df = pd.read_excel(karven_stock_file_path, skiprows=2)
+    stock_df = stock_df[
+        stock_df["Musteri"] != "FIRAT TEKSTİL ve DERİ ÜRÜNLERİ SAN.TİC.LTD.ŞTİ"
+    ].reset_index(drop=True)
+    # Create the 'images' column with empty lists
+    stock_df["images"] = [[] for _ in range(len(stock_df))]
+    stock_df["parent_images"] = [[] for _ in range(len(stock_df))]
+
+    for row_index, row in stock_df.iterrows():
+        parents_track = []
+        parent_images = []
+        images = []
+        # omit the GL designs for now
+        if "GL" in row["Desen"] or "FL" in row["Desen"]:
+            continue
+        for image_index, file in enumerate(os.listdir(images_folder_path)):
+
+            filename = os.fsdecode(file)
+            if re.sub("[^0-9]", "", row["Desen"]) not in filename:
+                continue
+            if os.path.isdir(os.path.join(images_folder_path, filename)):
+                print(f"{filename} is a folder, skipping.")
+                continue
+
+            # get rid of the extension
+            sku = filename.split(".")[0]
+            # get rid of the - if exists
+            if "-" in sku:
+                sku = sku.split("-")[0]
+            # skim the variant name
+            if "_" in sku:
+                design_number = sku.split("_")[0]
+                design_number = int(design_number)
+                prefix = ""
+                if design_number < 2000:
+                    prefix = "N"
+                else:
+                    prefix = "K"
+                parent_sku = prefix + str(design_number)
+                variant = sku.split("_")[1]
+                sku = design_number + "." + variant
+                parents_track.append(parent_sku)
+            else:
+                design_number = int(sku)
+                prefix = ""
+                if design_number < 2000:
+                    prefix = "N"
+                else:
+                    prefix = "K"
+                sku = prefix + str(design_number)
+            
+            if row["Desen"] != (design_number):
+                continue
+        stock_df.at[row_index, "parent_images"] = parent_images

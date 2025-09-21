@@ -35,7 +35,7 @@
       <button type="submit">Add Task</button>
     </form>
     <h2>Tasks</h2>
-    {% tasks_component company=None contact=contact csrf_token=csrf_token page_type='report_detail' sort_type='dictsortreversed' %}
+    {% tasks_component company=None contact=contact csrf_token=csrf_token page_type='report_detail' sort_type='dictsortreversed' path=path %}
     {% history_component company=None contact=contact csrf_token=csrf_token note_form=note_form current_url=request.path %}
     <div class="contact_actions">
       <a href="{% url 'crm:update_contact' contact.id %}?next_url={{ request.path|urlencode }}">Update Contact Information</a>

@@ -5,9 +5,10 @@
 {% endblock %}
 <div class="tasks_component">
   {% comment %} {{ page_type }} {% endcomment %}
+  <p>user is: {{member}}</p>
   <ul>
     {% for task in tasks|task_sort:sort_type %}
-      {% if 'report' in page_type %}
+      {% if 'report' in page_type and task.member == member %}
         {% if not task.completed %}
           <li class="taskComponent">
             <p class="taskName">
@@ -35,9 +36,9 @@
                 <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
               {% endif %}
             </p>
-            {% if not 'detail' in page_type %}
+            {% comment %} {% if not 'detail' in page_type %}
             {{task.completed}}
-            {% endif %}
+            {% endif %} {% endcomment %}
             <div class="task_buttons">
               <form action="{% url 'todo:complete_task' task.id %}" method="post">
                 {% csrf_token %}
@@ -52,12 +53,20 @@
                 <br />
               </form>
             </div>
+            {% if task.member %}
+            <div class="task_assigned_member">
+                <p>
+                 {{task.member}}
+                </p>
+            </div>
+            {% endif %}
           </li>
         {% endif %}
       {% else %}
         {% comment %} {% if not task.completed and task.due_date|is_past_due %} {% endcomment %}
         {% comment %} is_past_due so we won't see tasks due in future days than today in the dashboard {% endcomment %}
         {% if not task.completed and task.due_date|is_past_due %}
+        {% if not task.member or task.member == member%}
           <li class="taskComponent">
             <p class="taskName">
               {{ task.name }}
@@ -96,7 +105,15 @@
                 <br />
               </form>
             </div>
+            {% if task.member %}
+            <div class="task_assigned_member">
+                <p>
+                 {{task.member}}
+                </p>
+            </div>
+            {% endif %}
           </li>
+        {% endif %}
         {% else %}
           {% comment %} <a href="{% url 'todo:update_task' task.pk %}"><p class="error" style="color:red;">{{ task.name }}</p></a> {% endcomment %}
         {% endif %}

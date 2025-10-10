@@ -11,6 +11,8 @@
   {% block js %}
     <script src="{% static 'crm/js/detailPages.js' %}" defer></script>
   {% endblock %}
+<div class="company_detail_page">
+
 
   <p>
     <a href="{% url 'crm:company_list' %}"><--- Go to Company List page</a>
@@ -165,6 +167,11 @@
             <button type="submit" class="deleteTaskButton">Delete Task</button><br />
           </form>
           <a href="{% url 'todo:update_task' task.id %}?next_url={{ request.path|urlencode }}"><button>Update Task</button></a>
+          {% if task.member %}
+            <div class="task_assigned_member">
+              <p>{{ task.member }}</p>
+            </div>
+          {% endif %}
         </li>
       {% endif %}
     {% empty %}
@@ -184,4 +191,5 @@
       <button type="submit" class="deleteButton">Delete Company</button><br />
     </form>
   </div>
+</div>
 {% endblock %}

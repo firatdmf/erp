@@ -12,14 +12,18 @@ def update_task(task_id):
     return render_to_string("todo/update_task.html", {"task_id": task_id})
 
 
-@register.simple_tag
-def tasks_component(sort_type, csrf_token, page_type, contact, company, path):
+@register.simple_tag()
+# below is to allow passing context (the user)
+# @register.inclusion_tag("todo/components/tasks.html", takes_context=True)
+def tasks_component(sort_type, csrf_token, page_type, contact, company, path, member):
+    # member = user.member
     today = timezone.now().date()
+    # user = context["user"]
     if page_type == "dashboard":
         if contact:
-            tasks = Task.objects.filter(contact=contact,completed=False)
+            tasks = Task.objects.filter(contact=contact, completed=False)
         elif company:
-            tasks = Task.objects.filter(company=company,completed=False)
+            tasks = Task.objects.filter(company=company, completed=False)
         else:
             tasks = Task.objects.filter(completed=False)
     else:
@@ -43,6 +47,8 @@ def tasks_component(sort_type, csrf_token, page_type, contact, company, path):
             "page_type": page_type,
             "csrf_token": csrf_token,
             "path": path,
+            "member": member,
+            # "user": user,
             # 'company': company,
             # 'contact':contact,
             # 'note_form': note_form,

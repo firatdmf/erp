@@ -5,7 +5,7 @@ from django.db.models import Value, CharField
 
 # This is for base view functions to work on everywhere
 
-def last_five_entities(request):
+def last_ten_entities(request):
     contacts = Contact.objects.all().annotate(
         entry_type=Value("Contact", output_field=CharField())
     )
@@ -15,4 +15,4 @@ def last_five_entities(request):
     combined_list = sorted(
         chain(contacts, companies), key=attrgetter("created_at"), reverse=True
     )
-    return {'last_five_entities':combined_list[:5]}
+    return {'last_ten_entities':combined_list[:10]}

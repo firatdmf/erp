@@ -138,7 +138,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 # The below helps to put the view function variable global in all templates
-                "erp.context_processors.last_five_entities",
+                "erp.context_processors.last_ten_entities",
             ],
         },
     },

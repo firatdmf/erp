@@ -149,6 +149,7 @@ class CompanyCreate(generic.edit.CreateView):
                 due_date=task_due_date,
                 description=task_description,
                 company=self.object,
+                member=self.request.user.member,
             )
         # return super().form_valid(form)
         return HttpResponseRedirect(self.get_success_url())
@@ -162,6 +163,12 @@ class EditCompanyView(generic.edit.UpdateView):
     model = Company
     form_class = CompanyForm
     template_name = "crm/update_company.html"
+
+    # pass data to the form
+    def get_initial(self):
+        initial = super().get_initial()
+        initial["member"] = self.request.user.member
+        return initial
 
     # success_url = "/crm/"  # URL to redirect after successfully editing an entry
     def form_valid(self, form):
@@ -182,7 +189,9 @@ class ContactDetail(generic.DetailView):
         context["notes"] = Note.objects.filter(contact=contact)
         context["note_form"] = NoteForm()
         context["tasks"] = Task.objects.filter(contact=contact)
-        initial_task_data = {"contact": contact.pk}
+        initial_task_data = {
+            "contact": contact.pk,
+        }
         # below is hide some specific fields I chose in todo task form view
         context["task_form"] = TaskForm(
             initial=initial_task_data, hide_fields=True
@@ -273,6 +282,7 @@ class CompanyDetail(generic.DetailView):
         elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.company = company
+            task.member = request.user.member
             task.save()
             return redirect(f"/crm/company/detail/{company.pk}")
         # If the form data is valid, it saves the new note associated with the company and redirects to the company detail page.

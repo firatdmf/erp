@@ -78,3 +78,9 @@
 .tasks_component .completeTaskButton{
     color:green;
 }
+
+.tasks_component .task_assigned_member{
+    margin-top: 10px;
+    font-size: 12px;
+    color: #555;
+}

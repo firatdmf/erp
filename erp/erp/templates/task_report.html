@@ -4,5 +4,5 @@
 {% block content %}
   <p>This is Task report page</p>
   {% comment %} <p>{{ my_variable }}</p> {% endcomment %}
-  {% tasks_component sort_type='dictsort' csrf_token=csrf_token page_type='report' company=None contact=None path=request.path%}
+  {% tasks_component sort_type='dictsort' csrf_token=csrf_token page_type='report' company=None contact=None path=request.path member=member%}
 {% endblock %}

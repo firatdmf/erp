@@ -105,11 +105,14 @@ class index(View):
 class CreateTask(generic.edit.CreateView):
     model = Task
     form_class = TaskForm
-    template_name = "todo/index.html"
+    template_name = "todo/create_task.html"
     # index here is from the url name
     success_url = reverse_lazy("index")
 
     def form_valid(self, form):
+        print("your member iss")
+        print("your member is", self.request.user.member)
+        form.instance.member = self.request.user.member
         return super().form_valid(form)
 
 

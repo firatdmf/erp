@@ -6,6 +6,7 @@ app_name = 'todo'
 urlpatterns = [
     path("", views.index.as_view(),name="index"),
     path('search/', views.search_contacts_and_companies, name='search_contacts_and_companies'),
+    path('tasks/create/',views.CreateTask.as_view(),name="create_task"),
     path("tasks/<int:task_id>/complete_task",views.complete_task,name="complete_task"),
     # path('tasks/<int:pk>/edit', views.TaskUpdateView.as_view(), name='edit_task'),
     path('tasks/<int:pk>/update_task', views.EditTaskView.as_view(), name='update_task'),

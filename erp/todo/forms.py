@@ -22,6 +22,7 @@ class TaskForm(forms.ModelForm):
             # 'company': HiddenInputWithStyle(),
             # 'contact': forms.HiddenInput(),  # Specify 'contact_company_id' as a hidden input here
             # 'company': forms.HiddenInput(),  # Specify 'contact_company_id' as a hidden input here
+            'member': forms.HiddenInput(),
         }
 
     # Below is to hide contact and company fields if the form has been used with parameter hide_fields=True
@@ -31,6 +32,8 @@ class TaskForm(forms.ModelForm):
         # Initialize the due date as today's date
         self.fields['due_date'].widget.attrs['value'] = date.today().strftime('%Y-%m-%d')
         self.fields['name'].label = "Task name"
+
+
         if hide_fields:
             # Remove Contact and Company fields from the form
             self.fields.pop('contact', None)

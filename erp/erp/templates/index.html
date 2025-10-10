@@ -4,5 +4,5 @@
 {% block content %}
   <div class="index"></div>
   <p>welcome to DEMFIRAT HOME PAGE</p>
-  {% dashboard_component csrf_token=csrf_token path=request.path %}
+  {% dashboard_component  csrf_token=csrf_token path=request.path member=user.member %}
 {% endblock %}

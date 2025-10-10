@@ -83,6 +83,7 @@ class ContactCreateForm(ModelForm):
                     name=self.cleaned_data["task_name"],
                     due_date=self.cleaned_data["task_due_date"],
                     description=self.cleaned_data["task_description"],
+                    member = instance.member,
                 )
         return instance
     
@@ -101,11 +102,15 @@ class CompanyForm(ModelForm):
         label="Task Due Date",
         widget=forms.DateInput(attrs={"type": "date"}),
         required=False,
-        initial=date.today(),
+        # initial=date.today(),
     )
     task_description = forms.CharField(
         widget=forms.Textarea, label="Task Description", required=False
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["task_due_date"].initial = date.today()
 
     class Meta:
         model = Company

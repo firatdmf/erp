@@ -4,8 +4,10 @@ from django.db import models
 from django.utils import timezone
 from django.urls import reverse
 from crm.models import Contact, Company
+
 # from authentication.models import Member
 from datetime import datetime, date
+from authentication.models import Member
 
 
 class Task(models.Model):
@@ -14,22 +16,26 @@ class Task(models.Model):
     # So, in summary:
     # blank=True affects form validation.
     # null=True affects the database schema.
-    
+
     name = models.CharField(max_length=200)
     due_date = models.DateField()
-    description = models.TextField(blank=True,null=True)
+    description = models.TextField(blank=True, null=True)
     completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(auto_now_add=True,editable=True)
+    completed_at = models.DateTimeField(auto_now_add=True, editable=True)
     # make it either a company or contact
-    contact = models.ForeignKey(Contact, on_delete=models.CASCADE,blank=True,  null=True)
-    company = models.ForeignKey(Company, on_delete=models.CASCADE,blank=True,  null=True)
-
+    contact = models.ForeignKey(
+        Contact, on_delete=models.CASCADE, blank=True, null=True
+    )
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, blank=True, null=True
+    )
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True)
 
     def __str__(self):
-        if(self.company):
+        if self.company:
             return f"{self.name} for | {self.company}"
-        elif (self.contact):
+        elif self.contact:
             return f"{self.name} for | {self.contact}"
         else:
             return self.name
@@ -37,6 +43,9 @@ class Task(models.Model):
     #  Add a delete_url field to your Todo model to store the URL that will be used to delete the todo item.
     #  You can use the reverse function to generate this URL.
     def get_delete_url(self):
-        return reverse('complete_task',args=[str(self.id)])
+        return reverse("complete_task", args=[str(self.id)])
 
-
+    def save(self, *args, **kwargs):
+        if not self.member and hasattr(self, "_current_member"):
+            self.member = self._current_member
+        super().save(*args, **kwargs)

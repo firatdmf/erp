@@ -43,7 +43,7 @@
               <div class="recent">
                 <h4>Recent</h4>
                 <ul>
-                  {% for entry in last_five_entities %}
+                  {% for entry in last_ten_entities %}
                     <li>
                       {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
                       {% if entry.entry_type == 'Contact' %}
@@ -74,7 +74,7 @@
                     <a href="{% url 'crm:create_company' %}">Add Company</a>
                   </li>
                   <li>
-                    <a href="{% url 'todo:index' %}">Add Task</a>
+                    <a href="{% url 'todo:create_task' %}">Add Task</a>
                   </li>
                   <li>
                     <a href="{% url 'marketing:product_create' %}">Add Product</a>

@@ -5,7 +5,7 @@
 {% endblock %}
 <div class="tasks_component">
   {% comment %} {{ page_type }} {% endcomment %}
-  <p>user is: {{member}}</p>
+  {% comment %} <p>user is: {{member}}</p> {% endcomment %}
   <ul>
     {% for task in tasks|task_sort:sort_type %}
       {% if 'report' in page_type and task.member == member %}

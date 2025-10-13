@@ -8,8 +8,8 @@
 {% endblock %}
 <div class="dashboardComponent">
   <h2>New leads added today: {{ number_of_leads_added }}</h2>
-  <p>{{member}}</p>
-  <p>user is1: {{user.member.first_name}}</p>
+  {% comment %} <p>{{member}}</p> {% endcomment %}
+  {% comment %} <p>user is1: {{user.member.first_name}}</p> {% endcomment %}
   {% if country_of_the_day %}
     <h2>Country of the day: {{ country_of_the_day }}</h2>
   {% endif %}

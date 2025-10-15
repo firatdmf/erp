@@ -16,3 +16,17 @@ class CompanyAdmin(admin.ModelAdmin):
     search_fields = ["name", "email", "phone"]
 
 admin.site.register(ClientGroup)
+
+
+@admin.register(CompanyFollowUp)
+class CompanyFollowUpAdmin(admin.ModelAdmin):
+    list_display = ('company', 'is_active', 'emails_sent_count', 'last_email_sent_at', 'stopped_reason', 'created_at')
+    list_filter = ('is_active', 'stopped_reason', 'emails_sent_count')
+    search_fields = ('company__name', 'company__email')
+    readonly_fields = ('created_at', 'last_email_sent_at', 'stopped_at')
+    
+    def get_readonly_fields(self, request, obj=None):
+        # Make all tracking fields readonly when editing
+        if obj:
+            return self.readonly_fields + ('company', 'emails_sent_count')
+        return self.readonly_fields

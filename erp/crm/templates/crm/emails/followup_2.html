@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .signature { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p>Hi {{ company.name }} team,</p>
+        
+        <p>I wanted to follow up on my previous email about how our ERP solution could benefit {{ company.name }}.</p>
+        
+        <p>I understand you're probably busy, but I thought you might be interested in a quick case study: One of our clients reduced their operational overhead by 30% within the first quarter of implementation.</p>
+        
+        <p>Key benefits they experienced:</p>
+        <ul>
+            <li>Real-time inventory tracking</li>
+            <li>Automated financial reporting</li>
+            <li>Streamlined customer management</li>
+            <li>Better visibility across operations</li>
+        </ul>
+        
+        <p>Would it be valuable to explore how we could achieve similar results for {{ company.name }}?</p>
+        
+        <p>Let me know if you'd like to schedule a quick demo or have any questions.</p>
+        
+        <p>Best regards,</p>
+        
+        <div class="signature">
+            <p><strong>{{ sender_name }}</strong><br>
+            {{ sender_title }}<br>
+            {{ sender_company }}</p>
+        </div>
+    </div>
+</body>
+</html>

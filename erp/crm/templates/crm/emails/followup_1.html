@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .signature { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <p>Hi {{ company.name }} team,</p>
+        
+        <p>I hope this email finds you well. I wanted to reach out to introduce our ERP solutions that can help streamline your business operations.</p>
+        
+        <p>We specialize in providing lightweight, modular ERP systems designed specifically for production facilities. Our platform helps businesses like yours manage:</p>
+        
+        <ul>
+            <li>Accounting and financial tracking</li>
+            <li>Customer relationship management</li>
+            <li>Product catalog and inventory</li>
+            <li>Operations and manufacturing workflows</li>
+        </ul>
+        
+        <p>I'd love to learn more about your current challenges and see if we might be a good fit to help.</p>
+        
+        <p>Would you be open to a brief conversation sometime this week or next?</p>
+        
+        <p>Best regards,</p>
+        
+        <div class="signature">
+            <p><strong>{{ sender_name }}</strong><br>
+            {{ sender_title }}<br>
+            {{ sender_company }}</p>
+        </div>
+    </div>
+</body>
+</html>

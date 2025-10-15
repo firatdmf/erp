@@ -276,3 +276,17 @@ LOGOUT_REDIRECT_URL = "/authentication/index"
 
 # for accounting model
 BASE_CURRENCY_CODE = "USD"
+
+# Email Configuration (Gmail SMTP)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+
+# Follow-up email settings
+FOLLOWUP_EMAIL_FROM = config('FOLLOWUP_EMAIL_FROM', default=EMAIL_HOST_USER)
+FOLLOWUP_SENDER_NAME = config('FOLLOWUP_SENDER_NAME', default='Nejum ERP Team')
+FOLLOWUP_SENDER_TITLE = config('FOLLOWUP_SENDER_TITLE', default='Sales Team')
+FOLLOWUP_SENDER_COMPANY = config('FOLLOWUP_SENDER_COMPANY', default='Nejum')

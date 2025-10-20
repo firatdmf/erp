@@ -171,7 +171,7 @@ class Product(models.Model):
     # This should be unique also
     # If the product has a variant, this should be null
     sku = models.CharField(
-        max_length=20, null=True, blank=True, unique=True, db_index=True
+        max_length=20, null=True, blank=False, unique=True, db_index=True
     )
     # Barcode (ISBN, UPC, GTIN, etc.) might delete this later
     barcode = models.CharField(max_length=14, null=True, blank=True, db_index=True)

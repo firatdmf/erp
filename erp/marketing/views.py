@@ -301,7 +301,7 @@ class ProductFileDelete(View):
 def get_product_categories(request):
     categories = ProductCategory.objects.all()
     data = [
-        {"pk": category.pk, "name": category.name, "image_url": category.image_url}
+        {"pk": category.pk, "name": category.name, "image_url": category.image_url, "description": category.description}
         for category in categories
     ]
     return JsonResponse(data, safe=False)
@@ -517,6 +517,8 @@ def get_products(request):
             "product_variants": product_variants_data,
             "product_variant_attributes": product_variant_attributes_data,
             "product_variant_attribute_values": product_variant_attribute_values_data,
+            "product_category": category.name if product_category else None,
+            "product_category_description": category.description if category.description else None,
         }
     )
 

@@ -146,11 +146,11 @@ class CompanyFollowUp(models.Model):
     """
     Tracks automated follow-up emails sent to prospect companies.
     Follow-up schedule:
-    - Email 1: 3 days after company creation
-    - Email 2: 7 days after email 1 (10 days total)
-    - Email 3: 14 days after email 2 (24 days total)
-    - Email 4: 30 days after email 3 (54 days total)
-    - Email 5: 60 days after email 4 (114 days total)
+    - Email 1: Sent immediately when company is created
+    - Email 2: 3 days after email 1
+    - Email 3: 7 days after email 2 (10 days total)
+    - Email 4: 14 days after email 3 (24 days total)
+    - Email 5: 30 days after email 4 (54 days total)
     """
     company = models.OneToOneField(
         Company,
@@ -179,24 +179,32 @@ class CompanyFollowUp(models.Model):
         """
         Determines if a follow-up email should be sent based on schedule.
         Returns: (should_send: bool, days_to_wait: int)
+        
+        Note: Email 1 is sent immediately via signal, so this handles emails 2-5.
         """
         if not self.is_active or self.emails_sent_count >= 5:
             return False, 0
 
-        # Schedule in days: [3, 7, 14, 30, 60]
-        schedule = [3, 7, 14, 30, 60]
+        # Email 1 is already sent immediately via signal
+        # This handles emails 2-5 with schedule: [3, 7, 14, 30] days after previous email
+        schedule = [3, 7, 14, 30]  # Days to wait after each email
         
         from django.utils import timezone
         now = timezone.now()
         
+        # Emails 2-5: wait specified days after last email
         if self.emails_sent_count == 0:
-            # First email: 3 days after company creation
-            reference_date = self.company.created_at
-            days_to_wait = schedule[0]
-        else:
-            # Subsequent emails: use last email sent date
-            reference_date = self.last_email_sent_at
-            days_to_wait = schedule[self.emails_sent_count]
+            # Edge case: Email 1 wasn't sent for some reason, shouldn't happen
+            return False, 0
+        
+        # Calculate which email we're about to send (2-5)
+        next_email_index = self.emails_sent_count  # Since email 1 is already sent
+        
+        if next_email_index > len(schedule):
+            return False, 0
+        
+        reference_date = self.last_email_sent_at
+        days_to_wait = schedule[next_email_index - 1]  # -1 because email 1 is index 0
         
         days_elapsed = (now - reference_date).days
         return days_elapsed >= days_to_wait, days_to_wait

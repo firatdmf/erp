@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "authentication",
     "operating",
     "marketing",
+    "email_automation",  # Email automation system
     "django_htmx",
     # below is to host images
     "cloudinary",
@@ -139,6 +140,9 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 # The below helps to put the view function variable global in all templates
                 "erp.context_processors.last_ten_entities",
+                "erp.context_processors.client_groups",
+                "erp.context_processors.product_categories",
+                "erp.context_processors.suppliers",
             ],
         },
     },
@@ -290,3 +294,13 @@ FOLLOWUP_EMAIL_FROM = config('FOLLOWUP_EMAIL_FROM', default=EMAIL_HOST_USER)
 FOLLOWUP_SENDER_NAME = config('FOLLOWUP_SENDER_NAME', default='Nejum ERP Team')
 FOLLOWUP_SENDER_TITLE = config('FOLLOWUP_SENDER_TITLE', default='Sales Team')
 FOLLOWUP_SENDER_COMPANY = config('FOLLOWUP_SENDER_COMPANY', default='Nejum')
+
+# Gmail OAuth2 Settings for Email Automation
+GMAIL_CLIENT_ID = config('GMAIL_CLIENT_ID', default='')
+GMAIL_CLIENT_SECRET = config('GMAIL_CLIENT_SECRET', default='')
+GMAIL_REDIRECT_URI = config('GMAIL_REDIRECT_URI', default='http://localhost:8000/email/oauth2callback/')
+GMAIL_SCOPES = [
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.modify'
+]

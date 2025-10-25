@@ -72,6 +72,31 @@ class Dashboard(View):
     template_name = "dashboard.html"
 
     def get(self, request,*args, **kwargs):
+        # Check if this is an AJAX request for tasks by date
+        selected_date = request.GET.get('date')
+        if selected_date:
+            from django.http import HttpResponse
+            from django.template.loader import render_to_string
+            from datetime import datetime
+            
+            try:
+                date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
+                tasks = Task.objects.filter(completed=False, due_date=date_obj)
+                
+                # Render tasks using the same template
+                html = render_to_string('todo/components/tasks.html', {
+                    'tasks': tasks,
+                    'sort_type': 'dictsortreversed',
+                    'page_type': 'dashboard',
+                    'csrf_token': request.META.get('CSRF_COOKIE'),
+                    'path': request.path,
+                    'member': request.user.member if hasattr(request.user, 'member') else None,
+                })
+                
+                return HttpResponse(html)
+            except ValueError:
+                return HttpResponse('<div class="tasks_component"><ul><li style="color: red;">Invalid date format</li></ul></div>')
+        
         return render(request, self.template_name, {"title": "Dashboard"})
     
 

@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'email_automation/css/mail_dashboard.css' %}?v=1.0" />
+{% endblock %}
+
+{% block content %}
+<div class="mail-dashboard">
+  <!-- Compact Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <i class="fa fa-rocket"></i>
+      <div class="stat-content">
+        <span class="stat-value">{{ active_campaigns }}</span>
+        <span class="stat-label">Active</span>
+      </div>
+    </div>
+    <div class="stat-item">
+      <i class="fa fa-paper-plane"></i>
+      <div class="stat-content">
+        <span class="stat-value">{{ total_sent }}</span>
+        <span class="stat-label">Sent Today</span>
+      </div>
+    </div>
+    <div class="stat-item">
+      <i class="fa fa-reply"></i>
+      <div class="stat-content">
+        <span class="stat-value">{{ total_replies }}</span>
+        <span class="stat-label">Replies</span>
+      </div>
+    </div>
+    <div class="stat-item">
+      <i class="fa fa-check-circle"></i>
+      <div class="stat-content">
+        <span class="stat-value">{{ qualified_companies }}</span>
+        <span class="stat-label">Qualified</span>
+      </div>
+    </div>
+    
+    <!-- Gmail Connection Status -->
+    <div class="gmail-status">
+      {% if email_account %}
+        <i class="fa fa-check-circle" style="color: #10b981;"></i>
+        <span>{{ email_account.email_address }}</span>
+        <a href="{% url 'email_automation:disconnect_gmail' %}" class="btn-icon" title="Disconnect">
+          <i class="fa fa-times"></i>
+        </a>
+      {% else %}
+        <a href="{% url 'email_automation:connect_gmail' %}" class="btn btn-primary btn-sm">
+          <i class="fa fa-link"></i> Connect Gmail
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Main Mail Interface -->
+  <div class="mail-interface">
+    <!-- Sidebar Navigation -->
+    <div class="mail-sidebar">
+      <nav class="mail-nav">
+        <a href="#" class="nav-item active" data-view="inbox">
+          <i class="fa fa-inbox"></i>
+          <span>Inbox</span>
+          <span class="count">{{ total_replies }}</span>
+        </a>
+        <a href="#" class="nav-item" data-view="sent">
+          <i class="fa fa-paper-plane"></i>
+          <span>Sent</span>
+        </a>
+        <a href="#" class="nav-item" data-view="templates">
+          <i class="fa fa-file-text"></i>
+          <span>Templates</span>
+        </a>
+        <a href="#" class="nav-item" data-view="campaigns">
+          <i class="fa fa-list"></i>
+          <span>Campaigns</span>
+          <span class="count">{{ active_campaigns }}</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Content Area -->
+    <div class="mail-content">
+      <!-- Inbox View -->
+      <div class="mail-view" id="inbox-view">
+        <div class="view-header">
+          <h2><i class="fa fa-inbox"></i> Inbox - Replies</h2>
+          <div class="view-actions">
+            <button class="btn btn-secondary btn-sm" data-refresh="inbox">
+              <i class="fa fa-refresh"></i> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="mail-list" id="inbox-list">
+          {% if not email_account %}
+          <div class="empty-state">
+            <i class="fa fa-envelope-open"></i>
+            <p>Connect your Gmail account to view replies</p>
+            <a href="{% url 'email_automation:connect_gmail' %}" class="btn btn-primary">Connect Gmail</a>
+          </div>
+          {% else %}
+          <div class="loading-state">
+            <i class="fa fa-spinner fa-spin"></i>
+            <p>Loading emails...</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Sent View -->
+      <div class="mail-view" id="sent-view" style="display: none;">
+        <div class="view-header">
+          <h2><i class="fa fa-paper-plane"></i> Sent Emails</h2>
+          <div class="view-actions">
+            <select class="form-select" id="dateFilter">
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="all" selected>All Time</option>
+            </select>
+          </div>
+        </div>
+        <div class="mail-list" id="sent-list">
+          <div class="loading-state">
+            <i class="fa fa-spinner fa-spin"></i>
+            <p>Loading sent emails...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Templates View -->
+      <div class="mail-view" id="templates-view" style="display: none;">
+        <div class="view-header">
+          <h2><i class="fa fa-file-text"></i> Email Templates</h2>
+          <div class="view-actions">
+            <a href="{% url 'email_automation:template_create' %}" class="btn btn-primary btn-sm">
+              <i class="fa fa-plus"></i> New Template
+            </a>
+          </div>
+        </div>
+        <div class="templates-grid" id="templates-list">
+          <div class="loading-state">
+            <i class="fa fa-spinner fa-spin"></i>
+            <p>Loading templates...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Campaigns View -->
+      <div class="mail-view" id="campaigns-view" style="display: none;">
+        <div class="view-header">
+          <h2><i class="fa fa-list"></i> Email Campaigns</h2>
+          <div class="view-actions">
+            <button class="btn btn-secondary btn-sm" data-refresh="campaigns">
+              <i class="fa fa-refresh"></i> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="campaigns-list" id="campaigns-list">
+          <div class="loading-state">
+            <i class="fa fa-spinner fa-spin"></i>
+            <p>Loading campaigns...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Manage Actions Section -->
+    <div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 12px;">
+      <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
+        <i class="fa fa-cog"></i> Manage Actions
+      </h3>
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="{% url 'email_automation:template_list' %}" class="btn btn-secondary">
+          <i class="fa fa-file-text"></i> Manage Templates
+        </a>
+        <a href="{% url 'email_automation:campaign_list' %}" class="btn btn-secondary">
+          <i class="fa fa-list"></i> View All Campaigns
+        </a>
+        {% if email_account %}
+        <a href="{% url 'email_automation:disconnect_gmail' %}" class="btn btn-danger">
+          <i class="fa fa-unlink"></i> Disconnect Gmail
+        </a>
+        {% else %}
+        <a href="{% url 'email_automation:connect_gmail' %}" class="btn btn-primary">
+          <i class="fa fa-link"></i> Connect Gmail
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+    <!-- Detail Panel (slides in from right) -->
+    <div class="mail-detail" id="mailDetail">
+      <div class="detail-header">
+        <button class="btn-icon" id="closeDetail">
+          <i class="fa fa-times"></i>
+        </button>
+        <div class="detail-actions">
+          <button class="btn-icon" title="Reply">
+            <i class="fa fa-reply"></i>
+          </button>
+          <button class="btn-icon" title="Forward">
+            <i class="fa fa-share"></i>
+          </button>
+          <button class="btn-icon" title="Delete">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+      </div>
+      <div class="detail-content" id="detail-content">
+        <!-- Dynamic content loads here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'email_automation/js/mail_dashboard.js' %}?v=1.0"></script>
+{% endblock %}

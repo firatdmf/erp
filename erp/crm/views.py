@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
 from .models import Contact, Company, Note
 from todo.models import Task
@@ -70,10 +70,11 @@ class ContactCreate(generic.edit.CreateView):
         return context
 
     def form_valid(self, form):
+        from django.http import JsonResponse
         try:
             # Below starts a database transaction block.
             # All database operations inside this block are treated as a single transaction.
-            # If something fails (e.g., a database error), you won’t end up with a partially saved contact or company.
+            # If something fails (e.g., a database error), you won't end up with a partially saved contact or company.
             with transaction.atomic():
                 company_name = form.cleaned_data.get("company_name")
                 if company_name:
@@ -82,8 +83,29 @@ class ContactCreate(generic.edit.CreateView):
                     # set contact's company to the created or existing company.
                     form.instance.company = company
 
+                # Save the contact
+                self.object = form.save()
+                
+                # Check if AJAX request (from nested sidebar)
+                if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'success': True,
+                        'contact': {
+                            'id': self.object.pk,
+                            'name': self.object.name,
+                            'email': self.object.email or '',
+                            'phone': self.object.phone or '',
+                            'company_name': self.object.company.name if self.object.company else ''
+                        }
+                    })
+                
                 return super().form_valid(form)
         except Exception as e:
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'errors': str(e)
+                })
             form.add_error(None, f"An unexpected error occurred: {e}")
             return self.form_invalid(form)
 
@@ -131,9 +153,21 @@ class CompanyCreate(generic.edit.CreateView):
         return context
 
     def form_valid(self, form):
+        from django.http import JsonResponse
         #  # Save the form data to create the Company instance but do not commit yet because there might be duplicates
         self.object = form.save(commit=False)
         self.object.save()
+        
+        # Attach contact if selected
+        contact_id = form.cleaned_data.get("contact_id")
+        if contact_id:
+            try:
+                contact = Contact.objects.get(pk=contact_id)
+                contact.company = self.object
+                contact.save()
+            except Contact.DoesNotExist:
+                pass
+        
         # Save the note if it exists
         note_content = form.cleaned_data.get("note_content")
         if note_content:
@@ -151,6 +185,14 @@ class CompanyCreate(generic.edit.CreateView):
                 company=self.object,
                 member=self.request.user.member,
             )
+        
+        # Check if AJAX request
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'redirect_url': self.get_success_url()
+            })
+        
         # return super().form_valid(form)
         return HttpResponseRedirect(self.get_success_url())
 
@@ -449,32 +491,67 @@ def search_contact(request):
 
 def search_contacts_only(request):
     csrf_token = get_token(request)
-    search_text = request.POST.get("searchInput")  # search is the name of the field
+    search_text = request.POST.get("searchInput") or request.GET.get("search_term")  # support both POST and GET
     company_id = request.POST.get("company_id")
+    
     if search_text:
-        resultsContact = Contact.objects.filter(name__icontains=search_text).annotate(
+        resultsContact = Contact.objects.filter(
+            Q(name__icontains=search_text) | 
+            Q(email__icontains=search_text) |
+            Q(phone__icontains=search_text)
+        ).select_related('company').annotate(
             entry_type=Value("Contact", output_field=CharField())
-        )
-        resultsContact = sorted(
-            chain(resultsContact), key=attrgetter("created_at"), reverse=True
-        )
+        ).order_by('-created_at')[:10]
+        
         response = HttpResponse()
-        for item in resultsContact:
-            url = reverse(
-                "crm:add_contact_to_company",
-                kwargs={"company_pk": company_id, "contact_pk": item.pk},
-            )
-            response.write(
-                f"<form hx-post='{url}' hx-target='.whoWorksHere'><input type='hidden' name='csrfmiddlewaretoken' value='{csrf_token}'>"
-            )
-            response.write(
-                f"<input type='hidden' name='contact_id' value='{item.pk}'><button type='submit'>{item.name}</button></form>"
-            )
-            # response.write(f"<label for='contact' >{item.name}</label><input hx-trigger='click' value='{item.pk}' name='contact' readonly>")
-            # response.write('<input hx-post="{% url "crm:add_contact_to_company" %}"> type="hidden"')
+        
+        # If company_id is provided, this is for adding contact to company (HTMX)
+        if company_id:
+            for item in resultsContact:
+                url = reverse(
+                    "crm:add_contact_to_company",
+                    kwargs={"company_pk": company_id, "contact_pk": item.pk},
+                )
+                response.write(
+                    f"<form hx-post='{url}' hx-target='.whoWorksHere'><input type='hidden' name='csrfmiddlewaretoken' value='{csrf_token}'>"
+                )
+                response.write(
+                    f"<input type='hidden' name='contact_id' value='{item.pk}'><button type='submit'>{item.name}</button></form>"
+                )
+        # Modern contact selector for company form
+        elif request.GET.get("search_term"):
+            if resultsContact:
+                for item in resultsContact:
+                    company_name = item.company.name if item.company else ''
+                    initial = item.name[0].upper() if item.name else '?'
+                    response.write(
+                        f'<div class="contact-result-item" '
+                        f'data-contact-id="{item.pk}" '
+                        f'data-contact-name="{item.name}" '
+                        f'data-contact-email="{item.email or ""}" '
+                        f'data-contact-company="{company_name}">'
+                        f'<div class="contact-avatar">{initial}</div>'
+                        f'<div class="contact-info">'
+                        f'<div class="contact-name">{item.name}</div>'
+                        f'<div class="contact-details">{item.email or "No email"}{" • " + company_name if company_name else ""}</div>'
+                        f'</div>'
+                        f'</div>'
+                    )
+            else:
+                response.write('<div class="no-results">No contacts found</div>')
+        # Task sidebar - clickable list
+        else:
+            response.write("<ul class='search-results-list'>")
+            for item in resultsContact:
+                response.write(
+                    f"<li onclick=\"selectContact('{item.name}', '{item.pk}')\" style='cursor: pointer;'>"
+                    f"<i class='fa fa-user'></i> {item.name}"
+                    f"</li>"
+                )
+            response.write("</ul>")
         return response
     else:
-        return HttpResponse("<p>Contacts not found</p>")
+        return HttpResponse("")
 
 
 class add_contact_to_company(View):
@@ -528,18 +605,18 @@ def company_search(request):
     q = request.GET.get("company_name", "")
     companies = Company.objects.filter(name__icontains=q) if q else []
     if companies:
-        html = "<ul>"
+        html = "<ul class='search-results-list'>"
         for company in companies:
-            # this does not send a get request
-            html += f"<li hx-get='#' hx-trigger='click' hx-swap='none' onclick=\"document.getElementById('company_name').value = '{company.name}'; document.getElementById('company-suggestions').innerHTML = '';\">{company.name}</li>"
+            # Handle both contact form and task form
+            html += f"""<li onclick="selectCompany('{company.name}', '{company.pk}')" style="cursor: pointer;">
+                <i class="fa fa-building"></i> {company.name}
+            </li>"""
         html += "</ul>"
     else:
         if q == "":
             html = ""
         else:
-            html = (
-                "<div>No matching company found. A new company will be created.</div>"
-            )
+            html = "<div class='search-no-results'>No matching company found.</div>"
 
     return HttpResponse(html)
 

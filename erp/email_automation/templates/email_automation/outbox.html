@@ -1,0 +1,387 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+.outbox-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.outbox-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.outbox-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.outbox-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.emails-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.email-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.email-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--accent-primary);
+}
+
+.email-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.email-recipient {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.recipient-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #10b981;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+.recipient-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.recipient-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.recipient-company {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.email-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.email-date {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.status-badge {
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.status-sent {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-replied {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.email-subject {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.email-footer {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.email-footer i {
+  color: var(--accent-primary);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-state i {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.modal.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  max-width: 900px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.email-detail-meta {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 2rem;
+}
+
+.email-detail-body {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="outbox-container">
+  <div class="outbox-header">
+    <h1>
+      <i class="fa fa-paper-plane"></i>
+      Sent Emails
+    </h1>
+    <div class="outbox-actions">
+      <a href="{% url 'email_automation:dashboard' %}" class="btn btn-secondary">
+        <i class="fa fa-arrow-left"></i> Back
+      </a>
+      <button class="btn btn-primary" onclick="location.reload()">
+        <i class="fa fa-refresh"></i> Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="emails-grid">
+    {% if emails %}
+      {% for email in emails %}
+      <div class="email-card" onclick="showEmailDetail({{ email.id }})">
+        <div class="email-card-header">
+          <div class="email-recipient">
+            <div class="recipient-avatar">
+              {{ email.recipient_email|slice:":1"|upper }}
+            </div>
+            <div class="recipient-info">
+              <div class="recipient-name">To: {{ email.recipient_email }}</div>
+              <div class="recipient-company">
+                {% if email.campaign.company %}
+                  <i class="fa fa-building"></i> {{ email.campaign.company.name }}
+                {% else %}
+                  Campaign Email
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="email-meta">
+            <div class="email-date">{{ email.sent_at|date:"M d, Y H:i" }}</div>
+            <span class="status-badge {% if email.replied %}status-replied{% else %}status-sent{% endif %}">
+              <i class="fa {% if email.replied %}fa-reply{% else %}fa-check{% endif %}"></i>
+              {% if email.replied %}Replied{% else %}Sent{% endif %}
+            </span>
+          </div>
+        </div>
+        <div class="email-subject">{{ email.subject }}</div>
+        <div class="email-footer">
+          {% if email.template %}
+          <span>
+            <i class="fa fa-hashtag"></i>
+            Email {{ email.template.sequence_number }}
+          </span>
+          <span>
+            <i class="fa fa-file-text"></i>
+            {{ email.template.name }}
+          </span>
+          {% endif %}
+          <span>
+            <i class="fa fa-rocket"></i>
+            Campaign
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="fa fa-paper-plane"></i>
+        <h3>No sent emails yet</h3>
+        <p>Emails sent through campaigns will appear here</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Email Detail Modal -->
+<div class="modal" id="emailModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="modalSubject">Email Subject</div>
+      <button class="modal-close" onclick="closeModal()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="email-detail-meta">
+        <div class="recipient-avatar" id="modalAvatar">R</div>
+        <div style="flex: 1;">
+          <div class="recipient-name" id="modalRecipient">Recipient</div>
+          <div class="recipient-company" id="modalDate">Date</div>
+        </div>
+      </div>
+      <div class="email-detail-body" id="modalBody">
+        Email body will appear here...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showEmailDetail(emailId) {
+  fetch(`/email/sent/${emailId}/`)
+    .then(response => response.json())
+    .then(email => {
+      document.getElementById('modalSubject').textContent = email.subject;
+      document.getElementById('modalAvatar').textContent = email.recipient_email.charAt(0).toUpperCase();
+      document.getElementById('modalRecipient').textContent = 'To: ' + email.recipient_email;
+      document.getElementById('modalDate').textContent = email.sent_at;
+      document.getElementById('modalBody').textContent = email.body;
+      
+      document.getElementById('emailModal').classList.add('active');
+    })
+    .catch(error => console.error('Error loading email:', error));
+}
+
+function closeModal() {
+  document.getElementById('emailModal').classList.remove('active');
+}
+
+// Close modal on outside click
+document.getElementById('emailModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeModal();
+  }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeModal();
+  }
+});
+</script>
+{% endblock %}

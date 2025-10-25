@@ -1,0 +1,77 @@
+/* Container */
+.container {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  color: #333;
+}
+
+/* Headings */
+h2 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+h4 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  color: #34495e;
+}
+
+/* KPI lead text */
+.lead {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #27ae60;
+}
+
+/* Table styling */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.table th, 
+.table td {
+  border: 1px solid #ddd;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.table thead {
+  background-color: #f8f9fa;
+}
+
+.table th {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+/* Row hover effect */
+.table tbody tr:hover {
+  background-color: #f1f7ff;
+}
+
+/* Money in/out colors */
+.text-success {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.text-danger {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+/* Alive/Not Alive styling */
+td {
+  font-size: 0.95em;
+}
+
+td:last-child {
+  font-weight: bold;
+}

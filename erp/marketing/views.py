@@ -5,6 +5,7 @@ from django.views import View, generic
 from django.views.generic.edit import ModelFormMixin
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, Http404
 from django.db import transaction
+from django.db import models
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
@@ -35,6 +36,20 @@ class ProductList(generic.ListView):
     model = Product
     template_name = "marketing/product_list.html"
     context_object_name = "products"
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search_query = self.request.GET.get('search', '').strip()
+        
+        if search_query:
+            # Search by title, SKU, or barcode (case-insensitive)
+            queryset = queryset.filter(
+                models.Q(title__icontains=search_query) |
+                models.Q(sku__icontains=search_query) |
+                models.Q(barcode__icontains=search_query)
+            )
+        
+        return queryset.select_related('category', 'primary_image', 'supplier').prefetch_related('variants')
 
 
 class ProductDetail(generic.DetailView):
@@ -72,16 +87,30 @@ class BaseProductView(ModelFormMixin):
         """
         Creates or updates ProductVariant and links shared ProductVariantAttributeValue.
         """
+        print("\n=== handle_variants called ===")
+        print(f"variants_json type: {type(variants_json)}")
+        print(f"variants_json content: {variants_json}")
+        
         if not variants_json:
-            print("heelloo")
+            print("No variants_json provided")
             return
 
         try:
             variants_json = json.loads(variants_json)
-        except json.JSONDecodeError:
+            print(f"Parsed variants_json: {variants_json}")
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
             raise ValueError(
                 {"JSON": "failed to parse json: variants.json from variant_form.js"}
             )
+        
+        # Handle if variants_json is a list (empty variants) instead of dict
+        if isinstance(variants_json, list):
+            if len(variants_json) == 0:
+                # No variants to process
+                return
+            # If it's a list with items, wrap it in expected format
+            variants_json = {"product_variant_list": variants_json}
 
         # ---------------------------- this runs when we have no variants. --------------------------------------------
         delete_all_variants = variants_json.get("delete_all_variants", False)
@@ -96,7 +125,8 @@ class BaseProductView(ModelFormMixin):
                 product.primary_image = None
 
             # add the no_variant_files to product files
-            for file_obj in self.request.FILES.getlist("no_variant_file"):
+            uploaded_files = []
+            for index, file_obj in enumerate(self.request.FILES.getlist("no_variant_file")):
                 try:
                     folder = f"media/product_images/product_{product.sku}"
                     upload_result = cloudinary_upload(
@@ -104,20 +134,55 @@ class BaseProductView(ModelFormMixin):
                     )
                     url = upload_result.get("secure_url")
                     if url:
-                        ProductFile.objects.create(
+                        product_file = ProductFile.objects.create(
                             product=product,
                             file_url=url,
+                            is_primary=False,  # Will be set below based on order
+                            sequence=index,
                         )
+                        uploaded_files.append(product_file)
                 except CloudinaryError:
                     print(
                         f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
                     )
                     continue
+            
+            # Handle image ordering - first image is primary (ONLY for main product images, not variants)
+            image_order = self.request.POST.get('image_order')
+            if image_order:
+                try:
+                    order_list = json.loads(image_order)
+                    if order_list:
+                        # Clear all is_primary flags for main product images only
+                        ProductFile.objects.filter(product=product, product_variant__isnull=True).update(is_primary=False)
+                        # Set first image as primary (must be a main product image, not variant)
+                        first_image_id = order_list[0]
+                        primary_file = ProductFile.objects.get(pk=first_image_id, product=product, product_variant__isnull=True)
+                        primary_file.is_primary = True
+                        primary_file.save()
+                        product.primary_image = primary_file
+                        product.save()
+                        print(f"Set primary image to {first_image_id} (main product image) based on order")
+                except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
+                    print(f"Error setting primary from order: {e}")
+            else:
+                # If no order specified, set first available MAIN PRODUCT image as primary
+                first_file = ProductFile.objects.filter(product=product, product_variant__isnull=True).order_by('sequence', 'pk').first()
+                if first_file:
+                    ProductFile.objects.filter(product=product, product_variant__isnull=True).update(is_primary=False)
+                    first_file.is_primary = True
+                    first_file.save()
+                    product.primary_image = first_file
+                    product.save()
+                    print(f"Set first available main product image {first_file.pk} as primary")
+            
             return
 
         # --------------------------------------------------------------------------------------------------------------------
 
         variants_data = variants_json.get("product_variant_list", [])
+        print(f"\nVariants data length: {len(variants_data)}")
+        print(f"Variants data: {variants_data}")
 
         # product's existing variants' SKUs
         existing_skus = set(self.object.variants.values_list("variant_sku", flat=True))
@@ -177,8 +242,6 @@ class BaseProductView(ModelFormMixin):
                 variant.product_variant_attribute_values.add(value_obj)
 
             for file_obj in self.request.FILES.getlist(f"variant_file_{index+1}"):
-
-                # get_variant_sku = variants_data[index].get("variant_sku")
                 variant = ProductVariant.objects.get(
                     variant_sku=variants_data[index].get("variant_sku")
                 )
@@ -200,6 +263,30 @@ class BaseProductView(ModelFormMixin):
                     )
                     continue
             index += 1
+        
+        # Handle primary variant image selection
+        primary_variant_index = self.request.POST.get('primary_variant_image')
+        if primary_variant_index:
+            try:
+                primary_variant_index = int(primary_variant_index)
+                # Index in form is 1-based, convert to 0-based for list
+                if 0 < primary_variant_index <= len(variants_data):
+                    primary_variant_sku = variants_data[primary_variant_index - 1].get("variant_sku")
+                    if primary_variant_sku:
+                        # Get the first file of the primary variant
+                        primary_variant = ProductVariant.objects.get(variant_sku=primary_variant_sku, product=self.object)
+                        primary_file = ProductFile.objects.filter(product_variant=primary_variant).first()
+                        if primary_file:
+                            # Clear all is_primary flags
+                            ProductFile.objects.filter(product=self.object).update(is_primary=False)
+                            # Set new primary
+                            primary_file.is_primary = True
+                            primary_file.save()
+                            self.object.primary_image = primary_file
+                            self.object.save()
+                            print(f"Set primary image to variant {primary_variant_sku}")
+            except (ValueError, ProductVariant.DoesNotExist, IndexError) as e:
+                print(f"Error setting primary variant image: {e}")
 
         # Handle deletion passed via json data.
         deleted_files_pks = variants_json.get("deleted_files", [])
@@ -207,6 +294,61 @@ class BaseProductView(ModelFormMixin):
         if len(deleted_files_pks) > 0:
             print("these files will be deleted:", deleted_files_pks)
             ProductFile.objects.filter(pk__in=deleted_files_pks).delete()
+        
+        # IMPORTANT: Upload main product images even when variants exist
+        uploaded_main_files = []
+        for index, file_obj in enumerate(self.request.FILES.getlist("no_variant_file")):
+            try:
+                folder = f"media/product_images/product_{self.object.sku}"
+                upload_result = cloudinary_upload(
+                    file_obj, folder=folder, resource_type="image"
+                )
+                url = upload_result.get("secure_url")
+                if url:
+                    product_file = ProductFile.objects.create(
+                        product=self.object,
+                        file_url=url,
+                        is_primary=False,  # Will be set below
+                        sequence=index,
+                    )
+                    uploaded_main_files.append(product_file)
+                    print(f"Uploaded main product file {product_file.pk} with variants")
+            except CloudinaryError:
+                print(
+                    f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
+                )
+                continue
+        
+        # After handling variants and uploading main product images, set primary
+        image_order = self.request.POST.get('image_order')
+        if image_order:
+            try:
+                order_list = json.loads(image_order)
+                if order_list:
+                    # Clear all is_primary flags for main product images only
+                    ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
+                    # Set first image as primary (must be a main product image, not variant)
+                    first_image_id = order_list[0]
+                    primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object, product_variant__isnull=True)
+                    primary_file.is_primary = True
+                    primary_file.save()
+                    self.object.primary_image = primary_file
+                    self.object.save()
+                    print(f"Set primary image to {first_image_id} (main product image with variants) based on order")
+            except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
+                print(f"Error setting primary from order (with variants): {e}")
+        else:
+            # If no order specified, set first available MAIN PRODUCT image as primary
+            first_file = ProductFile.objects.filter(product=self.object, product_variant__isnull=True).order_by('sequence', 'pk').first()
+            if first_file:
+                ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
+                first_file.is_primary = True
+                first_file.save()
+                self.object.primary_image = first_file
+                self.object.save()
+                print(f"Set first available main product image {first_file.pk} as primary (with variants)")
+            else:
+                print("WARNING: No main product images found to set as primary (with variants)")
 
 
 # ----------------------------------------------
@@ -225,6 +367,40 @@ class ProductCreate(BaseProductView, generic.CreateView):
     def form_valid(self, form):
         with transaction.atomic():
             self.object = form.save()
+            
+            # Check if it's an AJAX request (sidebar submission)
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                # Handle primary image upload from sidebar
+                primary_image_file = self.request.FILES.get('primary_image')
+                if primary_image_file:
+                    try:
+                        folder = f"media/product_images/product_{self.object.sku}"
+                        upload_result = cloudinary_upload(
+                            primary_image_file, folder=folder, resource_type="image"
+                        )
+                        url = upload_result.get("secure_url")
+                        if url:
+                            product_file = ProductFile.objects.create(
+                                product=self.object,
+                                file_url=url,
+                                is_primary=True
+                            )
+                            self.object.primary_image = product_file
+                            self.object.save()
+                    except CloudinaryError as e:
+                        print(f"Cloudinary error uploading primary image: {e}")
+                
+                # Handle variants from sidebar
+                variants_json = self.request.POST.get("variants_json", "[]")
+                if variants_json and variants_json != "[]":
+                    self.handle_variants(self.object, variants_json)
+                
+                return JsonResponse({
+                    'success': True,
+                    'redirect_url': self.get_success_url()
+                })
+            
+            # Full form with files and variants
             context = self.get_context_data()
             self.save_product_files(self.object, context["productfile_formset"])
 
@@ -234,6 +410,12 @@ class ProductCreate(BaseProductView, generic.CreateView):
         return super().form_valid(form)
 
     def form_invalid(self, form):
+        # Check if it's an AJAX request
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors.as_json()
+            })
         context = self.get_context_data(form=form)
         return self.render_to_response(context)
 
@@ -248,7 +430,12 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         context["is_update"] = True
         # pass the variants if product variants exist
         if self.object.variants.exists():
-            context["variants"] = self.object.variants.all()
+            context["variants"] = self.object.variants.prefetch_related(
+                'product_variant_attribute_values',
+                'product_variant_attribute_values__product_variant_attribute',
+                'files'
+            ).all()
+            print(f"Found {context['variants'].count()} variants for product {self.object.sku}")  # Debug
         # else:
         #     context["no_variant_files"] = self.object.files.all()
         return context

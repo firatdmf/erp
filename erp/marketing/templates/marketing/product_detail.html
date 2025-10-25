@@ -1,49 +1,224 @@
 {% extends 'base.html' %}
 {% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'erp/css/product_detail.css' %}?v=1.0" />
+{% endblock %}
+
 {% block content %}
-  {% comment %} <p>
-    <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
-  </p> {% endcomment %}
-  <h1>Product Details</h1>
-  <ul>
-    <li>title:{{ product.title }}</li>
-    <li>
-      description: <br />{{ product.description }}
-    </li>
-    <li>tags:{{ product.tags }}</li>
-    <li>category:{{ product.category }}</li>
-    <li>sku:{{ product.sku }}</li>
-    {% comment %}Checks if the product has variants{% endcomment %}
-    {% if product.variants.all %}
-      {% comment %}Do not show sku price and barcode{% endcomment %}
-    {% else %}
-      <li>price:{{ product.price }}</li>
-      <li>barcode:{{ product.barcode }}</li>
-    {% endif %}
-  </ul>
+<div class="product-detail-container">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <a href="{% url 'marketing:product_list' %}"><i class="fa fa-arrow-left"></i> Back to Products</a>
+  </div>
 
-  <h2>Your variants are listed below:</h2>
-  <img src="{% static 'marketing/media/products/' %}ready_made/RK72010/RK72010GC8/Beige-dandelion-embroidery-sheer-curtain-model-72010-photo-taken-from-far-to-display-the-both-panels-and-full-product.jpg" alt="" />
+  <!-- Product Header -->
+  <div class="product-header">
+    <div class="header-left">
+      <h1>{{ product.title }}</h1>
+      <div class="product-meta">
+        <span class="product-sku"><i class="fa fa-barcode"></i> {{ product.sku }}</span>
+        {% if product.category %}
+          <span class="badge badge-category">{{ product.category.name|title }}</span>
+        {% endif %}
+        {% if product.featured %}
+          <span class="badge badge-featured"><i class="fa fa-star"></i> Featured</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="header-right">
+      <a href="{% url 'marketing:product_edit' product.id %}" class="btn btn-primary">
+        <i class="fa fa-edit"></i> Edit Product
+      </a>
+    </div>
+  </div>
 
-  {% comment %}below is a related name{% endcomment %}
-  {% for variant in product.variants.all %}
-    <ul>
-      <li>
-        {{ variant.variant_sku }}
-        {% for attribute_value in variant.attribute_values.all %}
-          {{ attribute_value.product_variant_attribute }}: {{ attribute_value.product_variant_attribute_value }}
+  <!-- Main Content -->
+  <div class="product-content">
+    <!-- Left Column: Images -->
+    <div class="product-images">
+      <div class="main-image">
+        {% if product.primary_image %}
+          <img src="{{ product.primary_image.file_url }}" alt="{{ product.title }}" id="mainImage">
+        {% elif product.files.all.first %}
+          <img src="{{ product.files.all.first.file_url }}" alt="{{ product.title }}" id="mainImage">
+        {% else %}
+          <div class="image-placeholder">
+            <i class="fa fa-image"></i>
+            <p>No image available</p>
+          </div>
+        {% endif %}
+      </div>
+      
+      {% if product.files.all %}
+      <div class="image-thumbnails">
+        {% for file in product.files.all %}
+          <div class="thumbnail {% if forloop.first %}active{% endif %}" onclick="changeImage('{{ file.file_url }}', this)">
+            <img src="{{ file.file_url }}" alt="Thumbnail {{ forloop.counter }}">
+          </div>
         {% endfor %}
-      </li>
-    </ul>
-  {% empty %}
-    <p>This product has no variants</p>
-    <h3>Product Images:</h3>
-    {% for file in product.files.all %}
-      <p>
-        <a href="{{ file.optimized_url }}" target="_blank"><img src="{{ file.optimized_url }}" alt="product_image_{{ file.pk }}" style="max-width:60px; max-height:60px; vertical-align:middle; margin-right:8px;" /></a>
-      </p>
-    {% endfor %}
-  {% endfor %}
+      </div>
+      {% endif %}
+    </div>
 
-  <a href="{% url 'marketing:product_edit' product.id %}">Edit Product</a>
+    <!-- Right Column: Details -->
+    <div class="product-info">
+      <!-- Description -->
+      <div class="info-section">
+        <h2>Description</h2>
+        {% if product.description %}
+          <div class="description-text">{{ product.description|safe }}</div>
+        {% else %}
+          <p class="text-muted">No description available</p>
+        {% endif %}
+      </div>
+
+      <!-- Basic Info -->
+      <div class="info-section">
+        <h2>Product Information</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">SKU</span>
+            <span class="value">{{ product.sku|default:"-" }}</span>
+          </div>
+          {% if product.barcode %}
+          <div class="info-item">
+            <span class="label">Barcode</span>
+            <span class="value">{{ product.barcode }}</span>
+          </div>
+          {% endif %}
+          {% if not product.variants.all %}
+          <div class="info-item">
+            <span class="label">Price</span>
+            <span class="value price">${{ product.price|default:"0.00" }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Quantity</span>
+            <span class="value">{{ product.quantity|default:"0" }} {{ product.unit_of_measurement|default:"units" }}</span>
+          </div>
+          {% endif %}
+          {% if product.weight %}
+          <div class="info-item">
+            <span class="label">Weight</span>
+            <span class="value">{{ product.weight }} {{ product.unit_of_weight|default:"kg" }}</span>
+          </div>
+          {% endif %}
+          {% if product.supplier %}
+          <div class="info-item">
+            <span class="label">Supplier</span>
+            <span class="value">{{ product.supplier.company_name|default:product.supplier.contact_name }}</span>
+          </div>
+          {% endif %}
+          {% if product.minimum_inventory_level %}
+          <div class="info-item">
+            <span class="label">Min Inventory</span>
+            <span class="value">{{ product.minimum_inventory_level }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Tags -->
+      {% if product.tags %}
+      <div class="info-section">
+        <h2>Tags</h2>
+        <div class="tags-container">
+          {% for tag in product.tags %}
+            <span class="tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Collections -->
+      {% if product.collections.all %}
+      <div class="info-section">
+        <h2>Collections</h2>
+        <div class="collections-container">
+          {% for collection in product.collections.all %}
+            <span class="collection-badge">{{ collection.title }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Datasheet -->
+      {% if product.datasheet_url %}
+      <div class="info-section">
+        <h2>Documents</h2>
+        <a href="{{ product.datasheet_url }}" target="_blank" class="document-link">
+          <i class="fa fa-file-pdf"></i>
+          <span>Product Datasheet</span>
+          <i class="fa fa-external-link"></i>
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Variants Section -->
+  {% if product.variants.all %}
+  <div class="variants-section">
+    <h2>Product Variants ({{ product.variants.count }})</h2>
+    <div class="table-container">
+      <table class="variants-table">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>SKU</th>
+            <th>Attributes</th>
+            <th>Price</th>
+            <th>Quantity</th>
+            <th>Barcode</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for variant in product.variants.all %}
+          <tr>
+            <td>
+              {% if variant.files.all.first %}
+                <img src="{{ variant.files.all.first.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
+              {% else %}
+                <div class="variant-image-placeholder">
+                  <i class="fa fa-image"></i>
+                </div>
+              {% endif %}
+            </td>
+            <td><span class="variant-sku">{{ variant.variant_sku }}</span></td>
+            <td>
+              <div class="attributes">
+                {% for attribute_value in variant.attribute_values.all %}
+                  <span class="attribute">
+                    <strong>{{ attribute_value.product_variant_attribute|title }}:</strong> {{ attribute_value.product_variant_attribute_value|title }}
+                  </span>
+                {% endfor %}
+              </div>
+            </td>
+            <td><span class="variant-price">${{ variant.variant_price|default:"0.00" }}</span></td>
+            <td>{{ variant.variant_quantity|default:"0" }}</td>
+            <td>{{ variant.variant_barcode|default:"-" }}</td>
+            <td>
+              {% if variant.variant_featured %}
+                <span class="badge badge-featured">Featured</span>
+              {% else %}
+                <span class="badge badge-regular">Regular</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function changeImage(url, thumbnail) {
+  document.getElementById('mainImage').src = url;
+  document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
+  thumbnail.classList.add('active');
+}
+</script>
 {% endblock %}

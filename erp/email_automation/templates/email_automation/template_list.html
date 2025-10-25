@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+.template-page {
+  max-width: 1200px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-header h1 i {
+  color: var(--accent-primary);
+}
+
+.page-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.template-card {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  transition: all var(--transition-speed) ease;
+}
+
+.template-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.template-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.template-sequence {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--accent-light);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.template-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.icon-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.template-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.template-subject {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.template-preview {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  padding: 0.75rem;
+  border-radius: 6px;
+}
+
+.empty-state {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-state i {
+  font-size: 4rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+
+.btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="template-page">
+  <div class="page-header">
+    <h1>
+      <i class="fa fa-file-text"></i>
+      Email Templates
+    </h1>
+    <div class="page-actions">
+      <a href="{% url 'email_automation:dashboard' %}" class="btn btn-secondary">
+        <i class="fa fa-arrow-left"></i>
+        Back
+      </a>
+      <a href="{% url 'email_automation:template_create' %}" class="btn btn-primary">
+        <i class="fa fa-plus"></i>
+        Create Template
+      </a>
+    </div>
+  </div>
+
+  {% if templates %}
+  <div class="template-grid">
+    {% for template in templates %}
+    <div class="template-card">
+      <div class="template-header">
+        <div class="template-sequence">{{ template.sequence_number }}</div>
+        <div class="template-actions">
+          <a href="{% url 'email_automation:template_edit' template.pk %}" class="icon-btn" title="Edit">
+            <i class="fa fa-edit"></i>
+          </a>
+        </div>
+      </div>
+      <div class="template-name">{{ template.name }}</div>
+      <div class="template-subject"><strong>Subject:</strong> {{ template.subject }}</div>
+      <div class="template-preview">{{ template.body|truncatewords:30 }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <i class="fa fa-file-text"></i>
+    <h3>No email templates yet</h3>
+    <p>Create email templates for your automated campaigns. You can create up to 6 sequential emails.</p>
+    <a href="{% url 'email_automation:template_create' %}" class="btn btn-primary">
+      <i class="fa fa-plus"></i>
+      Create Your First Template
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

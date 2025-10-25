@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+  {% comment %} <p>
+    <a href="{% url 'crm:index' %}"><--- Go to CRM home page</a>
+  </p> {% endcomment %}
+  <h1>Product Details</h1>
+  <ul>
+    <li>title:{{ product.title }}</li>
+    <li>
+      description: <br />{{ product.description }}
+    </li>
+    <li>tags:{{ product.tags }}</li>
+    <li>category:{{ product.category }}</li>
+    <li>sku:{{ product.sku }}</li>
+    {% comment %}Checks if the product has variants{% endcomment %}
+    {% if product.variants.all %}
+      {% comment %}Do not show sku price and barcode{% endcomment %}
+    {% else %}
+      <li>price:{{ product.price }}</li>
+      <li>barcode:{{ product.barcode }}</li>
+    {% endif %}
+  </ul>
+
+  <h2>Your variants are listed below:</h2>
+  <img src="{% static 'marketing/media/products/' %}ready_made/RK72010/RK72010GC8/Beige-dandelion-embroidery-sheer-curtain-model-72010-photo-taken-from-far-to-display-the-both-panels-and-full-product.jpg" alt="" />
+
+  {% comment %}below is a related name{% endcomment %}
+  {% for variant in product.variants.all %}
+    <ul>
+      <li>
+        {{ variant.variant_sku }}
+        {% for attribute_value in variant.attribute_values.all %}
+          {{ attribute_value.product_variant_attribute }}: {{ attribute_value.product_variant_attribute_value }}
+        {% endfor %}
+      </li>
+    </ul>
+  {% empty %}
+    <p>This product has no variants</p>
+    <h3>Product Images:</h3>
+    {% for file in product.files.all %}
+      <p>
+        <a href="{{ file.optimized_url }}" target="_blank"><img src="{{ file.optimized_url }}" alt="product_image_{{ file.pk }}" style="max-width:60px; max-height:60px; vertical-align:middle; margin-right:8px;" /></a>
+      </p>
+    {% endfor %}
+  {% endfor %}
+
+  <a href="{% url 'marketing:product_edit' product.id %}">Edit Product</a>
+{% endblock %}

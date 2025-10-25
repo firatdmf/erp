@@ -30,12 +30,13 @@ def variant_form(variants, product, current_url):
                 for f in files
             ]
 
-            # Collect attribute values
+            # Collect attribute values (use correct related name)
             attribute_values = variant.product_variant_attribute_values.all()
             variant_attribute_values = {
                 av.product_variant_attribute.name: av.product_variant_attribute_value
                 for av in attribute_values
             }
+            print(f"Variant {variant.variant_sku}: {variant_attribute_values}")  # Debug
 
             # Build the variant dict
             product_variant_list.append(

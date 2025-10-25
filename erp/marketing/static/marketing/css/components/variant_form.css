@@ -1,3 +1,219 @@
+/* Modern Variant Form Styles */
+.variant_component {
+  margin-top: 20px;
+}
+
+.variant_container {
+  margin-bottom: 20px;
+}
+
+.variantCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 15px;
+}
+
+.option_name {
+  margin-bottom: 15px;
+}
+
+.option_name > div:first-child {
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.option_name input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.option_name input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.optionValues {
+  margin-top: 15px;
+}
+
+.optionValues > div:first-child {
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.optionValues input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.optionValues input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.add_another_value {
+  color: #667eea;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 5px;
+  transition: background 0.2s;
+}
+
+.add_another_value:hover {
+  background: #f0f4ff;
+}
+
+.add_another_option {
+  color: #667eea;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 16px;
+  border: 1.5px dashed #667eea;
+  border-radius: 8px;
+  display: inline-block;
+  margin-top: 10px;
+  transition: all 0.2s;
+}
+
+.add_another_option:hover {
+  background: #f0f4ff;
+  border-style: solid;
+}
+
+#create_table_button {
+  background: #667eea;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-block;
+  margin: 20px 0;
+  transition: all 0.2s;
+}
+
+#create_table_button:hover {
+  background: #5568d3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.displayVariantJSON {
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  display: inline-block;
+  margin-left: 10px;
+  transition: all 0.2s;
+}
+
+.displayVariantJSON:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.delete_button {
+  color: #ef4444;
+  cursor: pointer;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.delete_button:hover {
+  background: #fef2f2;
+}
+
+.variant-file p {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.alert {
+  color: #ef4444;
+  font-size: 13px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border-radius: 6px;
+  border-left: 3px solid #ef4444;
+}
+
+/* Variant Table */
+#variant_table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#variant_table thead {
+  background: #f3f4f6;
+}
+
+#variant_table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+#variant_table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#variant_table tbody tr:hover {
+  background: #f9fafb;
+}
+
+#variant_table input[type="text"],
+#variant_table input[type="number"],
+#variant_table input[type="file"] {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+#variant_table input[type="text"]:focus,
+#variant_table input[type="number"]:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
 /* Absolute Center Spinner */
 .loading {
   position: fixed;
@@ -10,17 +226,7 @@
   left: 0;
   bottom: 0;
   right: 0;
-}
-
-.delete_button{
-  color:red;
-  cursor: pointer;
-}
-
-.variant-file p{
-  display:flex;
-  flex-direction: row;
-  gap:10px;
+  display: none;
 }
 
 /* Transparent Overlay */

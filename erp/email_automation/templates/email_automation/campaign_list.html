@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+.campaign-page {
+  max-width: 1200px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-header h1 i {
+  color: var(--accent-primary);
+}
+
+.campaign-list {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.campaign-item {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: all var(--transition-speed) ease;
+}
+
+.campaign-item:last-child {
+  border-bottom: none;
+}
+
+.campaign-item:hover {
+  background: var(--bg-hover);
+}
+
+.campaign-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.campaign-info {
+  flex: 1;
+}
+
+.campaign-company {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.campaign-company i {
+  color: var(--accent-primary);
+}
+
+.campaign-date {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.campaign-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.status-badge {
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-paused {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-completed {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-stopped {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.campaign-stats {
+  display: flex;
+  gap: 2rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.stat i {
+  color: var(--accent-primary);
+}
+
+.stat-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  color: var(--text-secondary);
+}
+
+.view-link {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color var(--transition-speed) ease;
+}
+
+.view-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.action-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-size: 0.75rem;
+}
+
+.pause-btn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pause-btn:hover {
+  background: #fde68a;
+  color: #78350f;
+  transform: scale(1.1);
+}
+
+.resume-btn {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.resume-btn:hover {
+  background: #a7f3d0;
+  color: #064e3b;
+  transform: scale(1.1);
+}
+
+.delete-btn {
+  background: #fee2e2;
+  color: #991b1b;
+  border: none;
+  cursor: pointer;
+}
+
+.delete-btn:hover {
+  background: #fecaca;
+  color: #7f1d1d;
+  transform: scale(1.1);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-state i {
+  font-size: 4rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="campaign-page">
+  <div class="page-header">
+    <h1>
+      <i class="fa fa-rocket"></i>
+      Email Campaigns
+    </h1>
+    <a href="{% url 'email_automation:dashboard' %}" class="btn btn-secondary">
+      <i class="fa fa-arrow-left"></i>
+      Back to Dashboard
+    </a>
+  </div>
+
+  <div class="campaign-list">
+    {% if campaigns %}
+      {% for campaign in campaigns %}
+      <div class="campaign-item">
+        <div class="campaign-header">
+          <div class="campaign-info">
+            <div class="campaign-company">
+              <i class="fa fa-building"></i>
+              {{ campaign.company.name }}
+            </div>
+            <div class="campaign-date">
+              Started: {{ campaign.created_at|date:"M d, Y" }}
+            </div>
+          </div>
+          <div class="campaign-status">
+            <span class="status-badge status-{{ campaign.status }}">
+              {{ campaign.status }}
+            </span>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              {% if campaign.status == 'active' %}
+              <a href="{% url 'email_automation:campaign_pause' campaign.pk %}" class="action-btn pause-btn" title="Pause campaign">
+                <i class="fa fa-pause"></i>
+              </a>
+              {% elif campaign.status == 'paused' %}
+              <a href="{% url 'email_automation:campaign_resume' campaign.pk %}" class="action-btn resume-btn" title="Resume campaign">
+                <i class="fa fa-play"></i>
+              </a>
+              {% endif %}
+              <form method="post" action="{% url 'email_automation:campaign_delete' campaign.pk %}" style="display: inline;" onsubmit="return confirm('Delete this campaign?')">
+                {% csrf_token %}
+                <button type="submit" class="action-btn delete-btn" title="Delete campaign">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </form>
+              <a href="{% url 'email_automation:campaign_detail' campaign.pk %}" class="view-link">
+                View Details <i class="fa fa-arrow-right"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+        
+        <div class="campaign-stats">
+          <div class="stat">
+            <i class="fa fa-paper-plane"></i>
+            <span class="stat-value">{{ campaign.emails_sent }}</span>
+            <span class="stat-label">/ 6 emails sent</span>
+          </div>
+          
+          {% if campaign.company.email and campaign.company.email|length > 0 %}
+          <div class="stat">
+            <i class="fa fa-envelope"></i>
+            <span class="stat-label">To: {{ campaign.company.email.0 }}{% if campaign.company.email|length > 1 %} (+{{ campaign.company.email|length|add:"-1" }}){% endif %}</span>
+          </div>
+          {% endif %}
+          
+          {% if campaign.last_email_sent_at %}
+          <div class="stat">
+            <i class="fa fa-clock"></i>
+            <span class="stat-label">Last sent: {{ campaign.last_email_sent_at|date:"M d, H:i" }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <i class="fa fa-rocket"></i>
+        <h3>No campaigns yet</h3>
+        <p>Campaigns will be automatically created for prospect companies when email automation is active.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

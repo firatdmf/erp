@@ -27,6 +27,7 @@ class ProductForm(forms.ModelForm):
         model = Product
         # fields = ['title', 'description', 'sku', 'barcode', 'price', 'cost', 'featured', 'selling_while_out_of_stock', 'weight', 'unit_of_weight', 'vendor', 'has_variants']
         fields = "__all__"
+        exclude = ['datasheet_url']
 
     # The input id will be "id_has_variants", this won't be saved to the database, for interactions only. Later we can just do Product.variants.exists()
     has_variants = forms.BooleanField(

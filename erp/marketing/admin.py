@@ -58,7 +58,7 @@ class ProductFileInline(admin.TabularInline):
     form = ProductFileInlineForm
     extra = 1  # Number of extra forms to display
     # fields = ("file", "sequence", "is_primary")
-    fields = ("file", "sequence")
+    fields = ("file_url", "sequence", "is_primary")
     ordering = ["sequence"]
 
 

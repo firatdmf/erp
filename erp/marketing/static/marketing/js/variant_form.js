@@ -1,4 +1,7 @@
 console.log("welcome to the variant form my fellas");
+console.log("JS: window.product_variant_list_data =", window.product_variant_list_data);
+console.log("JS: window.product_variant_options_data =", window.product_variant_options_data);
+
 // Let's combine the data and export it.
 export_data = {
     "product_variant_options": {},
@@ -450,7 +453,7 @@ let createTable = () => {
             variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" required></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
-            variant_table_rows += `<td><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
+            variant_table_rows += `<td style="text-align: center;"><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
             variant_table_rows += `</tr>`
 
             new_product_variant_list.push(
@@ -484,28 +487,20 @@ let createTable = () => {
     variant_table_element = document.getElementById("variant_table")
     variant_table_element.style.display = "inline-block";
     variant_table_element.innerHTML = `
+   <thead>
    <tr>
     ${variant_table_option_names}
-    <th>
-      Photo
-    </th>
-    <th>
-      Price
-    </th>
-    <th>
-      Quantity
-    </th>
-    <th>
-      SKU
-    </th>
-    <th>
-      BARCODE
-    </th>
-     <th>
-      FEATURED
-    </th>
+    <th>Photo</th>
+    <th>Price</th>
+    <th>Quantity</th>
+    <th>SKU</th>
+    <th>Barcode</th>
+    <th>Featured</th>
   </tr>
+  </thead>
+  <tbody>
   ${variant_table_rows}
+  </tbody>
   `;
     //   This shall go on the bottom of table
     //   <button onClick=submit_table(${export_data})>Submit Table</button>
@@ -596,12 +591,6 @@ let prepopulate_variant_table = () => {
             variant_table_rows += `<input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple>`;
             if (files && files.length > 0) {
                 files.forEach((file) => {
-                    // const link = document.createElement("a");
-                    // link.href = file.url;
-                    // link.textContent = file.name;
-                    // link.target = "_blank";
-                    // variant_file_input_element.after(link);
-
                     variant_table_rows += `
                     <div id="variant-file-${file.id}" class="variant-file" >
                     <p>
@@ -640,28 +629,20 @@ let prepopulate_variant_table = () => {
         variant_table_element = document.getElementById("variant_table")
         variant_table_element.style.display = "inline-block";
         variant_table_element.innerHTML = `
+   <thead>
    <tr>
     ${variant_table_option_names}
-    <th>
-      Photo
-    </th>
-    <th>
-      Price
-    </th>
-    <th>
-      Quantity
-    </th>
-    <th>
-      SKU
-    </th>
-    <th>
-      BARCODE
-    </th>
-     <th>
-      FEATURED
-    </th>
+    <th>Photo</th>
+    <th>Price</th>
+    <th>Quantity</th>
+    <th>SKU</th>
+    <th>Barcode</th>
+    <th>Featured</th>
   </tr>
+  </thead>
+  <tbody>
   ${variant_table_rows}
+  </tbody>
   `;
     }
 }
@@ -740,45 +721,35 @@ let prepopulate_variant_containers = () => {
 
 }
 
-// This is input field from django marketing.models product form
-let hasVariantsCheckbox = document.getElementById('id_has_variants');
+// Variant component elements
 let variant_component = document.getElementById('variant_component');
 let no_variant_product_files_form = document.getElementById('no_variant_product_files_form');
-
-if (hasVariantsCheckbox.checked) {
-    variant_component.style.display = 'block';
-    no_variant_product_files_form.style.display = 'none';
-    document.getElementById("id_quantity").setAttribute('disabled', true)
-    document.getElementById("id_barcode").setAttribute('disabled', true)
-    document.getElementById("id_price").setAttribute('disabled', true)
-    document.getElementById("id_quantity").value = "";
-    document.getElementById("id_price").value = "";
-    document.getElementById("id_barcode").value = "";
-
-
-    prepopulate_variant_containers();
-}
-let toggleVariantForm = () => {
-    if (hasVariantsCheckbox.checked) {
-        variant_component.style.display = 'block';
-        no_variant_product_files_form.style.display = 'none';
-        document.getElementById("id_quantity").setAttribute('disabled', true)
-        document.getElementById("id_barcode").setAttribute('disabled', true)
-        document.getElementById("id_price").setAttribute('disabled', true)
-
-    } else {
-        variant_component.style.display = 'none';
-        no_variant_product_files_form.style.display = 'block';
-        document.getElementById("id_quantity").removeAttribute('disabled');
-        document.getElementById("id_barcode").removeAttribute('disabled');
-        document.getElementById("id_price").removeAttribute('disabled')
-    }
-}
-
 let loading = document.getElementById('loading');
 
+// Check if variants exist (for edit mode)
+if (variant_component && variant_component.style.display === 'block') {
+    // Variant section is visible, disable non-variant fields
+    const qtyField = document.getElementById("id_quantity");
+    const barcodeField = document.getElementById("id_barcode");
+    const priceField = document.getElementById("id_price");
+    
+    if (qtyField) qtyField.setAttribute('disabled', true);
+    if (barcodeField) barcodeField.setAttribute('disabled', true);
+    if (priceField) priceField.setAttribute('disabled', true);
+    
+    prepopulate_variant_containers();
+}
 
-hasVariantsCheckbox.addEventListener('change', toggleVariantForm);
+// Helper function to check if variant section is visible and has data
+function hasVariants() {
+    // Check if variant table has been created and has rows
+    const variantTable = document.getElementById('variant_table');
+    if (!variantTable) return false;
+    
+    const tableRows = variantTable.getElementsByTagName('tr');
+    // More than 1 row means header + data rows
+    return tableRows.length > 1;
+}
 
 const MAX_FILES = 7; // Set your desired limit
 
@@ -796,36 +767,29 @@ const form = document.getElementById('product_form');
 const form_submit_button = document.getElementById("form_submit_button")
 
 form.addEventListener('submit', async (event) => {
-    // If the event is not from the original form, then ignore the request (needed for htmx)
 
+    
+    // If the event is not from the original form, then ignore the request (needed for htmx)
     if (event.target !== form) return;
-    // if (event.submitter?.hasAttribute('hx-post')) {
-    //     return; // Let HTMX handle it
-    // }
-    if (!hasVariantsCheckbox.checked) {
+    
+    // Check if variant section is visible
+    const hasVariantSection = hasVariants();
+ 
+    
+    if (!hasVariantSection) {
         export_data.delete_all_variants = true;
         export_data.product_variant_list = [];
-    }
-
-
-    // might delete below later:
-    // ----------------------------------------------------------------------------------------
-
-    if (!hasVariantsCheckbox.checked) {
         Object.keys(export_data).forEach((key) => {
             if (key === "product_variant_list") {
                 export_data[key] = [];
             }
         });
-
+        
         // Optionally, remove file inputs from DOM if they exist
         document.querySelectorAll("input[type='file'][name^='variant_file_']").forEach(input => {
             input.value = null;
         });
     }
-    // ----------------------------------------------------------------------------------------
-
-    // ----------------------------------------------------------------------------------------
 
     event.preventDefault();
     loading.style.display = 'block';
@@ -845,10 +809,6 @@ form.addEventListener('submit', async (event) => {
         // I am not sure if this is needed, but I am doing it just in case
         if (!export_data.product_variant_list[variant_row]) {
             export_data.product_variant_list[variant_row] = {};
-            // Add the combination for this row
-            if (typeof variant_combinations !== "undefined" && variant_combinations[variant_row]) {
-                export_data.product_variants[variant_row]["variant_attribute_values"] = variant_combinations[variant_row];
-            }
         }
 
         if (element.name.includes("featured")) {
@@ -869,10 +829,15 @@ form.addEventListener('submit', async (event) => {
     // variants_json.value = JSON.stringify(export_data);
 
 
+    console.log("\n=== FINAL EXPORT DATA ===");
+    console.log("export_data:", export_data);
+    console.log("export_data.product_variant_list:", export_data.product_variant_list);
+    console.log("export_data JSON:", JSON.stringify(export_data));
+    
     const formData = new FormData(form);
     formData.append('variants_json', JSON.stringify(export_data));
-    console.log("your form data is");
-    console.log(formData);
+    console.log("\n=== FORM DATA ===");
+    console.log("FormData variants_json:", formData.get('variants_json'));
 
 
 

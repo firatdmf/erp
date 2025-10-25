@@ -39,14 +39,35 @@ def dashboard_component(csrf_token,path,member):
 
 
 
+    from todo.models import Task
+    import json
+    from collections import defaultdict
+    
     # contact = Contact.objects.filter(name__icontains="firat")[0]
     start_of_today = today.replace(hour=0, minute=0, second=0, microsecond=0)
     contacts = Contact.objects.filter(created_at__gte=start_of_today)
     companies = Company.objects.filter(created_at__gte=start_of_today)
     number_of_leads_added = len(contacts) + len(companies)
+    
+    # Get all pending tasks
+    pending_tasks = Task.objects.filter(completed=False)
+    if member:
+        pending_tasks = pending_tasks.filter(member=member) | pending_tasks.filter(member__isnull=True)
+    pending_tasks_count = pending_tasks.count()
+    
+    # Group tasks by date for calendar
+    tasks_by_date = defaultdict(int)
+    for task in pending_tasks:
+        date_str = task.due_date.strftime('%Y-%m-%d')
+        tasks_by_date[date_str] += 1
+    
+    tasks_calendar_data = json.dumps(dict(tasks_by_date))
+    
     return render_to_string('components/dashboard.html',{
         'csrf_token':csrf_token,
         'number_of_leads_added':number_of_leads_added,
+        'pending_tasks_count':pending_tasks_count,
+        'tasks_calendar_data':tasks_calendar_data,
         # 'country_of_the_day':country_of_the_day,
         'path':path,
         'member':member,

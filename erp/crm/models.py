@@ -29,13 +29,23 @@ class Company(models.Model):
     name = models.CharField(
         max_length=100, verbose_name="Company Name (required)", unique=True
     )
-    email = models.EmailField(blank=True)
+    email = ArrayField(
+        models.EmailField(max_length=254),
+        blank=True,
+        default=list,
+        verbose_name="Email addresses"
+    )
     backgroundInfo = models.TextField(
         max_length=200,
         verbose_name="Background info",
         blank=True,
     )
-    phone = models.CharField(max_length=15, blank=True)
+    phone = ArrayField(
+        models.CharField(max_length=20),
+        blank=True,
+        default=list,
+        verbose_name="Phone numbers"
+    )
     website = models.CharField(max_length=100, blank=True)
     address = models.CharField(max_length=255, blank=True)
     country = models.CharField(max_length=50, blank=True)
@@ -69,13 +79,23 @@ class Contact(models.Model):
         related_name="contacts",
     )
     job_title = models.CharField(max_length=25, blank=True, verbose_name="Job Title")
-    email = models.EmailField(blank=True)
+    email = ArrayField(
+        models.EmailField(max_length=254),
+        blank=True,
+        default=list,
+        verbose_name="Email addresses"
+    )
     backgroundInfo = models.TextField(
         max_length=200,
         verbose_name="Background info",
         blank=True,
     )
-    phone = models.CharField(max_length=15, blank=True)
+    phone = ArrayField(
+        models.CharField(max_length=20),
+        blank=True,
+        default=list,
+        verbose_name="Phone numbers"
+    )
     address = models.TextField(max_length=255, blank=True)
     country = models.CharField(max_length=50, blank=True)
     birthday = models.DateField(null=True, blank=True)
@@ -117,7 +137,11 @@ class Supplier(models.Model):
             )
 
     def __str__(self):
-        return f"{self.company_name}"
+        if self.company_name:
+            return self.company_name
+        elif self.contact_name:
+            return self.contact_name
+        return "Unnamed Supplier"
 
 
 class Note(models.Model):

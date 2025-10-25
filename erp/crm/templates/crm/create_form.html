@@ -20,6 +20,28 @@
       {% for field in form %}
         {% if field.name == 'company_suggestions' %}
           <div id="company-suggestions"></div>
+        {% elif field.name == 'contact_id' %}
+          {{ field }}
+          {% if model_type == 'company' %}
+          <div class="contact-selector-container">
+            <label>Attach Contact</label>
+            <div class="contact-selector-wrapper">
+              <div class="contact-search-box">
+                <input 
+                  type="text" 
+                  id="contact_search_input" 
+                  placeholder="Search contacts..."
+                  autocomplete="off"
+                />
+                <button type="button" class="add-contact-btn" id="add_new_contact_btn" title="Add new contact">
+                  <i class="fa fa-plus"></i>
+                </button>
+              </div>
+              <div id="contact-search-results" class="contact-results"></div>
+              <div id="selected-contact-display" class="selected-contact"></div>
+            </div>
+          </div>
+          {% endif %}
         {% else %}
           <p>
             {{ field.label_tag }}<br />
@@ -36,4 +58,252 @@
       <button type="submit">Submit</button>
     </form>
   </div>
+
+  <style>
+  .contact-selector-container {
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+
+  .contact-selector-container label {
+    display: block;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  .contact-search-box {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  #contact_search_input {
+    flex: 1;
+    padding: 0.625rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+  }
+
+  #contact_search_input:focus {
+    outline: none;
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+
+  .add-contact-btn {
+    width: 40px;
+    height: 40px;
+    background: #4f46e5;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  .add-contact-btn:hover {
+    background: #4338ca;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(79, 70, 229, 0.3);
+  }
+
+  .contact-results {
+    max-height: 300px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    display: none;
+  }
+
+  .contact-results.active {
+    display: block;
+  }
+
+  .contact-result-item {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .contact-result-item:last-child {
+    border-bottom: none;
+  }
+
+  .contact-result-item:hover {
+    background: #f9fafb;
+  }
+
+  .contact-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+  }
+
+  .contact-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .contact-name {
+    font-weight: 600;
+    color: #111827;
+    font-size: 0.9375rem;
+  }
+
+  .contact-details {
+    font-size: 0.8125rem;
+    color: #6b7280;
+    margin-top: 0.125rem;
+  }
+
+  .selected-contact {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    display: none;
+  }
+
+  .selected-contact.active {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+  }
+
+  .selected-contact-info {
+    flex: 1;
+  }
+
+  .remove-contact-btn {
+    padding: 0.5rem 0.75rem;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    transition: background 0.2s ease;
+  }
+
+  .remove-contact-btn:hover {
+    background: #dc2626;
+  }
+
+  .no-results {
+    padding: 1.5rem;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.875rem;
+  }
+  </style>
+
+  <script>
+  {% if model_type == 'company' %}
+  let searchTimeout = null;
+  const searchInput = document.getElementById('contact_search_input');
+  const searchResults = document.getElementById('contact-search-results');
+  const selectedDisplay = document.getElementById('selected-contact-display');
+  const contactIdInput = document.getElementById('selected_contact_id');
+  const addNewBtn = document.getElementById('add_new_contact_btn');
+
+  // Search contacts
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+
+    if (query.length < 2) {
+      searchResults.classList.remove('active');
+      return;
+    }
+
+    searchTimeout = setTimeout(() => {
+      fetch(`/crm/search_contacts_only/?search_term=${encodeURIComponent(query)}`)
+        .then(response => response.text())
+        .then(html => {
+          searchResults.innerHTML = html;
+          searchResults.classList.add('active');
+          
+          // Add click handlers to results
+          document.querySelectorAll('.contact-result-item').forEach(item => {
+            item.addEventListener('click', function() {
+              selectContact(
+                this.dataset.contactId,
+                this.dataset.contactName,
+                this.dataset.contactEmail,
+                this.dataset.contactCompany
+              );
+            });
+          });
+        })
+        .catch(error => {
+          console.error('Error searching contacts:', error);
+        });
+    }, 300);
+  });
+
+  // Select contact
+  function selectContact(id, name, email, company) {
+    contactIdInput.value = id;
+    searchInput.value = '';
+    searchResults.classList.remove('active');
+
+    const initial = name.charAt(0).toUpperCase();
+    selectedDisplay.innerHTML = `
+      <div class="contact-avatar">${initial}</div>
+      <div class="selected-contact-info">
+        <div class="contact-name">${name}</div>
+        <div class="contact-details">${email}${company ? ' • ' + company : ''}</div>
+      </div>
+      <button type="button" class="remove-contact-btn" onclick="removeContact()">
+        <i class="fa fa-times"></i> Remove
+      </button>
+    `;
+    selectedDisplay.classList.add('active');
+  }
+
+  // Remove selected contact
+  function removeContact() {
+    contactIdInput.value = '';
+    selectedDisplay.classList.remove('active');
+    selectedDisplay.innerHTML = '';
+  }
+
+  // Add new contact button
+  addNewBtn.addEventListener('click', function() {
+    window.open('/crm/contact/create/', '_blank');
+  });
+
+  // Hide results when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.contact-selector-wrapper')) {
+      searchResults.classList.remove('active');
+    }
+  });
+  {% endif %}
+  </script>
 {% endblock %}

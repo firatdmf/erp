@@ -1,0 +1,504 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+.campaign-detail-page {
+  max-width: 1200px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-header h1 i {
+  color: var(--accent-primary);
+}
+
+.btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+  border: 1px solid #f59e0b;
+}
+
+.btn-warning:hover {
+  background: #d97706;
+  color: white;
+  border-color: #d97706;
+}
+
+.btn-success {
+  background: #10b981;
+  color: white;
+  border: 1px solid #10b981;
+}
+
+.btn-success:hover {
+  background: #059669;
+  color: white;
+  border-color: #059669;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  border: 1px solid #ef4444;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+  color: white;
+  border-color: #dc2626;
+}
+
+.campaign-overview {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.company-info {
+  flex: 1;
+}
+
+.company-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.company-name i {
+  color: var(--accent-primary);
+}
+
+.company-email {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-paused {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-completed {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-stopped {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.overview-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.stat-card {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.campaign-timeline {
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  padding: 2rem;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-title i {
+  color: var(--accent-primary);
+}
+
+.timeline {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 0.5rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-color);
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 2rem;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -1.5rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  border: 3px solid var(--bg-primary);
+  z-index: 1;
+}
+
+.timeline-marker.pending {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.timeline-content {
+  background: var(--bg-secondary);
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.email-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.email-status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.status-sent {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-scheduled {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-pending {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.email-meta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.email-subject {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.email-subject strong {
+  color: var(--text-primary);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-state i {
+  font-size: 3rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="campaign-detail-page">
+    <div class="page-header">
+      <h1>
+        <i class="fa fa-rocket"></i>
+        Campaign Details
+      </h1>
+      <div style="display: flex; gap: 0.75rem;">
+        {% if campaign.status == 'active' %}
+        <a href="{% url 'email_automation:campaign_pause' campaign.pk %}" class="btn btn-warning" onclick="return confirm('Are you sure you want to pause this campaign?')">
+          <i class="fa fa-pause"></i>
+          Pause Campaign
+        </a>
+        {% elif campaign.status == 'paused' %}
+        <a href="{% url 'email_automation:campaign_resume' campaign.pk %}" class="btn btn-success" onclick="return confirm('Resume this campaign?')">
+          <i class="fa fa-play"></i>
+          Resume Campaign
+        </a>
+        {% endif %}
+        <form method="post" action="{% url 'email_automation:campaign_delete' campaign.pk %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to DELETE this campaign? This action cannot be undone!')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">
+            <i class="fa fa-trash"></i>
+            Delete
+          </button>
+        </form>
+        <a href="{% url 'email_automation:campaign_list' %}" class="btn btn-secondary">
+          <i class="fa fa-arrow-left"></i>
+          Back to Campaigns
+        </a>
+      </div>
+    </div>
+
+  <!-- Campaign Overview -->
+  <div class="campaign-overview">
+    <div class="overview-header">
+      <div class="company-info">
+        <div class="company-name">
+          <i class="fa fa-building"></i>
+          {{ campaign.company.name }}
+        </div>
+        <div class="company-email">
+          <i class="fa fa-envelope"></i>
+          {% if campaign.company.email and campaign.company.email|length > 0 %}
+            {{ campaign.company.email.0 }}
+            {% if campaign.company.email|length > 1 %}
+              <span style="color: #6b7280; font-size: 0.85rem;">(+{{ campaign.company.email|length|add:"-1" }} more)</span>
+            {% endif %}
+          {% else %}
+            No email set
+          {% endif %}
+        </div>
+      </div>
+      <span class="status-badge status-{{ campaign.status }}">
+        {{ campaign.status }}
+      </span>
+    </div>
+
+    <div class="overview-stats">
+      <div class="stat-card">
+        <span class="stat-value">{{ campaign.emails_sent }}</span>
+        <span class="stat-label">
+          <i class="fa fa-paper-plane"></i>
+          Emails Sent
+        </span>
+      </div>
+      
+      <div class="stat-card">
+        <span class="stat-value">{{ sent_emails.count }}</span>
+        <span class="stat-label">
+          <i class="fa fa-check-circle"></i>
+          Delivered
+        </span>
+      </div>
+      
+      <div class="stat-card">
+        <span class="stat-value">{{ campaign.created_at|date:"M d, Y" }}</span>
+        <span class="stat-label">
+          <i class="fa fa-calendar"></i>
+          Started
+        </span>
+      </div>
+      
+      {% if campaign.last_email_sent_at %}
+      <div class="stat-card">
+        <span class="stat-value">{{ campaign.last_email_sent_at|date:"M d, H:i" }}</span>
+        <span class="stat-label">
+          <i class="fa fa-clock"></i>
+          Last Sent
+        </span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Email Timeline -->
+  <div class="campaign-timeline">
+    <h2 class="section-title">
+      <i class="fa fa-history"></i>
+      Email Timeline
+    </h2>
+
+    {% if sent_emails %}
+    <div class="timeline">
+      {% for email in sent_emails %}
+      <div class="timeline-item">
+        <div class="timeline-marker"></div>
+        <div class="timeline-content">
+          <div class="timeline-header">
+            <div class="email-title">
+              <i class="fa fa-envelope"></i>
+              Email {{ email.template.sequence_number }}: {{ email.template.name }}
+            </div>
+            <span class="email-status status-sent">
+              <i class="fa fa-check"></i> Sent
+            </span>
+          </div>
+          <div class="email-meta">
+            <i class="fa fa-clock"></i>
+            {{ email.sent_at|date:"F d, Y \a\t H:i" }}
+          </div>
+          {% if email.template.subject %}
+          <div class="email-subject">
+            <strong>Subject:</strong> {{ email.template.subject }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      
+      <!-- Show scheduled/pending emails -->
+      {% if campaign.status == 'active' %}
+      <div class="timeline-item">
+        <div class="timeline-marker pending"></div>
+        <div class="timeline-content">
+          <div class="timeline-header">
+            <div class="email-title">
+              <i class="fa fa-hourglass-half"></i>
+              Email {{ campaign.emails_sent|add:1 }}: Next in sequence
+            </div>
+            {% if campaign.next_email_scheduled_at %}
+            <span class="email-status status-scheduled">
+              <i class="fa fa-clock"></i> Scheduled
+            </span>
+            {% else %}
+            <span class="email-status status-pending">
+              <i class="fa fa-pause"></i> Pending
+            </span>
+            {% endif %}
+          </div>
+          {% if campaign.next_email_scheduled_at %}
+          <div class="email-meta">
+            <i class="fa fa-clock"></i>
+            Scheduled for: {{ campaign.next_email_scheduled_at|date:"F d, Y \a\t H:i" }}
+          </div>
+          {% else %}
+          <div class="email-meta">
+            <i class="fa fa-info-circle"></i>
+            Waiting for template or conditions
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <i class="fa fa-inbox"></i>
+      <p>No emails sent yet for this campaign.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

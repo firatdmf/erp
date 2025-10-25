@@ -29,6 +29,17 @@ class ContactCreateForm(ModelForm):
         ),
     )
 
+    # Hidden fields to store JSON arrays
+    emails_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "contact_emails_data"})
+    )
+    
+    phones_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "contact_phones_data"})
+    )
+
     note_content = forms.CharField(
         label="Initial Note", widget=forms.Textarea, required=False
     )
@@ -44,11 +55,39 @@ class ContactCreateForm(ModelForm):
         widget=forms.Textarea, label="Task Description", required=False
     )
 
+    def clean_emails_data(self):
+        import json
+        emails_str = self.cleaned_data.get("emails_data", "")
+        if not emails_str:
+            return []
+        try:
+            emails = json.loads(emails_str)
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            for email in emails:
+                try:
+                    validate_email(email)
+                except DjangoValidationError:
+                    raise forms.ValidationError(f"Invalid email: {email}")
+            return emails
+        except json.JSONDecodeError:
+            return []
+    
+    def clean_phones_data(self):
+        import json
+        phones_str = self.cleaned_data.get("phones_data", "")
+        if not phones_str:
+            return []
+        try:
+            return json.loads(phones_str)
+        except json.JSONDecodeError:
+            return []
+
     class Meta:
         model = Contact
         # Bring all fields to the form
         # fields = "__all__"  
-        exclude = ("company",)
+        exclude = ("company", "email", "phone")
         widgets = {
             "birthday": forms.DateInput(attrs={"type": "date"}),
         }
@@ -71,6 +110,9 @@ class ContactCreateForm(ModelForm):
     # when the form is submitted (Saved), do this.
     def save(self, commit=True):
         instance = super().save(commit=False)
+        # Set email and phone arrays
+        instance.email = self.cleaned_data.get("emails_data", [])
+        instance.phone = self.cleaned_data.get("phones_data", [])
         if commit:
             instance.save()
             if self.cleaned_data["note_content"]:
@@ -88,12 +130,77 @@ class ContactCreateForm(ModelForm):
         return instance
     
 class ContactUpdateForm(ModelForm):
+    # Hidden fields to store JSON arrays
+    emails_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "contact_emails_data"})
+    )
+    
+    phones_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "contact_phones_data"})
+    )
+    
+    def clean_emails_data(self):
+        import json
+        emails_str = self.cleaned_data.get("emails_data", "")
+        if not emails_str:
+            return []
+        try:
+            emails = json.loads(emails_str)
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            for email in emails:
+                try:
+                    validate_email(email)
+                except DjangoValidationError:
+                    raise forms.ValidationError(f"Invalid email: {email}")
+            return emails
+        except json.JSONDecodeError:
+            return []
+    
+    def clean_phones_data(self):
+        import json
+        phones_str = self.cleaned_data.get("phones_data", "")
+        if not phones_str:
+            return []
+        try:
+            return json.loads(phones_str)
+        except json.JSONDecodeError:
+            return []
+    
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        # Set email and phone arrays
+        instance.email = self.cleaned_data.get("emails_data", [])
+        instance.phone = self.cleaned_data.get("phones_data", [])
+        if commit:
+            instance.save()
+        return instance
+    
     class Meta:
         model = Contact
-        fields = "__all__"
+        exclude = ["email", "phone"]
 
 
 class CompanyForm(ModelForm):
+    # Contact selector field
+    contact_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "selected_contact_id"})
+    )
+    
+    # Hidden fields to store JSON arrays
+    emails_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "emails_data"})
+    )
+    
+    phones_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "phones_data"})
+    )
+    
     note_content = forms.CharField(
         label="Initial Note", widget=forms.Textarea, required=False
     )
@@ -102,7 +209,6 @@ class CompanyForm(ModelForm):
         label="Task Due Date",
         widget=forms.DateInput(attrs={"type": "date"}),
         required=False,
-        # initial=date.today(),
     )
     task_description = forms.CharField(
         widget=forms.Textarea, label="Task Description", required=False
@@ -112,9 +218,47 @@ class CompanyForm(ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["task_due_date"].initial = date.today()
 
+    def clean_emails_data(self):
+        import json
+        emails_str = self.cleaned_data.get("emails_data", "")
+        if not emails_str:
+            return []
+        try:
+            emails = json.loads(emails_str)
+            # Validate each email
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            for email in emails:
+                try:
+                    validate_email(email)
+                except DjangoValidationError:
+                    raise forms.ValidationError(f"Invalid email: {email}")
+            return emails
+        except json.JSONDecodeError:
+            return []
+    
+    def clean_phones_data(self):
+        import json
+        phones_str = self.cleaned_data.get("phones_data", "")
+        if not phones_str:
+            return []
+        try:
+            return json.loads(phones_str)
+        except json.JSONDecodeError:
+            return []
+    
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        # Set email and phone arrays
+        instance.email = self.cleaned_data.get("emails_data", [])
+        instance.phone = self.cleaned_data.get("phones_data", [])
+        if commit:
+            instance.save()
+        return instance
+
     class Meta:
         model = Company
-        fields = "__all__"
+        exclude = ["email", "phone"]  # Exclude ArrayFields, we'll handle them manually
 
 
 class NoteForm(ModelForm):

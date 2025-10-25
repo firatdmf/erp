@@ -1,13 +1,157 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=1.0" />
+{% endblock %}
+
 {% block content %}
-{% comment %} <p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p> {% endcomment %}
-    <h1>Product List ({{ products.count }})</h1>
-    <ul>
-        {% comment %} List the company names alphabetically {% endcomment %}
+<div class="product-list-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>Products</h1>
+      <span class="product-count">{{ products.count }} product{{ products.count|pluralize }}</span>
+    </div>
+    <div class="header-right">
+      <a href="{% url 'marketing:product_create' %}" class="btn btn-primary">
+        <i class="fa fa-plus"></i>
+        Add Product
+      </a>
+    </div>
+  </div>
+
+  <!-- Search/Filter Section -->
+  <div class="filter-section">
+    <form method="get" action="{% url 'marketing:product_list' %}" class="filter-form">
+      <div class="search-box">
+        <i class="fa fa-search"></i>
+        <input 
+          type="text" 
+          name="search" 
+          placeholder="Search by name, SKU, or barcode..." 
+          value="{{ request.GET.search }}"
+          class="search-input"
+        >
+      </div>
+      <button type="submit" class="btn btn-secondary">
+        <i class="fa fa-filter"></i>
+        Filter
+      </button>
+      {% if request.GET.search %}
+      <a href="{% url 'marketing:product_list' %}" class="btn btn-outline">
+        <i class="fa fa-times"></i>
+        Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Products Table -->
+  <div class="table-container">
+    <table class="products-table">
+      <thead>
+        <tr>
+          <th style="width: 80px;">Image</th>
+          <th style="width: 120px;">SKU</th>
+          <th>Product</th>
+          <th style="width: 120px;">Category</th>
+          <th style="width: 100px;">Price</th>
+          <th style="width: 100px;">Quantity</th>
+          <th style="width: 100px;">Variants</th>
+          <th style="width: 80px;">Status</th>
+          <th style="width: 100px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
         {% for product in products|dictsort:'title' %}
-        <li><a href="{% url 'marketing:product_detail' product.id %}">{{product.sku}} | {{ product.title }}</a></li>
+        <tr class="product-row" onclick="window.location='{% url 'marketing:product_detail' product.id %}'" style="cursor: pointer;">
+          <td>
+            <div class="product-image-cell">
+              {% if product.primary_image %}
+                <img src="{{ product.primary_image.file_url }}" alt="{{ product.title }}" class="product-thumbnail">
+              {% else %}
+                <div class="product-image-placeholder">
+                  <i class="fa fa-image"></i>
+                </div>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <span class="product-sku">{{ product.sku|default:"-" }}</span>
+          </td>
+          <td>
+            <div class="product-info">
+              <div class="product-title">{{ product.title }}</div>
+              {% if product.description %}
+                <div class="product-description">{{ product.description|truncatewords:15|striptags }}</div>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            {% if product.category %}
+              <span class="badge badge-category">{{ product.category.name|title }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if product.price %}
+              <span class="product-price">${{ product.price }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if product.quantity %}
+              <span class="product-quantity">{{ product.quantity }} {{ product.unit_of_measurement|default:"units" }}</span>
+            {% else %}
+              <span class="text-muted">0</span>
+            {% endif %}
+          </td>
+          <td>
+            {% with variant_count=product.variants.count %}
+              {% if variant_count > 0 %}
+                <span class="badge badge-variants">{{ variant_count }} variant{{ variant_count|pluralize }}</span>
+              {% else %}
+                <span class="text-muted">-</span>
+              {% endif %}
+            {% endwith %}
+          </td>
+          <td>
+            {% if product.featured %}
+              <span class="badge badge-featured">Featured</span>
+            {% else %}
+              <span class="badge badge-regular">Regular</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="action-buttons" onclick="event.stopPropagation();">
+              <a href="{% url 'marketing:product_detail' product.id %}" class="btn-icon" title="View">
+                <i class="fa fa-eye"></i>
+              </a>
+              <a href="{% url 'marketing:product_edit' product.id %}" class="btn-icon" title="Edit">
+                <i class="fa fa-edit"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
         {% empty %}
-        <li>No products available.</li>
+        <tr>
+          <td colspan="9" class="empty-state">
+            <div class="empty-state-content">
+              <i class="fa fa-box-open"></i>
+              <p>No products available</p>
+              <a href="{% url 'marketing:product_create' %}" class="btn btn-primary">
+                <i class="fa fa-plus"></i>
+                Create your first product
+              </a>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
-    </ul>
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock content %}

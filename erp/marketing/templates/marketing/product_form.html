@@ -1,54 +1,699 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load marketing_tags %}
+
 {% block css %}
-  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
+<style>
+  #Product_Form_Page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px;
+  }
+
+  .form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .form-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+  }
+
+  .form-header i {
+    color: #667eea;
+  }
+
+  .modern-form {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+  }
+
+  .form-section {
+    margin-bottom: 30px;
+  }
+
+  .form-section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .form-group label .required {
+    color: #ef4444;
+    margin-left: 4px;
+  }
+
+  .form-input,
+  .form-textarea,
+  .form-select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+  }
+
+  .form-input:focus,
+  .form-textarea:focus,
+  .form-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+
+  .btn-primary {
+    background: #667eea;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+
+  .btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+
+  .btn-secondary:hover {
+    background: #e5e7eb;
+  }
+
+  .checkbox-group {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: 400;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Variant Section */
+  .variant-option-card {
+    background: #f9fafb;
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .variant-badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+    border-radius: 8px;
+    font-size: 9px;
+    padding: 2px 5px;
+    font-weight: 600;
+  }
+
+  /* Drag and drop states */
+  .sortable-image {
+    transition: all 0.2s ease;
+  }
+  
+  .sortable-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .drag-over {
+    border: 3px dashed #667eea !important;
+    background: #f0f4ff !important;
+    transform: scale(1.05);
+  }
+
+  .drag-handle {
+    transition: all 0.2s;
+  }
+  
+  .drag-handle:hover {
+    background: rgba(0, 0, 0, 0.85) !important;
+    transform: scale(1.1);
+  }
+
+  .drag-handle:active {
+    cursor: grabbing !important;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-  <div id="Product_Form_Page">
-    {% if not is_update %}
-      <h1>Product Create Form</h1>
-    {% else %}
-      <h1>Product Edit Form</h1>
-    {% endif %}
+<div id="Product_Form_Page">
+  <div class="form-header">
+    <h1>
+      <i class="fa fa-tag"></i>
+      {% if not is_update %}
+        Create New Product
+      {% else %}
+        Edit Product
+      {% endif %}
+    </h1>
+  </div>
 
-    <form method="post" id="product_form">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-      {{ form.as_p }}
-      <div id="no_variant_product_files_form">
-        <input type="file" name="no_variant_file" id="no_variant_file" multiple />
-        {% if not variants %}
-          {% comment %} <div id="no_variant_file_{{ file.pk }}" class="variant-file">
-            {% endcomment %}
-            {% for file in product.files.all %}
-              <p id="no_variant_file_{{ file.pk }}">
-                <a href="{{ file.optimized_url }}" target="_blank"><img src="{{ file.optimized_url }}" width="60" /></a>
-                <button onclick="handle_no_variant_file_delete({{ file.pk }})">Delete</button>
-              </p>
-            {% endfor %}
-            {% comment %}
-          </div> {% endcomment %}
-        {% endif %}
+  <form method="post" id="product_form" class="modern-form" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <!-- Basic Information -->
+    <div class="form-section">
+      <div class="form-section-title">Basic Information</div>
+      
+      <div class="form-group">
+        <label for="id_title">Product Title<span class="required">*</span></label>
+        {{ form.title }}
       </div>
 
+      <div class="form-group">
+        <label for="id_description">Description</label>
+        {{ form.description }}
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="id_sku">SKU<span class="required">*</span></label>
+          {{ form.sku }}
+        </div>
+        <div class="form-group">
+          <label for="id_barcode">Barcode</label>
+          {{ form.barcode }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing & Inventory -->
+    <div class="form-section">
+      <div class="form-section-title">Pricing & Inventory</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="id_price">Price</label>
+          {{ form.price }}
+        </div>
+        <div class="form-group">
+          <label for="id_quantity">Quantity</label>
+          {{ form.quantity }}
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="id_unit_of_measurement">Unit of Measurement</label>
+          {{ form.unit_of_measurement }}
+        </div>
+        <div class="form-group">
+          <label for="id_minimum_inventory_level">Min. Inventory Level</label>
+          {{ form.minimum_inventory_level }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Details -->
+    <div class="form-section">
+      <div class="form-section-title">Product Details</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="id_weight">Weight</label>
+          {{ form.weight }}
+        </div>
+        <div class="form-group">
+          <label for="id_unit_of_weight">Weight Unit</label>
+          {{ form.unit_of_weight }}
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="id_type">Product Type</label>
+          {{ form.type }}
+        </div>
+        <div class="form-group">
+          <label for="id_category">Category</label>
+          {{ form.category }}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="id_supplier">Supplier</label>
+        {{ form.supplier }}
+      </div>
+    </div>
+
+    <!-- Product Images -->
+    <div class="form-section">
+      <div class="form-section-title">Product Images</div>
+      <div class="form-group">
+        <label for="no_variant_file">
+          <i class="fa fa-cloud-upload"></i> Upload Images (Multiple)
+        </label>
+        <input type="file" name="no_variant_file" id="no_variant_file" class="form-input" multiple accept="image/*" onchange="previewImages(event)">
+        <small style="color: #6b7280; display: block; margin-top: 8px;">Select multiple images at once. First uploaded image will be primary by default.</small>
+      </div>
+
+      <!-- Preview newly selected images -->
+      <div id="image_preview_container" style="display: none; margin-top: 20px;">
+        <div style="font-weight: 500; color: #374151; margin-bottom: 12px;">
+          New Images Preview:
+          <small style="color: #6b7280; font-weight: 400;">(Drag to reorder • First image will be primary)</small>
+        </div>
+        <div id="image_previews" style="display: flex; flex-wrap: wrap; gap: 15px;"></div>
+      </div>
+
+      <!-- Existing images (Main product images only, not variant images) -->
+      {% if product.files.all %}
+      <div style="margin-top: 20px;">
+        <div style="font-weight: 500; color: #374151; margin-bottom: 12px;">
+          <i class="fa fa-images"></i> Main Product Images 
+          <small style="color: #6b7280; font-weight: 400;">(Drag to reorder • First image is primary for main product)</small>
+        </div>
+        <div id="sortable_images" style="display: flex; flex-wrap: wrap; gap: 15px;">
+          {% for file in product.files.all %}
+          {% if not file.product_variant %}
+          <div class="sortable-image" data-file-id="{{ file.pk }}" style="position: relative; border: 2px solid {% if file.is_primary %}#667eea{% else %}#e5e7eb{% endif %}; border-radius: 8px; padding: 10px; background: white; width: 150px;">
+            {% if file.is_primary %}
+            <div class="primary-badge" style="position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;">
+              PRIMARY
+            </div>
+            {% endif %}
+            <div class="drag-handle" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
+              <i class="fa fa-grip-vertical"></i>
+            </div>
+            <a href="{{ file.optimized_url }}" target="_blank" style="pointer-events: none;">
+              <img src="{{ file.optimized_url }}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;"/>
+            </a>
+            <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px;">
+              <button type="button" onclick="handle_no_variant_file_delete({{ file.pk }})" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
+                <i class="fa fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        <input type="hidden" id="image_order" name="image_order" value="">
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Variants -->
+    <div class="form-section">
+      <div class="form-section-title">Product Variants</div>
       {% variant_form current_url=request.path product=product variants=variants %}
-      <input type="submit" id="product_form_submit_button" />
-    </form>
-  </div>
-  <script>
-    const handle_no_variant_file_delete = (file_pk) => {
-      const fileRow = document.getElementById(`no_variant_file_${file_pk}`)
-      if (fileRow) {
-        fileRow.remove()
-      }
-    
-      // Track the deleted file in export_data
-      if (!export_data.deleted_files) {
-        export_data.deleted_files = []
-      }
-      export_data.deleted_files.push(file_pk)
+    </div>
+
+    <!-- Options -->
+    <div class="form-section">
+      <div class="form-section-title">Options</div>
+      <div class="checkbox-group">
+        <label class="checkbox-label">
+          {{ form.featured }}
+          <span>Featured Product</span>
+        </label>
+        <label class="checkbox-label">
+          {{ form.selling_while_out_of_stock }}
+          <span>Allow Selling When Out of Stock</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="form-actions">
+      <a href="{% url 'marketing:index' %}" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">
+        {% if not is_update %}
+          Create Product
+        {% else %}
+          Update Product
+        {% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+  // Native HTML5 drag and drop for image sorting
+  let draggedItem = null;
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    const sortableContainer = document.getElementById('sortable_images');
+    if (sortableContainer) {
+      console.log('Drag & drop başlatılıyor...');
+      initDragAndDrop();
+      updateImageOrder();
+      updatePrimaryBadge();  // Sayfa yüklendiğinde primary badge'i göster
     }
-  </script>
+  });
+  
+  function initDragAndDrop() {
+    const items = document.querySelectorAll('.sortable-image');
+    console.log('Bulunan resim sayısı:', items.length);
+    
+    items.forEach(item => {
+      item.setAttribute('draggable', 'true');
+      
+      item.addEventListener('dragstart', function(e) {
+        draggedItem = this;
+        console.log('Sürükleme başladı');
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+      });
+      
+      item.addEventListener('dragend', function(e) {
+        console.log('Sürükleme bitti');
+        this.style.opacity = '1';
+        items.forEach(i => i.classList.remove('drag-over'));
+      });
+      
+      item.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        if (this !== draggedItem) {
+          this.classList.add('drag-over');
+        }
+        return false;
+      });
+      
+      item.addEventListener('dragleave', function(e) {
+        this.classList.remove('drag-over');
+      });
+      
+      item.addEventListener('drop', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        if (draggedItem !== this) {
+          console.log('Drop yapıldı');
+          const container = document.getElementById('sortable_images');
+          const allItems = Array.from(container.children);
+          const draggedIndex = allItems.indexOf(draggedItem);
+          const targetIndex = allItems.indexOf(this);
+          
+          if (draggedIndex < targetIndex) {
+            container.insertBefore(draggedItem, this.nextSibling);
+          } else {
+            container.insertBefore(draggedItem, this);
+          }
+          
+          updateImageOrder();
+          updatePrimaryBadge();
+        }
+        
+        this.classList.remove('drag-over');
+        return false;
+      });
+    });
+  }
+  
+  function updateImageOrder() {
+    const container = document.getElementById('sortable_images');
+    if (!container) return;
+    
+    const images = container.querySelectorAll('.sortable-image');
+    const order = Array.from(images).map(img => img.getAttribute('data-file-id'));
+    const orderInput = document.getElementById('image_order');
+    if (orderInput) {
+      orderInput.value = JSON.stringify(order);
+      console.log('Sıra güncellendi:', order);
+    }
+  }
+  
+  function updatePrimaryBadge() {
+    const container = document.getElementById('sortable_images');
+    if (!container) return;
+    
+    // Remove all primary badges
+    container.querySelectorAll('.primary-badge').forEach(badge => badge.remove());
+    container.querySelectorAll('.sortable-image').forEach(img => {
+      img.style.borderColor = '#e5e7eb';
+    });
+    
+    // Add primary badge to first image
+    const firstImage = container.querySelector('.sortable-image');
+    if (firstImage) {
+      firstImage.style.borderColor = '#667eea';
+      const badge = document.createElement('div');
+      badge.className = 'primary-badge';
+      badge.style.cssText = 'position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;';
+      badge.textContent = 'PRIMARY';
+      firstImage.insertBefore(badge, firstImage.firstChild);
+    }
+  }
+  
+  function previewImages(event) {
+    const files = event.target.files;
+    const previewContainer = document.getElementById('image_preview_container');
+    const previewsDiv = document.getElementById('image_previews');
+    
+    if (files.length === 0) {
+      previewContainer.style.display = 'none';
+      return;
+    }
+    
+    previewContainer.style.display = 'block';
+    previewsDiv.innerHTML = '';
+    
+    // Store files array for later access
+    window.uploadedFilesArray = Array.from(files);
+    
+    Array.from(files).forEach((file, index) => {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const previewCard = document.createElement('div');
+        previewCard.className = 'preview-image';
+        previewCard.setAttribute('data-file-index', index);
+        previewCard.setAttribute('draggable', 'true');
+        previewCard.style.cssText = `
+          position: relative;
+          border: 2px solid ${index === 0 ? '#667eea' : '#e5e7eb'};
+          border-radius: 8px;
+          padding: 10px;
+          background: white;
+          width: 150px;
+          cursor: grab;
+        `;
+        
+        previewCard.innerHTML = `
+          ${index === 0 ? '<div class="primary-badge" style="position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;">PRIMARY</div>' : ''}
+          <div style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px;">
+            <i class="fa fa-grip-vertical"></i>
+          </div>
+          <img src="${e.target.result}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;"/>
+          <div style="margin-top: 8px; font-size: 11px; color: #6b7280; text-align: center; user-select: none;">${file.name}</div>
+        `;
+        
+        previewsDiv.appendChild(previewCard);
+        
+        // After all images loaded, initialize drag and drop for previews
+        if (previewsDiv.children.length === files.length) {
+          initPreviewDragAndDrop();
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  function initPreviewDragAndDrop() {
+    const items = document.querySelectorAll('.preview-image');
+    let draggedPreview = null;
+    
+    items.forEach(item => {
+      item.addEventListener('dragstart', function(e) {
+        draggedPreview = this;
+        this.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML);
+      });
+      
+      item.addEventListener('dragend', function(e) {
+        this.style.opacity = '1';
+        items.forEach(i => i.classList.remove('drag-over'));
+      });
+      
+      item.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        if (this !== draggedPreview) {
+          this.classList.add('drag-over');
+        }
+        return false;
+      });
+      
+      item.addEventListener('dragleave', function(e) {
+        this.classList.remove('drag-over');
+      });
+      
+      item.addEventListener('drop', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        if (draggedPreview !== this) {
+          const container = document.getElementById('image_previews');
+          const allItems = Array.from(container.children);
+          const draggedIndex = allItems.indexOf(draggedPreview);
+          const targetIndex = allItems.indexOf(this);
+          
+          if (draggedIndex < targetIndex) {
+            container.insertBefore(draggedPreview, this.nextSibling);
+          } else {
+            container.insertBefore(draggedPreview, this);
+          }
+          
+          updatePreviewPrimaryBadge();
+          reorderFileInput();
+        }
+        
+        this.classList.remove('drag-over');
+        return false;
+      });
+    });
+  }
+  
+  function updatePreviewPrimaryBadge() {
+    const container = document.getElementById('image_previews');
+    if (!container) return;
+    
+    // Remove all primary badges
+    container.querySelectorAll('.primary-badge').forEach(badge => badge.remove());
+    container.querySelectorAll('.preview-image').forEach(img => {
+      img.style.borderColor = '#e5e7eb';
+    });
+    
+    // Add primary badge to first image
+    const firstImage = container.querySelector('.preview-image');
+    if (firstImage) {
+      firstImage.style.borderColor = '#667eea';
+      const badge = document.createElement('div');
+      badge.className = 'primary-badge';
+      badge.style.cssText = 'position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;';
+      badge.textContent = 'PRIMARY';
+      firstImage.insertBefore(badge, firstImage.firstChild);
+    }
+  }
+  
+  function reorderFileInput() {
+    // Reorder the files in the input based on new order
+    const container = document.getElementById('image_previews');
+    const orderedIndices = Array.from(container.querySelectorAll('.preview-image'))
+      .map(img => parseInt(img.getAttribute('data-file-index')));
+    
+    // Create new FileList with reordered files
+    const dt = new DataTransfer();
+    orderedIndices.forEach(index => {
+      dt.items.add(window.uploadedFilesArray[index]);
+    });
+    
+    // Update the file input
+    const fileInput = document.getElementById('no_variant_file');
+    fileInput.files = dt.files;
+    
+    console.log('Files reordered:', orderedIndices);
+  }
+  
+  const handle_no_variant_file_delete = (file_pk) => {
+    // Find the image element by data-file-id
+    const sortableImage = document.querySelector(`.sortable-image[data-file-id="${file_pk}"]`);
+    if (sortableImage) {
+      sortableImage.remove();
+      console.log('Resim DOM\'dan silindi:', file_pk);
+    }
+  
+    // Track the deleted file in export_data
+    if (!export_data.deleted_files) {
+      export_data.deleted_files = [];
+    }
+    export_data.deleted_files.push(file_pk);
+    console.log('Silinen dosyalar:', export_data.deleted_files);
+    
+    // Update image order and primary badge after deletion
+    updateImageOrder();
+    updatePrimaryBadge();
+  }
+  
+  // Update image order before form submission
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('productForm');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        // Update image order one last time before submission
+        updateImageOrder();
+        console.log('Form submitting with image order:', document.getElementById('image_order').value);
+      });
+    }
+  });
+</script>
 {% endblock %}

@@ -68,50 +68,66 @@
         {% if not task.completed and task.due_date|is_past_due %}
         {% if not task.member or task.member == member%}
           <li class="taskComponent">
-            <p class="taskName">
-              {{ task.name }}
-              {% if task.contact %}
-                -
-                <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact.name }}</a></b>
-              {% elif task.company %}
-                -
-                <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
-              {% endif %}
-            </p>
+            <div class="task-header">
+              <div class="task-title-section">
+                <h4 class="taskName">{{ task.name }}</h4>
+                {% if task.contact or task.company %}
+                  <p class="task-related">
+                    <i class="fa fa-link"></i>
+                    {% if task.contact %}
+                      <a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact.name }}</a>
+                    {% elif task.company %}
+                      <a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a>
+                    {% endif %}
+                  </p>
+                {% endif %}
+              </div>
+              
+              <div class="task-meta">
+                <span class="taskDueDate {% if task.due_date|days_since == 'today' %}today{% elif task.due_date|days_since != False and task.due_date|days_since != 'today' %}overdue{% endif %}">
+                  <i class="fa fa-calendar"></i>
+                  {{ task.due_date }}
+                  {% if task.due_date|days_since == 'today' %}
+                    <span class="badge badge-warning">Today</span>
+                  {% elif task.due_date|days_since != False and task.due_date|days_since != 'today' %}
+                    <span class="badge badge-danger">{{ task.due_date|days_since }}</span>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            
             {% if task.description %}
-              <p class="taskDescription">{{ task.description|linebreaksbr }}</p>
+              <p class="taskDescription">{{ task.description|linebreaksbr|truncatewords:30 }}</p>
             {% endif %}
-            <p class="taskDueDate">
-              Due: {{ task.due_date }}
-              {% if task.due_date|days_since == False %}
-                <span></span>
-              {% elif task.due_date|days_since == 'today' %}
-                <span class="daysDueToday">{{ task.due_date|days_since }}</span>
-              {% elif task.due_date|days_since != 'today' %}
-                <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
+            
+            <div class="task-footer">
+              {% if task.member %}
+                <div class="task-assignee">
+                  <i class="fa fa-user-circle"></i>
+                  <span>{{ task.member }}</span>
+                </div>
               {% endif %}
-            </p>
-            <div class="task_buttons">
-              <form action="{% url 'todo:complete_task' task.id %}" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="task_id" value="{{ task.id }}" />
-                <button type="submit" class="completeTaskButton">Complete Task</button>
-              </form>
-              <a href="{% url 'todo:update_task' task.id %}?next_url={{ path|urlencode }}"><button>Update Task</button></a>
-              <form action="{% url 'todo:delete_task' task.id %}" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="company_id" value="{{ company.id }}" />
-                <button type="submit" class="deleteTaskButton">Delete Task</button>
-                <br />
-              </form>
+              
+              <div class="task-actions">
+                <form action="{% url 'todo:complete_task' task.id %}" method="post" class="inline-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="task_id" value="{{ task.id }}" />
+                  <button type="submit" class="btn btn-success btn-sm" title="Complete">
+                    <i class="fa fa-check"></i> Complete
+                  </button>
+                </form>
+                <a href="{% url 'todo:update_task' task.id %}?next_url={{ path|urlencode }}" class="btn btn-secondary btn-sm" title="Edit">
+                  <i class="fa fa-edit"></i> Edit
+                </a>
+                <form action="{% url 'todo:delete_task' task.id %}" method="post" class="inline-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="company_id" value="{{ company.id }}" />
+                  <button type="submit" class="btn btn-danger btn-sm" title="Delete" onclick="return confirm('Are you sure?');">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </form>
+              </div>
             </div>
-            {% if task.member %}
-            <div class="task_assigned_member">
-                <p>
-                 {{task.member}}
-                </p>
-            </div>
-            {% endif %}
           </li>
         {% endif %}
         {% else %}

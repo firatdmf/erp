@@ -19,20 +19,29 @@ def tasks_component(sort_type, csrf_token, page_type, contact, company, path, me
     # member = user.member
     today = timezone.now().date()
     # user = context["user"]
+    
+    # Optimize queries with select_related to prevent N+1 problem
+    base_query = Task.objects.select_related(
+        'member',
+        'member__user',
+        'company',
+        'contact'
+    )
+    
     if page_type == "dashboard":
         if contact:
-            tasks = Task.objects.filter(contact=contact, completed=False)
+            tasks = base_query.filter(contact=contact, completed=False)
         elif company:
-            tasks = Task.objects.filter(company=company, completed=False)
+            tasks = base_query.filter(company=company, completed=False)
         else:
-            tasks = Task.objects.filter(completed=False)
+            tasks = base_query.filter(completed=False)
     else:
         if contact:
-            tasks = Task.objects.filter(contact=contact)
+            tasks = base_query.filter(contact=contact)
         elif company:
-            tasks = Task.objects.filter(company=company)
+            tasks = base_query.filter(company=company)
         else:
-            tasks = Task.objects.all()
+            tasks = base_query.all()
 
     # if page_type=="report":
     #     print("report")

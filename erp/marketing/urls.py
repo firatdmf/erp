@@ -9,6 +9,7 @@ urlpatterns = [
     path("product_detail/<int:pk>/",views.ProductDetail.as_view(),name="product_detail"),
     path("product_create/",views.ProductCreate.as_view(),name="product_create"),
     path("product_edit/<int:pk>/",views.ProductEdit.as_view(),name="product_edit"),
+    path("product/<int:pk>/delete/",views.ProductDelete.as_view(),name="product_delete"),
     # path("product_file_create/",views.ProductFileCreate.as_view(),name="product_file_create"),
     # below are for api routes
     path("api/get_product_categories",views.get_product_categories,name="get_product_categories"),

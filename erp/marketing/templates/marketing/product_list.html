@@ -64,7 +64,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for product in products|dictsort:'title' %}
+        {% for product in products %}
         <tr class="product-row" onclick="window.location='{% url 'marketing:product_detail' product.id %}'" style="cursor: pointer;">
           <td>
             <div class="product-image-cell">
@@ -110,13 +110,11 @@
             {% endif %}
           </td>
           <td>
-            {% with variant_count=product.variants.count %}
-              {% if variant_count > 0 %}
-                <span class="badge badge-variants">{{ variant_count }} variant{{ variant_count|pluralize }}</span>
-              {% else %}
-                <span class="text-muted">-</span>
-              {% endif %}
-            {% endwith %}
+            {% if product.variant_count > 0 %}
+              <span class="badge badge-variants">{{ product.variant_count }} variant{{ product.variant_count|pluralize }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
           </td>
           <td>
             {% if product.featured %}
@@ -133,6 +131,9 @@
               <a href="{% url 'marketing:product_edit' product.id %}" class="btn-icon" title="Edit">
                 <i class="fa fa-edit"></i>
               </a>
+              <button type="button" class="btn-icon btn-delete" onclick="deleteProduct({{ product.id }}, '{{ product.title|escapejs }}')" title="Delete">
+                <i class="fa fa-trash"></i>
+              </button>
             </div>
           </td>
         </tr>
@@ -154,4 +155,62 @@
     </table>
   </div>
 </div>
+
+<script>
+function deleteProduct(productId, productTitle) {
+  if (confirm(`Are you sure you want to delete "${productTitle}"?\n\nThis action cannot be undone.`)) {
+    // Create form and submit
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/marketing/product/${productId}/delete/`;
+    
+    // Add CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken) {
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrfmiddlewaretoken';
+      csrfInput.value = csrfToken.value;
+      form.appendChild(csrfInput);
+    } else {
+      // Get CSRF from cookie
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrfmiddlewaretoken';
+      csrfInput.value = getCookie('csrftoken');
+      form.appendChild(csrfInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+  }
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+</script>
+
+<style>
+.btn-delete {
+  color: #dc2626 !important;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: #fef2f2 !important;
+  transform: scale(1.1);
+}
+</style>
 {% endblock content %}

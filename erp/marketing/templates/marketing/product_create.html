@@ -3,15 +3,119 @@
 {% load marketing_tags %}
 
 {% block css %}
-  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
+  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v={{ request.timestamp|default:'2' }}" />
 {% endblock %}
 {% block content %}
   <div class="ProductCreatePage">
-    <h1>Create Product Form</h1>
+    <h1>Create Product Formm</h1>
     <form id="product_form" method="post" enctype="multipart/form-data">
       {% csrf_token %}
-       {{ form.non_field_errors }}
-      {{ form.as_p }} {# Render each form field as a paragraph #}
+      {{ form.non_field_errors }}
+      
+      <div class="form-section">
+        <h2>Basic Informationnn</h2>
+        <div class="form-field">
+          {{ form.title.label_tag }}
+          {{ form.title }}
+          {{ form.title.errors }}
+        </div>
+        
+        <div class="form-field">
+          {{ form.description.label_tag }}
+          {{ form.description }}
+          {{ form.description.errors }}
+        </div>
+        
+        <div class="form-row">
+          <div class="form-field">
+            {{ form.sku.label_tag }}
+            {{ form.sku }}
+            {{ form.sku.errors }}
+          </div>
+          <div class="form-field">
+            {{ form.barcode.label_tag }}
+            {{ form.barcode }}
+            {{ form.barcode.errors }}
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-section">
+        <h2>Pricing & Inventoryyy</h2>
+        <div class="form-row">
+          <div class="form-field">
+            {{ form.price.label_tag }}
+            {{ form.price }}
+            {{ form.price.errors }}
+          </div>
+          <div class="form-field">
+            {{ form.quantity.label_tag }}
+            {{ form.quantity }}
+            {{ form.quantity.errors }}
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-field">
+            {{ form.unit_of_weight.label_tag }}
+            {{ form.unit_of_weight }}
+            {{ form.unit_of_weight.errors }}
+          </div>
+          <div class="form-field">
+            {{ form.minimum_inventory_level.label_tag }}
+            {{ form.minimum_inventory_level }}
+            {{ form.minimum_inventory_level.errors }}
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-field">
+            {{ form.weight.label_tag }}
+            {{ form.weight }}
+            {{ form.weight.errors }}
+          </div>
+          <div class="form-field">
+            {{ form.cost.label_tag }}
+            {{ form.cost }}
+            {{ form.cost.errors }}
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-section">
+        <h2>Additional Details</h2>
+        <div class="form-row">
+          <div class="form-field">
+            {{ form.vendor.label_tag }}
+            {{ form.vendor }}
+            {{ form.vendor.errors }}
+          </div>
+          <div class="form-field">
+            {{ form.primary_image.label_tag }}
+            {{ form.primary_image }}
+            {{ form.primary_image.errors }}
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-field">
+            {{ form.featured.label_tag }}
+            {{ form.featured }}
+            {{ form.featured.errors }}
+          </div>
+          <div class="form-field">
+            {{ form.selling_while_out_of_stock.label_tag }}
+            {{ form.selling_while_out_of_stock }}
+            {{ form.selling_while_out_of_stock.errors }}
+          </div>
+        </div>
+        
+        <div class="form-field">
+          {{ form.has_variants.label_tag }}
+          {{ form.has_variants }}
+          {{ form.has_variants.errors }}
+        </div>
+      </div>
 
       <div class="variant_component" id="variant_component">
         <div class="variant_container" id="variant_container">

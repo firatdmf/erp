@@ -14,35 +14,22 @@
 
 <!-- Variant Options Section (initially hidden) -->
 <div class="variant_component" id="variant_component" style="display: none;">
-    <div class="variant_container" id="variant_container">
-      <div class="variantCard" id="variantCard_1">
-        <div class="option_name">
-          <div>Option Name</div>
-          <input type="text" placeholder="e.g. Color, Size" name="variant_name_1" id="variant_name_1">
-        </div>
-        <div class="optionValues">
-          <div>Option Values</div>
-          <input type="text" placeholder="e.g. Red" name="variant_name_1_value_1" id="variant_name_1_value_1">
-          <input type="text" placeholder="e.g. Blue" name="variant_name_1_value_2" id="variant_name_1_value_2">
-          <div class="add_another_value" id="variant_name_1_add_another_value_3" onClick=add_another_value(this)>
-            <i class="fa fa-plus"></i> Add Another Option Value
-          </div>
-          <div id="error_message_option_value_1" class="alert"></div>
-        </div>
-      </div>
-      <div id="add_another_name_2" class="add_another_option" onClick=add_another_name(this)>
-        <i class="fa fa-plus"></i> Add Another Option
-      </div>
-      <div id="error_message_option_name" class="alert"></div>
+    <div class="variant_options_wrapper">
+      <div id="variant_options_list"></div>
+      <button type="button" class="add_option_button" onclick="addNewOption()">
+        <i class="fa fa-plus-circle"></i> Add another option
+      </button>
     </div>
 
-    <div style="margin-top: 20px;">
-      <div onClick=createTable() id="create_table_button">
-        <i class="fa fa-table"></i> Create Variant Table
-      </div>
+    <!-- Grouping Selector -->
+    <div class="variant_grouping" id="variant_grouping" style="display: none;">
+      <label>Grouping By</label>
+      <select id="grouping_select" onchange="filterVariantTableByGroup()">
+        <option value="">All variants</option>
+      </select>
     </div>
 
-    <table id="variant_table"></table>
+    <table id="variant_table" style="width: 100%; margin-top: 20px; border-collapse: collapse;"></table>
 
   {% comment %} <p>{{message}}</p> {% endcomment %}
   <script>
@@ -70,5 +57,5 @@
     }
   </script>
 
-  <script src="{% static 'marketing/js/variant_form.js' %}" defer></script>
+  <script src="{% static 'marketing/js/variant_form_modern.js' %}" defer></script>
 </div>

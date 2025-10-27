@@ -356,8 +356,37 @@ let add_another_value = (el, next_option_name_id) => {
 const create_table_button = document.getElementById("create_table_button");
 let createTable = () => {
 
+    // Clear any existing error messages
+    document.querySelectorAll('.alert').forEach(el => {
+        if (el.innerHTML.includes('fill all')) {
+            el.remove();
+        }
+    });
+
     // Get all the input elements. (not the table inputs, just the option inputs (variant names and their values))
     const variant_container_input_elements = document.getElementById('variant_container').getElementsByTagName('input');
+
+    // Check if any fields are empty first
+    let hasEmptyFields = false;
+    Object.values(variant_container_input_elements).forEach((element) => {
+        if (element.value.trim() === "") {
+            hasEmptyFields = true;
+        }
+    });
+
+    // If there are empty fields, show error and stop
+    if (hasEmptyFields) {
+        let error_message_element = document.createElement("div");
+        error_message_element.innerHTML = "<i class='fa fa-exclamation-circle'></i> Please fill all option names and values before creating the table";
+        error_message_element.setAttribute('class', 'alert');
+        error_message_element.style.cssText = 'margin-top: 16px; padding: 12px 16px; background: #fef2f2; border-left: 3px solid #ef4444; color: #dc2626; border-radius: 6px; font-size: 14px;';
+        create_table_button.after(error_message_element);
+        // remove error message after 5 seconds
+        setTimeout(function () {
+            error_message_element.remove();
+        }, 5000);
+        return;
+    }
 
     // initialize variant array
     let new_product_variant_options = {};
@@ -365,26 +394,7 @@ let createTable = () => {
     let variant_table_option_names = ""
     let variant_table_rows = ""
     // Below iterates through every input value and stores the value in the variant array
-    // I do not know how this works, but it just works. Something is confusing me here with variant_name
     Object.values(variant_container_input_elements).map((element, index) => {
-        // an element is either:
-        // input#variant_name_1
-        // or
-        // input#variant_name_1_value_1
-
-        // If there are empty input fields in variant_container, then stop createing table, and alert user.
-        if (element.value.trim() === "") {
-            let error_message_element = document.createElement("p")
-            console.error("you have empty input fields");
-            error_message_element.innerHTML = "Please fill all the input fields"
-            error_message_element.setAttribute('class', 'alert')
-            create_table_button.after(error_message_element)
-            // remove error message after 5 seconds
-            setTimeout(function () {
-                error_message_element.innerHTML = ""
-            }, 5000)
-            return;
-        }
 
         // If it is an option name (not a value)
         if (!element.id.includes("value")) {
@@ -435,35 +445,71 @@ let createTable = () => {
 
 
 
-    // variant_combinations is generated from the variant names and their valus in the variant container
+    // variant_combinations is generated from the variant names and their values in the variant container
     if (variant_combinations.length > 0) {
+        // Hide the table initially
+        variant_table_element = document.getElementById("variant_table")
+        variant_table_element.style.display = "none";
 
         let new_product_variant_list = []
         variant_combinations.map((element, index) => {
             index++
+            
+            // Try to find existing data for this combination
+            let existing_variant = null;
+            if (export_data.product_variant_list && export_data.product_variant_list.length > 0) {
+                existing_variant = export_data.product_variant_list.find(v => {
+                    return JSON.stringify(v.variant_attribute_values) === JSON.stringify(element);
+                });
+            }
+            
+            // If not found, try to read from current table inputs
+            if (!existing_variant) {
+                const priceInput = document.getElementById(`variant_price_${index}`);
+                const qtyInput = document.getElementById(`variant_quantity_${index}`);
+                const skuInput = document.getElementById(`variant_sku_${index}`);
+                const barcodeInput = document.getElementById(`variant_barcode_${index}`);
+                const featuredInput = document.getElementById(`variant_featured_${index}`);
+                
+                if (priceInput || qtyInput || skuInput) {
+                    existing_variant = {
+                        variant_price: priceInput?.value || null,
+                        variant_quantity: qtyInput?.value || null,
+                        variant_sku: skuInput?.value || "",
+                        variant_barcode: barcodeInput?.value || "",
+                        variant_featured: featuredInput?.checked !== false
+                    };
+                }
+            }
+            
             // Split the element and create a row for the table
-            // The element is like [{"color":"white","size":"84"},{"color":"beige","size":"95"}]
             let element_values = Object.values(element)
             variant_table_rows += `<tr>`
             element_values.map((value) => { variant_table_rows += `<td>${value}</td>` })
-            // Define name for below and state that the inputs are from the table.
-            // Each input will refer to its combination index.
+            
+            // Use existing values if available
+            const price = existing_variant?.variant_price || '';
+            const quantity = existing_variant?.variant_quantity || '';
+            const sku = existing_variant?.variant_sku || '';
+            const barcode = existing_variant?.variant_barcode || '';
+            const featured = existing_variant?.variant_featured !== false;
+            
             variant_table_rows += `<td><input type="file" name="variant_file_${index}" id="variant_file_${index}" multiple></td>`
-            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" step="0.01"></td>`
-            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}"></td>`
-            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" required></td>`
-            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}"></td>`
-            variant_table_rows += `<td style="text-align: center;"><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" checked></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" step="0.01" value="${price}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" step="0.01" value="${quantity}"></td>`
+            variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" required value="${sku}"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${barcode}"></td>`
+            variant_table_rows += `<td style="text-align: center;"><input type="checkbox" name="variant_featured_${index}" id="variant_featured_${index}" ${featured ? 'checked' : ''}></td>`
             variant_table_rows += `</tr>`
 
             new_product_variant_list.push(
                 {
-                    "variant_sku": "",
+                    "variant_sku": sku,
                     "variant_attribute_values": element,
-                    "variant_price": null,
-                    "variant_quantity": null,
-                    "variant_barcode": "",
-                    "variant_featured": true
+                    "variant_price": price || null,
+                    "variant_quantity": quantity || null,
+                    "variant_barcode": barcode,
+                    "variant_featured": featured
                 }
             )
         })
@@ -483,25 +529,32 @@ let createTable = () => {
 
 
 
-    // Get the table element and insert the values in it.
-    variant_table_element = document.getElementById("variant_table")
-    variant_table_element.style.display = "inline-block";
-    variant_table_element.innerHTML = `
-   <thead>
-   <tr>
-    ${variant_table_option_names}
-    <th>Photo</th>
-    <th>Price</th>
-    <th>Quantity</th>
-    <th>SKU</th>
-    <th>Barcode</th>
-    <th>Featured</th>
-  </tr>
-  </thead>
-  <tbody>
-  ${variant_table_rows}
-  </tbody>
-  `;
+    // Only show table if we have rows
+    if (variant_table_rows) {
+        // Get the table element and insert the values in it.
+        variant_table_element = document.getElementById("variant_table")
+        variant_table_element.style.display = "table";
+        variant_table_element.innerHTML = `
+       <thead>
+       <tr>
+        ${variant_table_option_names}
+        <th>Photo</th>
+        <th>Price</th>
+        <th>Quantity</th>
+        <th>SKU</th>
+        <th>Barcode</th>
+        <th>Featured</th>
+      </tr>
+      </thead>
+      <tbody>
+      ${variant_table_rows}
+      </tbody>
+      `;
+    } else {
+        // Hide table if no rows
+        variant_table_element = document.getElementById("variant_table")
+        variant_table_element.style.display = "none";
+    }
     //   This shall go on the bottom of table
     //   <button onClick=submit_table(${export_data})>Submit Table</button>
     // I am not gonna put it there and handle the inputs in django because I am not sure how to handle the file inputs in js object
@@ -606,8 +659,8 @@ let prepopulate_variant_table = () => {
             variant_table_rows += "</td>"
 
             // ------------------------------------------------------------------------
-            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}" step=".01"></td>`
-            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" ></td>`
+            variant_table_rows += `<td><input type="number" name="variant_price_${index}" id="variant_price_${index}" value="${product_variant.variant_price || ''}" step="0.01"></td>`
+            variant_table_rows += `<td><input type="number" name="variant_quantity_${index}" id="variant_quantity_${index}" value="${product_variant.variant_quantity || ''}" step="0.01"></td>`
             variant_table_rows += `<td><input type="text" name="variant_sku_${index}" id="variant_sku_${index}" value="${product_variant.variant_sku || ''}" required></td>`
             variant_table_rows += `<td><input type="number" name="variant_barcode_${index}" id="variant_barcode_${index}" value="${product_variant.variant_barcode || ''}"></td>`
 

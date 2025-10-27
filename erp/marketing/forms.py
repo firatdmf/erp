@@ -40,12 +40,15 @@ class ProductForm(forms.ModelForm):
         is_update = kwargs.pop("is_update", False)
         super(ProductForm, self).__init__(*args, **kwargs)
         # If the instance has variants, set the has_variants field to True
-        if self.instance:
+        if self.instance and self.instance.pk:
             if is_update and self.instance.variants.exists():
                 self.fields["has_variants"].initial = True
             self.fields["primary_image"].queryset = ProductFile.objects.filter(
                 product=self.instance
             )
+        else:
+            # For new products, show empty queryset
+            self.fields["primary_image"].queryset = ProductFile.objects.none()
 
 class ProductVariantForm(forms.ModelForm):
     class Meta:

@@ -58,7 +58,7 @@ def variant_form(variants, product, current_url):
                 product_variant_options.setdefault(attr, set()).add(val)
 
         # Convert sets to lists
-        product_variant_options = {
+        product_variant_options_dict = {
             k: list(v) for k, v in product_variant_options.items()
         }
 
@@ -76,13 +76,19 @@ def variant_form(variants, product, current_url):
             return tuple(key)
 
         product_variant_list.sort(
-            key=lambda v: variant_sort_key(v, product_variant_options)
+            key=lambda v: variant_sort_key(v, product_variant_options_dict)
         )
+
+        # Convert variant options to array format for modern JS: [{name: "color", values: [...]}, ...]
+        product_variant_options_array = [
+            {"name": name, "values": values}
+            for name, values in product_variant_options_dict.items()
+        ]
 
         # Convert to JSON for template
         product_variant_list = json.dumps(product_variant_list, cls=DecimalEncoder)
         product_variant_options = json.dumps(
-            product_variant_options, cls=DecimalEncoder
+            product_variant_options_array, cls=DecimalEncoder
         )
 
     else:

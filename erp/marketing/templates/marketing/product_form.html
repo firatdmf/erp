@@ -81,6 +81,24 @@
     transition: border-color 0.2s, box-shadow 0.2s;
     box-sizing: border-box;
   }
+  
+  /* Force proper field rendering */
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100% !important;
+    padding: 10px 14px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+    box-sizing: border-box !important;
+    display: block !important;
+  }
+  
+  .form-group textarea {
+    min-height: 100px !important;
+  }
 
   .form-input:focus,
   .form-textarea:focus,
@@ -205,6 +223,16 @@
   .drag-handle:active {
     cursor: grabbing !important;
   }
+  
+  /* Hide file input */
+  #no_variant_file {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    opacity: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+  }
 </style>
 {% endblock %}
 
@@ -313,10 +341,10 @@
     <div class="form-section">
       <div class="form-section-title">Product Images</div>
       <div class="form-group">
-        <label for="no_variant_file">
-          <i class="fa fa-cloud-upload"></i> Upload Images (Multiple)
-        </label>
-        <input type="file" name="no_variant_file" id="no_variant_file" class="form-input" multiple accept="image/*" onchange="previewImages(event)">
+        <button type="button" onclick="document.getElementById('no_variant_file').click()" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.background='#5568d3'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'" onmouseout="this.style.background='#667eea'; this.style.transform=''; this.style.boxShadow=''">
+          <i class="fa fa-camera"></i> Upload Images
+        </button>
+        <input type="file" name="no_variant_file" id="no_variant_file" multiple accept="image/*" onchange="previewImages(event)" style="display: none;">
         <small style="color: #6b7280; display: block; margin-top: 8px;">Select multiple images at once. First uploaded image will be primary by default.</small>
       </div>
 

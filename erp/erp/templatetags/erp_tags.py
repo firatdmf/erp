@@ -49,17 +49,33 @@ def dashboard_component(csrf_token,path,member):
     companies = Company.objects.filter(created_at__gte=start_of_today)
     number_of_leads_added = len(contacts) + len(companies)
     
-    # Get all pending tasks
-    pending_tasks = Task.objects.filter(completed=False)
+    # Get all pending tasks with optimized query
+    pending_tasks = Task.objects.filter(completed=False).select_related(
+        'member', 
+        'member__user',
+        'company',
+        'contact'
+    )
     if member:
         pending_tasks = pending_tasks.filter(member=member) | pending_tasks.filter(member__isnull=True)
-    pending_tasks_count = pending_tasks.count()
     
-    # Group tasks by date for calendar
-    tasks_by_date = defaultdict(int)
-    for task in pending_tasks:
-        date_str = task.due_date.strftime('%Y-%m-%d')
-        tasks_by_date[date_str] += 1
+    # Use values to group by date efficiently (without loading full objects)
+    from django.db.models.functions import TruncDate
+    from django.db.models import Count
+    tasks_by_date_query = pending_tasks.annotate(
+        date=TruncDate('due_date')
+    ).values('date').annotate(
+        count=Count('id')
+    ).order_by('date')
+    
+    # Convert to dict format for JSON
+    tasks_by_date = {}
+    for item in tasks_by_date_query:
+        if item['date']:
+            date_str = item['date'].strftime('%Y-%m-%d')
+            tasks_by_date[date_str] = item['count']
+    
+    pending_tasks_count = pending_tasks.count()
     
     tasks_calendar_data = json.dumps(dict(tasks_by_date))
     

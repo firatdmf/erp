@@ -40,8 +40,8 @@
       <div class="main-image">
         {% if product.primary_image %}
           <img src="{{ product.primary_image.file_url }}" alt="{{ product.title }}" id="mainImage">
-        {% elif product.files.all.first %}
-          <img src="{{ product.files.all.first.file_url }}" alt="{{ product.title }}" id="mainImage">
+        {% elif product.files.all.0 %}
+          <img src="{{ product.files.all.0.file_url }}" alt="{{ product.title }}" id="mainImage">
         {% else %}
           <div class="image-placeholder">
             <i class="fa fa-image"></i>
@@ -177,8 +177,8 @@
           {% for variant in product.variants.all %}
           <tr>
             <td>
-              {% if variant.files.all.first %}
-                <img src="{{ variant.files.all.first.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
+              {% if variant.files.all.0 %}
+                <img src="{{ variant.files.all.0.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
               {% else %}
                 <div class="variant-image-placeholder">
                   <i class="fa fa-image"></i>
@@ -188,9 +188,9 @@
             <td><span class="variant-sku">{{ variant.variant_sku }}</span></td>
             <td>
               <div class="attributes">
-                {% for attribute_value in variant.attribute_values.all %}
+                {% for attribute_value in variant.product_variant_attribute_values.all %}
                   <span class="attribute">
-                    <strong>{{ attribute_value.product_variant_attribute|title }}:</strong> {{ attribute_value.product_variant_attribute_value|title }}
+                    <strong>{{ attribute_value.product_variant_attribute.name|title }}:</strong> {{ attribute_value.product_variant_attribute_value|title }}
                   </span>
                 {% endfor %}
               </div>

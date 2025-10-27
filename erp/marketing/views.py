@@ -49,13 +49,30 @@ class ProductList(generic.ListView):
                 models.Q(barcode__icontains=search_query)
             )
         
-        return queryset.select_related('category', 'primary_image', 'supplier').prefetch_related('variants')
+        return queryset.select_related('category', 'primary_image', 'supplier').annotate(
+            variant_count=models.Count('variants')
+        ).order_by('title')
 
 
 class ProductDetail(generic.DetailView):
     model = Product
     template_name = "marketing/product_detail.html"
     context_object_name = "product"
+    
+    def get_queryset(self):
+        # Optimize query to prevent N+1 problems
+        return Product.objects.select_related(
+            'category',
+            'primary_image',
+            'supplier'
+        ).prefetch_related(
+            'files',
+            'collections',
+            'variants',
+            'variants__files',
+            'variants__product_variant_attribute_values',
+            'variants__product_variant_attribute_values__product_variant_attribute'
+        )
 
 
 # ----------------------------------------------
@@ -424,17 +441,27 @@ class ProductCreate(BaseProductView, generic.CreateView):
 class ProductEdit(BaseProductView, generic.UpdateView):
     template_name = "marketing/product_edit.html"
     template_name = "marketing/product_form.html"
+    
+    def get_queryset(self):
+        # Optimize query to prevent N+1 problems
+        return Product.objects.select_related(
+            'category',
+            'primary_image',
+            'supplier'
+        ).prefetch_related(
+            'files',
+            'variants',
+            'variants__files',
+            'variants__product_variant_attribute_values',
+            'variants__product_variant_attribute_values__product_variant_attribute'
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["is_update"] = True
-        # pass the variants if product variants exist
+        # pass the variants if product variants exist (already prefetched)
         if self.object.variants.exists():
-            context["variants"] = self.object.variants.prefetch_related(
-                'product_variant_attribute_values',
-                'product_variant_attribute_values__product_variant_attribute',
-                'files'
-            ).all()
+            context["variants"] = self.object.variants.all()
             print(f"Found {context['variants'].count()} variants for product {self.object.sku}")  # Debug
         # else:
         #     context["no_variant_files"] = self.object.files.all()
@@ -480,6 +507,17 @@ class ProductFileDelete(View):
             return HttpResponse("")  # HTMX will remove the element
         except ProductFile.DoesNotExist:
             return HttpResponseBadRequest("File not found")
+
+
+# ----------------------------------------------
+# Product Delete
+# ----------------------------------------------
+@method_decorator([login_required, csrf_protect], name="dispatch")
+class ProductDelete(View):
+    def post(self, request, pk, *args, **kwargs):
+        product = get_object_or_404(Product, pk=pk)
+        product.delete()
+        return redirect(reverse("marketing:product_list"))
 
 
 # ----------------------------------------------

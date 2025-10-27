@@ -7,16 +7,18 @@ from django.db.models import Value, CharField
 # This is for base view functions to work on everywhere
 
 def last_ten_entities(request):
-    contacts = Contact.objects.all().annotate(
+    # Only fetch last 10 of each type, then sort and limit again
+    # This avoids loading ALL records into memory
+    contacts = Contact.objects.order_by('-created_at')[:10].annotate(
         entry_type=Value("Contact", output_field=CharField())
     )
-    companies = Company.objects.all().annotate(
+    companies = Company.objects.order_by('-created_at')[:10].annotate(
         entry_type=Value("Company", output_field=CharField())
     )
     combined_list = sorted(
         chain(contacts, companies), key=attrgetter("created_at"), reverse=True
-    )
-    return {'last_ten_entities':combined_list[:10]}
+    )[:10]
+    return {'last_ten_entities':combined_list}
 
 def client_groups(request):
     return {'client_groups': ClientGroup.objects.all()}

@@ -30,16 +30,17 @@ EMAIL_HOST_PASSWORD=your-16-character-app-password
 
 | Email | Days After | Cumulative Days |
 |-------|-----------|-----------------|
-| #1    | 3 days    | Day 3           |
-| #2    | 7 days    | Day 10          |
-| #3    | 14 days   | Day 24          |
-| #4    | 30 days   | Day 54          |
-| #5    | 60 days   | Day 114 (Final) |
+| #1    | Immediate | Day 0 (when you save the company) |
+| #2    | 3 days    | Day 3           |
+| #3    | 7 days    | Day 10          |
+| #4    | 14 days   | Day 24          |
+| #5    | 30 days   | Day 54 (Final)  |
 
 ## 🤖 What Happens Automatically
 
 ### ✅ When You Add a Company
-- If `status = "prospect"` AND has email → Follow-up tracking starts
+- If `status = "prospect"` AND has email → **Email 1 sent immediately!**
+- Follow-up tracking starts for remaining 4 emails
 
 ### ✅ When You Change Status
 - Change from "prospect" to anything else → Follow-ups stop immediately

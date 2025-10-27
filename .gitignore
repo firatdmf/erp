@@ -148,6 +148,12 @@ GitHub.sublime-settings
 !.vscode/extensions.json 
 .history
 
+# Gmail API credentials and tokens #
+gmail_credentials.json
+gmail_token.pickle
+followup_emails.log
+reply_check.log
+
 
 
 

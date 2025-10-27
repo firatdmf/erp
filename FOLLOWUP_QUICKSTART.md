@@ -29,11 +29,11 @@ crontab -e
 ```
 
 ## Email Schedule
-- Day 3: Email 1
-- Day 10: Email 2
-- Day 24: Email 3
-- Day 54: Email 4
-- Day 114: Email 5 (final)
+- Day 0: Email 1 (sent immediately when you save company)
+- Day 3: Email 2
+- Day 10: Email 3
+- Day 24: Email 4
+- Day 54: Email 5 (final)
 
 ## What Happens Automatically
 

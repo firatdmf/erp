@@ -69,7 +69,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "debug_toolbar",  # Django Debug Toolbar
     "erp",
     "todo",
     "crm",
@@ -114,7 +113,6 @@ INSTALLED_APPS = [
 # ]
 
 MIDDLEWARE = [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",  # Debug toolbar - should be first
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -312,8 +310,11 @@ GMAIL_SCOPES = [
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (default is 2.5 MB)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (default is 2.5 MB)
 
-# Django Debug Toolbar
-INTERNAL_IPS = [
-    "127.0.0.1",
-    "localhost",
-]
+# Django Debug Toolbar - Only enable in DEBUG mode
+if DEBUG:
+    INSTALLED_APPS.append('debug_toolbar')
+    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+    INTERNAL_IPS = [
+        "127.0.0.1",
+        "localhost",
+    ]

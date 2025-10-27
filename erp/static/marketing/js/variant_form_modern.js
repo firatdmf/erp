@@ -295,19 +295,60 @@ function removeOption(optionId) {
     updateGroupingOptions();
 }
 
-// Remove value
+// Remove value - same logic as deleteVariantRow but for multiple variants
 function removeValue(optionId, valueIndex) {
     const valuesList = document.getElementById(`${optionId}_values`);
     if (!valuesList) return;
     
     const wrapper = valuesList.querySelector(`[data-value-index="${valueIndex}"]`);
-    if (wrapper) wrapper.remove();
+    const deletedValue = wrapper ? wrapper.querySelector('.value_input')?.value : '';
     
-    if (variantData[optionId] && variantData[optionId].values) {
-        variantData[optionId].values.splice(valueIndex, 1);
+    if (!deletedValue || !deletedValue.trim()) {
+        // If empty value, just remove the field
+        if (wrapper) wrapper.remove();
+        return;
     }
     
-    // Reindex remaining fields
+    // SINGLE confirmation (like deleteVariantRow)
+    if (!confirm('Are you sure you want to delete this variant?')) {
+        return;
+    }
+    
+    // Find all variant indices that have this value
+    const combinations = generateCombinations();
+    const optionName = variantData[optionId]?.name;
+    const table = document.getElementById('variant_table');
+    
+    if (optionName && deletedValue && table) {
+        combinations.forEach((combo, index) => {
+            if (combo[optionName] === deletedValue) {
+                // SAME logic as deleteVariantRow - no confirmation here
+                deletedVariantIndices.add(index);
+                
+                // Remove from variantImages if exists
+                if (variantImages[index]) {
+                    delete variantImages[index];
+                }
+                
+                // Remove the row from table DOM
+                if (table.rows[index + 1]) {
+                    table.rows[index + 1].remove();
+                }
+                
+                console.log('Deleted variant at index:', index);
+            }
+        });
+        
+        console.log('All deleted indices:', Array.from(deletedVariantIndices));
+    }
+    
+    // Remove the value field from DOM (visual only)
+    if (wrapper) wrapper.remove();
+    
+    // DON'T modify variantData - keep it as is so indices stay correct!
+    // The variants are already marked as deleted via deletedVariantIndices
+    
+    // Reindex remaining fields (visual only, variantData unchanged)
     Array.from(valuesList.children).forEach((child, idx) => {
         child.setAttribute('data-value-index', idx);
         const input = child.querySelector('.value_input');
@@ -319,8 +360,6 @@ function removeValue(optionId, valueIndex) {
             btn.setAttribute('onclick', `removeValue('${optionId}', ${idx})`);
         }
     });
-    
-    updateVariantTable();
 }
 
 // Generate variant combinations

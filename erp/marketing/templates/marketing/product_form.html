@@ -389,6 +389,7 @@
           {% endfor %}
         </div>
         <input type="hidden" id="image_order" name="image_order" value="">
+        <input type="hidden" id="deleted_files" name="deleted_files" value="">
       </div>
       {% endif %}
     </div>
@@ -692,34 +693,34 @@
     console.log('Files reordered:', orderedIndices);
   }
   
-  const handle_no_variant_file_delete = (file_pk) => {
-    // Find the image element by data-file-id
+  function handle_no_variant_file_delete(file_pk) {
+    // Remove from DOM
     const sortableImage = document.querySelector(`.sortable-image[data-file-id="${file_pk}"]`);
     if (sortableImage) {
       sortableImage.remove();
-      console.log('Resim DOM\'dan silindi:', file_pk);
     }
   
-    // Track the deleted file in export_data
-    if (!export_data.deleted_files) {
-      export_data.deleted_files = [];
+    // Add to hidden input
+    const deletedInput = document.getElementById('deleted_files');
+    if (deletedInput) {
+      const current = deletedInput.value ? JSON.parse(deletedInput.value) : [];
+      current.push(file_pk);
+      deletedInput.value = JSON.stringify(current);
+      console.log('Product image deleted, will be removed on save:', current);
     }
-    export_data.deleted_files.push(file_pk);
-    console.log('Silinen dosyalar:', export_data.deleted_files);
     
-    // Update image order and primary badge after deletion
     updateImageOrder();
     updatePrimaryBadge();
   }
   
   // Update image order before form submission
   document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('productForm');
+    const form = document.getElementById('product_form');
     if (form) {
       form.addEventListener('submit', function(e) {
-        // Update image order one last time before submission
         updateImageOrder();
-        console.log('Form submitting with image order:', document.getElementById('image_order').value);
+        const deletedFiles = document.getElementById('deleted_files').value;
+        console.log('Form submitting with deleted_files:', deletedFiles);
       });
     }
   });

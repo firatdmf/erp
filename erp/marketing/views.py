@@ -477,6 +477,29 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         with transaction.atomic():
             # print(self.request.POST)
             self.object = form.save()
+            
+            # Handle deleted product files from hidden input
+            deleted_files_json = self.request.POST.get("deleted_files", "")
+            if deleted_files_json:
+                try:
+                    deleted_file_pks = json.loads(deleted_files_json)
+                    if deleted_file_pks:
+                        print(f"Deleting product files: {deleted_file_pks}")
+                        ProductFile.objects.filter(pk__in=deleted_file_pks).delete()
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"Error parsing deleted_files: {e}")
+            
+            # Handle deleted variant files from hidden input
+            deleted_variant_files_json = self.request.POST.get("deleted_variant_files", "")
+            if deleted_variant_files_json:
+                try:
+                    deleted_variant_file_pks = json.loads(deleted_variant_files_json)
+                    if deleted_variant_file_pks:
+                        print(f"Deleting variant files: {deleted_variant_file_pks}")
+                        ProductFile.objects.filter(pk__in=deleted_variant_file_pks).delete()
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"Error parsing deleted_variant_files: {e}")
+            
             context = self.get_context_data()
             self.save_product_files(self.object, context["productfile_formset"])
 

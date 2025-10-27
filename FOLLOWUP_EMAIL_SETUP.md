@@ -12,11 +12,11 @@ When a company is added with `status="prospect"`, the system automatically:
 
 ## Email Schedule
 
-- **Email 1**: 3 days after company creation
-- **Email 2**: 7 days after Email 1 (10 days total)
-- **Email 3**: 14 days after Email 2 (24 days total)  
-- **Email 4**: 30 days after Email 3 (54 days total)
-- **Email 5**: 60 days after Email 4 (114 days total)
+- **Email 1**: Sent immediately when company is created
+- **Email 2**: 3 days after Email 1
+- **Email 3**: 7 days after Email 2 (10 days total)
+- **Email 4**: 14 days after Email 3 (24 days total)
+- **Email 5**: 30 days after Email 4 (54 days total)
 
 ## Setup Instructions
 

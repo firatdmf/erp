@@ -101,12 +101,12 @@ erp/
 
 ```
 Day 0:  Company added as prospect
-Day 3:  ✉️ Email 1 - Introduction
-Day 10: ✉️ Email 2 - Case study (7 days after #1)
-Day 24: ✉️ Email 3 - Pain points (14 days after #2)
-Day 54: ✉️ Email 4 - Check-in (30 days after #3)
-Day 114: ✉️ Email 5 - Final email (60 days after #4)
-         🛑 System stops and notifies you
+        ✉️ Email 1 - Introduction (sent immediately!)
+Day 3:  ✉️ Email 2 - Case study (3 days after #1)
+Day 10: ✉️ Email 3 - Pain points (7 days after #2)
+Day 24: ✉️ Email 4 - Check-in (14 days after #3)
+Day 54: ✉️ Email 5 - Final email (30 days after #4)
+        🛑 System stops and notifies you
 ```
 
 ## Configuration Required

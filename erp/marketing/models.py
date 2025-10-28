@@ -379,7 +379,7 @@ class ProductVariantAttributeValue(models.Model):
         ProductVariantAttribute, on_delete=models.CASCADE
     )
     product_variant_attribute_value = models.CharField(
-        max_length=255, verbose_name="Attribute Value", db_index=True, unique=True
+        max_length=255, verbose_name="Attribute Value", db_index=True
     )  # e.g., "S", "Red"
     # code = models.CharField(max_length=255, unique=True, blank=True, null=True)
 

@@ -192,6 +192,24 @@ function showVariantSection() {
     if (optionCounter === 0) {
         addNewOption(); // Add first option automatically
     }
+    toggleProductImagesSection();
+}
+
+// Toggle product images section based on variants
+function toggleProductImagesSection() {
+    const hasVariants = allCombinations && allCombinations.length > 0;
+    const productImagesContent = document.getElementById('product_images_content');
+    const variantsImageNotice = document.getElementById('variants_image_notice');
+    
+    if (hasVariants) {
+        // Hide product images upload, show notice
+        if (productImagesContent) productImagesContent.style.display = 'none';
+        if (variantsImageNotice) variantsImageNotice.style.display = 'block';
+    } else {
+        // Show product images upload, hide notice
+        if (productImagesContent) productImagesContent.style.display = 'block';
+        if (variantsImageNotice) variantsImageNotice.style.display = 'none';
+    }
 }
 
 // Add a new option (e.g., Color, Size)
@@ -432,6 +450,7 @@ function updateVariantTable() {
         console.log('No combinations, hiding table');
         table.style.display = 'none';
         if (grouping) grouping.style.display = 'none';
+        toggleProductImagesSection();
         return;
     }
     
@@ -449,6 +468,9 @@ function updateVariantTable() {
         select.selectedIndex = 0;
         filterVariantTableByGroup();
     }
+    
+    // Toggle product images section based on variants
+    toggleProductImagesSection();
     
     console.log('Table should be visible now');
 }
@@ -733,20 +755,16 @@ function renderVariantImages(variantIndex) {
     // First image is always primary
     variantImg.primaryIndex = 0;
     
-    return variantImg.images.map((img, idx) => {
+    const html = variantImg.images.map((img, idx) => {
         const isPrimary = idx === 0;
         return `
             <div class="variant_thumb ${isPrimary ? 'primary' : ''}" 
                  data-variant-index="${variantIndex}" 
                  data-image-index="${idx}" 
                  draggable="true"
-                 ondragstart="dragStartVariantImage(event, ${variantIndex}, ${idx})"
-                 ondragover="dragOverVariantImage(event)"
-                 ondrop="dropVariantImage(event, ${variantIndex}, ${idx})"
-                 ondragend="dragEndVariantImage(event)"
                  title="${isPrimary ? 'Primary image - Drag to reorder' : 'Drag to reorder'}">
                 <span class="drag_handle_variant"><i class="fa fa-grip-vertical"></i></span>
-                <img src="${img.url}" alt="Variant image">
+                <img src="${img.url}" alt="Variant image" draggable="false">
                 ${isPrimary ? '<div class="primary_label">PRIMARY</div>' : ''}
                 <button type="button" class="remove_variant_img" onclick="event.stopPropagation(); removeVariantImage(${variantIndex}, ${idx})" title="Remove image">
                     <i class="fa fa-times"></i>
@@ -754,6 +772,35 @@ function renderVariantImages(variantIndex) {
             </div>
         `;
     }).join('');
+    
+    // Attach event listeners after rendering
+    setTimeout(() => attachVariantImageDragListeners(variantIndex), 0);
+    
+    return html;
+}
+
+// Attach drag event listeners to variant images
+function attachVariantImageDragListeners(variantIndex) {
+    const container = document.getElementById(`variant_images_${variantIndex}`);
+    if (!container) return;
+    
+    const thumbs = container.querySelectorAll('.variant_thumb');
+    thumbs.forEach(thumb => {
+        const vIdx = parseInt(thumb.getAttribute('data-variant-index'));
+        const iIdx = parseInt(thumb.getAttribute('data-image-index'));
+        
+        // Remove old listeners
+        thumb.ondragstart = null;
+        thumb.ondragover = null;
+        thumb.ondrop = null;
+        thumb.ondragend = null;
+        
+        // Add new listeners
+        thumb.addEventListener('dragstart', (e) => dragStartVariantImage(e, vIdx, iIdx));
+        thumb.addEventListener('dragover', (e) => dragOverVariantImage(e));
+        thumb.addEventListener('drop', (e) => dropVariantImage(e, vIdx, iIdx));
+        thumb.addEventListener('dragend', (e) => dragEndVariantImage(e));
+    });
 }
 
 // Drag and drop handlers for variant images
@@ -1113,6 +1160,14 @@ function prepareVariantsForSubmission() {
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
         const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
         
+        // Normalize decimal inputs (convert comma to dot)
+        if (priceInput && priceInput.value) {
+            priceInput.value = priceInput.value.replace(',', '.');
+        }
+        if (quantityInput && quantityInput.value) {
+            quantityInput.value = quantityInput.value.replace(',', '.');
+        }
+        
         // Get images for this variant
         const variantImg = variantImages[index];
         const hasImages = variantImg && variantImg.images && variantImg.images.length > 0;
@@ -1121,17 +1176,19 @@ function prepareVariantsForSubmission() {
             variant_sku: skuInput && skuInput.value ? skuInput.value : variantValues,
             variant_attribute_values: combo,
             variant_price: priceInput ? parseFloat(priceInput.value) || 0 : 0,
-            variant_quantity: quantityInput ? parseInt(quantityInput.value) || 0 : 0,
+            variant_quantity: quantityInput ? parseFloat(quantityInput.value) || 0 : 0,
             variant_barcode: barcodeInput ? barcodeInput.value : '',
             variant_featured: featuredInput ? featuredInput.checked : true,
         };
         
         // Add image information
         if (hasImages) {
-            variantData.variant_images = variantImg.images.map(img => ({
+            variantData.variant_images = variantImg.images.map((img, imgIdx) => ({
                 url: img.url,
                 name: img.name,
-                file: img.file
+                file: img.file,
+                id: img.id,  // Include ID for existing images
+                sequence: imgIdx  // Include sequence order
             }));
             variantData.primary_image_index = variantImg.primaryIndex;
         }

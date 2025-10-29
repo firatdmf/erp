@@ -23,8 +23,8 @@ def variant_form(variants, product, current_url):
 
     if variants:
         for variant in variants:
-            # Collect files
-            files = variant.files.all()
+            # Collect files ordered by sequence
+            files = variant.files.order_by('sequence', 'pk').all()
             variant_files_dict[str(variant.variant_sku)] = [
                 {"id": f.id, "url": f.file_url, "name": f.file_url.split("/")[-1]}
                 for f in files

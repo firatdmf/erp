@@ -258,27 +258,66 @@ class BaseProductView(ModelFormMixin):
                 # link it to the variant
                 variant.product_variant_attribute_values.add(value_obj)
 
-            for file_obj in self.request.FILES.getlist(f"variant_file_{index+1}"):
+            # Handle variant images from JSON (includes sequence info)
+            variant_image_info = variant_data.get("variant_images", [])
+            print(f"\n=== Processing images for variant {variant_data.get('variant_sku')} ===")
+            print(f"variant_image_info: {variant_image_info}")
+            
+            if variant_image_info:
+                variant = ProductVariant.objects.get(
+                    variant_sku=variant_data.get("variant_sku")
+                )
+                
+                # Update sequence for existing images
+                for img_info in variant_image_info:
+                    img_id = img_info.get("id")
+                    img_sequence = img_info.get("sequence", 0)
+                    
+                    if img_id:  # Existing image
+                        try:
+                            existing_file = ProductFile.objects.get(pk=img_id, product_variant=variant)
+                            existing_file.sequence = img_sequence
+                            existing_file.is_primary = (img_sequence == 0)
+                            existing_file.save()
+                            print(f"Updated existing variant image {img_id} with sequence {img_sequence}")
+                        except ProductFile.DoesNotExist:
+                            print(f"WARNING: Image {img_id} not found for variant {variant.variant_sku}")
+            
+            # Upload new images from FILES
+            variant_files = self.request.FILES.getlist(f"variant_file_{index+1}")
+            if variant_files:
                 variant = ProductVariant.objects.get(
                     variant_sku=variants_data[index].get("variant_sku")
                 )
-                try:
-                    folder = f"media/product_images/product_{variant.product.sku}/variant_{variant.variant_sku}"
-                    upload_result = cloudinary_upload(
-                        file_obj, folder=folder, resource_type="image"
-                    )
-                    url = upload_result.get("secure_url")
-                    if url:
-                        ProductFile.objects.create(
-                            product=variant.product,
-                            product_variant=variant,
-                            file_url=url,
+                
+                # Get current max sequence
+                max_seq = ProductFile.objects.filter(product_variant=variant).aggregate(
+                    models.Max('sequence')
+                )['sequence__max'] or -1
+                
+                # Upload new images with sequence
+                for file_index, file_obj in enumerate(variant_files):
+                    try:
+                        folder = f"media/product_images/product_{variant.product.sku}/variant_{variant.variant_sku}"
+                        upload_result = cloudinary_upload(
+                            file_obj, folder=folder, resource_type="image"
                         )
-                except CloudinaryError:
-                    print(
-                        f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
-                    )
-                    continue
+                        url = upload_result.get("secure_url")
+                        if url:
+                            new_sequence = max_seq + file_index + 1
+                            ProductFile.objects.create(
+                                product=variant.product,
+                                product_variant=variant,
+                                file_url=url,
+                                sequence=new_sequence,
+                                is_primary=False  # Existing images already set primary
+                            )
+                            print(f"Uploaded new variant file with sequence {new_sequence}")
+                    except CloudinaryError:
+                        print(
+                            f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
+                        )
+                        continue
             index += 1
         
         # Handle primary variant image selection
@@ -336,36 +375,60 @@ class BaseProductView(ModelFormMixin):
                 )
                 continue
         
-        # After handling variants and uploading main product images, set primary
-        image_order = self.request.POST.get('image_order')
-        if image_order:
-            try:
-                order_list = json.loads(image_order)
-                if order_list:
-                    # Clear all is_primary flags for main product images only
-                    ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
-                    # Set first image as primary (must be a main product image, not variant)
-                    first_image_id = order_list[0]
-                    primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object, product_variant__isnull=True)
-                    primary_file.is_primary = True
-                    primary_file.save()
-                    self.object.primary_image = primary_file
-                    self.object.save()
-                    print(f"Set primary image to {first_image_id} (main product image with variants) based on order")
-            except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
-                print(f"Error setting primary from order (with variants): {e}")
-        else:
-            # If no order specified, set first available MAIN PRODUCT image as primary
-            first_file = ProductFile.objects.filter(product=self.object, product_variant__isnull=True).order_by('sequence', 'pk').first()
-            if first_file:
-                ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
-                first_file.is_primary = True
-                first_file.save()
-                self.object.primary_image = first_file
-                self.object.save()
-                print(f"Set first available main product image {first_file.pk} as primary (with variants)")
+        # After handling variants, ALWAYS use first variant's first image as product primary
+        # This ignores any main product images if variants exist
+        if len(variants_data) > 0:
+            first_variant_sku = variants_data[0].get("variant_sku")
+            if first_variant_sku:
+                try:
+                    first_variant = ProductVariant.objects.get(variant_sku=first_variant_sku, product=self.object)
+                    first_variant_file = ProductFile.objects.filter(product_variant=first_variant).order_by('sequence', 'pk').first()
+                    if first_variant_file:
+                        # Clear all is_primary flags
+                        ProductFile.objects.filter(product=self.object).update(is_primary=False)
+                        # Set first variant's first image as product primary
+                        first_variant_file.is_primary = True
+                        first_variant_file.save()
+                        self.object.primary_image = first_variant_file
+                        self.object.save()
+                        print(f"✓ Set first variant's image {first_variant_file.pk} as product primary (variants exist)")
+                    else:
+                        print("WARNING: First variant has no images")
+                except ProductVariant.DoesNotExist:
+                    print(f"WARNING: First variant with SKU {first_variant_sku} not found")
             else:
-                print("WARNING: No main product images found to set as primary (with variants)")
+                print("WARNING: First variant has no SKU")
+        else:
+            # No variants, use main product images logic
+            image_order = self.request.POST.get('image_order')
+            if image_order:
+                try:
+                    order_list = json.loads(image_order)
+                    if order_list:
+                        # Clear all is_primary flags for main product images only
+                        ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
+                        # Set first image as primary (must be a main product image, not variant)
+                        first_image_id = order_list[0]
+                        primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object, product_variant__isnull=True)
+                        primary_file.is_primary = True
+                        primary_file.save()
+                        self.object.primary_image = primary_file
+                        self.object.save()
+                        print(f"Set primary image to {first_image_id} (main product image, no variants) based on order")
+                except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
+                    print(f"Error setting primary from order (no variants): {e}")
+            else:
+                # No order specified, set first available MAIN PRODUCT image as primary
+                first_main_file = ProductFile.objects.filter(product=self.object, product_variant__isnull=True).order_by('sequence', 'pk').first()
+                if first_main_file:
+                    ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
+                    first_main_file.is_primary = True
+                    first_main_file.save()
+                    self.object.primary_image = first_main_file
+                    self.object.save()
+                    print(f"Set first available main product image {first_main_file.pk} as primary (no variants)")
+                else:
+                    print("WARNING: No main product images found to set as primary (no variants)")
 
 
 # ----------------------------------------------
@@ -460,9 +523,11 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         context = super().get_context_data(**kwargs)
         context["is_update"] = True
         # pass the variants if product variants exist (already prefetched)
-        if self.object.variants.exists():
-            context["variants"] = self.object.variants.all()
-            print(f"Found {context['variants'].count()} variants for product {self.object.sku}")  # Debug
+        # Use list() to evaluate queryset immediately and avoid cursor issues
+        variants = list(self.object.variants.all())
+        if variants:
+            context["variants"] = variants
+            print(f"Found {len(variants)} variants for product {self.object.sku}")  # Debug
         # else:
         #     context["no_variant_files"] = self.object.files.all()
         return context

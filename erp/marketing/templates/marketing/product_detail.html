@@ -52,7 +52,7 @@
       
       {% if product.files.all %}
       <div class="image-thumbnails">
-        {% for file in product.files.all %}
+        {% for file in product.files.all|dictsort:"sequence" %}
           <div class="thumbnail {% if forloop.first %}active{% endif %}" onclick="changeImage('{{ file.file_url }}', this)">
             <img src="{{ file.file_url }}" alt="Thumbnail {{ forloop.counter }}">
           </div>
@@ -177,13 +177,15 @@
           {% for variant in product.variants.all %}
           <tr>
             <td>
-              {% if variant.files.all.0 %}
-                <img src="{{ variant.files.all.0.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
-              {% else %}
-                <div class="variant-image-placeholder">
-                  <i class="fa fa-image"></i>
-                </div>
-              {% endif %}
+              {% with variant.files.all|dictsort:"sequence" as sorted_files %}
+                {% if sorted_files %}
+                  <img src="{{ sorted_files.0.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
+                {% else %}
+                  <div class="variant-image-placeholder">
+                    <i class="fa fa-image"></i>
+                  </div>
+                {% endif %}
+              {% endwith %}
             </td>
             <td><span class="variant-sku">{{ variant.variant_sku }}</span></td>
             <td>

@@ -36,12 +36,15 @@ def get_template_context(campaign, contact=None):
         'user_company': getattr(user, 'member', None) and getattr(user.member, 'company_name', 'Our Company') or 'Our Company',
     }
     
-    # Add contact info if available
+    # Add contact info if available (email is ArrayField)
     if contact:
-        context['contact_name'] = contact.first_name or contact.email
+        # Get first email from array or use name
+        first_email = contact.email[0] if contact.email and len(contact.email) > 0 else None
+        context['contact_name'] = contact.name or first_email or 'there'
     elif company.contacts.exists():
         first_contact = company.contacts.first()
-        context['contact_name'] = first_contact.first_name or first_contact.email
+        first_email = first_contact.email[0] if first_contact.email and len(first_contact.email) > 0 else None
+        context['contact_name'] = first_contact.name or first_email or 'there'
     else:
         context['contact_name'] = 'there'
     
@@ -81,13 +84,14 @@ def send_campaign_email(campaign, sequence_number):
     recipient_email = None
     recipient_name = ''
     
-    # Try to get email from contacts first
+    # Try to get email from contacts first (email is ArrayField)
     if company.contacts.exists():
-        contacts_with_email = company.contacts.exclude(email='').exclude(email__isnull=True)
-        if contacts_with_email.exists():
-            contact = contacts_with_email.first()
-            recipient_email = contact.email
-            recipient_name = contact.first_name or contact.email
+        # Find contacts with at least one email in their array
+        for contact in company.contacts.all():
+            if contact.email and len(contact.email) > 0 and contact.email[0].strip():
+                recipient_email = contact.email[0]  # Take first email from array
+                recipient_name = contact.name or recipient_email
+                break
     
     # Fallback to company email (array - take first email)
     if not recipient_email and company.email and len(company.email) > 0:
@@ -99,7 +103,7 @@ def send_campaign_email(campaign, sequence_number):
         return False
     
     # Build template context
-    context = get_template_context(campaign, contact=contacts_with_email.first() if 'contacts_with_email' in locals() else None)
+    context = get_template_context(campaign)
     
     # Replace variables in subject and body
     subject = replace_template_variables(template.subject, context)
@@ -195,12 +199,12 @@ def process_scheduled_campaigns():
     for campaign in campaigns:
         # Skip if company has no email (check if array is empty)
         if not campaign.company.email or len(campaign.company.email) == 0:
-            # Check if company has contacts with email
-            has_contact_email = campaign.company.contacts.exclude(
-                email=''
-            ).exclude(
-                email__isnull=True
-            ).exists()
+            # Check if company has contacts with email (email is ArrayField)
+            has_contact_email = False
+            for contact in campaign.company.contacts.all():
+                if contact.email and len(contact.email) > 0 and contact.email[0].strip():
+                    has_contact_email = True
+                    break
             
             if not has_contact_email:
                 print(f"⊘ Skipping campaign {campaign.id} - no email address for {campaign.company.name}")

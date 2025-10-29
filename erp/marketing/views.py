@@ -735,7 +735,6 @@ def get_product_categories(request):
 def get_products(request):
     start = time.time()
     product_category = request.GET.get("product_category", None)
-    # ...existing code...
 
     if product_category:
         try:
@@ -749,32 +748,31 @@ def get_products(request):
     else:
         products = Product.objects.filter(featured=True)
 
-    # Optimize: select_related for primary_image
-    products = products.select_related("primary_image")
-
-    # Optimize: select_related for product in variants
-    product_variants = ProductVariant.objects.filter(
-        product__in=products
-    ).select_related("product")
-
-    # Optimize: select_related for product_variant in attribute values
-    product_variant_attribute_values = ProductVariantAttributeValue.objects.filter(
-        variants__in=product_variants
-    ).prefetch_related("variants", "product_variant_attribute")
-
-    # product_variant_attribute_values = ProductVariantAttributeValue.objects.filter(
-    #     variants__in=product_variants
-    # ).prefetch_related("variants", "product_variant_attribute")
-
-    # 3. Get all unique attributes used by these variants
-    attribute_ids = product_variant_attribute_values.values_list(
-        "product_variant_attribute_id", flat=True
-    ).distinct()
-    product_variant_attributes = ProductVariantAttribute.objects.filter(
-        id__in=attribute_ids
+    # Optimize: prefetch all related data in a single query chain
+    products = products.select_related("primary_image", "category").prefetch_related(
+        'variants',
+        'variants__product_variant_attribute_values',
+        'variants__product_variant_attribute_values__product_variant_attribute'
     )
 
-    # Optimize: build products_data
+    # Convert to list to execute query once
+    products_list = list(products)
+    
+    # Collect variants from prefetched data
+    product_variants = []
+    for product in products_list:
+        product_variants.extend(product.variants.all())
+    
+    # Collect attribute values from prefetched data
+    product_variant_attribute_values_set = set()
+    attributes_map = {}
+    for variant in product_variants:
+        for av in variant.product_variant_attribute_values.all():
+            product_variant_attribute_values_set.add(av)
+            if av.product_variant_attribute_id not in attributes_map:
+                attributes_map[av.product_variant_attribute_id] = av.product_variant_attribute
+
+    # Build products data from already fetched list
     products_data = [
         {
             "id": p.id,
@@ -782,11 +780,11 @@ def get_products(request):
             "sku": p.sku,
             "price": p.price,
             "primary_image": p.primary_image.file_url if p.primary_image else None,
-            # Add other fields you want to expose
         }
-        for p in products
+        for p in products_list
     ]
 
+    # Build variant data from collected variants (already prefetched)
     product_variants_data = [
         {
             "id": v.id,
@@ -797,28 +795,27 @@ def get_products(request):
             "product_variant_attribute_values": [
                 av.id for av in v.product_variant_attribute_values.all()
             ],
-            # Add other fields you want to expose
         }
         for v in product_variants
     ]
 
+    # Build attributes data from collected map
     product_variant_attributes_data = [
         {
             "id": a.id,
             "name": a.name,
         }
-        for a in product_variant_attributes
+        for a in attributes_map.values()
     ]
 
+    # Build attribute values from collected set
     product_variant_attribute_values_data = [
         {
             "id": av.id,
-            # "product_variant_id": av.product_variant_id,
             "product_variant_attribute_id": av.product_variant_attribute_id,
             "product_variant_attribute_value": av.product_variant_attribute_value,
-            # "product_id": av.product_variant.product_id,  # Now this is fast!
         }
-        for av in product_variant_attribute_values
+        for av in product_variant_attribute_values_set
     ]
 
     end = time.time()
@@ -881,7 +878,18 @@ def get_products(request):
 def get_product(request):
     product_sku = request.GET.get("product_sku", None)
     try:
-        product = Product.objects.get(sku=product_sku, featured=True)
+        # Optimize: prefetch all related data in one query
+        product = Product.objects.select_related(
+            'category',
+            'primary_image',
+            'supplier'
+        ).prefetch_related(
+            models.Prefetch('files', queryset=ProductFile.objects.order_by('sequence', 'pk')),
+            'variants',
+            models.Prefetch('variants__files', queryset=ProductFile.objects.order_by('sequence', 'pk')),
+            'variants__product_variant_attribute_values',
+            'variants__product_variant_attribute_values__product_variant_attribute'
+        ).get(sku=product_sku, featured=True)
     except Product.DoesNotExist:
         return JsonResponse({"error": "Product not found"}, status=404)
 
@@ -924,32 +932,32 @@ def get_product(request):
     #     "fields": product_fields,
     # }
 
-    # All product files (main and variant)
-    product_files_qs = product.files.all()
-    # print("your product files", product_files_qs)
+    # All product files (main and variant) - already ordered by sequence in prefetch
     product_files = [
         {
             "id": pf.id,
             "file": pf.file_url,
             "product_id": pf.product_id,
             "product_variant_id": pf.product_variant_id,
+            "sequence": pf.sequence,
+            "is_primary": pf.is_primary,
         }
-        for pf in product_files_qs
+        for pf in product.files.all()
     ]
 
-    # Variants
+    # Variants (already prefetched)
     variants = product.variants.all()
     variants_data = []
-    unique_attribute_value_pks = set()
     for variant in variants:
-        # Find primary image for variant (if any)
-        variant_primary_file = variant.files.first()
-        # product_variant_attribute_values = variant.product_variant_attribute_values.all().values_list("pk", flat=True)
-        product_variant_attribute_values_pk_list = list(
-            variant.product_variant_attribute_values.values_list("pk", flat=True)
-        )
-        unique_attribute_value_pks.update(product_variant_attribute_values_pk_list)
-        print("Unique attribute value pks:", unique_attribute_value_pks)
+        # Find primary image for variant (first by sequence) - already ordered in prefetch
+        variant_files = list(variant.files.all())
+        variant_primary_file = variant_files[0] if variant_files else None
+        
+        # Get attribute value pks (already prefetched)
+        product_variant_attribute_values_pk_list = [
+            av.pk for av in variant.product_variant_attribute_values.all()
+        ]
+        
         variants_data.append(
             {
                 "id": variant.id,
@@ -963,40 +971,37 @@ def get_product(request):
                 "primary_image": (
                     variant_primary_file.file_url if variant_primary_file else None
                 ),
-                "product_variant_attribute_values": list(unique_attribute_value_pks),
-                # "product_variant_attribute_values":variant.product_variant_attribute_values,
-                # product_variant_attribute_values: variant.product_variant_attribute_values,
+                "product_variant_attribute_values": product_variant_attribute_values_pk_list,
             }
         )
-        unique_attribute_value_pks = set()
 
-    # Attribute values
-    # attribute_values = ProductVariantAttributeValue.objects.filter(product=product)
-    product_variant_attribute_values = ProductVariantAttributeValue.objects.filter(
-        variants__in=variants
-    )
+    # Attribute values - collect from already prefetched data
+    attribute_values_set = set()
+    attributes_map = {}
+    
+    for variant in variants:
+        for av in variant.product_variant_attribute_values.all():
+            attribute_values_set.add(av)
+            # Also collect unique attributes
+            if av.product_variant_attribute_id not in attributes_map:
+                attributes_map[av.product_variant_attribute_id] = av.product_variant_attribute
+    
     attribute_values_data = [
         {
             "id": av.id,
             "product_variant_attribute_value": av.product_variant_attribute_value,
             "product_variant_attribute_id": av.product_variant_attribute_id,
-            # "product_variant_id": av.product_variant_id,
-            # "product_id": av.product_id,
         }
-        for av in product_variant_attribute_values
+        for av in attribute_values_set
     ]
 
-    # Attributes
-    attribute_ids = product_variant_attribute_values.values_list(
-        "product_variant_attribute_id", flat=True
-    ).distinct()
-    attributes = ProductVariantAttribute.objects.filter(id__in=attribute_ids)
+    # Attributes - from already collected map
     attributes_data = [
         {
             "id": attr.id,
             "name": attr.name,
         }
-        for attr in attributes
+        for attr in attributes_map.values()
     ]
     # print("here comes the response")
     # print(product_files)

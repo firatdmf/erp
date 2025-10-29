@@ -13,8 +13,8 @@ def create_campaign_for_prospect(sender, instance, created, **kwargs):
     """
     # Only create campaign for new prospect companies that have an email address
     if created and instance.status == 'prospect':
-        # Check if company has email address
-        if not instance.email or instance.email.strip() == '':
+        # Check if company has email address (email is now an ArrayField)
+        if not instance.email or len(instance.email) == 0 or not instance.email[0].strip():
             print(f"⊘ Skipping campaign creation for {instance.name} - no email address")
             return
         

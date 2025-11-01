@@ -1,0 +1,72 @@
+<!-- Task Edit Form Content -->
+<form id="taskEditForm" method="post" action="{% url 'todo:update_task_ajax' task.id %}" onsubmit="handleTaskEditFormSubmit(event); return false;">
+  {% csrf_token %}
+  
+  <!-- Task Info -->
+  {% if task.company %}
+    <div class="form-group">
+      <label><i class="fa fa-building"></i> Company</label>
+      <div style="padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; font-size: 0.875rem;">
+        <a href="{% url 'crm:company_detail' task.company.pk %}" style="color: var(--text-primary); text-decoration: none;">
+          <strong>{{ task.company }}</strong>
+        </a>
+      </div>
+    </div>
+  {% elif task.contact %}
+    <div class="form-group">
+      <label><i class="fa fa-user"></i> Contact</label>
+      <div style="padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; font-size: 0.875rem;">
+        <a href="{% url 'crm:contact_detail' task.contact.pk %}" style="color: var(--text-primary); text-decoration: none;">
+          <strong>{{ task.contact }}</strong>
+        </a>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Task Name -->
+  <div class="form-group">
+    <label for="id_name">Task Name *</label>
+    {{ form.name }}
+  </div>
+
+  <!-- Due Date -->
+  <div class="form-group">
+    <label for="id_due_date">Due Date *</label>
+    {{ form.due_date }}
+  </div>
+
+  <!-- Description -->
+  <div class="form-group">
+    <label for="id_description">Description</label>
+    {{ form.description }}
+  </div>
+
+  <!-- Hidden fields -->
+  {{ form.contact }}
+  {{ form.company }}
+  {{ form.member }}
+
+  <!-- Form Errors -->
+  {% if form.errors %}
+    <div style="margin: 1rem 0; padding: 0.75rem; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 0.875rem;">
+      <strong><i class="fa fa-exclamation-circle"></i> Please correct the errors below:</strong>
+      <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">
+        {% for field, errors in form.errors.items %}
+          {% for error in errors %}
+            <li>{{ field }}: {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <!-- Footer Buttons -->
+  <div class="sidebar-footer" style="margin: 1.5rem -1.5rem -1.5rem; padding: 1.25rem 1.5rem;">
+    <button type="button" class="btn btn-secondary" onclick="closeTaskEditSidebar()" style="flex: 1;">
+      Cancel
+    </button>
+    <button type="submit" class="btn btn-primary" style="flex: 1;">
+      <i class="fa fa-save"></i> Update Task
+    </button>
+  </div>
+</form>

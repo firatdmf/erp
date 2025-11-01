@@ -170,6 +170,7 @@ function loadExistingVariantImages() {
                     
                     if (existingVariantData[attrKey]) {
                         existingVariantData[attrKey].images = files.map(f => ({
+                            id: f.id,  // Add file ID for deletion tracking
                             url: f.url,
                             name: f.name || f.url.split('/').pop()
                         }));
@@ -190,6 +191,24 @@ function showVariantSection() {
     document.getElementById('variant_component').style.display = 'block';
     if (optionCounter === 0) {
         addNewOption(); // Add first option automatically
+    }
+    toggleProductImagesSection();
+}
+
+// Toggle product images section based on variants
+function toggleProductImagesSection() {
+    const hasVariants = allCombinations && allCombinations.length > 0;
+    const productImagesContent = document.getElementById('product_images_content');
+    const variantsImageNotice = document.getElementById('variants_image_notice');
+    
+    if (hasVariants) {
+        // Hide product images upload, show notice
+        if (productImagesContent) productImagesContent.style.display = 'none';
+        if (variantsImageNotice) variantsImageNotice.style.display = 'block';
+    } else {
+        // Show product images upload, hide notice
+        if (productImagesContent) productImagesContent.style.display = 'block';
+        if (variantsImageNotice) variantsImageNotice.style.display = 'none';
     }
 }
 
@@ -431,6 +450,7 @@ function updateVariantTable() {
         console.log('No combinations, hiding table');
         table.style.display = 'none';
         if (grouping) grouping.style.display = 'none';
+        toggleProductImagesSection();
         return;
     }
     
@@ -449,6 +469,9 @@ function updateVariantTable() {
         filterVariantTableByGroup();
     }
     
+    // Toggle product images section based on variants
+    toggleProductImagesSection();
+    
     console.log('Table should be visible now');
 }
 
@@ -457,16 +480,10 @@ function renderVariantTable(combinations, selectedGrouping = null) {
     const table = document.getElementById('variant_table');
     if (!table) return;
     
-    // If a specific grouping is selected, show only that option column
-    let displayOptions = [];
-    if (selectedGrouping) {
-        displayOptions = [selectedGrouping];
-    } else {
-        // Get all option names for headers
-        displayOptions = Object.values(variantData)
-            .filter(d => d.name)
-            .map(d => d.name);
-    }
+    // Always show all option names for headers
+    const displayOptions = Object.values(variantData)
+        .filter(d => d.name)
+        .map(d => d.name);
     
     // Build table HTML
     let tableHTML = '<thead><tr><th>ACTIONS</th>';
@@ -475,65 +492,240 @@ function renderVariantTable(combinations, selectedGrouping = null) {
     });
     tableHTML += '<th>PRICE</th><th>STOCK</th><th>PHOTO</th><th>SKU</th><th>BARCODE</th><th>FEATURED</th></tr></thead><tbody>';
     
-    combinations.forEach((combo, index) => {
-        tableHTML += `<tr><td><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${index})" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
-        
-        // Only show selected option values
-        displayOptions.forEach(optionName => {
-            const value = combo[optionName] || '';
-            tableHTML += `<td>${value}</td>`;
+    // If grouping is selected, create hierarchical structure
+    if (selectedGrouping) {
+        // Group all combinations by the selected option
+        const grouped = {};
+        allCombinations.forEach((combo, index) => {
+            const groupValue = combo[selectedGrouping];
+            if (!grouped[groupValue]) {
+                grouped[groupValue] = [];
+            }
+            grouped[groupValue].push({ combo, originalIndex: index });
         });
         
-        // Create key for looking up existing data
-        const attrKey = Object.entries(combo)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, val]) => `${key}:${val}`)
-            .join('|');
-        
-        const existingData = existingVariantData[attrKey] || {};
-        
-        // Try to read current form values first (preserves user input during re-render)
-        const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
-        const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
-        const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
-        const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
-        const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
-        
-        const price = priceInput?.value || existingData.price || '';
-        const quantity = quantityInput?.value || existingData.quantity || '';
-        const sku = skuInput?.value || existingData.sku || '';
-        const barcode = barcodeInput?.value || existingData.barcode || '';
-        const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
-        
-        // Load existing images for this variant
-        if (existingData.images && existingData.images.length > 0 && !variantImages[index]) {
-            variantImages[index] = {
-                images: existingData.images,
-                primaryIndex: 0
-            };
-        }
-        
-        const variantImagesHtml = renderVariantImages(index);
-        
-        tableHTML += `
-            <td><input type="number" name="variant_price_${index + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;"></td>
-            <td><input type="number" name="variant_quantity_${index + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
-            <td>
-                <button type="button" class="photo_picker_btn" onclick="openImagePicker(${index})" title="Select images">
-                    <i class="fa fa-camera"></i>
-                </button>
-                <div class="variant_images_preview" id="variant_images_${index}">
-                    ${variantImagesHtml}
-                </div>
-            </td>
-            <td><input type="text" name="variant_sku_${index + 1}" value="${sku}" style="min-width: 120px;"></td>
-            <td><input type="text" name="variant_barcode_${index + 1}" value="${barcode}" style="min-width: 120px;"></td>
-            <td style="text-align: center;"><input type="checkbox" name="variant_featured_${index + 1}" ${featured ? 'checked' : ''}></td>
-        </tr>`;
-    });
+        // Render each group
+        Object.entries(grouped).forEach(([groupValue, variants]) => {
+            // Skip deleted groups
+            const hasNonDeletedVariants = variants.some(v => !deletedVariantIndices.has(v.originalIndex));
+            if (!hasNonDeletedVariants) return;
+            
+            // Calculate price range for this group
+            const prices = variants
+                .filter(v => !deletedVariantIndices.has(v.originalIndex))
+                .map(v => {
+                    const priceInput = document.querySelector(`input[name="variant_price_${v.originalIndex + 1}"]`);
+                    return parseFloat(priceInput?.value || 0);
+                })
+                .filter(p => p > 0);
+            
+            let priceRange = '₺ 0,00';
+            if (prices.length > 0) {
+                const minPrice = Math.min(...prices);
+                const maxPrice = Math.max(...prices);
+                if (minPrice === maxPrice) {
+                    priceRange = `₺ ${minPrice.toFixed(2).replace('.', ',')}`;
+                } else {
+                    priceRange = `₺ ${minPrice.toFixed(2).replace('.', ',')}-${maxPrice.toFixed(2).replace('.', ',')}`;
+                }
+            }
+            
+            // Group header row (collapsible)
+            const groupId = `group_${groupValue.replace(/\s+/g, '_')}`;
+            const variantCount = variants.filter(v => !deletedVariantIndices.has(v.originalIndex)).length;
+            tableHTML += `
+                <tr class="group_header_row" style="background: #f3f4f6; font-weight: 600; cursor: pointer;" onclick="toggleGroupCollapse('${groupId}')">
+                    <td>
+                        <i class="fa fa-chevron-down group_toggle_icon" id="icon_${groupId}" style="transition: transform 0.2s;"></i>
+                    </td>
+                    <td colspan="${displayOptions.length}">
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-weight: 600; color: #111827;">${groupValue}</span>
+                            <span style="font-weight: 400; color: #6b7280; font-size: 12px; margin-top: 2px;">Tümünü genişlet</span>
+                        </div>
+                    </td>
+                    <td id="price_range_${groupId}">${priceRange}</td>
+                    <td colspan="5"></td>
+                </tr>
+            `;
+            
+            // Render all variants in this group
+            variants.forEach(({ combo, originalIndex }) => {
+                // Skip deleted variants
+                if (deletedVariantIndices.has(originalIndex)) return;
+                
+                tableHTML += `<tr class="variant_row ${groupId}" style="background: white;">`;
+                tableHTML += `<td style="padding-left: 30px;"><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${originalIndex})" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
+                
+                // Show all option values
+                displayOptions.forEach(optionName => {
+                    const value = combo[optionName] || '';
+                    tableHTML += `<td>${value}</td>`;
+                });
+                
+                // Create key for looking up existing data
+                const attrKey = Object.entries(combo)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, val]) => `${key}:${val}`)
+                    .join('|');
+                
+                const existingData = existingVariantData[attrKey] || {};
+                
+                // Try to read current form values first (preserves user input during re-render)
+                const priceInput = document.querySelector(`input[name="variant_price_${originalIndex + 1}"]`);
+                const quantityInput = document.querySelector(`input[name="variant_quantity_${originalIndex + 1}"]`);
+                const skuInput = document.querySelector(`input[name="variant_sku_${originalIndex + 1}"]`);
+                const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
+                const featuredInput = document.querySelector(`input[name="variant_featured_${originalIndex + 1}"]`);
+                
+                const price = priceInput?.value || existingData.price || '';
+                const quantity = quantityInput?.value || existingData.quantity || '';
+                const sku = skuInput?.value || existingData.sku || '';
+                const barcode = barcodeInput?.value || existingData.barcode || '';
+                const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
+                
+                // Load existing images for this variant
+                if (existingData.images && existingData.images.length > 0 && !variantImages[originalIndex]) {
+                    variantImages[originalIndex] = {
+                        images: existingData.images,
+                        primaryIndex: 0
+                    };
+                }
+                
+                const variantImagesHtml = renderVariantImages(originalIndex);
+                
+                tableHTML += `
+                    <td><input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" oninput="updateGroupPriceRange('${groupId}')"></td>
+                    <td><input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
+                    <td>
+                        <button type="button" class="photo_picker_btn" onclick="openImagePicker(${originalIndex})" title="Select images">
+                            <i class="fa fa-camera"></i>
+                        </button>
+                        <div class="variant_images_preview" id="variant_images_${originalIndex}">
+                            ${variantImagesHtml}
+                        </div>
+                    </td>
+                    <td><input type="text" name="variant_sku_${originalIndex + 1}" value="${sku}" style="min-width: 120px;"></td>
+                    <td><input type="text" name="variant_barcode_${originalIndex + 1}" value="${barcode}" style="min-width: 120px;"></td>
+                    <td style="text-align: center;"><input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}></td>
+                </tr>`;
+            });
+        });
+    } else {
+        // No grouping - show all variants flat
+        allCombinations.forEach((combo, index) => {
+            // Skip deleted variants
+            if (deletedVariantIndices.has(index)) return;
+            
+            tableHTML += `<tr><td><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${index})" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
+            
+            // Show all option values
+            displayOptions.forEach(optionName => {
+                const value = combo[optionName] || '';
+                tableHTML += `<td>${value}</td>`;
+            });
+            
+            // Create key for looking up existing data
+            const attrKey = Object.entries(combo)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, val]) => `${key}:${val}`)
+                .join('|');
+            
+            const existingData = existingVariantData[attrKey] || {};
+            
+            // Try to read current form values first (preserves user input during re-render)
+            const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
+            const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
+            const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
+            const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
+            const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
+            
+            const price = priceInput?.value || existingData.price || '';
+            const quantity = quantityInput?.value || existingData.quantity || '';
+            const sku = skuInput?.value || existingData.sku || '';
+            const barcode = barcodeInput?.value || existingData.barcode || '';
+            const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
+            
+            // Load existing images for this variant
+            if (existingData.images && existingData.images.length > 0 && !variantImages[index]) {
+                variantImages[index] = {
+                    images: existingData.images,
+                    primaryIndex: 0
+                };
+            }
+            
+            const variantImagesHtml = renderVariantImages(index);
+            
+            tableHTML += `
+                <td><input type="number" name="variant_price_${index + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;"></td>
+                <td><input type="number" name="variant_quantity_${index + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
+                <td>
+                    <button type="button" class="photo_picker_btn" onclick="openImagePicker(${index})" title="Select images">
+                        <i class="fa fa-camera"></i>
+                    </button>
+                    <div class="variant_images_preview" id="variant_images_${index}">
+                        ${variantImagesHtml}
+                    </div>
+                </td>
+                <td><input type="text" name="variant_sku_${index + 1}" value="${sku}" style="min-width: 120px;"></td>
+                <td><input type="text" name="variant_barcode_${index + 1}" value="${barcode}" style="min-width: 120px;"></td>
+                <td style="text-align: center;"><input type="checkbox" name="variant_featured_${index + 1}" ${featured ? 'checked' : ''}></td>
+            </tr>`;
+        });
+    }
     
     tableHTML += '</tbody>';
     table.innerHTML = tableHTML;
+}
+
+// Toggle group collapse/expand
+function toggleGroupCollapse(groupId) {
+    const rows = document.querySelectorAll(`.${groupId}`);
+    const icon = document.getElementById(`icon_${groupId}`);
+    
+    rows.forEach(row => {
+        if (row.style.display === 'none') {
+            row.style.display = '';
+            if (icon) icon.style.transform = 'rotate(0deg)';
+        } else {
+            row.style.display = 'none';
+            if (icon) icon.style.transform = 'rotate(-90deg)';
+        }
+    });
+}
+
+// Update group price range in real-time
+function updateGroupPriceRange(groupId) {
+    const priceRangeCell = document.getElementById(`price_range_${groupId}`);
+    if (!priceRangeCell) return;
+    
+    // Find all variant rows in this group
+    const variantRows = document.querySelectorAll(`.variant_row.${groupId}`);
+    const prices = [];
+    
+    variantRows.forEach(row => {
+        // Find price input in this row
+        const priceInput = row.querySelector('input[name^="variant_price_"]');
+        if (priceInput && priceInput.value) {
+            const price = parseFloat(priceInput.value);
+            if (!isNaN(price) && price > 0) {
+                prices.push(price);
+            }
+        }
+    });
+    
+    let priceRange = '₺ 0,00';
+    if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        if (minPrice === maxPrice) {
+            priceRange = `₺ ${minPrice.toFixed(2).replace('.', ',')}`;
+        } else {
+            priceRange = `₺ ${minPrice.toFixed(2).replace('.', ',')}-${maxPrice.toFixed(2).replace('.', ',')}`;
+        }
+    }
+    
+    priceRangeCell.textContent = priceRange;
 }
 
 // Filter table by selected grouping option
@@ -549,20 +741,8 @@ function filterVariantTableByGroup() {
         selectedOption = select.options[0].value;
     }
     
-    // If still no selection, return
-    if (!selectedOption) {
-        return;
-    }
-    
-    // Get unique values for the selected option
-    const uniqueValues = [...new Set(allCombinations.map(combo => combo[selectedOption]).filter(Boolean))];
-    
-    // Create simplified combinations with only the selected option
-    const filteredCombinations = uniqueValues.map(value => {
-        return { [selectedOption]: value };
-    });
-    
-    renderVariantTable(filteredCombinations, selectedOption);
+    // Render table with grouping (or without if no selection)
+    renderVariantTable(allCombinations, selectedOption || null);
 }
 
 // Render variant images as thumbnails
@@ -575,20 +755,16 @@ function renderVariantImages(variantIndex) {
     // First image is always primary
     variantImg.primaryIndex = 0;
     
-    return variantImg.images.map((img, idx) => {
+    const html = variantImg.images.map((img, idx) => {
         const isPrimary = idx === 0;
         return `
             <div class="variant_thumb ${isPrimary ? 'primary' : ''}" 
                  data-variant-index="${variantIndex}" 
                  data-image-index="${idx}" 
                  draggable="true"
-                 ondragstart="dragStartVariantImage(event, ${variantIndex}, ${idx})"
-                 ondragover="dragOverVariantImage(event)"
-                 ondrop="dropVariantImage(event, ${variantIndex}, ${idx})"
-                 ondragend="dragEndVariantImage(event)"
                  title="${isPrimary ? 'Primary image - Drag to reorder' : 'Drag to reorder'}">
                 <span class="drag_handle_variant"><i class="fa fa-grip-vertical"></i></span>
-                <img src="${img.url}" alt="Variant image">
+                <img src="${img.url}" alt="Variant image" draggable="false">
                 ${isPrimary ? '<div class="primary_label">PRIMARY</div>' : ''}
                 <button type="button" class="remove_variant_img" onclick="event.stopPropagation(); removeVariantImage(${variantIndex}, ${idx})" title="Remove image">
                     <i class="fa fa-times"></i>
@@ -596,6 +772,35 @@ function renderVariantImages(variantIndex) {
             </div>
         `;
     }).join('');
+    
+    // Attach event listeners after rendering
+    setTimeout(() => attachVariantImageDragListeners(variantIndex), 0);
+    
+    return html;
+}
+
+// Attach drag event listeners to variant images
+function attachVariantImageDragListeners(variantIndex) {
+    const container = document.getElementById(`variant_images_${variantIndex}`);
+    if (!container) return;
+    
+    const thumbs = container.querySelectorAll('.variant_thumb');
+    thumbs.forEach(thumb => {
+        const vIdx = parseInt(thumb.getAttribute('data-variant-index'));
+        const iIdx = parseInt(thumb.getAttribute('data-image-index'));
+        
+        // Remove old listeners
+        thumb.ondragstart = null;
+        thumb.ondragover = null;
+        thumb.ondrop = null;
+        thumb.ondragend = null;
+        
+        // Add new listeners
+        thumb.addEventListener('dragstart', (e) => dragStartVariantImage(e, vIdx, iIdx));
+        thumb.addEventListener('dragover', (e) => dragOverVariantImage(e));
+        thumb.addEventListener('drop', (e) => dropVariantImage(e, vIdx, iIdx));
+        thumb.addEventListener('dragend', (e) => dragEndVariantImage(e));
+    });
 }
 
 // Drag and drop handlers for variant images
@@ -642,21 +847,34 @@ function dragEndVariantImage(event) {
 function removeVariantImage(variantIndex, imageIndex) {
     if (!variantImages[variantIndex]) return;
     
-    if (confirm('Remove this image?')) {
-        variantImages[variantIndex].images.splice(imageIndex, 1);
-        
-        // Adjust primary index if needed
-        if (variantImages[variantIndex].images.length === 0) {
-            variantImages[variantIndex].primaryIndex = 0;
-        } else if (imageIndex === variantImages[variantIndex].primaryIndex) {
-            variantImages[variantIndex].primaryIndex = 0; // Set first as primary
-        } else if (imageIndex < variantImages[variantIndex].primaryIndex) {
-            variantImages[variantIndex].primaryIndex--;
+    const img = variantImages[variantIndex].images[imageIndex];
+    
+    // Check if this is an existing file with ID (from backend)
+    if (img && img.id) {
+        // Add to hidden input for deletion on save
+        const deletedInput = document.getElementById('deleted_variant_files');
+        if (deletedInput) {
+            const current = deletedInput.value ? JSON.parse(deletedInput.value) : [];
+            current.push(img.id);
+            deletedInput.value = JSON.stringify(current);
+            console.log('Variant image marked for deletion:', img.id);
         }
-        
-        // Update preview
-        updateVariantImagePreview(variantIndex);
     }
+    
+    // Remove from DOM
+    variantImages[variantIndex].images.splice(imageIndex, 1);
+    
+    // Adjust primary index if needed
+    if (variantImages[variantIndex].images.length === 0) {
+        variantImages[variantIndex].primaryIndex = 0;
+    } else if (imageIndex === variantImages[variantIndex].primaryIndex) {
+        variantImages[variantIndex].primaryIndex = 0; // Set first as primary
+    } else if (imageIndex < variantImages[variantIndex].primaryIndex) {
+        variantImages[variantIndex].primaryIndex--;
+    }
+    
+    // Update preview
+    updateVariantImagePreview(variantIndex);
 }
 
 // Open image picker modal
@@ -942,6 +1160,14 @@ function prepareVariantsForSubmission() {
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
         const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
         
+        // Normalize decimal inputs (convert comma to dot)
+        if (priceInput && priceInput.value) {
+            priceInput.value = priceInput.value.replace(',', '.');
+        }
+        if (quantityInput && quantityInput.value) {
+            quantityInput.value = quantityInput.value.replace(',', '.');
+        }
+        
         // Get images for this variant
         const variantImg = variantImages[index];
         const hasImages = variantImg && variantImg.images && variantImg.images.length > 0;
@@ -950,17 +1176,19 @@ function prepareVariantsForSubmission() {
             variant_sku: skuInput && skuInput.value ? skuInput.value : variantValues,
             variant_attribute_values: combo,
             variant_price: priceInput ? parseFloat(priceInput.value) || 0 : 0,
-            variant_quantity: quantityInput ? parseInt(quantityInput.value) || 0 : 0,
+            variant_quantity: quantityInput ? parseFloat(quantityInput.value) || 0 : 0,
             variant_barcode: barcodeInput ? barcodeInput.value : '',
             variant_featured: featuredInput ? featuredInput.checked : true,
         };
         
         // Add image information
         if (hasImages) {
-            variantData.variant_images = variantImg.images.map(img => ({
+            variantData.variant_images = variantImg.images.map((img, imgIdx) => ({
                 url: img.url,
                 name: img.name,
-                file: img.file
+                file: img.file,
+                id: img.id,  // Include ID for existing images
+                sequence: imgIdx  // Include sequence order
             }));
             variantData.primary_image_index = variantImg.primaryIndex;
         }

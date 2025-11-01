@@ -18,9 +18,9 @@ class Task(models.Model):
     # null=True affects the database schema.
 
     name = models.CharField(max_length=200)
-    due_date = models.DateField()
+    due_date = models.DateField(db_index=True)
     description = models.TextField(blank=True, null=True)
-    completed = models.BooleanField(default=False)
+    completed = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(auto_now_add=True, editable=True)
     # make it either a company or contact
@@ -45,6 +45,12 @@ class Task(models.Model):
     def get_delete_url(self):
         return reverse("complete_task", args=[str(self.id)])
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['completed', 'due_date']),
+            models.Index(fields=['due_date', 'completed']),
+        ]
+        
     def save(self, *args, **kwargs):
         if not self.member and hasattr(self, "_current_member"):
             self.member = self._current_member

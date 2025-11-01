@@ -78,16 +78,24 @@ class Dashboard(View):
             from django.http import HttpResponse
             from django.template.loader import render_to_string
             from datetime import datetime
+            from django.utils import timezone
             
             try:
                 date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
-                tasks = Task.objects.filter(completed=False, due_date=date_obj)
+                today = timezone.localdate()
+                
+                # If selected date is today, show all tasks up to and including today
+                if date_obj == today:
+                    tasks = Task.objects.filter(completed=False, due_date__lte=today).select_related('contact', 'company', 'member').order_by('-due_date')
+                else:
+                    # For other dates, show only tasks for that specific date
+                    tasks = Task.objects.filter(completed=False, due_date=date_obj).select_related('contact', 'company', 'member')
                 
                 # Render tasks using the same template
                 html = render_to_string('todo/components/tasks.html', {
                     'tasks': tasks,
                     'sort_type': 'dictsortreversed',
-                    'page_type': 'dashboard',
+                    'page_type': 'dashboard_calendar',
                     'csrf_token': request.META.get('CSRF_COOKIE'),
                     'path': request.path,
                     'member': request.user.member if hasattr(request.user, 'member') else None,

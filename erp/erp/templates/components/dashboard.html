@@ -77,9 +77,15 @@
 </div>
 
 <script>
-let currentDate = new Date();
-let selectedDate = new Date();
-const tasksData = {{ tasks_calendar_data|safe }};
+// Make these global for task component access
+window.currentDate = new Date();
+window.selectedDate = new Date();
+window.tasksData = {{ tasks_calendar_data|safe }};
+
+// Local references
+let currentDate = window.currentDate;
+let selectedDate = window.selectedDate;
+const tasksData = window.tasksData;
 
 function renderCalendar() {
   const year = currentDate.getFullYear();
@@ -111,7 +117,8 @@ function renderCalendar() {
     dayElement.className = 'calendar-day';
     
     const dateObj = new Date(year, month, day);
-    const dateStr = dateObj.toISOString().split('T')[0];
+    // Use local date string instead of UTC to avoid timezone issues
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     
     // Check if today
     if (dateObj.toDateString() === today.toDateString()) {
@@ -146,6 +153,7 @@ function renderCalendar() {
 
 function selectDate(date) {
   selectedDate = date;
+  window.selectedDate = date; // Update global reference
   renderCalendar();
   
   // Update tasks header
@@ -164,7 +172,11 @@ function selectDate(date) {
 }
 
 function loadTasksForDate(date) {
-  const dateStr = date.toISOString().split('T')[0];
+  // Use local date string instead of UTC to avoid timezone issues
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
   const tasksContainer = document.getElementById('tasksContainer');
   
   // Show loading state

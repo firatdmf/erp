@@ -221,8 +221,8 @@
   font-size: 0.875rem;
 }
 
-/* Empty State */
-.tasks_component ul li:only-child {
+/* Empty State - only apply to non-taskComponent items */
+.tasks_component ul li:only-child:not(.taskComponent) {
   text-align: center;
   padding: 2rem;
   color: var(--text-muted);

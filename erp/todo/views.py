@@ -1,9 +1,11 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse,HttpResponseRedirect
+from django.http import HttpResponse,HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django import forms
 from .models import Task
 from django.http import HttpRequest
+from django.utils import timezone
+from django.template.loader import render_to_string
 
 # Create your views here.
 from django.views import generic, View
@@ -112,6 +114,9 @@ class CreateTask(generic.edit.CreateView):
     def form_valid(self, form):
         print("your member iss")
         print("your member is", self.request.user.member)
+        print("Form due_date:", form.cleaned_data.get('due_date'))
+        print("Current localdate:", timezone.localdate())
+        print("Current date.today():", date.today())
         form.instance.member = self.request.user.member
         return super().form_valid(form)
 
@@ -232,5 +237,58 @@ def delete_task(request, task_id):
     if request.method == "POST":
         task = get_object_or_404(Task, pk=task_id)
         task.delete()
-        # below line brings back the user to the current page
+        
+        # Check if it's an AJAX request (HTMX)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('HX-Request'):
+            # Return empty response - HTMX will handle removal with hx-swap="outerHTML"
+            response = HttpResponse()
+            # Send custom header to trigger toast notification
+            response['HX-Trigger'] = '{"showToast": {"message": "Task deleted successfully", "type": "success"}}'
+            return response
+        
+        # Fallback for non-AJAX requests
         return redirect(request.META.get("HTTP_REFERER"))
+
+
+# Get task edit form (AJAX endpoint)
+def get_task_edit_form(request, task_id):
+    task = get_object_or_404(Task, pk=task_id)
+    form = TaskForm(instance=task)
+    
+    # Render the form template
+    html = render_to_string('todo/components/task_edit_form.html', {
+        'task': task,
+        'form': form,
+    }, request=request)
+    
+    return HttpResponse(html)
+
+
+# Update task via AJAX
+def update_task_ajax(request, task_id):
+    if request.method == "POST":
+        task = get_object_or_404(Task, pk=task_id)
+        form = TaskForm(request.POST, instance=task)
+        
+        if form.is_valid():
+            updated_task = form.save()
+            
+            # Return JSON response
+            return JsonResponse({
+                'success': True,
+                'task': {
+                    'id': updated_task.id,
+                    'name': updated_task.name,
+                    'description': updated_task.description,
+                    'due_date': updated_task.due_date.strftime('%Y-%m-%d') if updated_task.due_date else None,
+                    'completed': updated_task.completed,
+                }
+            })
+        else:
+            # Return form errors
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})

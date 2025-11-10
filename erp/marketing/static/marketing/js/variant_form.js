@@ -393,6 +393,8 @@ let createTable = () => {
     let variant_name = "";
     let variant_table_option_names = ""
     let variant_table_rows = ""
+    let seen_option_names = new Set();
+    
     // Below iterates through every input value and stores the value in the variant array
     Object.values(variant_container_input_elements).map((element, index) => {
 
@@ -416,6 +418,7 @@ let createTable = () => {
             }
         }
     });
+    
     // console.log("your new_product_variant_options are");
     // console.log(new_product_variant_options);
     export_data.product_variant_options = new_product_variant_options;
@@ -990,6 +993,131 @@ form.addEventListener('submit', async (event) => {
     // }
 
 });
+
+// Real-time duplicate detection for option names and values
+console.log('Duplicate detection loaded!');
+
+document.addEventListener('input', function(e) {
+    const target = e.target;
+    console.log('Input event detected on:', target.id);
+    
+    // Check if it's a variant name input
+    if (target.id && target.id.startsWith('variant_name_') && !target.id.includes('value')) {
+        console.log('Checking option name:', target.value);
+        checkDuplicateOptionName(target);
+    }
+    
+    // Check if it's a variant value input
+    if (target.id && target.id.includes('_value_')) {
+        console.log('Checking option value:', target.value);
+        checkDuplicateOptionValue(target);
+    }
+    
+    // Check if it's a variant SKU input
+    if (target.id && target.id.startsWith('variant_sku_')) {
+        console.log('Checking SKU:', target.value);
+        checkDuplicateSku(target);
+    }
+});
+
+function checkDuplicateOptionName(input) {
+    const currentValue = input.value.trim().toLowerCase();
+    if (!currentValue) {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return;
+    }
+    
+    // Get all option name inputs
+    const allOptionNames = document.querySelectorAll('[id^="variant_name_"]:not([id*="value"])');
+    let isDuplicate = false;
+    
+    allOptionNames.forEach(otherInput => {
+        if (otherInput !== input && otherInput.value.trim().toLowerCase() === currentValue) {
+            isDuplicate = true;
+        }
+    });
+    
+    if (isDuplicate) {
+        input.style.color = 'red';
+        input.style.borderColor = 'red';
+        input.style.backgroundColor = '#fee';
+        input.title = '⚠️ This option name already exists!';
+    } else {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        input.title = '';
+    }
+}
+
+function checkDuplicateOptionValue(input) {
+    const currentValue = input.value.trim().toLowerCase();
+    if (!currentValue) {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return;
+    }
+    
+    // Extract option name id from input id (e.g., variant_name_1_value_2 -> 1)
+    const optionNameId = input.id.split('_')[2];
+    
+    // Get all value inputs for this option
+    const allValues = document.querySelectorAll(`[id^="variant_name_${optionNameId}_value_"]`);
+    let isDuplicate = false;
+    
+    allValues.forEach(otherInput => {
+        if (otherInput !== input && otherInput.value.trim().toLowerCase() === currentValue) {
+            isDuplicate = true;
+        }
+    });
+    
+    if (isDuplicate) {
+        input.style.color = 'red';
+        input.style.borderColor = 'red';
+        input.style.backgroundColor = '#fee';
+        input.title = '⚠️ This value already exists for this option!';
+    } else {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        input.title = '';
+    }
+}
+
+function checkDuplicateSku(input) {
+    const currentValue = input.value.trim().toLowerCase();
+    if (!currentValue) {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return;
+    }
+    
+    // Get all SKU inputs in the variant table
+    const allSkus = document.querySelectorAll('[id^="variant_sku_"]');
+    let isDuplicate = false;
+    
+    allSkus.forEach(otherInput => {
+        if (otherInput !== input && otherInput.value.trim().toLowerCase() === currentValue) {
+            isDuplicate = true;
+        }
+    });
+    
+    if (isDuplicate) {
+        input.style.color = 'red';
+        input.style.borderColor = 'red';
+        input.style.backgroundColor = '#fee';
+        input.title = '⚠️ This SKU already exists!';
+    } else {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        input.title = '';
+    }
+}
 
 // auto generate variant_sku based on the parent sku and the variant_attribute_values
 // TSHIRT001-BLK-95

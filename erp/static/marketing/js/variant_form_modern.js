@@ -145,6 +145,7 @@ function loadExistingVariantImages() {
                 .join('|');
             
             existingVariantData[attrKey] = {
+                variant_id: variant.variant_id,
                 price: variant.variant_price,
                 quantity: variant.variant_quantity,
                 sku: variant.variant_sku,
@@ -393,8 +394,10 @@ function generateCombinations() {
         .map(([id, data]) => ({
             id,
             name: data.name,
-            // Filter out empty/whitespace values
-            values: data.values.filter(v => v && typeof v === 'string' && v.trim())
+            // Filter out empty/whitespace AND duplicate values (case-insensitive)
+            values: [...new Set(data.values
+                .filter(v => v && typeof v === 'string' && v.trim())
+                .map(v => v.trim().toLowerCase()))]
         }));
     
     console.log('Valid options for combinations:', validOptions);
@@ -554,7 +557,16 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                 // Skip deleted variants
                 if (deletedVariantIndices.has(originalIndex)) return;
                 
-                tableHTML += `<tr class="variant_row ${groupId}" style="background: white;">`;
+                // Create key for looking up existing data - MUST BE FIRST
+                const attrKey = Object.entries(combo)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, val]) => `${key}:${val}`)
+                    .join('|');
+                
+                const existingData = existingVariantData[attrKey] || {};
+                const variantId = existingData.variant_id || '';
+                
+                tableHTML += `<tr class="variant_row ${groupId}" data-variant-index="${originalIndex}" data-variant-id="${variantId}" style="background: white;">`;
                 tableHTML += `<td style="padding-left: 30px;"><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${originalIndex})" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
                 
                 // Show all option values
@@ -562,14 +574,6 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                     const value = combo[optionName] || '';
                     tableHTML += `<td>${value}</td>`;
                 });
-                
-                // Create key for looking up existing data
-                const attrKey = Object.entries(combo)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([key, val]) => `${key}:${val}`)
-                    .join('|');
-                
-                const existingData = existingVariantData[attrKey] || {};
                 
                 // Try to read current form values first (preserves user input during re-render)
                 const priceInput = document.querySelector(`input[name="variant_price_${originalIndex + 1}"]`);
@@ -617,21 +621,22 @@ function renderVariantTable(combinations, selectedGrouping = null) {
             // Skip deleted variants
             if (deletedVariantIndices.has(index)) return;
             
-            tableHTML += `<tr><td><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${index})" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
-            
-            // Show all option values
-            displayOptions.forEach(optionName => {
-                const value = combo[optionName] || '';
-                tableHTML += `<td>${value}</td>`;
-            });
-            
-            // Create key for looking up existing data
+            // Create key for looking up existing data - MUST BE FIRST
             const attrKey = Object.entries(combo)
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([key, val]) => `${key}:${val}`)
                 .join('|');
             
             const existingData = existingVariantData[attrKey] || {};
+            const variantId = existingData.variant_id || '';
+            
+            tableHTML += `<tr data-variant-index="${index}" data-variant-id="${variantId}"><td><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${index})" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
+            
+            // Show all option values
+            displayOptions.forEach(optionName => {
+                const value = combo[optionName] || '';
+                tableHTML += `<td>${value}</td>`;
+            });
             
             // Try to read current form values first (preserves user input during re-render)
             const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
@@ -745,7 +750,7 @@ function filterVariantTableByGroup() {
     renderVariantTable(allCombinations, selectedOption || null);
 }
 
-// Render variant images as thumbnails
+// Render variant images as thumbnails - SIMPLE VERSION
 function renderVariantImages(variantIndex) {
     const variantImg = variantImages[variantIndex];
     if (!variantImg || !variantImg.images || variantImg.images.length === 0) {
@@ -755,92 +760,277 @@ function renderVariantImages(variantIndex) {
     // First image is always primary
     variantImg.primaryIndex = 0;
     
+    // Build simple HTML
     const html = variantImg.images.map((img, idx) => {
         const isPrimary = idx === 0;
         return `
-            <div class="variant_thumb ${isPrimary ? 'primary' : ''}" 
-                 data-variant-index="${variantIndex}" 
-                 data-image-index="${idx}" 
-                 draggable="true"
-                 title="${isPrimary ? 'Primary image - Drag to reorder' : 'Drag to reorder'}">
-                <span class="drag_handle_variant"><i class="fa fa-grip-vertical"></i></span>
-                <img src="${img.url}" alt="Variant image" draggable="false">
-                ${isPrimary ? '<div class="primary_label">PRIMARY</div>' : ''}
-                <button type="button" class="remove_variant_img" onclick="event.stopPropagation(); removeVariantImage(${variantIndex}, ${idx})" title="Remove image">
+            <div class="variant-sortable-image" data-image-id="${img.id}" style="position: relative; border: 2px solid ${isPrimary ? '#667eea' : '#e5e7eb'}; border-radius: 6px; padding: 4px; background: white; width: 60px; height: 60px; cursor: move;">
+                ${isPrimary ? '<div style="position: absolute; top: -6px; left: 4px; background: #667eea; color: white; padding: 1px 4px; border-radius: 8px; font-size: 8px; font-weight: 600; z-index: 1;">PRIMARY</div>' : ''}
+                <img src="${img.url}" alt="Variant image" style="width: 100%; height: 50px; object-fit: cover; border-radius: 4px;">
+                <button type="button" class="remove-variant-btn" onclick="event.stopPropagation(); removeVariantImage(${variantIndex}, ${idx})" style="position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; border: none; border-radius: 3px; padding: 1px 3px; font-size: 8px; cursor: pointer;">
                     <i class="fa fa-times"></i>
                 </button>
             </div>
         `;
     }).join('');
     
-    // Attach event listeners after rendering
-    setTimeout(() => attachVariantImageDragListeners(variantIndex), 0);
+    // Initialize sortable after rendering
+    setTimeout(() => initVariantSortable(variantIndex), 0);
     
     return html;
 }
 
-// Attach drag event listeners to variant images
-function attachVariantImageDragListeners(variantIndex) {
+// Initialize simple sortable for variant images
+function initVariantSortable(variantIndex) {
     const container = document.getElementById(`variant_images_${variantIndex}`);
     if (!container) return;
     
-    const thumbs = container.querySelectorAll('.variant_thumb');
-    thumbs.forEach(thumb => {
-        const vIdx = parseInt(thumb.getAttribute('data-variant-index'));
-        const iIdx = parseInt(thumb.getAttribute('data-image-index'));
+    // Set flex layout
+    container.style.display = 'flex';
+    container.style.flexWrap = 'wrap';
+    container.style.gap = '8px';
+    container.style.marginTop = '5px';
+    
+    // Desktop: SortableJS, Mobile: Custom drag (same as main product)
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth < 768;
+    console.log('initVariantSortable called. Width:', window.innerWidth, 'isMobile:', isMobile);
+    if (!isMobile) {
+        if (typeof Sortable !== 'undefined') {
+            new Sortable(container, {
+                animation: 150,
+                onEnd: function(evt) {
+                    saveVariantImageOrder(variantIndex);
+                }
+            });
+        } else if (typeof $ !== 'undefined' && $.fn.sortable) {
+            $(container).sortable({
+                tolerance: 'pointer',
+                revert: true,
+                stop: function(event, ui) {
+                    saveVariantImageOrder(variantIndex);
+                }
+            }).disableSelection();
+        }
+    } else {
+        // Mobile: Custom touch drag (same as main product images)
+        console.log('Initializing mobile drag for variant', variantIndex);
+        initVariantMobileDrag(variantIndex, container);
+    }
+}
+
+// Mobile drag for variant images (same as main product)
+function initVariantMobileDrag(variantIndex, container) {
+    let draggedItem = null;
+    let startY = 0;
+    let longPressTimer = null;
+    
+    container.querySelectorAll('.variant-sortable-image').forEach(item => {
+        item.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY;
+            const touchItem = this;
+            
+            longPressTimer = setTimeout(() => {
+                draggedItem = touchItem;
+                draggedItem.style.opacity = '0.6';
+                draggedItem.style.transform = 'scale(1.05)';
+                draggedItem.style.zIndex = '1000';
+                draggedItem.style.boxShadow = '0 8px 16px rgba(0,0,0,0.3)';
+            }, 50);
+        }, {passive: true});
         
-        // Remove old listeners
-        thumb.ondragstart = null;
-        thumb.ondragover = null;
-        thumb.ondrop = null;
-        thumb.ondragend = null;
+        item.addEventListener('touchmove', function(e) {
+            if (!draggedItem) {
+                clearTimeout(longPressTimer);
+                return;
+            }
+            
+            e.preventDefault();
+            const touch = e.touches[0];
+            const currentY = touch.clientY;
+            
+            const items = Array.from(container.querySelectorAll('.variant-sortable-image'));
+            items.forEach(otherItem => {
+                if (otherItem === draggedItem) return;
+                
+                const rect = otherItem.getBoundingClientRect();
+                if (currentY >= rect.top && currentY <= rect.bottom) {
+                    const draggedIdx = items.indexOf(draggedItem);
+                    const targetIdx = items.indexOf(otherItem);
+                    
+                    if (draggedIdx < targetIdx) {
+                        container.insertBefore(draggedItem, otherItem.nextSibling);
+                    } else {
+                        container.insertBefore(draggedItem, otherItem);
+                    }
+                }
+            });
+        }, {passive: false});
         
-        // Add new listeners
-        thumb.addEventListener('dragstart', (e) => dragStartVariantImage(e, vIdx, iIdx));
-        thumb.addEventListener('dragover', (e) => dragOverVariantImage(e));
-        thumb.addEventListener('drop', (e) => dropVariantImage(e, vIdx, iIdx));
-        thumb.addEventListener('dragend', (e) => dragEndVariantImage(e));
+        item.addEventListener('touchend', function(e) {
+            clearTimeout(longPressTimer);
+            
+            if (draggedItem) {
+                draggedItem.style.opacity = '1';
+                draggedItem.style.transform = 'scale(1)';
+                draggedItem.style.zIndex = '';
+                draggedItem.style.boxShadow = '';
+                
+                saveVariantImageOrder(variantIndex);
+                
+                draggedItem = null;
+            }
+        });
     });
 }
 
-// Drag and drop handlers for variant images
-let draggedVariantImage = null;
-
-function dragStartVariantImage(event, variantIndex, imageIndex) {
-    draggedVariantImage = { variantIndex, imageIndex };
-    event.target.style.opacity = '0.5';
+// Simple drag-and-drop fallback with touch support
+function initSimpleDragDrop(variantIndex, container) {
+    let draggedItem = null;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const items = container.querySelectorAll('.variant-sortable-image');
+    
+    items.forEach(item => {
+        item.draggable = true;
+        item.style.touchAction = 'none'; // Prevent browser touch behaviors
+        
+        // Desktop drag-and-drop
+        item.addEventListener('dragstart', function(e) {
+            draggedItem = this;
+            this.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (this !== draggedItem) {
+                this.style.borderColor = '#667eea';
+            }
+        });
+        
+        item.addEventListener('dragleave', function() {
+            item.classList.remove('drag-over');
+        });
+        
+        item.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (draggedItem !== this) {
+                const allItems = Array.from(container.children);
+                const draggedIndex = allItems.indexOf(draggedItem);
+                const targetIndex = allItems.indexOf(this);
+                
+                if (draggedIndex < targetIndex) {
+                    container.insertBefore(draggedItem, this.nextSibling);
+                } else {
+                    container.insertBefore(draggedItem, this);
+                }
+                
+                saveVariantImageOrder(variantIndex);
+            }
+        });
+        
+        item.addEventListener('dragend', function(e) {
+            this.style.opacity = '1';
+        });
+        
+        // Mobile touch support - SWIPE BASED
+        let touchStartX = 0;
+        let touchStartIdx = -1;
+        item.addEventListener('touchstart', function(e) {
+          draggedItem = this;
+          touchStartX = e.touches[0].clientX;
+          touchStartIdx = Array.from(items).indexOf(this);
+          this.style.opacity = '0.5';
+          this.style.transform = 'scale(1.05)';
+          e.preventDefault();
+        });
+        
+        item.addEventListener('touchend', function(e) {
+          if (!draggedItem) return;
+          
+          const touchEndX = e.changedTouches[0].clientX;
+          const swipeDistance = touchEndX - touchStartX;
+          const allItems = Array.from(container.children);
+          
+          // Swipe right = move forward, Swipe left = move backward
+          if (Math.abs(swipeDistance) > 30) { // Minimum swipe distance for small images
+            if (swipeDistance > 0 && touchStartIdx < allItems.length - 1) {
+              // Swipe right - move to next position
+              const nextItem = allItems[touchStartIdx + 1];
+              container.insertBefore(draggedItem, nextItem.nextSibling);
+              saveVariantImageOrder(variantIndex);
+            } else if (swipeDistance < 0 && touchStartIdx > 0) {
+              // Swipe left - move to previous position
+              const prevItem = allItems[touchStartIdx - 1];
+              container.insertBefore(draggedItem, prevItem);
+              saveVariantImageOrder(variantIndex);
+            }
+          }
+          
+          // Reset styles
+          container.querySelectorAll('.variant-sortable-image').forEach(img => {
+            img.style.opacity = '1';
+            img.style.transform = 'scale(1)';
+          });
+          
+          draggedItem = null;
+          e.preventDefault();
+        });
+    });
 }
 
-function dragOverVariantImage(event) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+// Save variant image order to database
+function saveVariantImageOrder(variantIndex) {
+    const container = document.getElementById(`variant_images_${variantIndex}`);
+    if (!container) return;
+    
+    const items = container.querySelectorAll('.variant-sortable-image');
+    const imageOrder = Array.from(items).map(item => item.getAttribute('data-image-id'));
+    
+    // Update local variantImages array
+    const newOrder = [];
+    items.forEach((item, idx) => {
+        const imageId = item.getAttribute('data-image-id');
+        const originalImg = variantImages[variantIndex].images.find(img => img.id == imageId);
+        if (originalImg) {
+            newOrder.push(originalImg);
+        }
+    });
+    
+    variantImages[variantIndex].images = newOrder;
+    variantImages[variantIndex].primaryIndex = 0;
+    
+    // Update primary badge
+    updatePrimaryBadgeAfterSort(variantIndex);
+    
+    console.log('Image order updated for variant', variantIndex);
 }
 
-function dropVariantImage(event, targetVariantIndex, targetImageIndex) {
-    event.preventDefault();
+// Update primary badge after sort
+function updatePrimaryBadgeAfterSort(variantIndex) {
+    const container = document.getElementById(`variant_images_${variantIndex}`);
+    if (!container) return;
     
-    if (!draggedVariantImage || draggedVariantImage.variantIndex !== targetVariantIndex) return;
+    // Remove all badges
+    container.querySelectorAll('div').forEach(el => {
+        if (el.textContent === 'PRIMARY') el.remove();
+    });
     
-    const fromIndex = draggedVariantImage.imageIndex;
-    const toIndex = targetImageIndex;
+    // Reset borders
+    container.querySelectorAll('.variant-sortable-image').forEach(img => {
+        img.style.borderColor = '#e5e7eb';
+    });
     
-    if (fromIndex === toIndex) return;
-    
-    // Reorder images
-    const images = variantImages[targetVariantIndex].images;
-    const [movedImage] = images.splice(fromIndex, 1);
-    images.splice(toIndex, 0, movedImage);
-    
-    // First image is always primary
-    variantImages[targetVariantIndex].primaryIndex = 0;
-    
-    // Re-render
-    updateVariantImagePreview(targetVariantIndex);
-}
-
-function dragEndVariantImage(event) {
-    event.target.style.opacity = '1';
-    draggedVariantImage = null;
+    // Add badge to first
+    const first = container.querySelector('.variant-sortable-image');
+    if (first) {
+        first.style.borderColor = '#667eea';
+        const badge = document.createElement('div');
+        badge.textContent = 'PRIMARY';
+        badge.style.cssText = 'position: absolute; top: -6px; left: 4px; background: #667eea; color: white; padding: 1px 4px; border-radius: 8px; font-size: 8px; font-weight: 600;';
+        first.insertBefore(badge, first.firstChild);
+    }
 }
 
 // Remove image from variant
@@ -848,20 +1038,15 @@ function removeVariantImage(variantIndex, imageIndex) {
     if (!variantImages[variantIndex]) return;
     
     const img = variantImages[variantIndex].images[imageIndex];
+    if (!img) return;
     
-    // Check if this is an existing file with ID (from backend)
-    if (img && img.id) {
-        // Add to hidden input for deletion on save
-        const deletedInput = document.getElementById('deleted_variant_files');
-        if (deletedInput) {
-            const current = deletedInput.value ? JSON.parse(deletedInput.value) : [];
-            current.push(img.id);
-            deletedInput.value = JSON.stringify(current);
-            console.log('Variant image marked for deletion:', img.id);
-        }
+    // Track for backend unlinking (if image has DB ID)
+    if (img.id) {
+        unlinkedVariantFiles.add(img.id);
+        console.log('Tracking unlinked file:', img.id);
     }
     
-    // Remove from DOM
+    // Remove from frontend array (no confirmation, just unlink)
     variantImages[variantIndex].images.splice(imageIndex, 1);
     
     // Adjust primary index if needed
@@ -880,7 +1065,7 @@ function removeVariantImage(variantIndex, imageIndex) {
 // Open image picker modal
 let currentVariantIndex = null;
 
-function openImagePicker(variantIndex) {
+async function openImagePicker(variantIndex) {
     currentVariantIndex = variantIndex;
     
     // Initialize variant images if not exists
@@ -888,21 +1073,38 @@ function openImagePicker(variantIndex) {
         variantImages[variantIndex] = { images: [], primaryIndex: 0 };
     }
     
-    // Copy existing images to uploadedImages so they appear in modal
-    const existingImages = variantImages[variantIndex].images || [];
-    // Add existing images to uploadedImages if not already there
-    existingImages.forEach(img => {
-        if (!uploadedImages.find(u => u.url === img.url)) {
-            uploadedImages.push(img);
+    // CLEAR uploadedImages and reload from scratch to prevent duplicates
+    uploadedImages = [];
+    
+    // Load ALL product files (shared pool - includes all variant files)
+    const productId = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
+    if (productId) {
+        try {
+            const response = await fetch(`/marketing/api/get_product_files/?product_id=${productId}`);
+            const data = await response.json();
+            if (data.success && data.files) {
+                // Replace uploadedImages with fresh data from API
+                uploadedImages = data.files.map(file => ({
+                    id: file.id,
+                    url: file.url,
+                    name: file.name,
+                    variant: file.variant || null,  // Include variant info from API
+                    file: null  // No file object needed (already uploaded)
+                }));
+                console.log(`Loaded ${uploadedImages.length} files from shared pool`);
+            }
+        } catch (error) {
+            console.error('Error loading product files:', error);
         }
-    });
+    }
     
     // Create modal
     const modal = document.createElement('div');
     modal.id = 'image_picker_modal';
     modal.className = 'image_modal';
     
-    const selectedImages = variantImages[variantIndex].images.map(img => img.url);
+    // Get currently selected images for this variant (by ID, not URL)
+    const selectedImageIds = variantImages[variantIndex].images.map(img => img.id).filter(id => id);
     const primaryIndex = variantImages[variantIndex].primaryIndex;
     
     modal.innerHTML = `
@@ -922,7 +1124,7 @@ function openImagePicker(variantIndex) {
                     <p>Drag and drop images here</p>
                 </div>
                 <div class="image_grid" id="image_grid">
-                    ${generateImageGrid(selectedImages, primaryIndex)}
+                    ${generateImageGrid(selectedImageIds, primaryIndex)}
                 </div>
             </div>
             <div class="image_modal_footer">
@@ -940,14 +1142,18 @@ function openImagePicker(variantIndex) {
 let uploadedImages = [];
 
 // Generate image grid from uploaded images
-function generateImageGrid(selectedImages, primaryIndex) {
+function generateImageGrid(selectedImageIds, primaryIndex) {
     if (uploadedImages.length === 0) {
         return '<div class="no_images_message"><i class="fa fa-image"></i><p>No images uploaded yet. Use the \"Add File\" button above to add images.</p></div>';
     }
     
     return uploadedImages.map((img, idx) => {
-        const isSelected = selectedImages.includes(img.url);
-        const isPrimary = isSelected && selectedImages.indexOf(img.url) === primaryIndex;
+        // Check if this image is selected by ID (not URL)
+        const isSelected = img.id && selectedImageIds.includes(img.id);
+        const selectedIndex = isSelected ? selectedImageIds.indexOf(img.id) : -1;
+        const isPrimary = isSelected && selectedIndex === primaryIndex;
+        
+        // No variant badges - shared pool
         
         return `
             <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" onclick="toggleImageSelection(this, event)">
@@ -1021,47 +1227,108 @@ function toggleImageSelection(element, event) {
     }
 }
 
-// Handle image upload
-function handleImageUpload(event) {
+// Handle image upload - INSTANT upload to Cloudinary
+async function handleImageUpload(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
     
+    // Get product ID from URL
+    const productId = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
+    if (!productId) {
+        showToast('Product ID not found', 'error');
+        return;
+    }
+    
+    // Get variant ID from table row if variant exists
+    const variantId = getVariantId(currentVariantIndex);
+    console.log('Uploading to variant index:', currentVariantIndex, 'variant ID:', variantId);
+    
+    // Note: Upload to product even if variant doesn't exist yet
+    // Will be linked to variant on form submit
+    
     // Process each file
-    Array.from(files).forEach(file => {
+    for (const file of files) {
         // Check if it's an image
         if (!file.type.startsWith('image/')) {
-            alert(`${file.name} is not an image file.`);
-            return;
+            console.warn(`${file.name} is not an image file.`);
+            continue;
         }
         
-        // Create a FileReader to read the image
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            // Add image to uploaded images array
-            uploadedImages.push({
-                url: e.target.result,
-                name: file.name,
-                file: file
+        // Show progress placeholder
+        const grid = document.getElementById('image_grid');
+        const placeholder = document.createElement('div');
+        placeholder.className = 'image_item uploading';
+        placeholder.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f3f4f6;">
+                <i class="fa fa-spinner fa-spin" style="font-size: 24px; color: #667eea;"></i>
+            </div>
+            <p>Uploading...</p>
+        `;
+        if (grid) grid.appendChild(placeholder);
+        
+        try {
+            // Upload to Cloudinary via backend
+            // Always upload to PRODUCT (not variant) - will link on form submit
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('product_id', productId);
+            // DO NOT send variant_id - we want files to be unlinked until form submit
+            
+            const response = await fetch('/marketing/api/instant_upload_file/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
+                },
+                body: formData
             });
             
-            // Refresh the image grid
-            const grid = document.getElementById('image_grid');
-            if (grid) {
+            const data = await response.json();
+            
+            if (data.success) {
+                // Add to uploadedImages with real URL from Cloudinary
+                // Note: variant info will be null initially (unlinked file)
+                // It will be added when user selects the file for a variant
+                uploadedImages.push({
+                    url: data.file.url,
+                    name: file.name,
+                    file: null, // No longer needed
+                    id: data.file.id, // DB ID for deletion
+                    variant: null // Initially unlinked (added to shared pool)
+                });
+                
+                // Remove placeholder and refresh grid
+                if (placeholder) placeholder.remove();
+                
                 const variantImgs = variantImages[currentVariantIndex];
                 const selectedImages = variantImgs ? variantImgs.images.map(img => img.url) : [];
                 const primaryIndex = variantImgs ? variantImgs.primaryIndex : 0;
-                grid.innerHTML = generateImageGrid(selectedImages, primaryIndex);
+                if (grid) grid.innerHTML = generateImageGrid(selectedImages, primaryIndex);
+                
+                showToast(`✅ ${file.name} uploaded to shared pool!`, 'success');
+            } else {
+                throw new Error(data.error || 'Upload failed');
             }
-        };
-        reader.readAsDataURL(file);
-    });
+        } catch (error) {
+            console.error('Upload error:', error);
+            if (placeholder) placeholder.remove();
+            showToast(`❌ Upload failed: ${error.message}`, 'error');
+        }
+    }
     
     // Clear the input so the same file can be uploaded again if needed
     event.target.value = '';
 }
 
+// Get variant ID from table row
+function getVariantId(variantIndex) {
+    const row = document.querySelector(`tr[data-variant-index="${variantIndex}"]`);
+    const variantId = row ? row.getAttribute('data-variant-id') : null;
+    // Return null if empty string or null
+    return (variantId && variantId.trim()) ? variantId : null;
+}
+
 // Confirm image selection
-function confirmImageSelection() {
+async function confirmImageSelection() {
     const selectedItems = document.querySelectorAll('.image_item.selected');
     
     if (selectedItems.length === 0) {
@@ -1081,7 +1348,8 @@ function confirmImageSelection() {
         images.push({
             url: imageUrl,
             name: imageName,
-            file: uploadedImg ? uploadedImg.file : null
+            file: uploadedImg ? uploadedImg.file : null,
+            id: uploadedImg ? uploadedImg.id : null
         });
     });
     
@@ -1092,6 +1360,10 @@ function confirmImageSelection() {
     };
     
     console.log(`Variant ${currentVariantIndex} images:`, variantImages[currentVariantIndex]);
+    
+    // Note: Images are NOT linked to variant here
+    // They will be linked when form is submitted
+    showToast(`✅ ${images.length} image(s) selected for variant`, 'success');
     
     // Update preview in table
     updateVariantImagePreview(currentVariantIndex);
@@ -1107,11 +1379,48 @@ function updateVariantImagePreview(variantIndex) {
     previewContainer.innerHTML = renderVariantImages(variantIndex);
 }
 
-// Remove uploaded image
-function removeUploadedImage(index, event) {
+// Remove uploaded image - INSTANT delete
+async function removeUploadedImage(index, event) {
     event.stopPropagation(); // Prevent toggling selection
     
-    if (confirm('Are you sure you want to delete this image?')) {
+    const image = uploadedImages[index];
+    if (!image) return;
+    
+    // Use modern confirmation
+    const confirmed = await window.showConfirmDialog(
+        'Delete Image?',
+        'This action cannot be undone.',
+        'Delete',
+        'Cancel'
+    );
+    
+    if (confirmed) {
+        // If image has DB ID, delete from backend
+        if (image.id) {
+            try {
+                const response = await fetch('/marketing/api/instant_delete_file/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
+                    },
+                    body: JSON.stringify({ file_id: image.id })
+                });
+                
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Delete failed');
+                }
+                
+                showToast('🗑️ Image deleted!', 'success');
+            } catch (error) {
+                console.error('Delete error:', error);
+                showToast(`❌ Delete failed: ${error.message}`, 'error');
+                return;
+            }
+        }
+        
+        // Remove from array
         uploadedImages.splice(index, 1);
         
         // Refresh the grid
@@ -1134,11 +1443,14 @@ function closeImagePicker() {
     }
 }
 
+// Track files that were unlinked from variants (deleted from variant images, not from DB)
+let unlinkedVariantFiles = new Set();
+
 // Prepare variants data for form submission
 function prepareVariantsForSubmission() {
     const combinations = generateCombinations();
     if (combinations.length === 0) {
-        return { delete_all_variants: true, deleted_files: [] };
+        return { delete_all_variants: true, deleted_files: Array.from(unlinkedVariantFiles) };
     }
     
     const product_variant_list = [];
@@ -1172,6 +1484,10 @@ function prepareVariantsForSubmission() {
         const variantImg = variantImages[index];
         const hasImages = variantImg && variantImg.images && variantImg.images.length > 0;
         
+        // DEBUG: Log what we found
+        console.log(`prepareVariantsForSubmission: index=${index}, variantImg:`, variantImg);
+        console.log(`  hasImages=${hasImages}, images count=${variantImg?.images?.length || 0}`);
+        
         const variantData = {
             variant_sku: skuInput && skuInput.value ? skuInput.value : variantValues,
             variant_attribute_values: combo,
@@ -1191,12 +1507,18 @@ function prepareVariantsForSubmission() {
                 sequence: imgIdx  // Include sequence order
             }));
             variantData.primary_image_index = variantImg.primaryIndex;
+            console.log(`  ✅ Added ${variantData.variant_images.length} images to variant ${index}`);
+        } else {
+            console.log(`  ⚠️ No images for variant ${index}`);
         }
         
         product_variant_list.push(variantData);
     });
     
-    return { product_variant_list };
+    return { 
+        product_variant_list,
+        deleted_files: Array.from(unlinkedVariantFiles)
+    };
 }
 
 // Handle form submission
@@ -1204,10 +1526,69 @@ document.addEventListener('DOMContentLoaded', () => {
     const productForm = document.getElementById('product_form');
     if (productForm) {
         productForm.addEventListener('submit', function(e) {
+            const submitStartTime = performance.now();
+            console.log('\n=== FORM SUBMIT STARTED ===');
+            
+            // Check for duplicate SKUs before submitting
+            const dupCheckStart = performance.now();
+            const allSkuInputs = document.querySelectorAll('input[name*="variant_sku"]');
+            const skus = [];
+            const duplicates = [];
+            
+            allSkuInputs.forEach(input => {
+                const sku = input.value.trim().toLowerCase();
+                if (sku) {
+                    if (skus.includes(sku)) {
+                        duplicates.push(sku);
+                    } else {
+                        skus.push(sku);
+                    }
+                }
+            });
+            
+            const dupCheckTime = performance.now() - dupCheckStart;
+            console.log(`✓ Duplicate check: ${dupCheckTime.toFixed(2)}ms`);
+            
+            // If duplicates found, prevent submission
+            if (duplicates.length > 0) {
+                e.preventDefault();
+                console.log('❌ Form submission blocked - duplicate SKU found');
+                
+                // Show modern error modal
+                showErrorModal(
+                    'Duplicate SKU Detected',
+                    `Cannot submit form: Duplicate SKU "${duplicates[0]}" found.\n\nEach variant must have a unique SKU. Please correct the duplicate SKU(s) before submitting.`
+                );
+                
+                // Highlight the duplicate SKU inputs
+                allSkuInputs.forEach(input => {
+                    const sku = input.value.trim().toLowerCase();
+                    if (duplicates.includes(sku)) {
+                        input.style.borderColor = 'red';
+                        input.style.backgroundColor = '#fee';
+                        input.focus();
+                    }
+                });
+                
+                return false;
+            }
+            
             // Prepare variants data
+            const prepareStart = performance.now();
+            console.log('\n=== VARIANT IMAGES STATE ===');
+            console.log('variantImages object:', variantImages);
+            Object.keys(variantImages).forEach(key => {
+                console.log(`Variant ${key}:`, variantImages[key]);
+            });
+            console.log('===========================\n');
+            
             const variantsData = prepareVariantsForSubmission();
+            const prepareTime = performance.now() - prepareStart;
+            console.log(`✓ Prepare variants data: ${prepareTime.toFixed(2)}ms`);
+            console.log(`  - ${variantsData.product_variant_list?.length || 0} variants prepared`);
             
             // Create or update hidden input for variants_json
+            const jsonStart = performance.now();
             let variantsInput = document.getElementById('variants_json_input');
             if (!variantsInput) {
                 variantsInput = document.createElement('input');
@@ -1217,13 +1598,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 productForm.appendChild(variantsInput);
             }
             variantsInput.value = JSON.stringify(variantsData);
+            const jsonTime = performance.now() - jsonStart;
+            console.log(`✓ JSON stringify: ${jsonTime.toFixed(2)}ms`);
             
             console.log('Submitting variants data:', variantsData);
             
+            // DEBUG: Log each variant's images
+            if (variantsData.product_variant_list) {
+                variantsData.product_variant_list.forEach((variant, idx) => {
+                    if (variant.variant_images && variant.variant_images.length > 0) {
+                        console.log(`Variant ${idx + 1} (${variant.variant_sku}) has ${variant.variant_images.length} images:`);
+                        variant.variant_images.forEach(img => {
+                            console.log(`  - ID: ${img.id}, URL: ${img.url}`);
+                        });
+                    } else {
+                        console.log(`Variant ${idx + 1} (${variant.variant_sku}) has NO images`);
+                    }
+                });
+            }
+            
             // Handle variant images upload
+            const imagesStart = performance.now();
+            let totalImages = 0;
             if (variantsData.product_variant_list) {
                 variantsData.product_variant_list.forEach((variant, index) => {
                     if (variant.variant_images && variant.variant_images.length > 0) {
+                        totalImages += variant.variant_images.length;
                         console.log(`Processing images for variant ${index + 1}:`, variant.variant_images);
                         
                         // Create file inputs for variant images
@@ -1260,6 +1660,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
+            const imagesTime = performance.now() - imagesStart;
+            console.log(`✓ Process images: ${imagesTime.toFixed(2)}ms (${totalImages} images)`);
+            
+            const totalTime = performance.now() - submitStartTime;
+            console.log(`\n⏱️  TOTAL FORM SUBMIT TIME: ${totalTime.toFixed(2)}ms`);
+            console.log('=== FORM SUBMIT COMPLETED ===\n');
         });
     }
 });
@@ -1269,12 +1675,16 @@ function updateGroupingOptions() {
     const select = document.getElementById('grouping_select');
     if (!select) return;
     
+    // Get unique option names (filter out duplicates)
     const optionNames = Object.values(variantData)
         .filter(d => d.name)
         .map(d => d.name);
     
+    // Remove duplicate names (case-insensitive)
+    const uniqueNames = [...new Set(optionNames.map(n => n.toLowerCase()))];
+    
     // If no options, hide table and grouping
-    if (optionNames.length === 0) {
+    if (uniqueNames.length === 0) {
         const table = document.getElementById('variant_table');
         const grouping = document.getElementById('variant_grouping');
         if (table) table.style.display = 'none';
@@ -1284,7 +1694,7 @@ function updateGroupingOptions() {
     }
     
     let optionsHTML = '';
-    optionNames.forEach(name => {
+    uniqueNames.forEach(name => {
         optionsHTML += `<option value="${name}">${name}</option>`;
     });
     
@@ -1297,9 +1707,47 @@ function updateGroupingOptions() {
 }
 
 // Delete a variant row
-function deleteVariantRow(index) {
-    if (confirm('Are you sure you want to delete this variant?')) {
-        // Mark this index as deleted
+async function deleteVariantRow(index) {
+    // Use modern confirmation from instant_file_manager.js
+    const confirmed = await window.showConfirmDialog(
+        'Delete Variant?',
+        'This variant and all its images will be removed.',
+        'Delete',
+        'Cancel'
+    );
+    
+    if (confirmed) {
+        // Get variant ID from table row
+        const row = document.querySelector(`tr[data-variant-index="${index}"]`);
+        const variantId = row ? row.getAttribute('data-variant-id') : null;
+        
+        // If variant exists in DB, delete via API
+        if (variantId && variantId.trim()) {
+            try {
+                const response = await fetch('/marketing/api/instant_delete_variant/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : getCsrfToken()
+                    },
+                    body: JSON.stringify({ variant_id: variantId })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Delete failed');
+                }
+                
+                showToast('✅ Variant deleted!', 'success');
+            } catch (error) {
+                console.error('Delete error:', error);
+                showToast(`❌ Delete failed: ${error.message}`, 'error');
+                return; // Don't remove from UI if delete failed
+            }
+        }
+        
+        // Mark this index as deleted (for newly created variants not in DB yet)
         deletedVariantIndices.add(index);
         
         // Remove from variantImages if exists
@@ -1307,15 +1755,155 @@ function deleteVariantRow(index) {
             delete variantImages[index];
         }
         
-        // Re-render table without this row
+        // Get the variant's attribute values before removing
+        const combinations = generateCombinations();
+        const deletedVariant = combinations[index];
+        console.log('Deleted variant attributes:', deletedVariant);
+        
+        // Remove the specific row from table using data-variant-index attribute
+        if (row) {
+            row.remove();
+            console.log('Removed row from table');
+        } else {
+            console.warn('Row not found for index:', index);
+        }
+        
+        // Check which values are now unused and remove them from options
+        removeUnusedOptionValues(deletedVariant);
+        
+        // Check if table is empty now (only header left)
         const table = document.getElementById('variant_table');
-        if (table && table.rows[index + 1]) { // +1 because row 0 is header
-            table.rows[index + 1].remove();
+        if (table) {
+            const tbody = table.querySelector('tbody');
+            const remainingRows = tbody ? tbody.querySelectorAll('tr:not(.group_header_row)').length : 0;
+            
+            console.log('Remaining variant rows:', remainingRows);
+            
+            // If no variants left, hide table and grouping
+            if (remainingRows === 0) {
+                table.style.display = 'none';
+                const grouping = document.getElementById('variant_grouping');
+                if (grouping) grouping.style.display = 'none';
+                console.log('No variants left - hiding table');
+            }
         }
         
         console.log('Deleted variant at index:', index);
         console.log('All deleted indices:', Array.from(deletedVariantIndices));
     }
+}
+
+// Helper function to get CSRF token (fallback if window.getCookie doesn't exist)
+function getCsrfToken() {
+    const name = 'csrftoken';
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Remove option values that are no longer used by any remaining variants
+function removeUnusedOptionValues(deletedVariant) {
+    if (!deletedVariant) return;
+    
+    // Get all remaining combinations (excluding deleted ones)
+    const remainingCombinations = generateCombinations().filter((_, idx) => !deletedVariantIndices.has(idx));
+    
+    console.log('Remaining combinations:', remainingCombinations.length);
+    
+    // For each attribute in the deleted variant
+    Object.entries(deletedVariant).forEach(([optionName, optionValue]) => {
+        // Check if this value is still used by any remaining variant
+        const isValueStillUsed = remainingCombinations.some(combo => 
+            combo[optionName] && combo[optionName].toLowerCase() === optionValue.toLowerCase()
+        );
+        
+        if (!isValueStillUsed) {
+            console.log(`Value "${optionValue}" for option "${optionName}" is no longer used - removing`);
+            
+            // Find the option in variantData
+            const optionId = Object.keys(variantData).find(id => 
+                variantData[id].name && variantData[id].name.toLowerCase() === optionName.toLowerCase()
+            );
+            
+            if (optionId && variantData[optionId]) {
+                // Remove the value from variantData
+                const valueIndex = variantData[optionId].values.findIndex(v => 
+                    v && v.toLowerCase() === optionValue.toLowerCase()
+                );
+                
+                if (valueIndex !== -1) {
+                    variantData[optionId].values.splice(valueIndex, 1);
+                    console.log(`Removed value from variantData`);
+                    
+                    // Remove the value field from DOM
+                    const valuesList = document.getElementById(`${optionId}_values`);
+                    if (valuesList) {
+                        const valueField = valuesList.querySelector(`[data-value-index="${valueIndex}"]`);
+                        if (valueField) {
+                            valueField.remove();
+                            console.log(`Removed value field from DOM`);
+                            
+                            // Reindex remaining fields
+                            Array.from(valuesList.children).forEach((child, idx) => {
+                                child.setAttribute('data-value-index', idx);
+                                const input = child.querySelector('.value_input');
+                                if (input) {
+                                    input.setAttribute('oninput', `updateOptionValue('${optionId}', ${idx}, this.value)`);
+                                }
+                                const btn = child.querySelector('.btn_remove_value');
+                                if (btn) {
+                                    btn.setAttribute('onclick', `removeValue('${optionId}', ${idx})`);
+                                }
+                            });
+                        }
+                    }
+                    
+                    // If no values left for this option, remove the entire option
+                    const remainingValues = variantData[optionId].values.filter(v => v && v.trim());
+                    if (remainingValues.length === 0) {
+                        console.log(`No values left for option "${optionName}" - removing option`);
+                        removeOption(optionId);
+                    }
+                }
+            }
+        }
+    });
+    
+    // Regenerate table with updated options
+    updateVariantTable();
+    updateGroupingOptions();
+}
+
+
+// Show toast notification
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-size: 14px;
+        animation: slideInRight 0.3s, slideOutRight 0.3s 2.7s;
+    `;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    setTimeout(() => document.body.removeChild(toast), 3000);
 }
 
 // Debug helper - expose to console
@@ -1325,5 +1913,269 @@ window.debugVariantImages = function() {
     console.log('variantImages:', variantImages);
     console.log('variantData:', variantData);
 };
+
+// Modern error modal
+function showErrorModal(title, message) {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        animation: fadeIn 0.2s;
+    `;
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 0;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: slideIn 0.3s;
+    `;
+    
+    modal.innerHTML = `
+        <div style="padding: 24px; border-bottom: 1px solid #e5e7eb;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 48px; height: 48px; border-radius: 50%; background: #fee; display: flex; align-items: center; justify-content: center;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #111;">${title}</h3>
+            </div>
+        </div>
+        <div style="padding: 24px;">
+            <p style="margin: 0; line-height: 1.6; color: #374151; white-space: pre-line;">${message}</p>
+        </div>
+        <div style="padding: 16px 24px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end;">
+            <button id="modal-close-btn" style="
+                background: #ef4444;
+                color: white;
+                border: none;
+                padding: 10px 24px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+            ">OK</button>
+        </div>
+    `;
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    // Add animations
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        #modal-close-btn:hover {
+            background: #dc2626 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Close modal on button click
+    const closeBtn = overlay.querySelector('#modal-close-btn');
+    closeBtn.onclick = () => {
+        overlay.style.animation = 'fadeOut 0.2s';
+        setTimeout(() => {
+            document.body.removeChild(overlay);
+            document.head.removeChild(style);
+        }, 200);
+    };
+    
+    // Close on overlay click
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            closeBtn.click();
+        }
+    };
+}
+
+// Real-time duplicate detection for option names, values and SKUs
+console.log('Duplicate detection loaded for modern variant form!');
+
+document.addEventListener('input', function(e) {
+    const target = e.target;
+    
+    // Check option name inputs
+    if (target.classList.contains('option_name_field')) {
+        checkDuplicateOptionName(target);
+    }
+    
+    // Check option value inputs  
+    if (target.classList.contains('value_input')) {
+        checkDuplicateOptionValue(target);
+    }
+    
+    // Check SKU inputs in variant table
+    if (target.name && target.name.includes('variant_sku')) {
+        checkDuplicateSku(target);
+    }
+});
+
+function checkDuplicateOptionName(input) {
+    const currentValue = input.value.trim().toLowerCase();
+    
+    // Remove existing error message
+    let errorMsg = input.parentElement.querySelector('.duplicate-error');
+    if (errorMsg) errorMsg.remove();
+    
+    if (!currentValue) {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return false;
+    }
+    
+    const allOptionNames = document.querySelectorAll('.option_name_field');
+    let isDuplicate = false;
+    
+    allOptionNames.forEach(otherInput => {
+        if (otherInput !== input && otherInput.value.trim().toLowerCase() === currentValue) {
+            isDuplicate = true;
+        }
+    });
+    
+    if (isDuplicate) {
+        input.style.color = 'red';
+        input.style.borderColor = 'red';
+        input.style.backgroundColor = '#fee';
+        
+        // Add error message below input
+        const error = document.createElement('div');
+        error.className = 'duplicate-error';
+        error.style.cssText = 'color: red; font-size: 12px; margin-top: 4px;';
+        error.textContent = '⚠️ This option name already exists';
+        input.parentElement.appendChild(error);
+        
+        return true; // Is duplicate
+    } else {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return false; // Not duplicate
+    }
+}
+
+function checkDuplicateOptionValue(input) {
+    const currentValue = input.value.trim().toLowerCase();
+    
+    // Remove existing error message
+    let errorMsg = input.parentElement.querySelector('.duplicate-error');
+    if (errorMsg) errorMsg.remove();
+    
+    if (!currentValue) {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return false;
+    }
+    
+    // Get the parent option card to find sibling values
+    const optionCard = input.closest('.variant_option_card');
+    if (!optionCard) return false;
+    
+    const allValues = optionCard.querySelectorAll('.value_input');
+    let isDuplicate = false;
+    
+    allValues.forEach(otherInput => {
+        if (otherInput !== input && otherInput.value.trim().toLowerCase() === currentValue) {
+            isDuplicate = true;
+        }
+    });
+    
+    if (isDuplicate) {
+        input.style.color = 'red';
+        input.style.borderColor = 'red';
+        input.style.backgroundColor = '#fee';
+        
+        // Add error message below input
+        const error = document.createElement('div');
+        error.className = 'duplicate-error';
+        error.style.cssText = 'color: red; font-size: 12px; margin-top: 4px;';
+        error.textContent = '⚠️ This value already exists';
+        input.parentElement.appendChild(error);
+        
+        return true; // Is duplicate
+    } else {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return false; // Not duplicate
+    }
+}
+
+function checkDuplicateSku(input) {
+    const currentValue = input.value.trim().toLowerCase();
+    
+    // Remove existing error message
+    const cell = input.closest('td');
+    if (cell) {
+        let errorMsg = cell.querySelector('.duplicate-error');
+        if (errorMsg) errorMsg.remove();
+    }
+    
+    if (!currentValue) {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return false;
+    }
+    
+    const allSkus = document.querySelectorAll('input[name*="variant_sku"]');
+    let isDuplicate = false;
+    
+    allSkus.forEach(otherInput => {
+        if (otherInput !== input && otherInput.value.trim().toLowerCase() === currentValue) {
+            isDuplicate = true;
+        }
+    });
+    
+    if (isDuplicate) {
+        input.style.color = 'red';
+        input.style.borderColor = 'red';
+        input.style.backgroundColor = '#fee';
+        
+        // Add error message below input
+        if (cell) {
+            const error = document.createElement('div');
+            error.className = 'duplicate-error';
+            error.style.cssText = 'color: red; font-size: 11px; margin-top: 4px;';
+            error.textContent = '⚠️ Duplicate SKU';
+            cell.appendChild(error);
+        }
+        
+        return true; // Is duplicate
+    } else {
+        input.style.color = '';
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        return false; // Not duplicate
+    }
+}
 
 

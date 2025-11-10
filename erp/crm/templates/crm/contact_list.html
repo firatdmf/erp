@@ -1,13 +1,500 @@
 {% extends "base.html" %}
-{% block content %}
-<p><a href="{% url 'crm:index' %}"><--- Go to CRM home page</a></p>
-    <h1>Contact List</h1>
-    <ul>
-        {% for contact in contacts %}
+{% load static %}
 
-        <li><a href="{% url 'crm:contact_detail' contact.id%}">{{contact.name}}</a></li>
+{% block css %}
+<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
+{% endblock %}
+
+{% block content %}
+<div class="product-list-container">
+  <!-- Header Section -->
+  <div class="page-header">
+    <div class="header-left">
+      <h1>Contacts</h1>
+      <span class="product-count">{{ paginator.count|default:contacts.count }} contact{{ paginator.count|default:contacts.count|pluralize }}</span>
+    </div>
+    <div class="header-right">
+      <a href="#" onclick="openMainContactSidebar(); return false;" class="btn btn-primary">
+        <i class="fa fa-plus"></i>
+        Add Contact
+      </a>
+    </div>
+  </div>
+
+  <!-- Search Section -->
+  <div class="search-section">
+    <div class="search-box-modern">
+      <i class="fa fa-search search-icon"></i>
+      <input 
+        type="text" 
+        id="instantSearch" 
+        placeholder="Search contacts by name, email, or phone..." 
+        class="search-input-modern"
+        autocomplete="off"
+      >
+      <button type="button" class="search-clear" id="searchClear" style="display: none;" onclick="clearSearch()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Contacts Table -->
+  <div class="table-container">
+    <table class="products-table">
+      <thead>
+        <tr>
+          <th style="width: 60px;">Icon</th>
+          <th>Name</th>
+          <th style="width: 180px;">Email</th>
+          <th style="width: 150px;">Phone</th>
+          <th style="width: 200px;">Company</th>
+          <th style="width: 120px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="contactsTableBody">
+        {% for contact in contacts %}
+        <tr class="product-row" id="contact-row-{{ contact.id }}" onclick="window.location='{% url 'crm:contact_detail' contact.id %}'" style="cursor: pointer;">
+          <td>
+            <div class="product-image-placeholder">
+              <i class="fa fa-user"></i>
+            </div>
+          </td>
+          <td>
+            <div class="product-info">
+              <div class="product-title">{{ contact.name }}</div>
+              {% if contact.title %}
+                <div class="product-description">{{ contact.title }}</div>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            {% if contact.email %}
+              <span class="text-muted" style="font-size: 0.875rem;">{{ contact.email|first }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if contact.phone %}
+              <span class="text-muted" style="font-size: 0.875rem;">{{ contact.phone|first }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if contact.company %}
+              <span class="badge badge-category">{{ contact.company.name }}</span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="action-buttons" onclick="event.stopPropagation();">
+              <a href="{% url 'crm:contact_detail' contact.id %}" class="btn-icon" title="View">
+                <i class="fa fa-eye"></i>
+              </a>
+              <a href="{% url 'crm:update_contact' contact.id %}" class="btn-icon" title="Edit">
+                <i class="fa fa-edit"></i>
+              </a>
+              <button type="button" class="btn-icon btn-delete" onclick="openDeleteModal({{ contact.id }}, '{{ contact.name|escapejs }}')", title="Delete">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
         {% empty %}
-        <li>No contacts available.</li>
+        <tr>
+          <td colspan="6" class="empty-state">
+            <div class="empty-state-content">
+              <i class="fa fa-user"></i>
+              <p>No contacts found</p>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
-    </ul>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if is_paginated %}
+  <div class="pagination-container">
+    <div class="pagination-info">
+      Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} contacts
+    </div>
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a href="?page=1" class="pagination-btn" title="First"><i class="fa fa-angles-left"></i></a>
+        <a href="?page={{ page_obj.previous_page_number }}" class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
+      {% else %}
+        <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
+        <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
+      {% endif %}
+
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+          <span class="pagination-btn active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <a href="?page={{ num }}" class="pagination-btn">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
+        <a href="?page={{ paginator.num_pages }}" class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
+      {% else %}
+        <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
+        <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 0;
+  margin-top: 1rem;
+}
+
+.pagination-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.pagination {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.pagination-btn:hover:not(.disabled):not(.active) {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.pagination-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+  font-weight: 600;
+}
+
+.pagination-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Modern Delete Modal & Styles */
+.delete-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.delete-modal.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.delete-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.delete-modal-content {
+  position: relative;
+  background: white;
+  border-radius: 16px;
+  max-width: 480px;
+  width: 90%;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+}
+
+.delete-modal.show .delete-modal-content {
+  transform: scale(1);
+}
+
+.delete-modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.delete-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  background: #fef2f2;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-icon-wrapper i {
+  font-size: 32px;
+  color: #dc2626;
+}
+
+.delete-modal-header h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px;
+}
+
+.delete-modal-header p {
+  font-size: 15px;
+  color: #6b7280;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.delete-modal-header p span {
+  font-weight: 600;
+  color: #111827;
+}
+
+.warning-text {
+  font-size: 13px !important;
+  color: #dc2626 !important;
+  background: #fef2f2;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 16px !important;
+}
+
+.delete-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.delete-modal-footer .btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-modal-footer .btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.delete-modal-footer .btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.delete-modal-footer .btn-danger {
+  background: #dc2626;
+  color: white;
+}
+
+.delete-modal-footer .btn-danger:hover {
+  background: #b91c1c;
+}
+
+.btn-delete {
+  color: #dc2626 !important;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: #fef2f2 !important;
+  transform: scale(1.1);
+}
+</style>
+
+<!-- Modern Delete Modal -->
+<div id="deleteModal" class="delete-modal">
+  <div class="delete-modal-overlay" onclick="closeDeleteModal()"></div>
+  <div class="delete-modal-content">
+    <div class="delete-modal-header">
+      <div class="delete-icon-wrapper">
+        <i class="fa fa-exclamation-triangle"></i>
+      </div>
+      <h3>Delete Contact</h3>
+      <p>Are you sure you want to delete "<span id="deleteContactName"></span>"?</p>
+      <p class="warning-text">This action cannot be undone.</p>
+    </div>
+    <div class="delete-modal-footer">
+      <button type="button" class="btn btn-cancel" onclick="closeDeleteModal()">
+        Cancel
+      </button>
+      <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+        <i class="fa fa-trash"></i>
+        Delete Contact
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Simple search functionality
+const searchInput = document.getElementById('instantSearch');
+const searchClear = document.getElementById('searchClear');
+const tbody = document.getElementById('contactsTableBody');
+const allRows = Array.from(tbody.querySelectorAll('tr'));
+
+if (searchInput) {
+  searchInput.addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase().trim();
+    searchClear.style.display = query ? 'flex' : 'none';
+    
+    allRows.forEach(row => {
+      if (row.querySelector('.empty-state')) return;
+      
+      const name = row.querySelector('.product-title')?.textContent.toLowerCase() || '';
+      const email = row.cells[2]?.textContent.toLowerCase() || '';
+      const phone = row.cells[3]?.textContent.toLowerCase() || '';
+      const company = row.cells[4]?.textContent.toLowerCase() || '';
+      
+      const matches = name.includes(query) || email.includes(query) || phone.includes(query) || company.includes(query);
+      row.style.display = matches ? '' : 'none';
+    });
+  });
+}
+
+function clearSearch() {
+  searchInput.value = '';
+  searchClear.style.display = 'none';
+  allRows.forEach(row => row.style.display = '');
+}
+
+// Delete Modal Functions
+let currentDeleteContactId = null;
+
+function openDeleteModal(contactId, contactName) {
+  currentDeleteContactId = contactId;
+  document.getElementById('deleteContactName').textContent = contactName;
+  document.getElementById('deleteModal').classList.add('show');
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('show');
+  currentDeleteContactId = null;
+}
+
+function confirmDelete() {
+  if (!currentDeleteContactId) return;
+  
+  const contactId = currentDeleteContactId;
+  closeDeleteModal();
+  
+  // Optimistic UI - Animate row deletion
+  const row = document.getElementById(`contact-row-${contactId}`);
+  if (row) {
+    row.style.transition = 'all 0.3s ease';
+    row.style.backgroundColor = '#fee2e2';
+    row.style.transform = 'translateX(-20px)';
+    row.style.opacity = '0';
+    
+    setTimeout(() => {
+      row.remove();
+      
+      // Update contact count
+      const countEl = document.querySelector('.product-count');
+      if (countEl) {
+        const match = countEl.textContent.match(/\d+/);
+        if (match) {
+          const currentCount = parseInt(match[0]);
+          const newCount = currentCount - 1;
+          countEl.textContent = `${newCount} contact${newCount !== 1 ? 's' : ''}`;
+        }
+      }
+      
+      // Show empty state if no contacts left
+      const tbody = document.getElementById('contactsTableBody');
+      if (tbody && tbody.querySelectorAll('tr:not(.empty-state)').length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="empty-state">
+              <div class="empty-state-content">
+                <i class="fa fa-user"></i>
+                <p>No contacts found</p>
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+    }, 300);
+  }
+  
+  // Delete in background
+  fetch(`/crm/contact/delete/${contactId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+      'Content-Type': 'application/json'
+    }
+  }).catch(error => {
+    console.error('Background delete error:', error);
+  });
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Close modal on ESC key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeDeleteModal();
+  }
+});
+</script>
 {% endblock %}

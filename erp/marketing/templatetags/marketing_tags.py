@@ -18,29 +18,31 @@ class DecimalEncoder(json.JSONEncoder):
 
 @register.simple_tag
 def variant_form(variants, product, current_url):
+    tag_start = time.time()
     product_variant_list = []
     variant_files_dict = {}
 
     if variants:
         for variant in variants:
-            # Collect files ordered by sequence
-            files = variant.files.order_by('sequence', 'pk').all()
+            # Use prefetched data - files are already ordered in prefetch
+            files = variant.files.all()
             variant_files_dict[str(variant.variant_sku)] = [
                 {"id": f.id, "url": f.file_url, "name": f.file_url.split("/")[-1]}
                 for f in files
             ]
 
-            # Collect attribute values (use correct related name)
+            # Use prefetched attribute values
             attribute_values = variant.product_variant_attribute_values.all()
             variant_attribute_values = {
                 av.product_variant_attribute.name: av.product_variant_attribute_value
                 for av in attribute_values
             }
-            print(f"Variant {variant.variant_sku}: {variant_attribute_values}")  # Debug
+            # Removed debug print for performance
 
             # Build the variant dict
             product_variant_list.append(
                 {
+                    "variant_id": variant.id,
                     "variant_sku": variant.variant_sku,
                     "variant_attribute_values": variant_attribute_values,
                     "variant_price": variant.variant_price,
@@ -96,6 +98,10 @@ def variant_form(variants, product, current_url):
         product_variant_options = json.dumps({}, cls=DecimalEncoder)
         variant_files_json = json.dumps({}, cls=DecimalEncoder)
 
+    tag_time = time.time() - tag_start
+    if tag_time > 0.1:
+        print(f"⚠️  variant_form tag took {tag_time:.4f}s")
+    
     return render_to_string(
         "marketing/components/variant_form.html",
         {

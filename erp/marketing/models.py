@@ -1,5 +1,6 @@
 from django.db import models
 import os
+import time
 
 # Standardized labels used to identify the nature and format of a file's content
 import mimetypes
@@ -324,9 +325,9 @@ class ProductVariant(models.Model):
 
     @property
     def full_name(self):
-        attribute_values = self.attribute_values.select_related("attribute")
+        attribute_values = self.product_variant_attribute_values.select_related("product_variant_attribute")
         values = [
-            f"{v.attribute.name.capitalize()}: {v.value}" for v in attribute_values
+            f"{v.product_variant_attribute.name.capitalize()}: {v.product_variant_attribute_value}" for v in attribute_values
         ]
         return f"{self.product.title} - {' / '.join(values)}"
 
@@ -344,7 +345,7 @@ class ProductVariant(models.Model):
     # This is to record the attributes of the product variant and show them in the admin panel.
     def attribute_summary(self):
         # Get all attribute values for this variant
-        values = self.attribute_values.select_related("product_variant_attribute")
+        values = self.product_variant_attribute_values.select_related("product_variant_attribute")
         return ", ".join(
             f"{v.product_variant_attribute.name}: {v.product_variant_attribute_value}"
             for v in values
@@ -374,9 +375,12 @@ class ProductVariantAttributeValue(models.Model):
             "product_variant_attribute",
             "product_variant_attribute_value",
         )
+        indexes = [
+            models.Index(fields=['product_variant_attribute']),  # Fast attribute lookup
+        ]
 
     product_variant_attribute = models.ForeignKey(
-        ProductVariantAttribute, on_delete=models.CASCADE
+        ProductVariantAttribute, on_delete=models.CASCADE, db_index=True
     )
     product_variant_attribute_value = models.CharField(
         max_length=255, verbose_name="Attribute Value", db_index=True
@@ -472,26 +476,53 @@ class ProductFile(models.Model):
         # Insert transformations right after /upload/
         optimized_path = parts.path.replace("/upload/", "/upload/f_auto,q_auto/")
         return urlunparse(parts._replace(path=optimized_path))
+    
+    @property
+    def thumbnail_url(self):
+        """
+        Returns optimized thumbnail URL for list views (80x80, low quality).
+        Drastically reduces file size: 300KB → ~5KB!
+        """
+        if not self.file_url:
+            return None
+        
+        parts = urlparse(self.file_url)
+        # Aggressive optimization for list view thumbnails
+        optimized_path = parts.path.replace(
+            "/upload/", 
+            "/upload/w_80,h_80,c_fill,f_auto,q_auto:low/"
+        )
+        return urlunparse(parts._replace(path=optimized_path))
 
     # only works on single delete, not bulk delete. For bulk we use signals.py
     def delete(self, *args, **kwargs):
-        print("now deleting the file with pk:", self.pk)
+        start = time.perf_counter()
+        print(f"🗑️ ProductFile.delete(pk={self.pk}) called")
         """
         Extracts public_id from a Cloudinary URL and deletes it.
+        SKIP Cloudinary deletion if skip_cloudinary=True (for async cleanup).
         """
-        if self.file_url:
+        skip_cloudinary = kwargs.pop('skip_cloudinary', False)
+        
+        if self.file_url and not skip_cloudinary:
             match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", self.file_url)
             if match:
                 public_id = match.group(1)  # e.g. "media/product_images/sku123/file1"
                 try:
+                    c_start = time.perf_counter()
                     cloudinary_destroy(public_id)
+                    print(f"   ✅ Cloudinary destroy({public_id}) took {(time.perf_counter()-c_start):.3f}s")
                 except Exception as e:
-                    print(f"Failed to delete Cloudinary resource {public_id}: {e}")
+                    print(f"   ❌ Failed to delete Cloudinary resource {public_id}: {e}")
             else:
-                print("Could not extract public_id from URL")
+                print("   ⚠️ Could not extract public_id from URL")
+        elif skip_cloudinary:
+            print(f"   ⚡ Skipped Cloudinary deletion for pk={self.pk} (will be cleaned up async)")
 
         # finally delete the DB record
+        db_start = time.perf_counter()
         super().delete(*args, **kwargs)
+        print(f"   🗃️ DB delete took {(time.perf_counter()-db_start):.3f}s | TOTAL {(time.perf_counter()-start):.3f}s")
 
     def __str__(self):
         # return f"{self.product or self.product_variant}"

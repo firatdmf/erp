@@ -122,6 +122,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
+    "erp.middleware.PerformanceLoggingMiddleware",  # Performance monitoring
     # "allauth.account.middleware.AccountMiddleware",
 ]
 
@@ -141,8 +142,9 @@ TEMPLATES = [
                 # The below helps to put the view function variable global in all templates
                 "erp.context_processors.last_ten_entities",
                 "erp.context_processors.client_groups",
-                "erp.context_processors.product_categories",
-                "erp.context_processors.suppliers",
+                # Removed: product_categories and suppliers - not used in base.html
+                # "erp.context_processors.product_categories",
+                # "erp.context_processors.suppliers",
             ],
         },
     },
@@ -174,6 +176,12 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),  # an empty string means localhost
         "PORT": config("DB_PORT"),
+        # Connection pooling for better performance
+        "CONN_MAX_AGE": 600,  # Keep connections alive for 10 minutes
+        "OPTIONS": {
+            # PostgreSQL specific optimizations
+            "connect_timeout": 10,
+        },
         "TEST": {
             "NAME": "nejum_test",  # test DB
         },

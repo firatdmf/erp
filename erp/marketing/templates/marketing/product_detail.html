@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'erp/css/product_detail.css' %}?v=1.0" />
+<link rel="stylesheet" href="{% static 'erp/css/product_detail.css' %}?v=2.0" />
 {% endblock %}
 
 {% block content %}
@@ -50,9 +50,9 @@
         {% endif %}
       </div>
       
-      {% if product.files.all %}
+      {% if product_files %}
       <div class="image-thumbnails">
-        {% for file in product.files.all|dictsort:"sequence" %}
+        {% for file in product_files %}
           <div class="thumbnail {% if forloop.first %}active{% endif %}" onclick="changeImage('{{ file.file_url }}', this)">
             <img src="{{ file.file_url }}" alt="Thumbnail {{ forloop.counter }}">
           </div>
@@ -131,11 +131,11 @@
       {% endif %}
 
       <!-- Collections -->
-      {% if product.collections.all %}
+      {% if product_collections %}
       <div class="info-section">
         <h2>Collections</h2>
         <div class="collections-container">
-          {% for collection in product.collections.all %}
+          {% for collection in product_collections %}
             <span class="collection-badge">{{ collection.title }}</span>
           {% endfor %}
         </div>
@@ -157,9 +157,9 @@
   </div>
 
   <!-- Variants Section -->
-  {% if product.variants.all %}
+  {% if product_variants %}
   <div class="variants-section">
-    <h2>Product Variants ({{ product.variants.count }})</h2>
+    <h2>Product Variants ({{ product_variants|length }})</h2>
     <div class="table-container">
       <table class="variants-table">
         <thead>
@@ -174,12 +174,12 @@
           </tr>
         </thead>
         <tbody>
-          {% for variant in product.variants.all %}
+          {% for variant in product_variants %}
           <tr>
             <td>
-              {% with variant.files.all|dictsort:"sequence" as sorted_files %}
-                {% if sorted_files %}
-                  <img src="{{ sorted_files.0.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
+              {% with variant.files.all.0 as first_file %}
+                {% if first_file %}
+                  <img src="{{ first_file.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
                 {% else %}
                   <div class="variant-image-placeholder">
                     <i class="fa fa-image"></i>
@@ -222,5 +222,43 @@ function changeImage(url, thumbnail) {
   document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
   thumbnail.classList.add('active');
 }
+
+// Async Cloudinary cleanup - runs after page load
+(function() {
+  // Check if there are files to cleanup from session
+  {% if request.session.cloudinary_cleanup_urls %}
+  const urlsToDelete = {{ request.session.cloudinary_cleanup_urls|safe }};
+  
+  if (urlsToDelete && urlsToDelete.length > 0) {
+    console.log(`🗑️ Cleaning up ${urlsToDelete.length} Cloudinary files in background...`);
+    
+    // Send async delete request
+    fetch('{% url "marketing:async_delete_cloudinary_files" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({
+        file_urls: urlsToDelete
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        console.log(`✅ Successfully deleted ${data.deleted} Cloudinary files`);
+        if (data.errors && data.errors.length > 0) {
+          console.warn('⚠️ Some files failed to delete:', data.errors);
+        }
+      } else {
+        console.error('❌ Cloudinary cleanup failed:', data.error);
+      }
+    })
+    .catch(error => {
+      console.error('❌ Network error during Cloudinary cleanup:', error);
+    });
+  }
+  {% endif %}
+})();
 </script>
 {% endblock %}

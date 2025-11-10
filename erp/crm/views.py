@@ -9,7 +9,7 @@ from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm
 from todo.forms import TaskForm
 from itertools import chain
 from operator import attrgetter
-from django.db.models import Value, CharField
+from django.db.models import Value, CharField, Count
 from django.middleware.csrf import get_token
 
 # we need the below library to avoid saving any database queries in case there are any errors in view functions.
@@ -48,6 +48,11 @@ class ContactList(generic.ListView):
     model = Contact
     template_name = "crm/contact_list.html"
     context_object_name = "contacts"
+    paginate_by = 25  # Show 25 contacts per page
+    
+    def get_queryset(self):
+        # Prefetch company to avoid N+1 queries
+        return Contact.objects.select_related('company').order_by('name')
 
 
 class CompanyList(generic.ListView):
@@ -55,6 +60,13 @@ class CompanyList(generic.ListView):
     # number_of_companies = len(Company.objects.all())
     template_name = "crm/company_list.html"
     context_object_name = "companies"
+    paginate_by = 25  # Show 25 companies per page
+    
+    def get_queryset(self):
+        # Annotate with contacts count to avoid N+1 queries
+        return Company.objects.annotate(
+            contacts_count=Count('contacts')
+        ).order_by('name')
 
 
 class ContactCreate(generic.edit.CreateView):
@@ -383,14 +395,24 @@ def delete_company(request, pk):
         company = get_object_or_404(Company, pk=pk)
         company_name = company.name
         company.delete()
-        # below line brings back the user to the current page
-        # return render(request,'crm/index.html',{"message":f"Company, {company_name}, has been successfully deleted."})
+        
+        # Return JSON response for AJAX requests
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+            return JsonResponse({'success': True, 'message': f'Company {company_name} deleted'})
+        
         return redirect("crm:company_list")
 
 
 def delete_contact(request, pk):
-    contact = get_object_or_404(Contact, pk=pk)
-    contact.delete()
+    if request.method == "POST":
+        contact = get_object_or_404(Contact, pk=pk)
+        contact_name = contact.name
+        contact.delete()
+        
+        # Return JSON response for AJAX requests
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+            return JsonResponse({'success': True, 'message': f'Contact {contact_name} deleted'})
+    
     return redirect("crm:contact_list")
 
 

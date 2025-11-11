@@ -166,47 +166,88 @@ class CompanyCreate(generic.edit.CreateView):
 
     def form_valid(self, form):
         from django.http import JsonResponse
-        #  # Save the form data to create the Company instance but do not commit yet because there might be duplicates
-        self.object = form.save(commit=False)
-        self.object.save()
+        from .models import CompanyFollowUp
+        from .email_utils import send_followup_email
+        from django.db import connection
+        import logging
         
-        # Attach contact if selected
-        contact_id = form.cleaned_data.get("contact_id")
-        if contact_id:
-            try:
-                contact = Contact.objects.get(pk=contact_id)
-                contact.company = self.object
-                contact.save()
-            except Contact.DoesNotExist:
-                pass
+        logger = logging.getLogger(__name__)
         
-        # Save the note if it exists
-        note_content = form.cleaned_data.get("note_content")
-        if note_content:
-            Note.objects.create(company=self.object, content=note_content)
+        try:
+            #  # Save the form data to create the Company instance but do not commit yet because there might be duplicates
+            self.object = form.save(commit=False)
+            self.object.save()
+            
+            # Attach contact if selected
+            contact_id = form.cleaned_data.get("contact_id")
+            if contact_id:
+                try:
+                    contact = Contact.objects.get(pk=contact_id)
+                    contact.company = self.object
+                    contact.save()
+                except Contact.DoesNotExist:
+                    pass
+            
+            # Save the note if it exists
+            note_content = form.cleaned_data.get("note_content")
+            if note_content:
+                Note.objects.create(company=self.object, content=note_content)
 
-        # Save the task if all required fields are provided
-        task_name = form.cleaned_data.get("task_name")
-        task_due_date = form.cleaned_data.get("task_due_date")
-        if task_name and task_due_date:
-            task_description = form.cleaned_data.get("task_description", "")
-            Task.objects.create(
-                name=task_name,
-                due_date=task_due_date,
-                description=task_description,
-                company=self.object,
-                member=self.request.user.member,
-            )
-        
-        # Check if AJAX request
-        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'redirect_url': self.get_success_url()
-            })
-        
-        # return super().form_valid(form)
-        return HttpResponseRedirect(self.get_success_url())
+            # Save the task if all required fields are provided
+            task_name = form.cleaned_data.get("task_name")
+            task_due_date = form.cleaned_data.get("task_due_date")
+            if task_name and task_due_date:
+                task_description = form.cleaned_data.get("task_description", "")
+                Task.objects.create(
+                    name=task_name,
+                    due_date=task_due_date,
+                    description=task_description,
+                    company=self.object,
+                    member=self.request.user.member,
+                )
+            
+            # Handle follow-up email sending if enabled
+            send_emails = form.cleaned_data.get("send_followup_emails", False)
+            if send_emails and self.object.status == "prospect" and self.object.email:
+                # Create follow-up tracking
+                followup = CompanyFollowUp.objects.create(company=self.object)
+                
+                # Close database connection before sending email to avoid "connection already closed" error
+                connection.close()
+                
+                # Send the first email immediately
+                logger.info(f"Sending initial email to {self.object.name} ({self.object.email})")
+                try:
+                    success = send_followup_email(self.object, email_number=1)
+                    
+                    if success:
+                        # Mark the first email as sent
+                        followup.mark_email_sent()
+                        logger.info(f"Initial email sent successfully to {self.object.name}")
+                    else:
+                        logger.error(f"Failed to send initial email to {self.object.name}")
+                except Exception as e:
+                    logger.error(f"Error sending initial email to {self.object.name}: {str(e)}")
+            
+            # Check if AJAX request
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'redirect_url': self.get_success_url(),
+                    'company_name': self.object.name
+                })
+            
+            # return super().form_valid(form)
+            return HttpResponseRedirect(self.get_success_url())
+            
+        except Exception as e:
+            logger.error(f"Error creating company: {str(e)}")
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e)
+                }, status=400)
+            raise
 
     # taking the user to the page of the company just created
     def get_success_url(self) -> str:

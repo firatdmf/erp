@@ -582,6 +582,17 @@
               </select>
             </div>
             
+            <!-- Email Follow-up Option -->
+            <div class="email-followup-option">
+              <div class="email-checkbox-wrapper">
+                <input type="checkbox" name="send_followup_emails" id="send_followup_emails" class="email-checkbox">
+                <label for="send_followup_emails" class="email-checkbox-label">
+                  <span class="email-checkbox-title">📧 Send Follow-up Emails</span>
+                  <span class="email-checkbox-description">Automatically send 5 follow-up emails over 54 days</span>
+                </label>
+              </div>
+            </div>
+            
             <!-- Attach an item section -->
             <div class="attach-section">
               <div class="attach-header">
@@ -667,7 +678,15 @@
             </div>
             
             <div class="sidebar-footer">
-              <button type="submit" class="btn btn-primary">Create company</button>
+              <button type="submit" id="companySubmitBtn" class="btn btn-primary">
+                <span class="btn-text">Create company</span>
+                <span class="btn-spinner" style="display: none;">
+                  <svg class="spinner-icon" viewBox="0 0 50 50">
+                    <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                  </svg>
+                  Creating...
+                </span>
+              </button>
               <button type="button" class="btn btn-secondary" onclick="closeCompanySidebar()">Cancel</button>
             </div>
           </form>
@@ -1012,6 +1031,17 @@
       function submitCompanyForm(event) {
         event.preventDefault();
         const form = document.getElementById('companyForm');
+        const submitBtn = document.getElementById('companySubmitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+        const toast = document.getElementById('toastNotification');
+        const toastMessage = toast.querySelector('.toast-message-global');
+        
+        // Show loading state
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+        
         const formData = new FormData(form);
         
         fetch('{% url "crm:create_company" %}', {
@@ -1024,17 +1054,38 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
+            // Show success toast
+            toastMessage.textContent = `Company "${data.company_name || ''}" created successfully!`;
+            toast.classList.add('show');
+            
+            // Hide toast after 3 seconds
+            setTimeout(() => {
+              toast.classList.remove('show');
+            }, 3000);
+            
+            // Close sidebar
             closeCompanySidebar();
-            // Optional: Show success message or refresh part of page
-            if (data.redirect_url) {
-              window.location.href = data.redirect_url;
-            }
+            
+            // Redirect after short delay
+            setTimeout(() => {
+              if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+              }
+            }, 800);
           } else {
+            // Reset button
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
             // Show errors
-            alert('Error: ' + (data.errors || 'Failed to create company'));
+            alert('Error: ' + (data.error || 'Failed to create company'));
           }
         })
         .catch(error => {
+          // Reset button
+          btnText.style.display = 'inline';
+          btnSpinner.style.display = 'none';
+          submitBtn.disabled = false;
           console.error('Error:', error);
           alert('An error occurred while creating the company.');
         });
@@ -1667,5 +1718,13 @@
     
     <!-- Task Edit Sidebar Modal -->
     {% include 'todo/components/task_edit_modal.html' %}
+    
+    <!-- Toast Notification -->
+    <div id="toastNotification" class="toast-notification-global">
+      <div class="toast-content-global">
+        <i class="fa fa-check-circle toast-icon-global"></i>
+        <span class="toast-message-global"></span>
+      </div>
+    </div>
   </body>
 </html>

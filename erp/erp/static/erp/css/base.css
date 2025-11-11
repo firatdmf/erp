@@ -1385,3 +1385,140 @@ tbody td {
 }
 
 /* ------------------------------------------------ */
+/* Email Follow-up Checkbox */
+.email-followup-option {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%);
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.email-followup-option:hover {
+  border-color: #2563eb;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.email-checkbox-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.email-checkbox {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.email-checkbox-label {
+  flex: 1;
+  cursor: pointer;
+}
+
+.email-checkbox-title {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  margin-bottom: 0.25rem;
+}
+
+.email-checkbox-description {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Loading Spinner Button */
+.btn-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spinner-icon {
+  animation: rotate 1.5s linear infinite;
+  width: 18px;
+  height: 18px;
+}
+
+.spinner-path {
+  stroke: white;
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@keyframes rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Toast Notification Global */
+.toast-notification-global {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  transform: translateX(400px);
+  transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  z-index: 10000;
+  border-left: 4px solid #10b981;
+  min-width: 320px;
+  max-width: 500px;
+}
+
+.toast-notification-global.show {
+  transform: translateX(0);
+}
+
+.toast-content-global {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.toast-icon-global {
+  color: #10b981;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.toast-message-global {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}

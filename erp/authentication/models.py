@@ -51,3 +51,22 @@ class Member(models.Model):
             return self.user.last_name
         else:
             return self.user.username
+
+
+class WebClient(models.Model):
+    """Web client users for the Demfirat Karven website"""
+    username = models.CharField(max_length=150, unique=True)
+    email = models.EmailField(unique=True)
+    password = models.CharField(max_length=255)  # Will store hashed password
+    name = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'web_client'
+        verbose_name = 'Web Client'
+        verbose_name_plural = 'Web Clients'
+
+    def __str__(self):
+        return self.username

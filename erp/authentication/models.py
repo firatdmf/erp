@@ -115,3 +115,24 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f"{self.client.username} - {self.product_sku}"
+
+
+class CartItem(models.Model):
+    """Shopping cart items for web clients"""
+    client = models.ForeignKey(WebClient, on_delete=models.CASCADE, related_name='cart_items')
+    product_sku = models.CharField(max_length=100)  # Main product SKU
+    variant_sku = models.CharField(max_length=100, blank=True, null=True)  # Optional variant SKU
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)  # Support decimal quantities (e.g., 1.5m)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'client_cart_item'
+        verbose_name = 'Cart Item'
+        verbose_name_plural = 'Cart Items'
+        ordering = ['-created_at']
+        unique_together = ['client', 'product_sku', 'variant_sku']  # Prevent duplicate items
+
+    def __str__(self):
+        variant_info = f" ({self.variant_sku})" if self.variant_sku else ""
+        return f"{self.client.username} - {self.product_sku}{variant_info} x {self.quantity}"

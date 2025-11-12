@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from accounting.admin import StakeholderBookInline
-from .models import Member, Permission, WebClient, ClientAddress, Favorite
+from .models import Member, Permission, WebClient, ClientAddress, Favorite, CartItem
 # Register your models here.
 
 # admin.site.register(Member)
@@ -51,3 +51,11 @@ class FavoriteAdmin(admin.ModelAdmin):
     list_filter = ('created_at',)
     search_fields = ('client__username', 'client__email', 'product_sku')
     readonly_fields = ('created_at',)
+
+
+@admin.register(CartItem)
+class CartItemAdmin(admin.ModelAdmin):
+    list_display = ('client', 'product_sku', 'variant_sku', 'quantity', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('client__username', 'client__email', 'product_sku', 'variant_sku')
+    readonly_fields = ('created_at', 'updated_at')

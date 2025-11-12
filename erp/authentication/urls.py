@@ -26,4 +26,10 @@ urlpatterns = [
     path('api/get_user_favorites/<int:user_id>/', api_views.get_user_favorites, name='get_user_favorites'),
     path('api/toggle_favorite/<int:user_id>/', api_views.toggle_favorite, name='toggle_favorite'),
     path('api/check_favorite/<int:user_id>/<str:product_sku>/', api_views.check_favorite, name='check_favorite'),
+    
+    # Cart API endpoints
+    path('api/get_cart/<int:user_id>/', api_views.get_cart, name='get_cart'),
+    path('api/add_to_cart/<int:user_id>/', api_views.add_to_cart, name='add_to_cart'),
+    path('api/update_cart_item/<int:user_id>/<int:item_id>/', api_views.update_cart_item, name='update_cart_item'),
+    path('api/remove_from_cart/<int:user_id>/<int:item_id>/', api_views.remove_from_cart, name='remove_from_cart'),
 ]

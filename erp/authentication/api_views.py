@@ -681,3 +681,251 @@ def check_favorite(request, user_id, product_sku):
         return JsonResponse({
             'error': str(e)
         }, status=500)
+
+
+# ==================== CART API ENDPOINTS ====================
+
+@csrf_exempt
+def get_cart(request, user_id):
+    """Get all cart items for a user"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from .models import CartItem
+        web_client = WebClient.objects.get(id=user_id)
+        cart_items = CartItem.objects.filter(client=web_client)
+        
+        cart_list = [{
+            'id': item.id,
+            'product_sku': item.product_sku,
+            'variant_sku': item.variant_sku,
+            'quantity': str(item.quantity),
+            'created_at': item.created_at.isoformat(),
+            'updated_at': item.updated_at.isoformat()
+        } for item in cart_items]
+        
+        response = JsonResponse({
+            'cart_items': cart_list
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def add_to_cart(request, user_id):
+    """Add or update item in cart"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from .models import CartItem
+        from decimal import Decimal
+        
+        data = json.loads(request.body)
+        product_sku = data.get('product_sku')
+        variant_sku = data.get('variant_sku', None)
+        quantity = data.get('quantity', '1.0')
+        
+        if not product_sku:
+            return JsonResponse({
+                'error': 'product_sku is required'
+            }, status=400)
+        
+        # Convert quantity to Decimal
+        try:
+            quantity = Decimal(str(quantity))
+            if quantity <= 0:
+                return JsonResponse({
+                    'error': 'Quantity must be positive'
+                }, status=400)
+        except:
+            return JsonResponse({
+                'error': 'Invalid quantity format'
+            }, status=400)
+        
+        web_client = WebClient.objects.get(id=user_id)
+        
+        # Check if item already exists
+        cart_item = CartItem.objects.filter(
+            client=web_client, 
+            product_sku=product_sku,
+            variant_sku=variant_sku
+        ).first()
+        
+        if cart_item:
+            # Update quantity (add to existing)
+            cart_item.quantity += quantity
+            cart_item.save()
+            message = 'Cart item updated'
+        else:
+            # Create new cart item
+            cart_item = CartItem.objects.create(
+                client=web_client,
+                product_sku=product_sku,
+                variant_sku=variant_sku,
+                quantity=quantity
+            )
+            message = 'Added to cart'
+        
+        response = JsonResponse({
+            'message': message,
+            'cart_item': {
+                'id': cart_item.id,
+                'product_sku': cart_item.product_sku,
+                'variant_sku': cart_item.variant_sku,
+                'quantity': str(cart_item.quantity)
+            }
+        }, status=201)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def update_cart_item(request, user_id, item_id):
+    """Update cart item quantity"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'PUT':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from .models import CartItem
+        from decimal import Decimal
+        
+        data = json.loads(request.body)
+        quantity = data.get('quantity')
+        
+        if not quantity:
+            return JsonResponse({
+                'error': 'quantity is required'
+            }, status=400)
+        
+        # Convert quantity to Decimal
+        try:
+            quantity = Decimal(str(quantity))
+            if quantity <= 0:
+                return JsonResponse({
+                    'error': 'Quantity must be positive'
+                }, status=400)
+        except:
+            return JsonResponse({
+                'error': 'Invalid quantity format'
+            }, status=400)
+        
+        web_client = WebClient.objects.get(id=user_id)
+        cart_item = CartItem.objects.get(id=item_id, client=web_client)
+        
+        cart_item.quantity = quantity
+        cart_item.save()
+        
+        response = JsonResponse({
+            'message': 'Cart item updated',
+            'cart_item': {
+                'id': cart_item.id,
+                'product_sku': cart_item.product_sku,
+                'variant_sku': cart_item.variant_sku,
+                'quantity': str(cart_item.quantity)
+            }
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except CartItem.DoesNotExist:
+        return JsonResponse({
+            'error': 'Cart item not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def remove_from_cart(request, user_id, item_id):
+    """Remove item from cart"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "DELETE, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from .models import CartItem
+        
+        web_client = WebClient.objects.get(id=user_id)
+        cart_item = CartItem.objects.get(id=item_id, client=web_client)
+        
+        cart_item.delete()
+        
+        response = JsonResponse({
+            'message': 'Removed from cart'
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except CartItem.DoesNotExist:
+        return JsonResponse({
+            'error': 'Cart item not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)

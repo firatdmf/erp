@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from accounting.admin import StakeholderBookInline
-from .models import Member, Permission, WebClient
+from .models import Member, Permission, WebClient, ClientAddress, Favorite
 # Register your models here.
 
 # admin.site.register(Member)
@@ -35,3 +35,19 @@ class WebClientAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at')
         }),
     )
+
+
+@admin.register(ClientAddress)
+class ClientAddressAdmin(admin.ModelAdmin):
+    list_display = ('client', 'title', 'city', 'country', 'is_default', 'created_at')
+    list_filter = ('is_default', 'created_at', 'country')
+    search_fields = ('client__username', 'client__email', 'title', 'city')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ('client', 'product_sku', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('client__username', 'client__email', 'product_sku')
+    readonly_fields = ('created_at',)

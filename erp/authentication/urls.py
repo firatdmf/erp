@@ -21,4 +21,9 @@ urlpatterns = [
     path('api/add_client_address/<int:user_id>/', api_views.add_client_address, name='add_client_address'),
     path('api/set_default_address/<int:user_id>/<int:address_id>/', api_views.set_default_address, name='set_default_address'),
     path('api/delete_client_address/<int:user_id>/<int:address_id>/', api_views.delete_client_address, name='delete_client_address'),
+    
+    # Favorite API endpoints
+    path('api/get_user_favorites/<int:user_id>/', api_views.get_user_favorites, name='get_user_favorites'),
+    path('api/toggle_favorite/<int:user_id>/', api_views.toggle_favorite, name='toggle_favorite'),
+    path('api/check_favorite/<int:user_id>/<str:product_sku>/', api_views.check_favorite, name='check_favorite'),
 ]

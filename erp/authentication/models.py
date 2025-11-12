@@ -98,3 +98,20 @@ class ClientAddress(models.Model):
         if self.is_default:
             ClientAddress.objects.filter(client=self.client, is_default=True).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+class Favorite(models.Model):
+    """Favorite products for web clients"""
+    client = models.ForeignKey(WebClient, on_delete=models.CASCADE, related_name='favorites')
+    product_sku = models.CharField(max_length=100)  # Store product SKU
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'client_favorite'
+        verbose_name = 'Client Favorite'
+        verbose_name_plural = 'Client Favorites'
+        ordering = ['-created_at']
+        unique_together = ['client', 'product_sku']  # Prevent duplicate favorites
+
+    def __str__(self):
+        return f"{self.client.username} - {self.product_sku}"

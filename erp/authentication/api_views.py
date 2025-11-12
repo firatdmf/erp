@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.hashers import make_password, check_password
-from .models import WebClient, ClientAddress
+from .models import WebClient, ClientAddress, Favorite
 import json
 
 
@@ -544,6 +544,139 @@ def change_password(request, user_id):
         return JsonResponse({
             'error': 'Invalid JSON'
         }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+# ==================== FAVORITE API ENDPOINTS ====================
+
+@csrf_exempt
+def get_user_favorites(request, user_id):
+    """Get all favorites for a user"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        web_client = WebClient.objects.get(id=user_id)
+        favorites = Favorite.objects.filter(client=web_client)
+        
+        favorite_list = [{
+            'id': fav.id,
+            'product_sku': fav.product_sku,
+            'created_at': fav.created_at.isoformat()
+        } for fav in favorites]
+        
+        response = JsonResponse({
+            'favorites': favorite_list
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def toggle_favorite(request, user_id):
+    """Add or remove a product from favorites"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        product_sku = data.get('product_sku')
+        
+        if not product_sku:
+            return JsonResponse({
+                'error': 'product_sku is required'
+            }, status=400)
+        
+        web_client = WebClient.objects.get(id=user_id)
+        
+        # Check if already favorited
+        favorite = Favorite.objects.filter(client=web_client, product_sku=product_sku).first()
+        
+        if favorite:
+            # Remove from favorites
+            favorite.delete()
+            response = JsonResponse({
+                'message': 'Removed from favorites',
+                'is_favorited': False
+            }, status=200)
+        else:
+            # Add to favorites
+            Favorite.objects.create(client=web_client, product_sku=product_sku)
+            response = JsonResponse({
+                'message': 'Added to favorites',
+                'is_favorited': True
+            }, status=201)
+        
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def check_favorite(request, user_id, product_sku):
+    """Check if a product is favorited by user"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        web_client = WebClient.objects.get(id=user_id)
+        is_favorited = Favorite.objects.filter(client=web_client, product_sku=product_sku).exists()
+        
+        response = JsonResponse({
+            'is_favorited': is_favorited
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
     except Exception as e:
         return JsonResponse({
             'error': str(e)

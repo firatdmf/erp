@@ -1816,6 +1816,14 @@ def get_product_categories(request):
 
 # This is just to try if I can make api calls from my next js application, and it works.
 def get_products(request):
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
     start = time.time()
     product_category = request.GET.get("product_category", None)
 
@@ -1904,7 +1912,7 @@ def get_products(request):
     end = time.time()
     print(f"Time taken to get products: {end - start} seconds")
 
-    return JsonResponse(
+    response = JsonResponse(
         {
             "products": products_data,
             "product_variants": product_variants_data,
@@ -1914,6 +1922,8 @@ def get_products(request):
             "product_category_description": category.description if category.description else None,
         }
     )
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
 
 
 # def get_product(request):

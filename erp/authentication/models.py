@@ -59,6 +59,8 @@ class WebClient(models.Model):
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=255)  # Will store hashed password
     name = models.CharField(max_length=255, blank=True, null=True)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    birthdate = models.DateField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -70,3 +72,29 @@ class WebClient(models.Model):
 
     def __str__(self):
         return self.username
+
+
+class ClientAddress(models.Model):
+    """Multiple addresses for web clients"""
+    client = models.ForeignKey(WebClient, on_delete=models.CASCADE, related_name='addresses')
+    title = models.CharField(max_length=100)
+    address = models.TextField()
+    city = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'client_address'
+        verbose_name = 'Client Address'
+        verbose_name_plural = 'Client Addresses'
+        ordering = ['-is_default', '-created_at']
+
+    def __str__(self):
+        return f"{self.client.username} - {self.title}"
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            ClientAddress.objects.filter(client=self.client, is_default=True).update(is_default=False)
+        super().save(*args, **kwargs)

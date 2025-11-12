@@ -166,16 +166,22 @@ class CompanyCreate(generic.edit.CreateView):
 
     def form_valid(self, form):
         from django.http import JsonResponse
-        from .models import CompanyFollowUp
-        from .email_utils import send_followup_email
-        from django.db import connection
         import logging
         
         logger = logging.getLogger(__name__)
         
         try:
-            #  # Save the form data to create the Company instance but do not commit yet because there might be duplicates
+            # Get checkbox value BEFORE saving
+            send_emails = form.cleaned_data.get("send_followup_emails", False)
+            
+            # Save the form data to create the Company instance but do not commit yet
             self.object = form.save(commit=False)
+            
+            # Set flag for email_automation signal
+            # This tells the email_automation module whether to create a campaign
+            self.object._enable_email_campaign = send_emails
+            
+            # Now save (signal will check _enable_email_campaign flag)
             self.object.save()
             
             # Attach contact if selected
@@ -206,28 +212,15 @@ class CompanyCreate(generic.edit.CreateView):
                     member=self.request.user.member,
                 )
             
-            # Handle follow-up email sending if enabled
-            send_emails = form.cleaned_data.get("send_followup_emails", False)
-            if send_emails and self.object.status == "prospect" and self.object.email:
-                # Create follow-up tracking
-                followup = CompanyFollowUp.objects.create(company=self.object)
-                
-                # Close database connection before sending email to avoid "connection already closed" error
-                connection.close()
-                
-                # Send the first email immediately
-                logger.info(f"Sending initial email to {self.object.name} ({self.object.email})")
-                try:
-                    success = send_followup_email(self.object, email_number=1)
-                    
-                    if success:
-                        # Mark the first email as sent
-                        followup.mark_email_sent()
-                        logger.info(f"Initial email sent successfully to {self.object.name}")
-                    else:
-                        logger.error(f"Failed to send initial email to {self.object.name}")
-                except Exception as e:
-                    logger.error(f"Error sending initial email to {self.object.name}: {str(e)}")
+            # NOTE: Email campaign creation is now handled by email_automation module's signal
+            # The _enable_email_campaign flag (set above before save) controls whether
+            # the email_automation signal creates a campaign
+            
+            # Log for debugging
+            if send_emails:
+                logger.info(f"✓ Email automation ENABLED for {self.object.name} (email_automation module will handle)")
+            else:
+                logger.info(f"⊘ Email automation DISABLED for {self.object.name} - Checkbox not checked")
             
             # Check if AJAX request
             if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':

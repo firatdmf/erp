@@ -10,7 +10,15 @@ from .models import EmailCampaign, EmailTemplate
 def create_campaign_for_prospect(sender, instance, created, **kwargs):
     """
     Automatically create email campaign when a company is created with 'prospect' status
+    ONLY if explicitly enabled via the 'enable_email_campaign' flag
     """
+    # IMPORTANT: Only create campaign if explicitly enabled
+    # This prevents unwanted email campaigns from being created
+    if not getattr(instance, '_enable_email_campaign', False):
+        if created:
+            print(f"⊘ Skipping campaign creation for {instance.name} - Email automation not enabled")
+        return
+    
     # Only create campaign for new prospect companies that have an email address
     if created and instance.status == 'prospect':
         # Check if company has email address (email is now an ArrayField)

@@ -73,7 +73,6 @@ INSTALLED_APPS = [
     "todo",
     "crm",
     "accounting",
-    "jquery",
     "authentication",
     "operating",
     "marketing",

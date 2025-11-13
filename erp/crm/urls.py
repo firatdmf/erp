@@ -13,6 +13,7 @@ urlpatterns = [
     path("contact/detail/<int:pk>/",views.ContactDetail.as_view(),name="contact_detail"),
     path("company/detail/<int:pk>/",views.CompanyDetail.as_view(),name="company_detail"),
     path('notes/<int:pk>/update_note/', views.EditNoteView.as_view(), name='update_note'),
+    path('notes/<int:pk>/update_ajax/', views.update_note_ajax, name='update_note_ajax'),
     path('contact/update/<int:pk>/', views.ContactUpdate.as_view(), name='update_contact'),
     path('update_company/<int:pk>/', views.EditCompanyView.as_view(), name='update_company'),
     path('notes/<int:pk>/delete_note/', views.DeleteNoteView.as_view(), name='delete_note'),
@@ -28,6 +29,10 @@ path('search_contacts_only/',views.search_contacts_only,name="search_contacts_on
 path('add_contact_to_company/<int:company_pk>/<int:contact_pk>/',views.add_contact_to_company.as_view(),name="add_contact_to_company"),
 path('company/company_search/', views.company_search, name='company_search'),
 path('customer_autocomplete/', views.customer_autocomplete, name='customer_autocomplete'),
+path('company/<int:pk>/toggle_email_campaign/', views.toggle_email_campaign, name='toggle_email_campaign'),
+path('company/<int:pk>/notes_partial/', views.get_notes_partial, name='get_notes_partial'),
+path('company/<int:pk>/tasks_partial/', views.get_tasks_partial, name='get_tasks_partial'),
+path('contact/<int:pk>/notes_partial/', views.get_contact_notes_partial, name='get_contact_notes_partial'),
 
 ]
 

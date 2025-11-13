@@ -1,87 +1,162 @@
 {% load static %}
-{% block css %}
-  <link rel="stylesheet" href="{% static 'crm/css/components/history.css' %}" />
-{% endblock %}
-<div class="history-component">
+<div class="detail-card">
   <div class="card-header">
-    <h2><i class="fa fa-history"></i> History</h2>
+    <h2><i class="fa fa-sticky-note"></i> Notes & History</h2>
   </div>
-  <div class="history-timeline">
-    <!-- Iterate over both notes and completed tasks -->
+  <div class="notes-list">
     {% for entry in history_entries %}
-      <div class="history-entry">
-        <div class="history-icon">
-          {% if entry.content %}
-            <i class="fa fa-file-text"></i>
-          {% elif entry.name %}
-            <i class="fa fa-check-circle"></i>
-          {% endif %}
-        </div>
-        <div class="history-content">
-          <div class="history-header">
-            <span class="history-date">
-              {% if entry.completed_at %}
-                {{ entry.completed_at|date:"M d, Y - g:i A" }}
-              {% elif entry.created_at %}
-                {{ entry.created_at|date:"M d, Y - g:i A" }}
-              {% endif %}
-            </span>
+      {% if entry.content %}
+        <!-- Note Item -->
+        <div class="note-item" id="note-{{ entry.id }}">
+          <div class="note-content" id="note-content-{{ entry.id }}">
+            <div class="note-meta">
+              <span class="note-date">{{ entry.created_at|date:"M d, Y - g:i A" }}</span>
+            </div>
+            <p class="note-text">{{ entry.content }}</p>
           </div>
-          {% if entry.content %}
-            <p class="history-text">{{ entry.content }}</p>
-            <div class="history-actions">
-              <a href="{% url 'crm:update_note' entry.id %}?next_url={{ current_url|urlencode }}" class="btn-text btn-text-primary">
-                <i class="fa fa-edit"></i> Edit
-              </a>
-              <form action="{% url 'crm:delete_note' entry.id %}" method="post" style="display: inline;" onsubmit="return confirm('Delete this note?');">
-                {% csrf_token %}
-                <input type="hidden" name="note_id" value="{{ entry.id }}" />
-                <button type="submit" class="btn-text btn-text-danger">
-                  <i class="fa fa-trash"></i> Delete
-                </button>
-              </form>
+          <div class="note-actions">
+            <button type="button" class="btn-icon-minimal" title="Edit" onclick="editNote({{ entry.id }}, `{{ entry.content|escapejs }}`)">
+              <i class="fa fa-edit"></i>
+            </button>
+            <button type="button" class="btn-icon-minimal" title="Delete" onclick="confirmDelete('delete_note', {{ entry.id }})">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      {% elif entry.name %}
+        <!-- Completed Task Item -->
+        <div class="note-item completed-task-item">
+          <div class="note-content">
+            <div class="note-meta">
+              <span class="note-date">{{ entry.completed_at|date:"M d, Y - g:i A" }}</span>
+              <span class="note-badge"><i class="fa fa-check-circle"></i> Completed</span>
             </div>
-          {% elif entry.name %}
-            <p class="history-text"><strong>Task completed:</strong> {{ entry.name }}</p>
+            <p class="note-text"><strong>{{ entry.name }}</strong></p>
             {% if entry.description %}
-              <p class="history-description">{{ entry.description }}</p>
+              <p class="note-description">{{ entry.description }}</p>
             {% endif %}
-            <div class="history-actions">
-              <a href="{% url 'todo:update_task' entry.id %}?next_url={{ current_url|urlencode }}" class="btn-text btn-text-primary">
-                <i class="fa fa-edit"></i> Edit
-              </a>
-            </div>
-          {% endif %}
+          </div>
         </div>
-      </div>
+      {% endif %}
     {% empty %}
-      <div class="history-entry-empty">
-        <p class="empty-state">No history available.</p>
-      </div>
+      <p class="empty-state">No notes or history available.</p>
     {% endfor %}
-    <!-- Created entry -->
-    <div class="history-entry history-entry-created">
-      <div class="history-icon">
-        <i class="fa fa-plus-circle"></i>
-      </div>
-      <div class="history-content">
-        <div class="history-header">
-          <span class="history-date">
-            {% if company %}
-              {{ company.created_at|date:"M d, Y - g:i A" }}
-            {% elif contact %}
-              {{ contact.created_at|date:"M d, Y - g:i A" }}
-            {% endif %}
+    
+    <!-- Created Entry -->
+    <div class="note-item created-item">
+      <div class="note-content">
+        <div class="note-meta">
+          <span class="note-date">
+            {% if company %}{{ company.created_at|date:"M d, Y - g:i A" }}{% elif contact %}{{ contact.created_at|date:"M d, Y - g:i A" }}{% endif %}
           </span>
+          <span class="note-badge created-badge"><i class="fa fa-plus-circle"></i> Created</span>
         </div>
-        <p class="history-text">
-          {% if company %}
-            <strong>{{ company.name }}</strong> was added to the CRM
-          {% elif contact %}
-            <strong>{{ contact.name }}</strong> was added to the CRM
-          {% endif %}
+        <p class="note-text">
+          {% if company %}<strong>{{ company.name }}</strong> was added to the CRM{% elif contact %}<strong>{{ contact.name }}</strong> was added to the CRM{% endif %}
         </p>
       </div>
     </div>
   </div>
 </div>
+
+<style>
+.notes-list {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.note-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.note-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.note-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.note-date {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.note-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.created-badge {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.note-text {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #1e293b;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.note-description {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.note-actions {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: 1rem;
+  flex-shrink: 0;
+}
+
+.completed-task-item {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.completed-task-item:hover {
+  background: #dcfce7;
+}
+
+.created-item {
+  background: #fefce8;
+  border-color: #fde047;
+  opacity: 0.7;
+}
+
+.created-item:hover {
+  background: #fef9c3;
+  opacity: 0.8;
+}
+</style>

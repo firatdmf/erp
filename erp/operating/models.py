@@ -154,7 +154,8 @@ class RawMaterialGoodItem(models.Model):
     )
 
     def __str__(self):
-        return f"{self.raw_material_good.name } from {self.receipt.supplier} | {self.quantity}@{self.receipt.currency.symbol if (self.receipt.currency) else "" }{self.unit_cost}"
+        currency_symbol = self.receipt.currency.symbol if self.receipt.currency else ""
+        return f"{self.raw_material_good.name} from {self.receipt.supplier} | {self.quantity}@{currency_symbol}{self.unit_cost}"
 
     def save(self, *args, **kwargs):
 

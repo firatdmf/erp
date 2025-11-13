@@ -201,18 +201,6 @@ class CompanyForm(ModelForm):
         widget=forms.HiddenInput(attrs={"id": "phones_data"})
     )
     
-    # Email sending option
-    send_followup_emails = forms.BooleanField(
-        required=False,
-        initial=False,
-        label="Send Follow-up Emails",
-        help_text="Automatically send 5 follow-up emails over 54 days",
-        widget=forms.CheckboxInput(attrs={
-            "class": "form-check-input",
-            "id": "send_followup_emails"
-        })
-    )
-    
     note_content = forms.CharField(
         label="Initial Note", widget=forms.Textarea, required=False
     )

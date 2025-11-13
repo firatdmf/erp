@@ -42,16 +42,6 @@
             </div>
           </div>
           {% endif %}
-        {% elif field.name == 'send_followup_emails' %}
-          <div class="email-option-container">
-            <div class="checkbox-wrapper">
-              {{ field }}
-              <label for="{{ field.id_for_label }}" class="checkbox-label">
-                <span class="checkbox-title">{{ field.label }}</span>
-                <span class="checkbox-description">{{ field.help_text }}</span>
-              </label>
-            </div>
-          </div>
         {% else %}
           <p>
             {{ field.label_tag }}<br />

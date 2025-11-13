@@ -61,6 +61,21 @@ def send_campaign_email(campaign, sequence_number):
     """
     Send a specific email in the campaign sequence
     """
+    # Check if this sequence email was already sent
+    existing_emails = SentEmail.objects.filter(
+        campaign=campaign,
+        template__sequence_number=sequence_number
+    )
+    
+    if existing_emails.exists():
+        print(f"⚠️ DUPLICATE DETECTED: Email {sequence_number} already sent for campaign {campaign.id}")
+        for email in existing_emails:
+            print(f"   - Sent at: {email.sent_at}, to: {email.recipient_email}")
+        print(f"   - Skipping duplicate send")
+        return False
+    
+    print(f"✓ No duplicate found for campaign {campaign.id} email #{sequence_number} - proceeding with send")
+    
     # Get email account
     try:
         email_account = EmailAccount.objects.get(user=campaign.user)
@@ -186,7 +201,13 @@ def process_scheduled_campaigns():
     """
     Process all campaigns that have emails scheduled to be sent
     """
+    import time
+    process_id = int(time.time() * 1000)  # Unique ID for this process run
     now = timezone.now()
+    
+    print(f"\n{'='*60}")
+    print(f"[PROCESS {process_id}] Starting process_scheduled_campaigns at {now}")
+    print(f"{'='*60}")
     
     # Get campaigns ready to send - must have company email or contact with email
     campaigns = EmailCampaign.objects.filter(
@@ -195,8 +216,11 @@ def process_scheduled_campaigns():
         emails_sent__lt=6
     ).select_related('company', 'user')
     
+    print(f"[PROCESS {process_id}] Found {campaigns.count()} campaigns ready to send")
+    
     sent_count = 0
     for campaign in campaigns:
+        print(f"[PROCESS {process_id}] Processing campaign {campaign.id} for {campaign.company.name}")
         # Skip if company has no email (check if array is empty)
         if not campaign.company.email or len(campaign.company.email) == 0:
             # Check if company has contacts with email (email is ArrayField)
@@ -214,8 +238,13 @@ def process_scheduled_campaigns():
                 continue
         
         sequence_number = campaign.emails_sent + 1
+        print(f"[PROCESS {process_id}] Attempting to send email #{sequence_number} for campaign {campaign.id}")
         if send_campaign_email(campaign, sequence_number):
             sent_count += 1
+            print(f"[PROCESS {process_id}] ✓ Successfully sent email #{sequence_number} for campaign {campaign.id}")
+        else:
+            print(f"[PROCESS {process_id}] ✗ Failed or skipped email #{sequence_number} for campaign {campaign.id}")
     
-    print(f"✓ Processed {campaigns.count()} campaigns, sent {sent_count} emails")
+    print(f"\n[PROCESS {process_id}] ✓ Processed {campaigns.count()} campaigns, sent {sent_count} emails")
+    print(f"{'='*60}\n")
     return sent_count

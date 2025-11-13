@@ -1,36 +1,201 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 {% block css %}
-  <link rel="stylesheet" href="{% static 'crm/css/update_contact.css' %}" />
+<style>
+  .modern-form-container {
+    max-width: 800px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+  }
+  
+  .modern-form-header {
+    padding: 24px 32px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .modern-form-header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+  }
+  
+  .modern-form-header i {
+    font-size: 28px;
+  }
+  
+  .modern-form-body {
+    padding: 32px;
+  }
+  
+  .modern-form-body form p {
+    margin-bottom: 20px;
+  }
+  
+  .modern-form-body label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+  
+  .modern-form-body input[type="text"],
+  .modern-form-body input[type="email"],
+  .modern-form-body input[type="url"],
+  .modern-form-body input[type="tel"],
+  .modern-form-body textarea,
+  .modern-form-body select {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  
+  .modern-form-body input:focus,
+  .modern-form-body textarea:focus,
+  .modern-form-body select:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  }
+  
+  .modern-form-body textarea {
+    min-height: 100px;
+    resize: vertical;
+  }
+  
+  .modern-form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 24px;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 32px;
+  }
+  
+  .btn-modern {
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+  
+  .btn-modern-primary {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+  }
+  
+  .btn-modern-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  }
+  
+  .btn-modern-secondary {
+    background: #f3f4f6;
+    color: #374151;
+  }
+  
+  .btn-modern-secondary:hover {
+    background: #e5e7eb;
+  }
+  
+  .helptext {
+    display: block;
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 6px;
+  }
+  
+  .errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0 0;
+  }
+  
+  .errorlist li {
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 500;
+  }
+</style>
 {% endblock %}
+
 {% block content %}
-  {% comment %} <p>{{ request.GET.next_url }}</p> {% endcomment %}
-  {% comment %} <form method="post" action="{% url 'crm:update_contact' contact.id %}">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <input type="hidden" name="next_url" value="{{ request.GET.next_url }}" />
-    <button type="submit" class="btn btn-primary">Update</button>
-  </form> {% endcomment %}
-  <div id="UpdateContactPage">
-    <form method="post">
+<div class="modern-form-container">
+  <div class="modern-form-header">
+    <i class="fa fa-user"></i>
+    <h1>Edit Contact</h1>
+  </div>
+  <div class="modern-form-body">
+    <form method="post" action="{% url 'crm:update_contact' contact.id %}" id="contactUpdateForm">
       {% csrf_token %}
       {% for field in form %}
-        {% if field.name == 'company_suggestions' %}
-          <div id="company-suggestions"></div>
-        {% else %}
+        {% if field.name != 'emails_data' and field.name != 'phones_data' %}
           <p>
-            {{ field.label_tag }}<br />
+            {{ field.label_tag }}
             {{ field }}
             {% if field.help_text %}
-              <small>{{ field.help_text }}</small>
+              <span class="helptext">{{ field.help_text }}</span>
             {% endif %}
+            {{ field.errors }}
           </p>
-          {% for error in field.errors %}
-            <div class="error">{{ error }}</div>
-          {% endfor %}
         {% endif %}
       {% endfor %}
-      <button type="submit">Submit</button>
+      
+      <!-- Dynamic Email Fields -->
+      <p>
+        <label>Email addresses</label>
+        <div id="edit_emails_container"></div>
+        {{ form.emails_data }}
+      </p>
+      
+      <!-- Dynamic Phone Fields -->
+      <p>
+        <label>Phone numbers</label>
+        <div id="edit_phones_container"></div>
+        {{ form.phones_data }}
+      </p>
+      
+      <input type="hidden" name="next_url" value="{{ request.GET.next_url }}">
+      <div class="modern-form-actions">
+        <a href="{{ request.GET.next_url }}" class="btn-modern btn-modern-secondary">
+          <i class="fa fa-times"></i>
+          Cancel
+        </a>
+        <button type="submit" class="btn-modern btn-modern-primary">
+          <i class="fa fa-save"></i>
+          Update Contact
+        </button>
+      </div>
     </form>
   </div>
-{% endblock %}
+</div>
+
+<script>
+  // Initialize dynamic fields with existing data
+  document.addEventListener('DOMContentLoaded', function() {
+    const existingEmails = {{ contact.email|safe }};
+    const existingPhones = {{ contact.phone|safe }};
+    
+    initDynamicFields('edit_emails_container', 'contact_emails_data', 'email', existingEmails);
+    initDynamicFields('edit_phones_container', 'contact_phones_data', 'phone', existingPhones);
+  });
+</script>
+{% endblock content %}

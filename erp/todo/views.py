@@ -228,6 +228,19 @@ def complete_task(request, task_id):
     task.completed = True
     task.completed_at = datetime.now()
     task.save()
+    
+    # Check if it's an AJAX/HTMX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Return task data for history
+        return JsonResponse({
+            'success': True,
+            'task': {
+                'name': task.name,
+                'description': task.description,
+                'completed_at': task.completed_at.strftime('%b %d, %Y - %I:%M %p')
+            }
+        })
+    
     # below line brings back the user to the current page
     return redirect(request.META.get("HTTP_REFERER"))
 
@@ -268,27 +281,49 @@ def get_task_edit_form(request, task_id):
 def update_task_ajax(request, task_id):
     if request.method == "POST":
         task = get_object_or_404(Task, pk=task_id)
-        form = TaskForm(request.POST, instance=task)
         
-        if form.is_valid():
-            updated_task = form.save()
+        # Get data from POST
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        due_date_str = request.POST.get('due_date', '').strip()
+        
+        if not name:
+            return JsonResponse({'success': False, 'error': 'Task name cannot be empty'})
+        
+        if not due_date_str:
+            return JsonResponse({'success': False, 'error': 'Due date is required'})
+        
+        try:
+            # Parse due date
+            from datetime import datetime
+            due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
             
-            # Return JSON response
+            # Update task
+            task.name = name
+            task.description = description
+            task.due_date = due_date
+            task.save()
+            
+            # Calculate overdue display
+            from datetime import date as dt_date
+            delta = (due_date - dt_date.today()).days
+            if delta < 0:
+                overdue_badge = f'<span class="task-overdue">{abs(delta)}d</span>'
+            elif delta == 0:
+                overdue_badge = '<span class="task-overdue">today</span>'
+            else:
+                overdue_badge = ''
+            
             return JsonResponse({
                 'success': True,
-                'task': {
-                    'id': updated_task.id,
-                    'name': updated_task.name,
-                    'description': updated_task.description,
-                    'due_date': updated_task.due_date.strftime('%Y-%m-%d') if updated_task.due_date else None,
-                    'completed': updated_task.completed,
-                }
+                'name': task.name,
+                'description': task.description,
+                'due_date_display': due_date.strftime('%b %d, %Y'),
+                'overdue_badge': overdue_badge
             })
-        else:
-            # Return form errors
-            return JsonResponse({
-                'success': False,
-                'errors': form.errors
-            })
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Invalid date format'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})

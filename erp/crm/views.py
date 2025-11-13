@@ -3,7 +3,7 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
-from .models import Contact, Company, Note
+from .models import Contact, Company, Note, CompanyFollowUp
 from todo.models import Task
 from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm
 from todo.forms import TaskForm
@@ -11,6 +11,8 @@ from itertools import chain
 from operator import attrgetter
 from django.db.models import Value, CharField, Count
 from django.middleware.csrf import get_token
+from django.utils import timezone
+from datetime import date
 
 # we need the below library to avoid saving any database queries in case there are any errors in view functions.
 # so it never saves anything partially, and saves when everything runs smoothly.
@@ -102,6 +104,7 @@ class ContactCreate(generic.edit.CreateView):
                 if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return JsonResponse({
                         'success': True,
+                        'redirect_url': self.get_success_url(),
                         'contact': {
                             'id': self.object.pk,
                             'name': self.object.name,
@@ -260,9 +263,12 @@ class EditCompanyView(generic.edit.UpdateView):
 
     # success_url = "/crm/"  # URL to redirect after successfully editing an entry
     def form_valid(self, form):
+        # Save the company
+        self.object = form.save()
+        
         next_url = self.request.POST.get("next_url")
         self.success_url = next_url
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.success_url)
 
 
 class ContactDetail(generic.DetailView):
@@ -293,28 +299,74 @@ class ContactDetail(generic.DetailView):
         contact = self.object
         note_form = NoteForm(request.POST)
         task_form = TaskForm(request.POST)
-        print("Note form data:", request.POST)
-        print(note_form)
+        
+        # Check if it's an HTMX request
+        is_htmx = request.headers.get('HX-Request') == 'true'
+        
         if note_form.is_valid():
             note = note_form.save(commit=False)
             note.contact = contact
-            # if contact.company:
-            #     note.company = contact.company
             note.save()
+            
+            if is_htmx:
+                return HttpResponse(status=200)
             return redirect(f"/crm/contact/detail/{contact.pk}")
 
-        if task_form.is_valid():
+        elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.contact = contact
+            task.member = request.user.member
             task.save()
+            
+            if is_htmx:
+                # Return task list HTML
+                tasks = Task.objects.filter(contact=contact, completed=False).order_by('-due_date')
+                html = ''
+                task_count = 0
+                for t in tasks:
+                    task_count += 1
+                    delta = (t.due_date - date.today()).days
+                    if delta < 0:
+                        days_display = f"{abs(delta)}d"
+                    elif delta == 0:
+                        days_display = "today"
+                    else:
+                        days_display = None
+                    
+                    overdue_html = f'<span class="task-overdue">{days_display}</span>' if days_display else ''
+                    
+                    html += f'''<div class="task-item" id="task-{t.id}">
+                        <div class="task-content" id="task-content-{t.id}">
+                            <h3 class="task-name">{t.name}</h3>
+                            {f'<p class="task-description">{t.description}</p>' if t.description else ''}
+                            <div class="task-meta">
+                                <span class="task-due">Due: {t.due_date.strftime("%b %d, %Y")}</span>
+                                {overdue_html}
+                                {f'<span class="task-member"><i class="fa fa-user"></i> {t.member}</span>' if t.member else ''}
+                            </div>
+                        </div>
+                        <div class="task-actions">
+                            <button type="button" class="btn-icon-minimal" title="Complete" onclick="confirmDelete('complete_task', {t.id})">
+                                <i class="fa fa-check"></i>
+                            </button>
+                            <button type="button" class="btn-icon-minimal" title="Edit" onclick="editTask({t.id}, \'{t.name}\', \'{t.description or ""}\', \'{t.due_date.strftime("%Y-%m-%d")}\')">
+                                <i class="fa fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn-icon-minimal" title="Delete" onclick="confirmDelete('delete_task', {t.id})">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>'''
+                
+                if task_count == 0:
+                    html = '<p class="empty-state">No tasks available.</p>'
+                return HttpResponse(html)
             return redirect(f"/crm/contact/detail/{contact.pk}")
 
-        # If the form is not valid, you can handle the error case here.
-        # You might want to add error handling or return an error message.
-
-        # You can also pass the form with errors back to the template.
+        # If the form is not valid
         context = self.get_context_data()
         context["note_form"] = note_form
+        context["task_form"] = task_form
         return self.render_to_response(context)
 
 
@@ -351,33 +403,100 @@ class CompanyDetail(generic.DetailView):
         context["contacts"] = contacts
 
         context["tasks"] = Task.objects.filter(company=company)
+        
+        # Add email campaign info if exists
+        try:
+            from email_automation.models import EmailCampaign
+            campaign = company.email_campaign
+            context["email_campaign"] = campaign
+            context["has_campaign"] = True
+        except EmailCampaign.DoesNotExist:
+            context["email_campaign"] = None
+            context["has_campaign"] = False
+        
         # print(context["tasks"])
         return context
 
     # The post() method handles POST requests when the user submits a form to add a new note.
     def post(self, request, *args, **kwargs):
+        from django.template.loader import render_to_string
         # It retrieves the Company object associated with the view.
         company = self.get_object()
         # NoteForm() creates a form instance for adding notes, which is added to the context as note_form.
         # It instantiates a NoteForm object with the form data from the request.
         note_form = NoteForm(request.POST)
         task_form = TaskForm(request.POST)  # Get task from form data
+        
+        # Check if it's an HTMX request
+        is_htmx = request.headers.get('HX-Request') == 'true'
+        
         if note_form.is_valid():
             note = note_form.save(commit=False)
             note.company = company
             note.save()
+            
+            if is_htmx:
+                # Just return 200 - HTMX will trigger a refresh via the frontend
+                return HttpResponse(status=200)
             return redirect(f"/crm/company/detail/{company.pk}")
+            
         elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.company = company
             task.member = request.user.member
             task.save()
+            
+            if is_htmx:
+                # Return updated task list for HTMX
+                tasks = Task.objects.filter(company=company).order_by('-due_date')
+                from datetime import date
+                html = ''
+                task_count = 0
+                for t in tasks:
+                    if not t.completed:
+                        task_count += 1
+                        # Calculate days_since using same logic as template filter
+                        delta = (t.due_date - date.today()).days
+                        if delta < 0:
+                            days_display = f"{abs(delta)}d"
+                        elif delta == 0:
+                            days_display = "today"
+                        else:
+                            days_display = None
+                        
+                        overdue_html = f'<span class="task-overdue">{days_display}</span>' if days_display else ''
+                        
+                        html += f'''<div class="task-item" id="task-{t.id}">
+                            <div class="task-content">
+                                <h3 class="task-name">{t.name}</h3>
+                                {f'<p class="task-description">{t.description}</p>' if t.description else ''}
+                                <div class="task-meta">
+                                    <span class="task-due">Due: {t.due_date.strftime("%b %d, %Y")}</span>
+                                    {overdue_html}
+                                    {f'<span class="task-member"><i class="fa fa-user"></i> {t.member}</span>' if t.member else ''}
+                                </div>
+                            </div>
+                            <div class="task-actions">
+                                <button type="button" class="btn-icon-minimal" title="Complete" onclick="confirmDelete('complete_task', {t.id})">
+                                    <i class="fa fa-check"></i>
+                                </button>
+                                <a href="/todo/tasks/{t.id}/update_task?next_url={request.path}" class="btn-icon-minimal" title="Edit">
+                                    <i class="fa fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn-icon-minimal" title="Delete" onclick="confirmDelete('delete_task', {t.id})">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>'''
+                if task_count == 0:
+                    html = '<p class="empty-state">No tasks available.</p>'
+                return HttpResponse(html)
             return redirect(f"/crm/company/detail/{company.pk}")
-        # If the form data is valid, it saves the new note associated with the company and redirects to the company detail page.
-        # If the form data is invalid, it adds the form with errors to the context and renders the page again with the form and errors displayed.        # You might want to add error handling or return an error message.
+            
+        # If the form data is invalid
         context = self.get_context_data()
         context["note_form"] = note_form
-        context["task_form"] = task_form  # Add task form to context
+        context["task_form"] = task_form
         return self.render_to_response(context)
 
 
@@ -393,6 +512,141 @@ class EditNoteView(generic.edit.UpdateView):
         return super().form_valid(form)
 
 
+# AJAX endpoint for inline note editing
+def update_note_ajax(request, pk):
+    if request.method == 'POST':
+        note = get_object_or_404(Note, pk=pk)
+        content = request.POST.get('content', '').strip()
+        
+        if not content:
+            return JsonResponse({'success': False, 'error': 'Content cannot be empty'})
+        
+        note.content = content
+        note.save()
+        
+        return JsonResponse({
+            'success': True,
+            'content': note.content,
+            'date': note.created_at.strftime('%b %d, %Y - %I:%M %p')
+        })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+
+# Partial view for notes refresh (HTMX)
+def get_notes_partial(request, pk):
+    """Return only the notes section HTML for a company"""
+    company = get_object_or_404(Company, pk=pk)
+    from django.template.loader import render_to_string
+    from django.middleware.csrf import get_token
+    
+    # Get notes for rendering
+    notes = Note.objects.filter(company=company).order_by('-created_at')
+    completed_tasks = Task.objects.filter(completed=True, company=company).order_by('-completed_at')
+    history_entries = list(notes) + list(completed_tasks)
+    history_entries.sort(
+        key=lambda x: x.created_at if hasattr(x, "created_at") else x.completed_at,
+        reverse=True,
+    )
+    
+    history_html = render_to_string(
+        "crm/components/history.html",
+        {
+            "company": company,
+            "contact": None,
+            "note_form": NoteForm(),
+            "csrf_token": get_token(request),
+            "history_entries": history_entries,
+            "current_url": request.path,
+        },
+    )
+    # Wrap in notesSection div for HTMX swap
+    html = f'<div id="notesSection">{history_html}</div>'
+    return HttpResponse(html)
+
+
+# Partial view for tasks refresh (HTMX)
+def get_tasks_partial(request, pk):
+    """Return only the task list HTML for a company"""
+    company = get_object_or_404(Company, pk=pk)
+    tasks = Task.objects.filter(company=company, completed=False).order_by('-due_date')
+    
+    html = ''
+    task_count = 0
+    for t in tasks:
+        task_count += 1
+        # Calculate days_since using same logic as template filter
+        delta = (t.due_date - date.today()).days
+        if delta < 0:
+            days_display = f"{abs(delta)}d"
+        elif delta == 0:
+            days_display = "today"
+        else:
+            days_display = None
+        
+        overdue_html = f'<span class="task-overdue">{days_display}</span>' if days_display else ''
+        
+        html += f'''<div class="task-item" id="task-{t.id}">
+            <div class="task-content">
+                <h3 class="task-name">{t.name}</h3>
+                {f'<p class="task-description">{t.description}</p>' if t.description else ''}
+                <div class="task-meta">
+                    <span class="task-due">Due: {t.due_date.strftime("%b %d, %Y")}</span>
+                    {overdue_html}
+                    {f'<span class="task-member"><i class="fa fa-user"></i> {t.member}</span>' if t.member else ''}
+                </div>
+            </div>
+            <div class="task-actions">
+                <button type="button" class="btn-icon-minimal" title="Complete" onclick="confirmDelete('complete_task', {t.id})">
+                    <i class="fa fa-check"></i>
+                </button>
+                <a href="/todo/tasks/{t.id}/update_task?next_url={request.path}" class="btn-icon-minimal" title="Edit">
+                    <i class="fa fa-edit"></i>
+                </a>
+                <button type="button" class="btn-icon-minimal" title="Delete" onclick="confirmDelete('delete_task', {t.id})">
+                    <i class="fa fa-trash"></i>
+                </button>
+            </div>
+        </div>'''
+    
+    if task_count == 0:
+        html = '<p class="empty-state">No tasks available.</p>'
+    
+    return HttpResponse(html)
+
+
+# Partial view for contact notes refresh (HTMX)
+def get_contact_notes_partial(request, pk):
+    """Return only the notes section HTML for a contact"""
+    contact = get_object_or_404(Contact, pk=pk)
+    from django.template.loader import render_to_string
+    from django.middleware.csrf import get_token
+    
+    # Get notes for rendering
+    notes = Note.objects.filter(contact=contact).order_by('-created_at')
+    completed_tasks = Task.objects.filter(completed=True, contact=contact).order_by('-completed_at')
+    history_entries = list(notes) + list(completed_tasks)
+    history_entries.sort(
+        key=lambda x: x.created_at if hasattr(x, "created_at") else x.completed_at,
+        reverse=True,
+    )
+    
+    history_html = render_to_string(
+        "crm/components/history.html",
+        {
+            "company": None,
+            "contact": contact,
+            "note_form": NoteForm(),
+            "csrf_token": get_token(request),
+            "history_entries": history_entries,
+            "current_url": request.path,
+        },
+    )
+    # Wrap in notesSection div for HTMX swap
+    html = f'<div id="notesSection">{history_html}</div>'
+    return HttpResponse(html)
+
+
 class DeleteNoteView(generic.View):
     # def post(self, request, pk, *args, **kwargs):
     #     note = get_object_or_404(Note, pk=pk)
@@ -406,6 +660,11 @@ class DeleteNoteView(generic.View):
                 note.delete()
             except Note.DoesNotExist:
                 pass
+        
+        # Check if it's an AJAX/HTMX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return HttpResponse(status=200)
+        
         # Redirect back to the same page
         return redirect(request.META.get("HTTP_REFERER"))
 
@@ -579,14 +838,12 @@ def search_contacts_only(request):
             if resultsContact:
                 for item in resultsContact:
                     company_name = item.company.name if item.company else ''
-                    initial = item.name[0].upper() if item.name else '?'
                     response.write(
                         f'<div class="contact-result-item" '
                         f'data-contact-id="{item.pk}" '
                         f'data-contact-name="{item.name}" '
                         f'data-contact-email="{item.email or ""}" '
                         f'data-contact-company="{company_name}">'
-                        f'<div class="contact-avatar">{initial}</div>'
                         f'<div class="contact-info">'
                         f'<div class="contact-name">{item.name}</div>'
                         f'<div class="contact-details">{item.email or "No email"}{" • " + company_name if company_name else ""}</div>'
@@ -613,32 +870,36 @@ def search_contacts_only(request):
 class add_contact_to_company(View):
 
     def post(self, request, company_pk, contact_pk):
-        csrf_token = get_token(request)
-        print("post request has been made")
-        print(request.POST.get("contact_id"))
-        print(company_pk, contact_pk)
         contact = get_object_or_404(Contact, pk=contact_pk)
         company = get_object_or_404(Company, pk=company_pk)
         contact.company = company
         contact.save()
+        
         response = HttpResponse()
         all_contacts_at_this_company = Contact.objects.filter(company=company)
+        
         if len(all_contacts_at_this_company) == 0:
-            response.write("<p>No contacts found for this company.</p>")
+            response.write('<p class="empty-state">No contacts found for this company.</p>')
         else:
-            response.write("<ul>")
+            response.write('<div class="contacts-list">')
             for contact_item in all_contacts_at_this_company:
                 url = reverse("crm:contact_detail", args=[contact_item.id])
-                url_for_company_delete = reverse(
-                    "crm:delete_company_from_contact", args=[contact_item.id]
-                )
+                job_title_html = f'<span class="contact-job">{contact_item.job_title}</span>' if contact_item.job_title else ''
                 response.write(
-                    f"<li><a href='{url}'><i><b>{ contact_item.name }</b></i></a> works here</li>"
+                    f'<div class="contact-item" id="contact-item-{contact_item.id}">'
+                    f'<div class="contact-info">'
+                    f'<i class="fa fa-user contact-icon"></i>'
+                    f'<div>'
+                    f'<a href="{url}" class="contact-name">{contact_item.name}</a>'
+                    f'{job_title_html}'
+                    f'</div>'
+                    f'</div>'
+                    f'<button type="button" class="btn-icon-minimal" title="Remove contact" onclick="confirmRemoveContact({contact_item.id}, \'{contact_item.name}\')">' 
+                    f'<i class="fa fa-times"></i>'
+                    f'</button>'
+                    f'</div>'
                 )
-                response.write(
-                    f"<form action='{url_for_company_delete}' method='post'><input type='hidden' name='csrfmiddlewaretoken' value='{csrf_token}'><button type='submit'>Delete this contact</button></form>"
-                )
-            response.write("</ul>")
+            response.write('</div>')
         return response
         # below line brings back the user to the current page
         # return render(request,'crm/index.html',{"message":f"Company, {company_name}, has been successfully deleted."})
@@ -648,12 +909,14 @@ class add_contact_to_company(View):
 
 class delete_company_from_contact(View):
     def post(self, request, contact_pk):
-        print("Contact pk is:", contact_pk)
-        # contact_pk = request.POST.get("contact_pk")
         contact = get_object_or_404(Contact, pk=contact_pk)
-        print(contact.name + ", is deleted.")
         contact.company = None
         contact.save()
+        
+        # Check if AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return HttpResponse(status=200)
+        
         return redirect(request.META.get("HTTP_REFERER"))
 
 
@@ -712,4 +975,186 @@ def customer_autocomplete(request):
         html += "<li>No results found.</li>"
     html += "</ul>"
 
+    return HttpResponse(html)
+
+
+@login_required
+def toggle_email_campaign(request, pk):
+    """Toggle email campaign on/off for a company via HTMX"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    company = get_object_or_404(Company, pk=pk)
+    
+    if request.method == "POST":
+        enable = request.POST.get("enable") == "true"
+        
+        if enable and company.status == 'prospect':
+            # Check if company has email
+            if company.email and len(company.email) > 0 and company.email[0].strip():
+                # Check if campaign already exists
+                from email_automation.models import EmailCampaign, EmailTemplate
+                from django.contrib.auth.models import User
+                
+                try:
+                    campaign = company.email_campaign
+                    # Campaign exists, just return current state
+                    logger.info(f"Campaign already exists for {company.name}")
+                except EmailCampaign.DoesNotExist:
+                    # Create new campaign
+                    user = request.user
+                    if not EmailTemplate.objects.filter(user=user, is_active=True).exists():
+                        users_with_templates = User.objects.filter(email_templates__isnull=False).distinct()
+                        if users_with_templates.exists():
+                            user = users_with_templates.first()
+                    
+                    first_template = EmailTemplate.objects.filter(
+                        user=user,
+                        sequence_number=1,
+                        is_active=True
+                    ).first()
+                    
+                    if first_template:
+                        campaign = EmailCampaign.objects.create(
+                            company=company,
+                            user=user,
+                            status='active',
+                            emails_sent=0,
+                            next_email_scheduled_at=timezone.now()
+                        )
+                        logger.info(f"✓ Campaign created for {company.name}")
+                        
+                        # Send Email 1 immediately
+                        from email_automation.email_service import send_campaign_email
+                        try:
+                            if send_campaign_email(campaign, sequence_number=1):
+                                logger.info(f"✓ Email 1 sent immediately to {company.name}")
+                            else:
+                                logger.info(f"✗ Failed to send Email 1 to {company.name}")
+                        except Exception as e:
+                            logger.error(f"✗ Error sending Email 1: {str(e)}")
+        
+        elif not enable:
+            # Disable/Pause campaign if exists
+            try:
+                from email_automation.models import EmailCampaign
+                campaign = company.email_campaign
+                if campaign.status == 'active':
+                    campaign.status = 'paused'
+                    campaign.save()
+                    logger.info(f"⊘ Campaign paused for {company.name}")
+            except EmailCampaign.DoesNotExist:
+                pass
+        
+        # Re-enable if campaign is paused
+        if enable:
+            try:
+                from email_automation.models import EmailCampaign
+                campaign = company.email_campaign
+                if campaign.status == 'paused':
+                    campaign.status = 'active'
+                    campaign.save()
+                    logger.info(f"✓ Campaign re-activated for {company.name}")
+            except EmailCampaign.DoesNotExist:
+                pass
+    
+    # Return updated campaign card HTML
+    try:
+        from email_automation.models import EmailCampaign
+        campaign = company.email_campaign
+        has_campaign = True
+    except EmailCampaign.DoesNotExist:
+        campaign = None
+        has_campaign = False
+    
+    html = f"""
+    <div class="card-header">
+        <h2><i class="fa fa-envelope"></i> Email Follow-up Campaign</h2>
+    </div>
+    """
+    
+    if has_campaign:
+        status_display = ""
+        if campaign.status == 'active':
+            status_display = '<span style="color: #10b981; font-weight: 600;">✓ Active</span>'
+        elif campaign.status == 'paused':
+            status_display = '<span style="color: #f59e0b; font-weight: 600;">⏸ Paused</span>'
+        elif campaign.status == 'completed':
+            status_display = '<span style="color: #6b7280; font-weight: 600;">✓ Completed</span>'
+        else:
+            status_display = '<span style="color: #ef4444; font-weight: 600;">⊘ Stopped</span>'
+        
+        # Checkbox should be checked if campaign is active, unchecked if paused
+        is_checked = 'checked' if campaign.status == 'active' else ''
+        checkbox_value = 'false' if campaign.status == 'active' else 'true'
+        
+        next_email_num = campaign.emails_sent + 1
+        next_email_date = campaign.next_email_scheduled_at.strftime("%b %d, %Y %H:%M") if campaign.next_email_scheduled_at else ""
+        created_date = campaign.created_at.strftime("%b %d, %Y %H:%M")
+        
+        html += f"""
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">
+                    <input type="checkbox" 
+                           id="email-campaign-toggle" 
+                           {is_checked}
+                           hx-post="/crm/company/{company.pk}/toggle_email_campaign/"
+                           hx-vals='{{"enable": "{checkbox_value}"}}'
+                           hx-target="#email-campaign-card"
+                           hx-swap="innerHTML"
+                           style="margin-right: 8px; cursor: pointer;">
+                    Enable Follow-up Emails
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Campaign Status</span>
+                <span class="info-value">{status_display}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Emails Progress</span>
+                <span class="info-value" style="font-weight: 600; font-size: 1.1em;">
+                    {campaign.emails_sent} / 6 emails sent
+                </span>
+            </div>
+        """
+        
+        if campaign.next_email_scheduled_at and campaign.status == 'active' and campaign.emails_sent < 6:
+            html += f"""
+            <div class="info-item">
+                <span class="info-label">Next Email</span>
+                <span class="info-value">
+                    Email #{next_email_num} - {next_email_date}
+                </span>
+            </div>
+            """
+        
+        html += f"""
+            <div class="info-item">
+                <span class="info-label">Campaign Started</span>
+                <span class="info-value">{created_date}</span>
+            </div>
+        </div>
+        """
+    else:
+        html += f"""
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">
+                    <input type="checkbox" 
+                           id="email-campaign-toggle" 
+                           hx-post="/crm/company/{company.pk}/toggle_email_campaign/"
+                           hx-vals='{{"enable": "true"}}'
+                           hx-target="#email-campaign-card"
+                           hx-swap="innerHTML"
+                           style="margin-right: 8px; cursor: pointer;">
+                    Enable Follow-up Emails
+                </span>
+            </div>
+        </div>
+        <p class="empty-state" style="margin: 16px 0 0 0;">
+            <i class="fa fa-info-circle"></i> Check the box above to start automated email follow-ups for this prospect.
+        </p>
+        """
+    
     return HttpResponse(html)

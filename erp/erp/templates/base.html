@@ -18,6 +18,7 @@
     {% comment %}below is htmx{% endcomment %}
     <script src="{% static 'erp/htmx.min.js' %}" defer></script>
      {% comment %} <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script> {% endcomment %}
+    {% comment %}Unsaved changes handler - now inline in base.html script section{% endcomment %}
     {% block css %}
     {% endblock %}
     <style>
@@ -409,7 +410,7 @@
     
     <!-- Task Sidebar Modal -->
     <div id="taskSidebarOverlay" class="sidebar-overlay" onclick="closeTaskSidebar()">
-      <div class="sidebar-modal" onclick="event.stopPropagation()">
+      <div class="sidebar-modal" onclick="event.stopPropagation();">
         <div class="sidebar-header">
           <button class="sidebar-close" onclick="closeTaskSidebar()">
             <i class="fa fa-times"></i> Close
@@ -514,7 +515,7 @@
     
     <!-- Company Sidebar Modal -->
     <div id="companySidebarOverlay" class="sidebar-overlay" onclick="closeCompanySidebar()">
-      <div class="sidebar-modal" onclick="event.stopPropagation()">
+      <div class="sidebar-modal" onclick="event.stopPropagation();">
         <div class="sidebar-header">
           <button class="sidebar-close" onclick="closeCompanySidebar()">
             <i class="fa fa-times"></i> Close
@@ -696,7 +697,7 @@
     
     <!-- Main Contact Sidebar Modal (From Add Menu) -->
     <div id="mainContactSidebarOverlay" class="sidebar-overlay" onclick="closeMainContactSidebar()">
-      <div class="sidebar-modal" onclick="event.stopPropagation()">
+      <div class="sidebar-modal" onclick="event.stopPropagation();">
         <div class="sidebar-header">
           <button class="sidebar-close" onclick="closeMainContactSidebar()">
             <i class="fa fa-times"></i> Close
@@ -791,7 +792,15 @@
             </div>
             
             <div class="sidebar-footer">
-              <button type="submit" class="btn btn-primary">Add Contact</button>
+              <button type="submit" id="mainContactSubmitBtn" class="btn btn-primary">
+                <span class="btn-text">Add Contact</span>
+                <span class="btn-spinner" style="display: none;">
+                  <svg class="spinner-icon" viewBox="0 0 50 50">
+                    <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                  </svg>
+                  Creating...
+                </span>
+              </button>
               <button type="button" class="btn btn-secondary" onclick="closeMainContactSidebar()">Cancel</button>
             </div>
           </form>
@@ -851,6 +860,11 @@
     </div>
     
     <script>
+      // Configure HTMX to include CSRF token in all requests
+      document.body.addEventListener('htmx:configRequest', (event) => {
+        event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+      });
+      
       // Unified menu system
       document.addEventListener('DOMContentLoaded', function() {
         const addButton = document.getElementById('addButton');
@@ -993,13 +1007,15 @@
         // Set today's date again
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('id_due_date').value = today;
-        // Focus on first input
+        // Initialize form tracking
         setTimeout(() => {
+          initializeFormTracking('taskForm');
           document.getElementById('id_name').focus();
         }, 300);
       }
       
-      function closeTaskSidebar() {
+      // Original close function (without checks)
+      function _closeTaskSidebarOriginal() {
         document.getElementById('taskSidebarOverlay').classList.remove('active');
         document.body.style.overflow = '';
         // Reset form
@@ -1010,7 +1026,23 @@
         // Clear hidden fields
         document.getElementById('id_company').value = '';
         document.getElementById('id_contact').value = '';
+        resetFormTracking();
       }
+      
+      // Wrapped close function (with unsaved changes check)
+      const closeTaskSidebar = function() {
+        // Don't show modal if form is being submitted
+        const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
+        
+        if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
+          window.showUnsavedChangesModal(
+            () => _closeTaskSidebarOriginal(),
+            () => {}
+          );
+        } else {
+          _closeTaskSidebarOriginal();
+        }
+      };
       
       // Company Modal Functions
       function openCompanySidebar() {
@@ -1022,14 +1054,16 @@
         // Set today's date for task
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('id_company_task_due').value = today;
-        // Focus on first input
+        // Initialize form tracking and focus
         setTimeout(() => {
+          initializeFormTracking('companyForm');
           document.getElementById('id_company_name').focus();
         }, 300);
       }
       
       function submitCompanyForm(event) {
         event.preventDefault();
+        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
         const form = document.getElementById('companyForm');
         const submitBtn = document.getElementById('companySubmitBtn');
         const btnText = submitBtn.querySelector('.btn-text');
@@ -1091,7 +1125,8 @@
         });
       }
       
-      function closeCompanySidebar() {
+      // Original close function
+      function _closeCompanySidebarOriginal() {
         document.getElementById('companySidebarOverlay').classList.remove('active');
         document.body.style.overflow = '';
         // Reset form
@@ -1102,7 +1137,23 @@
         document.getElementById('companyTaskSection').style.display = 'none';
         // Clear contact selection
         removeCompanyContact();
+        resetFormTracking();
       }
+      
+      // Wrapped close function
+      const closeCompanySidebar = function() {
+        // Don't show modal if form is being submitted
+        const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
+        
+        if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
+          window.showUnsavedChangesModal(
+            () => _closeCompanySidebarOriginal(),
+            () => {}
+          );
+        } else {
+          _closeCompanySidebarOriginal();
+        }
+      };
       
       // Main Contact Sidebar Functions
       function openMainContactSidebar() {
@@ -1114,13 +1165,15 @@
         // Set today's date for task
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('id_main_contact_task_due').value = today;
-        // Focus on first input
+        // Initialize form tracking and focus
         setTimeout(() => {
+          initializeFormTracking('mainContactForm');
           document.getElementById('id_main_contact_name').focus();
         }, 300);
       }
       
-      function closeMainContactSidebar() {
+      // Original close function
+      function _closeMainContactSidebarOriginal() {
         document.getElementById('mainContactSidebarOverlay').classList.remove('active');
         document.body.style.overflow = '';
         // Reset form
@@ -1128,7 +1181,23 @@
         // Hide all attachment sections
         document.getElementById('mainContactNoteSection').style.display = 'none';
         document.getElementById('mainContactTaskSection').style.display = 'none';
+        resetFormTracking();
       }
+      
+      // Wrapped close function
+      const closeMainContactSidebar = function() {
+        // Don't show modal if form is being submitted
+        const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
+        
+        if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
+          window.showUnsavedChangesModal(
+            () => _closeMainContactSidebarOriginal(),
+            () => {}
+          );
+        } else {
+          _closeMainContactSidebarOriginal();
+        }
+      };
       
       // Product Sidebar Functions
       function openProductSidebar() {
@@ -1157,6 +1226,7 @@
       
       function submitProductForm(event) {
         event.preventDefault();
+        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
         const form = document.getElementById('productForm');
         const formData = new FormData(form);
         
@@ -1186,7 +1256,19 @@
       
       function submitMainContactForm(event) {
         event.preventDefault();
+        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
         const form = document.getElementById('mainContactForm');
+        const submitBtn = document.getElementById('mainContactSubmitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+        const toast = document.getElementById('toastNotification');
+        const toastMessage = toast.querySelector('.toast-message-global');
+        
+        // Show loading state
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+        
         const formData = new FormData(form);
         
         fetch('{% url "crm:create_contact" %}', {
@@ -1199,17 +1281,38 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
+            // Show success toast
+            toastMessage.textContent = `Contact "${data.contact.name || ''}" created successfully!`;
+            toast.classList.add('show');
+            
+            // Hide toast after 3 seconds
+            setTimeout(() => {
+              toast.classList.remove('show');
+            }, 3000);
+            
+            // Close sidebar
             closeMainContactSidebar();
+            
             // Redirect to contact detail page
-            if (data.redirect_url) {
-              window.location.href = data.redirect_url;
-            }
+            setTimeout(() => {
+              if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+              }
+            }, 800);
           } else {
+            // Reset button
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
             // Show errors
             alert('Error: ' + (data.errors || 'Failed to create contact'));
           }
         })
         .catch(error => {
+          // Reset button
+          btnText.style.display = 'inline';
+          btnSpinner.style.display = 'none';
+          submitBtn.disabled = false;
           console.error('Error:', error);
           alert('An error occurred while creating the contact.');
         });
@@ -1431,6 +1534,7 @@
       
       function submitContactForm(event) {
         event.preventDefault();
+        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
         const form = document.getElementById('contactForm');
         const formData = new FormData(form);
         
@@ -1502,6 +1606,208 @@
           }
         }
       });
+      
+      // ====================================
+      // UNSAVED CHANGES HANDLER - INLINE
+      // ====================================
+      
+      // Track form changes
+      let formHasChanges = false;
+      let currentFormId = null;
+      let isSubmitting = false;
+      
+      // Initialize tracking when form is opened
+      function initializeFormTracking(formId) {
+        formHasChanges = false;
+        currentFormId = formId;
+        isSubmitting = false;
+        
+        const form = document.getElementById(formId);
+        if (!form) return;
+        
+        // Track all input changes
+        const inputs = form.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+          // Store initial value
+          input.dataset.initialValue = input.value || '';
+          
+          // Listen for changes
+          input.addEventListener('input', () => {
+            formHasChanges = true;
+          });
+          
+          input.addEventListener('change', () => {
+            formHasChanges = true;
+          });
+        });
+        
+        // Track form submission
+        form.addEventListener('submit', () => {
+          isSubmitting = true;
+        });
+      }
+      
+      // Reset form tracking
+      function resetFormTracking() {
+        formHasChanges = false;
+        currentFormId = null;
+        isSubmitting = false;
+      }
+      
+      // Show unsaved changes modal
+      function showUnsavedChangesModal(onDiscard, onReturn) {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'unsaved-changes-overlay';
+        overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(4px);
+          z-index: 10001;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: fadeIn 0.2s ease;
+        `;
+        
+        // Create modal dialog
+        const dialog = document.createElement('div');
+        dialog.className = 'unsaved-changes-dialog';
+        dialog.style.cssText = `
+          background: white;
+          border-radius: 16px;
+          max-width: 480px;
+          width: 90%;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          animation: slideUp 0.3s ease;
+          overflow: hidden;
+        `;
+        
+        dialog.innerHTML = `
+          <div style="padding: 32px;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <div style="width: 64px; height: 64px; margin: 0 auto 16px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <i class="fa fa-exclamation-triangle" style="font-size: 28px; color: #f59e0b;"></i>
+              </div>
+              <h3 style="margin: 0 0 12px; font-size: 20px; font-weight: 700; color: #111827;">
+                You have unsaved data!
+              </h3>
+              <p style="margin: 0; font-size: 15px; color: #6b7280; line-height: 1.6;">
+                The form you just closed had unsaved changes. Are you sure you want to close the form and discard the changes?
+              </p>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: center;">
+              <button 
+                type="button"
+                class="btn-return-to-form"
+                style="
+                  flex: 1;
+                  padding: 12px 24px;
+                  background: #3b82f6;
+                  color: white;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 15px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                "
+                onmouseover="this.style.background='#2563eb'"
+                onmouseout="this.style.background='#3b82f6'">
+                Return to the form
+              </button>
+              
+              <button 
+                type="button"
+                class="btn-discard-changes"
+                style="
+                  flex: 1;
+                  padding: 12px 24px;
+                  background: #f3f4f6;
+                  color: #374151;
+                  border: none;
+                  border-radius: 8px;
+                  font-size: 15px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                "
+                onmouseover="this.style.background='#e5e7eb'"
+                onmouseout="this.style.background='#f3f4f6'">
+                Discard changes
+              </button>
+            </div>
+          </div>
+        `;
+        
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        
+        // Add event listeners
+        const btnReturn = dialog.querySelector('.btn-return-to-form');
+        const btnDiscard = dialog.querySelector('.btn-discard-changes');
+        
+        btnReturn.addEventListener('click', () => {
+          overlay.remove();
+          if (onReturn) onReturn();
+        });
+        
+        btnDiscard.addEventListener('click', () => {
+          overlay.remove();
+          resetFormTracking();
+          if (onDiscard) onDiscard();
+        });
+        
+        // Close on Escape key
+        const escapeHandler = (e) => {
+          if (e.key === 'Escape') {
+            overlay.remove();
+            if (onReturn) onReturn();
+            document.removeEventListener('keydown', escapeHandler);
+          }
+        };
+        document.addEventListener('keydown', escapeHandler);
+        
+        // Add animation styles if not present
+        if (!document.getElementById('unsaved-changes-animations')) {
+          const style = document.createElement('style');
+          style.id = 'unsaved-changes-animations';
+          style.textContent = `
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes slideUp {
+              from { 
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              to { 
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      }
+      
+      // Export to window object
+      window.formChangeTracker = {
+        hasChanges: () => formHasChanges,
+        isSubmitting: () => isSubmitting,
+        setSubmitting: () => { isSubmitting = true; },
+        reset: resetFormTracking
+      };
+      
+      // ====================================
+      // END UNSAVED CHANGES HANDLER
+      // ====================================
       
       // Product Variant System
       let variantOptionCount = 0;

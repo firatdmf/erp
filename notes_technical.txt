@@ -115,3 +115,7 @@ pg_dumpall -h aws-0-eu-west-1.pooler.supabase.com -U postgres.eyzefiawzpxtwzqymy
 to run ngrok:
 python manage.py runserver 0.0.0.0:8000
 ngrok http 8000
+
+
+
+--

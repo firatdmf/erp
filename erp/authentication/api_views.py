@@ -447,12 +447,15 @@ def update_web_client_profile(request, user_id):
     if request.method == 'OPTIONS':
         response = JsonResponse({})
         response["Access-Control-Allow-Origin"] = "*"
-        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Methods"] = "POST, PUT, OPTIONS"
         response["Access-Control-Allow-Headers"] = "Content-Type"
         return response
     
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    if request.method not in ['POST', 'PUT']:
+        response = JsonResponse({'error': 'Method not allowed'}, status=405)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
     """Update web client profile information"""
     try:
         data = json.loads(request.body)
@@ -465,7 +468,30 @@ def update_web_client_profile(request, user_id):
         if 'phone' in data:
             web_client.phone = data['phone']
         if 'birthdate' in data:
-            web_client.birthdate = data['birthdate'] if data['birthdate'] else None
+            # Handle birthdate - can be empty string, None, or a date
+            birthdate_value = data['birthdate']
+            if birthdate_value and birthdate_value != '':
+                # Parse date string to ensure valid format
+                from datetime import datetime
+                try:
+                    # Try parsing ISO format (YYYY-MM-DD)
+                    parsed_date = datetime.strptime(birthdate_value, '%Y-%m-%d').date()
+                    web_client.birthdate = parsed_date
+                except ValueError as e1:
+                    # If parsing fails, try datetime.fromisoformat
+                    try:
+                        parsed_date = datetime.fromisoformat(birthdate_value.replace('Z', '+00:00')).date()
+                        web_client.birthdate = parsed_date
+                    except Exception as e2:
+                        # If all parsing fails, return error
+                        print(f"Error parsing birthdate: {birthdate_value}, Error1: {e1}, Error2: {e2}")
+                        response = JsonResponse({
+                            'error': f'Invalid birthdate format. Expected YYYY-MM-DD, got: {birthdate_value}'
+                        }, status=400)
+                        response["Access-Control-Allow-Origin"] = "*"
+                        return response
+            else:
+                web_client.birthdate = None
         
         web_client.save()
         
@@ -482,17 +508,26 @@ def update_web_client_profile(request, user_id):
         return response
         
     except WebClient.DoesNotExist:
-        return JsonResponse({
+        response = JsonResponse({
             'error': 'User not found'
         }, status=404)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
     except json.JSONDecodeError:
-        return JsonResponse({
+        response = JsonResponse({
             'error': 'Invalid JSON'
         }, status=400)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
     except Exception as e:
-        return JsonResponse({
+        import traceback
+        print(f"Error updating profile: {str(e)}")
+        print(traceback.format_exc())
+        response = JsonResponse({
             'error': str(e)
         }, status=500)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
 
 
 @csrf_exempt

@@ -141,6 +141,7 @@ TEMPLATES = [
                 # The below helps to put the view function variable global in all templates
                 "erp.context_processors.last_ten_entities",
                 "erp.context_processors.client_groups",
+                "erp.context_processors.all_members",
                 # Removed: product_categories and suppliers - not used in base.html
                 # "erp.context_processors.product_categories",
                 # "erp.context_processors.suppliers",

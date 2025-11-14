@@ -207,12 +207,21 @@ class CompanyCreate(generic.edit.CreateView):
             task_due_date = form.cleaned_data.get("task_due_date")
             if task_name and task_due_date:
                 task_description = form.cleaned_data.get("task_description", "")
+                task_member_id = form.cleaned_data.get("task_member")
+                
+                # Get member - default to current user if not provided
+                if task_member_id:
+                    from authentication.models import Member
+                    task_member = Member.objects.get(pk=task_member_id)
+                else:
+                    task_member = self.request.user.member
+                
                 Task.objects.create(
                     name=task_name,
                     due_date=task_due_date,
                     description=task_description,
                     company=self.object,
-                    member=self.request.user.member,
+                    member=task_member,
                 )
             
             # NOTE: Email campaign creation is now handled by email_automation module's signal
@@ -282,13 +291,16 @@ class ContactDetail(generic.DetailView):
         contact = self.get_object()
         context["notes"] = Note.objects.filter(contact=contact)
         context["note_form"] = NoteForm()
-        context["tasks"] = Task.objects.filter(contact=contact)
+        # Filter tasks by current user's member
+        current_member = self.request.user.member if hasattr(self.request.user, 'member') else None
+        context["tasks"] = Task.objects.filter(contact=contact, member=current_member)
         initial_task_data = {
             "contact": contact.pk,
         }
         # below is hide some specific fields I chose in todo task form view
+        current_member = self.request.user.member if hasattr(self.request.user, 'member') else None
         context["task_form"] = TaskForm(
-            initial=initial_task_data, hide_fields=True
+            initial=initial_task_data, hide_fields=True, current_member=current_member
         )  # Add task form to context
         return context
 
@@ -315,12 +327,15 @@ class ContactDetail(generic.DetailView):
         elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.contact = contact
-            task.member = request.user.member
+            # Member is already set from form data
+            if not task.member:
+                task.member = request.user.member
             task.save()
             
             if is_htmx:
-                # Return task list HTML
-                tasks = Task.objects.filter(contact=contact, completed=False).order_by('-due_date')
+                # Return task list HTML - filter by current user
+                current_member = request.user.member if hasattr(request.user, 'member') else None
+                tasks = Task.objects.filter(contact=contact, member=current_member, completed=False).order_by('-due_date')
                 html = ''
                 task_count = 0
                 for t in tasks:
@@ -395,14 +410,17 @@ class CompanyDetail(generic.DetailView):
         # below is to preselect the company field in the task form with the current company
         initial_task_data = {"company": company.pk}
         # below is hide some specific fields I chose in todo task form view
+        current_member = self.request.user.member if hasattr(self.request.user, 'member') else None
         context["task_form"] = TaskForm(
-            initial=initial_task_data, hide_fields=True
+            initial=initial_task_data, hide_fields=True, current_member=current_member
         )  # Add task form to context
 
         contacts = Contact.objects.filter(company=company)
         context["contacts"] = contacts
 
-        context["tasks"] = Task.objects.filter(company=company)
+        # Filter tasks by current user's member
+        current_member = self.request.user.member if hasattr(self.request.user, 'member') else None
+        context["tasks"] = Task.objects.filter(company=company, member=current_member)
         
         # Add email campaign info if exists
         try:
@@ -443,12 +461,15 @@ class CompanyDetail(generic.DetailView):
         elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.company = company
-            task.member = request.user.member
+            # Member is already set from form data
+            if not task.member:
+                task.member = request.user.member
             task.save()
             
             if is_htmx:
-                # Return updated task list for HTMX
-                tasks = Task.objects.filter(company=company).order_by('-due_date')
+                # Return updated task list for HTMX - filter by current user
+                current_member = request.user.member if hasattr(request.user, 'member') else None
+                tasks = Task.objects.filter(company=company, member=current_member).order_by('-due_date')
                 from datetime import date
                 html = ''
                 task_count = 0

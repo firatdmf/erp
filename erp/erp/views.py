@@ -84,12 +84,15 @@ class Dashboard(View):
                 date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
                 today = timezone.localdate()
                 
+                # Get current user's member
+                current_member = request.user.member if hasattr(request.user, 'member') else None
+                
                 # If selected date is today, show all tasks up to and including today
                 if date_obj == today:
-                    tasks = Task.objects.filter(completed=False, due_date__lte=today).select_related('contact', 'company', 'member').order_by('-due_date')
+                    tasks = Task.objects.filter(completed=False, due_date__lte=today, member=current_member).select_related('contact', 'company', 'member').order_by('-due_date')
                 else:
                     # For other dates, show only tasks for that specific date
-                    tasks = Task.objects.filter(completed=False, due_date=date_obj).select_related('contact', 'company', 'member')
+                    tasks = Task.objects.filter(completed=False, due_date=date_obj, member=current_member).select_related('contact', 'company', 'member')
                 
                 # Render tasks using the same template
                 html = render_to_string('todo/components/tasks.html', {

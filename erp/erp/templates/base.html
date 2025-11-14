@@ -438,6 +438,15 @@
               <textarea name="description" id="id_description" class="form-textarea" rows="3" placeholder="Enter a description or any notes about this task."></textarea>
             </div>
             
+            <div class="form-group">
+              <label for="id_task_member">Assign to</label>
+              <select name="member" id="id_task_member" class="form-input">
+                {% for member in all_members %}
+                  <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
             <!-- Attach an item section -->
             <div class="attach-section">
               <div class="attach-header">
@@ -676,6 +685,14 @@
                 <label for="id_company_task_desc">Description</label>
                 <textarea name="task_description" id="id_company_task_desc" class="form-textarea" rows="3"></textarea>
               </div>
+              <div class="form-group">
+                <label for="id_company_task_member">Assign to</label>
+                <select name="task_member" id="id_company_task_member" class="form-input">
+                  {% for member in all_members %}
+                    <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}</option>
+                  {% endfor %}
+                </select>
+              </div>
             </div>
             
             <div class="sidebar-footer">
@@ -788,6 +805,14 @@
               <div class="form-group">
                 <label for="id_main_contact_task_desc">Description</label>
                 <textarea name="task_description" id="id_main_contact_task_desc" class="form-textarea" rows="3"></textarea>
+              </div>
+              <div class="form-group">
+                <label for="id_main_contact_task_member">Assign to</label>
+                <select name="task_member" id="id_main_contact_task_member" class="form-input">
+                  {% for member in all_members %}
+                    <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}</option>
+                  {% endfor %}
+                </select>
               </div>
             </div>
             

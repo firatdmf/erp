@@ -1,5 +1,6 @@
 from crm.models import Contact, Company, ClientGroup, Supplier
 from marketing.models import ProductCategory
+from authentication.models import Member
 from itertools import chain
 from operator import attrgetter
 from django.db.models import Value, CharField
@@ -62,3 +63,7 @@ def suppliers(request):
         suppliers_list = list(Supplier.objects.all())
         cache.set('suppliers_list', suppliers_list, 300)  # 5 minutes
     return {'suppliers': suppliers_list}
+
+def all_members(request):
+    """Lazy loading of all members for task assignment"""
+    return {'all_members': LazyList(lambda: Member.objects.select_related('user').all())}

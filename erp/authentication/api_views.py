@@ -964,3 +964,39 @@ def remove_from_cart(request, user_id, item_id):
         return JsonResponse({
             'error': str(e)
         }, status=500)
+
+
+@csrf_exempt
+def clear_cart(request, user_id):
+    """Clear all items from user's cart"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from .models import CartItem
+        
+        web_client = WebClient.objects.get(id=user_id)
+        deleted_count, _ = CartItem.objects.filter(client=web_client).delete()
+        
+        response = JsonResponse({
+            'message': 'Cart cleared successfully',
+            'deleted_items': deleted_count
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)

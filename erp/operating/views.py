@@ -1013,3 +1013,110 @@ def get_order_status(request, order_id):
         )
     except Order.DoesNotExist:
         return JsonResponse({"error": "Order not found"}, status=404)
+
+
+@csrf_exempt
+def create_web_order(request):
+    """API endpoint to create orders from web checkout"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        
+        # Get web client
+        from authentication.models import WebClient
+        web_client_id = data.get('web_client_id')
+        if not web_client_id:
+            return JsonResponse({'error': 'web_client_id required'}, status=400)
+        
+        try:
+            web_client = WebClient.objects.get(pk=web_client_id)
+        except WebClient.DoesNotExist:
+            return JsonResponse({'error': 'Web client not found'}, status=404)
+        
+        # Create order
+        with transaction.atomic():
+            order = Order.objects.create(
+                web_client=web_client,
+                status=data.get('status', 'pending'),
+                notes=data.get('notes', ''),
+                
+                # Payment fields
+                payment_id=data.get('payment_id'),
+                payment_method=data.get('payment_method'),
+                payment_status=data.get('payment_status'),
+                card_type=data.get('card_type'),
+                card_association=data.get('card_association'),
+                card_last_four=data.get('card_last_four'),
+                
+                # Pricing fields
+                original_currency=data.get('original_currency'),
+                original_price=data.get('original_price'),
+                paid_currency=data.get('paid_currency'),
+                paid_amount=data.get('paid_amount'),
+                exchange_rate=data.get('exchange_rate'),
+                
+                # Delivery address
+                delivery_address_title=data.get('delivery_address_title'),
+                delivery_address=data.get('delivery_address'),
+                delivery_city=data.get('delivery_city'),
+                delivery_country=data.get('delivery_country'),
+                delivery_phone=data.get('delivery_phone'),
+                
+                # Billing address
+                billing_address_title=data.get('billing_address_title'),
+                billing_address=data.get('billing_address'),
+                billing_city=data.get('billing_city'),
+                billing_country=data.get('billing_country'),
+                billing_phone=data.get('billing_phone'),
+            )
+            
+            # Create order items
+            items = data.get('items', [])
+            for item_data in items:
+                product_sku = item_data.get('product_sku')
+                variant_sku = item_data.get('product_variant_sku')
+                
+                product = None
+                variant = None
+                
+                # Get product
+                if product_sku:
+                    try:
+                        product = Product.objects.get(sku=product_sku)
+                    except Product.DoesNotExist:
+                        pass
+                
+                # Get variant if specified
+                if variant_sku:
+                    try:
+                        variant = ProductVariant.objects.get(variant_sku=variant_sku)
+                        if not product and variant:
+                            product = variant.product
+                    except ProductVariant.DoesNotExist:
+                        pass
+                
+                if product:
+                    OrderItem.objects.create(
+                        order=order,
+                        product=product,
+                        product_variant=variant,
+                        quantity=item_data.get('quantity', 1),
+                        price=item_data.get('price', 0),
+                        description=item_data.get('description', '')
+                    )
+            
+            return JsonResponse({
+                'success': True,
+                'order_id': order.pk,
+                'order_number': str(order.pk)
+            }, status=201)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': 'Order creation failed',
+            'details': str(e)
+        }, status=500)

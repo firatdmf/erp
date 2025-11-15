@@ -222,16 +222,70 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # should be linked to an either contact or company
+    # Customer can be: contact (B2B), company (B2B), or web_client (B2C)
     contact = models.ForeignKey(
         Contact, on_delete=models.SET_NULL, blank=True, null=True
     )
     company = models.ForeignKey(
         Company, on_delete=models.SET_NULL, blank=True, null=True
     )
+    web_client = models.ForeignKey(
+        'authentication.WebClient', 
+        on_delete=models.SET_NULL, 
+        blank=True, 
+        null=True,
+        related_name='orders'
+    )
+    
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     notes = models.TextField(blank=True, null=True)
-    qr_code_url = models.URLField(blank=True, null=True)  # ✅ Add this line
+    qr_code_url = models.URLField(blank=True, null=True)
+    
+    # Payment Information (for web orders)
+    payment_id = models.CharField(max_length=100, blank=True, null=True)
+    payment_method = models.CharField(max_length=50, blank=True, null=True)  # 'iyzico_card', 'bank_transfer', etc.
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('success', 'Success'),
+            ('failed', 'Failed'),
+            ('refunded', 'Refunded'),
+        ],
+        blank=True,
+        null=True
+    )
+    
+    # Pricing Information
+    original_currency = models.CharField(max_length=3, blank=True, null=True)  # 'USD', 'EUR', etc.
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    paid_currency = models.CharField(max_length=3, blank=True, null=True)  # 'TRY'
+    paid_amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, blank=True, null=True)
+    
+    # Card Information (last 4 digits only)
+    card_type = models.CharField(max_length=50, blank=True, null=True)
+    card_association = models.CharField(max_length=50, blank=True, null=True)
+    card_last_four = models.CharField(max_length=4, blank=True, null=True)
+    
+    # Delivery Address
+    delivery_address_title = models.CharField(max_length=100, blank=True, null=True)
+    delivery_address = models.TextField(blank=True, null=True)
+    delivery_city = models.CharField(max_length=100, blank=True, null=True)
+    delivery_country = models.CharField(max_length=100, blank=True, null=True)
+    delivery_phone = models.CharField(max_length=20, blank=True, null=True)
+    
+    # Billing Address
+    billing_address_title = models.CharField(max_length=100, blank=True, null=True)
+    billing_address = models.TextField(blank=True, null=True)
+    billing_city = models.CharField(max_length=100, blank=True, null=True)
+    billing_country = models.CharField(max_length=100, blank=True, null=True)
+    billing_phone = models.CharField(max_length=20, blank=True, null=True)
+    
+    # Shipping Tracking
+    tracking_number = models.CharField(max_length=100, blank=True, null=True)
+    shipped_at = models.DateTimeField(blank=True, null=True)
+    delivered_at = models.DateTimeField(blank=True, null=True)
 
     def total_value(self):
         # round makes it have two decimals
@@ -244,6 +298,8 @@ class Order(models.Model):
             return self.contact
         elif self.company:
             return self.company
+        elif self.web_client:
+            return self.web_client
         return "Unknown Client"
 
     # below function is used in signals.py

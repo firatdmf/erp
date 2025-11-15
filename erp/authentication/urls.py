@@ -32,4 +32,5 @@ urlpatterns = [
     path('api/add_to_cart/<int:user_id>/', api_views.add_to_cart, name='add_to_cart'),
     path('api/update_cart_item/<int:user_id>/<int:item_id>/', api_views.update_cart_item, name='update_cart_item'),
     path('api/remove_from_cart/<int:user_id>/<int:item_id>/', api_views.remove_from_cart, name='remove_from_cart'),
+    path('api/clear_cart/<int:user_id>/', api_views.clear_cart, name='clear_cart'),
 ]

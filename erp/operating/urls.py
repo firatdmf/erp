@@ -6,6 +6,7 @@ from django.views.generic import TemplateView
 app_name = "operating"
 urlpatterns = [
     path("", views.index.as_view(), name="index"),
+    path("orders/create/", views.create_web_order, name="create_web_order"),
     path("orders/create", views.OrderCreate.as_view(), name="create_order"),
     path("orders/edit/<int:pk>/", views.OrderEdit.as_view(), name="edit_order"),
     path("orders/<int:pk>/", views.OrderDetail.as_view(), name="order_detail"),

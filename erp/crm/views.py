@@ -53,8 +53,27 @@ class ContactList(generic.ListView):
     paginate_by = 25  # Show 25 contacts per page
     
     def get_queryset(self):
-        # Prefetch company to avoid N+1 queries
-        return Contact.objects.select_related('company').order_by('name')
+        queryset = Contact.objects.select_related('company').order_by('name')
+        
+        # Get search query from URL parameter
+        search_query = self.request.GET.get('search', '').strip()
+        
+        if search_query:
+            # Search in name, email array, phone array, and company name
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) |
+                Q(email__icontains=search_query) |
+                Q(phone__icontains=search_query) |
+                Q(company__name__icontains=search_query)
+            )
+        
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pass search query to template
+        context['search_query'] = self.request.GET.get('search', '')
+        return context
 
 
 class CompanyList(generic.ListView):
@@ -65,10 +84,28 @@ class CompanyList(generic.ListView):
     paginate_by = 25  # Show 25 companies per page
     
     def get_queryset(self):
-        # Annotate with contacts count to avoid N+1 queries
-        return Company.objects.annotate(
+        queryset = Company.objects.annotate(
             contacts_count=Count('contacts')
         ).order_by('name')
+        
+        # Get search query from URL parameter
+        search_query = self.request.GET.get('search', '').strip()
+        
+        if search_query:
+            # Search in name, email array, phone array
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) |
+                Q(email__icontains=search_query) |
+                Q(phone__icontains=search_query)
+            )
+        
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pass search query to template
+        context['search_query'] = self.request.GET.get('search', '')
+        return context
 
 
 class ContactCreate(generic.edit.CreateView):
@@ -97,8 +134,8 @@ class ContactCreate(generic.edit.CreateView):
                     # set contact's company to the created or existing company.
                     form.instance.company = company
 
-                # Save the contact
-                self.object = form.save()
+                # Save the contact (pass request for task member)
+                self.object = form.save(request=self.request)
                 
                 # Check if AJAX request (from nested sidebar)
                 if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':

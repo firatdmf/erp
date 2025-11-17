@@ -526,6 +526,42 @@ class OrderList(ListView):
     template_name = "operating/order_list.html"
     context_object_name = "orders"
     ordering = ["-created_at"]
+    
+    def get_queryset(self):
+        # Optimize with select_related and prefetch_related to avoid N+1 queries
+        return (
+            Order.objects
+            .select_related('contact', 'company', 'web_client')
+            .prefetch_related('items')
+            .order_by("-created_at")
+        )
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Use the already-evaluated list to share prefetch cache across tabs
+        all_orders = context.get('orders', [])
+        
+        # B2B orders: Has contact OR company, but NO web_client
+        b2b_orders = [
+            order for order in all_orders 
+            if (order.contact or order.company) and not order.web_client
+        ]
+        
+        # B2C orders: Has web_client (regardless of contact/company)
+        b2c_orders = [
+            order for order in all_orders 
+            if order.web_client
+        ]
+        
+        # Add to context
+        context['b2b_orders'] = b2b_orders
+        context['b2c_orders'] = b2c_orders
+        context['total_count'] = len(all_orders)
+        context['b2b_count'] = len(b2b_orders)
+        context['b2c_count'] = len(b2c_orders)
+        
+        return context
 
 
 class OrderProduction(View):

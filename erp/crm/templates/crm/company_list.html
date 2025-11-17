@@ -31,8 +31,9 @@
         placeholder="Search companies by name, email, or phone..." 
         class="search-input-modern"
         autocomplete="off"
+        value="{{ search_query }}"
       >
-      <button type="button" class="search-clear" id="searchClear" style="display: none;" onclick="clearSearch()">
+      <button type="button" class="search-clear" id="searchClear" style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
         <i class="fa fa-times"></i>
       </button>
     </div>
@@ -133,8 +134,8 @@
     </div>
     <div class="pagination">
       {% if page_obj.has_previous %}
-        <a href="?page=1" class="pagination-btn" title="First"><i class="fa fa-angles-left"></i></a>
-        <a href="?page={{ page_obj.previous_page_number }}" class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn" title="First"><i class="fa fa-angles-left"></i></a>
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
       {% else %}
         <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
         <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
@@ -144,13 +145,13 @@
         {% if page_obj.number == num %}
           <span class="pagination-btn active">{{ num }}</span>
         {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-          <a href="?page={{ num }}" class="pagination-btn">{{ num }}</a>
+          <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">{{ num }}</a>
         {% endif %}
       {% endfor %}
 
       {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}" class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
-        <a href="?page={{ paginator.num_pages }}" class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}" class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
       {% else %}
         <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
         <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
@@ -382,34 +383,32 @@
 </div>
 
 <script>
-// Simple search functionality
+// Backend search functionality
 const searchInput = document.getElementById('instantSearch');
 const searchClear = document.getElementById('searchClear');
-const tbody = document.getElementById('companiesTableBody');
-const allRows = Array.from(tbody.querySelectorAll('tr'));
 
 if (searchInput) {
+  // Navigate to search URL with debounce
+  let searchTimeout;
   searchInput.addEventListener('input', function(e) {
-    const query = e.target.value.toLowerCase().trim();
+    const query = e.target.value.trim();
     searchClear.style.display = query ? 'flex' : 'none';
     
-    allRows.forEach(row => {
-      if (row.querySelector('.empty-state')) return;
-      
-      const companyName = row.querySelector('.product-title')?.textContent.toLowerCase() || '';
-      const email = row.cells[2]?.textContent.toLowerCase() || '';
-      const phone = row.cells[3]?.textContent.toLowerCase() || '';
-      
-      const matches = companyName.includes(query) || email.includes(query) || phone.includes(query);
-      row.style.display = matches ? '' : 'none';
-    });
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      if (query) {
+        window.location.href = '{% url "crm:company_list" %}?search=' + encodeURIComponent(query);
+      } else {
+        window.location.href = '{% url "crm:company_list" %}';
+      }
+    }, 500); // 500ms debounce
   });
 }
 
 function clearSearch() {
   searchInput.value = '';
   searchClear.style.display = 'none';
-  allRows.forEach(row => row.style.display = '');
+  window.location.href = '{% url "crm:company_list" %}';
 }
 
 // Delete Modal Functions

@@ -54,6 +54,10 @@ class ContactCreateForm(ModelForm):
     task_description = forms.CharField(
         widget=forms.Textarea, label="Task Description", required=False
     )
+    task_member = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "task_member_id"})
+    )
 
     def clean_emails_data(self):
         import json
@@ -108,7 +112,7 @@ class ContactCreateForm(ModelForm):
         self.fields = OrderedDict(new_fields)
 
     # when the form is submitted (Saved), do this.
-    def save(self, commit=True):
+    def save(self, commit=True, request=None):
         instance = super().save(commit=False)
         # Set email and phone arrays
         instance.email = self.cleaned_data.get("emails_data", [])
@@ -120,12 +124,23 @@ class ContactCreateForm(ModelForm):
                     contact=instance, content=self.cleaned_data["note_content"]
                 )
             if self.cleaned_data["task_name"] and self.cleaned_data["task_due_date"]:
+                # Get task member - use request.user if available
+                task_member_id = self.cleaned_data.get("task_member")
+                if task_member_id:
+                    from authentication.models import Member
+                    task_member = Member.objects.get(pk=task_member_id)
+                elif request and hasattr(request.user, 'member'):
+                    task_member = request.user.member
+                else:
+                    # Skip task creation if no member available
+                    return instance
+                
                 Task.objects.create(
-                    contact = instance,
+                    contact=instance,
                     name=self.cleaned_data["task_name"],
                     due_date=self.cleaned_data["task_due_date"],
                     description=self.cleaned_data["task_description"],
-                    member = instance.member,
+                    member=task_member,
                 )
         return instance
     

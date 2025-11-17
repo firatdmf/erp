@@ -107,6 +107,88 @@
         transform: scale(1.1);
         box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
       }
+      
+      /* Modern Contact Search Results */
+      .contact-results {
+        max-height: 300px;
+        overflow-y: auto;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        display: none;
+        margin-top: 8px;
+      }
+      
+      .contact-results.active {
+        display: block;
+      }
+      
+      .contact-result-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        user-select: none;
+      }
+      
+      .contact-result-item:hover {
+        background: #f0f4ff;
+      }
+      
+      .contact-result-item:active {
+        background: #e0e7ff;
+      }
+      
+      .contact-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+      
+      .contact-info {
+        flex: 1;
+        min-width: 0;
+        pointer-events: none;
+      }
+      
+      .contact-name {
+        font-weight: 600;
+        color: #111827;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      
+      .contact-details {
+        font-size: 13px;
+        color: #6b7280;
+        margin-top: 2px;
+        cursor: pointer;
+      }
+      
+      .selected-contact {
+        margin-top: 12px;
+        padding: 12px 16px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        display: none;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .selected-contact.active {
+        display: flex;
+      }
     </style>
   </head>
   <body>
@@ -1481,7 +1563,7 @@
           clearTimeout(companyContactSearchTimeout);
           const query = this.value.trim();
           
-          if (query.length < 2) {
+          if (query.length < 1) {
             companyContactResults.classList.remove('active');
             companyContactResults.innerHTML = '';
             return;
@@ -1509,7 +1591,7 @@
               .catch(error => {
                 console.error('Error searching contacts:', error);
               });
-          }, 300);
+          }, 200);
         });
       }
       
@@ -1519,15 +1601,27 @@
         companyContactResults.classList.remove('active');
         companyContactResults.innerHTML = '';
         
-        const initial = name.charAt(0).toUpperCase();
         companySelectedContact.innerHTML = `
-          <div class="contact-avatar-small">${initial}</div>
-          <div class="selected-contact-info">
-            <div class="contact-name-small">${name}</div>
-            <div class="contact-details-small">${email}${company ? ' • ' + company : ''}</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; color: #111827; font-size: 15px;">${name}</div>
+            <div style="font-size: 13px; color: #6b7280; margin-top: 2px;">${email}${company ? ' • ' + company : ''}</div>
           </div>
-          <button type="button" class="remove-contact-btn-small" onclick="removeCompanyContact()">
+          <button type="button" style="
+            padding: 6px 12px;
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          " onclick="removeCompanyContact()" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
             <i class="fa fa-times"></i>
+            Remove
           </button>
         `;
         companySelectedContact.classList.add('active');

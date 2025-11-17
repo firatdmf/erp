@@ -896,15 +896,19 @@ def search_contacts_only(request):
             if resultsContact:
                 for item in resultsContact:
                     company_name = item.company.name if item.company else ''
+                    initial = item.name[0].upper() if item.name else '?'
+                    email_str = item.email[0] if item.email and len(item.email) > 0 else 'No email'
+                    company_str = f' • {company_name}' if company_name else ''
                     response.write(
                         f'<div class="contact-result-item" '
                         f'data-contact-id="{item.pk}" '
                         f'data-contact-name="{item.name}" '
-                        f'data-contact-email="{item.email or ""}" '
+                        f'data-contact-email="{email_str}" '
                         f'data-contact-company="{company_name}">'
+                        f'<div class="contact-avatar">{initial}</div>'
                         f'<div class="contact-info">'
                         f'<div class="contact-name">{item.name}</div>'
-                        f'<div class="contact-details">{item.email or "No email"}{" • " + company_name if company_name else ""}</div>'
+                        f'<div class="contact-details">{email_str}{company_str}</div>'
                         f'</div>'
                         f'</div>'
                     )

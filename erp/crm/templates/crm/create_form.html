@@ -151,10 +151,11 @@
     padding: 0.875rem 1rem;
     border-bottom: 1px solid #f3f4f6;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    user-select: none;
   }
 
   .contact-result-item:last-child {
@@ -162,7 +163,13 @@
   }
 
   .contact-result-item:hover {
-    background: #f9fafb;
+    background: #f0f4ff;
+    transform: translateX(4px);
+  }
+
+  .contact-result-item:active {
+    transform: translateX(2px);
+    background: #e0e7ff;
   }
 
   .contact-avatar {
@@ -182,18 +189,22 @@
   .contact-info {
     flex: 1;
     min-width: 0;
+    cursor: pointer;
+    pointer-events: none;
   }
 
   .contact-name {
     font-weight: 600;
     color: #111827;
     font-size: 0.9375rem;
+    cursor: pointer;
   }
 
   .contact-details {
     font-size: 0.8125rem;
     color: #6b7280;
     margin-top: 0.125rem;
+    cursor: pointer;
   }
 
   .selected-contact {

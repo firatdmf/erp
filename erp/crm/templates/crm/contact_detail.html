@@ -225,7 +225,7 @@
         <div style="display:flex;flex-direction:column;gap:0.75rem;">
           <div>
             <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">Task Name</label>
-            <input type="text" id="edit-task-name-${taskId}" value="${name}" style="width:100%;padding:0.5rem;border:2px solid #3b82f6;border-radius:6px;font-size:0.875rem;font-weight:600;" />
+            <input type="text" id="edit-task-name-${taskId}" style="width:100%;padding:0.5rem;border:2px solid #3b82f6;border-radius:6px;font-size:0.875rem;font-weight:600;" />
           </div>
           <div>
             <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">Description (optional)</label>
@@ -246,7 +246,10 @@
         </div>
       `;
       
-      document.getElementById(`edit-task-name-${taskId}`).focus();
+      const nameInput = document.getElementById(`edit-task-name-${taskId}`);
+      nameInput.value = name;
+      nameInput.focus();
+      nameInput.setSelectionRange(nameInput.value.length, nameInput.value.length);
     }
     
     function cancelTaskEdit(taskId) {
@@ -282,13 +285,13 @@
         body: `name=${encodeURIComponent(name)}&description=${encodeURIComponent(description)}&due_date=${dueDate}`
       }).then(response => response.json())
       .then(data => {
-        if (data.success) {
+        if (data.success && data.task) {
           document.getElementById(`task-content-${taskId}`).innerHTML = `
-            <h3 class="task-name">${data.name}</h3>
-            ${data.description ? `<p class="task-description">${data.description}</p>` : ''}
+            <h3 class="task-name">${data.task.name}</h3>
+            ${data.task.description ? `<p class="task-description">${data.task.description}</p>` : ''}
             <div class="task-meta">
-              <span class="task-due">Due: ${data.due_date_display}</span>
-              ${data.overdue_badge || ''}
+              <span class="task-due">Due: ${data.task.due_date}</span>
+              ${data.task.overdue_badge || ''}
             </div>
           `;
         } else {

@@ -316,10 +316,13 @@ def update_task_ajax(request, task_id):
             
             return JsonResponse({
                 'success': True,
-                'name': task.name,
-                'description': task.description,
-                'due_date_display': due_date.strftime('%b %d, %Y'),
-                'overdue_badge': overdue_badge
+                'task': {
+                    'id': task.id,
+                    'name': task.name,
+                    'description': task.description,
+                    'due_date': due_date.strftime('%b %d, %Y'),
+                    'overdue_badge': overdue_badge
+                }
             })
         except ValueError:
             return JsonResponse({'success': False, 'error': 'Invalid date format'})

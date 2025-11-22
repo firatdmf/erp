@@ -117,18 +117,205 @@ class CreateTask(generic.edit.CreateView):
         print("Form due_date:", form.cleaned_data.get('due_date'))
         print("Current localdate:", timezone.localdate())
         print("Current date.today():", date.today())
-        form.instance.member = self.request.user.member
+        form.instance.created_by = self.request.user.member
+        # If member is not set, assign to creator
+        if not form.instance.member:
+            form.instance.member = self.request.user.member
         return super().form_valid(form)
 
 
 @method_decorator(login_required, name="dispatch")
-class TaskReport(generic.ListView):
-    # Model to list out
-    model = Task
-    # Where to list out
+class TaskReport(View):
     template_name = "todo/task_report.html"
-    # Variable to use in the template for listing out
-    context_object_name = "tasks"
+    
+    def get(self, request):
+        from django.core.paginator import Paginator
+        from django.db.models import Q
+        
+        current_member = request.user.member if hasattr(request.user, 'member') else None
+        tab = request.GET.get('tab', 'myTasks')
+        search_query = request.GET.get('search', '').strip()
+        page_number = request.GET.get('page', 1)
+        
+        print(f"\n=== TaskReport Debug ===")
+        print(f"Current member: {current_member} (ID: {current_member.id if current_member else None})")
+        print(f"Tab: {tab}")
+        print(f"Search: {search_query}")
+        print(f"Page: {page_number}")
+        
+        # My Tasks - tasks assigned to me (OPTIMIZED)
+        my_tasks_query = Task.objects.filter(
+            member=current_member,
+            completed=False
+        ).select_related(
+            'contact', 
+            'company', 
+            'member__user',  # ✅ Optimized: member.user already loaded
+            'created_by__user'
+        ).order_by('-priority', 'due_date')
+        
+        # Apply search filter for My Tasks (OPTIMIZED - Türkçe karakter desteği ile)
+        if search_query:
+            # Türkçe karakterler için upper() kullan (İ/i problemi için)
+            search_upper = search_query.upper()
+            my_tasks_query = my_tasks_query.filter(
+                Q(name__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(contact__name__icontains=search_query) |
+                Q(company__name__icontains=search_query)
+            )
+        
+        print(f"My tasks count: {my_tasks_query.count()}")
+        
+        # Paginate My Tasks
+        my_tasks_paginator = Paginator(my_tasks_query, 10)  # 10 tasks per page
+        my_tasks_page = my_tasks_paginator.get_page(page_number if tab == 'myTasks' else 1)
+        
+        # Assigned Tasks - tasks I created/assigned to others (OPTIMIZED)
+        assigned_tasks_query = Task.objects.filter(
+            created_by=current_member,
+            completed=False
+        ).exclude(
+            member=current_member
+        ).select_related(
+            'contact', 
+            'company', 
+            'member__user',  # ✅ Already optimized
+            'created_by__user'
+        ).order_by('-priority', 'due_date')
+        
+        # Apply search filter for Assigned Tasks (OPTIMIZED - Türkçe karakter desteği ile)
+        if search_query:
+            # Türkçe karakterler için upper() kullan (İ/i problemi için)
+            search_upper = search_query.upper()
+            assigned_tasks_query = assigned_tasks_query.filter(
+                Q(name__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(contact__name__icontains=search_query) |
+                Q(company__name__icontains=search_query) |
+                Q(member__user__first_name__icontains=search_query) |
+                Q(member__user__last_name__icontains=search_query)
+            )
+        
+        print(f"Assigned tasks count: {assigned_tasks_query.count()}")
+        
+        # Calculate statistics BEFORE applying search (for display purposes)
+        # These should NOT change when user searches
+        my_total_count = Task.objects.filter(member=current_member, completed=False).count()
+        assigned_total_count = Task.objects.filter(
+            created_by=current_member,
+            completed=False
+        ).exclude(member=current_member).count()
+        
+        # Paginate Assigned Tasks
+        assigned_tasks_paginator = Paginator(assigned_tasks_query, 10)  # 10 tasks per page
+        assigned_tasks_page = assigned_tasks_paginator.get_page(page_number if tab == 'assignedTasks' else 1)
+        
+        # AJAX için direkt döndür - statistics'i hesaplama (ÇOOK DAHA HIZLI)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            if tab == 'myTasks':
+                html = render_to_string('todo/components/task_table.html', {
+                    'tasks': my_tasks_page,
+                    'today': timezone.localdate(),
+                    'total_count': my_total_count,  # Use pre-calculated total, not filtered count
+                    'completed_count': 0,  # Skip expensive query
+                    'ongoing_count': my_total_count,  # Use pre-calculated total
+                    'is_assigned_view': False,
+                    'search_query': search_query,
+                    'tab': tab,
+                }, request=request)
+            else:
+                html = render_to_string('todo/components/task_table.html', {
+                    'tasks': assigned_tasks_page,
+                    'today': timezone.localdate(),
+                    'total_count': assigned_total_count,  # Use pre-calculated total, not filtered count
+                    'completed_count': 0,  # Skip expensive query
+                    'ongoing_count': assigned_total_count,  # Use pre-calculated total
+                    'is_assigned_view': True,
+                    'search_query': search_query,
+                    'tab': tab,
+                }, request=request)
+            return HttpResponse(html)
+        
+        # Full page load için statistics hesapla
+        from datetime import timedelta
+        today = timezone.localdate()
+        week_start = today - timedelta(days=today.weekday())  # Monday
+        week_end = week_start + timedelta(days=6)  # Sunday
+        
+        # My Tasks - all tasks assigned to me (including completed)
+        all_my_tasks = Task.objects.filter(member=current_member)
+        my_total = all_my_tasks.count()
+        my_ongoing = all_my_tasks.filter(completed=False).count()
+        my_completed_this_week = all_my_tasks.filter(
+            completed=True,
+            completed_at__gte=week_start,
+            completed_at__lte=week_end + timedelta(days=1)  # Include end of Sunday
+        ).count()
+        
+        # Assigned Tasks - all tasks I created for others (including completed)
+        all_assigned_tasks = Task.objects.filter(
+            created_by=current_member
+        ).exclude(member=current_member)
+        assigned_total = all_assigned_tasks.count()
+        assigned_ongoing = all_assigned_tasks.filter(completed=False).count()
+        assigned_completed_this_week = all_assigned_tasks.filter(
+            completed=True,
+            completed_at__gte=week_start,
+            completed_at__lte=week_end + timedelta(days=1)
+        ).count()
+        
+        context = {
+            'my_tasks': my_tasks_page,
+            'assigned_tasks': assigned_tasks_page,
+            'current_member': current_member,
+            'today': timezone.localdate(),
+            'search_query': search_query,
+            # My Tasks stats
+            'my_total_count': my_total,
+            'my_completed_count': my_completed_this_week,
+            'my_ongoing_count': my_ongoing,
+            # Assigned Tasks stats
+            'assigned_total_count': assigned_total,
+            'assigned_completed_count': assigned_completed_this_week,
+            'assigned_ongoing_count': assigned_ongoing,
+        }
+        
+        return render(request, self.template_name, context)
+
+
+@method_decorator(login_required, name="dispatch")
+class TasksList(View):
+    template_name = "todo/tasks_list.html"
+    
+    def get(self, request):
+        current_member = request.user.member if hasattr(request.user, 'member') else None
+        
+        # My Tasks - tasks assigned to me
+        my_tasks = Task.objects.filter(
+            member=current_member,
+            completed=False
+        ).select_related('contact', 'company', 'member').order_by('due_date')
+        
+        # Assigned Tasks - tasks I created/assigned to others (would need created_by field)
+        # For now, show tasks assigned to other members
+        from authentication.models import Member
+        assigned_tasks = Task.objects.filter(
+            completed=False
+        ).exclude(
+            member=current_member
+        ).exclude(
+            member__isnull=True
+        ).select_related('contact', 'company', 'member').order_by('due_date')
+        
+        context = {
+            'my_tasks': my_tasks,
+            'assigned_tasks': assigned_tasks,
+            'current_member': current_member,
+            'today': timezone.localdate(),
+        }
+        
+        return render(request, self.template_name, context)
 
 
 
@@ -282,16 +469,34 @@ def update_task_ajax(request, task_id):
     if request.method == "POST":
         task = get_object_or_404(Task, pk=task_id)
         
+        # Check if it's a member assignment update
+        member_id = request.POST.get('member_id')
+        if member_id:
+            from authentication.models import Member
+            try:
+                member = Member.objects.get(id=member_id)
+                task.member = member
+                task.save()
+                return JsonResponse({'success': True})
+            except Member.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Member not found'})
+        
         # Get data from POST
         name = request.POST.get('name', '').strip()
         description = request.POST.get('description', '').strip()
         due_date_str = request.POST.get('due_date', '').strip()
+        priority = request.POST.get('priority', 'medium').strip()  # Default to medium if not provided
         
         if not name:
             return JsonResponse({'success': False, 'error': 'Task name cannot be empty'})
         
         if not due_date_str:
             return JsonResponse({'success': False, 'error': 'Due date is required'})
+        
+        # Validate priority
+        valid_priorities = ['low', 'medium', 'high', 'urgent']
+        if priority not in valid_priorities:
+            priority = 'medium'  # Fallback to medium if invalid
         
         try:
             # Parse due date
@@ -302,6 +507,7 @@ def update_task_ajax(request, task_id):
             task.name = name
             task.description = description
             task.due_date = due_date
+            task.priority = priority  # Update priority
             task.save()
             
             # Calculate overdue display
@@ -321,6 +527,7 @@ def update_task_ajax(request, task_id):
                     'name': task.name,
                     'description': task.description,
                     'due_date': due_date.strftime('%b %d, %Y'),
+                    'priority': task.priority,  # Include priority in response
                     'overdue_badge': overdue_badge
                 }
             })
@@ -330,3 +537,127 @@ def update_task_ajax(request, task_id):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+# Task detail full page view
+@login_required
+def task_detail_page(request, task_id):
+    from authentication.models import Member
+    
+    task = get_object_or_404(Task, pk=task_id)
+    task = Task.objects.select_related(
+        'member', 'member__user',
+        'created_by', 'created_by__user',
+        'contact', 'company'
+    ).prefetch_related('comments', 'comments__author', 'comments__author__user').get(pk=task_id)
+    
+    comments = task.comments.all().order_by('-created_at')
+    all_members = Member.objects.select_related('user').all()
+    
+    context = {
+        'task': task,
+        'comments': comments,
+        'all_members': all_members,
+    }
+    
+    return render(request, 'todo/task_detail_page.html', context)
+
+
+# Get task detail (AJAX endpoint)
+@login_required
+def task_detail_ajax(request, task_id):
+    from datetime import date as dt_date
+    task = get_object_or_404(Task, pk=task_id)
+    
+    # Get task with related data
+    task = Task.objects.select_related(
+        'member', 'member__user',
+        'created_by', 'created_by__user',
+        'contact', 'company'
+    ).prefetch_related('comments', 'comments__author', 'comments__author__user').get(pk=task_id)
+    
+    # Check permissions
+    can_edit = request.user.member == task.created_by or request.user.member == task.member
+    
+    # Prepare comments data
+    comments_data = []
+    for comment in task.comments.all().order_by('created_at'):
+        comments_data.append({
+            'id': comment.id,
+            'author_name': f"{comment.author.user.first_name} {comment.author.user.last_name}",
+            'content': comment.content,
+            'created_at': comment.created_at.strftime('%b %d, %Y at %I:%M %p')
+        })
+    
+    # Check if overdue or today
+    today = dt_date.today()
+    is_overdue = task.due_date < today
+    is_today = task.due_date == today
+    
+    # Prepare task data
+    task_data = {
+        'id': task.id,
+        'name': task.name,
+        'description': task.description or '',
+        'priority': task.priority,
+        'priority_display': task.get_priority_display(),
+        'due_date': task.due_date.strftime('%b %d, %Y'),
+        'is_overdue': is_overdue,
+        'is_today': is_today,
+        'completed': task.completed,
+        'member_name': f"{task.member.user.first_name} {task.member.user.last_name}" if task.member else 'Unassigned',
+        'created_by_name': f"{task.created_by.user.first_name} {task.created_by.user.last_name}" if task.created_by else 'Unknown',
+        'contact_name': task.contact.name if task.contact else None,
+        'contact_id': task.contact.id if task.contact else None,
+        'company_name': task.company.name if task.company else None,
+        'company_id': task.company.id if task.company else None,
+        'can_edit': can_edit,
+        'comments': comments_data
+    }
+    
+    return JsonResponse({'success': True, 'task': task_data})
+
+
+# Add comment to task
+@login_required
+def add_task_comment(request, task_id):
+    if request.method == "POST":
+        task = get_object_or_404(Task, pk=task_id)
+        content = request.POST.get('content', '').strip()
+        
+        if not content:
+            return HttpResponse('<div style="color: red;">Comment cannot be empty</div>', status=400)
+        
+        from .models import TaskComment
+        from django.utils.timesince import timesince
+        
+        comment = TaskComment.objects.create(
+            task=task,
+            author=request.user.member,
+            content=content
+        )
+        
+        # Return HTML snippet for HTMX
+        html = f'''
+        <div class="comment-item" style="display: flex; gap: 1rem;">
+            <div class="comment-avatar" style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem;">
+                {comment.author.user.first_name[0]}{comment.author.user.last_name[0]}
+            </div>
+            <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 600; color: #0f172a; font-size: 0.875rem;">{comment.author.user.first_name} {comment.author.user.last_name}</span>
+                    <span style="font-size: 0.75rem; color: #94a3b8;">az önce</span>
+                </div>
+                <div style="color: #475569; font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap;">{comment.content}</div>
+            </div>
+        </div>
+        <script>
+            // Remove empty state message if it exists
+            const noComments = document.getElementById('noComments');
+            if (noComments) noComments.remove();
+        </script>
+        '''
+        
+        return HttpResponse(html)
+    
+    return HttpResponse('Invalid request', status=400)

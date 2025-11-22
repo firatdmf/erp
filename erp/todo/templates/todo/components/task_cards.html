@@ -1,0 +1,228 @@
+{% load static %}
+<style>
+.tasks-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.task-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.task-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  transform: translateY(-2px);
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 0.75rem;
+}
+
+.task-title-section {
+  flex: 1;
+}
+
+.task-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.5rem 0;
+}
+
+.task-meta-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.priority-low {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.priority-medium {
+  background: #fed7aa;
+  color: #92400e;
+}
+
+.priority-high {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.priority-urgent {
+  background: #fca5a5;
+  color: #7f1d1d;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.task-due-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.task-due-date.overdue {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.task-due-date.today {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.task-description {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin: 0.75rem 0;
+  line-height: 1.5;
+}
+
+.task-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.task-assignee {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.task-related {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 4px 10px;
+  background: #f0fdf4;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #15803d;
+  text-decoration: none;
+}
+
+.task-related:hover {
+  background: #dcfce7;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #94a3b8;
+}
+
+.empty-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  color: #cbd5e1;
+}
+</style>
+
+{% if tasks %}
+<div class="tasks-grid">
+  {% for task in tasks %}
+  <div class="task-card" onclick="openTaskDetailSidebar({{ task.id }})" id="task-card-{{ task.id }}">
+    <div class="task-card-header">
+      <div class="task-title-section">
+        <h3 class="task-title">{{ task.name }}</h3>
+        <div class="task-meta-badges">
+          <!-- Priority Badge -->
+          <span class="priority-badge priority-{{ task.priority }}">
+            <i class="fa {{ task.get_priority_icon }}"></i>
+            {{ task.get_priority_display }}
+          </span>
+          
+          <!-- Due Date Badge -->
+          <span class="task-due-date {% if task.due_date < today %}overdue{% elif task.due_date == today %}today{% endif %}">
+            <i class="fa fa-calendar"></i>
+            {{ task.due_date|date:"M d, Y" }}
+            {% if task.due_date < today %}
+              ({{ task.due_date|timesince }} ago)
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    {% if task.description %}
+      <p class="task-description">{{ task.description|truncatewords:30 }}</p>
+    {% endif %}
+    
+    <div class="task-footer">
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        {% if task.member %}
+          <div class="task-assignee">
+            <i class="fa fa-user-circle"></i>
+            <span>{{ task.member.user.first_name }} {{ task.member.user.last_name }}</span>
+          </div>
+        {% endif %}
+        
+        {% if task.contact %}
+          <a href="{% url 'crm:contact_detail' task.contact.id %}" class="task-related" onclick="event.stopPropagation();">
+            <i class="fa fa-user"></i>
+            {{ task.contact.name }}
+          </a>
+        {% elif task.company %}
+          <a href="{% url 'crm:company_detail' task.company.id %}" class="task-related" onclick="event.stopPropagation();">
+            <i class="fa fa-building"></i>
+            {{ task.company.name }}
+          </a>
+        {% endif %}
+      </div>
+      
+      {% if task.comments.count > 0 %}
+        <div style="font-size: 0.85rem; color: #64748b;">
+          <i class="fa fa-comment"></i> {{ task.comments.count }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <i class="fa fa-check-circle"></i>
+  <h3>No tasks found</h3>
+  <p>{% if is_assigned_view %}You haven't assigned any tasks yet.{% else %}You don't have any pending tasks.{% endif %}</p>
+</div>
+{% endif %}

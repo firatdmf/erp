@@ -364,6 +364,7 @@ class ContactDetail(generic.DetailView):
         elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.contact = contact
+            task.created_by = request.user.member if hasattr(request.user, 'member') else None
             # Member is already set from form data
             if not task.member:
                 task.member = request.user.member
@@ -498,6 +499,7 @@ class CompanyDetail(generic.DetailView):
         elif task_form.is_valid():
             task = task_form.save(commit=False)
             task.company = company
+            task.created_by = request.user.member if hasattr(request.user, 'member') else None
             # Member is already set from form data
             if not task.member:
                 task.member = request.user.member

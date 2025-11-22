@@ -1,149 +1,164 @@
 {% load todo_filters %}
 {% load static %}
 {% block css %}
-  <link rel="stylesheet" href="{% static 'todo/css/components/tasks.css' %}" />
+<link rel="stylesheet" href="{% static 'todo/css/components/tasks_new.css' %}" />
 {% endblock %}
 <div class="tasks_component">
   {% comment %} {{ page_type }} {% endcomment %}
   {% comment %} <p>user is: {{member}}</p> {% endcomment %}
   <ul>
     {% for task in tasks|task_sort:sort_type %}
-      {% if 'report' in page_type and task.member == member %}
-        {% if not task.completed %}
-          <li class="taskComponent" data-task-id="{{ task.id }}">
-            <p class="taskName">
-              {{ task.name }}
-              {% if not 'detail' in page_type %}
-                {% if task.contact %}
-                  -
-                  <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
-                {% elif task.company %}
-                  -
-                  <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
-                {% endif %}
-              {% endif %}
-            </p>
-            {% if task.description %}
-              <p class="taskDescription">{{ task.description|linebreaksbr }}</p>
-            {% endif %}
-            <p class="taskDueDate">
-              Due: {{ task.due_date }}
-              {% if task.due_date|days_since == False %}
-                <span></span>
-              {% elif task.due_date|days_since == 'today' %}
-                <span class="daysDueToday">{{ task.due_date|days_since }}</span>
-              {% elif task.due_date|days_since != 'today' %}
-                <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
-              {% endif %}
-            </p>
-            {% comment %} {% if not 'detail' in page_type %}
-            {{task.completed}}
-            {% endif %} {% endcomment %}
-            <div class="task_buttons">
-              <button type="button" class="completeTaskButton" onclick="completeTask('{{ task.id }}', this)">Complete Task</button>
-              <button type="button" onclick="openTaskEditSidebar('{{ task.id }}')">Update Task</button>
-              <button type="button" 
-                      class="deleteTaskButton" 
-                      onclick="confirmDeleteTask('{{ task.id }}', this)">Delete Task</button>
-              <br />
-            </div>
-            {% if task.member %}
-            <div class="task_assigned_member">
-                <p>
-                 {{task.member}}
-                </p>
-            </div>
-            {% endif %}
-          </li>
+    {% if 'report' in page_type and task.member == member %}
+    {% if not task.completed %}
+    <li class="taskComponent" data-task-id="{{ task.id }}">
+      <p class="taskName">
+        {{ task.name }}
+        {% if not 'detail' in page_type %}
+        {% if task.contact %}
+        -
+        <b><a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact }}</a></b>
+        {% elif task.company %}
+        -
+        <b><a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a></b>
         {% endif %}
-      {% else %}
-        {% comment %} {% if not task.completed and task.due_date|is_past_due %} {% endcomment %}
-        {% comment %} is_past_due so we won't see tasks due in future days than today in the dashboard {% endcomment %}
-        {% comment %} For dashboard calendar view, show all tasks for selected date regardless of due date {% endcomment %}
-        {% if 'dashboard_calendar' in page_type or not task.completed and task.due_date|is_past_due %}
-        {% if not task.member or task.member == member%}
-          <li class="taskComponent" data-task-id="{{ task.id }}">
-            <div class="task-header">
-              <div class="task-title-section">
-                <h4 class="taskName">{{ task.name }}</h4>
-                {% if task.contact or task.company %}
-                  <p class="task-related">
-                    <i class="fa fa-link"></i>
-                    {% if task.contact %}
-                      <a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact.name }}</a>
-                    {% elif task.company %}
-                      <a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company }}</a>
-                    {% endif %}
-                  </p>
-                {% endif %}
-              </div>
-              
-              <div class="task-meta">
-                <span class="taskDueDate {% if task.due_date|days_since == 'today' %}today{% elif task.due_date|days_since != False and task.due_date|days_since != 'today' %}overdue{% endif %}">
-                  <i class="fa fa-calendar"></i>
-                  {{ task.due_date }}
-                  {% if task.due_date|days_since == 'today' %}
-                    <span class="badge badge-warning">Today</span>
-                  {% elif task.due_date|days_since != False and task.due_date|days_since != 'today' %}
-                    <span class="badge badge-danger">{{ task.due_date|days_since }}</span>
-                  {% endif %}
-                </span>
-              </div>
-            </div>
-            
-            {% if task.description %}
-              <p class="taskDescription">{{ task.description|linebreaksbr|truncatewords:30 }}</p>
-            {% endif %}
-            
-            <div class="task-footer">
-              {% if task.member %}
-                <div class="task-assignee">
-                  <i class="fa fa-user-circle"></i>
-                  <span>{{ task.member }}</span>
-                </div>
-              {% endif %}
-              
-              <div class="task-actions">
-                <button type="button" class="btn btn-success btn-sm" title="Complete" onclick="completeTask('{{ task.id }}', this)">
-                  <i class="fa fa-check"></i> Complete
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm" title="Edit" onclick="openTaskEditSidebar('{{ task.id }}')">
-                  <i class="fa fa-edit"></i> Edit
-                </button>
-                <button type="button" 
-                        class="btn btn-danger btn-sm" 
-                        title="Delete" 
-                        onclick="confirmDeleteTask('{{ task.id }}', this)">
-                  <i class="fa fa-trash"></i>
-                </button>
-              </div>
-            </div>
-          </li>
         {% endif %}
-        {% else %}
-          {% comment %} <a href="{% url 'todo:update_task' task.pk %}"><p class="error" style="color:red;">{{ task.name }}</p></a> {% endcomment %}
-        {% endif %}
+      </p>
+      {% if task.description %}
+      <p class="taskDescription">{{ task.description|linebreaksbr }}</p>
       {% endif %}
+      <p class="taskDueDate">
+        Due: {{ task.due_date }}
+        {% if task.due_date|days_since == False %}
+        <span></span>
+        {% elif task.due_date|days_since == 'today' %}
+        <span class="daysDueToday">{{ task.due_date|days_since }}</span>
+        {% elif task.due_date|days_since != 'today' %}
+        <span class="daysDueBox"><span class="daysDuePast">{{ task.due_date|days_since }}</span></span>
+        {% endif %}
+      </p>
+      {% comment %} {% if not 'detail' in page_type %}
+      {{task.completed}}
+      {% endif %} {% endcomment %}
+      <div class="task_buttons">
+        <button type="button" class="completeTaskButton" onclick="completeTask('{{ task.id }}', this)">Complete
+          Task</button>
+        <button type="button" onclick="openTaskEditSidebar('{{ task.id }}')">Update Task</button>
+        <button type="button" class="deleteTaskButton" onclick="confirmDeleteTask('{{ task.id }}', this)">Delete
+          Task</button>
+        <br />
+      </div>
+      {% if task.member %}
+      <div class="task_assigned_member">
+        <p>
+          {{task.member}}
+        </p>
+      </div>
+      {% endif %}
+    </li>
+    {% endif %}
+    {% else %}
+    {% comment %} {% if not task.completed and task.due_date|is_past_due %} {% endcomment %}
+    {% comment %} is_past_due so we won't see tasks due in future days than today in the dashboard {% endcomment %}
+    {% comment %} For dashboard calendar view, show all tasks for selected date regardless of due date {% endcomment %}
+    {% if 'dashboard_calendar' in page_type or not task.completed and task.due_date|is_past_due %}
+    {% if not task.member or task.member == member%}
+    <li class="taskComponent" data-task-id="{{ task.id }}"
+      onclick="window.location.href='{% url 'todo:task_detail' task.id %}'">
+      <!-- Compact Card Header -->
+      <div class="task-card-header">
+        <h3 class="taskName">{{ task.name }}</h3>
+        <div class="task-date-badges">
+          <span class="taskDueDate">
+            <i class="fa fa-calendar-alt"></i> {{ task.due_date|date:"M. d, Y" }}
+          </span>
+          {% if task.due_date|days_since == 'today' %}
+          <span class="badge badge-today">TODAY</span>
+          {% elif task.due_date|days_since != False and task.due_date|days_since != 'today' %}
+          <span class="badge badge-overdue">{{ task.due_date|days_since|upper }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Related Link (Company/Contact) -->
+      {% if task.contact or task.company %}
+      <div class="task-related-row">
+        {% if task.contact %}
+        <a href="{% url 'crm:contact_detail' task.contact.id %}" class="related-link" onclick="event.stopPropagation()">
+          <i class="fa fa-link"></i> {{ task.contact.name }}
+        </a>
+        {% elif task.company %}
+        <a href="{% url 'crm:company_detail' task.company.id %}" class="related-link" onclick="event.stopPropagation()">
+          <i class="fa fa-link"></i> {{ task.company }}
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Task Description -->
+      {% if task.description %}
+      <div class="task-description">
+        {{ task.description|truncatewords:15 }}
+      </div>
+      {% endif %}
+
+      <!-- Footer: Assignee & Actions -->
+      <div class="task-footer-row">
+        <div class="task-assignee">
+          <div class="avatar-circle">
+            <i class="fa fa-user"></i>
+          </div>
+          <span class="assignee-name">
+            {% if task.member %}
+            {{ task.member.user.get_full_name|default:task.member.user.username }}
+            {% else %}
+            Unassigned
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="task-actions">
+          <button type="button" class="btn-complete"
+            onclick="event.stopPropagation(); completeTask('{{ task.id }}', this)">
+            <i class="fa fa-check"></i> Complete
+          </button>
+          <button type="button" class="btn-edit"
+            onclick="event.stopPropagation(); openTaskEditSidebar('{{ task.id }}')">
+            <i class="fa fa-edit"></i> Edit
+          </button>
+          <button type="button" class="btn-delete"
+            onclick="event.stopPropagation(); confirmDeleteTask('{{ task.id }}', this)">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    </li>
+    {% endif %}
+    {% else %}
+    {% comment %} <a href="{% url 'todo:update_task' task.pk %}">
+      <p class="error" style="color:red;">{{ task.name }}</p>
+    </a> {% endcomment %}
+    {% endif %}
+    {% endif %}
     {% empty %}
-      <li>No tasks available.</li>
+    <li>No tasks available.</li>
     {% endfor %}
   </ul>
 </div>
 
 <script>
-function confirmDeleteTask(taskId, button) {
-  const taskComponent = button.closest('.taskComponent');
-  
-  // Create modern confirmation modal
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease;';
-  
-  const dialog = document.createElement('div');
-  dialog.className = 'modal-dialog';
-  dialog.style.cssText = 'background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); max-width: 400px; width: 90%; animation: slideUp 0.3s ease;';
-  
-  dialog.innerHTML = `
+  function confirmDeleteTask(taskId, button) {
+    const taskComponent = button.closest('.taskComponent');
+
+    // Create modern confirmation modal
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease;';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-dialog';
+    dialog.style.cssText = 'background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); max-width: 400px; width: 90%; animation: slideUp 0.3s ease;';
+
+    dialog.innerHTML = `
     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
       <div style="width: 48px; height: 48px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
         <i class="fa fa-trash" style="color: #ef4444; font-size: 20px;"></i>
@@ -162,97 +177,97 @@ function confirmDeleteTask(taskId, button) {
               onmouseout="this.style.background='#ef4444'">Delete</button>
     </div>
   `;
-  
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
-  
-  // Close on outside click
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
-  });
-}
 
-function deleteTaskHTMX(taskId, button) {
-  const overlay = button.closest('.modal-overlay');
-  const taskComponent = document.querySelector(`[data-task-id="${taskId}"]`)?.closest('.taskComponent');
-  
-  if (!taskComponent) {
-    console.error('Task component not found');
-    overlay.remove();
-    return;
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Close on outside click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
   }
-  
-  // Change button to loading state
-  button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting...';
-  button.disabled = true;
-  
-  // Get CSRF token
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-  
-  // Send delete request with HTMX headers
-  fetch(`/todo/tasks/${taskId}/delete_task`, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'X-Requested-With': 'XMLHttpRequest',
-      'HX-Request': 'true'
-    }
-  })
-  .then(response => {
-    if (response.ok) {
-      // Remove modal
-      overlay.remove();
-      
-      // Smooth fade out animation
-      taskComponent.style.transition = 'all 0.3s ease';
-      taskComponent.style.opacity = '0';
-      taskComponent.style.transform = 'translateX(-20px)';
-      
-      setTimeout(() => {
-        taskComponent.remove();
-        
-        // Check if there are no more tasks
-        const tasksList = document.querySelector('.tasks_component ul');
-        if (tasksList && tasksList.children.length === 0) {
-          tasksList.innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tasks available.</li>';
-        }
-        
-        // Update calendar badge count if on dashboard
-        updateCalendarBadge();
-      }, 300);
-      
-      // Show success toast
-      showToast('Task deleted successfully', 'success');
-    } else {
-      overlay.remove();
-      showToast('Failed to delete task. Please try again.', 'error');
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    overlay.remove();
-    showToast('An error occurred. Please try again.', 'error');
-  });
-}
 
-// Toast notification system
-function showToast(message, type = 'success') {
-  // Remove existing toasts
-  const existingToast = document.querySelector('.toast-notification');
-  if (existingToast) existingToast.remove();
-  
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification';
-  
-  const colors = {
-    success: { bg: '#10b981', icon: 'fa-check-circle' },
-    error: { bg: '#ef4444', icon: 'fa-exclamation-circle' },
-    info: { bg: '#3b82f6', icon: 'fa-info-circle' }
-  };
-  
-  const color = colors[type] || colors.success;
-  
-  toast.style.cssText = `
+  function deleteTaskHTMX(taskId, button) {
+    const overlay = button.closest('.modal-overlay');
+    const taskComponent = document.querySelector(`[data-task-id="${taskId}"]`)?.closest('.taskComponent');
+
+    if (!taskComponent) {
+      console.error('Task component not found');
+      overlay.remove();
+      return;
+    }
+
+    // Change button to loading state
+    button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting...';
+    button.disabled = true;
+
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Send delete request with HTMX headers
+    fetch(`/todo/tasks/${taskId}/delete_task`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'HX-Request': 'true'
+      }
+    })
+      .then(response => {
+        if (response.ok) {
+          // Remove modal
+          overlay.remove();
+
+          // Smooth fade out animation
+          taskComponent.style.transition = 'all 0.3s ease';
+          taskComponent.style.opacity = '0';
+          taskComponent.style.transform = 'translateX(-20px)';
+
+          setTimeout(() => {
+            taskComponent.remove();
+
+            // Check if there are no more tasks
+            const tasksList = document.querySelector('.tasks_component ul');
+            if (tasksList && tasksList.children.length === 0) {
+              tasksList.innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tasks available.</li>';
+            }
+
+            // Update calendar badge count if on dashboard
+            updateCalendarBadge();
+          }, 300);
+
+          // Show success toast
+          showToast('Task deleted successfully', 'success');
+        } else {
+          overlay.remove();
+          showToast('Failed to delete task. Please try again.', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        overlay.remove();
+        showToast('An error occurred. Please try again.', 'error');
+      });
+  }
+
+  // Toast notification system
+  function showToast(message, type = 'success') {
+    // Remove existing toasts
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+
+    const colors = {
+      success: { bg: '#10b981', icon: 'fa-check-circle' },
+      error: { bg: '#ef4444', icon: 'fa-exclamation-circle' },
+      info: { bg: '#3b82f6', icon: 'fa-info-circle' }
+    };
+
+    const color = colors[type] || colors.success;
+
+    toast.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
@@ -267,8 +282,8 @@ function showToast(message, type = 'success') {
     animation: slideInRight 0.3s ease;
     max-width: 400px;
   `;
-  
-  toast.innerHTML = `
+
+    toast.innerHTML = `
     <div style="width: 40px; height: 40px; background: ${color.bg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
       <i class="fa ${color.icon}" style="color: white; font-size: 18px;"></i>
     </div>
@@ -280,51 +295,51 @@ function showToast(message, type = 'success') {
       <i class="fa fa-times"></i>
     </button>
   `;
-  
-  document.body.appendChild(toast);
-  
-  // Auto remove after 4 seconds
-  setTimeout(() => {
-    toast.style.animation = 'slideOutRight 0.3s ease';
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
-}
 
-// Complete task with animation
-function completeTask(taskId, button) {
-  const taskComponent = button.closest('.taskComponent');
-  
-  if (!taskComponent) {
-    console.error('Task component not found');
-    return;
+    document.body.appendChild(toast);
+
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+      toast.style.animation = 'slideOutRight 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
   }
-  
-  // Change button to loading state
-  const originalButtonContent = button.innerHTML;
-  button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
-  button.disabled = true;
-  
-  // Get CSRF token
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-  
-  // Send complete request
-  fetch(`/todo/tasks/${taskId}/complete_task`, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'X-Requested-With': 'XMLHttpRequest'
+
+  // Complete task with animation
+  function completeTask(taskId, button) {
+    const taskComponent = button.closest('.taskComponent');
+
+    if (!taskComponent) {
+      console.error('Task component not found');
+      return;
     }
-  })
-  .then(response => {
-    if (response.ok) {
-      // Add completion animation
-      taskComponent.style.transition = 'all 0.5s ease';
-      taskComponent.style.opacity = '0.5';
-      taskComponent.style.transform = 'scale(0.95)';
-      
-      // Add checkmark overlay
-      const checkmark = document.createElement('div');
-      checkmark.style.cssText = `
+
+    // Change button to loading state
+    const originalButtonContent = button.innerHTML;
+    button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    button.disabled = true;
+
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Send complete request
+    fetch(`/todo/tasks/${taskId}/complete_task`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => {
+        if (response.ok) {
+          // Add completion animation
+          taskComponent.style.transition = 'all 0.5s ease';
+          taskComponent.style.opacity = '0.5';
+          taskComponent.style.transform = 'scale(0.95)';
+
+          // Add checkmark overlay
+          const checkmark = document.createElement('div');
+          checkmark.style.cssText = `
         position: absolute;
         top: 50%;
         left: 50%;
@@ -339,121 +354,121 @@ function completeTask(taskId, button) {
         animation: checkmarkPop 0.3s ease;
         z-index: 100;
       `;
-      checkmark.innerHTML = '<i class="fa fa-check" style="color: white; font-size: 30px;"></i>';
-      
-      taskComponent.style.position = 'relative';
-      taskComponent.appendChild(checkmark);
-      
-      // Remove task after animation
-      setTimeout(() => {
-        taskComponent.style.transform = 'translateX(-100%)';
-        
-        setTimeout(() => {
-          taskComponent.remove();
-          
-          // Check if there are no more tasks
-          const tasksList = document.querySelector('.tasks_component ul');
-          if (tasksList && tasksList.children.length === 0) {
-            tasksList.innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tasks available.</li>';
-          }
-          
-          // Update calendar badge and pending count
-          updateCalendarBadge();
-        }, 500);
-      }, 800);
-      
-      // Show success toast
-      showToast('Task completed successfully! 🎉', 'success');
-    } else {
-      // Revert button state
-      button.innerHTML = originalButtonContent;
-      button.disabled = false;
-      showToast('Failed to complete task. Please try again.', 'error');
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    button.innerHTML = originalButtonContent;
-    button.disabled = false;
-    showToast('An error occurred. Please try again.', 'error');
-  });
-}
+          checkmark.innerHTML = '<i class="fa fa-check" style="color: white; font-size: 30px;"></i>';
 
-// Update calendar badge count after task deletion
-function updateCalendarBadge() {
-  // Only on dashboard with calendar
-  if (!document.getElementById('calendarDays')) return;
-  
-  // Get the selected date from global scope (dashboard.html)
-  const targetDate = window.selectedDate || new Date();
-  const year = targetDate.getFullYear();
-  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-  const day = String(targetDate.getDate()).padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
-  
-  // Update global tasksData if it exists
-  if (window.tasksData && window.tasksData[dateStr]) {
-    const currentCount = window.tasksData[dateStr];
-    const newCount = currentCount - 1;
-    
-    if (newCount > 0) {
-      window.tasksData[dateStr] = newCount;
-    } else {
-      delete window.tasksData[dateStr];
-    }
-  }
-  
-  // Find the calendar day element and update badge
-  const calendarDays = document.querySelectorAll('.calendar-day');
-  calendarDays.forEach(dayEl => {
-    // Check if this is the selected day
-    if (dayEl.classList.contains('selected')) {
-      const badge = dayEl.querySelector('.task-badge');
-      if (badge) {
-        const currentCount = parseInt(badge.textContent) || 0;
-        const newCount = currentCount - 1;
-        
-        if (newCount > 0) {
-          badge.textContent = newCount;
+          taskComponent.style.position = 'relative';
+          taskComponent.appendChild(checkmark);
+
+          // Remove task after animation
+          setTimeout(() => {
+            taskComponent.style.transform = 'translateX(-100%)';
+
+            setTimeout(() => {
+              taskComponent.remove();
+
+              // Check if there are no more tasks
+              const tasksList = document.querySelector('.tasks_component ul');
+              if (tasksList && tasksList.children.length === 0) {
+                tasksList.innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tasks available.</li>';
+              }
+
+              // Update calendar badge and pending count
+              updateCalendarBadge();
+            }, 500);
+          }, 800);
+
+          // Show success toast
+          showToast('Task completed successfully! 🎉', 'success');
         } else {
-          // Remove badge and has-tasks class
-          dayEl.classList.remove('has-tasks');
-          badge.remove();
-          
-          // Update day element to show just the number
-          const dayNumber = dayEl.textContent.trim();
-          dayEl.innerHTML = dayNumber;
+          // Revert button state
+          button.innerHTML = originalButtonContent;
+          button.disabled = false;
+          showToast('Failed to complete task. Please try again.', 'error');
         }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        button.innerHTML = originalButtonContent;
+        button.disabled = false;
+        showToast('An error occurred. Please try again.', 'error');
+      });
+  }
+
+  // Update calendar badge count after task deletion
+  function updateCalendarBadge() {
+    // Only on dashboard with calendar
+    if (!document.getElementById('calendarDays')) return;
+
+    // Get the selected date from global scope (dashboard.html)
+    const targetDate = window.selectedDate || new Date();
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    // Update global tasksData if it exists
+    if (window.tasksData && window.tasksData[dateStr]) {
+      const currentCount = window.tasksData[dateStr];
+      const newCount = currentCount - 1;
+
+      if (newCount > 0) {
+        window.tasksData[dateStr] = newCount;
+      } else {
+        delete window.tasksData[dateStr];
       }
     }
-  });
-  
-  // Update pending tasks counter
-  updatePendingTasksCount();
-}
 
-// Update pending tasks counter in stats bar
-function updatePendingTasksCount() {
-  // Get all task components currently in the DOM (excluding completed ones)
-  const allTasksInView = document.querySelectorAll('.tasks-container .taskComponent');
-  const currentViewCount = allTasksInView.length;
-  
-  // Find the stat-number elements
-  const statNumbers = document.querySelectorAll('.stat-number');
-  
-  // The second stat-number is "Pending Tasks" (index 1)
-  if (statNumbers.length >= 2) {
-    const currentPendingCount = parseInt(statNumbers[1].textContent) || 0;
-    const newPendingCount = Math.max(0, currentPendingCount - 1);
-    statNumbers[1].textContent = newPendingCount;
+    // Find the calendar day element and update badge
+    const calendarDays = document.querySelectorAll('.calendar-day');
+    calendarDays.forEach(dayEl => {
+      // Check if this is the selected day
+      if (dayEl.classList.contains('selected')) {
+        const badge = dayEl.querySelector('.task-badge');
+        if (badge) {
+          const currentCount = parseInt(badge.textContent) || 0;
+          const newCount = currentCount - 1;
+
+          if (newCount > 0) {
+            badge.textContent = newCount;
+          } else {
+            // Remove badge and has-tasks class
+            dayEl.classList.remove('has-tasks');
+            badge.remove();
+
+            // Update day element to show just the number
+            const dayNumber = dayEl.textContent.trim();
+            dayEl.innerHTML = dayNumber;
+          }
+        }
+      }
+    });
+
+    // Update pending tasks counter
+    updatePendingTasksCount();
   }
-}
 
-// Add CSS animations
-if (!document.getElementById('toast-animations')) {
-  const style = document.createElement('style');
-  style.id = 'toast-animations';
-  style.textContent = `
+  // Update pending tasks counter in stats bar
+  function updatePendingTasksCount() {
+    // Get all task components currently in the DOM (excluding completed ones)
+    const allTasksInView = document.querySelectorAll('.tasks-container .taskComponent');
+    const currentViewCount = allTasksInView.length;
+
+    // Find the stat-number elements
+    const statNumbers = document.querySelectorAll('.stat-number');
+
+    // The second stat-number is "Pending Tasks" (index 1)
+    if (statNumbers.length >= 2) {
+      const currentPendingCount = parseInt(statNumbers[1].textContent) || 0;
+      const newPendingCount = Math.max(0, currentPendingCount - 1);
+      statNumbers[1].textContent = newPendingCount;
+    }
+  }
+
+  // Add CSS animations
+  if (!document.getElementById('toast-animations')) {
+    const style = document.createElement('style');
+    style.id = 'toast-animations';
+    style.textContent = `
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -476,14 +491,14 @@ if (!document.getElementById('toast-animations')) {
       100% { transform: translate(-50%, -50%) scale(1); }
     }
   `;
-  document.head.appendChild(style);
-}
-
-// Listen for HTMX events for toast notifications
-document.body.addEventListener('showToast', function(evt) {
-  const detail = evt.detail;
-  if (detail && detail.message) {
-    showToast(detail.message, detail.type || 'success');
+    document.head.appendChild(style);
   }
-});
+
+  // Listen for HTMX events for toast notifications
+  document.body.addEventListener('showToast', function (evt) {
+    const detail = evt.detail;
+    if (detail && detail.message) {
+      showToast(detail.message, detail.type || 'success');
+    }
+  });
 </script>

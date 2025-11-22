@@ -1,1212 +1,1240 @@
+{% load static %}
+{% load erp_tags %}
 <!DOCTYPE html>
 <html lang="en">
-  {% comment %}This file includes the app title, user greeting if they are logged in, Signout | signin buttons|{% endcomment %}
-  <head>
-    {% load static %}
-    {% load erp_tags %}
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Nejum is providing Digital Transformation and Industrial Automation services" />
-    <meta name="keywords" content="Manufacturing, ERP, Digital Transformation" />
-    <title>nejum | The Holistic Guide to Industry</title>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ERP{% endblock %}</title>
+  
+  <!-- CSS Files -->
+  <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=4.3" />
+  <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <!-- HTMX -->
+  <script src="{% static 'erp/htmx.min.js' %}" defer></script>
+{% comment %}
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script> {% endcomment %}
+{% comment %}Unsaved changes handler - now inline in base.html script section{% endcomment %}
+{% block css %}
+{% endblock %}
+<style>
+  /* Dynamic Email/Phone Fields - Modern Circular Buttons */
+  .dynamic-field-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px !important;
+  }
 
-    <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=3.5" />
-    <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
-    {% comment %} <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" /> {% endcomment %}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    {% comment %} <script src="{% static 'erp/base.js' %}"></script> {% endcomment %}
-    {% comment %}below is htmx{% endcomment %}
-    <script src="{% static 'erp/htmx.min.js' %}" defer></script>
-     {% comment %} <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script> {% endcomment %}
-    {% comment %}Unsaved changes handler - now inline in base.html script section{% endcomment %}
-    {% block css %}
+  .dynamic-field-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .dynamic-field-input-wrapper {
+    flex: 1 1 0 !important;
+    max-width: 100% !important;
+    background: #fff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    transition: border-color 0.2s !important;
+    min-height: 42px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .dynamic-field-input-wrapper:hover {
+    border-color: #cbd5e1 !important;
+  }
+
+  .dynamic-field-input-wrapper:focus-within {
+    border-color: #667eea !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  .dynamic-field-input {
+    width: 100%;
+    padding: 11px 14px !important;
+    font-size: 14px !important;
+    border: none !important;
+    background: transparent !important;
+    min-height: 42px;
+  }
+
+  .dynamic-field-input:focus {
+    outline: none !important;
+  }
+
+  .btn-remove-field,
+  .btn-add-field {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    border: 1.5px solid #d1d5db !important;
+    border-radius: 50% !important;
+    background: #fff !important;
+    cursor: pointer;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    color: #6b7280 !important;
+    transition: all 0.15s ease;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+  }
+
+  .btn-add-field:hover {
+    background: #f0fdf4 !important;
+    border-color: #86efac !important;
+    color: #16a34a !important;
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+  }
+
+  .btn-remove-field:hover {
+    background: #fef2f2 !important;
+    border-color: #fca5a5 !important;
+    color: #dc2626 !important;
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+  }
+
+  /* Modern Contact Search Results */
+  .contact-results {
+    max-height: 300px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    display: none;
+    margin-top: 8px;
+  }
+
+  .contact-results.active {
+    display: block;
+  }
+
+  .contact-result-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    user-select: none;
+  }
+
+  .contact-result-item:hover {
+    background: #f0f4ff;
+  }
+
+  .contact-result-item:active {
+    background: #e0e7ff;
+  }
+
+  .contact-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .contact-info {
+    flex: 1;
+    min-width: 0;
+    pointer-events: none;
+  }
+
+  .contact-name {
+    font-weight: 600;
+    color: #111827;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .contact-details {
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 2px;
+    cursor: pointer;
+  }
+
+  .selected-contact {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .selected-contact.active {
+    display: flex;
+  }
+</style>
+</head>
+
+<body>
+  {% with member=user.member %}
+  <nav class="navbar">
+    <ul class="navbar-nav">
+      <li class="logo">
+        <a href="{% url 'index' %}" class="nav-link"><span id="nejum_logo_text"
+            class="link-text logo-text">nejum</span></a>
+      </li>
+      <li class="nav-item" id="searchButton">
+        <a class="nav-link">
+          <i class="fa fa-solid fa-search fa-2x"></i>
+          <span class="link-text" id="searchButton">Search</span>
+        </a>
+      </li>
+
+      <div class="overlay" id="searchOverlay">
+        <div class="overlayContent">
+          {% comment %} <input type="text" name="searchInput" id="searchInput"
+            placeholder="Search for a company or contact..." /> {% endcomment %}
+          {% comment %} <div class="searchResults"></div> {% endcomment %}
+          {% search_component csrf_token=csrf_token %}
+          <div class="recent">
+            <h4>Recent</h4>
+            <ul>
+              {% for entry in last_ten_entities %}
+              <li>
+                {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
+                {% if entry.entry_type == 'Contact' %}
+                <a href="{% url 'crm:contact_detail' entry.id %}"><i class="fa fa-user" aria-hidden="true"></i> {{
+                  entry.name }} - {{ entry.created_at }}</a>
+                {% elif entry.entry_type == 'Company' %}
+                <a href="{% url 'crm:company_detail' entry.id %}"><i class="fa fa-briefcase" aria-hidden="true"></i> {{
+                  entry.name }} - {{ entry.created_at }}</a>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <li class="nav-item" id="addButton">
+        <a href="#add" class="nav-link">
+          <i class="fa fa-plus fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Add</span>
+        </a>
+        <div id="addExpanded">
+          <div class="add-menu-header">
+            <i class="fa fa-plus-circle" aria-hidden="true"></i>
+            <h2>Add new records</h2>
+          </div>
+          <div class="add-menu-section">
+            <h3>Add a single record</h3>
+            <ul>
+              <li>
+                <a href="#" onclick="openMainContactSidebar(); return false;">
+                  <i class="fa fa-user" aria-hidden="true"></i>
+                  <span>Contact</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" onclick="openCompanySidebar(); return false;">
+                  <i class="fa fa-building" aria-hidden="true"></i>
+                  <span>Company</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" onclick="openTaskSidebar(); return false;">
+                  <i class="fa fa-check-circle" aria-hidden="true"></i>
+                  <span>Task</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'marketing:product_create' %}">
+                  <i class="fa fa-tag" aria-hidden="true"></i>
+                  <span>Product</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'operating:create_order' %}">
+                  <i class="fa fa-shopping-cart" aria-hidden="true"></i>
+                  <span>Order</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="nav-separator-in-add">
+          <div class="nav-separator-line"></div>
+        </div>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'index' %}" class="nav-link">
+          <i class="fa fa-home fa-2x" aria-hidden="true"></i>
+          {% comment %} <i class="fa fa-table-columns fa-2x" aria-hidden="true"></i> {% endcomment %}
+          <span class="link-text">Home</span>
+        </a>
+      </li>
+      {% comment %} <li class="nav-item">
+        <a href="{% url 'crm:index' %}" class="nav-link">
+          <i class="fa fa-users fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Contacts</span>
+        </a>
+      </li> {% endcomment %}
+      <li class="nav-item">
+        <a href="{% url 'accounting:index' %}" class="nav-link">
+          <i class="fa fa-money fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Accounting</span>
+        </a>
+      </li>
+      <li class="nav-item" id="marketingButton">
+        <a href="#marketing" class="nav-link">
+          {% comment %} <i class="fa fa-cogs fa-2x" aria-hidden="true"></i> {% endcomment %}
+          <i class="fa fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Marketing</span>
+        </a>
+        <div id="marketingExpanded">
+          <div class="add-menu-header">
+            <i class="fa fa-bullseye" aria-hidden="true"></i>
+            <h2>Marketing</h2>
+          </div>
+          <div class="add-menu-section">
+            <h3>Products</h3>
+            <ul>
+              <li>
+                <a href="{% url 'marketing:product_create' %}">
+                  <i class="fa fa-plus-circle" aria-hidden="true"></i>
+                  <span>Create Product</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'marketing:product_list' %}">
+                  <i class="fa fa-list" aria-hidden="true"></i>
+                  <span>Product List</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="add-menu-section">
+            <h3>Customers</h3>
+            <ul>
+              <li>
+                <a href="{% url 'crm:company_list' %}">
+                  <i class="fa fa-building" aria-hidden="true"></i>
+                  <span>Companies</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'crm:contact_list' %}">
+                  <i class="fa fa-users" aria-hidden="true"></i>
+                  <span>Contacts</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </li>
+      <li class="nav-item" id="operatingButton">
+        <a href="#operating" class="nav-link">
+          <i class="fa fa-cogs fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Operating</span>
+        </a>
+        <div id="operatingExpanded">
+          <div class="add-menu-header">
+            <i class="fa fa-cogs" aria-hidden="true"></i>
+            <h2>Operating</h2>
+          </div>
+          <div class="add-menu-section">
+            <h3>QR Operations</h3>
+            <ul>
+              <li>
+                <a href="{% url 'operating:scan_order_item_unit' %}">
+                  <i class="fa fa-qrcode" aria-hidden="true"></i>
+                  <span>QR Scan</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'operating:scan_order_item_unit_pack' %}">
+                  <i class="fa fa-box" aria-hidden="true"></i>
+                  <span>QR Scan Pack</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="add-menu-section">
+            <h3>Raw Materials</h3>
+            <ul>
+              <li>
+                <a href="{% url 'operating:create_raw_material_good' %}">
+                  <i class="fa fa-cube" aria-hidden="true"></i>
+                  <span>Create Raw Material Good</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'operating:create_raw_material_good_receipt' %}">
+                  <i class="fa fa-file-text" aria-hidden="true"></i>
+                  <span>Create Raw Material Good Receipt</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'operating:create_raw_material_good_item' %}">
+                  <i class="fa fa-plus-square" aria-hidden="true"></i>
+                  <span>Create Raw Material Good Item</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="add-menu-section">
+            <h3>Orders</h3>
+            <ul>
+              <li>
+                <a href="{% url 'operating:create_order' %}">
+                  <i class="fa fa-plus-circle" aria-hidden="true"></i>
+                  <span>Create Order</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'operating:order_list' %}">
+                  <i class="fa fa-list" aria-hidden="true"></i>
+                  <span>Order List</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'email_automation:dashboard' %}" class="nav-link">
+          <i class="fa fa-envelope fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Mail</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'reports' %}" class="nav-link">
+          <i class="fa fa-solid fa-paste fa-2x"></i>
+          <span class="link-text">Reports</span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  <main>
+    <header>
+      <div class="line">
+        <div class="header-left">
+          {% if member %}
+          <p>Welcome to the base page, {{ member.user.first_name|title }}!</p>
+          {% elif user %}
+          <p>Welcome to the base page, {{ user.first_name|title }}!</p>
+          {% endif %}
+          {% if member.company_name %}
+          <p>We love, {{ member.company_name|upper }}!</p>
+          {% endif %}
+          <span>{% now 'F j, Y' %}</span>
+        </div>
+        <div class="header-right">
+          <a href="{% url 'user_settings' %}" class="header-link">
+            <i class="fa fa-wrench" aria-hidden="true"></i>
+            <span>Settings</span>
+          </a>
+          <a href="{% url 'authentication:signout' %}" class="header-link">
+            <i class="fa fa-sign-out" aria-hidden="true"></i>
+            <span>Sign Out</span>
+          </a>
+        </div>
+        {% comment %}
+        <div class="countDown">
+          <div class="container">
+            <div id="countdown">
+              <ul>
+                <li>
+                  <span id="days"></span>days
+                </li>
+                <li>
+                  <span id="hours"></span>Hours
+                </li>
+                <li>
+                  <span id="minutes"></span>Minutes
+                </li>
+                <li>
+                  <span id="seconds"></span>Seconds
+                </li>
+              </ul>
+              <p>... left for my project.</p>
+            </div>
+            <div id="content" class="emoji">
+              <span>🥳</span>
+              <span>🎉</span>
+              <span>🎂</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endcomment %}
+    </header>
+    {% block content %}
+
     {% endblock %}
-    <style>
-      /* Dynamic Email/Phone Fields - Modern Circular Buttons */
-      .dynamic-field-container {
-        display: flex;
-        flex-direction: column;
-        gap: 8px !important;
-      }
-      
-      .dynamic-field-wrapper {
-        display: flex !important;
-        align-items: center !important;
-        gap: 8px !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-      }
-      
-      .dynamic-field-input-wrapper {
-        flex: 1 1 0 !important;
-        max-width: 100% !important;
-        background: #fff !important;
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        transition: border-color 0.2s !important;
-        min-height: 42px !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-      }
-      
-      .dynamic-field-input-wrapper:hover {
-        border-color: #cbd5e1 !important;
-      }
-      
-      .dynamic-field-input-wrapper:focus-within {
-        border-color: #667eea !important;
-        box-shadow: none !important;
-        outline: none !important;
-      }
-      
-      .dynamic-field-input {
-        width: 100%;
-        padding: 11px 14px !important;
-        font-size: 14px !important;
-        border: none !important;
-        background: transparent !important;
-        min-height: 42px;
-      }
-      
-      .dynamic-field-input:focus {
-        outline: none !important;
-      }
-      
-      .btn-remove-field,
-      .btn-add-field {
-        width: 28px !important;
-        height: 28px !important;
-        min-width: 28px !important;
-        border: 1.5px solid #d1d5db !important;
-        border-radius: 50% !important;
-        background: #fff !important;
-        cursor: pointer;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 14px !important;
-        color: #6b7280 !important;
-        transition: all 0.15s ease;
-        flex-shrink: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-      }
-      
-      .btn-add-field:hover {
-        background: #f0fdf4 !important;
-        border-color: #86efac !important;
-        color: #16a34a !important;
-        transform: scale(1.1);
-        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
-      }
-      
-      .btn-remove-field:hover {
-        background: #fef2f2 !important;
-        border-color: #fca5a5 !important;
-        color: #dc2626 !important;
-        transform: scale(1.1);
-        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
-      }
-      
-      /* Modern Contact Search Results */
-      .contact-results {
-        max-height: 300px;
-        overflow-y: auto;
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        display: none;
-        margin-top: 8px;
-      }
-      
-      .contact-results.active {
-        display: block;
-      }
-      
-      .contact-result-item {
-        padding: 12px 16px;
-        cursor: pointer;
-        transition: background 0.2s ease;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        user-select: none;
-      }
-      
-      .contact-result-item:hover {
-        background: #f0f4ff;
-      }
-      
-      .contact-result-item:active {
-        background: #e0e7ff;
-      }
-      
-      .contact-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: 600;
-        font-size: 16px;
-        flex-shrink: 0;
-      }
-      
-      .contact-info {
-        flex: 1;
-        min-width: 0;
-        pointer-events: none;
-      }
-      
-      .contact-name {
-        font-weight: 600;
-        color: #111827;
-        font-size: 15px;
-        cursor: pointer;
-      }
-      
-      .contact-details {
-        font-size: 13px;
-        color: #6b7280;
-        margin-top: 2px;
-        cursor: pointer;
-      }
-      
-      .selected-contact {
-        margin-top: 12px;
-        padding: 12px 16px;
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        display: none;
-        align-items: center;
-        gap: 12px;
-      }
-      
-      .selected-contact.active {
-        display: flex;
-      }
-    </style>
-  </head>
-  <body>
-    {% with member=user.member %}
-      <nav class="navbar">
-        <ul class="navbar-nav">
-          <li class="logo">
-            <a href="{% url 'index' %}" class="nav-link"><span id="nejum_logo_text" class="link-text logo-text">nejum</span></a>
-          </li>
-          <li class="nav-item" id="searchButton">
-            <a class="nav-link">
-              <i class="fa fa-solid fa-search fa-2x"></i>
-              <span class="link-text" id="searchButton">Search</span>
-            </a>
-          </li>
+  </main>
+  {% endwith %}
 
-          <div class="overlay" id="searchOverlay">
-            <div class="overlayContent">
-              {% comment %} <input type="text" name="searchInput" id="searchInput" placeholder="Search for a company or contact..." /> {% endcomment %}
-              {% comment %} <div class="searchResults"></div> {% endcomment %}
-              {% search_component csrf_token=csrf_token %}
-              <div class="recent">
-                <h4>Recent</h4>
-                <ul>
-                  {% for entry in last_ten_entities %}
-                    <li>
-                      {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
-                      {% if entry.entry_type == 'Contact' %}
-                        <a href="{% url 'crm:contact_detail' entry.id %}"><i class="fa fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}</a>
-                      {% elif entry.entry_type == 'Company' %}
-                        <a href="{% url 'crm:company_detail' entry.id %}"><i class="fa fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}</a>
-                      {% endif %}
-                    </li>
-                  {% endfor %}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <li class="nav-item" id="addButton">
-            <a href="#add" class="nav-link">
-              <i class="fa fa-plus fa-2x" aria-hidden="true"></i>
-              <span class="link-text">Add</span>
-            </a>
-            <div id="addExpanded">
-              <div class="add-menu-header">
-                <i class="fa fa-plus-circle" aria-hidden="true"></i>
-                <h2>Add new records</h2>
-              </div>
-              <div class="add-menu-section">
-                <h3>Add a single record</h3>
-                <ul>
-                  <li>
-                    <a href="#" onclick="openMainContactSidebar(); return false;">
-                      <i class="fa fa-user" aria-hidden="true"></i>
-                      <span>Contact</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" onclick="openCompanySidebar(); return false;">
-                      <i class="fa fa-building" aria-hidden="true"></i>
-                      <span>Company</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" onclick="openTaskSidebar(); return false;">
-                      <i class="fa fa-check-circle" aria-hidden="true"></i>
-                      <span>Task</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'marketing:product_create' %}">
-                      <i class="fa fa-tag" aria-hidden="true"></i>
-                      <span>Product</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'operating:create_order' %}">
-                      <i class="fa fa-shopping-cart" aria-hidden="true"></i>
-                      <span>Order</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div class="nav-separator-in-add">
-              <div class="nav-separator-line"></div>
-            </div>
-          </li>
-          <li class="nav-item">
-            <a href="{% url 'index' %}" class="nav-link">
-              <i class="fa fa-home fa-2x" aria-hidden="true"></i>
-              {% comment %} <i class="fa fa-table-columns fa-2x" aria-hidden="true"></i> {% endcomment %}
-              <span class="link-text">Home</span>
-            </a>
-          </li>
-          {% comment %} <li class="nav-item">
-            <a href="{% url 'crm:index' %}" class="nav-link">
-              <i class="fa fa-users fa-2x" aria-hidden="true"></i>
-              <span class="link-text">Contacts</span>
-            </a>
-          </li> {% endcomment %}
-          <li class="nav-item">
-            <a href="{% url 'accounting:index' %}" class="nav-link">
-              <i class="fa fa-money fa-2x" aria-hidden="true"></i>
-              <span class="link-text">Accounting</span>
-            </a>
-          </li>
-          <li class="nav-item" id="marketingButton">
-            <a href="#marketing" class="nav-link">
-              {% comment %} <i class="fa fa-cogs fa-2x" aria-hidden="true"></i> {% endcomment %}
-              <i class="fa fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
-              <span class="link-text">Marketing</span>
-            </a>
-            <div id="marketingExpanded">
-              <div class="add-menu-header">
-                <i class="fa fa-bullseye" aria-hidden="true"></i>
-                <h2>Marketing</h2>
-              </div>
-              <div class="add-menu-section">
-                <h3>Products</h3>
-                <ul>
-                  <li>
-                    <a href="{% url 'marketing:product_create' %}">
-                      <i class="fa fa-plus-circle" aria-hidden="true"></i>
-                      <span>Create Product</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'marketing:product_list' %}">
-                      <i class="fa fa-list" aria-hidden="true"></i>
-                      <span>Product List</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-              <div class="add-menu-section">
-                <h3>Customers</h3>
-                <ul>
-                  <li>
-                    <a href="{% url 'crm:company_list' %}">
-                      <i class="fa fa-building" aria-hidden="true"></i>
-                      <span>Companies</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'crm:contact_list' %}">
-                      <i class="fa fa-users" aria-hidden="true"></i>
-                      <span>Contacts</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </li>
-          <li class="nav-item" id="operatingButton">
-            <a href="#operating" class="nav-link">
-              <i class="fa fa-cogs fa-2x" aria-hidden="true"></i>
-              <span class="link-text">Operating</span>
-            </a>
-            <div id="operatingExpanded">
-              <div class="add-menu-header">
-                <i class="fa fa-cogs" aria-hidden="true"></i>
-                <h2>Operating</h2>
-              </div>
-              <div class="add-menu-section">
-                <h3>QR Operations</h3>
-                <ul>
-                  <li>
-                    <a href="{% url 'operating:scan_order_item_unit' %}">
-                      <i class="fa fa-qrcode" aria-hidden="true"></i>
-                      <span>QR Scan</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'operating:scan_order_item_unit_pack' %}">
-                      <i class="fa fa-box" aria-hidden="true"></i>
-                      <span>QR Scan Pack</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-              <div class="add-menu-section">
-                <h3>Raw Materials</h3>
-                <ul>
-                  <li>
-                    <a href="{% url 'operating:create_raw_material_good' %}">
-                      <i class="fa fa-cube" aria-hidden="true"></i>
-                      <span>Create Raw Material Good</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'operating:create_raw_material_good_receipt' %}">
-                      <i class="fa fa-file-text" aria-hidden="true"></i>
-                      <span>Create Raw Material Good Receipt</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'operating:create_raw_material_good_item' %}">
-                      <i class="fa fa-plus-square" aria-hidden="true"></i>
-                      <span>Create Raw Material Good Item</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-              <div class="add-menu-section">
-                <h3>Orders</h3>
-                <ul>
-                  <li>
-                    <a href="{% url 'operating:create_order' %}">
-                      <i class="fa fa-plus-circle" aria-hidden="true"></i>
-                      <span>Create Order</span>
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{% url 'operating:order_list' %}">
-                      <i class="fa fa-list" aria-hidden="true"></i>
-                      <span>Order List</span>
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </li>
-          <li class="nav-item">
-            <a href="{% url 'email_automation:dashboard' %}" class="nav-link">
-              <i class="fa fa-envelope fa-2x" aria-hidden="true"></i>
-              <span class="link-text">Mail</span>
-            </a>
-          </li>
-
-          <div class="last2items">
-            <li class="nav-item">
-              <a href="{% url 'reports' %}" class="nav-link">
-                <i class="fa fa-solid fa-paste fa-2x"></i>
-                <span class="link-text">Reports</span>
-              </a>
-            </li>
-          </div>
-        </ul>
-      </nav>
-      <main>
-        <header>
-          <div class="line">
-            <div class="header-left">
-              {% if member %}
-                <p>Welcome to the base page, {{ member.user.first_name|title }}!</p>
-              {% elif user %}
-                <p>Welcome to the base page, {{ user.first_name|title }}!</p>
-              {% endif %}
-              {% if member.company_name %}
-                <p>We love, {{ member.company_name|upper }}!</p>
-              {% endif %}
-              <span>{% now 'F j, Y' %}</span>
-            </div>
-            <div class="header-right">
-              <a href="{% url 'user_settings' %}" class="header-link">
-                <i class="fa fa-wrench" aria-hidden="true"></i>
-                <span>Settings</span>
-              </a>
-              <a href="{% url 'authentication:signout' %}" class="header-link">
-                <i class="fa fa-sign-out" aria-hidden="true"></i>
-                <span>Sign Out</span>
-              </a>
-            </div>
-            {% comment %}
-            <div class="countDown">
-              <div class="container">
-                <div id="countdown">
-                  <ul>
-                    <li>
-                      <span id="days"></span>days
-                    </li>
-                    <li>
-                      <span id="hours"></span>Hours
-                    </li>
-                    <li>
-                      <span id="minutes"></span>Minutes
-                    </li>
-                    <li>
-                      <span id="seconds"></span>Seconds
-                    </li>
-                  </ul>
-                  <p>... left for my project.</p>
-                </div>
-                <div id="content" class="emoji">
-                  <span>🥳</span>
-                  <span>🎉</span>
-                  <span>🎂</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          {% endcomment %}
-        </header>
-        {% block content %}
-
-        {% endblock %}
-      </main>
-    {% endwith %}
-    
-    <!-- Task Sidebar Modal -->
-    <div id="taskSidebarOverlay" class="sidebar-overlay" onclick="closeTaskSidebar()">
-      <div class="sidebar-modal" onclick="event.stopPropagation();">
-        <div class="sidebar-header">
-          <button class="sidebar-close" onclick="closeTaskSidebar()">
-            <i class="fa fa-times"></i> Close
-          </button>
-          <div class="sidebar-title">
-            <i class="fa fa-check-circle"></i>
-            <h2>Create a new task</h2>
-          </div>
+  <!-- Task Sidebar Modal -->
+  <div id="taskSidebarOverlay" class="sidebar-overlay" onclick="closeTaskSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeTaskSidebar()">
+          <i class="fa fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fa fa-check-circle"></i>
+          <h2>Create a new task</h2>
         </div>
-        <div class="sidebar-content">
-          <form id="taskForm" method="post" action="{% url 'todo:create_task' %}">
-            {% csrf_token %}
-            <div class="form-group">
-              <label for="id_name">Task name</label>
-              <input type="text" name="name" id="id_name" class="form-input" required autofocus>
+      </div>
+      <div class="sidebar-content">
+        <form id="taskForm" method="post" action="{% url 'todo:create_task' %}">
+          {% csrf_token %}
+          <div class="form-group">
+            <label for="id_name">Task name</label>
+            <input type="text" name="name" id="id_name" class="form-input" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label for="id_due_date">Due date</label>
+            <input type="date" name="due_date" id="id_due_date" class="form-input" value="{{ today }}">
+          </div>
+
+          <div class="form-group">
+            <label for="id_priority">Priority</label>
+            <select name="priority" id="id_priority" class="form-input">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="id_description">Description</label>
+            <textarea name="description" id="id_description" class="form-textarea" rows="3"
+              placeholder="Enter a description or any notes about this task."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="id_task_member">Assign to</label>
+            <select name="member" id="id_task_member" class="form-input">
+              {% for member in all_members %}
+              <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Attach an item section -->
+          <div class="attach-section">
+            <div class="attach-header">
+              <i class="fa fa-paperclip"></i>
+              <span>Attach to</span>
             </div>
-            
-            <div class="form-group">
-              <label for="id_due_date">Due date</label>
-              <input type="date" name="due_date" id="id_due_date" class="form-input" value="{{ today }}">
+            <div class="attach-buttons">
+              <button type="button" class="attach-btn" onclick="toggleAttachment('taskCompany')">
+                <i class="fa fa-building"></i> Company
+              </button>
+              <button type="button" class="attach-btn" onclick="toggleAttachment('taskContact')">
+                <i class="fa fa-user"></i> Contact
+              </button>
             </div>
-            
-            <div class="form-group">
-              <label for="id_description">Description</label>
-              <textarea name="description" id="id_description" class="form-textarea" rows="3" placeholder="Enter a description or any notes about this task."></textarea>
+          </div>
+
+          <!-- Company attachment -->
+          <div id="taskCompanySection" class="attachment-section" style="display: none;">
+            <div class="attachment-header">
+              <span><i class="fa fa-building"></i> Attach to company</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskCompany')">
+                Remove
+              </button>
             </div>
-            
             <div class="form-group">
-              <label for="id_task_member">Assign to</label>
-              <select name="member" id="id_task_member" class="form-input">
+              <label for="id_task_company_search">Search company</label>
+              <input type="text" id="id_task_company_search" class="form-input" placeholder="Type company name..."
+                hx-get="{% url 'crm:company_search' %}" hx-trigger="keyup changed delay:300ms"
+                hx-target="#taskCompanyResults" hx-params="*" name="company_name" autocomplete="off">
+              <div id="taskCompanyResults" class="search-results"></div>
+            </div>
+            <input type="hidden" name="company" id="id_company" value="">
+          </div>
+
+          <!-- Contact attachment -->
+          <div id="taskContactSection" class="attachment-section" style="display: none;">
+            <div class="attachment-header">
+              <span><i class="fa fa-user"></i> Attach to contact</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskContact')">
+                Remove
+              </button>
+            </div>
+            <div class="form-group">
+              <label for="id_task_contact_search">Search contact</label>
+              <input type="text" id="id_task_contact_search" class="form-input" placeholder="Type contact name..."
+                hx-post="{% url 'crm:search_contacts_only' %}" hx-trigger="keyup changed delay:300ms"
+                hx-target="#taskContactResults" hx-params="*" name="searchInput" autocomplete="off">
+              <div id="taskContactResults" class="search-results"></div>
+            </div>
+            <input type="hidden" name="contact" id="id_contact" value="">
+          </div>
+
+          <div class="sidebar-footer">
+            <button type="submit" class="btn btn-primary">Create task</button>
+            <button type="button" class="btn btn-secondary" onclick="closeTaskSidebar()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Company Sidebar Modal -->
+  <div id="companySidebarOverlay" class="sidebar-overlay" onclick="closeCompanySidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeCompanySidebar()">
+          <i class="fa fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fa fa-building"></i>
+          <h2>Add a Company</h2>
+        </div>
+      </div>
+      <div class="sidebar-content">
+        <form id="companyForm" method="post" onsubmit="submitCompanyForm(event); return false;">
+          {% csrf_token %}
+          <div class="form-group">
+            <label for="id_company_name">Company Name <span style="color: #ef4444;">*</span></label>
+            <input type="text" name="name" id="id_company_name" class="form-input" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label>Email addresses</label>
+            <div id="company_emails_container"></div>
+            <input type="hidden" name="emails_data" id="emails_data">
+          </div>
+
+          <div class="form-group">
+            <label>Phone numbers</label>
+            <div id="company_phones_container"></div>
+            <input type="hidden" name="phones_data" id="phones_data">
+          </div>
+
+          <div class="form-group">
+            <label for="id_company_website">Website</label>
+            <input type="text" name="website" id="id_company_website" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label for="id_company_address">Address</label>
+            <textarea name="address" id="id_company_address" class="form-textarea" rows="3"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="id_company_background">Background info</label>
+            <textarea name="backgroundInfo" id="id_company_background" class="form-textarea" rows="2"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="id_company_country">Country</label>
+            <input type="text" name="country" id="id_company_country" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label for="id_company_group">Group</label>
+            <select name="group" id="id_company_group" class="form-input">
+              <option value="">---------</option>
+              {% for group in client_groups %}
+              <option value="{{ group.id }}">{{ group.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="id_company_status">Status</label>
+            <select name="status" id="id_company_status" class="form-input" required>
+              <option value="prospect">Prospect</option>
+              <option value="qualified">Qualified</option>
+            </select>
+          </div>
+
+          <!-- Email Follow-up Option -->
+          <div class="email-followup-option">
+            <div class="email-checkbox-wrapper">
+              <input type="checkbox" name="send_followup_emails" id="send_followup_emails" class="email-checkbox">
+              <label for="send_followup_emails" class="email-checkbox-label">
+                <span class="email-checkbox-title">📧 Send Follow-up Emails</span>
+                <span class="email-checkbox-description">Automatically send 5 follow-up emails over 54 days</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Attach an item section -->
+          <div class="attach-section">
+            <div class="attach-header">
+              <i class="fa fa-paperclip"></i>
+              <span>Attach an item</span>
+            </div>
+            <div class="attach-buttons">
+              <button type="button" class="attach-btn" onclick="toggleAttachment('companyContact')">
+                <i class="fa fa-user"></i> Contact
+              </button>
+              <button type="button" class="attach-btn" onclick="toggleAttachment('companyNote')">
+                <i class="fa fa-file-text"></i> Note
+              </button>
+              <button type="button" class="attach-btn" onclick="toggleAttachment('companyTask')">
+                <i class="fa fa-check-circle"></i> Task
+              </button>
+            </div>
+          </div>
+
+          <!-- Contact attachment -->
+          <div id="companyContactSection" class="attachment-section" style="display: none;">
+            <div class="attachment-header">
+              <span><i class="fa fa-user"></i> Attach a contact</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyContact')">
+                Remove this contact
+              </button>
+            </div>
+            <div class="contact-selector-wrapper">
+              <div class="contact-search-box">
+                <input type="text" id="company_contact_search" class="form-input" placeholder="Search contacts..."
+                  autocomplete="off" />
+                <button type="button" class="add-contact-icon-btn" onclick="openContactSidebarFromCompany()"
+                  title="Add new contact">
+                  <i class="fa fa-plus"></i>
+                </button>
+              </div>
+              <div id="company_contact_results" class="contact-results"></div>
+              <div id="company_selected_contact" class="selected-contact"></div>
+              <input type="hidden" name="contact_id" id="company_contact_id" value="">
+            </div>
+          </div>
+
+          <!-- Note attachment -->
+          <div id="companyNoteSection" class="attachment-section" style="display: none;">
+            <div class="attachment-header">
+              <span><i class="fa fa-file-text"></i> Attach a note</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyNote')">
+                Remove this note
+              </button>
+            </div>
+            <div class="form-group">
+              <label for="id_company_note">Note</label>
+              <textarea name="note_content" id="id_company_note" class="form-textarea" rows="3"></textarea>
+            </div>
+          </div>
+
+          <!-- Task attachment -->
+          <div id="companyTaskSection" class="attachment-section" style="display: none;">
+            <div class="attachment-header">
+              <span><i class="fa fa-check-circle"></i> Attach a task</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyTask')">
+                Remove this task
+              </button>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex: 1;">
+                <label for="id_company_task_name">Task name</label>
+                <input type="text" name="task_name" id="id_company_task_name" class="form-input">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label for="id_company_task_due">Due date</label>
+                <input type="date" name="task_due_date" id="id_company_task_due" class="form-input">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="id_company_task_desc">Description</label>
+              <textarea name="task_description" id="id_company_task_desc" class="form-textarea" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="id_company_task_member">Assign to</label>
+              <select name="task_member" id="id_company_task_member" class="form-input">
                 {% for member in all_members %}
-                  <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}</option>
+               <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
+                </option>
                 {% endfor %}
               </select>
             </div>
-            
-            <!-- Attach an item section -->
-            <div class="attach-section">
-              <div class="attach-header">
-                <i class="fa fa-paperclip"></i>
-                <span>Attach to</span>
-              </div>
-              <div class="attach-buttons">
-                <button type="button" class="attach-btn" onclick="toggleAttachment('taskCompany')">
-                  <i class="fa fa-building"></i> Company
-                </button>
-                <button type="button" class="attach-btn" onclick="toggleAttachment('taskContact')">
-                  <i class="fa fa-user"></i> Contact
-                </button>
-              </div>
-            </div>
-            
-            <!-- Company attachment -->
-            <div id="taskCompanySection" class="attachment-section" style="display: none;">
-              <div class="attachment-header">
-                <span><i class="fa fa-building"></i> Attach to company</span>
-                <button type="button" class="remove-attachment" onclick="toggleAttachment('taskCompany')">
-                  Remove
-                </button>
-              </div>
-              <div class="form-group">
-                <label for="id_task_company_search">Search company</label>
-                <input type="text" 
-                       id="id_task_company_search" 
-                       class="form-input" 
-                       placeholder="Type company name..."
-                       hx-get="{% url 'crm:company_search' %}" 
-                       hx-trigger="keyup changed delay:300ms" 
-                       hx-target="#taskCompanyResults"
-                       hx-params="*"
-                       name="company_name"
-                       autocomplete="off">
-                <div id="taskCompanyResults" class="search-results"></div>
-              </div>
-              <input type="hidden" name="company" id="id_company" value="">
-            </div>
-            
-            <!-- Contact attachment -->
-            <div id="taskContactSection" class="attachment-section" style="display: none;">
-              <div class="attachment-header">
-                <span><i class="fa fa-user"></i> Attach to contact</span>
-                <button type="button" class="remove-attachment" onclick="toggleAttachment('taskContact')">
-                  Remove
-                </button>
-              </div>
-              <div class="form-group">
-                <label for="id_task_contact_search">Search contact</label>
-                <input type="text" 
-                       id="id_task_contact_search" 
-                       class="form-input" 
-                       placeholder="Type contact name..."
-                       hx-post="{% url 'crm:search_contacts_only' %}" 
-                       hx-trigger="keyup changed delay:300ms" 
-                       hx-target="#taskContactResults"
-                       hx-params="*"
-                       name="searchInput"
-                       autocomplete="off">
-                <div id="taskContactResults" class="search-results"></div>
-              </div>
-              <input type="hidden" name="contact" id="id_contact" value="">
-            </div>
-            
-            <div class="sidebar-footer">
-              <button type="submit" class="btn btn-primary">Create task</button>
-              <button type="button" class="btn btn-secondary" onclick="closeTaskSidebar()">Cancel</button>
-            </div>
-          </form>
-        </div>
+          </div>
+
+          <div class="sidebar-footer">
+            <button type="submit" id="companySubmitBtn" class="btn btn-primary">
+              <span class="btn-text">Create company</span>
+              <span class="btn-spinner" style="display: none;">
+                <svg class="spinner-icon" viewBox="0 0 50 50">
+                  <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                </svg>
+                Creating...
+              </span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="closeCompanySidebar()">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
-    
-    <!-- Company Sidebar Modal -->
-    <div id="companySidebarOverlay" class="sidebar-overlay" onclick="closeCompanySidebar()">
-      <div class="sidebar-modal" onclick="event.stopPropagation();">
-        <div class="sidebar-header">
-          <button class="sidebar-close" onclick="closeCompanySidebar()">
-            <i class="fa fa-times"></i> Close
-          </button>
-          <div class="sidebar-title">
-            <i class="fa fa-building"></i>
-            <h2>Add a Company</h2>
-          </div>
+  </div>
+
+  <!-- Main Contact Sidebar Modal (From Add Menu) -->
+  <div id="mainContactSidebarOverlay" class="sidebar-overlay" onclick="closeMainContactSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeMainContactSidebar()">
+          <i class="fa fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fa fa-user"></i>
+          <h2>Add a Contact</h2>
         </div>
-        <div class="sidebar-content">
-          <form id="companyForm" method="post" onsubmit="submitCompanyForm(event); return false;">
-            {% csrf_token %}
-            <div class="form-group">
-              <label for="id_company_name">Company Name <span style="color: #ef4444;">*</span></label>
-              <input type="text" name="name" id="id_company_name" class="form-input" required autofocus>
+      </div>
+      <div class="sidebar-content">
+        <form id="mainContactForm" method="post" onsubmit="submitMainContactForm(event); return false;">
+          {% csrf_token %}
+          <div class="form-group">
+            <label for="id_main_contact_name">Name <span style="color: #ef4444;">*</span></label>
+            <input type="text" name="name" id="id_main_contact_name" class="form-input" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label>Email addresses</label>
+            <div id="main_contact_emails_container"></div>
+            <input type="hidden" name="emails_data" id="contact_emails_data">
+          </div>
+
+          <div class="form-group">
+            <label>Phone numbers</label>
+            <div id="main_contact_phones_container"></div>
+            <input type="hidden" name="phones_data" id="contact_phones_data">
+          </div>
+
+          <div class="form-group">
+            <label for="id_main_contact_job">Job Title</label>
+            <input type="text" name="job_title" id="id_main_contact_job" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label for="id_main_contact_address">Address</label>
+            <textarea name="address" id="id_main_contact_address" class="form-textarea" rows="2"></textarea>
+          </div>
+
+          <!-- Attach an item section -->
+          <div class="attach-section">
+            <div class="attach-header">
+              <i class="fa fa-paperclip"></i>
+              <span>Attach an item</span>
             </div>
-            
-            <div class="form-group">
-              <label>Email addresses</label>
-              <div id="company_emails_container"></div>
-              <input type="hidden" name="emails_data" id="emails_data">
+            <div class="attach-buttons">
+              <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactNote')">
+                <i class="fa fa-file-text"></i> Note
+              </button>
+              <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactTask')">
+                <i class="fa fa-check-circle"></i> Task
+              </button>
             </div>
-            
-            <div class="form-group">
-              <label>Phone numbers</label>
-              <div id="company_phones_container"></div>
-              <input type="hidden" name="phones_data" id="phones_data">
+          </div>
+
+          <!-- Note attachment -->
+          <div id="mainContactNoteSection" class="attachment-section" style="display: none;">
+            <div class="attachment-header">
+              <span><i class="fa fa-file-text"></i> Attach a note</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactNote')">
+                Remove this note
+              </button>
             </div>
-            
             <div class="form-group">
-              <label for="id_company_website">Website</label>
-              <input type="text" name="website" id="id_company_website" class="form-input">
+              <label for="id_main_contact_note">Note</label>
+              <textarea name="note_content" id="id_main_contact_note" class="form-textarea" rows="3"></textarea>
             </div>
-            
-            <div class="form-group">
-              <label for="id_company_address">Address</label>
-              <textarea name="address" id="id_company_address" class="form-textarea" rows="3"></textarea>
+          </div>
+
+          <!-- Task attachment -->
+          <div id="mainContactTaskSection" class="attachment-section" style="display: none;">
+            <div class="attachment-header">
+              <span><i class="fa fa-check-circle"></i> Attach a task</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactTask')">
+                Remove this task
+              </button>
             </div>
-            
-            <div class="form-group">
-              <label for="id_company_background">Background info</label>
-              <textarea name="backgroundInfo" id="id_company_background" class="form-textarea" rows="2"></textarea>
+            <div class="form-row">
+              <div class="form-group" style="flex: 1;">
+                <label for="id_main_contact_task_name">Task name</label>
+                <input type="text" name="task_name" id="id_main_contact_task_name" class="form-input">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label for="id_main_contact_task_due">Due date</label>
+                <input type="date" name="task_due_date" id="id_main_contact_task_due" class="form-input">
+              </div>
             </div>
-            
             <div class="form-group">
-              <label for="id_company_country">Country</label>
-              <input type="text" name="country" id="id_company_country" class="form-input">
+              <label for="id_main_contact_task_desc">Description</label>
+              <textarea name="task_description" id="id_main_contact_task_desc" class="form-textarea"
+                rows="3"></textarea>
             </div>
-            
             <div class="form-group">
-              <label for="id_company_group">Group</label>
-              <select name="group" id="id_company_group" class="form-input">
-                <option value="">---------</option>
-                {% for group in client_groups %}
-                  <option value="{{ group.id }}">{{ group.name }}</option>
+              <label for="id_main_contact_task_member">Assign to</label>
+              <select name="task_member" id="id_main_contact_task_member" class="form-input">
+                {% for member in all_members %}
+                <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
+                </option>
                 {% endfor %}
               </select>
             </div>
-            
-            <div class="form-group">
-              <label for="id_company_status">Status</label>
-              <select name="status" id="id_company_status" class="form-input" required>
-                <option value="prospect">Prospect</option>
-                <option value="qualified">Qualified</option>
-              </select>
-            </div>
-            
-            <!-- Email Follow-up Option -->
-            <div class="email-followup-option">
-              <div class="email-checkbox-wrapper">
-                <input type="checkbox" name="send_followup_emails" id="send_followup_emails" class="email-checkbox">
-                <label for="send_followup_emails" class="email-checkbox-label">
-                  <span class="email-checkbox-title">📧 Send Follow-up Emails</span>
-                  <span class="email-checkbox-description">Automatically send 5 follow-up emails over 54 days</span>
-                </label>
-              </div>
-            </div>
-            
-            <!-- Attach an item section -->
-            <div class="attach-section">
-              <div class="attach-header">
-                <i class="fa fa-paperclip"></i>
-                <span>Attach an item</span>
-              </div>
-              <div class="attach-buttons">
-                <button type="button" class="attach-btn" onclick="toggleAttachment('companyContact')">
-                  <i class="fa fa-user"></i> Contact
-                </button>
-                <button type="button" class="attach-btn" onclick="toggleAttachment('companyNote')">
-                  <i class="fa fa-file-text"></i> Note
-                </button>
-                <button type="button" class="attach-btn" onclick="toggleAttachment('companyTask')">
-                  <i class="fa fa-check-circle"></i> Task
-                </button>
-              </div>
-            </div>
-            
-            <!-- Contact attachment -->
-            <div id="companyContactSection" class="attachment-section" style="display: none;">
-              <div class="attachment-header">
-                <span><i class="fa fa-user"></i> Attach a contact</span>
-                <button type="button" class="remove-attachment" onclick="toggleAttachment('companyContact')">
-                  Remove this contact
-                </button>
-              </div>
-              <div class="contact-selector-wrapper">
-                <div class="contact-search-box">
-                  <input 
-                    type="text" 
-                    id="company_contact_search" 
-                    class="form-input"
-                    placeholder="Search contacts..."
-                    autocomplete="off"
-                  />
-                  <button type="button" class="add-contact-icon-btn" onclick="openContactSidebarFromCompany()" title="Add new contact">
-                    <i class="fa fa-plus"></i>
-                  </button>
-                </div>
-                <div id="company_contact_results" class="contact-results"></div>
-                <div id="company_selected_contact" class="selected-contact"></div>
-                <input type="hidden" name="contact_id" id="company_contact_id" value="">
-              </div>
-            </div>
-            
-            <!-- Note attachment -->
-            <div id="companyNoteSection" class="attachment-section" style="display: none;">
-              <div class="attachment-header">
-                <span><i class="fa fa-file-text"></i> Attach a note</span>
-                <button type="button" class="remove-attachment" onclick="toggleAttachment('companyNote')">
-                  Remove this note
-                </button>
-              </div>
-              <div class="form-group">
-                <label for="id_company_note">Note</label>
-                <textarea name="note_content" id="id_company_note" class="form-textarea" rows="3"></textarea>
-              </div>
-            </div>
-            
-            <!-- Task attachment -->
-            <div id="companyTaskSection" class="attachment-section" style="display: none;">
-              <div class="attachment-header">
-                <span><i class="fa fa-check-circle"></i> Attach a task</span>
-                <button type="button" class="remove-attachment" onclick="toggleAttachment('companyTask')">
-                  Remove this task
-                </button>
-              </div>
-              <div class="form-row">
-                <div class="form-group" style="flex: 1;">
-                  <label for="id_company_task_name">Task name</label>
-                  <input type="text" name="task_name" id="id_company_task_name" class="form-input">
-                </div>
-                <div class="form-group" style="flex: 1;">
-                  <label for="id_company_task_due">Due date</label>
-                  <input type="date" name="task_due_date" id="id_company_task_due" class="form-input">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="id_company_task_desc">Description</label>
-                <textarea name="task_description" id="id_company_task_desc" class="form-textarea" rows="3"></textarea>
-              </div>
-              <div class="form-group">
-                <label for="id_company_task_member">Assign to</label>
-                <select name="task_member" id="id_company_task_member" class="form-input">
-                  {% for member in all_members %}
-                    <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-            
-            <div class="sidebar-footer">
-              <button type="submit" id="companySubmitBtn" class="btn btn-primary">
-                <span class="btn-text">Create company</span>
-                <span class="btn-spinner" style="display: none;">
-                  <svg class="spinner-icon" viewBox="0 0 50 50">
-                    <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
-                  </svg>
-                  Creating...
-                </span>
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="closeCompanySidebar()">Cancel</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Main Contact Sidebar Modal (From Add Menu) -->
-    <div id="mainContactSidebarOverlay" class="sidebar-overlay" onclick="closeMainContactSidebar()">
-      <div class="sidebar-modal" onclick="event.stopPropagation();">
-        <div class="sidebar-header">
-          <button class="sidebar-close" onclick="closeMainContactSidebar()">
-            <i class="fa fa-times"></i> Close
-          </button>
-          <div class="sidebar-title">
-            <i class="fa fa-user"></i>
-            <h2>Add a Contact</h2>
           </div>
-        </div>
-        <div class="sidebar-content">
-          <form id="mainContactForm" method="post" onsubmit="submitMainContactForm(event); return false;">
-            {% csrf_token %}
-            <div class="form-group">
-              <label for="id_main_contact_name">Name <span style="color: #ef4444;">*</span></label>
-              <input type="text" name="name" id="id_main_contact_name" class="form-input" required autofocus>
-            </div>
-            
-            <div class="form-group">
-              <label>Email addresses</label>
-              <div id="main_contact_emails_container"></div>
-              <input type="hidden" name="emails_data" id="contact_emails_data">
-            </div>
-            
-            <div class="form-group">
-              <label>Phone numbers</label>
-              <div id="main_contact_phones_container"></div>
-              <input type="hidden" name="phones_data" id="contact_phones_data">
-            </div>
-            
-            <div class="form-group">
-              <label for="id_main_contact_job">Job Title</label>
-              <input type="text" name="job_title" id="id_main_contact_job" class="form-input">
-            </div>
-            
-            <div class="form-group">
-              <label for="id_main_contact_address">Address</label>
-              <textarea name="address" id="id_main_contact_address" class="form-textarea" rows="2"></textarea>
-            </div>
-            
-            <!-- Attach an item section -->
-            <div class="attach-section">
-              <div class="attach-header">
-                <i class="fa fa-paperclip"></i>
-                <span>Attach an item</span>
-              </div>
-              <div class="attach-buttons">
-                <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactNote')">
-                  <i class="fa fa-file-text"></i> Note
-                </button>
-                <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactTask')">
-                  <i class="fa fa-check-circle"></i> Task
-                </button>
-              </div>
-            </div>
-            
-            <!-- Note attachment -->
-            <div id="mainContactNoteSection" class="attachment-section" style="display: none;">
-              <div class="attachment-header">
-                <span><i class="fa fa-file-text"></i> Attach a note</span>
-                <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactNote')">
-                  Remove this note
-                </button>
-              </div>
-              <div class="form-group">
-                <label for="id_main_contact_note">Note</label>
-                <textarea name="note_content" id="id_main_contact_note" class="form-textarea" rows="3"></textarea>
-              </div>
-            </div>
-            
-            <!-- Task attachment -->
-            <div id="mainContactTaskSection" class="attachment-section" style="display: none;">
-              <div class="attachment-header">
-                <span><i class="fa fa-check-circle"></i> Attach a task</span>
-                <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactTask')">
-                  Remove this task
-                </button>
-              </div>
-              <div class="form-row">
-                <div class="form-group" style="flex: 1;">
-                  <label for="id_main_contact_task_name">Task name</label>
-                  <input type="text" name="task_name" id="id_main_contact_task_name" class="form-input">
-                </div>
-                <div class="form-group" style="flex: 1;">
-                  <label for="id_main_contact_task_due">Due date</label>
-                  <input type="date" name="task_due_date" id="id_main_contact_task_due" class="form-input">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="id_main_contact_task_desc">Description</label>
-                <textarea name="task_description" id="id_main_contact_task_desc" class="form-textarea" rows="3"></textarea>
-              </div>
-              <div class="form-group">
-                <label for="id_main_contact_task_member">Assign to</label>
-                <select name="task_member" id="id_main_contact_task_member" class="form-input">
-                  {% for member in all_members %}
-                    <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-            
-            <div class="sidebar-footer">
-              <button type="submit" id="mainContactSubmitBtn" class="btn btn-primary">
-                <span class="btn-text">Add Contact</span>
-                <span class="btn-spinner" style="display: none;">
-                  <svg class="spinner-icon" viewBox="0 0 50 50">
-                    <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
-                  </svg>
-                  Creating...
-                </span>
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="closeMainContactSidebar()">Cancel</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Contact Sidebar Modal (Nested from Company) -->
-    <div id="contactSidebarOverlay" class="sidebar-overlay sidebar-nested" onclick="closeContactSidebar()">
-      <div class="sidebar-modal" onclick="event.stopPropagation()">
-        <div class="sidebar-header">
-          <button class="sidebar-close" onclick="closeContactSidebar()">
-            <i class="fa fa-arrow-left"></i> Back
-          </button>
-          <div class="sidebar-title">
-            <i class="fa fa-user"></i>
-            <h2>Add a Contact</h2>
+
+          <div class="sidebar-footer">
+            <button type="submit" id="mainContactSubmitBtn" class="btn btn-primary">
+              <span class="btn-text">Add Contact</span>
+              <span class="btn-spinner" style="display: none;">
+                <svg class="spinner-icon" viewBox="0 0 50 50">
+                  <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                </svg>
+                Creating...
+              </span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="closeMainContactSidebar()">Cancel</button>
           </div>
-        </div>
-        <div class="sidebar-content">
-          <form id="contactForm" method="post" onsubmit="submitContactForm(event); return false;">
-            {% csrf_token %}
-            <div class="form-group">
-              <label for="id_contact_name">Name <span style="color: #ef4444;">*</span></label>
-              <input type="text" name="name" id="id_contact_name" class="form-input" required autofocus>
-            </div>
-            
-            <div class="form-group">
-              <label>Email addresses</label>
-              <div id="nested_contact_emails_container"></div>
-              <input type="hidden" name="emails_data" id="nested_contact_emails_data">
-            </div>
-            
-            <div class="form-group">
-              <label>Phone numbers</label>
-              <div id="nested_contact_phones_container"></div>
-              <input type="hidden" name="phones_data" id="nested_contact_phones_data">
-            </div>
-            
-            <div class="form-group">
-              <label for="id_contact_job">Job Title</label>
-              <input type="text" name="job_title" id="id_contact_job" class="form-input">
-            </div>
-            
-            <div class="form-group">
-              <label for="id_contact_address">Address</label>
-              <textarea name="address" id="id_contact_address" class="form-textarea" rows="2"></textarea>
-            </div>
-            
-            <div class="sidebar-footer">
-              <button type="submit" class="btn btn-primary">Add Contact</button>
-              <button type="button" class="btn btn-secondary" onclick="closeContactSidebar()">Cancel</button>
-            </div>
-          </form>
-        </div>
+        </form>
       </div>
     </div>
-    
-    <script>
-      // Configure HTMX to include CSRF token in all requests
-      document.body.addEventListener('htmx:configRequest', (event) => {
-        event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
-      });
-      
-      // Unified menu system
-      document.addEventListener('DOMContentLoaded', function() {
-        const addButton = document.getElementById('addButton');
-        const addExpanded = document.getElementById('addExpanded');
-        const marketingButton = document.getElementById('marketingButton');
-        const marketingExpanded = document.getElementById('marketingExpanded');
-        const operatingButton = document.getElementById('operatingButton');
-        const operatingExpanded = document.getElementById('operatingExpanded');
-        
-        let hoverTimeout;
-        let marketingHoverTimeout;
-        let operatingHoverTimeout;
-        let isMenuOpen = false;
-        let isMarketingMenuOpen = false;
-        let isOperatingMenuOpen = false;
-        
-        // Tüm menüleri kapat (sadece görünümü gizle, bayrakları dokunma)
-        function closeAllMenus(except) {
-          if (except !== 'add' && addExpanded) {
-            addExpanded.style.display = 'none';
-          }
-          if (except !== 'marketing' && marketingExpanded) {
-            marketingExpanded.style.display = 'none';
-          }
-          if (except !== 'operating' && operatingExpanded) {
-            operatingExpanded.style.display = 'none';
-          }
+  </div>
+
+  <!-- Contact Sidebar Modal (Nested from Company) -->
+  <div id="contactSidebarOverlay" class="sidebar-overlay sidebar-nested" onclick="closeContactSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation()">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeContactSidebar()">
+          <i class="fa fa-arrow-left"></i> Back
+        </button>
+        <div class="sidebar-title">
+          <i class="fa fa-user"></i>
+          <h2>Add a Contact</h2>
+        </div>
+      </div>
+      <div class="sidebar-content">
+        <form id="contactForm" method="post" onsubmit="submitContactForm(event); return false;">
+          {% csrf_token %}
+          <div class="form-group">
+            <label for="id_contact_name">Name <span style="color: #ef4444;">*</span></label>
+            <input type="text" name="name" id="id_contact_name" class="form-input" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label>Email addresses</label>
+            <div id="nested_contact_emails_container"></div>
+            <input type="hidden" name="emails_data" id="nested_contact_emails_data">
+          </div>
+
+          <div class="form-group">
+            <label>Phone numbers</label>
+            <div id="nested_contact_phones_container"></div>
+            <input type="hidden" name="phones_data" id="nested_contact_phones_data">
+          </div>
+
+          <div class="form-group">
+            <label for="id_contact_job">Job Title</label>
+            <input type="text" name="job_title" id="id_contact_job" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label for="id_contact_address">Address</label>
+            <textarea name="address" id="id_contact_address" class="form-textarea" rows="2"></textarea>
+          </div>
+
+          <div class="sidebar-footer">
+            <button type="submit" class="btn btn-primary">Add Contact</button>
+            <button type="button" class="btn btn-secondary" onclick="closeContactSidebar()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Configure HTMX to include CSRF token in all requests
+    document.body.addEventListener('htmx:configRequest', (event) => {
+      event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+    });
+
+    // Preserve navbar scroll position across page navigations
+    (function () {
+      const navbar = document.querySelector('.navbar');
+
+      // Restore scroll position if it exists
+      const savedScrollPos = sessionStorage.getItem('navbarScrollPos');
+      if (savedScrollPos !== null && navbar) {
+        navbar.scrollTop = parseInt(savedScrollPos);
+        sessionStorage.removeItem('navbarScrollPos');
+      }
+
+      // Save scroll position before navigating away
+      window.addEventListener('beforeunload', function () {
+        if (navbar) {
+          sessionStorage.setItem('navbarScrollPos', navbar.scrollTop);
         }
-        
-        // Add menu
-        if (addButton && addExpanded) {
-          addButton.addEventListener('mouseenter', function() {
-            clearTimeout(hoverTimeout);
-            clearTimeout(marketingHoverTimeout);
-            clearTimeout(operatingHoverTimeout);
-            closeAllMenus('add');
-            addExpanded.style.display = 'block';
-            isMenuOpen = true;
-          });
-          
-          addExpanded.addEventListener('mouseenter', function() {
-            clearTimeout(hoverTimeout);
-            isMenuOpen = true;
-          });
-          
-          addButton.addEventListener('mouseleave', function() {
-            isMenuOpen = false;
-            hoverTimeout = setTimeout(function() {
-              if (!isMenuOpen) {
-                addExpanded.style.display = 'none';
-              }
-            }, 150);
-          });
-          
-          addExpanded.addEventListener('mouseleave', function() {
-            isMenuOpen = false;
-            hoverTimeout = setTimeout(function() {
+      });
+    })();
+
+
+    // Unified menu system
+    document.addEventListener('DOMContentLoaded', function () {
+      const addButton = document.getElementById('addButton');
+      const addExpanded = document.getElementById('addExpanded');
+      const marketingButton = document.getElementById('marketingButton');
+      const marketingExpanded = document.getElementById('marketingExpanded');
+      const operatingButton = document.getElementById('operatingButton');
+      const operatingExpanded = document.getElementById('operatingExpanded');
+
+      let hoverTimeout;
+      let marketingHoverTimeout;
+      let operatingHoverTimeout;
+      let isMenuOpen = false;
+      let isMarketingMenuOpen = false;
+      let isOperatingMenuOpen = false;
+
+      // Tüm menüleri kapat (sadece görünümü gizle, bayrakları dokunma)
+      function closeAllMenus(except) {
+        if (except !== 'add' && addExpanded) {
+          addExpanded.style.display = 'none';
+        }
+        if (except !== 'marketing' && marketingExpanded) {
+          marketingExpanded.style.display = 'none';
+        }
+        if (except !== 'operating' && operatingExpanded) {
+          operatingExpanded.style.display = 'none';
+        }
+      }
+
+      // Add menu
+      if (addButton && addExpanded) {
+        addButton.addEventListener('mouseenter', function () {
+          clearTimeout(hoverTimeout);
+          clearTimeout(marketingHoverTimeout);
+          clearTimeout(operatingHoverTimeout);
+          closeAllMenus('add');
+          // Position menu at button's vertical position
+          const rect = addButton.getBoundingClientRect();
+          addExpanded.style.top = rect.top + 'px';
+          addExpanded.style.display = 'block';
+          isMenuOpen = true;
+        });
+
+        addExpanded.addEventListener('mouseenter', function () {
+          clearTimeout(hoverTimeout);
+          isMenuOpen = true;
+        });
+
+        addButton.addEventListener('mouseleave', function () {
+          isMenuOpen = false;
+          hoverTimeout = setTimeout(function () {
+            if (!isMenuOpen) {
               addExpanded.style.display = 'none';
-            }, 150);
-          });
-        }
-        
-        // Marketing menu
-        if (marketingButton && marketingExpanded) {
-          marketingButton.addEventListener('mouseenter', function() {
-            clearTimeout(hoverTimeout);
-            clearTimeout(marketingHoverTimeout);
-            clearTimeout(operatingHoverTimeout);
-            closeAllMenus('marketing');
-            marketingExpanded.style.display = 'block';
-            isMarketingMenuOpen = true;
-          });
-          
-          marketingExpanded.addEventListener('mouseenter', function() {
-            clearTimeout(marketingHoverTimeout);
-            isMarketingMenuOpen = true;
-          });
-          
-          marketingButton.addEventListener('mouseleave', function() {
-            isMarketingMenuOpen = false;
-            marketingHoverTimeout = setTimeout(function() {
-              if (!isMarketingMenuOpen) {
-                marketingExpanded.style.display = 'none';
-              }
-            }, 150);
-          });
-          
-          marketingExpanded.addEventListener('mouseleave', function() {
-            isMarketingMenuOpen = false;
-            marketingHoverTimeout = setTimeout(function() {
+            }
+          }, 150);
+        });
+
+        addExpanded.addEventListener('mouseleave', function () {
+          isMenuOpen = false;
+          hoverTimeout = setTimeout(function () {
+            addExpanded.style.display = 'none';
+          }, 150);
+        });
+      }
+
+      // Marketing menu
+      if (marketingButton && marketingExpanded) {
+        marketingButton.addEventListener('mouseenter', function () {
+          clearTimeout(hoverTimeout);
+          clearTimeout(marketingHoverTimeout);
+          clearTimeout(operatingHoverTimeout);
+          closeAllMenus('marketing');
+          // Position menu at button's vertical position with offset
+          const rect = marketingButton.getBoundingClientRect();
+          const offset = 80; // Move menu up by 80px
+          marketingExpanded.style.top = (rect.top - offset) + 'px';
+          marketingExpanded.style.display = 'block';
+          isMarketingMenuOpen = true;
+        });
+
+        marketingExpanded.addEventListener('mouseenter', function () {
+          clearTimeout(marketingHoverTimeout);
+          isMarketingMenuOpen = true;
+        });
+
+        marketingButton.addEventListener('mouseleave', function () {
+          isMarketingMenuOpen = false;
+          marketingHoverTimeout = setTimeout(function () {
+            if (!isMarketingMenuOpen) {
               marketingExpanded.style.display = 'none';
-            }, 150);
-          });
-        }
-        
-        // Operating menu
-        if (operatingButton && operatingExpanded) {
-          operatingButton.addEventListener('mouseenter', function() {
-            clearTimeout(hoverTimeout);
-            clearTimeout(marketingHoverTimeout);
-            clearTimeout(operatingHoverTimeout);
-            closeAllMenus('operating');
-            operatingExpanded.style.display = 'block';
-            isOperatingMenuOpen = true;
-          });
-          
-          operatingExpanded.addEventListener('mouseenter', function() {
-            clearTimeout(operatingHoverTimeout);
-            isOperatingMenuOpen = true;
-          });
-          
-          operatingButton.addEventListener('mouseleave', function() {
-            isOperatingMenuOpen = false;
-            operatingHoverTimeout = setTimeout(function() {
-              if (!isOperatingMenuOpen) {
-                operatingExpanded.style.display = 'none';
-              }
-            }, 150);
-          });
-          
-          operatingExpanded.addEventListener('mouseleave', function() {
-            isOperatingMenuOpen = false;
-            operatingHoverTimeout = setTimeout(function() {
+            }
+          }, 150);
+        });
+
+        marketingExpanded.addEventListener('mouseleave', function () {
+          isMarketingMenuOpen = false;
+          marketingHoverTimeout = setTimeout(function () {
+            marketingExpanded.style.display = 'none';
+          }, 150);
+        });
+      }
+
+      // Operating menu
+      if (operatingButton && operatingExpanded) {
+        operatingButton.addEventListener('mouseenter', function () {
+          clearTimeout(hoverTimeout);
+          clearTimeout(marketingHoverTimeout);
+          clearTimeout(operatingHoverTimeout);
+          closeAllMenus('operating');
+          // Position menu at button's vertical position with offset
+          const rect = operatingButton.getBoundingClientRect();
+          const offset = 290; // Move menu up by 290px
+          operatingExpanded.style.top = (rect.top - offset) + 'px';
+          operatingExpanded.style.display = 'block';
+          isOperatingMenuOpen = true;
+        });
+
+        operatingExpanded.addEventListener('mouseenter', function () {
+          clearTimeout(operatingHoverTimeout);
+          isOperatingMenuOpen = true;
+        });
+
+        operatingButton.addEventListener('mouseleave', function () {
+          isOperatingMenuOpen = false;
+          operatingHoverTimeout = setTimeout(function () {
+            if (!isOperatingMenuOpen) {
               operatingExpanded.style.display = 'none';
-            }, 150);
-          });
-        }
-        
-        // Set today's date on page load
-        const today = new Date().toISOString().split('T')[0];
-        const dueDateField = document.getElementById('id_due_date');
-        if (dueDateField) {
-          dueDateField.value = today;
-        }
-      });
-      
-      function openTaskSidebar() {
-        document.getElementById('taskSidebarOverlay').classList.add('active');
-        document.body.style.overflow = 'hidden';
-        // Set today's date again
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('id_due_date').value = today;
-        // Initialize form tracking
-        setTimeout(() => {
-          initializeFormTracking('taskForm');
-          document.getElementById('id_name').focus();
-        }, 300);
+            }
+          }, 150);
+        });
+
+        operatingExpanded.addEventListener('mouseleave', function () {
+          isOperatingMenuOpen = false;
+          operatingHoverTimeout = setTimeout(function () {
+            operatingExpanded.style.display = 'none';
+          }, 150);
+        });
       }
-      
-      // Original close function (without checks)
-      function _closeTaskSidebarOriginal() {
-        document.getElementById('taskSidebarOverlay').classList.remove('active');
-        document.body.style.overflow = '';
-        // Reset form
-        document.getElementById('taskForm').reset();
-        // Hide all attachment sections
-        document.getElementById('taskCompanySection').style.display = 'none';
-        document.getElementById('taskContactSection').style.display = 'none';
-        // Clear hidden fields
-        document.getElementById('id_company').value = '';
-        document.getElementById('id_contact').value = '';
-        resetFormTracking();
+
+      // Set today's date on page load
+      const today = new Date().toISOString().split('T')[0];
+      const dueDateField = document.getElementById('id_due_date');
+      if (dueDateField) {
+        dueDateField.value = today;
       }
-      
-      // Wrapped close function (with unsaved changes check)
-      const closeTaskSidebar = function() {
-        // Don't show modal if form is being submitted
-        const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
-        
-        if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
-          window.showUnsavedChangesModal(
-            () => _closeTaskSidebarOriginal(),
-            () => {}
-          );
-        } else {
-          _closeTaskSidebarOriginal();
+    });
+
+    function openTaskSidebar() {
+      document.getElementById('taskSidebarOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      // Set today's date again
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('id_due_date').value = today;
+      // Initialize form tracking
+      setTimeout(() => {
+        initializeFormTracking('taskForm');
+        document.getElementById('id_name').focus();
+      }, 300);
+    }
+
+    // Original close function (without checks)
+    function _closeTaskSidebarOriginal() {
+      document.getElementById('taskSidebarOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+      // Reset form
+      document.getElementById('taskForm').reset();
+      // Hide all attachment sections
+      document.getElementById('taskCompanySection').style.display = 'none';
+      document.getElementById('taskContactSection').style.display = 'none';
+      // Clear hidden fields
+      document.getElementById('id_company').value = '';
+      document.getElementById('id_contact').value = '';
+      resetFormTracking();
+    }
+
+    // Wrapped close function (with unsaved changes check)
+    const closeTaskSidebar = function () {
+      // Don't show modal if form is being submitted
+      const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
+
+      if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
+        window.showUnsavedChangesModal(
+          () => _closeTaskSidebarOriginal(),
+          () => { }
+        );
+      } else {
+        _closeTaskSidebarOriginal();
+      }
+    };
+
+    // Company Modal Functions
+    function openCompanySidebar() {
+      document.getElementById('companySidebarOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      // Initialize dynamic email/phone fields
+      initDynamicFields('company_emails_container', 'emails_data', 'email', []);
+      initDynamicFields('company_phones_container', 'phones_data', 'phone', []);
+      // Set today's date for task
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('id_company_task_due').value = today;
+      // Initialize form tracking and focus
+      setTimeout(() => {
+        initializeFormTracking('companyForm');
+        document.getElementById('id_company_name').focus();
+      }, 300);
+    }
+
+    function submitCompanyForm(event) {
+      event.preventDefault();
+      if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
+      const form = document.getElementById('companyForm');
+      const submitBtn = document.getElementById('companySubmitBtn');
+      const btnText = submitBtn.querySelector('.btn-text');
+      const btnSpinner = submitBtn.querySelector('.btn-spinner');
+      const toast = document.getElementById('toastNotification');
+      const toastMessage = toast.querySelector('.toast-message-global');
+
+      // Show loading state
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline-flex';
+      submitBtn.disabled = true;
+
+      const formData = new FormData(form);
+
+      fetch('{% url "crm:create_company" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
         }
-      };
-      
-      // Company Modal Functions
-      function openCompanySidebar() {
-        document.getElementById('companySidebarOverlay').classList.add('active');
-        document.body.style.overflow = 'hidden';
-        // Initialize dynamic email/phone fields
-        initDynamicFields('company_emails_container', 'emails_data', 'email', []);
-        initDynamicFields('company_phones_container', 'phones_data', 'phone', []);
-        // Set today's date for task
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('id_company_task_due').value = today;
-        // Initialize form tracking and focus
-        setTimeout(() => {
-          initializeFormTracking('companyForm');
-          document.getElementById('id_company_name').focus();
-        }, 300);
-      }
-      
-      function submitCompanyForm(event) {
-        event.preventDefault();
-        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
-        const form = document.getElementById('companyForm');
-        const submitBtn = document.getElementById('companySubmitBtn');
-        const btnText = submitBtn.querySelector('.btn-text');
-        const btnSpinner = submitBtn.querySelector('.btn-spinner');
-        const toast = document.getElementById('toastNotification');
-        const toastMessage = toast.querySelector('.toast-message-global');
-        
-        // Show loading state
-        btnText.style.display = 'none';
-        btnSpinner.style.display = 'inline-flex';
-        submitBtn.disabled = true;
-        
-        const formData = new FormData(form);
-        
-        fetch('{% url "crm:create_company" %}', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        })
+      })
         .then(response => response.json())
         .then(data => {
           if (data.success) {
             // Show success toast
             toastMessage.textContent = `Company "${data.company_name || ''}" created successfully!`;
             toast.classList.add('show');
-            
+
             // Hide toast after 3 seconds
             setTimeout(() => {
               toast.classList.remove('show');
             }, 3000);
-            
+
             // Close sidebar
             closeCompanySidebar();
-            
+
             // Redirect after short delay
             setTimeout(() => {
               if (data.redirect_url) {
@@ -1230,120 +1258,120 @@
           console.error('Error:', error);
           alert('An error occurred while creating the company.');
         });
+    }
+
+    // Original close function
+    function _closeCompanySidebarOriginal() {
+      document.getElementById('companySidebarOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+      // Reset form
+      document.getElementById('companyForm').reset();
+      // Hide all attachment sections
+      document.getElementById('companyContactSection').style.display = 'none';
+      document.getElementById('companyNoteSection').style.display = 'none';
+      document.getElementById('companyTaskSection').style.display = 'none';
+      // Clear contact selection
+      removeCompanyContact();
+      resetFormTracking();
+    }
+
+    // Wrapped close function
+    const closeCompanySidebar = function () {
+      // Don't show modal if form is being submitted
+      const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
+
+      if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
+        window.showUnsavedChangesModal(
+          () => _closeCompanySidebarOriginal(),
+          () => { }
+        );
+      } else {
+        _closeCompanySidebarOriginal();
       }
-      
-      // Original close function
-      function _closeCompanySidebarOriginal() {
-        document.getElementById('companySidebarOverlay').classList.remove('active');
-        document.body.style.overflow = '';
-        // Reset form
-        document.getElementById('companyForm').reset();
-        // Hide all attachment sections
-        document.getElementById('companyContactSection').style.display = 'none';
-        document.getElementById('companyNoteSection').style.display = 'none';
-        document.getElementById('companyTaskSection').style.display = 'none';
-        // Clear contact selection
-        removeCompanyContact();
-        resetFormTracking();
+    };
+
+    // Main Contact Sidebar Functions
+    function openMainContactSidebar() {
+      document.getElementById('mainContactSidebarOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      // Initialize dynamic email/phone fields
+      initDynamicFields('main_contact_emails_container', 'contact_emails_data', 'email', []);
+      initDynamicFields('main_contact_phones_container', 'contact_phones_data', 'phone', []);
+      // Set today's date for task
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('id_main_contact_task_due').value = today;
+      // Initialize form tracking and focus
+      setTimeout(() => {
+        initializeFormTracking('mainContactForm');
+        document.getElementById('id_main_contact_name').focus();
+      }, 300);
+    }
+
+    // Original close function
+    function _closeMainContactSidebarOriginal() {
+      document.getElementById('mainContactSidebarOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+      // Reset form
+      document.getElementById('mainContactForm').reset();
+      // Hide all attachment sections
+      document.getElementById('mainContactNoteSection').style.display = 'none';
+      document.getElementById('mainContactTaskSection').style.display = 'none';
+      resetFormTracking();
+    }
+
+    // Wrapped close function
+    const closeMainContactSidebar = function () {
+      // Don't show modal if form is being submitted
+      const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
+
+      if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
+        window.showUnsavedChangesModal(
+          () => _closeMainContactSidebarOriginal(),
+          () => { }
+        );
+      } else {
+        _closeMainContactSidebarOriginal();
       }
-      
-      // Wrapped close function
-      const closeCompanySidebar = function() {
-        // Don't show modal if form is being submitted
-        const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
-        
-        if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
-          window.showUnsavedChangesModal(
-            () => _closeCompanySidebarOriginal(),
-            () => {}
-          );
-        } else {
-          _closeCompanySidebarOriginal();
+    };
+
+    // Product Sidebar Functions
+    function openProductSidebar() {
+      document.getElementById('productSidebarOverlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+      // Initialize variant system
+      setTimeout(() => {
+        initVariantSystem();
+        document.getElementById('id_product_title').focus();
+      }, 300);
+    }
+
+    function closeProductSidebar() {
+      document.getElementById('productSidebarOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+      document.getElementById('productForm').reset();
+      // Reset variant system
+      variantOptionCount = 0;
+      for (let key in variantOptions) {
+        delete variantOptions[key];
+      }
+      document.getElementById('variant_options_container').innerHTML = '';
+      document.getElementById('variant_table_container').innerHTML = '';
+      document.getElementById('variant_section').style.display = 'none';
+    }
+
+    function submitProductForm(event) {
+      event.preventDefault();
+      if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
+      const form = document.getElementById('productForm');
+      const formData = new FormData(form);
+
+      fetch('{% url "marketing:product_create" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
         }
-      };
-      
-      // Main Contact Sidebar Functions
-      function openMainContactSidebar() {
-        document.getElementById('mainContactSidebarOverlay').classList.add('active');
-        document.body.style.overflow = 'hidden';
-        // Initialize dynamic email/phone fields
-        initDynamicFields('main_contact_emails_container', 'contact_emails_data', 'email', []);
-        initDynamicFields('main_contact_phones_container', 'contact_phones_data', 'phone', []);
-        // Set today's date for task
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('id_main_contact_task_due').value = today;
-        // Initialize form tracking and focus
-        setTimeout(() => {
-          initializeFormTracking('mainContactForm');
-          document.getElementById('id_main_contact_name').focus();
-        }, 300);
-      }
-      
-      // Original close function
-      function _closeMainContactSidebarOriginal() {
-        document.getElementById('mainContactSidebarOverlay').classList.remove('active');
-        document.body.style.overflow = '';
-        // Reset form
-        document.getElementById('mainContactForm').reset();
-        // Hide all attachment sections
-        document.getElementById('mainContactNoteSection').style.display = 'none';
-        document.getElementById('mainContactTaskSection').style.display = 'none';
-        resetFormTracking();
-      }
-      
-      // Wrapped close function
-      const closeMainContactSidebar = function() {
-        // Don't show modal if form is being submitted
-        const isSubmitting = window.formChangeTracker && window.formChangeTracker.isSubmitting && window.formChangeTracker.isSubmitting();
-        
-        if (!isSubmitting && window.formChangeTracker && window.formChangeTracker.hasChanges && window.formChangeTracker.hasChanges()) {
-          window.showUnsavedChangesModal(
-            () => _closeMainContactSidebarOriginal(),
-            () => {}
-          );
-        } else {
-          _closeMainContactSidebarOriginal();
-        }
-      };
-      
-      // Product Sidebar Functions
-      function openProductSidebar() {
-        document.getElementById('productSidebarOverlay').classList.add('active');
-        document.body.style.overflow = 'hidden';
-        // Initialize variant system
-        setTimeout(() => {
-          initVariantSystem();
-          document.getElementById('id_product_title').focus();
-        }, 300);
-      }
-      
-      function closeProductSidebar() {
-        document.getElementById('productSidebarOverlay').classList.remove('active');
-        document.body.style.overflow = '';
-        document.getElementById('productForm').reset();
-        // Reset variant system
-        variantOptionCount = 0;
-        for (let key in variantOptions) {
-          delete variantOptions[key];
-        }
-        document.getElementById('variant_options_container').innerHTML = '';
-        document.getElementById('variant_table_container').innerHTML = '';
-        document.getElementById('variant_section').style.display = 'none';
-      }
-      
-      function submitProductForm(event) {
-        event.preventDefault();
-        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
-        const form = document.getElementById('productForm');
-        const formData = new FormData(form);
-        
-        fetch('{% url "marketing:product_create" %}', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        })
+      })
         .then(response => response.json())
         .then(data => {
           if (data.success) {
@@ -1359,47 +1387,47 @@
           console.error('Error:', error);
           alert('An error occurred while creating the product.');
         });
-      }
-      
-      function submitMainContactForm(event) {
-        event.preventDefault();
-        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
-        const form = document.getElementById('mainContactForm');
-        const submitBtn = document.getElementById('mainContactSubmitBtn');
-        const btnText = submitBtn.querySelector('.btn-text');
-        const btnSpinner = submitBtn.querySelector('.btn-spinner');
-        const toast = document.getElementById('toastNotification');
-        const toastMessage = toast.querySelector('.toast-message-global');
-        
-        // Show loading state
-        btnText.style.display = 'none';
-        btnSpinner.style.display = 'inline-flex';
-        submitBtn.disabled = true;
-        
-        const formData = new FormData(form);
-        
-        fetch('{% url "crm:create_contact" %}', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        })
+    }
+
+    function submitMainContactForm(event) {
+      event.preventDefault();
+      if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
+      const form = document.getElementById('mainContactForm');
+      const submitBtn = document.getElementById('mainContactSubmitBtn');
+      const btnText = submitBtn.querySelector('.btn-text');
+      const btnSpinner = submitBtn.querySelector('.btn-spinner');
+      const toast = document.getElementById('toastNotification');
+      const toastMessage = toast.querySelector('.toast-message-global');
+
+      // Show loading state
+      btnText.style.display = 'none';
+      btnSpinner.style.display = 'inline-flex';
+      submitBtn.disabled = true;
+
+      const formData = new FormData(form);
+
+      fetch('{% url "crm:create_contact" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
         .then(response => response.json())
         .then(data => {
           if (data.success) {
             // Show success toast
             toastMessage.textContent = `Contact "${data.contact.name || ''}" created successfully!`;
             toast.classList.add('show');
-            
+
             // Hide toast after 3 seconds
             setTimeout(() => {
               toast.classList.remove('show');
             }, 3000);
-            
+
             // Close sidebar
             closeMainContactSidebar();
-            
+
             // Redirect to contact detail page
             setTimeout(() => {
               if (data.redirect_url) {
@@ -1423,42 +1451,42 @@
           console.error('Error:', error);
           alert('An error occurred while creating the contact.');
         });
+    }
+
+    // Dynamic Email/Phone Management
+    function initDynamicFields(containerId, hiddenFieldId, type, existingData = []) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      container.innerHTML = '';
+      container.className = 'dynamic-field-container';
+
+      // Add existing data
+      if (existingData && existingData.length > 0) {
+        existingData.forEach((value, index) => {
+          addDynamicField(containerId, hiddenFieldId, type, value, index);
+        });
+      } else {
+        // Add first empty field with + button
+        addDynamicField(containerId, hiddenFieldId, type, '', 0);
       }
-      
-      // Dynamic Email/Phone Management
-      function initDynamicFields(containerId, hiddenFieldId, type, existingData = []) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        
-        container.innerHTML = '';
-        container.className = 'dynamic-field-container';
-        
-        // Add existing data
-        if (existingData && existingData.length > 0) {
-          existingData.forEach((value, index) => {
-            addDynamicField(containerId, hiddenFieldId, type, value, index);
-          });
-        } else {
-          // Add first empty field with + button
-          addDynamicField(containerId, hiddenFieldId, type, '', 0);
-        }
-      }
-      
-      function addDynamicField(containerId, hiddenFieldId, type, value = '', index = null) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        
-        // Get actual field count (exclude the + button)
-        const fieldCount = container.querySelectorAll('.dynamic-field-wrapper').length;
-        const placeholder = type === 'email' ? 'email@example.com' : '+1234567890';
-        
-        const fieldWrapper = document.createElement('div');
-        fieldWrapper.className = 'dynamic-field-wrapper';
-        
-        // Create input wrapper
-        const inputWrapper = document.createElement('div');
-        inputWrapper.className = 'dynamic-field-input-wrapper';
-        inputWrapper.innerHTML = `
+    }
+
+    function addDynamicField(containerId, hiddenFieldId, type, value = '', index = null) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      // Get actual field count (exclude the + button)
+      const fieldCount = container.querySelectorAll('.dynamic-field-wrapper').length;
+      const placeholder = type === 'email' ? 'email@example.com' : '+1234567890';
+
+      const fieldWrapper = document.createElement('div');
+      fieldWrapper.className = 'dynamic-field-wrapper';
+
+      // Create input wrapper
+      const inputWrapper = document.createElement('div');
+      inputWrapper.className = 'dynamic-field-input-wrapper';
+      inputWrapper.innerHTML = `
           <input 
             type="${type === 'email' ? 'email' : 'text'}" 
             class="dynamic-field-input" 
@@ -1467,141 +1495,141 @@
             onchange="updateHiddenField('${containerId}', '${hiddenFieldId}')"
           />
         `;
-        
-        fieldWrapper.appendChild(inputWrapper);
-        
-        // Create button
-        const button = document.createElement('button');
-        button.type = 'button';
-        
-        if (fieldCount === 0) {
-          // First field has + button
-          button.className = 'btn-add-field';
-          button.innerHTML = '<i class="fa fa-plus"></i>';
-          button.onclick = () => addDynamicField(containerId, hiddenFieldId, type);
-          button.title = `Add ${type}`;
-        } else {
-          // Other fields have - button
-          button.className = 'btn-remove-field';
-          button.innerHTML = '<i class="fa fa-minus"></i>';
-          button.onclick = () => removeDynamicField(button, containerId, hiddenFieldId);
-          button.title = `Remove ${type}`;
-        }
-        
-        fieldWrapper.appendChild(button);
-        
-        container.appendChild(fieldWrapper);
-        
-        // Update hidden field
-        updateHiddenField(containerId, hiddenFieldId);
+
+      fieldWrapper.appendChild(inputWrapper);
+
+      // Create button
+      const button = document.createElement('button');
+      button.type = 'button';
+
+      if (fieldCount === 0) {
+        // First field has + button
+        button.className = 'btn-add-field';
+        button.innerHTML = '<i class="fa fa-plus"></i>';
+        button.onclick = () => addDynamicField(containerId, hiddenFieldId, type);
+        button.title = `Add ${type}`;
+      } else {
+        // Other fields have - button
+        button.className = 'btn-remove-field';
+        button.innerHTML = '<i class="fa fa-minus"></i>';
+        button.onclick = () => removeDynamicField(button, containerId, hiddenFieldId);
+        button.title = `Remove ${type}`;
       }
-      
-      function removeDynamicField(button, containerId, hiddenFieldId) {
-        const wrapper = button.closest('.dynamic-field-wrapper');
-        wrapper.remove();
-        updateHiddenField(containerId, hiddenFieldId);
-      }
-      
-      function updateHiddenField(containerId, hiddenFieldId) {
-        const container = document.getElementById(containerId);
-        const hiddenField = document.getElementById(hiddenFieldId);
-        if (!container || !hiddenField) return;
-        
-        const values = [];
-        container.querySelectorAll('.dynamic-field-input').forEach(input => {
-          const val = input.value.trim();
-          if (val) values.push(val);
+
+      fieldWrapper.appendChild(button);
+
+      container.appendChild(fieldWrapper);
+
+      // Update hidden field
+      updateHiddenField(containerId, hiddenFieldId);
+    }
+
+    function removeDynamicField(button, containerId, hiddenFieldId) {
+      const wrapper = button.closest('.dynamic-field-wrapper');
+      wrapper.remove();
+      updateHiddenField(containerId, hiddenFieldId);
+    }
+
+    function updateHiddenField(containerId, hiddenFieldId) {
+      const container = document.getElementById(containerId);
+      const hiddenField = document.getElementById(hiddenFieldId);
+      if (!container || !hiddenField) return;
+
+      const values = [];
+      container.querySelectorAll('.dynamic-field-input').forEach(input => {
+        const val = input.value.trim();
+        if (val) values.push(val);
+      });
+
+      hiddenField.value = JSON.stringify(values);
+    }
+
+    // Toggle attachment sections
+    function toggleAttachment(type) {
+      const sections = {
+        'mainContactNote': 'mainContactNoteSection',
+        'mainContactTask': 'mainContactTaskSection',
+        'companyContact': 'companyContactSection',
+        'companyNote': 'companyNoteSection',
+        'companyTask': 'companyTaskSection',
+        'taskCompany': 'taskCompanySection',
+        'taskContact': 'taskContactSection'
+      };
+
+      const sectionId = sections[type];
+      const section = document.getElementById(sectionId);
+
+      if (section.style.display === 'none') {
+        section.style.display = 'block';
+        // Set focus to first input in the section
+        setTimeout(() => {
+          const firstInput = section.querySelector('input, textarea');
+          if (firstInput) firstInput.focus();
+        }, 100);
+      } else {
+        section.style.display = 'none';
+        // Clear fields
+        section.querySelectorAll('input, textarea').forEach(input => {
+          input.value = '';
         });
-        
-        hiddenField.value = JSON.stringify(values);
-      }
-      
-      // Toggle attachment sections
-      function toggleAttachment(type) {
-        const sections = {
-          'mainContactNote': 'mainContactNoteSection',
-          'mainContactTask': 'mainContactTaskSection',
-          'companyContact': 'companyContactSection',
-          'companyNote': 'companyNoteSection',
-          'companyTask': 'companyTaskSection',
-          'taskCompany': 'taskCompanySection',
-          'taskContact': 'taskContactSection'
-        };
-        
-        const sectionId = sections[type];
-        const section = document.getElementById(sectionId);
-        
-        if (section.style.display === 'none') {
-          section.style.display = 'block';
-          // Set focus to first input in the section
-          setTimeout(() => {
-            const firstInput = section.querySelector('input, textarea');
-            if (firstInput) firstInput.focus();
-          }, 100);
-        } else {
-          section.style.display = 'none';
-          // Clear fields
-          section.querySelectorAll('input, textarea').forEach(input => {
-            input.value = '';
-          });
-          // Clear contact selection
-          if (type === 'companyContact') {
-            removeCompanyContact();
-          }
+        // Clear contact selection
+        if (type === 'companyContact') {
+          removeCompanyContact();
         }
       }
-      
-      // Company Contact Selector
-      let companyContactSearchTimeout = null;
-      const companyContactSearch = document.getElementById('company_contact_search');
-      const companyContactResults = document.getElementById('company_contact_results');
-      const companySelectedContact = document.getElementById('company_selected_contact');
-      const companyContactId = document.getElementById('company_contact_id');
-      
-      if (companyContactSearch) {
-        companyContactSearch.addEventListener('input', function() {
-          clearTimeout(companyContactSearchTimeout);
-          const query = this.value.trim();
-          
-          if (query.length < 1) {
-            companyContactResults.classList.remove('active');
-            companyContactResults.innerHTML = '';
-            return;
-          }
-          
-          companyContactSearchTimeout = setTimeout(() => {
-            fetch(`/crm/search_contacts_only/?search_term=${encodeURIComponent(query)}`)
-              .then(response => response.text())
-              .then(html => {
-                companyContactResults.innerHTML = html;
-                companyContactResults.classList.add('active');
-                
-                // Add click handlers to results
-                document.querySelectorAll('#company_contact_results .contact-result-item').forEach(item => {
-                  item.addEventListener('click', function() {
-                    selectCompanyContact(
-                      this.dataset.contactId,
-                      this.dataset.contactName,
-                      this.dataset.contactEmail,
-                      this.dataset.contactCompany
-                    );
-                  });
+    }
+
+    // Company Contact Selector
+    let companyContactSearchTimeout = null;
+    const companyContactSearch = document.getElementById('company_contact_search');
+    const companyContactResults = document.getElementById('company_contact_results');
+    const companySelectedContact = document.getElementById('company_selected_contact');
+    const companyContactId = document.getElementById('company_contact_id');
+
+    if (companyContactSearch) {
+      companyContactSearch.addEventListener('input', function () {
+        clearTimeout(companyContactSearchTimeout);
+        const query = this.value.trim();
+
+        if (query.length < 1) {
+          companyContactResults.classList.remove('active');
+          companyContactResults.innerHTML = '';
+          return;
+        }
+
+        companyContactSearchTimeout = setTimeout(() => {
+          fetch(`/crm/search_contacts_only/?search_term=${encodeURIComponent(query)}`)
+            .then(response => response.text())
+            .then(html => {
+              companyContactResults.innerHTML = html;
+              companyContactResults.classList.add('active');
+
+              // Add click handlers to results
+              document.querySelectorAll('#company_contact_results .contact-result-item').forEach(item => {
+                item.addEventListener('click', function () {
+                  selectCompanyContact(
+                    this.dataset.contactId,
+                    this.dataset.contactName,
+                    this.dataset.contactEmail,
+                    this.dataset.contactCompany
+                  );
                 });
-              })
-              .catch(error => {
-                console.error('Error searching contacts:', error);
               });
-          }, 200);
-        });
-      }
-      
-      function selectCompanyContact(id, name, email, company) {
-        companyContactId.value = id;
-        companyContactSearch.value = '';
-        companyContactResults.classList.remove('active');
-        companyContactResults.innerHTML = '';
-        
-        companySelectedContact.innerHTML = `
+            })
+            .catch(error => {
+              console.error('Error searching contacts:', error);
+            });
+        }, 200);
+      });
+    }
+
+    function selectCompanyContact(id, name, email, company) {
+      companyContactId.value = id;
+      companyContactSearch.value = '';
+      companyContactResults.classList.remove('active');
+      companyContactResults.innerHTML = '';
+
+      companySelectedContact.innerHTML = `
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 600; color: #111827; font-size: 15px;">${name}</div>
             <div style="font-size: 13px; color: #6b7280; margin-top: 2px;">${email}${company ? ' • ' + company : ''}</div>
@@ -1624,52 +1652,52 @@
             Remove
           </button>
         `;
-        companySelectedContact.classList.add('active');
-      }
-      
-      function removeCompanyContact() {
-        companyContactId.value = '';
-        companySelectedContact.classList.remove('active');
-        companySelectedContact.innerHTML = '';
-      }
-      
-      // Contact Sidebar Functions (Nested from Company)
-      function openContactSidebarFromCompany() {
-        document.getElementById('contactSidebarOverlay').classList.add('active');
-        // Initialize dynamic email/phone fields
-        initDynamicFields('nested_contact_emails_container', 'nested_contact_emails_data', 'email', []);
-        initDynamicFields('nested_contact_phones_container', 'nested_contact_phones_data', 'phone', []);
-        // Don't hide body overflow - keep company sidebar visible underneath
-        setTimeout(() => {
-          document.getElementById('id_contact_name').focus();
-        }, 300);
-      }
-      
-      function closeContactSidebar() {
-        document.getElementById('contactSidebarOverlay').classList.remove('active');
-        // Reset form
-        document.getElementById('contactForm').reset();
-      }
-      
-      function submitContactForm(event) {
-        event.preventDefault();
-        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
-        const form = document.getElementById('contactForm');
-        const formData = new FormData(form);
-        
-        fetch('{% url "crm:create_contact" %}', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        })
+      companySelectedContact.classList.add('active');
+    }
+
+    function removeCompanyContact() {
+      companyContactId.value = '';
+      companySelectedContact.classList.remove('active');
+      companySelectedContact.innerHTML = '';
+    }
+
+    // Contact Sidebar Functions (Nested from Company)
+    function openContactSidebarFromCompany() {
+      document.getElementById('contactSidebarOverlay').classList.add('active');
+      // Initialize dynamic email/phone fields
+      initDynamicFields('nested_contact_emails_container', 'nested_contact_emails_data', 'email', []);
+      initDynamicFields('nested_contact_phones_container', 'nested_contact_phones_data', 'phone', []);
+      // Don't hide body overflow - keep company sidebar visible underneath
+      setTimeout(() => {
+        document.getElementById('id_contact_name').focus();
+      }, 300);
+    }
+
+    function closeContactSidebar() {
+      document.getElementById('contactSidebarOverlay').classList.remove('active');
+      // Reset form
+      document.getElementById('contactForm').reset();
+    }
+
+    function submitContactForm(event) {
+      event.preventDefault();
+      if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
+      const form = document.getElementById('contactForm');
+      const formData = new FormData(form);
+
+      fetch('{% url "crm:create_contact" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
         .then(response => response.json())
         .then(data => {
           if (data.success && data.contact) {
             // Close contact sidebar
             closeContactSidebar();
-            
+
             // Auto-select the newly created contact in company form
             selectCompanyContact(
               data.contact.id,
@@ -1677,7 +1705,7 @@
               data.contact.email || '',
               data.contact.company_name || ''
             );
-            
+
             // Show success message
             alert('Contact created successfully!');
           } else {
@@ -1689,96 +1717,96 @@
           console.error('Error:', error);
           alert('An error occurred while creating the contact.');
         });
+    }
+
+    // Company and Contact selection functions for task sidebar
+    function selectCompany(name, pk) {
+      // Check if we're in task sidebar or contact form
+      const taskCompanySearch = document.getElementById('id_task_company_search');
+      const contactCompanyName = document.getElementById('company_name');
+
+      if (taskCompanySearch) {
+        taskCompanySearch.value = name;
+        document.getElementById('id_company').value = pk;
+        document.getElementById('taskCompanyResults').innerHTML = '';
+      } else if (contactCompanyName) {
+        contactCompanyName.value = name;
+        document.getElementById('company-suggestions').innerHTML = '';
       }
-      
-      // Company and Contact selection functions for task sidebar
-      function selectCompany(name, pk) {
-        // Check if we're in task sidebar or contact form
-        const taskCompanySearch = document.getElementById('id_task_company_search');
-        const contactCompanyName = document.getElementById('company_name');
-        
-        if (taskCompanySearch) {
-          taskCompanySearch.value = name;
-          document.getElementById('id_company').value = pk;
-          document.getElementById('taskCompanyResults').innerHTML = '';
-        } else if (contactCompanyName) {
-          contactCompanyName.value = name;
-          document.getElementById('company-suggestions').innerHTML = '';
+    }
+
+    function selectContact(name, pk) {
+      document.getElementById('id_task_contact_search').value = name;
+      document.getElementById('id_contact').value = pk;
+      document.getElementById('taskContactResults').innerHTML = '';
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        // Close nested sidebar first if open
+        if (document.getElementById('contactSidebarOverlay').classList.contains('active')) {
+          closeContactSidebar();
+        } else {
+          closeTaskSidebar();
+          closeCompanySidebar();
         }
       }
-      
-      function selectContact(name, pk) {
-        document.getElementById('id_task_contact_search').value = name;
-        document.getElementById('id_contact').value = pk;
-        document.getElementById('taskContactResults').innerHTML = '';
-      }
-      
-      // Close on Escape key
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-          // Close nested sidebar first if open
-          if (document.getElementById('contactSidebarOverlay').classList.contains('active')) {
-            closeContactSidebar();
-          } else {
-            closeTaskSidebar();
-            closeCompanySidebar();
-          }
-        }
+    });
+
+    // ====================================
+    // UNSAVED CHANGES HANDLER - INLINE
+    // ====================================
+
+    // Track form changes
+    let formHasChanges = false;
+    let currentFormId = null;
+    let isSubmitting = false;
+
+    // Initialize tracking when form is opened
+    function initializeFormTracking(formId) {
+      formHasChanges = false;
+      currentFormId = formId;
+      isSubmitting = false;
+
+      const form = document.getElementById(formId);
+      if (!form) return;
+
+      // Track all input changes
+      const inputs = form.querySelectorAll('input, textarea, select');
+      inputs.forEach(input => {
+        // Store initial value
+        input.dataset.initialValue = input.value || '';
+
+        // Listen for changes
+        input.addEventListener('input', () => {
+          formHasChanges = true;
+        });
+
+        input.addEventListener('change', () => {
+          formHasChanges = true;
+        });
       });
-      
-      // ====================================
-      // UNSAVED CHANGES HANDLER - INLINE
-      // ====================================
-      
-      // Track form changes
-      let formHasChanges = false;
-      let currentFormId = null;
-      let isSubmitting = false;
-      
-      // Initialize tracking when form is opened
-      function initializeFormTracking(formId) {
-        formHasChanges = false;
-        currentFormId = formId;
-        isSubmitting = false;
-        
-        const form = document.getElementById(formId);
-        if (!form) return;
-        
-        // Track all input changes
-        const inputs = form.querySelectorAll('input, textarea, select');
-        inputs.forEach(input => {
-          // Store initial value
-          input.dataset.initialValue = input.value || '';
-          
-          // Listen for changes
-          input.addEventListener('input', () => {
-            formHasChanges = true;
-          });
-          
-          input.addEventListener('change', () => {
-            formHasChanges = true;
-          });
-        });
-        
-        // Track form submission
-        form.addEventListener('submit', () => {
-          isSubmitting = true;
-        });
-      }
-      
-      // Reset form tracking
-      function resetFormTracking() {
-        formHasChanges = false;
-        currentFormId = null;
-        isSubmitting = false;
-      }
-      
-      // Show unsaved changes modal
-      function showUnsavedChangesModal(onDiscard, onReturn) {
-        // Create modal overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'unsaved-changes-overlay';
-        overlay.style.cssText = `
+
+      // Track form submission
+      form.addEventListener('submit', () => {
+        isSubmitting = true;
+      });
+    }
+
+    // Reset form tracking
+    function resetFormTracking() {
+      formHasChanges = false;
+      currentFormId = null;
+      isSubmitting = false;
+    }
+
+    // Show unsaved changes modal
+    function showUnsavedChangesModal(onDiscard, onReturn) {
+      // Create modal overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'unsaved-changes-overlay';
+      overlay.style.cssText = `
           position: fixed;
           top: 0;
           left: 0;
@@ -1792,11 +1820,11 @@
           justify-content: center;
           animation: fadeIn 0.2s ease;
         `;
-        
-        // Create modal dialog
-        const dialog = document.createElement('div');
-        dialog.className = 'unsaved-changes-dialog';
-        dialog.style.cssText = `
+
+      // Create modal dialog
+      const dialog = document.createElement('div');
+      dialog.className = 'unsaved-changes-dialog';
+      dialog.style.cssText = `
           background: white;
           border-radius: 16px;
           max-width: 480px;
@@ -1805,8 +1833,8 @@
           animation: slideUp 0.3s ease;
           overflow: hidden;
         `;
-        
-        dialog.innerHTML = `
+
+      dialog.innerHTML = `
           <div style="padding: 32px;">
             <div style="text-align: center; margin-bottom: 24px;">
               <div style="width: 64px; height: 64px; margin: 0 auto 16px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
@@ -1863,40 +1891,40 @@
             </div>
           </div>
         `;
-        
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
-        
-        // Add event listeners
-        const btnReturn = dialog.querySelector('.btn-return-to-form');
-        const btnDiscard = dialog.querySelector('.btn-discard-changes');
-        
-        btnReturn.addEventListener('click', () => {
+
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+
+      // Add event listeners
+      const btnReturn = dialog.querySelector('.btn-return-to-form');
+      const btnDiscard = dialog.querySelector('.btn-discard-changes');
+
+      btnReturn.addEventListener('click', () => {
+        overlay.remove();
+        if (onReturn) onReturn();
+      });
+
+      btnDiscard.addEventListener('click', () => {
+        overlay.remove();
+        resetFormTracking();
+        if (onDiscard) onDiscard();
+      });
+
+      // Close on Escape key
+      const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
           overlay.remove();
           if (onReturn) onReturn();
-        });
-        
-        btnDiscard.addEventListener('click', () => {
-          overlay.remove();
-          resetFormTracking();
-          if (onDiscard) onDiscard();
-        });
-        
-        // Close on Escape key
-        const escapeHandler = (e) => {
-          if (e.key === 'Escape') {
-            overlay.remove();
-            if (onReturn) onReturn();
-            document.removeEventListener('keydown', escapeHandler);
-          }
-        };
-        document.addEventListener('keydown', escapeHandler);
-        
-        // Add animation styles if not present
-        if (!document.getElementById('unsaved-changes-animations')) {
-          const style = document.createElement('style');
-          style.id = 'unsaved-changes-animations';
-          style.textContent = `
+          document.removeEventListener('keydown', escapeHandler);
+        }
+      };
+      document.addEventListener('keydown', escapeHandler);
+
+      // Add animation styles if not present
+      if (!document.getElementById('unsaved-changes-animations')) {
+        const style = document.createElement('style');
+        style.id = 'unsaved-changes-animations';
+        style.textContent = `
             @keyframes fadeIn {
               from { opacity: 0; }
               to { opacity: 1; }
@@ -1912,56 +1940,56 @@
               }
             }
           `;
-          document.head.appendChild(style);
-        }
+        document.head.appendChild(style);
       }
-      
-      // Export to window object
-      window.formChangeTracker = {
-        hasChanges: () => formHasChanges,
-        isSubmitting: () => isSubmitting,
-        setSubmitting: () => { isSubmitting = true; },
-        reset: resetFormTracking
-      };
-      
-      // ====================================
-      // END UNSAVED CHANGES HANDLER
-      // ====================================
-      
-      // Product Variant System
-      let variantOptionCount = 0;
-      const variantOptions = {};
-      
-      // Initialize variant checkbox listener when DOM is ready
-      function initVariantSystem() {
-        const hasVariantsCheckbox = document.getElementById('id_has_variants');
-        if (hasVariantsCheckbox) {
-          hasVariantsCheckbox.addEventListener('change', function() {
-            const variantSection = document.getElementById('variant_section');
-            if (this.checked) {
-              variantSection.style.display = 'block';
-              if (variantOptionCount === 0) {
-                addVariantOption();
-              }
-            } else {
-              variantSection.style.display = 'none';
+    }
+
+    // Export to window object
+    window.formChangeTracker = {
+      hasChanges: () => formHasChanges,
+      isSubmitting: () => isSubmitting,
+      setSubmitting: () => { isSubmitting = true; },
+      reset: resetFormTracking
+    };
+
+    // ====================================
+    // END UNSAVED CHANGES HANDLER
+    // ====================================
+
+    // Product Variant System
+    let variantOptionCount = 0;
+    const variantOptions = {};
+
+    // Initialize variant checkbox listener when DOM is ready
+    function initVariantSystem() {
+      const hasVariantsCheckbox = document.getElementById('id_has_variants');
+      if (hasVariantsCheckbox) {
+        hasVariantsCheckbox.addEventListener('change', function () {
+          const variantSection = document.getElementById('variant_section');
+          if (this.checked) {
+            variantSection.style.display = 'block';
+            if (variantOptionCount === 0) {
+              addVariantOption();
             }
-          });
-        }
+          } else {
+            variantSection.style.display = 'none';
+          }
+        });
       }
-      
-      function addVariantOption() {
-        variantOptionCount++;
-        const optionId = variantOptionCount;
-        variantOptions[optionId] = { name: '', values: [] };
-        
-        const container = document.getElementById('variant_options_container');
-        const optionCard = document.createElement('div');
-        optionCard.className = 'variant-option-card';
-        optionCard.id = `variant_option_${optionId}`;
-        optionCard.style.cssText = 'background: #f9fafb; padding: 15px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #e5e7eb;';
-        
-        optionCard.innerHTML = `
+    }
+
+    function addVariantOption() {
+      variantOptionCount++;
+      const optionId = variantOptionCount;
+      variantOptions[optionId] = { name: '', values: [] };
+
+      const container = document.getElementById('variant_options_container');
+      const optionCard = document.createElement('div');
+      optionCard.className = 'variant-option-card';
+      optionCard.id = `variant_option_${optionId}`;
+      optionCard.style.cssText = 'background: #f9fafb; padding: 15px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #e5e7eb;';
+
+      optionCard.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <label style="margin: 0; font-weight: 500;">Option Name</label>
             <button type="button" onclick="removeVariantOption(${optionId})" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px;">
@@ -1982,26 +2010,26 @@
             + Add Value
           </button>
         `;
-        
-        container.appendChild(optionCard);
-        addVariantValue(optionId);
-        addVariantValue(optionId);
-      }
-      
-      function removeVariantOption(optionId) {
-        delete variantOptions[optionId];
-        document.getElementById(`variant_option_${optionId}`).remove();
-      }
-      
-      function addVariantValue(optionId) {
-        const valueId = variantOptions[optionId].values.length;
-        const container = document.getElementById(`option_values_${optionId}`);
-        
-        const valueWrapper = document.createElement('div');
-        valueWrapper.id = `option_value_${optionId}_${valueId}`;
-        valueWrapper.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
-        
-        valueWrapper.innerHTML = `
+
+      container.appendChild(optionCard);
+      addVariantValue(optionId);
+      addVariantValue(optionId);
+    }
+
+    function removeVariantOption(optionId) {
+      delete variantOptions[optionId];
+      document.getElementById(`variant_option_${optionId}`).remove();
+    }
+
+    function addVariantValue(optionId) {
+      const valueId = variantOptions[optionId].values.length;
+      const container = document.getElementById(`option_values_${optionId}`);
+
+      const valueWrapper = document.createElement('div');
+      valueWrapper.id = `option_value_${optionId}_${valueId}`;
+      valueWrapper.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+
+      valueWrapper.innerHTML = `
           <input type="text" 
                  class="form-input" 
                  placeholder="Value ${valueId + 1}" 
@@ -2013,54 +2041,54 @@
             <i class="fa fa-minus"></i>
           </button>
         `;
-        
-        container.appendChild(valueWrapper);
-        variantOptions[optionId].values.push('');
-      }
-      
-      function removeVariantValue(optionId, valueId) {
-        document.getElementById(`option_value_${optionId}_${valueId}`).remove();
-      }
-      
-      function updateVariantOptionName(optionId, name) {
-        variantOptions[optionId].name = name;
-      }
-      
-      function updateVariantValue(optionId, valueId, value) {
-        variantOptions[optionId].values[valueId] = value;
-      }
-      
-      function generateVariantTable() {
-        const validOptions = [];
-        for (const optionId in variantOptions) {
-          const option = variantOptions[optionId];
-          if (option.name && option.values.filter(v => v).length > 0) {
-            validOptions.push({
-              name: option.name,
-              values: option.values.filter(v => v)
-            });
-          }
+
+      container.appendChild(valueWrapper);
+      variantOptions[optionId].values.push('');
+    }
+
+    function removeVariantValue(optionId, valueId) {
+      document.getElementById(`option_value_${optionId}_${valueId}`).remove();
+    }
+
+    function updateVariantOptionName(optionId, name) {
+      variantOptions[optionId].name = name;
+    }
+
+    function updateVariantValue(optionId, valueId, value) {
+      variantOptions[optionId].values[valueId] = value;
+    }
+
+    function generateVariantTable() {
+      const validOptions = [];
+      for (const optionId in variantOptions) {
+        const option = variantOptions[optionId];
+        if (option.name && option.values.filter(v => v).length > 0) {
+          validOptions.push({
+            name: option.name,
+            values: option.values.filter(v => v)
+          });
         }
-        
-        if (validOptions.length === 0) {
-          alert('Please add at least one option with values');
-          return;
-        }
-        
-        const combinations = generateCombinations(validOptions);
-        const container = document.getElementById('variant_table_container');
-        
-        let tableHTML = `
+      }
+
+      if (validOptions.length === 0) {
+        alert('Please add at least one option with values');
+        return;
+      }
+
+      const combinations = generateCombinations(validOptions);
+      const container = document.getElementById('variant_table_container');
+
+      let tableHTML = `
           <div style="overflow-x: auto; max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
             <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
               <thead style="position: sticky; top: 0; background: #f3f4f6; z-index: 10;">
                 <tr>`;
-        
-        validOptions.forEach(opt => {
-          tableHTML += `<th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">${opt.name}</th>`;
-        });
-        
-        tableHTML += `
+
+      validOptions.forEach(opt => {
+        tableHTML += `<th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">${opt.name}</th>`;
+      });
+
+      tableHTML += `
                   <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Photo</th>
                   <th style="padding: 6px 8px; text-align: center; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Primary</th>
                   <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Price</th>
@@ -2071,13 +2099,13 @@
                 </tr>
               </thead>
               <tbody>`;
-        
-        combinations.forEach((combo, index) => {
-          tableHTML += '<tr style="background: ' + (index % 2 === 0 ? '#ffffff' : '#f9fafb') + ';">';
-          combo.forEach(value => {
-            tableHTML += `<td style="padding: 4px 6px; border: 1px solid #e5e7eb; white-space: nowrap; font-size: 11px;">${value}</td>`;
-          });
-          tableHTML += `
+
+      combinations.forEach((combo, index) => {
+        tableHTML += '<tr style="background: ' + (index % 2 === 0 ? '#ffffff' : '#f9fafb') + ';">';
+        combo.forEach(value => {
+          tableHTML += `<td style="padding: 4px 6px; border: 1px solid #e5e7eb; white-space: nowrap; font-size: 11px;">${value}</td>`;
+        });
+        tableHTML += `
             <td style="padding: 4px 6px; border: 1px solid #e5e7eb;">
               <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                 <span id="primary_badge_${index}" style="display: ${index === 0 ? 'inline-block' : 'none'}; background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; font-size: 9px; padding: 2px 5px; font-weight: 600;">PRIMARY</span>
@@ -2103,53 +2131,54 @@
               <input type="checkbox" name="variant_featured_${index}" checked style="cursor: pointer;">
             </td>
           </tr>`;
-        });
-        
-        tableHTML += '</tbody></table></div>';
-        container.innerHTML = tableHTML;
-      }
-      
-      function updatePrimaryBadges() {
-        // Hide all primary badges
-        document.querySelectorAll('[id^="primary_badge_"]').forEach(badge => {
-          badge.style.display = 'none';
-        });
-        
-        // Show badge for selected primary
-        const selectedRadio = document.querySelector('input[name="primary_variant_image"]:checked');
-        if (selectedRadio) {
-          const badge = document.getElementById(`primary_badge_${selectedRadio.value}`);
-          if (badge) {
-            badge.style.display = 'inline-block';
-          }
+      });
+
+      tableHTML += '</tbody></table></div>';
+      container.innerHTML = tableHTML;
+    }
+
+    function updatePrimaryBadges() {
+      // Hide all primary badges
+      document.querySelectorAll('[id^="primary_badge_"]').forEach(badge => {
+        badge.style.display = 'none';
+      });
+
+      // Show badge for selected primary
+      const selectedRadio = document.querySelector('input[name="primary_variant_image"]:checked');
+      if (selectedRadio) {
+        const badge = document.getElementById(`primary_badge_${selectedRadio.value}`);
+        if (badge) {
+          badge.style.display = 'inline-block';
         }
       }
-      
-      function generateCombinations(options, current = [], index = 0) {
-        if (index === options.length) {
-          return [current];
-        }
-        
-        const results = [];
-        const option = options[index];
-        
-        option.values.forEach(value => {
-          results.push(...generateCombinations(options, [...current, value], index + 1));
-        });
-        
-        return results;
+    }
+
+    function generateCombinations(options, current = [], index = 0) {
+      if (index === options.length) {
+        return [current];
       }
-    </script>
-    
-    <!-- Task Edit Sidebar Modal -->
-    {% include 'todo/components/task_edit_modal.html' %}
-    
-    <!-- Toast Notification -->
-    <div id="toastNotification" class="toast-notification-global">
-      <div class="toast-content-global">
-        <i class="fa fa-check-circle toast-icon-global"></i>
-        <span class="toast-message-global"></span>
-      </div>
+
+      const results = [];
+      const option = options[index];
+
+      option.values.forEach(value => {
+        results.push(...generateCombinations(options, [...current, value], index + 1));
+      });
+
+      return results;
+    }
+  </script>
+
+  <!-- Task Edit Sidebar Modal -->
+  {% include 'todo/components/task_edit_modal.html' %}
+
+  <!-- Toast Notification -->
+  <div id="toastNotification" class="toast-notification-global">
+    <div class="toast-content-global">
+      <i class="fa fa-check-circle toast-icon-global"></i>
+      <span class="toast-message-global"></span>
     </div>
-  </body>
+  </div>
+</body>
+
 </html>

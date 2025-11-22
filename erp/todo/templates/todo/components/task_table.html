@@ -1,0 +1,695 @@
+{% load static %}
+<style>
+  .task-table-container {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border: 1px solid #f1f5f9;
+  }
+
+  .table-header {
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .table-header h2 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.025em;
+    margin: 0;
+  }
+
+  .table-header p {
+    color: #64748b;
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 400;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .stat-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    /* No hover animations */
+  }
+
+  .stat-label {
+    font-size: 0.875rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .table-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .search-filter-group {
+    display: flex;
+    gap: 0.75rem;
+    flex: 1;
+    max-width: 600px;
+  }
+
+  .filter-btn {
+    padding: 0.625rem 1rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #475569;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .filter-btn:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #1e293b;
+  }
+
+  .filter-dropdown {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    min-width: 220px;
+    z-index: 50;
+    display: none;
+    padding: 0.5rem;
+  }
+
+  .filter-dropdown.active {
+    display: block;
+  }
+
+  .filter-option {
+    padding: 0.625rem 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: #475569;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .filter-option:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .filter-option i {
+    color: #94a3b8;
+    width: 16px;
+  }
+
+  .filter-option:hover i {
+    color: #3b82f6;
+  }
+
+  .search-wrapper {
+    flex: 1;
+    position: relative;
+  }
+
+  .search-input {
+    width: 100%;
+    /* Force padding to prevent overlap */
+    padding: 0.625rem 1rem 0.625rem 3.5rem !important;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: #ffffff;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 1rem center;
+    /* Reset to 1rem */
+    background-size: 1.25rem;
+  }
+
+  .search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .btn-new-task {
+    padding: 0.625rem 1.25rem;
+    background: #0f172a;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    text-decoration: none;
+    /* Ensure no underline */
+  }
+
+  .btn-new-task:hover {
+    background: #1e293b;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    color: #ffffff !important;
+    /* Force white text on hover */
+  }
+
+  .tasks-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 0.5rem;
+  }
+
+  .tasks-table thead th {
+    padding: 1rem 1.5rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+
+  .tasks-table thead th:first-child {
+    border-top-left-radius: 8px;
+  }
+
+  .tasks-table thead th:last-child {
+    border-top-right-radius: 8px;
+  }
+
+  .tasks-table tbody tr {
+    background: #ffffff;
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+  }
+
+  .tasks-table tbody tr td {
+    padding: 1rem 1.5rem;
+    font-size: 0.875rem;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+
+  .tasks-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .tasks-table tbody tr:hover {
+    background: #f8fafc;
+    /* Subtle hover background */
+    /* Removed scale and shadow effects for a cleaner look */
+  }
+
+  .task-title-cell {
+    font-weight: 500;
+    color: #0f172a;
+    font-size: 0.9rem;
+  }
+
+  .assignee-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .assignee-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    border: 1px solid #e2e8f0;
+  }
+
+  .assignee-name {
+    color: #475569;
+    font-weight: 500;
+  }
+
+  /* Refined Badges - Flat Style */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .status-badge.ongoing {
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  .status-badge.completed {
+    background: #f0fdf4;
+    color: #16a34a;
+  }
+
+  .status-badge.pending {
+    background: #fffbeb;
+    color: #d97706;
+  }
+
+  .status-badge.blocked {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+
+  .status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .status-indicator.ongoing {
+    background: #3b82f6;
+  }
+
+  .status-indicator.completed {
+    background: #22c55e;
+  }
+
+  .status-indicator.pending {
+    background: #f59e0b;
+  }
+
+  .status-indicator.blocked {
+    background: #ef4444;
+  }
+
+  .priority-badge-table {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .priority-badge-table.urgent {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+
+  .priority-badge-table.high {
+    background: #fff1f2;
+    color: #e11d48;
+  }
+
+  .priority-badge-table.medium {
+    background: #fff7ed;
+    color: #ea580c;
+  }
+
+  .priority-badge-table.low {
+    background: #f0fdfa;
+    color: #0d9488;
+  }
+
+  .date-cell {
+    color: #64748b;
+    font-size: 0.813rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .date-cell::before {
+    content: '\f073';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 400;
+    color: #94a3b8;
+  }
+
+  .btn-actions {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+
+  .btn-actions:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .empty-state-table {
+    text-align: center;
+    padding: 6rem 2rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px dashed #e2e8f0;
+    margin-top: 2rem;
+  }
+
+  .empty-state-table i {
+    font-size: 3rem;
+    color: #cbd5e1;
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  @media (max-width: 768px) {
+    .task-table-container {
+      padding: 1rem;
+      border-radius: 12px;
+    }
+
+    .stats-row {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .table-controls {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 0;
+      background: transparent;
+      border: none;
+    }
+
+    .search-filter-group {
+      max-width: 100%;
+      flex-direction: column;
+    }
+
+    .tasks-table {
+      display: block;
+      overflow-x: auto;
+    }
+  }
+
+  .delete-task-btn {
+    color: #94a3b8;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .delete-task-btn:hover {
+    background: #fee2e2;
+    color: #ef4444;
+  }
+</style>
+
+<div class="task-table-container">
+  <!-- Header -->
+  <div class="table-header">
+    <h2>{% if is_assigned_view %}Delegated Tasks{% else %}My Tasks{% endif %}</h2>
+    <p>{% if is_assigned_view %}Track all tasks you've delegated to your team.{% else %}View and manage all tasks
+      assigned to you.{% endif %}</p>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">{% if is_assigned_view %}Total Delegated{% else %}Total Assigned Tasks{% endif %}</div>
+      <div class="stat-value">{{ total_count }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">{% if is_assigned_view %}Completed This Week{% else %}Completed This Week{% endif %}</div>
+      <div class="stat-value">{{ completed_count }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">{% if is_assigned_view %}In Progress{% else %}Ongoing Tasks{% endif %}</div>
+      <div class="stat-value">{{ ongoing_count }}</div>
+    </div>
+  </div>
+
+  <!-- Table Controls -->
+  <div class="table-controls">
+    <div class="search-filter-group">
+      <div style="position: relative;">
+        <button class="filter-btn" onclick="toggleFilterDropdown(this, event)">
+          <i class="fa fa-sliders-h"></i>
+        </button>
+        <div class="filter-dropdown">
+          <div class="filter-option" onclick="sortTasks(this, 'priority')">
+            <i class="fa fa-flag"></i>
+            {% if is_assigned_view %}Sort by Priority{% else %}Sort by Priority{% endif %}
+          </div>
+          <div class="filter-option" onclick="sortTasks(this, 'date')">
+            <i class="fa fa-calendar"></i>
+            {% if is_assigned_view %}Sort by Date{% else %}Sort by Date{% endif %}
+          </div>
+          <div class="filter-option" onclick="sortTasks(this, 'name')">
+            <i class="fa fa-sort-alpha-down"></i>
+            {% if is_assigned_view %}Sort by Name{% else %}Sort by Name{% endif %}
+          </div>
+          <div class="filter-option" onclick="sortTasks(this, 'status')">
+            <i class="fa fa-check-circle"></i>
+            {% if is_assigned_view %}Sort by Status{% else %}Sort by Status{% endif %}
+          </div>
+        </div>
+      </div>
+      <button class="filter-btn" onclick="toggleSort(this)">
+        <i class="fa fa-sort"></i>
+      </button>
+      <div class="search-wrapper">
+        <input type="text" class="search-input"
+          placeholder="{% if is_assigned_view %}Search delegated tasks...{% else %}Search tasks...{% endif %}"
+          id="taskSearchInput" value="{{ search_query }}" oninput="instantSearchTasks(this)">
+        <div id="searchResultCount" style="display: none; margin-top: 0.5rem; font-size: 0.875rem; color: #64748b;">
+        </div>
+      </div>
+    </div>
+    {% if not is_assigned_view %}
+    <a href="#" onclick="openTaskSidebar(); return false;" class="btn-new-task">
+      <i class="fa fa-plus-circle"></i>
+      Create New Task
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Tasks Table -->
+  {% if tasks %}
+  <table class="tasks-table" id="tasksTable">
+    <thead>
+      <tr>
+        {% if not is_assigned_view %}
+        <th style="width: 40px;"></th>
+        {% endif %}
+        <th>{% if is_assigned_view %}TASK TITLE{% else %}TASK TITLE{% endif %}</th>
+        <th>{% if is_assigned_view %}ASSIGNED TO{% else %}ASSIGNED TO{% endif %}</th>
+        <th>{% if is_assigned_view %}STATUS{% else %}STATUS{% endif %}</th>
+        <th>{% if is_assigned_view %}PRIORITY{% else %}PRIORITY{% endif %}</th>
+        <th>{% if is_assigned_view %}DUE DATE{% else %}DUE DATE{% endif %}</th>
+        <th style="width: 60px;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr class="taskComponent" data-task-id="{{ task.id }}"
+        onclick="if(!event.target.closest('.delete-task-btn') && !event.target.closest('input[type=checkbox]')) window.location.href='/todo/tasks/{{ task.id }}/detail/'"
+        style="cursor: pointer;">
+        {% if not is_assigned_view %}
+        <td class="delete-cell">
+          <button class="btn-icon delete-task-btn"
+            onclick="event.stopPropagation(); confirmDeleteTask('{{ task.id }}', this)">
+            <i class="fa fa-trash"></i>
+          </button>
+        </td>
+        {% endif %}
+        <td class="task-title-cell">{{ task.name }}</td>
+        <td>
+          <div class="assignee-cell">
+            <div class="assignee-avatar">
+              {{ task.member.user.first_name.0 }}{{ task.member.user.last_name.0 }}
+            </div>
+            <span class="assignee-name">
+              {{ task.member.user.first_name }} {{ task.member.user.last_name }}
+            </span>
+          </div>
+        </td>
+        <td>
+          {% if task.completed %}
+          <span class="status-badge completed">
+            <span class="status-indicator completed"></span>
+            {% if is_assigned_view %}Completed{% else %}Completed{% endif %}
+          </span>
+          {% else %}
+          <span class="status-badge ongoing">
+            <span class="status-indicator ongoing"></span>
+            {% if is_assigned_view %}In Progress{% else %}Ongoing{% endif %}
+          </span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="priority-cell">
+            <span class="priority-badge-table {{ task.priority }}">
+              {% if is_assigned_view %}
+              {% if task.priority == 'urgent' %}
+              <i class="fa fa-arrow-up"></i> Urgent
+              {% elif task.priority == 'high' %}
+              <i class="fa fa-arrow-up"></i> High
+              {% elif task.priority == 'medium' %}
+              <i class="fa fa-minus"></i> Medium
+              {% else %}
+              <i class="fa fa-arrow-down"></i> Low
+              {% endif %}
+              {% else %}
+              {% if task.priority == 'urgent' %}
+              <i class="fa fa-arrow-up"></i> High
+              {% elif task.priority == 'high' %}
+              <i class="fa fa-arrow-up"></i> High
+              {% elif task.priority == 'medium' %}
+              <i class="fa fa-minus"></i> Medium
+              {% else %}
+              <i class="fa fa-arrow-down"></i> Low
+              {% endif %}
+              {% endif %}
+            </span>
+          </div>
+        </td>
+        <td class="date-cell">
+          {{ task.due_date|date:"Y-m-d" }}
+        </td>
+        <td class="actions-cell" onclick="event.stopPropagation();">
+          <button class="btn-actions" onclick="showTaskMenu({{ task.id }}, event)">
+            <i class="fa fa-ellipsis-h"></i>
+          </button>
+        </td>
+        <!-- Hidden cells for search (not displayed but searchable) -->
+        <td class="description-cell" style="display: none;">{{ task.description|default:"" }}</td>
+        <td class="related-cell" style="display: none;">
+          {% if task.company %}{{ task.company.name }}{% endif %}
+          {% if task.contact %}{{ task.contact.name }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state-table">
+    <i class="fa fa-check-circle"></i>
+    <h3>{% if is_assigned_view %}No delegated tasks{% else %}No tasks yet{% endif %}</h3>
+    <p>{% if is_assigned_view %}You haven't delegated any tasks to your team yet.{% else %}You don't have any tasks
+      assigned to you.{% endif %}</p>
+  </div>
+  {% endif %}
+
+  <!-- Pagination -->
+  {% if tasks.has_other_pages %}
+  <div
+    style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;">
+    {% if tasks.has_previous %}
+    <button onclick="loadTaskPage({{ tasks.previous_page_number }})" class="filter-btn"
+      style="width: auto; padding: 0.5rem 1rem;">
+      <i class="fa fa-chevron-left"></i> Previous
+    </button>
+    {% endif %}
+
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      {% for num in tasks.paginator.page_range %}
+      {% if tasks.number == num %}
+      <button class="filter-btn" style="background: #3b82f6; color: white; font-weight: 600; width: auto; padding: 0.5rem 0.75rem;">{{ num }}</button>
+      {% elif num > tasks.number|add:'-3' and num < tasks.number|add:'3' %} <button onclick="loadTaskPage({{ num }})"
+        class="filter-btn" style="width: auto; padding: 0.5rem 0.75rem;">{{ num }}</button>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    {% if tasks.has_next %}
+    <button onclick="loadTaskPage({{ tasks.next_page_number }})" class="filter-btn"
+      style="width: auto; padding: 0.5rem 1rem;">
+      Next <i class="fa fa-chevron-right"></i>
+    </button>
+    {% endif %}
+  </div>
+  <div style="text-align: center; margin-top: 0.75rem; color: #64748b; font-size: 0.875rem;">
+    Page {{ tasks.number }} of {{ tasks.paginator.num_pages }} ({{ tasks.paginator.count }} total tasks)
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  // Update currentTab when this component loads
+  if (typeof window.currentTab !== 'undefined') {
+    window.currentTab = '{{ tab|default:"myTasks" }}';
+  }
+
+  // Close dropdown when clicking outside (component-specific)
+  document.addEventListener('click', function (e) {
+    const dropdown = document.getElementById('filterDropdown');
+    if (dropdown && !e.target.closest('.filter-btn')) {
+      dropdown.classList.remove('active');
+    }
+  });
+</script>

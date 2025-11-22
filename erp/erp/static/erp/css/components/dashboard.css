@@ -227,6 +227,43 @@
   color: white;
 }
 
+/* Task Tabs */
+.task-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 1rem 1.5rem 0;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.task-tab {
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.task-tab:hover {
+  background: rgba(59, 130, 246, 0.05);
+  color: var(--text-primary);
+}
+
+.task-tab.active {
+  background: var(--bg-primary);
+  color: var(--accent-primary);
+  border-bottom: 2px solid var(--accent-primary);
+  margin-bottom: -2px;
+}
+
 /* Tasks Container */
 .tasks-container {
   max-height: 600px;

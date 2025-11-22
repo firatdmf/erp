@@ -16,13 +16,21 @@ class Task(models.Model):
     # So, in summary:
     # blank=True affects form validation.
     # null=True affects the database schema.
+    
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
 
     name = models.CharField(max_length=200)
     due_date = models.DateField(db_index=True)
     description = models.TextField(blank=True, null=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium', db_index=True)
     completed = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(auto_now_add=True, editable=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
     # make it either a company or contact
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True
@@ -30,7 +38,8 @@ class Task(models.Model):
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True
     )
-    member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True)
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True, related_name='assigned_tasks')
+    created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, blank=True, null=True, related_name='created_tasks')
 
     def __str__(self):
         if self.company:
@@ -49,9 +58,50 @@ class Task(models.Model):
         indexes = [
             models.Index(fields=['completed', 'due_date']),
             models.Index(fields=['due_date', 'completed']),
+            models.Index(fields=['priority', 'completed']),
+            # ⚡ SEARCH OPTIMIZATION INDEXES
+            models.Index(fields=['member', 'completed', 'priority', 'due_date']),  # My Tasks query
+            models.Index(fields=['created_by', 'completed', 'member']),  # Delegated tasks query
+            models.Index(fields=['name']),  # Search by name
         ]
+        ordering = ['-priority', 'due_date']
         
     def save(self, *args, **kwargs):
         if not self.member and hasattr(self, "_current_member"):
             self.member = self._current_member
         super().save(*args, **kwargs)
+    
+    def get_priority_color(self):
+        """Return color for priority badge"""
+        colors = {
+            'low': '#10b981',      # green
+            'medium': '#f59e0b',   # orange
+            'high': '#ef4444',     # red
+            'urgent': '#dc2626',   # dark red
+        }
+        return colors.get(self.priority, '#6b7280')
+    
+    def get_priority_icon(self):
+        """Return icon for priority"""
+        icons = {
+            'low': 'fa-arrow-down',
+            'medium': 'fa-minus',
+            'high': 'fa-arrow-up',
+            'urgent': 'fa-exclamation-triangle',
+        }
+        return icons.get(self.priority, 'fa-minus')
+
+
+class TaskComment(models.Model):
+    """Comments on tasks for collaboration"""
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='task_comments')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"Comment by {self.author} on {self.task.name}"

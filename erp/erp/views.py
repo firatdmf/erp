@@ -74,6 +74,8 @@ class Dashboard(View):
     def get(self, request,*args, **kwargs):
         # Check if this is an AJAX request for tasks by date
         selected_date = request.GET.get('date')
+        task_tab = request.GET.get('tab', 'myTasks')  # Default to myTasks
+        
         if selected_date:
             from django.http import HttpResponse
             from django.template.loader import render_to_string
@@ -86,13 +88,30 @@ class Dashboard(View):
                 
                 # Get current user's member
                 current_member = request.user.member if hasattr(request.user, 'member') else None
+                print(f"\n=== Dashboard AJAX Debug ===")
+                print(f"Date: {date_obj}, Tab: {task_tab}")
+                print(f"Current member: {current_member} (ID: {current_member.id if current_member else None})")
                 
-                # If selected date is today, show all tasks up to and including today
+                # Base query - date filtering
                 if date_obj == today:
-                    tasks = Task.objects.filter(completed=False, due_date__lte=today, member=current_member).select_related('contact', 'company', 'member').order_by('-due_date')
+                    # If selected date is today, show all tasks up to and including today
+                    base_query = Task.objects.filter(completed=False, due_date__lte=today)
                 else:
                     # For other dates, show only tasks for that specific date
-                    tasks = Task.objects.filter(completed=False, due_date=date_obj, member=current_member).select_related('contact', 'company', 'member')
+                    base_query = Task.objects.filter(completed=False, due_date=date_obj)
+                
+                print(f"Base query count: {base_query.count()}")
+                
+                # Apply tab filter
+                if task_tab == 'myTasks':
+                    tasks = base_query.filter(member=current_member).select_related('contact', 'company', 'member', 'created_by').order_by('-due_date')
+                    print(f"My Tasks count: {tasks.count()}")
+                else:  # assignedTasks
+                    tasks = base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by').order_by('-due_date')
+                    print(f"Assigned Tasks count: {tasks.count()}")
+                    for t in tasks:
+                        print(f"  - Task ID {t.id}: {t.name} -> {t.member}")
+                print(f"========================\n")
                 
                 # Render tasks using the same template
                 html = render_to_string('todo/components/tasks.html', {

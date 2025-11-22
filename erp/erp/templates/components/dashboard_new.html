@@ -1,0 +1,1160 @@
+{% load static %}
+{% load todo_tags %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'erp/css/components/dashboard.css' %}" />
+<style>
+  /* HTMX Swap Animation */
+  tr.htmx-swapping {
+    opacity: 0;
+    transition: opacity 500ms ease-out;
+  }
+
+  /* Delete Button Hover */
+  .delete-task-btn:hover {
+    background-color: #fee2e2 !important;
+    transform: scale(1.1);
+  }
+
+  /* Main Tab System */
+  .main-tabs-container {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid #e5e7eb;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .main-tab {
+    padding: 14px 28px;
+    background: #f8f9fa;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #64748b;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .main-tab:hover {
+    background: #f1f3f5;
+    color: #475569;
+  }
+
+  .main-tab.active {
+    background: white;
+    color: #3b82f6;
+    border-bottom: 3px solid #3b82f6;
+    margin-bottom: -2px;
+  }
+
+  .main-tab .count-badge {
+    background: #e5e7eb;
+    color: #64748b;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .main-tab.active .count-badge {
+    background: #dbeafe;
+    color: #3b82f6;
+  }
+
+  .main-tab-content {
+    display: none;
+  }
+
+  .main-tab-content.active {
+    display: block;
+  }
+
+  /* Priority Badge */
+  .priority-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .priority-low {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .priority-medium {
+    background: #fed7aa;
+    color: #92400e;
+  }
+
+  .priority-high {
+    background: #fecaca;
+    color: #991b1b;
+  }
+
+  .priority-urgent {
+    background: #fca5a5;
+    color: #7f1d1d;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.7;
+    }
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+</style>
+{% endblock %}
+
+{% block js %}
+<script src="{% static 'erp/js/dashboard.js' %}"></script>
+{% endblock %}
+
+<div class="dashboardComponent">
+  <!-- Quick Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <span class="stat-number">{{ number_of_leads_added }}</span>
+      <span class="stat-label">New Leads Today</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-number">{{ pending_tasks_count }}</span>
+      <span class="stat-label">Pending Tasks</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-item">
+      <span class="stat-number" id="thisWeekTasks">-</span>
+      <span class="stat-label">This Week</span>
+    </div>
+  </div>
+
+  <!-- Main Tab System -->
+  <div class="main-tabs-container">
+    <button class="main-tab active" onclick="switchMainTab('calendar')">
+      <i class="fa fa-calendar"></i>
+      Calendar View
+    </button>
+    <button class="main-tab" onclick="switchMainTab('myTasks')">
+      <i class="fa fa-user"></i>
+      My Tasks
+      <span class="count-badge" id="myTasksCount">{{ my_tasks_count }}</span>
+    </button>
+    <button class="main-tab" onclick="switchMainTab('assignedTasks')">
+      <i class="fa fa-user-check"></i>
+      Delegated Tasks
+      <span class="count-badge" id="assignedTasksCount">{{ assigned_tasks_count }}</span>
+    </button>
+  </div>
+
+  <!-- TAB 1: Calendar View -->
+  <div id="calendarTabContent" class="main-tab-content active">
+    <div class="dashboard-grid">
+      <!-- Calendar Section -->
+      <div class="calendar-section">
+        <div class="section-header">
+          <div class="header-left">
+            <h3><i class="fa fa-calendar"></i> Calendar</h3>
+          </div>
+          <div class="calendar-controls">
+            <button class="btn-icon" onclick="previousMonth()">
+              <i class="fa fa-chevron-left"></i>
+            </button>
+            <span class="current-month" id="currentMonth"></span>
+            <button class="btn-icon" onclick="nextMonth()">
+              <i class="fa fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="calendar-container">
+          <div class="calendar-weekdays">
+            <div class="weekday">Sun</div>
+            <div class="weekday">Mon</div>
+            <div class="weekday">Tue</div>
+            <div class="weekday">Wed</div>
+            <div class="weekday">Thu</div>
+            <div class="weekday">Fri</div>
+            <div class="weekday">Sat</div>
+          </div>
+          <div class="calendar-days" id="calendarDays">
+            <!-- Generated by JavaScript -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks Section (for Calendar View) -->
+      <div class="tasks-section">
+        <div class="section-header">
+          <h3><i class="fa fa-check-square"></i> <span id="selectedDateText">Today's Tasks</span></h3>
+          <a href="{% url 'task_report' %}" class="btn-link" target="_blank">
+            View All <i class="fa fa-arrow-right"></i>
+          </a>
+        </div>
+
+        <div class="tasks-container" id="tasksContainer">
+          {% tasks_component csrf_token=csrf_token page_type='dashboard' contact=None company=None
+          sort_type='dictsortreversed' path=path member=member%}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: My Tasks -->
+  <div id="myTasksTabContent" class="main-tab-content">
+    <div id="myTasksList">
+      <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <i class="fa fa-spinner fa-spin"></i> Loading tasks...
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Assigned Tasks -->
+  <div id="assignedTasksTabContent" class="main-tab-content">
+    <div id="assignedTasksList">
+      <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <i class="fa fa-spinner fa-spin"></i> Loading tasks...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Make these global for task component access
+  window.currentDate = new Date();
+  window.selectedDate = new Date();
+  window.tasksData = {{ tasks_calendar_data | safe }};
+
+  // Local references
+  let currentDate = window.currentDate;
+  let selectedDate = window.selectedDate;
+  const tasksData = window.tasksData;
+  let currentTaskTab = 'myTasks';
+
+  // Global task table functions for search and pagination
+  window.currentSortOrder = 'asc';
+  window.searchTimeout = null;
+  window.currentTab = 'myTasks';
+  window.lastSearchQuery = '';
+  window.isSearching = false;
+
+  // ✅ INSTANT CLIENT-SIDE SEARCH (No server calls, no table reload)
+  window.instantSearchTasks = function (inputElement) {
+    // If inputElement is not passed (legacy call), try to find the visible one
+    if (!inputElement) {
+      const visibleTab = document.querySelector('.main-tab-content.active');
+      if (visibleTab) {
+        inputElement = visibleTab.querySelector('.search-input');
+      }
+      if (!inputElement) return;
+    }
+
+    const query = inputElement.value.toLowerCase().trim();
+
+    // Find the container to scope our search
+    const container = inputElement.closest('.task-table-container');
+    if (!container) return;
+
+    const table = container.querySelector('.tasks-table');
+    if (!table) return;
+
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    const rows = tbody.querySelectorAll('tr');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      // Get all searchable text from the row
+      const taskNameCell = row.querySelector('.task-title-cell');
+      const descriptionCell = row.querySelector('.description-cell');
+      const relatedCell = row.querySelector('.related-cell');
+      const priorityCell = row.querySelector('.priority-badge-table');
+
+      const taskName = (taskNameCell?.textContent || '').toLowerCase().trim();
+      const description = (descriptionCell?.textContent || '').toLowerCase().trim();
+      const related = (relatedCell?.textContent || '').toLowerCase().trim();
+      const priority = (priorityCell?.textContent || '').toLowerCase().trim();
+
+      // Check if ANY field starts with the query
+      const matchFound = query === '' ||
+        taskName.startsWith(query) ||
+        description.startsWith(query) ||
+        related.startsWith(query) ||
+        priority.startsWith(query);
+
+      // Show/hide based on match
+      if (matchFound) {
+        row.style.display = '';
+        row.style.opacity = '1';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+        row.style.opacity = '0';
+      }
+    });
+
+    // Update "no results" message
+    updateNoResultsMessage(tbody, visibleCount, query);
+
+    // Update result count in UI if exists (scoped to container)
+    const resultCountEl = container.querySelector('#searchResultCount'); // ID might be duplicated, but querySelector finds first in document usually. Better to use class.
+    // Since ID is duplicated, let's try to find it within container carefully or assume it's the next sibling
+    if (resultCountEl) {
+      // This might still find the wrong one if IDs are duplicated globally.
+      // Let's fix the ID in the next step, but for now let's try to find it relative to input
+      const localResultCount = inputElement.parentElement.querySelector('#searchResultCount');
+      if (localResultCount) {
+        if (visibleCount < rows.length) {
+          localResultCount.textContent = `Showing ${visibleCount} of ${rows.length} tasks`;
+          localResultCount.style.display = 'block';
+        } else {
+          localResultCount.style.display = 'none';
+        }
+      }
+    }
+  };
+  // Helper: Show/hide "no results" message
+  function updateNoResultsMessage(tbody, visibleCount, query) {
+    // Remove existing "no results" row
+    const existingNoResults = tbody.querySelector('.no-results-row');
+    if (existingNoResults) {
+      existingNoResults.remove();
+    }
+
+    // Add "no results" row if needed
+    if (visibleCount === 0 && query !== '') {
+      const noResultsRow = document.createElement('tr');
+      noResultsRow.className = 'no-results-row';
+      noResultsRow.innerHTML = `
+      <td colspan="100%" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+        <i class="fa fa-search" style="font-size: 2rem; opacity: 0.3; margin-bottom: 1rem; display: block;"></i>
+        <p style="font-size: 1rem; margin: 0;">No tasks found matching "<strong>${query}</strong>"</p>
+        <p style="font-size: 0.875rem; margin-top: 0.5rem; opacity: 0.7;">Try a different search term</p>
+      </td>
+    `;
+      tbody.appendChild(noResultsRow);
+    }
+  }
+
+  // Helper: Update search result count
+  function updateSearchResultCount(visibleCount, totalCount) {
+    const resultCountEl = document.getElementById('searchResultCount');
+    if (resultCountEl) {
+      if (visibleCount < totalCount) {
+        resultCountEl.textContent = `Showing ${visibleCount} of ${totalCount} tasks`;
+        resultCountEl.style.display = 'block';
+      } else {
+        resultCountEl.style.display = 'none';
+      }
+    }
+  }
+  // Instant search function that queries backend with loading indicator
+  window.instantSearchTasks = function (inputElement) {
+    const searchQuery = inputElement.value.trim();
+
+    // Debounce search to avoid too many requests (increased to 600ms for smoother UX)
+    if (window.searchTimeout) {
+      clearTimeout(window.searchTimeout);
+    }
+
+    // Show loading indicator immediately
+    const searchWrapper = inputElement.closest('.search-wrapper');
+    let loadingSpinner = searchWrapper ? searchWrapper.querySelector('.search-loading') : null;
+
+    if (!loadingSpinner && searchWrapper) {
+      loadingSpinner = document.createElement('div');
+      loadingSpinner.className = 'search-loading';
+      loadingSpinner.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+      loadingSpinner.style.cssText = 'position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: #3b82f6; font-size: 1rem; pointer-events: none;';
+      searchWrapper.style.position = 'relative';
+      searchWrapper.appendChild(loadingSpinner);
+    }
+
+    if (loadingSpinner) {
+      loadingSpinner.style.display = 'block';
+    }
+
+    window.searchTimeout = setTimeout(() => {
+      // Always go to page 1 when searching
+      const url = `/todo/task_report/?tab=${window.currentTab}&page=1&search=${encodeURIComponent(searchQuery)}`;
+
+      fetch(url, {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(response => response.text())
+        .then(html => {
+          const container = window.currentTab === 'myTasks' ?
+            document.getElementById('myTasksList') :
+            document.getElementById('assignedTasksList');
+          if (container) {
+            container.innerHTML = html;
+          }
+          // Hide loading spinner
+          if (loadingSpinner) {
+            loadingSpinner.style.display = 'none';
+          }
+        })
+        .catch(error => {
+          console.error('Search error:', error);
+          // Hide loading spinner on error
+          if (loadingSpinner) {
+            loadingSpinner.style.display = 'none';
+          }
+        });
+    }, 600); // Wait 600ms after user stops typing (smoother experience)
+  };
+
+  window.loadTaskPage = function (pageNumber) {
+    const searchInput = document.getElementById('taskSearchInput');
+    const searchQuery = searchInput ? searchInput.value.trim() : '';
+    const url = `/todo/task_report/?tab=${window.currentTab}&page=${pageNumber}&search=${encodeURIComponent(searchQuery)}`;
+
+    fetch(url, {
+      method: 'GET',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(response => response.text())
+      .then(html => {
+        const container = window.currentTab === 'myTasks' ?
+          document.getElementById('myTasksList') :
+          document.getElementById('assignedTasksList');
+        if (container) {
+          container.innerHTML = html;
+          container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      })
+      .catch(error => console.error('Pagination error:', error));
+  };
+
+  // Helper to get cookie value
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  // Add CSRF token to all HTMX requests
+  document.body.addEventListener('htmx:configRequest', (event) => {
+    event.detail.headers['X-CSRFToken'] = getCookie('csrftoken');
+  });
+
+  window.toggleFilterDropdown = function (button, event) {
+    event.stopPropagation();
+    // Close all other dropdowns first
+    document.querySelectorAll('.filter-dropdown.active').forEach(d => {
+      if (d !== button.nextElementSibling) d.classList.remove('active');
+    });
+
+    const dropdown = button.nextElementSibling;
+    if (dropdown && dropdown.classList.contains('filter-dropdown')) {
+      dropdown.classList.toggle('active');
+    }
+  };
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', function (event) {
+    if (!event.target.closest('.search-filter-group')) {
+      document.querySelectorAll('.filter-dropdown.active').forEach(d => d.classList.remove('active'));
+    }
+  });
+
+  window.sortTasks = function (element, sortBy) {
+    // Find the container to scope our sort
+    const container = element.closest('.task-table-container');
+    if (!container) return;
+
+    const table = container.querySelector('.tasks-table');
+    if (!table) return;
+
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+
+    // Store current sort type for toggleSort to use
+    window.currentSortType = sortBy;
+
+    rows.sort((a, b) => {
+      let aValue, bValue;
+      switch (sortBy) {
+        case 'priority':
+          const priorityOrder = { 'urgent': 4, 'high': 3, 'medium': 2, 'low': 1 };
+          const aPriority = a.querySelector('.priority-badge-table');
+          const bPriority = b.querySelector('.priority-badge-table');
+          // Check classes for priority
+          const getPriorityScore = (el) => {
+            if (!el) return 0;
+            if (el.classList.contains('urgent')) return 4;
+            if (el.classList.contains('high')) return 3;
+            if (el.classList.contains('medium')) return 2;
+            if (el.classList.contains('low')) return 1;
+            return 0;
+          };
+          aValue = getPriorityScore(aPriority);
+          bValue = getPriorityScore(bPriority);
+          // Inverted logic: 'asc' now means Highest Priority (4) to Lowest (1)
+          return window.currentSortOrder === 'asc' ? bValue - aValue : aValue - bValue;
+        case 'date':
+          const aDateText = a.querySelector('.date-cell').textContent.trim();
+          const bDateText = b.querySelector('.date-cell').textContent.trim();
+          // Simple date parsing
+          const aDate = new Date(aDateText);
+          const bDate = new Date(bDateText);
+          // Handle invalid dates
+          if (isNaN(aDate)) return 1;
+          if (isNaN(bDate)) return -1;
+          return window.currentSortOrder === 'asc' ? aDate - bDate : bDate - aDate;
+        case 'name':
+          aValue = a.querySelector('.task-title-cell').textContent.trim().toLowerCase();
+          bValue = b.querySelector('.task-title-cell').textContent.trim().toLowerCase();
+          return window.currentSortOrder === 'asc' ?
+            aValue.localeCompare(bValue, 'tr') : bValue.localeCompare(aValue, 'tr');
+        case 'status':
+          const aStatus = a.querySelector('.status-badge').textContent.trim();
+          const bStatus = b.querySelector('.status-badge').textContent.trim();
+          return window.currentSortOrder === 'asc' ?
+            aStatus.localeCompare(bStatus, 'tr') : bStatus.localeCompare(aStatus, 'tr');
+      }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+
+    // Close the dropdown (only if triggered from dropdown, not toggleSort)
+    if (element.classList.contains('filter-option')) {
+      const dropdown = element.closest('.filter-dropdown');
+      if (dropdown) dropdown.classList.remove('active');
+    }
+  };
+
+  window.toggleSort = function (button) {
+    window.currentSortOrder = window.currentSortOrder === 'asc' ? 'desc' : 'asc';
+    const icon = button.querySelector('i');
+    if (icon) {
+      icon.className = window.currentSortOrder === 'asc' ? 'fa fa-sort-amount-down' : 'fa fa-sort-amount-up';
+    }
+
+    // Re-trigger sort with current type (default to date if none selected yet)
+    // We pass the button itself as the element so scoping works
+    sortTasks(button, window.currentSortType || 'date');
+  };
+
+  window.toggleAllCheckboxes = function (source) {
+    const checkboxes = document.querySelectorAll('#tasksTable tbody input[type="checkbox"]');
+    checkboxes.forEach(checkbox => checkbox.checked = source.checked);
+  };
+
+  window.showTaskMenu = function (taskId, event) {
+    event.stopPropagation();
+    console.log('Show menu for task:', taskId);
+  };
+
+  // Main Tab Switching
+  function switchMainTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.main-tab-content').forEach(content => {
+      content.classList.remove('active');
+    });
+
+    // Remove active class from all tabs
+    document.querySelectorAll('.main-tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+
+    // Show selected tab content
+    if (tabName === 'calendar') {
+      document.getElementById('calendarTabContent').classList.add('active');
+      document.querySelectorAll('.main-tab')[0].classList.add('active');
+    } else if (tabName === 'myTasks') {
+      window.currentTab = 'myTasks';
+      document.getElementById('myTasksTabContent').classList.add('active');
+      document.querySelectorAll('.main-tab')[1].classList.add('active');
+      loadMyTasks();
+    } else if (tabName === 'assignedTasks') {
+      window.currentTab = 'assignedTasks';
+      document.getElementById('assignedTasksTabContent').classList.add('active');
+      document.querySelectorAll('.main-tab')[2].classList.add('active');
+      loadAssignedTasks();
+    }
+  }
+
+  // Load My Tasks (without calendar filter)
+  function loadMyTasks(page = 1, search = '') {
+    const container = document.getElementById('myTasksList');
+    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading...</div>';
+
+    fetch(`/todo/task_report/?tab=myTasks&page=${page}&search=${encodeURIComponent(search)}`, {
+      method: 'GET',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => response.text())
+      .then(html => {
+        container.innerHTML = html;
+        htmx.process(container);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        container.innerHTML = '<div style="text-align: center; padding: 2rem; color: red;">Error loading tasks.</div>';
+      });
+  }
+
+  // Load Assigned Tasks
+  function loadAssignedTasks(page = 1, search = '') {
+    const container = document.getElementById('assignedTasksList');
+    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading...</div>';
+
+    fetch(`/todo/task_report/?tab=assignedTasks&page=${page}&search=${encodeURIComponent(search)}`, {
+      method: 'GET',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => response.text())
+      .then(html => {
+        container.innerHTML = html;
+        htmx.process(container);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        container.innerHTML = '<div style="text-align: center; padding: 2rem; color: red;">Error loading tasks.</div>';
+      });
+  }
+
+  // Calendar functions (from original dashboard.html)
+  function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    // Update month display
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
+
+    // Get first day of month and total days
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const calendarDays = document.getElementById('calendarDays');
+    calendarDays.innerHTML = '';
+
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+      const emptyDay = document.createElement('div');
+      emptyDay.className = 'calendar-day empty';
+      calendarDays.appendChild(emptyDay);
+    }
+
+    // Add days of month
+    const today = new Date();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayElement = document.createElement('div');
+      dayElement.className = 'calendar-day';
+
+      const dateObj = new Date(year, month, day);
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+      // Check if today
+      if (dateObj.toDateString() === today.toDateString()) {
+        dayElement.classList.add('today');
+      }
+
+      // Check if selected
+      if (dateObj.toDateString() === selectedDate.toDateString()) {
+        dayElement.classList.add('selected');
+      }
+
+      // Check if has tasks
+      if (tasksData[dateStr]) {
+        dayElement.classList.add('has-tasks');
+        const badge = document.createElement('span');
+        badge.className = 'task-badge';
+        badge.textContent = tasksData[dateStr];
+        dayElement.appendChild(badge);
+
+        const dayNumber = document.createElement('span');
+        dayNumber.textContent = day;
+        dayElement.insertBefore(dayNumber, badge);
+      } else {
+        dayElement.textContent = day;
+      }
+
+      dayElement.onclick = () => selectDate(dateObj);
+
+      calendarDays.appendChild(dayElement);
+    }
+  }
+
+  function selectDate(date) {
+    selectedDate = date;
+    window.selectedDate = date;
+    renderCalendar();
+
+    // Update tasks header
+    const today = new Date();
+    const selectedDateText = document.getElementById('selectedDateText');
+
+    if (date.toDateString() === today.toDateString()) {
+      selectedDateText.textContent = "Today's Tasks";
+    } else {
+      const options = { month: 'short', day: 'numeric', year: 'numeric' };
+      selectedDateText.textContent = `Tasks for ${date.toLocaleDateString('en-US', options)}`;
+    }
+
+    // Fetch tasks for selected date
+    loadTasksForDate(date);
+  }
+
+  function loadTasksForDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    const tasksContainer = document.getElementById('tasksContainer');
+
+    tasksContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading tasks...</div>';
+
+    fetch(`/dashboard/?date=${dateStr}&tab=${currentTaskTab}`, {
+      method: 'GET',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => response.text())
+      .then(html => {
+        tasksContainer.innerHTML = html;
+        htmx.process(tasksContainer);
+      })
+      .catch(error => {
+        console.error('Error loading tasks:', error);
+        tasksContainer.innerHTML = '<div class="tasks_component"><ul><li style="color: red;">Error loading tasks.</li></ul></div>';
+      });
+  }
+
+  function previousMonth() {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+  }
+
+  function nextMonth() {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+  }
+
+  // Initialize calendar on page load
+  document.addEventListener('DOMContentLoaded', function () {
+    renderCalendar();
+    loadTasksForDate(new Date());
+  });
+
+  // --- Task Action Functions (Moved from tasks.html) ---
+
+  function confirmDeleteTask(taskId, button) {
+    const taskComponent = button.closest('.taskComponent');
+
+    // Create modern confirmation modal
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease;';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-dialog';
+    dialog.style.cssText = 'background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); max-width: 400px; width: 90%; animation: slideUp 0.3s ease;';
+
+    dialog.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+      <div style="width: 48px; height: 48px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+        <i class="fa fa-trash" style="color: #ef4444; font-size: 20px;"></i>
+      </div>
+      <h3 style="margin: 0; color: #1f2937; font-size: 1.25rem; font-weight: 600;">Delete Task</h3>
+    </div>
+    <p style="margin: 0 0 1.5rem; color: #6b7280; line-height: 1.5;">Are you sure you want to delete this task? This action cannot be undone.</p>
+    <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+      <button onclick="this.closest('.modal-overlay').remove()" 
+              style="padding: 0.625rem 1.25rem; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;" 
+              onmouseover="this.style.background='#f9fafb'" 
+              onmouseout="this.style.background='white'">Cancel</button>
+      <button onclick="deleteTaskHTMX('${taskId}', this)" 
+              style="padding: 0.625rem 1.25rem; border: none; background: #ef4444; color: white; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;" 
+              onmouseover="this.style.background='#dc2626'" 
+              onmouseout="this.style.background='#ef4444'">Delete</button>
+    </div>
+  `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Close on outside click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+  }
+
+  function deleteTaskHTMX(taskId, button) {
+    const overlay = button.closest('.modal-overlay');
+    // Find ALL components with this task ID (e.g. in Calendar AND My Tasks)
+    const taskComponents = document.querySelectorAll(`[data-task-id="${taskId}"]`);
+
+    if (taskComponents.length === 0) {
+      console.error('Task component not found');
+      overlay.remove();
+      return;
+    }
+
+    // Change button to loading state
+    button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting...';
+    button.disabled = true;
+
+    // Get CSRF token
+    const csrfToken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+    // Send delete request with HTMX headers
+    fetch(`/todo/tasks/${taskId}/delete_task`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'HX-Request': 'true'
+      }
+    })
+      .then(response => {
+        if (response.ok) {
+          // Remove modal
+          overlay.remove();
+
+          // Animate and remove ALL instances
+          taskComponents.forEach(component => {
+            // Ensure we are targeting the main container (li or tr)
+            const taskRowOrCard = component.closest('.taskComponent');
+            if (taskRowOrCard) {
+              taskRowOrCard.style.transition = 'all 0.3s ease';
+              taskRowOrCard.style.opacity = '0';
+              taskRowOrCard.style.transform = 'translateX(-20px)';
+
+              setTimeout(() => {
+                taskRowOrCard.remove();
+
+                // Check for empty states in containers
+                const tasksList = document.querySelector('.tasks_component ul');
+                if (tasksList && tasksList.children.length === 0) {
+                  tasksList.innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tasks available.</li>';
+                }
+
+                // Check table empty state
+                const tableBody = document.querySelector('#tasksTable tbody');
+                if (tableBody && tableBody.children.length === 0) {
+                  // Optional: Add empty row or hide table
+                }
+              }, 300);
+            }
+          });
+
+          // Update calendar badge count if on dashboard
+          // We wait a bit to ensure DOM is updated? No, badge update relies on data, not DOM.
+          setTimeout(() => {
+            updateCalendarBadge();
+          }, 300);
+
+          // Show success toast
+          showToast('Task deleted successfully', 'success');
+        } else {
+          overlay.remove();
+          showToast('Failed to delete task. Please try again.', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        overlay.remove();
+        showToast('An error occurred. Please try again.', 'error');
+      });
+  }
+
+  // Toast notification system
+  function showToast(message, type = 'success') {
+    // Remove existing toasts
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+
+    const colors = {
+      success: { bg: '#10b981', icon: 'fa-check-circle' },
+      error: { bg: '#ef4444', icon: 'fa-exclamation-circle' },
+      info: { bg: '#3b82f6', icon: 'fa-info-circle' }
+    };
+
+    const color = colors[type] || colors.success;
+
+    toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    z-index: 10000;
+    animation: slideInRight 0.3s ease;
+    max-width: 400px;
+  `;
+
+    toast.innerHTML = `
+    <div style="width: 40px; height: 40px; background: ${color.bg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <i class="fa ${color.icon}" style="color: white; font-size: 18px;"></i>
+    </div>
+    <span style="color: #1f2937; font-weight: 500;">${message}</span>
+    <button onclick="this.parentElement.remove()" 
+            style="margin-left: auto; background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 20px; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;"
+            onmouseover="this.style.color='#6b7280'" 
+            onmouseout="this.style.color='#9ca3af'">
+      <i class="fa fa-times"></i>
+    </button>
+  `;
+
+    document.body.appendChild(toast);
+
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+      toast.style.animation = 'slideOutRight 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  // Complete task with animation
+  function completeTask(taskId, button) {
+    const taskComponent = button.closest('.taskComponent');
+
+    if (!taskComponent) {
+      console.error('Task component not found');
+      return;
+    }
+
+    // Change button to loading state
+    const originalButtonContent = button.innerHTML;
+    button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    button.disabled = true;
+
+    // Get CSRF token
+    const csrfToken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+    // Send complete request
+    fetch(`/todo/tasks/${taskId}/complete_task`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => {
+        if (response.ok) {
+          // Add completion animation
+          taskComponent.style.transition = 'all 0.5s ease';
+          taskComponent.style.opacity = '0.5';
+          taskComponent.style.transform = 'scale(0.95)';
+
+          // Add checkmark overlay
+          const checkmark = document.createElement('div');
+          checkmark.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60px;
+        height: 60px;
+        background: #10b981;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: checkmarkPop 0.3s ease;
+        z-index: 100;
+      `;
+          checkmark.innerHTML = '<i class="fa fa-check" style="color: white; font-size: 30px;"></i>';
+
+          taskComponent.style.position = 'relative';
+          taskComponent.appendChild(checkmark);
+
+          // Remove task after animation
+          setTimeout(() => {
+            taskComponent.style.transform = 'translateX(-100%)';
+
+            setTimeout(() => {
+              taskComponent.remove();
+
+              // Check if there are no more tasks
+              const tasksList = document.querySelector('.tasks_component ul');
+              if (tasksList && tasksList.children.length === 0) {
+                tasksList.innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tasks available.</li>';
+              }
+
+              // Update calendar badge and pending count
+              updateCalendarBadge();
+            }, 500);
+          }, 800);
+
+          // Show success toast
+          showToast('Task completed successfully! 🎉', 'success');
+        } else {
+          // Revert button state
+          button.innerHTML = originalButtonContent;
+          button.disabled = false;
+          showToast('Failed to complete task. Please try again.', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        button.innerHTML = originalButtonContent;
+        button.disabled = false;
+        showToast('An error occurred. Please try again.', 'error');
+      });
+  }
+
+  // Update calendar badge count after task deletion
+  function updateCalendarBadge() {
+    // Only on dashboard with calendar
+    if (!document.getElementById('calendarDays')) return;
+
+    // Get the selected date from global scope (dashboard.html)
+    const targetDate = window.selectedDate || new Date();
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    // Update global tasksData if it exists
+    if (window.tasksData && window.tasksData[dateStr]) {
+      const currentCount = window.tasksData[dateStr];
+      const newCount = currentCount - 1;
+
+      if (newCount > 0) {
+        window.tasksData[dateStr] = newCount;
+      } else {
+        delete window.tasksData[dateStr];
+      }
+    }
+
+    // Find the calendar day element and update badge
+    const calendarDays = document.querySelectorAll('.calendar-day');
+    calendarDays.forEach(dayEl => {
+      // Check if this is the selected day
+      if (dayEl.classList.contains('selected')) {
+        const badge = dayEl.querySelector('.task-badge');
+        if (badge) {
+          const currentCount = parseInt(badge.textContent) || 0;
+          const newCount = currentCount - 1;
+
+          if (newCount > 0) {
+            badge.textContent = newCount;
+          } else {
+            // Remove badge and has-tasks class
+            dayEl.classList.remove('has-tasks');
+            badge.remove();
+
+            // Update day element to show just the number
+            const dayNumber = dayEl.textContent.trim();
+            dayEl.innerHTML = dayNumber;
+          }
+        }
+      }
+    });
+
+    // Update pending tasks counter
+    updatePendingTasksCount();
+  }
+
+  // Update pending tasks counter in stats bar
+  function updatePendingTasksCount() {
+    // Get all task components currently in the DOM (excluding completed ones)
+    const allTasksInView = document.querySelectorAll('.tasks-container .taskComponent');
+    const currentViewCount = allTasksInView.length;
+
+    // Find the stat-number elements
+    const statNumbers = document.querySelectorAll('.stat-number');
+
+    // The second stat-number is "Pending Tasks" (index 1)
+    if (statNumbers.length >= 2) {
+      const currentPendingCount = parseInt(statNumbers[1].textContent) || 0;
+      const newPendingCount = Math.max(0, currentPendingCount - 1);
+      statNumbers[1].textContent = newPendingCount;
+    }
+  }
+
+  // Add CSS animations
+  if (!document.getElementById('toast-animations')) {
+    const style = document.createElement('style');
+    style.id = 'toast-animations';
+    style.textContent = `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes slideInRight {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOutRight {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(400px); opacity: 0; }
+    }
+    @keyframes checkmarkPop {
+      0% { transform: translate(-50%, -50%) scale(0); }
+      50% { transform: translate(-50%, -50%) scale(1.2); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+  `;
+    document.head.appendChild(style);
+  }
+
+  // Listen for HTMX events for toast notifications
+  document.body.addEventListener('showToast', function (evt) {
+    const detail = evt.detail;
+    if (detail && detail.message) {
+      showToast(detail.message, detail.type || 'success');
+    }
+  });
+</script>
+
+<!-- Task Detail Sidebar -->
+{% include 'todo/components/task_detail_sidebar.html' %}

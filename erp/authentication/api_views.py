@@ -743,6 +743,9 @@ def get_cart(request, user_id):
             'product_sku': item.product_sku,
             'variant_sku': item.variant_sku,
             'quantity': str(item.quantity),
+            'is_custom_curtain': item.is_custom_curtain,
+            'custom_attributes': item.custom_attributes,
+            'custom_price': str(item.custom_price) if item.custom_price else None,
             'created_at': item.created_at.isoformat(),
             'updated_at': item.updated_at.isoformat()
         } for item in cart_items]
@@ -785,6 +788,11 @@ def add_to_cart(request, user_id):
         variant_sku = data.get('variant_sku', None)
         quantity = data.get('quantity', '1.0')
         
+        # Custom Curtain fields
+        is_custom_curtain = data.get('is_custom_curtain', False)
+        custom_attributes = data.get('custom_attributes', None)
+        custom_price = data.get('custom_price', None)
+        
         if not product_sku:
             return JsonResponse({
                 'error': 'product_sku is required'
@@ -802,29 +810,52 @@ def add_to_cart(request, user_id):
                 'error': 'Invalid quantity format'
             }, status=400)
         
+        # Convert custom_price to Decimal if provided
+        if custom_price is not None:
+            try:
+                custom_price = Decimal(str(custom_price))
+            except:
+                return JsonResponse({
+                    'error': 'Invalid custom_price format'
+                }, status=400)
+        
         web_client = WebClient.objects.get(id=user_id)
         
-        # Check if item already exists
-        cart_item = CartItem.objects.filter(
-            client=web_client, 
-            product_sku=product_sku,
-            variant_sku=variant_sku
-        ).first()
-        
-        if cart_item:
-            # Update quantity (add to existing)
-            cart_item.quantity += quantity
-            cart_item.save()
-            message = 'Cart item updated'
-        else:
-            # Create new cart item
+        # For custom curtains, always create a new item (each is unique)
+        if is_custom_curtain:
             cart_item = CartItem.objects.create(
                 client=web_client,
                 product_sku=product_sku,
                 variant_sku=variant_sku,
-                quantity=quantity
+                quantity=quantity,
+                is_custom_curtain=True,
+                custom_attributes=custom_attributes,
+                custom_price=custom_price
             )
-            message = 'Added to cart'
+            message = 'Custom curtain added to cart'
+        else:
+            # Check if regular item already exists
+            cart_item = CartItem.objects.filter(
+                client=web_client, 
+                product_sku=product_sku,
+                variant_sku=variant_sku,
+                is_custom_curtain=False
+            ).first()
+            
+            if cart_item:
+                # Update quantity (add to existing)
+                cart_item.quantity += quantity
+                cart_item.save()
+                message = 'Cart item updated'
+            else:
+                # Create new cart item
+                cart_item = CartItem.objects.create(
+                    client=web_client,
+                    product_sku=product_sku,
+                    variant_sku=variant_sku,
+                    quantity=quantity
+                )
+                message = 'Added to cart'
         
         response = JsonResponse({
             'message': message,
@@ -832,7 +863,10 @@ def add_to_cart(request, user_id):
                 'id': cart_item.id,
                 'product_sku': cart_item.product_sku,
                 'variant_sku': cart_item.variant_sku,
-                'quantity': str(cart_item.quantity)
+                'quantity': str(cart_item.quantity),
+                'is_custom_curtain': cart_item.is_custom_curtain,
+                'custom_attributes': cart_item.custom_attributes,
+                'custom_price': str(cart_item.custom_price) if cart_item.custom_price else None
             }
         }, status=201)
         response["Access-Control-Allow-Origin"] = "*"

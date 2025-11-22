@@ -62,37 +62,30 @@ button{
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: hidden; /* no internal scroll */
   overflow-x: hidden;
 }
 
-/* Hide scrollbar but keep functionality */
+/* Remove scrollbar completely */
 .navbar::-webkit-scrollbar {
-  width: 4px;
+  display: none;
 }
 
-.navbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.navbar::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 4px;
-}
-
-.navbar::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+.navbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .navbar-nav {
   list-style: none;
-  padding: 0;
+  padding: 0.3rem 0 1.0rem 0; /* üst az, alt biraz daha fazla boşluk */
   margin: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100%;
+  justify-content: space-between; /* öğeleri tüm yükseklikte dağıt */
   width: 100%;
+  height: 100%;
 }
 
 .nav-item {
@@ -109,7 +102,7 @@ button{
 }
 
 .last2items {
-  margin-top: auto;
+  margin-top: 0;
   width: 100%;
 }
 
@@ -256,11 +249,11 @@ button{
 
 
 .nav-item .nav-separator {
-  padding: 0.15rem 0;
+  padding: 0.1rem 0;
 }
 .nav-item .nav-separator-line {
   border-bottom: 1px solid var(--border-color);
-  margin: 0.15rem auto;
+  margin: 0.1rem auto;
   width: 60%;
 }
 .nav-link {
@@ -268,13 +261,14 @@ button{
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 4rem;
-  padding: 0.4rem 0;
+  height: auto;
+  padding: 0.75rem 0;       /* çok daha büyük hover alanı (üst-alt) */
+  margin: 0.25rem 0;        /* itemler arası daha fazla boşluk */
   color: var(--text-secondary);
   text-decoration: none;
   transition: all var(--transition-speed) ease;
   position: relative;
-  font-size: 0.7rem;
+  font-size: 0.65rem;       /* biraz daha küçült */
   font-weight: 500;
 }
 
@@ -285,7 +279,7 @@ button{
 }
 
 .nav-link:hover i {
-  transform: scale(1.1);
+  transform: scale(1.2); /* eskiye daha yakın, daha belirgin hover */
 }
 
 .nav-link.active {
@@ -294,14 +288,14 @@ button{
 }
 
 .link-text {
-  margin-top: 0.3rem;
+  margin-top: 0.25rem;
   font-size: 0.7rem;
   font-weight: 500;
   color: inherit;
 }
 
 .nav-link i {
-  font-size: 1.15rem;
+  font-size: 1.05rem;  /* ikonları daha da küçült, hover alanı daha da büyüsün */
   transition: transform var(--transition-speed) ease;
 }
 
@@ -354,8 +348,8 @@ a:hover {
 .logo {
   font-weight: 700;
   font-family: "Fuzzy Bubbles", sans-serif;
-  margin-bottom: 0.5rem;
-  padding: 0.75rem 0 0.5rem;
+  margin-bottom: 0.55rem;         /* logo altı daha fazla boşluk */
+  padding: 0.75rem 0 0.6rem;      /* üst-alt çok daha fazla boşluk */
   text-align: center;
   color: teal;
   width: 100%;
@@ -363,7 +357,7 @@ a:hover {
 }
 
 .logo-text {
-  font-size: 1.375rem;
+  font-size: 1.25rem;  /* logo boyutunu küçült */
   letter-spacing: 0.5px;
 }
 /* 
@@ -426,6 +420,10 @@ a:hover {
   position: relative;
 }
 
+#addButton .nav-link {
+  position: relative;
+}
+
 /* Add menüsü için hover bridge - boşluğu kapatan görünmez alan */
 #addButton::after {
   content: '';
@@ -452,8 +450,6 @@ a:hover {
 .nav-item #addExpanded {
   display: none;
   position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
   left: 6rem;
   background-color: var(--bg-primary);
   width: 340px;
@@ -469,11 +465,11 @@ a:hover {
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translate(-10px, -50%);
+    transform: translateX(-10px);
   }
   to {
     opacity: 1;
-    transform: translate(0, -50%);
+    transform: translateX(0);
   }
 }
 
@@ -563,6 +559,10 @@ a:hover {
   position: relative;
 }
 
+#marketingButton .nav-link {
+  position: relative;
+}
+
 /* Marketing menüsü için hover bridge */
 #marketingButton::after {
   content: '';
@@ -585,8 +585,6 @@ a:hover {
 #marketingExpanded {
   display: none;
   position: fixed;
-  top: 60%;
-  transform: translateY(-50%);
   left: 6rem;
   background-color: var(--bg-primary);
   width: 340px;
@@ -601,6 +599,10 @@ a:hover {
 
 /* Operating menüsü için stil - Marketing ile aynı yapı */
 #operatingButton {
+  position: relative;
+}
+
+#operatingButton .nav-link {
   position: relative;
 }
 
@@ -626,8 +628,6 @@ a:hover {
 #operatingExpanded {
   display: none;
   position: fixed;
-  top: 65%;
-  transform: translateY(-50%);
   left: 6rem;
   background-color: var(--bg-primary);
   width: 340px;

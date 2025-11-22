@@ -123,6 +123,12 @@ class CartItem(models.Model):
     product_sku = models.CharField(max_length=100)  # Main product SKU
     variant_sku = models.CharField(max_length=100, blank=True, null=True)  # Optional variant SKU
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)  # Support decimal quantities (e.g., 1.5m)
+    
+    # Custom Curtain Fields
+    is_custom_curtain = models.BooleanField(default=False)
+    custom_attributes = models.JSONField(blank=True, null=True)  # Store custom curtain specifications
+    custom_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # Calculated custom price
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -131,8 +137,11 @@ class CartItem(models.Model):
         verbose_name = 'Cart Item'
         verbose_name_plural = 'Cart Items'
         ordering = ['-created_at']
-        unique_together = ['client', 'product_sku', 'variant_sku']  # Prevent duplicate items
+        # Remove unique_together for custom curtains (each is unique)
+        # unique_together = ['client', 'product_sku', 'variant_sku']
 
     def __str__(self):
+        if self.is_custom_curtain:
+            return f"{self.client.username} - Custom Curtain ({self.product_sku}) x {self.quantity}"
         variant_info = f" ({self.variant_sku})" if self.variant_sku else ""
         return f"{self.client.username} - {self.product_sku}{variant_info} x {self.quantity}"

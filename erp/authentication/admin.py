@@ -55,7 +55,34 @@ class FavoriteAdmin(admin.ModelAdmin):
 
 @admin.register(CartItem)
 class CartItemAdmin(admin.ModelAdmin):
-    list_display = ('client', 'product_sku', 'variant_sku', 'quantity', 'created_at')
-    list_filter = ('created_at',)
+    list_display = ('client', 'product_sku', 'variant_sku', 'quantity', 'is_custom_curtain', 'display_custom_price', 'created_at')
+    list_filter = ('is_custom_curtain', 'created_at')
     search_fields = ('client__username', 'client__email', 'product_sku', 'variant_sku')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('display_custom_attributes', 'created_at', 'updated_at')
+    
+    def display_custom_price(self, obj):
+        if obj.is_custom_curtain and obj.custom_price:
+            return f"${obj.custom_price}"
+        return "-"
+    display_custom_price.short_description = "Custom Price"
+    
+    def display_custom_attributes(self, obj):
+        if obj.custom_attributes:
+            import json
+            return json.dumps(obj.custom_attributes, indent=2)
+        return "No custom attributes"
+    display_custom_attributes.short_description = "Custom Attributes"
+    
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('client', 'product_sku', 'variant_sku', 'quantity')
+        }),
+        ('Custom Curtain', {
+            'fields': ('is_custom_curtain', 'custom_price', 'display_custom_attributes'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )

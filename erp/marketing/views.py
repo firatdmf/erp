@@ -457,13 +457,12 @@ class BaseProductView(ModelFormMixin):
         # Get the through model
         ThroughModel = ProductVariant.product_variant_attribute_values.through
         
-        # Only delete/recreate if variant count changed or attributes changed
-        # For most updates (just price/quantity changes), skip this entirely
+        # Always delete/recreate M2M relationships to ensure attributes are updated correctly
+        # (e.g. if user changes "Pink" to "Gold", we must remove "Pink" association)
         variant_ids = [v.id for v in existing_variants_dict.values()]
-        if len(variants_to_create) > 0 or deleted_count > 0:
-            # Only clear if we created/deleted variants
+        if variant_ids:
             ThroughModel.objects.filter(productvariant_id__in=variant_ids).delete()
-        elif not variant_ids:
+        else:
             # No variants, skip M2M entirely
             print(f"  ✓ Skipped M2M (no variants): {time.time() - attr_bulk_start:.3f}s")
             variant_ids = []
@@ -504,7 +503,10 @@ class BaseProductView(ModelFormMixin):
             for img_info in variant_image_info:
                 img_id = img_info.get("id")
                 if img_id:
-                    all_image_ids.add(img_id)
+                    try:
+                        all_image_ids.add(int(img_id))
+                    except (ValueError, TypeError):
+                        pass
         
         # Fetch ALL files by ID (including those already linked to other variants)
         # This allows sharing images across variants (shared pool)
@@ -552,6 +554,11 @@ class BaseProductView(ModelFormMixin):
                     img_sequence = img_info.get("sequence", 0)
                     
                     if img_id:
+                        try:
+                            img_id = int(img_id)
+                        except (ValueError, TypeError):
+                            pass
+
                         # Get source file from shared pool
                         source_file = all_files_dict.get(img_id)
                         if source_file:
@@ -674,69 +681,26 @@ class BaseProductView(ModelFormMixin):
         # After handling variants, ALWAYS use first variant's first image as product primary
         # This ignores any main product images if variants exist
         set_primary_start = time.time()
-        if len(variants_data) > 0:
-            first_variant_sku = variants_data[0].get("variant_sku")
-            if first_variant_sku:
-                # Use cache if variant exists
-                first_variant = existing_variants_dict.get(first_variant_sku)
-                if first_variant:
-                    # Use cache if files exist
-                    first_variant_files = variant_files_cache.get(first_variant_sku, {})
-                    if first_variant_files:
-                        # Get first file by lowest ID (already in cache)
-                        first_variant_file_id = min(first_variant_files.keys())
-                        first_variant_file = first_variant_files[first_variant_file_id]
-                        
-                        # Only update if changed
-                        if self.object.primary_image_id != first_variant_file.pk:
-                            from django.db.models import Case, When, Value, BooleanField
-                            ProductFile.objects.filter(product=self.object).update(
-                                is_primary=Case(
-                                    When(pk=first_variant_file.pk, then=Value(True)),
-                                    default=Value(False),
-                                    output_field=BooleanField()
-                                )
-                            )
-                            self.object.primary_image_id = first_variant_file.pk
-                            self.object.save(update_fields=['primary_image'])
-                            print(f"✓ Set first variant's image {first_variant_file.pk} as product primary")
-                        else:
-                            print(f"✓ Primary image already correct (file {first_variant_file.pk})")
-                    else:
-                        print("WARNING: First variant has no images")
-                else:
-                    print(f"WARNING: First variant with SKU {first_variant_sku} not in cache")
-        else:
-            # No variants, use main product images logic
-            image_order = self.request.POST.get('image_order')
-            if image_order:
-                try:
-                    order_list = json.loads(image_order)
-                    if order_list:
-                        # Clear all is_primary flags for main product images only
-                        ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
-                        # Set first image as primary (must be a main product image, not variant)
-                        first_image_id = order_list[0]
-                        primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object, product_variant__isnull=True)
-                        primary_file.is_primary = True
-                        primary_file.save()
-                        self.object.primary_image = primary_file
-                        self.object.save()
-                        print(f"Set primary image to {first_image_id} (main product image, no variants) based on order")
-                except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
-                    print(f"Error setting primary from order (no variants): {e}")
-            else:
-                # No order specified, set first available MAIN PRODUCT image as primary
-                first_main_file = ProductFile.objects.filter(product=self.object, product_variant__isnull=True).order_by('sequence', 'pk').first()
-                if first_main_file:
-                    ProductFile.objects.filter(product=self.object, product_variant__isnull=True).update(is_primary=False)
-                    first_main_file.is_primary = True
-                    first_main_file.save()
-                    self.object.primary_image = first_main_file
+        # Always handle main product image ordering if provided
+        # User request: "primary imagei oradan seçelim" (select primary image from Product Images section)
+        image_order = self.request.POST.get('image_order')
+        if image_order:
+            try:
+                order_list = json.loads(image_order)
+                if order_list:
+                    # Clear all is_primary flags
+                    ProductFile.objects.filter(product=self.object).update(is_primary=False)
+                    
+                    # Set first image as primary
+                    first_image_id = order_list[0]
+                    primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object)
+                    primary_file.is_primary = True
+                    primary_file.save()
+                    self.object.primary_image = primary_file
                     self.object.save()
-                    print(f"Set first available main product image {first_main_file.pk} as primary (no variants)")
-                else:
-                    print(f"WARNING: No main product images found to set as primary (no variants)")
+                    print(f"Set primary image to {first_image_id} based on order")
+            except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
+                print(f"Error setting primary from order: {e}")
         
         set_primary_time = time.time() - set_primary_start
         print(f"  ✓ Set primary image: {set_primary_time:.3f}s")

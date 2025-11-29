@@ -2,14 +2,35 @@
 let optionCounter = 0;
 let variantData = {};
 let variantImages = {}; // Store images for each variant: { variantIndex: { images: [], primaryIndex: 0 } }
+let productAttributes = []; // Product-level attributes to show in variant table
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('variant_component')) {
+        // Load product attributes
+        loadProductAttributes();
         // Load existing variants if in edit mode
         loadExistingVariants();
     }
 });
+
+// Load product attributes from backend data
+function loadProductAttributes() {
+    const productAttributesData = window.product_attributes_data;
+
+    if (!productAttributesData || productAttributesData === '[]' || productAttributesData === '') {
+        productAttributes = [];
+        return;
+    }
+
+    try {
+        productAttributes = JSON.parse(productAttributesData);
+        console.log('Loaded product attributes:', productAttributes);
+    } catch (e) {
+        console.error('Error loading product attributes:', e);
+        productAttributes = [];
+    }
+}
 
 // Load existing variants from backend data
 function loadExistingVariants() {
@@ -137,6 +158,9 @@ function loadExistingVariantImages() {
         console.log('Loading existing variant data:', variants);
 
         // Store variant data keyed by attribute values for easy lookup
+        // Also need to find variant index for variantAttributesData
+        const combinations = generateCombinations();
+
         variants.forEach(variant => {
             // Create a key from attribute values (e.g., "color:white|size:1")
             const attrKey = Object.entries(variant.variant_attribute_values)
@@ -151,8 +175,26 @@ function loadExistingVariantImages() {
                 sku: variant.variant_sku,
                 barcode: variant.variant_barcode,
                 featured: variant.variant_featured,
+                product_attributes: variant.product_attributes || [],
                 images: []
             };
+
+            // Populate variantAttributesData for the modal to use
+            // Find the index of this variant in combinations
+            if (variant.product_attributes && variant.product_attributes.length > 0) {
+                const variantIndex = combinations.findIndex(combo => {
+                    const comboKey = Object.entries(combo)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([key, val]) => `${key}:${val}`)
+                        .join('|');
+                    return comboKey === attrKey;
+                });
+
+                if (variantIndex !== -1 && typeof variantAttributesData !== 'undefined') {
+                    variantAttributesData[variantIndex] = variant.product_attributes;
+                    console.log(`Loaded ${variant.product_attributes.length} attributes for variant index ${variantIndex}`);
+                }
+            }
         });
 
         // Load variant images if available
@@ -366,6 +408,12 @@ function removeValue(optionId, valueIndex) {
         const row = document.querySelector(`tr[data-variant-index="${index}"]`);
         const variantId = row ? row.getAttribute('data-variant-id') : '';
 
+        // Get product_attributes from existingVariantData or variantAttributesData
+        const existingData = existingVariantData[signature] || {};
+        const productAttrs = (typeof variantAttributesData !== 'undefined' && variantAttributesData[index])
+            ? variantAttributesData[index]
+            : (existingData.product_attributes || []);
+
         variantBackup[signature] = {
             images: images ? JSON.parse(JSON.stringify(images)) : null, // Deep copy images
             price: priceInput ? priceInput.value : '',
@@ -373,7 +421,8 @@ function removeValue(optionId, valueIndex) {
             sku: skuInput ? skuInput.value : '',
             barcode: barcodeInput ? barcodeInput.value : '',
             featured: featuredInput ? featuredInput.checked : true,
-            variant_id: variantId
+            variant_id: variantId,
+            product_attributes: productAttrs
         };
     });
 
@@ -418,6 +467,7 @@ function removeValue(optionId, valueIndex) {
                 sku: backup.sku,
                 barcode: backup.barcode,
                 featured: backup.featured,
+                product_attributes: backup.product_attributes || [],
                 images: backup.images ? backup.images.images : []
             };
         }
@@ -509,6 +559,49 @@ let deletedVariantIndices = new Set();
 // Update variant table with combinations
 function updateVariantTable() {
     console.log('updateVariantTable called');
+
+    // BACKUP: Save current variant data before regenerating combinations
+    const variantBackup = {};
+
+    if (allCombinations && allCombinations.length > 0) {
+        allCombinations.forEach((combo, index) => {
+            if (deletedVariantIndices.has(index)) return;
+
+            const signature = createVariantSignature(combo);
+
+            // Read current form values
+            const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
+            const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
+            const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
+            const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
+            const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
+
+            const attrKey = Object.entries(combo)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, val]) => `${key}:${val}`)
+                .join('|');
+            const existingData = existingVariantData[attrKey] || {};
+
+            // Get product_attributes from variantAttributesData (modal edits) or existingVariantData (backend)
+            const productAttrs = (typeof variantAttributesData !== 'undefined' && variantAttributesData[index])
+                ? variantAttributesData[index]
+                : (existingData.product_attributes || []);
+
+            variantBackup[signature] = {
+                price: priceInput?.value || existingData.price || '',
+                quantity: quantityInput?.value || existingData.quantity || '',
+                sku: skuInput?.value || existingData.sku || '',
+                barcode: barcodeInput?.value || existingData.barcode || '',
+                featured: featuredInput ? featuredInput.checked : (existingData.featured !== false),
+                variant_id: existingData.variant_id || '',
+                product_attributes: productAttrs,
+                images: variantImages[index] ? { ...variantImages[index] } : (existingData.images ? { images: existingData.images, primaryIndex: 0 } : null)
+            };
+        });
+    }
+
+    console.log('Backed up', Object.keys(variantBackup).length, 'variants');
+
     allCombinations = generateCombinations();
     console.log('Generated', allCombinations.length, 'combinations');
 
@@ -527,6 +620,75 @@ function updateVariantTable() {
         toggleProductImagesSection();
         return;
     }
+
+    // RESTORE: Map backed up data to new combinations by signature
+    // Track which backups have been used to prevent duplicates
+    const usedBackups = new Set();
+
+    allCombinations.forEach((combo, newIndex) => {
+        const newSignature = createVariantSignature(combo);
+
+        // Try exact match first
+        let backup = variantBackup[newSignature];
+        let matchedSignature = newSignature;
+
+        // If no exact match, try to find a backup whose signature is a subset of the new signature
+        if (!backup) {
+            for (const [oldSignature, oldBackup] of Object.entries(variantBackup)) {
+                // Skip if already used
+                if (usedBackups.has(oldSignature)) continue;
+
+                // Check if old signature is a subset of new signature
+                // e.g., "color:white" is subset of "color:white|size:s"
+                const oldParts = oldSignature.split('|');
+                const newParts = newSignature.split('|');
+
+                const isSubset = oldParts.every(oldPart => newParts.includes(oldPart));
+
+                if (isSubset) {
+                    backup = oldBackup;
+                    matchedSignature = oldSignature;
+                    break; // Use first match only
+                }
+            }
+        }
+
+        if (backup) {
+            // Mark this backup as used
+            usedBackups.add(matchedSignature);
+
+            // Restore to existingVariantData so renderVariantTable picks it up
+            const attrKey = Object.entries(combo)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, val]) => `${key}:${val}`)
+                .join('|');
+
+            existingVariantData[attrKey] = {
+                variant_id: backup.variant_id,
+                price: backup.price,
+                quantity: backup.quantity,
+                sku: backup.sku,
+                barcode: backup.barcode,
+                featured: backup.featured,
+                product_attributes: backup.product_attributes || [],
+                images: backup.images?.images || []
+            };
+
+            // Also update variantAttributesData for modal to pick up
+            if (backup.product_attributes && backup.product_attributes.length > 0) {
+                if (typeof variantAttributesData !== 'undefined') {
+                    variantAttributesData[newIndex] = backup.product_attributes;
+                }
+            }
+
+            // Restore images
+            if (backup.images) {
+                variantImages[newIndex] = backup.images;
+            }
+
+            console.log(`Restored data for variant ${newIndex} (${newSignature}) from backup (${matchedSignature})`);
+        }
+    });
 
     console.log('Showing table with', allCombinations.length, 'combinations');
     table.style.display = 'table';
@@ -564,7 +726,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
     displayOptions.forEach(name => {
         tableHTML += `<th>${name.toUpperCase()}</th>`;
     });
-    tableHTML += '<th>PRICE</th><th>STOCK</th><th>PHOTO</th><th>SKU</th><th>BARCODE</th><th>FEATURED</th></tr></thead><tbody>';
+    tableHTML += '<th>PRICE</th><th>STOCK</th><th>PHOTO</th><th>SKU</th><th>BARCODE</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
 
     // If grouping is selected, create hierarchical structure
     if (selectedGrouping) {
@@ -607,6 +769,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
             // Group header row (collapsible)
             const groupId = `group_${groupValue.replace(/\s+/g, '_')}`;
             const variantCount = variants.filter(v => !deletedVariantIndices.has(v.originalIndex)).length;
+            const extraColsCount = 6; // barcode, sku, photo, stock, featured, attributes
             tableHTML += `
                 <tr class="group_header_row" style="background: #f3f4f6; font-weight: 600; cursor: pointer;" onclick="toggleGroupCollapse('${groupId}')">
                     <td>
@@ -619,7 +782,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                         </div>
                     </td>
                     <td id="price_range_${groupId}">${priceRange}</td>
-                    <td colspan="5"></td>
+                    <td colspan="${extraColsCount}"></td>
                 </tr>
             `;
 
@@ -636,6 +799,9 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
                 const existingData = existingVariantData[attrKey] || {};
                 const variantId = existingData.variant_id || '';
+
+                // Get existing product attributes for this variant
+                const variantProductAttrs = existingData.product_attributes || [];
 
                 tableHTML += `<tr class="variant_row ${groupId}" data-variant-index="${originalIndex}" data-variant-id="${variantId}" style="background: white;">`;
                 tableHTML += `<td style="padding-left: 30px;"><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${originalIndex}, event)" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
@@ -670,20 +836,29 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                 const variantImagesHtml = renderVariantImages(originalIndex);
 
                 tableHTML += `
-                    <td><input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" oninput="updateGroupPriceRange('${groupId}')"></td>
-                    <td><input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
-                    <td>
-                        <button type="button" class="photo_picker_btn" onclick="openImagePicker(${originalIndex})" title="Select images">
-                            <i class="fa fa-camera"></i>
-                        </button>
-                        <div class="variant_images_preview" id="variant_images_${originalIndex}">
-                            ${variantImagesHtml}
-                        </div>
-                    </td>
-                    <td><input type="text" name="variant_sku_${originalIndex + 1}" value="${sku}" style="min-width: 120px;"></td>
-                    <td><input type="text" name="variant_barcode_${originalIndex + 1}" value="${barcode}" style="min-width: 120px;"></td>
-                    <td style="text-align: center;"><input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}></td>
-                </tr>`;
+                <td><input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" oninput="updateGroupPriceRange('${groupId}')"></td>
+                <td><input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
+                <td>
+                    <button type="button" class="photo_picker_btn" onclick="openImagePicker(${originalIndex})" title="Select images">
+                        <i class="fa fa-camera"></i>
+                    </button>
+                    <div class="variant_images_preview" id="variant_images_${originalIndex}">
+                        ${variantImagesHtml}
+                    </div>
+                </td>
+                <td><input type="text" name="variant_sku_${originalIndex + 1}" value="${sku}" style="min-width: 120px;"></td>
+                <td><input type="text" name="variant_barcode_${originalIndex + 1}" value="${barcode}" style="min-width: 120px;"></td>
+                <td style="text-align: center;"><input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}></td>
+                <td style="text-align: center;">
+                    <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${originalIndex}, '${sku}')" 
+                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);"
+                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.3)'"
+                            onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.2)'">
+                        <i class="fa fa-tags"></i>
+                        <span class="attr-count" id="attr_count_${originalIndex}">${variantProductAttrs.length}</span>
+                    </button>
+                </td>
+            </tr>`;
             });
         });
     } else {
@@ -700,6 +875,9 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             const existingData = existingVariantData[attrKey] || {};
             const variantId = existingData.variant_id || '';
+
+            // Get existing product attributes for this variant
+            const variantProductAttrs = existingData.product_attributes || [];
 
             tableHTML += `<tr data-variant-index="${index}" data-variant-id="${variantId}"><td><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${index}, event)" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
 
@@ -746,6 +924,15 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                 <td><input type="text" name="variant_sku_${index + 1}" value="${sku}" style="min-width: 120px;"></td>
                 <td><input type="text" name="variant_barcode_${index + 1}" value="${barcode}" style="min-width: 120px;"></td>
                 <td style="text-align: center;"><input type="checkbox" name="variant_featured_${index + 1}" ${featured ? 'checked' : ''}></td>
+                <td style="text-align: center;">
+                    <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${index}, '${sku}')" 
+                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);"
+                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.3)'"
+                            onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.2)'">
+                        <i class="fa fa-tags"></i>
+                        <span class="attr-count" id="attr_count_${index}">${variantProductAttrs.length}</span>
+                    </button>
+                </td>
             </tr>`;
         });
     }
@@ -856,10 +1043,8 @@ function initVariantSortable(variantIndex) {
     const container = document.getElementById(`variant_images_${variantIndex}`);
     if (!container) return;
 
-    // Set flex layout
-    container.style.display = 'flex';
-    container.style.flexWrap = 'wrap';
-    container.style.gap = '8px';
+    // Use CSS grid layout for 2-column display (defined in variant_form.css)
+    // Do not override with flex - CSS handles the layout
     container.style.marginTop = '5px';
 
     // Desktop: SortableJS, Mobile: Custom drag (same as main product)
@@ -1618,6 +1803,24 @@ function prepareVariantsForSubmission() {
             variant_barcode: barcodeInput ? barcodeInput.value : '',
             variant_featured: featuredInput ? featuredInput.checked : true,
         };
+
+        // Add product attributes for this variant from variantAttributesData
+        // variantAttributesData is populated by the variant attributes modal (variant_attributes_modal.js)
+        if (typeof variantAttributesData !== 'undefined' && variantAttributesData[index] && variantAttributesData[index].length > 0) {
+            variantData.product_attributes = variantAttributesData[index];
+            console.log(`  ✅ Added ${variantAttributesData[index].length} product attributes to variant ${index}`);
+        } else {
+            // Also check existingVariantData for attributes that were loaded from backend
+            const attrKey = Object.entries(combo)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, val]) => `${key}:${val}`)
+                .join('|');
+            const existingData = existingVariantData[attrKey] || {};
+            if (existingData.product_attributes && existingData.product_attributes.length > 0) {
+                variantData.product_attributes = existingData.product_attributes;
+                console.log(`  ✅ Added ${existingData.product_attributes.length} existing product attributes to variant ${index}`);
+            }
+        }
 
         // Add image information
         if (hasImages) {

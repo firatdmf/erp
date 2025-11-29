@@ -39,13 +39,21 @@ class ProductForm(forms.ModelForm):
         # default is false, passed through the views.
         is_update = kwargs.pop("is_update", False)
         super(ProductForm, self).__init__(*args, **kwargs)
+        
+        # Fix cursor issues by ensuring querysets are properly evaluated
+        # Force fresh queryset for supplier to avoid stale cursor references
+        if 'supplier' in self.fields:
+            self.fields['supplier'].queryset = Supplier.objects.all()
+        
         # If the instance has variants, set the has_variants field to True
         if self.instance and self.instance.pk:
-            if is_update and self.instance.variants.exists():
+            # Use count() instead of exists() to avoid cursor issues
+            if is_update and self.instance.variants.count() > 0:
                 self.fields["has_variants"].initial = True
+            # Force evaluation of queryset to prevent cursor issues
             self.fields["primary_image"].queryset = ProductFile.objects.filter(
                 product=self.instance
-            )
+            ).all()
         else:
             # For new products, show empty queryset
             self.fields["primary_image"].queryset = ProductFile.objects.none()

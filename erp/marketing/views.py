@@ -110,7 +110,11 @@ class ProductDetail(generic.DetailView):
             Prefetch(
                 'variants__product_variant_attribute_values',
                 queryset=ProductVariantAttributeValue.objects.select_related('product_variant_attribute')
-            )
+            ),
+            # Prefetch variant product attributes (ProductAttribute model)
+            'variants__attributes',
+            # Prefetch product-level attributes
+            'attributes'
         )
         
         query_time = time.time() - query_start
@@ -186,6 +190,36 @@ class BaseProductView(ModelFormMixin):
         if formset.is_valid():
             formset.instance = product
             formset.save()
+    
+    def handle_attributes(self, product):
+        """
+        Handle Product Attributes from POST data
+        Expects: attribute_names[] and attribute_values[] arrays
+        """
+        from marketing.models import ProductAttribute
+        
+        attribute_names = self.request.POST.getlist('attribute_names[]')
+        attribute_values = self.request.POST.getlist('attribute_values[]')
+        
+        if not attribute_names:
+            # No attributes submitted, clear existing
+            product.attributes.all().delete()
+            print("🗑️ Cleared all product attributes (none submitted)")
+            return
+        
+        # Delete all existing attributes for clean slate
+        product.attributes.all().delete()
+        
+        # Create new attributes
+        for idx, (name, value) in enumerate(zip(attribute_names, attribute_values)):
+            if name.strip() and value.strip():  # Skip empty entries
+                ProductAttribute.objects.create(
+                    product=product,
+                    name=name.strip(),
+                    value=value.strip(),
+                    sequence=idx
+                )
+                print(f"✅ Created attribute: {name} = {value}")
 
     def handle_variants(self, product, variants_json):
         """
@@ -420,7 +454,7 @@ class BaseProductView(ModelFormMixin):
         changed_fields = set()  # Track which fields actually changed
         
         # Fields that are not part of the model (form-only fields)
-        non_model_fields = {"variant_sku", "variant_attribute_values", "variant_images", "primary_image_index"}
+        non_model_fields = {"variant_sku", "variant_attribute_values", "variant_images", "primary_image_index", "product_attributes"}
         
         for variant_data in variants_data:
             variant_sku = variant_data.get("variant_sku")
@@ -440,6 +474,10 @@ class BaseProductView(ModelFormMixin):
                         setattr(variant, key, value)
                         changed_fields.add(key)
                         has_changes = True
+                elif key == "product_attributes":
+                    # Track that we have product attributes to process later
+                    # but don't add to model fields
+                    pass
             
             # Only add to update list if something changed
             if has_changes:
@@ -495,6 +533,40 @@ class BaseProductView(ModelFormMixin):
             ThroughModel.objects.bulk_create(m2m_entries, ignore_conflicts=True)
         
         print(f"  ✓ Set M2M relationships ({len(m2m_entries)} entries): {time.time() - attr_bulk_start:.3f}s")
+        
+        # Handle Product Attributes for variants (variant-specific attribute values)
+        variant_attr_start = time.time()
+        from marketing.models import ProductAttribute
+        
+        for variant_data in variants_data:
+            variant_sku = variant_data.get("variant_sku")
+            if not variant_sku:
+                continue
+            
+            variant = existing_variants_dict.get(variant_sku)
+            if not variant:
+                continue
+            
+            # Get variant's product attributes (if provided)
+            variant_product_attrs = variant_data.get("product_attributes", [])
+            
+            # Clear existing variant attributes
+            variant.attributes.all().delete()
+            
+            # Create new attributes for this variant
+            if variant_product_attrs:
+                for idx, attr_data in enumerate(variant_product_attrs):
+                    attr_name = attr_data.get("name", "").strip()
+                    attr_value = attr_data.get("value", "").strip()
+                    if attr_name and attr_value:
+                        ProductAttribute.objects.create(
+                            product_variant=variant,
+                            name=attr_name,
+                            value=attr_value,
+                            sequence=idx
+                        )
+        
+        print(f"  ✓ Handled variant product attributes: {time.time() - variant_attr_start:.3f}s")
         
         # Pre-fetch all unlinked files (uploaded but not assigned to variants) - ONCE
         all_image_ids = set()
@@ -841,6 +913,9 @@ class ProductCreate(BaseProductView, generic.CreateView):
             context = self.get_context_data()
             self.save_product_files(self.object, context["productfile_formset"])
 
+            # Handle product attributes
+            self.handle_attributes(self.object)
+
             # Use updated variants_json_str (with temp IDs replaced) or original
             if not variants_json_str:
                 variants_json_str = self.request.POST.get("variants_json", "[]")
@@ -898,14 +973,19 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             Prefetch(
                 'variants__product_variant_attribute_values',
                 queryset=ProductVariantAttributeValue.objects.select_related('product_variant_attribute')
-            )
+            ),
+            # Prefetch variant product attributes (ProductAttribute model)
+            'variants__attributes',
+            # Prefetch product-level attributes
+            'attributes'
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["is_update"] = True
-        # Pass variants as list to cache - prefetch is already done in get_queryset()
-        context["variants"] = list(self.object.variants.all())  # Force evaluation and cache
+        # Variants are already prefetched in get_queryset(), no need to force evaluation
+        # Forcing evaluation with list() can cause cursor issues
+        context["variants"] = self.object.variants.all()
         return context
 
     # # This sends data to the form.
@@ -999,6 +1079,11 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             formset_start = time.time()
             self.save_product_files(self.object, context["productfile_formset"])
             print(f"⏱️  Save product files formset: {time.time() - formset_start:.3f}s")
+
+            # Handle product attributes
+            attr_start = time.time()
+            self.handle_attributes(self.object)
+            print(f"⏱️  Handle attributes: {time.time() - attr_start:.3f}s")
 
             variants_json = self.request.POST.get("variants_json", "[]")
             # Always process variants (needed for image changes)
@@ -1605,6 +1690,86 @@ def cleanup_temp_files(request):
 
 @require_http_methods(["POST"])
 @login_required
+def save_product_attributes(request):
+    """
+    HTMX endpoint to save product attributes instantly.
+    Expects JSON: {"product_id": 123, "attributes": [{"name": "...", "value": "..."}, ...]}
+    Returns updated attributes list as JSON for frontend sync.
+    """
+    from marketing.models import ProductAttribute
+    
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        attributes = data.get('attributes', [])
+        
+        if not product_id:
+            return JsonResponse({'success': False, 'error': 'Missing product_id'}, status=400)
+        
+        # Get product
+        try:
+            product = Product.objects.get(pk=product_id)
+        except Product.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Product not found'}, status=404)
+        
+        # Delete all existing attributes
+        product.attributes.all().delete()
+        
+        # Create new attributes
+        created_attrs = []
+        for idx, attr_data in enumerate(attributes):
+            name = attr_data.get('name', '').strip()
+            value = attr_data.get('value', '').strip()
+            if name and value:
+                attr = ProductAttribute.objects.create(
+                    product=product,
+                    name=name,
+                    value=value,
+                    sequence=idx
+                )
+                created_attrs.append({'id': attr.id, 'name': attr.name, 'value': attr.value})
+        
+        return JsonResponse({
+            'success': True,
+            'attributes': created_attrs,
+            'message': f'Saved {len(created_attrs)} attributes'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+@login_required
+def get_product_attributes(request):
+    """
+    Get product attributes as JSON.
+    Used by variant attributes modal to fetch latest attributes.
+    """
+    from marketing.models import ProductAttribute
+    
+    product_id = request.GET.get('product_id')
+    
+    if not product_id:
+        return JsonResponse({'success': False, 'error': 'Missing product_id'}, status=400)
+    
+    try:
+        product = Product.objects.get(pk=product_id)
+    except Product.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Product not found'}, status=404)
+    
+    attributes = list(product.attributes.all().order_by('sequence').values('id', 'name', 'value'))
+    
+    return JsonResponse({
+        'success': True,
+        'attributes': attributes
+    })
+
+
+@require_http_methods(["POST"])
+@login_required
 def update_variant_image_order(request):
     """
     Lightweight AJAX endpoint to update variant image order without full form processing.
@@ -1803,6 +1968,37 @@ def get_products(request):
     else:
         products = Product.objects.filter(featured=True)
 
+    # Dynamic Attribute Filtering
+    # Iterate over GET parameters to find attribute filters
+    for key, value in request.GET.items():
+        # Skip reserved keys that are not attributes
+        if key in ['product_category', 'page', 'limit', 'sort', 'search']:
+            continue
+            
+        # Filter products where ANY variant has the specified attribute value
+        # We use iexact for case-insensitive matching
+        if value and value.strip():
+            print(f"🔍 Filtering by {key}={value}")
+            from django.db.models import Q
+            
+            # Debug: Check if any product has this attribute
+            has_attr = Product.objects.filter(attributes__name__iexact=key, attributes__value__iexact=value).exists()
+            print(f"   - ProductAttribute match exists? {has_attr}")
+            
+            has_variant_attr = Product.objects.filter(
+                variants__product_variant_attribute_values__product_variant_attribute__name__iexact=key,
+                variants__product_variant_attribute_values__product_variant_attribute_value__iexact=value
+            ).exists()
+            print(f"   - VariantAttribute match exists? {has_variant_attr}")
+
+            products = products.filter(
+                Q(variants__product_variant_attribute_values__product_variant_attribute__name__iexact=key,
+                  variants__product_variant_attribute_values__product_variant_attribute_value__iexact=value) |
+                Q(attributes__name__iexact=key,
+                  attributes__value__iexact=value)
+            ).distinct()
+            print(f"   - Products count after filter: {products.count()}")
+
     # Optimize: prefetch all related data in a single query chain
     products = products.select_related("primary_image", "category").prefetch_related(
         'variants',
@@ -1942,8 +2138,10 @@ def get_product(request):
             'supplier'
         ).prefetch_related(
             models.Prefetch('files', queryset=ProductFile.objects.order_by('sequence', 'pk')),
+            'attributes',  # Product-level attributes
             'variants',
             models.Prefetch('variants__files', queryset=ProductFile.objects.order_by('sequence', 'pk')),
+            'variants__attributes',  # Variant-level attributes
             'variants__product_variant_attribute_values',
             'variants__product_variant_attribute_values__product_variant_attribute'
         ).get(sku=product_sku, featured=True)
@@ -2060,6 +2258,30 @@ def get_product(request):
         }
         for attr in attributes_map.values()
     ]
+    
+    # Product-level attributes (ProductAttribute model)
+    product_attributes_data = [
+        {
+            "id": attr.id,
+            "name": attr.name,
+            "value": attr.value,
+            "sequence": attr.sequence,
+        }
+        for attr in product.attributes.all()
+    ]
+    
+    # Variant-level attributes (ProductAttribute model for variants)
+    variant_attributes_data = []
+    for variant in variants:
+        for attr in variant.attributes.all():
+            variant_attributes_data.append({
+                "id": attr.id,
+                "variant_id": variant.id,
+                "name": attr.name,
+                "value": attr.value,
+                "sequence": attr.sequence,
+            })
+    
     # print("here comes the response")
     # print(product_files)
     # print(
@@ -2081,5 +2303,7 @@ def get_product(request):
             "product_files": product_files,
             "product_variant_attributes": attributes_data,
             "product_variant_attribute_values": attribute_values_data,
+            "product_attributes": product_attributes_data,  # Product-level attributes
+            "variant_attributes": variant_attributes_data,  # Variant-level attributes
         }
     )

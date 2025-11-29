@@ -39,6 +39,15 @@ def variant_form(variants, product, current_url):
             }
             # Removed debug print for performance
 
+            # Get product attributes for this variant
+            variant_product_attrs = []
+            if hasattr(variant, 'attributes'):
+                for attr in variant.attributes.all():
+                    variant_product_attrs.append({
+                        "name": attr.name,
+                        "value": attr.value
+                    })
+            
             # Build the variant dict
             product_variant_list.append(
                 {
@@ -49,6 +58,7 @@ def variant_form(variants, product, current_url):
                     "variant_quantity": variant.variant_quantity,
                     "variant_barcode": variant.variant_barcode,
                     "variant_featured": variant.variant_featured,
+                    "product_attributes": variant_product_attrs,
                 }
             )
 
@@ -98,6 +108,17 @@ def variant_form(variants, product, current_url):
         product_variant_options = json.dumps({}, cls=DecimalEncoder)
         variant_files_json = json.dumps({}, cls=DecimalEncoder)
 
+    # Get product-level attributes
+    product_attributes = []
+    if product and hasattr(product, 'attributes'):
+        for attr in product.attributes.all():
+            product_attributes.append({
+                "name": attr.name,
+                "value": attr.value
+            })
+    
+    product_attributes_json = json.dumps(product_attributes, cls=DecimalEncoder)
+    
     tag_time = time.time() - tag_start
     if tag_time > 0.1:
         print(f"⚠️  variant_form tag took {tag_time:.4f}s")
@@ -109,6 +130,7 @@ def variant_form(variants, product, current_url):
             "product_variant_list": mark_safe(product_variant_list),
             "product_variant_options": mark_safe(product_variant_options),
             "variant_files_json": mark_safe(variant_files_json),
+            "product_attributes": mark_safe(product_attributes_json),
         },
     )
 

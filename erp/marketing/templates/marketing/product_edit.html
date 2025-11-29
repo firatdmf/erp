@@ -3,55 +3,56 @@
 {% load marketing_tags %}
 
 {% block css %}
-  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
+<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}" />
 {% endblock %}
 {% block content %}
-  <div class="ProductUpdatePage">
-    <h1>Edit Product Form</h1>
-    <form method="post" enctype="multipart/form-data" id="product_form" action="{% url 'marketing:product_edit' product.pk %}">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-      {{ form.as_p }} {# Render each form field as a paragraph #}
+<div class="ProductUpdatePage">
+  <h1>Edit Product Form</h1>
+  <form method="post" enctype="multipart/form-data" id="product_form"
+    action="{% url 'marketing:product_edit' product.pk %}">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {{ form.as_p }} {# Render each form field as a paragraph #}
 
-      <div id="product_files_form">
-        <h2>Product Files</h2>
-        {{ productfile_formset.management_form }}
-        <div id="productfile-forms">
-          {% for form in productfile_formset %}
-            {{ form.errors }}
-            <div class="productfile-form">{{ form.as_p }}</div>
-          {% endfor %}
-        </div>
-        <button type="button" id="add-productfile-form">Add Another File</button>
+    <div id="product_files_form">
+      <h2>Product Files</h2>
+      {{ productfile_formset.management_form }}
+      <div id="productfile-forms">
+        {% for form in productfile_formset %}
+        {{ form.errors }}
+        <div class="productfile-form">{{ form.as_p }}</div>
+        {% endfor %}
       </div>
+      <button type="button" id="add-productfile-form">Add Another File</button>
+    </div>
 
-      {% variant_form current_url=request.path product=product variants=variants %}
-      <button type="submit" id="form_submit_button">Submit</button>
-    </form>
-    <p>{{ form.errors }}</p>
-    <p>
-      {% if error_message %}
-        <strong>{{ error_message }}</strong>
-      {% endif %}
-    </p>
+    {% variant_form current_url=request.path product=product variants=variants %}
+    <button type="submit" id="form_submit_button">Submit</button>
+  </form>
+  <p>{{ form.errors }}</p>
+  <p>
+    {% if error_message %}
+    <strong>{{ error_message }}</strong>
+    {% endif %}
+  </p>
 
-    {% comment %} {% if variants %}
-      <h1>Your variants are listed below</h1>
-      {% for variant in variants %}
-        <ul>
-          <li>{{ variant.variant_sku }}</li>
-        </ul>
-      {% endfor %}
-    {% endif %} {% endcomment %}
-  </div>
-  {% block js %}
-    <script>
-      document.getElementById('add-productfile-form').addEventListener('click', function () {
-        var formIdx = document.querySelectorAll('.productfile-form').length
-        var newForm = document.querySelector('.productfile-form').cloneNode(true)
-        newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx)
-        document.getElementById('productfile-forms').appendChild(newForm)
-      })
-    </script>
-  {% endblock %}
+  {% comment %} {% if variants %}
+  <h1>Your variants are listed below</h1>
+  {% for variant in variants %}
+  <ul>
+    <li>{{ variant.variant_sku }}</li>
+  </ul>
+  {% endfor %}
+  {% endif %} {% endcomment %}
+</div>
+{% block js %}
+<script>
+  document.getElementById('add-productfile-form').addEventListener('click', function () {
+    var formIdx = document.querySelectorAll('.productfile-form').length
+    var newForm = document.querySelector('.productfile-form').cloneNode(true)
+    newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx)
+    document.getElementById('productfile-forms').appendChild(newForm)
+  })
+</script>
+{% endblock %}
 {% endblock %}

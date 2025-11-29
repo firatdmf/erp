@@ -702,10 +702,11 @@ box-shadow: rgba(255,255,255, 0.75) 1.5em 0 0 0, rgba(255,255,255, 0.75) 1.1em 1
 
 /* Variant Images Preview */
 .variant_images_preview {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   margin-top: 8px;
-  flex-wrap: wrap;
+  max-width: 140px;
 }
 
 .variant_thumb {

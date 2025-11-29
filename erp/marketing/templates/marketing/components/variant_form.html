@@ -1,6 +1,6 @@
 {% load static %}
 {% block css %}
-    <link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}" />
+<link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}" />
 {% endblock css %}
 
 <div class="loading" id="loading">Loading&#8230;</div>
@@ -14,25 +14,25 @@
 
 <!-- Variant Options Section (initially hidden) -->
 <div class="variant_component" id="variant_component" style="display: none;">
-    <div class="variant_options_wrapper">
-      <div id="variant_options_list"></div>
-      <button type="button" class="add_option_button" onclick="addNewOption()">
-        <i class="fa fa-plus-circle"></i> Add another option
-      </button>
-    </div>
+  <div class="variant_options_wrapper">
+    <div id="variant_options_list"></div>
+    <button type="button" class="add_option_button" onclick="addNewOption()">
+      <i class="fa fa-plus-circle"></i> Add another option
+    </button>
+  </div>
 
-    <!-- Grouping Selector -->
-    <div class="variant_grouping" id="variant_grouping" style="display: none;">
-      <label>Grouping By</label>
-      <select id="grouping_select" onchange="filterVariantTableByGroup()">
-        <option value="">All variants</option>
-      </select>
-    </div>
+  <!-- Grouping Selector -->
+  <div class="variant_grouping" id="variant_grouping" style="display: none;">
+    <label>Grouping By</label>
+    <select id="grouping_select" onchange="filterVariantTableByGroup()">
+      <option value="">All variants</option>
+    </select>
+  </div>
 
-    <table id="variant_table" style="width: 100%; margin-top: 20px; border-collapse: collapse;"></table>
-    
-    <!-- Hidden input for tracking deleted variant files -->
-    <input type="hidden" id="deleted_variant_files" name="deleted_variant_files" value="">
+  <table id="variant_table" style="width: 100%; margin-top: 20px; border-collapse: collapse;"></table>
+
+  <!-- Hidden input for tracking deleted variant files -->
+  <input type="hidden" id="deleted_variant_files" name="deleted_variant_files" value="">
 
   {% comment %} <p>{{message}}</p> {% endcomment %}
   <script>
@@ -41,18 +41,20 @@
       document.getElementById('add_variant_trigger').style.display = 'none';
       document.getElementById('variant_component').style.display = 'block';
     }
-    
+
     // Set window variables FIRST
     window.my_message = "{{ message }}";
     window.product_variant_list_data = '{{ product_variant_list }}';
     window.product_variant_options_data = '{{ product_variant_options }}';
     window.variant_files_json_data = '{{ variant_files_json }}';
-    
+    window.product_attributes_data = '{{ product_attributes }}';
+
     // Debug logs
     console.log('Variant form loaded');
     console.log('product_variant_list_data:', window.product_variant_list_data);
     console.log('product_variant_options_data:', window.product_variant_options_data);
-    
+    console.log('product_attributes_data:', window.product_attributes_data);
+
     // If editing and variants exist, show variant section automatically
     if (window.product_variant_list_data && window.product_variant_list_data !== '[]' && window.product_variant_list_data !== '') {
       console.log('Showing variant section because variants exist');
@@ -62,4 +64,5 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="{% static 'marketing/js/variant_form_modern.js' %}" defer></script>
+  <script src="{% static 'marketing/js/variant_attributes_modal.js' %}" defer></script>
 </div>

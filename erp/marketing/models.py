@@ -357,6 +357,75 @@ class ProductVariant(models.Model):
 
 # Example: Size and Color Attributes
 # Make this unique and do get or create when creating the product variant
+# ============================================================
+# PRODUCT ATTRIBUTES (Ürün Özellikleri)
+# Kumaş türü, en, boy, kullanım alanı gibi özellikler
+# Hem Product'a hem de ProductVariant'a eklenebilir
+# ============================================================
+class ProductAttribute(models.Model):
+    """
+    Product veya Variant özellikleri
+    Örnek: En: 150cm, Kumaş Türü: Tül, Kullanım: Gelinlik
+    """
+    name = models.CharField(
+        max_length=255, 
+        verbose_name="Özellik Adı",
+        help_text="Örn: En, Kumaş Türü, Kullanım Alanı"
+    )
+    value = models.CharField(
+        max_length=500, 
+        verbose_name="Özellik Değeri",
+        help_text="Örn: 150cm, Tül, Gelinlik"
+    )
+    
+    # Product veya Variant'a bağlanır (ikisinden biri zorunlu)
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="attributes",
+        null=True,
+        blank=True,
+        db_index=True
+    )
+    product_variant = models.ForeignKey(
+        "ProductVariant",
+        on_delete=models.CASCADE,
+        related_name="attributes",
+        null=True,
+        blank=True,
+        db_index=True
+    )
+    
+    # Sıralama için
+    sequence = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['sequence', 'name']
+        verbose_name = "Product Attribute"
+        verbose_name_plural = "Product Attributes"
+        indexes = [
+            models.Index(fields=['product', 'name']),
+            models.Index(fields=['product_variant', 'name']),
+        ]
+    
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        # Product veya Variant'tan biri zorunlu (ikisi birden olamaz)
+        if not self.product and not self.product_variant:
+            raise ValidationError("Product veya Product Variant seçilmeli.")
+        if self.product and self.product_variant:
+            raise ValidationError("Product ve Variant aynı anda seçilemez.")
+    
+    def __str__(self):
+        parent = self.product or self.product_variant
+        return f"{self.name}: {self.value}"
+
+
+# ============================================================
+# VARIANT ATTRIBUTES (Variant Ayırıcılar)
+# Color, Size, Material gibi variant'ları ayıran özellikler
+# ============================================================
 class ProductVariantAttribute(models.Model):
     name = models.CharField(max_length=255, verbose_name="Attribute Name", unique=True)
 

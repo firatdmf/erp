@@ -777,91 +777,52 @@ from django.http import HttpResponse
 
 
 def search_contact(request):
-    search_text = request.POST.get("searchInput")
-    if search_text:
-        # 1. Search Contact fields
-        contact_q = (
-            Q(name__icontains=search_text)
-            | Q(email__icontains=search_text)
-            | Q(phone__icontains=search_text)
-        )
-        contacts = Contact.objects.filter(contact_q)
-
-        # 2. Find Contacts with matching Notes
-        note_contact_ids = Note.objects.filter(
-            contact__isnull=False, content__icontains=search_text
-        ).values_list("contact_id", flat=True)
-
-        # Find Contacts with matching Tasks
-        task_contact_ids = Task.objects.filter(
-            Q(description__icontains=search_text)
-            | Q(name__icontains=search_text) & Q(contact__isnull=False)
-        ).values_list("contact_id", flat=True)
-
-        # 3. Combine Contact IDs
-        all_contact_ids = (
-            set(contacts.values_list("id", flat=True))
-            | set(note_contact_ids)
-            | set(task_contact_ids)
-        )
-        all_contacts = Contact.objects.filter(id__in=all_contact_ids)
-
-        resultsContact = all_contacts.annotate(
-            entry_type=Value("Contact", output_field=CharField())
-        )
-
-        # 4. Company search
-        company_q = (
-            Q(name__icontains=search_text)
-            | Q(email__icontains=search_text)
-            | Q(phone__icontains=search_text)
-        )
-        companies = Company.objects.filter(company_q)
-
-        # 5. Find Companies with matching Notes
-        note_company_ids = Note.objects.filter(
-            company__isnull=False, content__icontains=search_text
-        ).values_list("company_id", flat=True)
-
-        # Find Contacts with matching Tasks
-        task_company_ids = Task.objects.filter(
-            Q(description__icontains=search_text)
-            | Q(name__icontains=search_text) & Q(company__isnull=False)
-        ).values_list("company_id", flat=True)
-
-        all_company_ids = (
-            set(companies.values_list("id", flat=True))
-            | set(note_company_ids)
-            | set(task_company_ids)
-        )
-        all_companies = Company.objects.filter(id__in=all_company_ids)
-
-        resultsCompany = all_companies.annotate(
-            entry_type=Value("Company", output_field=CharField())
-        )
-
-        # 6. Combine and sort results
-        results = sorted(
-            chain(resultsContact, resultsCompany),
-            key=attrgetter("created_at"),
-            reverse=True,
-        )
-
-        response = HttpResponse()
-        for item in results:
-            if item.entry_type == "Contact":
-                url = reverse("crm:contact_detail", args=[item.id])
-                response.write(
-                    f'<a href="{url}"><p><i class="fa fa-user" aria-hidden="true"></i>{item.name}</p></a>'
-                )
-            elif item.entry_type == "Company":
-                url = reverse("crm:company_detail", args=[item.id])
-                response.write(
-                    f'<a href="{url}"><p><i class="fa fa-briefcase" aria-hidden="true"></i>{item.name}</p></a>'
-                )
-        return response
-    else:
+    """Optimized search for contacts and companies with fast response."""
+    search_text = request.POST.get("searchInput", "").strip()
+    
+    if not search_text:
         return HttpResponse("")
+    
+    # Optimize: Use only() to fetch minimal fields, limit results
+    # 1. Fast Contact search - only essential fields
+    contacts = Contact.objects.filter(
+        Q(name__icontains=search_text) |
+        Q(email__icontains=search_text) |
+        Q(phone__icontains=search_text)
+    ).only('id', 'name', 'created_at').order_by('-created_at')[:15]
+    
+    # 2. Fast Company search - only essential fields
+    companies = Company.objects.filter(
+        Q(name__icontains=search_text) |
+        Q(email__icontains=search_text) |
+        Q(phone__icontains=search_text)
+    ).only('id', 'name', 'created_at').order_by('-created_at')[:15]
+    
+    # 3. Combine and sort (already limited, so this is fast)
+    results = sorted(
+        chain(
+            [(c, 'Contact') for c in contacts],
+            [(c, 'Company') for c in companies]
+        ),
+        key=lambda x: x[0].created_at,
+        reverse=True
+    )[:20]  # Limit total results
+    
+    # 4. Build response HTML
+    response = HttpResponse()
+    for item, entry_type in results:
+        if entry_type == "Contact":
+            url = reverse("crm:contact_detail", args=[item.id])
+            response.write(
+                f'<a href="{url}"><i class="fa fa-user" aria-hidden="true"></i><p>{item.name}</p></a>'
+            )
+        else:
+            url = reverse("crm:company_detail", args=[item.id])
+            response.write(
+                f'<a href="{url}"><i class="fa fa-briefcase" aria-hidden="true"></i><p>{item.name}</p></a>'
+            )
+    
+    return response
 
 
 def search_contacts_only(request):

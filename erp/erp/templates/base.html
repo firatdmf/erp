@@ -200,7 +200,7 @@
       </li>
       <li class="nav-item" id="searchButton">
         <a class="nav-link">
-          <i class="fa fa-solid fa-search fa-2x"></i>
+          <i class="fa-solid fa-search fa-2x"></i>
           <span class="link-text" id="searchButton">Search</span>
         </a>
       </li>
@@ -217,12 +217,10 @@
               {% for entry in last_ten_entities %}
               <li>
                 {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
-                {% if entry.entry_type == 'Contact' %}
-                <a href="{% url 'crm:contact_detail' entry.id %}"><i class="fa fa-user" aria-hidden="true"></i> {{
-                  entry.name }} - {{ entry.created_at }}</a>
+              {% if entry.entry_type == 'Contact' %}
+                <a href="{% url 'crm:contact_detail' entry.id %}"><i class="fas fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}</a>
                 {% elif entry.entry_type == 'Company' %}
-                <a href="{% url 'crm:company_detail' entry.id %}"><i class="fa fa-briefcase" aria-hidden="true"></i> {{
-                  entry.name }} - {{ entry.created_at }}</a>
+                <a href="{% url 'crm:company_detail' entry.id %}"><i class="fas fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}</a>
                 {% endif %}
               </li>
               {% endfor %}
@@ -233,12 +231,12 @@
 
       <li class="nav-item" id="addButton">
         <a href="#add" class="nav-link">
-          <i class="fa fa-plus fa-2x" aria-hidden="true"></i>
+          <i class="fas fa-plus fa-2x" aria-hidden="true"></i>
           <span class="link-text">Add</span>
         </a>
         <div id="addExpanded">
           <div class="add-menu-header">
-            <i class="fa fa-plus-circle" aria-hidden="true"></i>
+            <i class="fas fa-plus-circle" aria-hidden="true"></i>
             <h2>Add new records</h2>
           </div>
           <div class="add-menu-section">
@@ -246,31 +244,31 @@
             <ul>
               <li>
                 <a href="#" onclick="openMainContactSidebar(); return false;">
-                  <i class="fa fa-user" aria-hidden="true"></i>
+                  <i class="fas fa-user" aria-hidden="true"></i>
                   <span>Contact</span>
                 </a>
               </li>
               <li>
                 <a href="#" onclick="openCompanySidebar(); return false;">
-                  <i class="fa fa-building" aria-hidden="true"></i>
+                  <i class="fas fa-building" aria-hidden="true"></i>
                   <span>Company</span>
                 </a>
               </li>
               <li>
                 <a href="#" onclick="openTaskSidebar(); return false;">
-                  <i class="fa fa-check-circle" aria-hidden="true"></i>
+                  <i class="fas fa-check-circle" aria-hidden="true"></i>
                   <span>Task</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'marketing:product_create' %}">
-                  <i class="fa fa-tag" aria-hidden="true"></i>
+                  <i class="fas fa-tag" aria-hidden="true"></i>
                   <span>Product</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'operating:create_order' %}">
-                  <i class="fa fa-shopping-cart" aria-hidden="true"></i>
+                  <i class="fas fa-shopping-cart" aria-hidden="true"></i>
                   <span>Order</span>
                 </a>
               </li>
@@ -283,32 +281,32 @@
       </li>
       <li class="nav-item">
         <a href="{% url 'index' %}" class="nav-link">
-          <i class="fa fa-home fa-2x" aria-hidden="true"></i>
-          {% comment %} <i class="fa fa-table-columns fa-2x" aria-hidden="true"></i> {% endcomment %}
+          <i class="fas fa-home fa-2x" aria-hidden="true"></i>
+          {% comment %} <i class="fas fa-table-columns fa-2x" aria-hidden="true"></i> {% endcomment %}
           <span class="link-text">Home</span>
         </a>
       </li>
       {% comment %} <li class="nav-item">
         <a href="{% url 'crm:index' %}" class="nav-link">
-          <i class="fa fa-users fa-2x" aria-hidden="true"></i>
+          <i class="fas fa-users fa-2x" aria-hidden="true"></i>
           <span class="link-text">Contacts</span>
         </a>
       </li> {% endcomment %}
       <li class="nav-item">
         <a href="{% url 'accounting:index' %}" class="nav-link">
-          <i class="fa fa-money fa-2x" aria-hidden="true"></i>
+          <i class="fa-solid fa-money-bill fa-2x" aria-hidden="true"></i>
           <span class="link-text">Accounting</span>
         </a>
       </li>
       <li class="nav-item" id="marketingButton">
         <a href="#marketing" class="nav-link">
-          {% comment %} <i class="fa fa-cogs fa-2x" aria-hidden="true"></i> {% endcomment %}
-          <i class="fa fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
+          {% comment %} <i class="fas fa-cogs fa-2x" aria-hidden="true"></i> {% endcomment %}
+          <i class="fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
           <span class="link-text">Marketing</span>
         </a>
         <div id="marketingExpanded">
           <div class="add-menu-header">
-            <i class="fa fa-bullseye" aria-hidden="true"></i>
+            <i class="fas fa-bullseye" aria-hidden="true"></i>
             <h2>Marketing</h2>
           </div>
           <div class="add-menu-section">
@@ -316,13 +314,13 @@
             <ul>
               <li>
                 <a href="{% url 'marketing:product_create' %}">
-                  <i class="fa fa-plus-circle" aria-hidden="true"></i>
+                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
                   <span>Create Product</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'marketing:product_list' %}">
-                  <i class="fa fa-list" aria-hidden="true"></i>
+                  <i class="fas fa-list" aria-hidden="true"></i>
                   <span>Product List</span>
                 </a>
               </li>
@@ -333,13 +331,13 @@
             <ul>
               <li>
                 <a href="{% url 'crm:company_list' %}">
-                  <i class="fa fa-building" aria-hidden="true"></i>
+                  <i class="fas fa-building" aria-hidden="true"></i>
                   <span>Companies</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'crm:contact_list' %}">
-                  <i class="fa fa-users" aria-hidden="true"></i>
+                  <i class="fas fa-users" aria-hidden="true"></i>
                   <span>Contacts</span>
                 </a>
               </li>
@@ -349,12 +347,12 @@
       </li>
       <li class="nav-item" id="operatingButton">
         <a href="#operating" class="nav-link">
-          <i class="fa fa-cogs fa-2x" aria-hidden="true"></i>
+          <i class="fas fa-cogs fa-2x" aria-hidden="true"></i>
           <span class="link-text">Operating</span>
         </a>
         <div id="operatingExpanded">
           <div class="add-menu-header">
-            <i class="fa fa-cogs" aria-hidden="true"></i>
+            <i class="fas fa-cogs" aria-hidden="true"></i>
             <h2>Operating</h2>
           </div>
           <div class="add-menu-section">
@@ -362,13 +360,13 @@
             <ul>
               <li>
                 <a href="{% url 'operating:scan_order_item_unit' %}">
-                  <i class="fa fa-qrcode" aria-hidden="true"></i>
+                  <i class="fas fa-qrcode" aria-hidden="true"></i>
                   <span>QR Scan</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'operating:scan_order_item_unit_pack' %}">
-                  <i class="fa fa-box" aria-hidden="true"></i>
+                  <i class="fa-solid fa-box" aria-hidden="true"></i>
                   <span>QR Scan Pack</span>
                 </a>
               </li>
@@ -379,19 +377,19 @@
             <ul>
               <li>
                 <a href="{% url 'operating:create_raw_material_good' %}">
-                  <i class="fa fa-cube" aria-hidden="true"></i>
+                  <i class="fas fa-cube" aria-hidden="true"></i>
                   <span>Create Raw Material Good</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'operating:create_raw_material_good_receipt' %}">
-                  <i class="fa fa-file-text" aria-hidden="true"></i>
+                  <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
                   <span>Create Raw Material Good Receipt</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'operating:create_raw_material_good_item' %}">
-                  <i class="fa fa-plus-square" aria-hidden="true"></i>
+                  <i class="fas fa-plus-square" aria-hidden="true"></i>
                   <span>Create Raw Material Good Item</span>
                 </a>
               </li>
@@ -402,13 +400,13 @@
             <ul>
               <li>
                 <a href="{% url 'operating:create_order' %}">
-                  <i class="fa fa-plus-circle" aria-hidden="true"></i>
+                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
                   <span>Create Order</span>
                 </a>
               </li>
               <li>
                 <a href="{% url 'operating:order_list' %}">
-                  <i class="fa fa-list" aria-hidden="true"></i>
+                  <i class="fas fa-list" aria-hidden="true"></i>
                   <span>Order List</span>
                 </a>
               </li>
@@ -418,13 +416,13 @@
       </li>
       <li class="nav-item">
         <a href="{% url 'email_automation:dashboard' %}" class="nav-link">
-          <i class="fa fa-envelope fa-2x" aria-hidden="true"></i>
+          <i class="fas fa-envelope fa-2x" aria-hidden="true"></i>
           <span class="link-text">Mail</span>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'reports' %}" class="nav-link">
-          <i class="fa fa-solid fa-paste fa-2x"></i>
+          <i class="fa-solid fa-paste fa-2x"></i>
           <span class="link-text">Reports</span>
         </a>
       </li>
@@ -446,11 +444,11 @@
         </div>
         <div class="header-right">
           <a href="{% url 'user_settings' %}" class="header-link">
-            <i class="fa fa-wrench" aria-hidden="true"></i>
+            <i class="fas fa-wrench" aria-hidden="true"></i>
             <span>Settings</span>
           </a>
           <a href="{% url 'authentication:signout' %}" class="header-link">
-            <i class="fa fa-sign-out" aria-hidden="true"></i>
+            <i class="fas fa-sign-out" aria-hidden="true"></i>
             <span>Sign Out</span>
           </a>
         </div>
@@ -495,10 +493,10 @@
     <div class="sidebar-modal" onclick="event.stopPropagation();">
       <div class="sidebar-header">
         <button class="sidebar-close" onclick="closeTaskSidebar()">
-          <i class="fa fa-times"></i> Close
+          <i class="fas fa-times"></i> Close
         </button>
         <div class="sidebar-title">
-          <i class="fa fa-check-circle"></i>
+          <i class="fas fa-check-circle"></i>
           <h2>Create a new task</h2>
         </div>
       </div>
@@ -544,15 +542,15 @@
           <!-- Attach an item section -->
           <div class="attach-section">
             <div class="attach-header">
-              <i class="fa fa-paperclip"></i>
+              <i class="fas fa-paperclip"></i>
               <span>Attach to</span>
             </div>
             <div class="attach-buttons">
               <button type="button" class="attach-btn" onclick="toggleAttachment('taskCompany')">
-                <i class="fa fa-building"></i> Company
+                <i class="fas fa-building"></i> Company
               </button>
               <button type="button" class="attach-btn" onclick="toggleAttachment('taskContact')">
-                <i class="fa fa-user"></i> Contact
+                <i class="fas fa-user"></i> Contact
               </button>
             </div>
           </div>
@@ -560,7 +558,7 @@
           <!-- Company attachment -->
           <div id="taskCompanySection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fa fa-building"></i> Attach to company</span>
+              <span><i class="fas fa-building"></i> Attach to company</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('taskCompany')">
                 Remove
               </button>
@@ -578,7 +576,7 @@
           <!-- Contact attachment -->
           <div id="taskContactSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fa fa-user"></i> Attach to contact</span>
+              <span><i class="fas fa-user"></i> Attach to contact</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('taskContact')">
                 Remove
               </button>
@@ -607,10 +605,10 @@
     <div class="sidebar-modal" onclick="event.stopPropagation();">
       <div class="sidebar-header">
         <button class="sidebar-close" onclick="closeCompanySidebar()">
-          <i class="fa fa-times"></i> Close
+          <i class="fas fa-times"></i> Close
         </button>
         <div class="sidebar-title">
-          <i class="fa fa-building"></i>
+          <i class="fas fa-building"></i>
           <h2>Add a Company</h2>
         </div>
       </div>
@@ -686,18 +684,18 @@
           <!-- Attach an item section -->
           <div class="attach-section">
             <div class="attach-header">
-              <i class="fa fa-paperclip"></i>
+              <i class="fas fa-paperclip"></i>
               <span>Attach an item</span>
             </div>
             <div class="attach-buttons">
               <button type="button" class="attach-btn" onclick="toggleAttachment('companyContact')">
-                <i class="fa fa-user"></i> Contact
+                <i class="fas fa-user"></i> Contact
               </button>
               <button type="button" class="attach-btn" onclick="toggleAttachment('companyNote')">
-                <i class="fa fa-file-text"></i> Note
+                <i class="fas fa-file-text"></i> Note
               </button>
               <button type="button" class="attach-btn" onclick="toggleAttachment('companyTask')">
-                <i class="fa fa-check-circle"></i> Task
+                <i class="fas fa-check-circle"></i> Task
               </button>
             </div>
           </div>
@@ -705,7 +703,7 @@
           <!-- Contact attachment -->
           <div id="companyContactSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fa fa-user"></i> Attach a contact</span>
+              <span><i class="fas fa-user"></i> Attach a contact</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('companyContact')">
                 Remove this contact
               </button>
@@ -716,7 +714,7 @@
                   autocomplete="off" />
                 <button type="button" class="add-contact-icon-btn" onclick="openContactSidebarFromCompany()"
                   title="Add new contact">
-                  <i class="fa fa-plus"></i>
+                  <i class="fas fa-plus"></i>
                 </button>
               </div>
               <div id="company_contact_results" class="contact-results"></div>
@@ -728,7 +726,7 @@
           <!-- Note attachment -->
           <div id="companyNoteSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fa fa-file-text"></i> Attach a note</span>
+              <span><i class="fas fa-file-text"></i> Attach a note</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('companyNote')">
                 Remove this note
               </button>
@@ -742,7 +740,7 @@
           <!-- Task attachment -->
           <div id="companyTaskSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fa fa-check-circle"></i> Attach a task</span>
+              <span><i class="fas fa-check-circle"></i> Attach a task</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('companyTask')">
                 Remove this task
               </button>
@@ -794,10 +792,10 @@
     <div class="sidebar-modal" onclick="event.stopPropagation();">
       <div class="sidebar-header">
         <button class="sidebar-close" onclick="closeMainContactSidebar()">
-          <i class="fa fa-times"></i> Close
+          <i class="fas fa-times"></i> Close
         </button>
         <div class="sidebar-title">
-          <i class="fa fa-user"></i>
+          <i class="fas fa-user"></i>
           <h2>Add a Contact</h2>
         </div>
       </div>
@@ -834,15 +832,15 @@
           <!-- Attach an item section -->
           <div class="attach-section">
             <div class="attach-header">
-              <i class="fa fa-paperclip"></i>
+              <i class="fas fa-paperclip"></i>
               <span>Attach an item</span>
             </div>
             <div class="attach-buttons">
               <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactNote')">
-                <i class="fa fa-file-text"></i> Note
+                <i class="fas fa-file-text"></i> Note
               </button>
               <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactTask')">
-                <i class="fa fa-check-circle"></i> Task
+                <i class="fas fa-check-circle"></i> Task
               </button>
             </div>
           </div>
@@ -850,7 +848,7 @@
           <!-- Note attachment -->
           <div id="mainContactNoteSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fa fa-file-text"></i> Attach a note</span>
+              <span><i class="fas fa-file-text"></i> Attach a note</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactNote')">
                 Remove this note
               </button>
@@ -864,7 +862,7 @@
           <!-- Task attachment -->
           <div id="mainContactTaskSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fa fa-check-circle"></i> Attach a task</span>
+              <span><i class="fas fa-check-circle"></i> Attach a task</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactTask')">
                 Remove this task
               </button>
@@ -917,10 +915,10 @@
     <div class="sidebar-modal" onclick="event.stopPropagation()">
       <div class="sidebar-header">
         <button class="sidebar-close" onclick="closeContactSidebar()">
-          <i class="fa fa-arrow-left"></i> Back
+          <i class="fas fa-arrow-left"></i> Back
         </button>
         <div class="sidebar-title">
-          <i class="fa fa-user"></i>
+          <i class="fas fa-user"></i>
           <h2>Add a Contact</h2>
         </div>
       </div>
@@ -1505,13 +1503,13 @@
       if (fieldCount === 0) {
         // First field has + button
         button.className = 'btn-add-field';
-        button.innerHTML = '<i class="fa fa-plus"></i>';
+        button.innerHTML = '<i class="fas fa-plus"></i>';
         button.onclick = () => addDynamicField(containerId, hiddenFieldId, type);
         button.title = `Add ${type}`;
       } else {
         // Other fields have - button
         button.className = 'btn-remove-field';
-        button.innerHTML = '<i class="fa fa-minus"></i>';
+        button.innerHTML = '<i class="fas fa-minus"></i>';
         button.onclick = () => removeDynamicField(button, containerId, hiddenFieldId);
         button.title = `Remove ${type}`;
       }
@@ -1648,7 +1646,7 @@
             align-items: center;
             gap: 6px;
           " onclick="removeCompanyContact()" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
-            <i class="fa fa-times"></i>
+            <i class="fas fa-times"></i>
             Remove
           </button>
         `;
@@ -1838,7 +1836,7 @@
           <div style="padding: 32px;">
             <div style="text-align: center; margin-bottom: 24px;">
               <div style="width: 64px; height: 64px; margin: 0 auto 16px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                <i class="fa fa-exclamation-triangle" style="font-size: 28px; color: #f59e0b;"></i>
+                <i class="fas fa-exclamation-triangle" style="font-size: 28px; color: #f59e0b;"></i>
               </div>
               <h3 style="margin: 0 0 12px; font-size: 20px; font-weight: 700; color: #111827;">
                 You have unsaved data!
@@ -1993,7 +1991,7 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <label style="margin: 0; font-weight: 500;">Option Name</label>
             <button type="button" onclick="removeVariantOption(${optionId})" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px;">
-              <i class="fa fa-trash"></i>
+              <i class="fas fa-trash"></i>
             </button>
           </div>
           <input type="text" 
@@ -2038,7 +2036,7 @@
           <button type="button" 
                   onclick="removeVariantValue(${optionId}, ${valueId})" 
                   style="background: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 0 10px; cursor: pointer;">
-            <i class="fa fa-minus"></i>
+            <i class="fas fa-minus"></i>
           </button>
         `;
 
@@ -2175,7 +2173,7 @@
   <!-- Toast Notification -->
   <div id="toastNotification" class="toast-notification-global">
     <div class="toast-content-global">
-      <i class="fa fa-check-circle toast-icon-global"></i>
+      <i class="fas fa-check-circle toast-icon-global"></i>
       <span class="toast-message-global"></span>
     </div>
   </div>

@@ -26,4 +26,6 @@ urlpatterns = [
     path("api/get_product_files/",views.get_product_files,name="get_product_files"),
     path("api/get_variant_files/",views.get_variant_files,name="get_variant_files"),
     path("api/link_files_to_variant/",views.link_files_to_variant,name="link_files_to_variant"),
+    path("api/save_product_attributes/",views.save_product_attributes,name="save_product_attributes"),
+    path("api/get_product_attributes/",views.get_product_attributes,name="get_product_attributes"),
 ]

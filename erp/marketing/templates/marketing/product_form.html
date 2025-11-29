@@ -13,9 +13,9 @@
     <h1>
       <i class="fa fa-tag"></i>
       {% if not is_update %}
-        Create New Product
+      Create New Product
       {% else %}
-        Edit Product
+      Edit Product
       {% endif %}
     </h1>
   </div>
@@ -26,7 +26,7 @@
     <!-- Basic Information -->
     <div class="form-section">
       <div class="form-section-title">Basic Information</div>
-      
+
       <div class="form-group">
         <label for="id_title">Product Title<span class="required">*</span></label>
         {{ form.title }}
@@ -111,19 +111,25 @@
     <!-- Product Images -->
     <div class="form-section" id="product_images_section">
       <div class="form-section-title">Product Images</div>
-      
+
       {% if product %}
       <!-- Upload Button - Opens File Manager Modal -->
       <div class="form-group">
-        <button type="button" id="openFileManagerBtn" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.background='#5568d3'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'" onmouseout="this.style.background='#667eea'; this.style.transform=''; this.style.boxShadow=''">
+        <button type="button" id="openFileManagerBtn"
+          style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;"
+          onmouseover="this.style.background='#5568d3'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'"
+          onmouseout="this.style.background='#667eea'; this.style.transform=''; this.style.boxShadow=''">
           <i class="fa fa-images"></i> Manage Files
         </button>
         <small style="color: #6b7280; display: block; margin-top: 8px;">Drag to reorder • First image is primary</small>
       </div>
-      
-      <div id="variants_image_notice" style="display: none; padding: 15px; background: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e40af; margin-top: 15px;">
-        <i class="fa fa-info-circle"></i> <strong>Product images will be automatically taken from the first variant.</strong><br>
-        <small style="margin-top: 4px; display: block;">To change product images, modify the first variant's images.</small>
+
+      <div id="variants_image_notice"
+        style="display: none; padding: 15px; background: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e40af; margin-top: 15px;">
+        <i class="fa fa-info-circle"></i> <strong>Product images will be automatically taken from the first
+          variant.</strong><br>
+        <small style="margin-top: 4px; display: block;">To change product images, modify the first variant's
+          images.</small>
       </div>
 
       <!-- All Product Images - Single Grid -->
@@ -131,20 +137,25 @@
         <div id="sortable_images" style="display: flex; flex-wrap: wrap; gap: 15px;">
           {% for file in product.files.all %}
           {% if not file.product_variant %}
-          <div class="sortable-image" data-file-id="{{ file.pk }}" style="position: relative; border: 2px solid {% if file.is_primary %}#667eea{% else %}#e5e7eb{% endif %}; border-radius: 8px; padding: 10px; background: white; width: 150px;">
+          <div class="sortable-image" data-file-id="{{ file.pk }}"
+            style="position: relative; border: 2px solid {% if file.is_primary %}#667eea{% else %}#e5e7eb{% endif %}; border-radius: 8px; padding: 10px; background: white; width: 150px;">
             {% if file.is_primary %}
-            <div class="primary-badge" style="position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;">
+            <div class="primary-badge"
+              style="position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;">
               PRIMARY
             </div>
             {% endif %}
-            <div class="drag-handle" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
+            <div class="drag-handle"
+              style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
               <i class="fa fa-grip-vertical"></i>
             </div>
             <a href="{{ file.optimized_url }}" target="_blank" style="pointer-events: none;">
-              <img src="{{ file.optimized_url }}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;"/>
+              <img src="{{ file.optimized_url }}"
+                style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;" />
             </a>
             <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px;">
-              <button type="button" class="instant-delete-btn" data-file-id="{{ file.pk }}" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
+              <button type="button" class="instant-delete-btn" data-file-id="{{ file.pk }}"
+                style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
                 <i class="fa fa-trash"></i> Delete
               </button>
             </div>
@@ -159,12 +170,16 @@
       <!-- Product creation mode - uses file manager modal with temp upload -->
       <div id="product_images_content">
         <div class="form-group">
-          <button type="button" id="openFileManagerBtnCreate" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.background='#5568d3'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'" onmouseout="this.style.background='#667eea'; this.style.transform=''; this.style.boxShadow=''">
+          <button type="button" id="openFileManagerBtnCreate"
+            style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;"
+            onmouseover="this.style.background='#5568d3'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'"
+            onmouseout="this.style.background='#667eea'; this.style.transform=''; this.style.boxShadow=''">
             <i class="fa fa-images"></i> Manage Files
           </button>
-          <small style="color: #6b7280; display: block; margin-top: 8px;">Drag to reorder • First image is primary</small>
+          <small style="color: #6b7280; display: block; margin-top: 8px;">Drag to reorder • First image is
+            primary</small>
         </div>
-        
+
         <!-- Product Images Grid (same as edit mode) -->
         <div style="margin-top: 20px;">
           <div id="sortable_images" style="display: flex; flex-wrap: wrap; gap: 15px;">
@@ -175,6 +190,201 @@
       </div>
       {% endif %}
     </div>
+
+    <!-- Product Attributes -->
+    <div class="form-section" id="product_attributes_section">
+      <div class="form-section-title">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; width: 100%;">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-weight: 600; color: #111827;">Product Attributes</span>
+            <span style="color: #6b7280; font-weight: 400; font-size: 13px;">Additional properties like fabric type, width, length</span>
+          </div>
+          <button type="button" class="btn-add-attribute" onclick="addProductAttribute()">
+            <i class="fa fa-plus"></i> Add Attribute
+          </button>
+        </div>
+      </div>
+
+      <div id="product_attributes_container" class="attributes-container">
+        {% if product %}
+        {% for attr in product.attributes.all %}
+        <div class="attribute-card">
+          <div class="attribute-field">
+            <label class="attribute-label">Attribute Name</label>
+            <input type="text" class="attribute-input" name="attribute_names[]" placeholder="e.g. Fabric Type"
+              value="{{ attr.name }}"
+              oninput="scheduleAttributeSave()"
+              required>
+          </div>
+          <div class="attribute-field">
+            <label class="attribute-label">Value</label>
+            <input type="text" class="attribute-input" name="attribute_values[]" placeholder="e.g. Cotton"
+              value="{{ attr.value }}"
+              oninput="scheduleAttributeSave()"
+              required>
+          </div>
+          <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+
+      {% if not product.attributes.all %}
+      <div id="empty_attributes_placeholder" class="empty-placeholder">
+        <i class="fa fa-tags"></i>
+        <p>No attributes yet. Click "Add Attribute" to create product attributes.</p>
+      </div>
+      {% endif %}
+
+      <div class="attributes-info-box">
+        <i class="fa fa-info-circle"></i>
+        <span><strong>Product-level attributes</strong> apply to all variants. You can customize them per-variant in the variants table.</span>
+      </div>
+    </div>
+
+    <style>
+    /* Product Attributes Modern Styles */
+    .btn-add-attribute {
+      padding: 10px 18px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn-add-attribute:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+    }
+    .attributes-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .attribute-card {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 16px;
+      padding: 16px 20px;
+      background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+      align-items: end;
+    }
+    .attribute-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+    }
+    .attribute-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .attribute-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .attribute-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+    .attribute-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .attribute-input::placeholder {
+      color: #94a3b8;
+    }
+    .attribute-delete-btn {
+      width: 42px;
+      height: 42px;
+      background: white;
+      color: #94a3b8;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .attribute-delete-btn:hover {
+      background: #fef2f2;
+      border-color: #fca5a5;
+      color: #ef4444;
+    }
+    .empty-placeholder {
+      padding: 32px;
+      text-align: center;
+      color: #94a3b8;
+      background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
+      border: 2px dashed #e2e8f0;
+      border-radius: 12px;
+      margin-top: 20px;
+    }
+    .empty-placeholder i {
+      font-size: 32px;
+      margin-bottom: 12px;
+      display: block;
+      opacity: 0.6;
+    }
+    .empty-placeholder p {
+      margin: 0;
+      font-size: 14px;
+    }
+    .attributes-info-box {
+      margin-top: 20px;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid #3b82f6;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #1e40af;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.5;
+    }
+    .attributes-info-box i {
+      color: #3b82f6;
+      margin-top: 2px;
+    }
+    @media (max-width: 768px) {
+      .attribute-card {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      .attribute-delete-btn {
+        width: 100%;
+        height: 38px;
+      }
+    }
+    </style>
 
     <!-- Variants -->
     <div class="form-section">
@@ -202,9 +412,9 @@
       <a href="{% url 'marketing:index' %}" class="btn btn-secondary">Cancel</a>
       <button type="submit" class="btn btn-primary">
         {% if not is_update %}
-          Create Product
+        Create Product
         {% else %}
-          Update Product
+        Update Product
         {% endif %}
       </button>
     </div>
@@ -214,41 +424,265 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script>
   let sortableInstance = null;
-  
-  document.addEventListener('DOMContentLoaded', function() {
+
+  document.addEventListener('DOMContentLoaded', function () {
     initSortable();
   });
+
+  // ============== PRODUCT ATTRIBUTES ==============
+  let attributeCounter = 0;
+  let attributeSaveTimeout = null;
+  const PRODUCT_ID = {% if product %}{{ product.id }}{% else %}null{% endif %};
+
+  function addProductAttribute() {
+    const container = document.getElementById('product_attributes_container');
+    if (!container) return;
+
+    // Hide empty placeholder if exists
+    const placeholder = document.getElementById('empty_attributes_placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+
+    const card = document.createElement('div');
+    card.className = 'attribute-card';
+    card.style.cssText = 'opacity: 0; transform: translateY(-10px); transition: opacity 0.3s ease, transform 0.3s ease;';
+    card.innerHTML = `
+      <div class="attribute-field">
+        <label class="attribute-label">Attribute Name</label>
+        <input type="text" class="attribute-input attr-name-input" name="attribute_names[]" 
+               placeholder="e.g. Fabric Type" 
+               oninput="scheduleAttributeSave()"
+               required>
+      </div>
+      <div class="attribute-field">
+        <label class="attribute-label">Value</label>
+        <input type="text" class="attribute-input attr-value-input" name="attribute_values[]" 
+               placeholder="e.g. Cotton" 
+               oninput="scheduleAttributeSave()"
+               required>
+      </div>
+      <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
+        <i class="fa fa-trash"></i>
+      </button>
+    `;
+    container.appendChild(card);
+    attributeCounter++;
+    console.log('✅ Added attribute card');
+    
+    // Animate the card to appear
+    requestAnimationFrame(() => {
+      card.style.opacity = '1';
+      card.style.transform = 'translateY(0)';
+    });
+    
+    // Focus on the new name input
+    const nameInput = card.querySelector('.attr-name-input');
+    if (nameInput) nameInput.focus();
+  }
+
+  function removeProductAttribute(button) {
+    const card = button.closest('.attribute-card');
+    if (card) {
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(-20px)';
+      setTimeout(() => {
+        card.remove();
+        // Auto-save after removal
+        scheduleAttributeSave();
+      }, 200);
+      console.log('🗑️ Removed attribute card');
+    }
+  }
   
+  // Schedule attribute save with debounce (500ms delay)
+  function scheduleAttributeSave() {
+    if (!PRODUCT_ID) {
+      console.log('⏭️ Skipping auto-save (new product)');
+      // For new products, update productAttributes global for variant modal
+      updateLocalProductAttributes();
+      return;
+    }
+    
+    // Clear previous timeout
+    if (attributeSaveTimeout) {
+      clearTimeout(attributeSaveTimeout);
+    }
+    
+    // Show saving indicator
+    showAttributeSaveStatus('saving');
+    
+    // Schedule save after 500ms of no typing
+    attributeSaveTimeout = setTimeout(() => {
+      saveProductAttributes();
+    }, 500);
+  }
+  
+  // Collect current attributes from DOM
+  function collectAttributesFromDOM() {
+    const attributes = [];
+    const cards = document.querySelectorAll('#product_attributes_container .attribute-card');
+    
+    cards.forEach(card => {
+      const nameInput = card.querySelector('input[name="attribute_names[]"]');
+      const valueInput = card.querySelector('input[name="attribute_values[]"]');
+      
+      if (nameInput && valueInput) {
+        const name = nameInput.value.trim();
+        const value = valueInput.value.trim();
+        if (name && value) {
+          attributes.push({ name, value });
+        }
+      }
+    });
+    
+    return attributes;
+  }
+  
+  // Update local productAttributes variable for variant modal
+  function updateLocalProductAttributes() {
+    const attrs = collectAttributesFromDOM();
+    // Update the global productAttributes variable used by variant_form_modern.js
+    if (typeof window.productAttributes !== 'undefined') {
+      window.productAttributes = attrs;
+    }
+    // Also update the window data
+    window.product_attributes_data = JSON.stringify(attrs);
+    console.log('📝 Updated local productAttributes:', attrs);
+  }
+  
+  // Save product attributes via AJAX
+  async function saveProductAttributes() {
+    if (!PRODUCT_ID) return;
+    
+    const attributes = collectAttributesFromDOM();
+    
+    try {
+      const response = await fetch('/marketing/api/save_product_attributes/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+          product_id: PRODUCT_ID,
+          attributes: attributes
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        showAttributeSaveStatus('saved');
+        // Update local data for variant modal
+        if (typeof window.productAttributes !== 'undefined') {
+          window.productAttributes = data.attributes;
+        }
+        window.product_attributes_data = JSON.stringify(data.attributes);
+        console.log('✅ Attributes saved:', data.attributes);
+      } else {
+        showAttributeSaveStatus('error');
+        console.error('❌ Save failed:', data.error);
+      }
+    } catch (error) {
+      showAttributeSaveStatus('error');
+      console.error('❌ Save error:', error);
+    }
+  }
+  
+  // Show save status indicator
+  function showAttributeSaveStatus(status) {
+    let indicator = document.getElementById('attr_save_status');
+    if (!indicator) {
+      // Create indicator next to section title
+      const sectionTitle = document.querySelector('#product_attributes_section .form-section-title');
+      if (sectionTitle) {
+        indicator = document.createElement('span');
+        indicator.id = 'attr_save_status';
+        indicator.style.cssText = 'margin-left: 12px; font-size: 12px; font-weight: 500; transition: all 0.3s;';
+        sectionTitle.appendChild(indicator);
+      }
+    }
+    
+    if (!indicator) return;
+    
+    switch(status) {
+      case 'saving':
+        indicator.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+        indicator.style.color = '#6b7280';
+        break;
+      case 'saved':
+        indicator.innerHTML = '<i class="fa fa-check"></i> Saved';
+        indicator.style.color = '#10b981';
+        // Hide after 2 seconds
+        setTimeout(() => {
+          indicator.style.opacity = '0';
+          setTimeout(() => {
+            indicator.innerHTML = '';
+            indicator.style.opacity = '1';
+          }, 300);
+        }, 2000);
+        break;
+      case 'error':
+        indicator.innerHTML = '<i class="fa fa-exclamation-triangle"></i> Error';
+        indicator.style.color = '#ef4444';
+        break;
+    }
+  }
+  
+  // Get CSRF token
+  function getCsrfToken() {
+    const name = 'csrftoken';
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  
+  // Add event listeners to existing attribute inputs on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    const existingInputs = document.querySelectorAll('#product_attributes_container input');
+    existingInputs.forEach(input => {
+      input.addEventListener('input', scheduleAttributeSave);
+    });
+  });
+
   function initSortable() {
     const sortableContainer = document.getElementById('sortable_images');
     if (!sortableContainer) return;
-    
+
     // Only create if doesn't exist
     if (sortableInstance) {
       console.log('Sortable already initialized');
       return;
     }
-    
+
     // Initialize SortableJS (works on both desktop and mobile)
     sortableInstance = new Sortable(sortableContainer, {
       animation: 150,
       direction: 'horizontal',
       forceFallback: false,
-      onEnd: function(evt) {
+      onEnd: function (evt) {
         console.log('Moved from', evt.oldIndex, 'to', evt.newIndex);
         updateImageOrder();
         updatePrimaryBadge();
       }
     });
-    
+
     updateImageOrder();
     updatePrimaryBadge();
   }
-  
+
   function updateImageOrder() {
     const container = document.getElementById('sortable_images');
     if (!container) return;
-    
+
     const images = container.querySelectorAll('.sortable-image');
     const order = Array.from(images).map(img => img.getAttribute('data-file-id'));
     const orderInput = document.getElementById('image_order');
@@ -257,11 +691,11 @@
       console.log('Sıra güncellendi:', order);
     }
   }
-  
+
   function updatePrimaryBadge() {
     const container = document.getElementById('sortable_images');
     if (!container) return;
-    
+
     // Remove all primary badges safely
     try {
       container.querySelectorAll('.primary-badge').forEach(badge => badge.remove());
@@ -273,12 +707,12 @@
     } catch (e) {
       console.warn('Error removing badges:', e);
     }
-    
+
     // Add primary badge to first image
     const firstImage = container.querySelector('.sortable-image');
     if (firstImage) {
       firstImage.style.borderColor = '#667eea';
-      
+
       // Check if badge already exists
       if (!firstImage.querySelector('.primary-badge')) {
         const badge = document.createElement('div');
@@ -289,27 +723,27 @@
       }
     }
   }
-  
+
   function previewImages(event) {
     const files = event.target.files;
     const previewContainer = document.getElementById('image_preview_container');
     const previewsDiv = document.getElementById('image_previews');
-    
+
     if (files.length === 0) {
       previewContainer.style.display = 'none';
       return;
     }
-    
+
     previewContainer.style.display = 'block';
     previewsDiv.innerHTML = '';
-    
+
     // Store files array for later access
     window.uploadedFilesArray = Array.from(files);
-    
+
     Array.from(files).forEach((file, index) => {
       const reader = new FileReader();
-      
-      reader.onload = function(e) {
+
+      reader.onload = function (e) {
         const previewCard = document.createElement('div');
         previewCard.className = 'preview-image';
         previewCard.setAttribute('data-file-index', index);
@@ -323,7 +757,7 @@
           width: 150px;
           cursor: grab;
         `;
-        
+
         previewCard.innerHTML = `
           ${index === 0 ? '<div class="primary-badge" style="position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;">PRIMARY</div>' : ''}
           <div style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px;">
@@ -332,19 +766,19 @@
           <img src="${e.target.result}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;"/>
           <div style="margin-top: 8px; font-size: 11px; color: #6b7280; text-align: center; user-select: none;">${file.name}</div>
         `;
-        
+
         previewsDiv.appendChild(previewCard);
-        
+
         // After all images loaded, initialize drag and drop for previews
         if (previewsDiv.children.length === files.length) {
           initPreviewDragAndDrop();
         }
       };
-      
+
       reader.readAsDataURL(file);
     });
   }
-  
+
   function initPreviewDragAndDrop() {
     const previewContainer = document.getElementById('image_previews');
     if (previewContainer) {
@@ -352,24 +786,24 @@
         animation: 150,
         delay: window.innerWidth < 768 ? 150 : 0,
         delayOnTouchOnly: true,
-        onEnd: function(evt) {
+        onEnd: function (evt) {
           updatePreviewPrimaryBadge();
           reorderFileInput();
         }
       });
     }
   }
-  
+
   function updatePreviewPrimaryBadge() {
     const container = document.getElementById('image_previews');
     if (!container) return;
-    
+
     // Remove all primary badges
     container.querySelectorAll('.primary-badge').forEach(badge => badge.remove());
     container.querySelectorAll('.preview-image').forEach(img => {
       img.style.borderColor = '#e5e7eb';
     });
-    
+
     // Add primary badge to first image
     const firstImage = container.querySelector('.preview-image');
     if (firstImage) {
@@ -381,33 +815,33 @@
       firstImage.insertBefore(badge, firstImage.firstChild);
     }
   }
-  
+
   function reorderFileInput() {
     // Reorder the files in the input based on new order
     const container = document.getElementById('image_previews');
     const orderedIndices = Array.from(container.querySelectorAll('.preview-image'))
       .map(img => parseInt(img.getAttribute('data-file-index')));
-    
+
     // Create new FileList with reordered files
     const dt = new DataTransfer();
     orderedIndices.forEach(index => {
       dt.items.add(window.uploadedFilesArray[index]);
     });
-    
+
     // Update the file input
     const fileInput = document.getElementById('no_variant_file');
     fileInput.files = dt.files;
-    
+
     console.log('Files reordered:', orderedIndices);
   }
-  
+
   function handle_no_variant_file_delete(file_pk) {
     // Remove from DOM
     const sortableImage = document.querySelector(`.sortable-image[data-file-id="${file_pk}"]`);
     if (sortableImage) {
       sortableImage.remove();
     }
-  
+
     // Add to hidden input
     const deletedInput = document.getElementById('deleted_files');
     if (deletedInput) {
@@ -416,11 +850,11 @@
       deletedInput.value = JSON.stringify(current);
       console.log('Product image deleted, will be removed on save:', current);
     }
-    
+
     updateImageOrder();
     updatePrimaryBadge();
   }
-  
+
   // Normalize decimal inputs (convert comma to dot)
   function normalizeDecimalInputs() {
     // Get all number inputs
@@ -432,12 +866,12 @@
       }
     });
   }
-  
+
   // Update image order before form submission
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('product_form');
     if (form) {
-      form.addEventListener('submit', function(e) {
+      form.addEventListener('submit', function (e) {
         normalizeDecimalInputs();
         updateImageOrder();
         const deletedFiles = document.getElementById('deleted_files').value;
@@ -457,20 +891,20 @@
 {% endif %}
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const productId = {% if product %}{{ product.id }}{% else %}'temp'{% endif %};
+  document.addEventListener('DOMContentLoaded', function () {
+    const productId = {% if product %}{{ product.id }}{% else %}'temp'{% endif %};
 
   // Open file manager modal - works for both create and edit
   const openBtn = document.getElementById('{% if product %}openFileManagerBtn{% else %}openFileManagerBtnCreate{% endif %}');
   if (openBtn) {
-    openBtn.addEventListener('click', function() {
+    openBtn.addEventListener('click', function () {
       openFileManager(productId);  // Pass 'temp' for create mode
     });
   }
-  
+
   if (productId !== 'temp') {
     // Edit mode: existing product
-    
+
     // Attach instant delete to all delete buttons
     function attachDeleteHandlers() {
       document.querySelectorAll('.instant-delete-btn').forEach(btn => {
@@ -479,41 +913,41 @@ document.addEventListener('DOMContentLoaded', function() {
           console.log('Handler already attached, skipping');
           return;
         }
-        
+
         const fileId = btn.dataset.fileId;
         const parentDiv = btn.closest('.sortable-image');
-        
+
         if (!fileId || !parentDiv) return;
-        
+
         // Mark as attached BEFORE adding handler
         btn.dataset.handlerAttached = 'true';
-        
+
         // Use 'once' option to ensure handler only runs once
         btn.addEventListener('click', function handler(e) {
           e.preventDefault();
           e.stopPropagation();
-          
+
           console.log('Delete handler called from template for file:', fileId);
-          
+
           if (typeof instantDeleteFile === 'function') {
             instantDeleteFile(fileId, parentDiv);
           }
         }, { once: false }); // Don't use once, we control via flag
       });
     }
-    
+
     // Initial attach
     attachDeleteHandlers();
-    
+
     console.log('✅ File manager enabled for product', productId);
   } else {
     // Create mode: temp uploads
     console.log('✅ File manager enabled in create mode (temporary uploads)');
-    
+
     // Mark files as saved on form submission
     const productForm = document.getElementById('product_form');
     if (productForm) {
-      productForm.addEventListener('submit', function() {
+      productForm.addEventListener('submit', function () {
         // Mark files as saved so beforeunload won't trigger cleanup
         if (typeof markFilesAsSaved === 'function') {
           markFilesAsSaved();

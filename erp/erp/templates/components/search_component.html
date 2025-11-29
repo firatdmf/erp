@@ -1,35 +1,144 @@
 {% load static %}
-<head>
-  {% block css %}
-    <link rel="stylesheet" href="{% static 'erp/css/components/search_component.css' %}" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
-    <script src="{% static 'erp/js/search_component.js' %}" defer></script>
-  {% endblock %}
-</head>
+<style>
+  .search_component {
+    position: relative;
+  }
+  .search-input-wrapper {
+    position: relative;
+  }
+  .search-input-wrapper input {
+    width: 100%;
+    padding: 12px 16px;
+    padding-right: 40px;
+    border: 2px solid #3b82f6;
+    border-radius: 8px;
+    font-size: 15px;
+    outline: none;
+    transition: all 0.2s;
+    box-sizing: border-box;
+  }
+  .search-input-wrapper input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  .search-loading {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #3b82f6;
+    display: none;
+  }
+  .searchResults {
+    margin-top: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .searchResults a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    color: #374151;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: background 0.15s;
+  }
+  .searchResults a:hover {
+    background: #f0f4ff;
+  }
+  .searchResults a i {
+    color: #3b82f6;
+    width: 20px;
+    text-align: center;
+  }
+  .searchResults p {
+    margin: 0;
+  }
+  .no-results {
+    text-align: center;
+    padding: 20px;
+    color: #9ca3af;
+  }
+  .search-loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    color: #6b7280;
+  }
+  .search-loading-container i {
+    font-size: 24px;
+    color: #3b82f6;
+    margin-bottom: 10px;
+  }
+</style>
 
 <div class="search_component">
-  {% comment %} <p>{{ context }}</p> {% endcomment %}
-
-  {% comment %} <label for="contactName">Contact name:</label> {% endcomment %}
-
-  <form>
-    {% csrf_token %}
-    <input type="text" hx-post="{% url 'crm:search_contact' %}" hx-target="#results" hx-trigger="keyup changed delay:500ms" name="searchInput" id="searchInput" placeholder="Search for a name, email, phone number, etc." hx-indicator="#spinner" />
-  </form>
-
-  <div id="spinner" class="htmx-indicator">
-    <div class="loader"></div>
-    <p>Loading...</p>
+  <div class="search-input-wrapper">
+    <input type="text" 
+           name="searchInput" 
+           id="searchInput" 
+           placeholder="Search for a name, email, phone number, etc."
+           oninput="instantSearchContacts(this)"
+           autocomplete="off" />
+    <div class="search-loading" id="searchSpinner">
+      <i class="fa fa-spinner fa-spin"></i>
+    </div>
   </div>
-
-  {% comment %} <div id="spinner2">
-    <span class="loading loading-spinner loading-xl htmx-indicator" id="spinner"></span>
-  </div> {% endcomment %}
   <div class="searchResults" id="results"></div>
 </div>
 
 <script>
-  document.body.addEventListener('htmx:configRequest', function (evt) {
-    console.log('HTMX request triggered')
-  })
+  let searchTimeout = null;
+  const csrfToken = '{{ csrf_token }}';
+
+  function instantSearchContacts(inputElement) {
+    const query = inputElement.value.trim();
+    const resultsDiv = document.getElementById('results');
+    const spinner = document.getElementById('searchSpinner');
+    const recent = document.querySelector('.recent');
+
+    // Clear previous timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    // If empty, hide results and show recent
+    if (!query) {
+      resultsDiv.innerHTML = '';
+      if (recent) recent.style.display = 'flex';
+      spinner.style.display = 'none';
+      return;
+    }
+
+    // Hide recent, show loading animation in results area
+    if (recent) recent.style.display = 'none';
+    spinner.style.display = 'block';
+    resultsDiv.innerHTML = '<div class="search-loading-container"><i class="fa fa-spinner fa-spin"></i><span>Searching...</span></div>';
+
+    // Debounce: wait 300ms after user stops typing
+    searchTimeout = setTimeout(() => {
+      fetch('{% url "crm:search_contact" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: 'searchInput=' + encodeURIComponent(query)
+      })
+      .then(response => response.text())
+      .then(html => {
+        resultsDiv.innerHTML = html || '<div class="no-results"><i class="fa fa-search"></i><p>No results found</p></div>';
+        spinner.style.display = 'none';
+      })
+      .catch(error => {
+        console.error('Search error:', error);
+        spinner.style.display = 'none';
+        resultsDiv.innerHTML = '<div class="no-results">Error searching</div>';
+      });
+    }, 300);
+  }
 </script>

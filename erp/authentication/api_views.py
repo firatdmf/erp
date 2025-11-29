@@ -52,7 +52,8 @@ def create_web_client(request):
             username=username,
             email=email,
             password=hashed_password,
-            name=name
+            name=name,
+            is_active=False  # User must verify email
         )
         
         return JsonResponse({
@@ -174,6 +175,56 @@ def set_default_address(request, user_id, address_id):
             'error': 'Address not found'
         }, status=404)
     except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+
+
+@csrf_exempt
+def get_client_addresses(request, user_id):
+    """Get all addresses for a client"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        web_client = WebClient.objects.get(id=user_id)
+        # Order by is_default only (created_at might not exist in model)
+        addresses = ClientAddress.objects.filter(client=web_client).order_by('-is_default')
+        
+        address_list = [{
+            'id': str(addr.id),
+            'title': addr.title,
+            'address': addr.address,
+            'city': addr.city,
+            'country': addr.country,
+            'isDefault': addr.is_default,
+        } for addr in addresses]
+        
+        response = JsonResponse({
+            'success': True,
+            'addresses': address_list
+        })
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] get_client_addresses failed for user {user_id}")
+        print(f"[ERROR] Exception: {str(e)}")
+        print(traceback.format_exc())
         return JsonResponse({
             'error': str(e)
         }, status=500)
@@ -428,6 +479,7 @@ def get_web_client_profile(request, user_id):
             'phone': web_client.phone or '',
             'birthdate': web_client.birthdate.isoformat() if web_client.birthdate else '',
             'addresses': addresses_data,
+            'settings': web_client.web_client_settings,
         }, status=200)
         response["Access-Control-Allow-Origin"] = "*"
         return response
@@ -437,6 +489,10 @@ def get_web_client_profile(request, user_id):
             'error': 'User not found'
         }, status=404)
     except Exception as e:
+        import traceback
+        print(f"[ERROR] get_web_client_profile failed for user {user_id}")
+        print(f"[ERROR] Exception: {str(e)}")
+        print(traceback.format_exc())
         return JsonResponse({
             'error': str(e)
         }, status=500)
@@ -493,7 +549,26 @@ def update_web_client_profile(request, user_id):
             else:
                 web_client.birthdate = None
         
+        if 'settings' in data:
+            old_settings = web_client.web_client_settings
+            new_settings = data['settings']
+            print(f"[SETTINGS UPDATE] User ID: {user_id}")
+            print(f"[SETTINGS UPDATE] Old settings: {old_settings}")
+            print(f"[SETTINGS UPDATE] New settings: {new_settings}")
+            
+            # Log specific changes
+            if old_settings:
+                if old_settings.get('currency') != new_settings.get('currency'):
+                    print(f"[SETTINGS UPDATE] Currency changed: {old_settings.get('currency')} -> {new_settings.get('currency')}")
+                if old_settings.get('language') != new_settings.get('language'):
+                    print(f"[SETTINGS UPDATE] Language changed: {old_settings.get('language')} -> {new_settings.get('language')}")
+                if old_settings.get('theme') != new_settings.get('theme'):
+                    print(f"[SETTINGS UPDATE] Theme changed: {old_settings.get('theme')} -> {new_settings.get('theme')}")
+            
+            web_client.web_client_settings = new_settings
+        
         web_client.save()
+        print(f"[SETTINGS UPDATE] Settings saved successfully for user {user_id}")
         
         response = JsonResponse({
             'message': 'Profile updated successfully',
@@ -1034,3 +1109,334 @@ def clear_cart(request, user_id):
         return JsonResponse({
             'error': str(e)
         }, status=500)
+
+
+# ==================== ORDER API ENDPOINTS ====================
+
+@csrf_exempt
+def get_user_orders(request, user_id):
+    """Get all orders for a user"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from operating.models import Order
+        
+        web_client = WebClient.objects.get(id=user_id)
+        orders = Order.objects.filter(web_client=web_client).order_by('-created_at')
+        
+        orders_list = []
+        for order in orders:
+            items_count = order.items.count()
+            
+            orders_list.append({
+                'id': order.id,
+                'status': order.status,
+                'payment_status': order.payment_status,
+                'original_currency': order.original_currency,
+                'original_price': str(order.original_price) if order.original_price else None,
+                'paid_currency': order.paid_currency,
+                'paid_amount': str(order.paid_amount) if order.paid_amount else None,
+                'items_count': items_count,
+                'tracking_number': order.tracking_number,
+                'created_at': order.created_at.isoformat(),
+            })
+            
+        response = JsonResponse({
+            'orders': orders_list
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@csrf_exempt
+def get_order_detail(request, user_id, order_id):
+    """Get detailed information about a specific order"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from operating.models import Order
+        
+        web_client = WebClient.objects.get(id=user_id)
+        order = Order.objects.get(id=order_id, web_client=web_client)
+        
+        items_list = []
+        for item in order.items.all():
+            product_image = None
+            if item.product and item.product.files.exists():
+                first_file = item.product.files.first()
+                if first_file and first_file.file_url:
+                    product_image = first_file.file_url
+            
+            # Calculate subtotal safely
+            subtotal = None
+            if item.quantity is not None and item.price is not None:
+                try:
+                    subtotal = str(item.quantity * item.price)
+                except:
+                    subtotal = None
+            
+            items_list.append({
+                'id': item.id,
+                'product_sku': item.product.sku if item.product else None,
+                'product_title': item.product.title if item.product else None,
+                'product_image': product_image,
+                'variant_sku': item.product_variant.variant_sku if item.product_variant else None,
+                'quantity': str(item.quantity) if item.quantity is not None else None,
+                'price': str(item.price) if item.price is not None else None,
+                'subtotal': subtotal,
+                'status': item.status,
+            })
+        
+        # Calculate total value safely
+        try:
+            total_value = str(order.total_value())
+        except:
+            total_value = str(order.original_price) if order.original_price else '0'
+        
+        order_data = {
+            'id': order.id,
+            'status': order.status,
+            'payment_status': order.payment_status,
+            'payment_method': order.payment_method,
+            'original_currency': order.original_currency,
+            'original_price': str(order.original_price) if order.original_price else None,
+            'paid_currency': order.paid_currency,
+            'paid_amount': str(order.paid_amount) if order.paid_amount else None,
+            'card_type': order.card_type,
+            'card_last_four': order.card_last_four,
+            'delivery_address_title': order.delivery_address_title,
+            'delivery_address': order.delivery_address,
+            'delivery_city': order.delivery_city,
+            'delivery_country': order.delivery_country,
+            'delivery_phone': order.delivery_phone,
+            'tracking_number': order.tracking_number,
+            'shipped_at': order.shipped_at.isoformat() if order.shipped_at else None,
+            'delivered_at': order.delivered_at.isoformat() if order.delivered_at else None,
+            'created_at': order.created_at.isoformat(),
+            'updated_at': order.updated_at.isoformat(),
+            'items': items_list,
+            'total_value': total_value,
+        }
+        
+        response = JsonResponse(order_data, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Order.DoesNotExist:
+        return JsonResponse({'error': 'Order not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def reset_password(request):
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    """Reset web client password (without old password)"""
+    try:
+        data = json.loads(request.body)
+        
+        email = data.get('email')
+        new_password = data.get('new_password')
+        
+        if not all([email, new_password]):
+            return JsonResponse({
+                'error': 'Email and new password are required'
+            }, status=400)
+        
+        web_client = WebClient.objects.get(email=email)
+        
+        # Update password
+        web_client.password = make_password(new_password)
+        web_client.save()
+        
+        response = JsonResponse({
+            'message': 'Password reset successfully'
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def verify_email(request):
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    """Verify web client email"""
+    try:
+        data = json.loads(request.body)
+        email = data.get('email')
+        
+        if not email:
+            return JsonResponse({
+                'error': 'Email is required'
+            }, status=400)
+        
+        web_client = WebClient.objects.get(email=email)
+        
+        # Activate user
+        web_client.is_active = True
+        web_client.save()
+        
+        response = JsonResponse({
+            'message': 'Email verified successfully'
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({
+            'error': 'User not found'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def get_exchange_rates(request):
+    """Get current exchange rates"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    from datetime import datetime
+    import pytz
+    
+    # Get current time in Turkey timezone
+    turkey_tz = pytz.timezone('Europe/Istanbul')
+    current_time = datetime.now(turkey_tz)
+    
+    print(f"\n{'='*60}")
+    print(f"[EXCHANGE RATES] Request received at: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    print(f"{'='*60}")
+    
+    rates_data = []
+    
+    try:
+        # Try to fetch live rates
+        import urllib.request
+        import json
+        
+        url = "https://open.er-api.com/v6/latest/USD"
+        print(f"[EXCHANGE RATES] Fetching live rates from: {url}")
+        
+        with urllib.request.urlopen(url) as url_response:
+            data = json.loads(url_response.read().decode())
+            
+            if data and 'rates' in data:
+                # Filter for currencies we support
+                supported_currencies = ['USD', 'EUR', 'TRY', 'RUB', 'PLN']
+                
+                print(f"[EXCHANGE RATES] ✓ Live rates fetched successfully!")
+                print(f"[EXCHANGE RATES] Base currency: USD")
+                print(f"[EXCHANGE RATES] Current rates:")
+                
+                for code in supported_currencies:
+                    if code in data['rates']:
+                        rate_value = data['rates'][code]
+                        rates_data.append({
+                            'currency_code': code,
+                            'rate': rate_value
+                        })
+                        print(f"  • 1 USD = {rate_value} {code}")
+    except Exception as e:
+        print(f"[EXCHANGE RATES] ✗ Error fetching live rates: {e}")
+        print(f"[EXCHANGE RATES] → Using fallback mock data")
+        # Fallback to mock rates if live fetch fails
+        rates_data = [
+            {'currency_code': 'USD', 'rate': 1.0},
+            {'currency_code': 'EUR', 'rate': 0.95},
+            {'currency_code': 'TRY', 'rate': 34.50},
+            {'currency_code': 'RUB', 'rate': 92.50},
+            {'currency_code': 'PLN', 'rate': 4.05},
+        ]
+        print(f"[EXCHANGE RATES] Fallback rates:")
+        for rate in rates_data:
+            print(f"  • 1 USD = {rate['rate']} {rate['currency_code']}")
+    
+    # If live fetch returned empty (e.g. API changed structure), use fallback
+    if not rates_data:
+        print(f"[EXCHANGE RATES] ✗ Live fetch returned empty data")
+        print(f"[EXCHANGE RATES] → Using fallback mock data")
+        rates_data = [
+            {'currency_code': 'USD', 'rate': 1.0},
+            {'currency_code': 'EUR', 'rate': 0.95},
+            {'currency_code': 'TRY', 'rate': 34.50},
+            {'currency_code': 'RUB', 'rate': 92.50},
+            {'currency_code': 'PLN', 'rate': 4.05},
+        ]
+        print(f"[EXCHANGE RATES] Fallback rates:")
+        for rate in rates_data:
+            print(f"  • 1 USD = {rate['rate']} {rate['currency_code']}")
+
+    print(f"{'='*60}\n")
+
+    response = JsonResponse({
+        'success': True,
+        'base': 'USD',
+        'rates': rates_data
+    }, status=200)
+    response["Access-Control-Allow-Origin"] = "*"
+    return response

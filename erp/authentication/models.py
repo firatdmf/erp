@@ -64,6 +64,7 @@ class WebClient(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+    web_client_settings = models.JSONField(default=dict, blank=True)  # Store user preferences (notifications, theme, etc.)
 
     class Meta:
         db_table = 'web_client'
@@ -72,6 +73,20 @@ class WebClient(models.Model):
 
     def __str__(self):
         return self.username
+
+
+class ExchangeRate(models.Model):
+    currency_code = models.CharField(max_length=3, unique=True)  # USD, EUR, RUB, PLN
+    rate = models.DecimalField(max_digits=10, decimal_places=4)  # Rate relative to TRY (e.g. 1 USD = 34.50 TRY)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'exchange_rate'
+        verbose_name = 'Exchange Rate'
+        verbose_name_plural = 'Exchange Rates'
+
+    def __str__(self):
+        return f"{self.currency_code}: {self.rate}"
 
 
 class ClientAddress(models.Model):

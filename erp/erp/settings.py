@@ -154,7 +154,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
-    "erp.middleware.PerformanceLoggingMiddleware",  # Performance monitoring
+    # "erp.middleware.PerformanceLoggingMiddleware",  # Performance monitoring
     # "allauth.account.middleware.AccountMiddleware",
 ]
 

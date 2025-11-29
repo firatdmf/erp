@@ -1978,18 +1978,18 @@ def get_products(request):
         # Filter products where ANY variant has the specified attribute value
         # We use iexact for case-insensitive matching
         if value and value.strip():
-            print(f"🔍 Filtering by {key}={value}")
+            # print(f"🔍 Filtering by {key}={value}")
             from django.db.models import Q
             
             # Debug: Check if any product has this attribute
             has_attr = Product.objects.filter(attributes__name__iexact=key, attributes__value__iexact=value).exists()
-            print(f"   - ProductAttribute match exists? {has_attr}")
+            # print(f"   - ProductAttribute match exists? {has_attr}")
             
             has_variant_attr = Product.objects.filter(
                 variants__product_variant_attribute_values__product_variant_attribute__name__iexact=key,
                 variants__product_variant_attribute_values__product_variant_attribute_value__iexact=value
             ).exists()
-            print(f"   - VariantAttribute match exists? {has_variant_attr}")
+            # print(f"   - VariantAttribute match exists? {has_variant_attr}")
 
             products = products.filter(
                 Q(variants__product_variant_attribute_values__product_variant_attribute__name__iexact=key,
@@ -1997,7 +1997,7 @@ def get_products(request):
                 Q(attributes__name__iexact=key,
                   attributes__value__iexact=value)
             ).distinct()
-            print(f"   - Products count after filter: {products.count()}")
+            # print(f"   - Products count after filter: {products.count()}")
 
     # Optimize: prefetch all related data in a single query chain
     products = products.select_related("primary_image", "category").prefetch_related(

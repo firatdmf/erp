@@ -62,6 +62,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "https://karvenhome.com",
     "https://www.karvenhome.com",
+    "https://demfirat.com",
+    "https://www.demfirat.com",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

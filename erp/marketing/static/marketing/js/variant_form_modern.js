@@ -317,6 +317,10 @@ function updateOptionName(optionId, name) {
     updateGroupingOptions();
 }
 
+// Track original values for each option (before any edits in this session)
+// Format: { optionId: { valueIndex: originalValue } }
+let originalOptionValues = {};
+
 // Update option value
 function updateOptionValue(optionId, valueIndex, value) {
     if (!variantData[optionId]) return;
@@ -326,6 +330,32 @@ function updateOptionValue(optionId, valueIndex, value) {
         variantData[optionId].values = [];
     }
 
+    // Track original value on first edit (for rename tracking)
+    if (!originalOptionValues[optionId]) {
+        originalOptionValues[optionId] = {};
+    }
+    const oldValue = variantData[optionId].values[valueIndex];
+    
+    // Store original value if this is the first time we're editing this field
+    if (oldValue && oldValue.trim() && originalOptionValues[optionId][valueIndex] === undefined) {
+        originalOptionValues[optionId][valueIndex] = oldValue.trim().toLowerCase();
+    }
+
+    // Track rename mapping: original value -> current value
+    const originalValue = originalOptionValues[optionId][valueIndex];
+    if (originalValue && value.trim() && originalValue !== value.trim().toLowerCase()) {
+        // Store rename mapping
+        if (!pendingValueRenames[optionId]) {
+            pendingValueRenames[optionId] = {};
+        }
+        const optionName = variantData[optionId].name;
+        if (optionName) {
+            pendingValueRenames[optionId][originalValue] = value.trim().toLowerCase();
+            console.log(`Tracking rename: ${optionName}:${originalValue} -> ${value.trim().toLowerCase()}`);
+        }
+    }
+
+    // Store the new value
     variantData[optionId].values[valueIndex] = value;
 
     // Auto-add new field if this is the last field and has value
@@ -338,7 +368,14 @@ function updateOptionValue(optionId, valueIndex, value) {
         addValueField(optionId);
     }
 
-    updateVariantTable();
+    // DON'T update table if value is being cleared (user might be renaming)
+    // User must click trash icon to actually delete a value
+    // Only update table if:
+    // 1. Value has content (rename or new value)
+    // 2. OR this is a new field being filled for the first time (no original value)
+    if (value.trim() || !originalValue) {
+        updateVariantTable();
+    }
 }
 
 // Remove option
@@ -555,6 +592,8 @@ let allCombinations = [];
 let existingVariantData = {};
 // Track deleted variant indices
 let deletedVariantIndices = new Set();
+// Track value renames: { optionId: { oldValue: newValue } }
+let pendingValueRenames = {};
 
 // Update variant table with combinations
 function updateVariantTable() {
@@ -625,6 +664,30 @@ function updateVariantTable() {
     // Track which backups have been used to prevent duplicates
     const usedBackups = new Set();
 
+    // Build rename mapping from pendingValueRenames
+    // Format: { "optionName:oldValue": "optionName:newValue" }
+    const renameMap = {};
+    for (const [optionId, renames] of Object.entries(pendingValueRenames)) {
+        const optionName = variantData[optionId]?.name;
+        if (optionName) {
+            for (const [oldVal, newVal] of Object.entries(renames)) {
+                renameMap[`${optionName.toLowerCase()}:${oldVal}`] = `${optionName.toLowerCase()}:${newVal}`;
+            }
+        }
+    }
+    console.log('Rename map:', renameMap);
+
+    // Helper function to apply renames to a signature
+    function applyRenamesToSignature(signature) {
+        let parts = signature.split('|');
+        parts = parts.map(part => {
+            // part is like "size:large"
+            const newPart = renameMap[part];
+            return newPart || part;
+        });
+        return parts.sort().join('|');
+    }
+
     allCombinations.forEach((combo, newIndex) => {
         const newSignature = createVariantSignature(combo);
 
@@ -632,24 +695,70 @@ function updateVariantTable() {
         let backup = variantBackup[newSignature];
         let matchedSignature = newSignature;
 
-        // If no exact match, try to find a backup whose signature is a subset of the new signature
+        // If no exact match, try renamed signature match
         if (!backup) {
             for (const [oldSignature, oldBackup] of Object.entries(variantBackup)) {
-                // Skip if already used
                 if (usedBackups.has(oldSignature)) continue;
 
-                // Check if old signature is a subset of new signature
-                // e.g., "color:white" is subset of "color:white|size:s"
-                const oldParts = oldSignature.split('|');
+                // Apply renames to old signature and check if it matches new signature
+                const renamedOldSignature = applyRenamesToSignature(oldSignature);
+                if (renamedOldSignature === newSignature) {
+                    backup = oldBackup;
+                    matchedSignature = oldSignature;
+                    console.log(`Matched via rename: ${oldSignature} -> ${newSignature}`);
+                    break;
+                }
+            }
+        }
+
+        // If still no match, try subset matching (for when new options are added)
+        // IMPORTANT: Only match if new signature is FIRST occurrence of this subset pattern
+        if (!backup) {
+            // Sort candidates by number of matching parts (descending) to get best match
+            const candidates = [];
+            for (const [oldSignature, oldBackup] of Object.entries(variantBackup)) {
+                if (usedBackups.has(oldSignature)) continue;
+
+                // Apply renames first
+                const renamedOldSignature = applyRenamesToSignature(oldSignature);
+                const oldParts = renamedOldSignature.split('|');
                 const newParts = newSignature.split('|');
 
+                // Check if old signature is a subset of new signature
                 const isSubset = oldParts.every(oldPart => newParts.includes(oldPart));
 
                 if (isSubset) {
-                    backup = oldBackup;
-                    matchedSignature = oldSignature;
-                    break; // Use first match only
+                    // Check if this is the FIRST new combination that matches this old signature
+                    // by checking if any earlier new combination also matches
+                    let isFirstMatch = true;
+                    for (let i = 0; i < newIndex; i++) {
+                        const earlierCombo = allCombinations[i];
+                        const earlierSignature = createVariantSignature(earlierCombo);
+                        const earlierParts = earlierSignature.split('|');
+                        const earlierIsSubset = oldParts.every(oldPart => earlierParts.includes(oldPart));
+                        if (earlierIsSubset) {
+                            isFirstMatch = false;
+                            break;
+                        }
+                    }
+
+                    if (isFirstMatch) {
+                        candidates.push({
+                            oldSignature,
+                            oldBackup,
+                            matchCount: oldParts.length
+                        });
+                    }
                 }
+            }
+
+            // Sort by match count (most specific match first)
+            candidates.sort((a, b) => b.matchCount - a.matchCount);
+
+            if (candidates.length > 0) {
+                backup = candidates[0].oldBackup;
+                matchedSignature = candidates[0].oldSignature;
+                console.log(`Matched via subset (first match): ${matchedSignature} -> ${newSignature}`);
             }
         }
 
@@ -1289,20 +1398,49 @@ function updatePrimaryBadgeAfterSort(variantIndex) {
     }
 }
 
-// Remove image from variant
-function removeVariantImage(variantIndex, imageIndex) {
+// Remove image from variant - INSTANT delete with confirmation
+async function removeVariantImage(variantIndex, imageIndex) {
     if (!variantImages[variantIndex]) return;
 
     const img = variantImages[variantIndex].images[imageIndex];
     if (!img) return;
 
-    // Track for backend unlinking (if image has DB ID)
+    // Use modern confirmation dialog
+    const confirmed = await window.showConfirmDialog(
+        'Resmi Sil?',
+        'Bu resim kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+        'Sil',
+        'İptal'
+    );
+
+    if (!confirmed) return;
+
+    // If image has DB ID, delete from Cloudinary via API
     if (img.id) {
-        unlinkedVariantFiles.add(img.id);
-        console.log('Tracking unlinked file:', img.id);
+        try {
+            const response = await fetch('/marketing/api/instant_delete_file/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : getCsrfToken()
+                },
+                body: JSON.stringify({ file_id: img.id })
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.error || 'Silme işlemi başarısız');
+            }
+
+            showToast('🗑️ Resim silindi!', 'success');
+        } catch (error) {
+            console.error('Delete error:', error);
+            showToast(`❌ Silme hatası: ${error.message}`, 'error');
+            return; // Don't remove from UI if delete failed
+        }
     }
 
-    // Remove from frontend array (no confirmation, just unlink)
+    // Remove from frontend array
     variantImages[variantIndex].images.splice(imageIndex, 1);
 
     // Adjust primary index if needed
@@ -1607,9 +1745,10 @@ async function handleImageUpload(event) {
                 if (placeholder) placeholder.remove();
 
                 const variantImgs = variantImages[currentVariantIndex];
-                const selectedImages = variantImgs ? variantImgs.images.map(img => img.url) : [];
+                // Fix: Pass image IDs instead of URLs to generateImageGrid
+                const selectedImageIds = variantImgs ? variantImgs.images.map(img => img.id).filter(id => id) : [];
                 const primaryIndex = variantImgs ? variantImgs.primaryIndex : 0;
-                if (grid) grid.innerHTML = generateImageGrid(selectedImages, primaryIndex);
+                if (grid) grid.innerHTML = generateImageGrid(selectedImageIds, primaryIndex);
 
                 showToast(`✅ ${file.name} uploaded to shared pool!`, 'success');
             } else {

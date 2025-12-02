@@ -187,13 +187,6 @@
   </div>
   {% endif %}
   
-  <!-- Loading overlay for search -->
-  <div id="tableLoadingOverlay" class="table-loading-overlay" style="display: none;">
-    <div class="loading-spinner">
-      <i class="fa fa-spinner fa-spin"></i>
-      <p>Searching...</p>
-    </div>
-  </div>
 </div>
 
 <!-- Modern Delete Modal -->
@@ -221,64 +214,69 @@
 </div>
 
 <script>
-// Instant Search with Debounce
-let searchTimeout = null;
-let lastSearchQuery = '';
+// Instant Search with Debounce (renamed to avoid conflict with base.html search_component)
+let productSearchTimeout = null;
+let lastProductSearchQuery = '';
 
-const searchInput = document.getElementById('instantSearch');
-const searchStatus = document.getElementById('searchStatus');
-const searchClear = document.getElementById('searchClear');
-const tableBody = document.querySelector('.products-table tbody');
+const productSearchInput = document.getElementById('instantSearch');
+const productSearchStatus = document.getElementById('searchStatus');
+const productSearchClear = document.getElementById('searchClear');
+const productTableBody = document.querySelector('.products-table tbody');
 
-if (searchInput) {
+if (productSearchInput) {
   // Show/hide clear button
-  searchInput.addEventListener('input', function(e) {
+  productSearchInput.addEventListener('input', function(e) {
     const query = e.target.value.trim();
-    searchClear.style.display = query ? 'flex' : 'none';
     
     // Clear previous timeout
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
+    if (productSearchTimeout) {
+      clearTimeout(productSearchTimeout);
     }
     
     // Don't search if empty or same as last query
-    if (query === '' && lastSearchQuery === '') {
+    if (query === '' && lastProductSearchQuery === '') {
+      productSearchClear.style.display = 'none';
+      productSearchStatus.style.display = 'none';
       return;
     }
     
-    // Show loading indicator
-    searchStatus.style.display = 'flex';
+    // Show loading spinner, hide clear button while loading
+    productSearchStatus.style.display = 'flex';
+    productSearchClear.style.display = 'none';
     
     // Debounce: wait 500ms after user stops typing
-    searchTimeout = setTimeout(() => {
-      performSearch(query);
+    productSearchTimeout = setTimeout(() => {
+      performProductSearch(query);
     }, 500);
   });
   
   // Handle Enter key
-  searchInput.addEventListener('keypress', function(e) {
+  productSearchInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
+      if (productSearchTimeout) {
+        clearTimeout(productSearchTimeout);
       }
-      performSearch(e.target.value.trim());
+      // Show loading immediately
+      productSearchStatus.style.display = 'flex';
+      productSearchClear.style.display = 'none';
+      performProductSearch(e.target.value.trim());
     }
   });
 }
 
 function clearSearch() {
-  searchInput.value = '';
-  searchClear.style.display = 'none';
-  searchStatus.style.display = 'none';
-  lastSearchQuery = '';
+  productSearchInput.value = '';
+  productSearchClear.style.display = 'none';
+  productSearchStatus.style.display = 'flex';
+  lastProductSearchQuery = '';
   
   // Reload page without search param
   window.location.href = '{% url "marketing:product_list" %}';
 }
 
-async function performSearch(query) {
-  lastSearchQuery = query;
+async function performProductSearch(query) {
+  lastProductSearchQuery = query;
   
   try {
     // Build URL with search param
@@ -300,26 +298,38 @@ async function performSearch(query) {
     const doc = parser.parseFromString(html, 'text/html');
     const newTbody = doc.querySelector('.products-table tbody');
     const newCount = doc.querySelector('.product-count');
+    const newPagination = doc.querySelector('.pagination-container');
     
-    if (newTbody && tableBody) {
+    if (newTbody && productTableBody) {
       // Smooth transition
-      tableBody.style.opacity = '0.5';
+      productTableBody.style.opacity = '0.5';
       
       setTimeout(() => {
-        tableBody.innerHTML = newTbody.innerHTML;
-        tableBody.style.opacity = '1';
+        productTableBody.innerHTML = newTbody.innerHTML;
+        productTableBody.style.opacity = '1';
         
         // Update product count
         if (newCount) {
           document.querySelector('.product-count').textContent = newCount.textContent;
         }
         
-        searchStatus.style.display = 'none';
+        // Update pagination
+        const currentPagination = document.querySelector('.pagination-container');
+        if (newPagination && currentPagination) {
+          currentPagination.innerHTML = newPagination.innerHTML;
+        } else if (!newPagination && currentPagination) {
+          currentPagination.innerHTML = '';
+        }
+        
+        // Hide loading, show clear button if query exists
+        productSearchStatus.style.display = 'none';
+        productSearchClear.style.display = query ? 'flex' : 'none';
       }, 150);
     }
   } catch (error) {
     console.error('Search error:', error);
-    searchStatus.style.display = 'none';
+    productSearchStatus.style.display = 'none';
+    productSearchClear.style.display = lastProductSearchQuery ? 'flex' : 'none';
   }
 }
 
@@ -563,5 +573,6 @@ document.addEventListener('keydown', function(e) {
   background: #fca5a5;
   cursor: not-allowed;
 }
+
 </style>
 {% endblock content %}

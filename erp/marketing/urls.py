@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import api_stock_update
 app_name = "marketing"
 
 
@@ -15,6 +16,7 @@ urlpatterns = [
     path("api/get_product_categories",views.get_product_categories,name="get_product_categories"),
     path("api/get_products",views.get_products,name="get_products"),
     path("api/get_product",views.get_product,name="get_product"),
+    path("api/update_product_stock/",api_stock_update.update_product_stock,name="update_product_stock"),
     path("api/product_file_delete/",views.ProductFileDelete.as_view(),name="product_file_delete"),
     path("api/update_variant_image_order/",views.update_variant_image_order,name="update_variant_image_order"),
     path("api/async_delete_cloudinary_files/",views.async_delete_cloudinary_files,name="async_delete_cloudinary_files"),

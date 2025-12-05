@@ -3,24 +3,32 @@
   .search_component {
     position: relative;
   }
+
   .search-input-wrapper {
     position: relative;
   }
+
   .search-input-wrapper input {
     width: 100%;
-    padding: 12px 16px;
-    padding-right: 40px;
+    padding: 16px 20px;
+    padding-left: 24px;
+    padding-right: 45px;
     border: 2px solid #3b82f6;
-    border-radius: 8px;
-    font-size: 15px;
+    border-radius: 10px;
+    font-size: 17px;
     outline: none;
     transition: all 0.2s;
     box-sizing: border-box;
+    min-height: 56px;
+    text-indent: 8px;
   }
+
   .search-input-wrapper input:focus {
     border-color: #2563eb;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+
   }
+
   .search-loading {
     position: absolute;
     right: 12px;
@@ -29,11 +37,13 @@
     color: #3b82f6;
     display: none;
   }
+
   .searchResults {
     margin-top: 8px;
     max-height: 400px;
     overflow-y: auto;
   }
+
   .searchResults a {
     display: flex;
     align-items: center;
@@ -44,22 +54,27 @@
     border-radius: 6px;
     transition: background 0.15s;
   }
+
   .searchResults a:hover {
     background: #f0f4ff;
   }
+
   .searchResults a i {
     color: #3b82f6;
     width: 20px;
     text-align: center;
   }
+
   .searchResults p {
     margin: 0;
   }
+
   .no-results {
     text-align: center;
     padding: 20px;
     color: #9ca3af;
   }
+
   .search-loading-container {
     display: flex;
     flex-direction: column;
@@ -68,6 +83,7 @@
     padding: 30px;
     color: #6b7280;
   }
+
   .search-loading-container i {
     font-size: 24px;
     color: #3b82f6;
@@ -77,12 +93,8 @@
 
 <div class="search_component">
   <div class="search-input-wrapper">
-    <input type="text" 
-           name="searchInput" 
-           id="searchInput" 
-           placeholder="Search for a name, email, phone number, etc."
-           oninput="instantSearchContacts(this)"
-           autocomplete="off" />
+    <input type="text" name="searchInput" id="searchInput" placeholder="Search for a name, email, phone number, etc."
+      oninput="instantSearchContacts(this)" autocomplete="off" />
     <div class="search-loading" id="searchSpinner">
       <i class="fa fa-spinner fa-spin"></i>
     </div>
@@ -129,16 +141,16 @@
         },
         body: 'searchInput=' + encodeURIComponent(query)
       })
-      .then(response => response.text())
-      .then(html => {
-        resultsDiv.innerHTML = html || '<div class="no-results"><i class="fa fa-search"></i><p>No results found</p></div>';
-        spinner.style.display = 'none';
-      })
-      .catch(error => {
-        console.error('Search error:', error);
-        spinner.style.display = 'none';
-        resultsDiv.innerHTML = '<div class="no-results">Error searching</div>';
-      });
+        .then(response => response.text())
+        .then(html => {
+          resultsDiv.innerHTML = html || '<div class="no-results"><i class="fa fa-search"></i><p>No results found</p></div>';
+          spinner.style.display = 'none';
+        })
+        .catch(error => {
+          console.error('Search error:', error);
+          spinner.style.display = 'none';
+          resultsDiv.innerHTML = '<div class="no-results">Error searching</div>';
+        });
     }, 300);
   }
 </script>

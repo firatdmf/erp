@@ -995,6 +995,40 @@
       const marketingExpanded = document.getElementById('marketingExpanded');
       const operatingButton = document.getElementById('operatingButton');
       const operatingExpanded = document.getElementById('operatingExpanded');
+      
+      // Search overlay functionality
+      const searchButton = document.getElementById('searchButton');
+      const searchOverlay = document.getElementById('searchOverlay');
+      const searchInput = document.getElementById('searchInput');
+      
+      if (searchButton && searchOverlay) {
+        // Open search overlay when search button is clicked
+        searchButton.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          searchOverlay.style.display = 'flex';
+          // Focus on search input after a short delay to allow overlay to render
+          setTimeout(() => {
+            if (searchInput) searchInput.focus();
+          }, 100);
+        });
+        
+        // Close search overlay when clicking outside the overlay content
+        searchOverlay.addEventListener('click', function(e) {
+          if (e.target === searchOverlay) {
+            searchOverlay.style.display = 'none';
+            if (searchInput) searchInput.value = '';
+          }
+        });
+        
+        // Close search overlay when pressing ESC key
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape' && searchOverlay.style.display === 'flex') {
+            searchOverlay.style.display = 'none';
+            if (searchInput) searchInput.value = '';
+          }
+        });
+      }
 
       let hoverTimeout;
       let marketingHoverTimeout;

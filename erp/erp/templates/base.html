@@ -2,192 +2,193 @@
 {% load erp_tags %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}ERP{% endblock %}</title>
-  
+
   <!-- CSS Files -->
   <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=4.3" />
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  
+
   <!-- HTMX -->
   <script src="{% static 'erp/htmx.min.js' %}" defer></script>
-{% comment %}
-<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script> {% endcomment %}
-{% comment %}Unsaved changes handler - now inline in base.html script section{% endcomment %}
-{% block css %}
-{% endblock %}
-<style>
-  /* Dynamic Email/Phone Fields - Modern Circular Buttons */
-  .dynamic-field-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px !important;
-  }
+  {% comment %}
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script> {% endcomment %}
+  {% comment %}Unsaved changes handler - now inline in base.html script section{% endcomment %}
+  {% block css %}
+  {% endblock %}
+  <style>
+    /* Dynamic Email/Phone Fields - Modern Circular Buttons */
+    .dynamic-field-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px !important;
+    }
 
-  .dynamic-field-wrapper {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
+    .dynamic-field-wrapper {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
 
-  .dynamic-field-input-wrapper {
-    flex: 1 1 0 !important;
-    max-width: 100% !important;
-    background: #fff !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 8px !important;
-    transition: border-color 0.2s !important;
-    min-height: 42px !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-  }
+    .dynamic-field-input-wrapper {
+      flex: 1 1 0 !important;
+      max-width: 100% !important;
+      background: #fff !important;
+      border: 1px solid #e5e7eb !important;
+      border-radius: 8px !important;
+      transition: border-color 0.2s !important;
+      min-height: 42px !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
 
-  .dynamic-field-input-wrapper:hover {
-    border-color: #cbd5e1 !important;
-  }
+    .dynamic-field-input-wrapper:hover {
+      border-color: #cbd5e1 !important;
+    }
 
-  .dynamic-field-input-wrapper:focus-within {
-    border-color: #667eea !important;
-    box-shadow: none !important;
-    outline: none !important;
-  }
+    .dynamic-field-input-wrapper:focus-within {
+      border-color: #667eea !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
 
-  .dynamic-field-input {
-    width: 100%;
-    padding: 11px 14px !important;
-    font-size: 14px !important;
-    border: none !important;
-    background: transparent !important;
-    min-height: 42px;
-  }
+    .dynamic-field-input {
+      width: 100%;
+      padding: 11px 14px !important;
+      font-size: 14px !important;
+      border: none !important;
+      background: transparent !important;
+      min-height: 42px;
+    }
 
-  .dynamic-field-input:focus {
-    outline: none !important;
-  }
+    .dynamic-field-input:focus {
+      outline: none !important;
+    }
 
-  .btn-remove-field,
-  .btn-add-field {
-    width: 28px !important;
-    height: 28px !important;
-    min-width: 28px !important;
-    border: 1.5px solid #d1d5db !important;
-    border-radius: 50% !important;
-    background: #fff !important;
-    cursor: pointer;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 14px !important;
-    color: #6b7280 !important;
-    transition: all 0.15s ease;
-    flex-shrink: 0 !important;
-    padding: 0 !important;
-    line-height: 1 !important;
-  }
+    .btn-remove-field,
+    .btn-add-field {
+      width: 28px !important;
+      height: 28px !important;
+      min-width: 28px !important;
+      border: 1.5px solid #d1d5db !important;
+      border-radius: 50% !important;
+      background: #fff !important;
+      cursor: pointer;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      font-size: 14px !important;
+      color: #6b7280 !important;
+      transition: all 0.15s ease;
+      flex-shrink: 0 !important;
+      padding: 0 !important;
+      line-height: 1 !important;
+    }
 
-  .btn-add-field:hover {
-    background: #f0fdf4 !important;
-    border-color: #86efac !important;
-    color: #16a34a !important;
-    transform: scale(1.1);
-    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
-  }
+    .btn-add-field:hover {
+      background: #f0fdf4 !important;
+      border-color: #86efac !important;
+      color: #16a34a !important;
+      transform: scale(1.1);
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+    }
 
-  .btn-remove-field:hover {
-    background: #fef2f2 !important;
-    border-color: #fca5a5 !important;
-    color: #dc2626 !important;
-    transform: scale(1.1);
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
-  }
+    .btn-remove-field:hover {
+      background: #fef2f2 !important;
+      border-color: #fca5a5 !important;
+      color: #dc2626 !important;
+      transform: scale(1.1);
+      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+    }
 
-  /* Modern Contact Search Results */
-  .contact-results {
-    max-height: 300px;
-    overflow-y: auto;
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    display: none;
-    margin-top: 8px;
-  }
+    /* Modern Contact Search Results */
+    .contact-results {
+      max-height: 300px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      display: none;
+      margin-top: 8px;
+    }
 
-  .contact-results.active {
-    display: block;
-  }
+    .contact-results.active {
+      display: block;
+    }
 
-  .contact-result-item {
-    padding: 12px 16px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    user-select: none;
-  }
+    .contact-result-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      user-select: none;
+    }
 
-  .contact-result-item:hover {
-    background: #f0f4ff;
-  }
+    .contact-result-item:hover {
+      background: #f0f4ff;
+    }
 
-  .contact-result-item:active {
-    background: #e0e7ff;
-  }
+    .contact-result-item:active {
+      background: #e0e7ff;
+    }
 
-  .contact-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 600;
-    font-size: 16px;
-    flex-shrink: 0;
-  }
+    .contact-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
 
-  .contact-info {
-    flex: 1;
-    min-width: 0;
-    pointer-events: none;
-  }
+    .contact-info {
+      flex: 1;
+      min-width: 0;
+      pointer-events: none;
+    }
 
-  .contact-name {
-    font-weight: 600;
-    color: #111827;
-    font-size: 15px;
-    cursor: pointer;
-  }
+    .contact-name {
+      font-weight: 600;
+      color: #111827;
+      font-size: 15px;
+      cursor: pointer;
+    }
 
-  .contact-details {
-    font-size: 13px;
-    color: #6b7280;
-    margin-top: 2px;
-    cursor: pointer;
-  }
+    .contact-details {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 2px;
+      cursor: pointer;
+    }
 
-  .selected-contact {
-    margin-top: 12px;
-    padding: 12px 16px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    display: none;
-    align-items: center;
-    gap: 12px;
-  }
+    .selected-contact {
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+    }
 
-  .selected-contact.active {
-    display: flex;
-  }
-</style>
+    .selected-contact.active {
+      display: flex;
+    }
+  </style>
 </head>
 
 <body>
@@ -213,7 +214,7 @@
           {% search_component csrf_token=csrf_token %}
           <div class="recent">
             <h4>Recent</h4>
-            <ul>
+                     <ul>
               {% for entry in last_ten_entities %}
               <li>
                 {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
@@ -617,7 +618,10 @@
           {% csrf_token %}
           <div class="form-group">
             <label for="id_company_name">Company Name <span style="color: #ef4444;">*</span></label>
-            <input type="text" name="name" id="id_company_name" class="form-input" required autofocus>
+            <input type="text" name="name" id="id_company_name" class="form-input" required autofocus
+              hx-get="{% url 'crm:check_company_duplicate' %}" hx-trigger="keyup changed delay:500ms"
+              hx-target="#company_name_error">
+            <div id="company_name_error"></div>
           </div>
 
           <div class="form-group">
@@ -763,7 +767,7 @@
               <label for="id_company_task_member">Assign to</label>
               <select name="task_member" id="id_company_task_member" class="form-input">
                 {% for member in all_members %}
-               <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
+                <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
                 </option>
                 {% endfor %}
               </select>
@@ -804,7 +808,10 @@
           {% csrf_token %}
           <div class="form-group">
             <label for="id_main_contact_name">Name <span style="color: #ef4444;">*</span></label>
-            <input type="text" name="name" id="id_main_contact_name" class="form-input" required autofocus>
+            <input type="text" name="name" id="id_main_contact_name" class="form-input" required autofocus
+              hx-get="{% url 'crm:check_contact_duplicate' %}" hx-trigger="keyup changed delay:500ms"
+              hx-target="#contact_name_error">
+            <div id="contact_name_error"></div>
           </div>
 
           <div class="form-group">
@@ -927,7 +934,10 @@
           {% csrf_token %}
           <div class="form-group">
             <label for="id_contact_name">Name <span style="color: #ef4444;">*</span></label>
-            <input type="text" name="name" id="id_contact_name" class="form-input" required autofocus>
+            <input type="text" name="name" id="id_contact_name" class="form-input" required autofocus
+              hx-get="{% url 'crm:check_contact_duplicate' %}?input_id=id_contact_name"
+              hx-trigger="keyup changed delay:500ms" hx-target="#nested_contact_name_error">
+            <div id="nested_contact_name_error"></div>
           </div>
 
           <div class="form-group">
@@ -995,15 +1005,15 @@
       const marketingExpanded = document.getElementById('marketingExpanded');
       const operatingButton = document.getElementById('operatingButton');
       const operatingExpanded = document.getElementById('operatingExpanded');
-      
+
       // Search overlay functionality
       const searchButton = document.getElementById('searchButton');
       const searchOverlay = document.getElementById('searchOverlay');
       const searchInput = document.getElementById('searchInput');
-      
+
       if (searchButton && searchOverlay) {
         // Open search overlay when search button is clicked
-        searchButton.addEventListener('click', function(e) {
+        searchButton.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
           searchOverlay.style.display = 'flex';
@@ -1012,17 +1022,17 @@
             if (searchInput) searchInput.focus();
           }, 100);
         });
-        
+
         // Close search overlay when clicking outside the overlay content
-        searchOverlay.addEventListener('click', function(e) {
+        searchOverlay.addEventListener('click', function (e) {
           if (e.target === searchOverlay) {
             searchOverlay.style.display = 'none';
             if (searchInput) searchInput.value = '';
           }
         });
-        
+
         // Close search overlay when pressing ESC key
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
           if (e.key === 'Escape' && searchOverlay.style.display === 'flex') {
             searchOverlay.style.display = 'none';
             if (searchInput) searchInput.value = '';

@@ -510,13 +510,13 @@ def update_task_ajax(request, task_id):
             task.priority = priority  # Update priority
             task.save()
             
-            # Calculate overdue display
+            # Calculate overdue display (use same classes as tasks.html)
             from datetime import date as dt_date
             delta = (due_date - dt_date.today()).days
             if delta < 0:
-                overdue_badge = f'<span class="task-overdue">{abs(delta)}d</span>'
+                overdue_badge = f'<span class="badge badge-overdue">{abs(delta)}D</span>'
             elif delta == 0:
-                overdue_badge = '<span class="task-overdue">today</span>'
+                overdue_badge = '<span class="badge badge-today">TODAY</span>'
             else:
                 overdue_badge = ''
             

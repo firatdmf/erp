@@ -775,6 +775,63 @@ from operator import attrgetter
 from django.urls import reverse
 from django.http import HttpResponse
 
+@login_required
+def check_company_duplicate(request):
+    """Check if company name already exists (HTMX)"""
+    name = request.GET.get('name', '').strip()
+    input_id = request.GET.get('input_id', 'id_company_name') # Default to main form
+    
+    if not name:
+        return HttpResponse("")
+    
+    # Check for exact case-insensitive match
+    exists = Company.objects.filter(name__iexact=name).exists()
+    
+    if exists:
+        return HttpResponse(
+            f'<div class="error-message" style="color: #ef4444; font-size: 13px; margin-top: 4px;">'
+            f'<i class="fas fa-exclamation-circle"></i> This company name already exists.'
+            f'</div>'
+            f'<script>'
+            f'document.getElementById("{input_id}").style.borderColor = "#ef4444";'
+            f'</script>'
+        )
+    else:
+        return HttpResponse(
+            f'<script>'
+            f'document.getElementById("{input_id}").style.borderColor = "#e5e7eb";'
+            f'</script>'
+        )
+
+@login_required
+def check_contact_duplicate(request):
+    """Check if contact name already exists (HTMX)"""
+    name = request.GET.get('name', '').strip()
+    input_id = request.GET.get('input_id', 'id_main_contact_name') # Default to main form
+
+    if not name:
+        return HttpResponse("")
+    
+    # Check for exact case-insensitive match
+    exists = Contact.objects.filter(name__iexact=name).exists()
+    
+    if exists:
+        return HttpResponse(
+            f'<div class="error-message" style="color: #ef4444; font-size: 13px; margin-top: 4px;">'
+            f'<i class="fas fa-exclamation-circle"></i> This contact name already exists.'
+            f'</div>'
+            f'<script>'
+            f'document.getElementById("{input_id}").style.borderColor = "#ef4444";'
+            f'</script>'
+        )
+    else:
+        return HttpResponse(
+            f'<script>'
+            f'document.getElementById("{input_id}").style.borderColor = "#e5e7eb";'
+            f'</script>'
+        )
+
+
 
 def search_contact(request):
     """Optimized search for contacts and companies with fast response."""

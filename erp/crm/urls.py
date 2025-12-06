@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 app_name = 'crm'
 urlpatterns = [
+    # Force reload
     path("",views.index.as_view(),name="index"),
     # path("search/",views.search_view,name='search'),
     path("contact/create/",views.ContactCreate.as_view(),name="create_contact"),
@@ -33,6 +34,8 @@ path('company/<int:pk>/toggle_email_campaign/', views.toggle_email_campaign, nam
 path('company/<int:pk>/notes_partial/', views.get_notes_partial, name='get_notes_partial'),
 path('company/<int:pk>/tasks_partial/', views.get_tasks_partial, name='get_tasks_partial'),
 path('contact/<int:pk>/notes_partial/', views.get_contact_notes_partial, name='get_contact_notes_partial'),
+path('check_company_duplicate/', views.check_company_duplicate, name='check_company_duplicate'),
+path('check_contact_duplicate/', views.check_contact_duplicate, name='check_contact_duplicate'),
 
 ]
 

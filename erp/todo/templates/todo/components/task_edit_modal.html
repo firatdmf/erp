@@ -27,208 +27,252 @@
 </div>
 
 <script>
-function openTaskEditSidebar(taskId) {
-  const sidebar = document.getElementById('taskEditSidebar');
-  const content = document.getElementById('taskEditContent');
-  
-  // Show sidebar
-  sidebar.classList.add('active');
-  
-  // Load task form via AJAX
-  fetch(`/todo/tasks/${taskId}/edit_form`, {
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest'
-    }
-  })
-  .then(response => response.text())
-  .then(html => {
-    content.innerHTML = html;
-  })
-  .catch(error => {
-    console.error('Error loading task form:', error);
-    content.innerHTML = '<div style="text-align: center; padding: 2rem; color: #ef4444;"><i class="fa fa-exclamation-circle fa-2x"></i><p style="margin-top: 1rem;">Error loading task form</p></div>';
-  });
-}
-
-function closeTaskEditSidebar() {
-  const sidebar = document.getElementById('taskEditSidebar');
-  sidebar.classList.remove('active');
-  
-  // Clear content after animation
-  setTimeout(() => {
-    document.getElementById('taskEditContent').innerHTML = '';
-  }, 300);
-}
-
-// Close on outside click
-document.addEventListener('click', function(e) {
-  const sidebar = document.getElementById('taskEditSidebar');
-  if (sidebar && e.target === sidebar) {
-    closeTaskEditSidebar();
-  }
-});
-
-// Close on Escape key
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
+  function openTaskEditSidebar(taskId) {
     const sidebar = document.getElementById('taskEditSidebar');
-    if (sidebar && sidebar.classList.contains('active')) {
-      closeTaskEditSidebar();
-    }
-  }
-});
+    const content = document.getElementById('taskEditContent');
 
-// Handle task edit form submission (global handler)
-function handleTaskEditFormSubmit(event) {
-  event.preventDefault();
-  console.log('Form submit intercepted - GLOBAL HANDLER');
-  
-  const form = event.target;
-  const submitButton = form.querySelector('button[type="submit"]');
-  if (!submitButton) {
-    console.error('Submit button not found');
-    return;
+    // Show sidebar
+    sidebar.classList.add('active');
+
+    // Load task form via AJAX
+    fetch(`/todo/tasks/${taskId}/edit_form`, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => response.text())
+      .then(html => {
+        content.innerHTML = html;
+      })
+      .catch(error => {
+        console.error('Error loading task form:', error);
+        content.innerHTML = '<div style="text-align: center; padding: 2rem; color: #ef4444;"><i class="fa fa-exclamation-circle fa-2x"></i><p style="margin-top: 1rem;">Error loading task form</p></div>';
+      });
   }
-  
-  const originalButtonText = submitButton.innerHTML;
-  
-  // Show loading state
-  submitButton.disabled = true;
-  submitButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Updating...';
-  
-  // Get form data
-  const formData = new FormData(form);
-  
-  console.log('Sending AJAX request to:', form.action);
-  
-  // Send AJAX request
-  fetch(form.action, {
-    method: 'POST',
-    body: formData,
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-    }
-  })
-  .then(response => {
-    console.log('Response received:', response.status);
-    return response.json();
-  })
-  .then(data => {
-    console.log('Response data:', data);
-    if (data.success) {
-      // Close sidebar
+
+  function closeTaskEditSidebar() {
+    const sidebar = document.getElementById('taskEditSidebar');
+    sidebar.classList.remove('active');
+
+    // Clear content after animation
+    setTimeout(() => {
+      document.getElementById('taskEditContent').innerHTML = '';
+    }, 300);
+  }
+
+  // Close on outside click
+  document.addEventListener('click', function (e) {
+    const sidebar = document.getElementById('taskEditSidebar');
+    if (sidebar && e.target === sidebar) {
       closeTaskEditSidebar();
-      
-      // Show success toast
-      if (typeof showToast === 'function') {
-        showToast('Task updated successfully', 'success');
-      } else {
-        showToastLocal('Task updated successfully', 'success');
-      }
-      
-      // Update task in DOM
-      updateTaskInDOM(data.task);
-      
-      // Reload tasks for current date if on dashboard
-      if (typeof loadTasksForDate === 'function' && window.selectedDate) {
-        loadTasksForDate(window.selectedDate);
-      }
-    } else {
-      // Show errors
-      submitButton.disabled = false;
-      submitButton.innerHTML = originalButtonText;
-      
-      if (data.errors) {
-        // Display form errors
-        let errorHtml = '<div style="margin: 1rem 0; padding: 0.75rem; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 0.875rem;">';
-        errorHtml += '<strong><i class="fa fa-exclamation-circle"></i> Please correct the errors below:</strong><ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">';
-        
-        for (const [field, errors] of Object.entries(data.errors)) {
-          errors.forEach(error => {
-            errorHtml += `<li>${field}: ${error}</li>`;
-          });
-        }
-        
-        errorHtml += '</ul></div>';
-        
-        // Insert errors before footer
-        const existingErrors = form.querySelector('[style*="fee2e2"]');
-        if (existingErrors) existingErrors.remove();
-        
-        const footer = form.querySelector('.sidebar-footer');
-        if (footer) {
-          footer.insertAdjacentHTML('beforebegin', errorHtml);
-        }
-      } else {
-        if (typeof showToast === 'function') {
-          showToast('Failed to update task. Please try again.', 'error');
-        } else {
-          alert('Failed to update task. Please try again.');
-        }
-      }
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    submitButton.disabled = false;
-    submitButton.innerHTML = originalButtonText;
-    if (typeof showToast === 'function') {
-      showToast('An error occurred. Please try again.', 'error');
-    } else {
-      alert('An error occurred. Please try again.');
     }
   });
-}
 
-// Update task in DOM without page reload
-function updateTaskInDOM(taskData) {
-  const taskElement = document.querySelector(`[data-task-id="${taskData.id}"]`);
-  if (!taskElement) return;
-  
-  // Update task name
-  const taskName = taskElement.querySelector('.taskName, h4.taskName');
-  if (taskName) taskName.textContent = taskData.name;
-  
-  // Update description
-  const taskDescription = taskElement.querySelector('.taskDescription');
-  if (taskDescription && taskData.description) {
-    taskDescription.textContent = taskData.description;
-  }
-  
-  // Update due date
-  const taskDueDate = taskElement.querySelector('.taskDueDate, span.taskDueDate');
-  if (taskDueDate && taskData.due_date) {
-    const icon = taskDueDate.querySelector('i');
-    const badge = taskDueDate.querySelector('.badge');
-    
-    if (icon) {
-      taskDueDate.innerHTML = icon.outerHTML + ' ' + taskData.due_date;
-      if (badge) taskDueDate.appendChild(badge);
-    } else {
-      const dueDateText = taskDueDate.textContent.replace(/Due:.*\d{4}/, `Due: ${taskData.due_date}`);
-      taskDueDate.innerHTML = dueDateText;
+  // Close on Escape key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      const sidebar = document.getElementById('taskEditSidebar');
+      if (sidebar && sidebar.classList.contains('active')) {
+        closeTaskEditSidebar();
+      }
     }
-  }
-  
-  // Add visual feedback
-  taskElement.style.transition = 'all 0.3s ease';
-  taskElement.style.background = '#dbeafe';
-  setTimeout(() => { taskElement.style.background = ''; }, 1000);
-}
+  });
 
-// Local toast function (fallback)
-function showToastLocal(message, type = 'success') {
-  const colors = {
-    success: { bg: '#10b981', icon: 'fa-check-circle' },
-    error: { bg: '#ef4444', icon: 'fa-exclamation-circle' }
-  };
-  const color = colors[type] || colors.success;
-  
-  const toast = document.createElement('div');
-  toast.style.cssText = `position: fixed; top: 20px; right: 20px; background: white; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 0.75rem; z-index: 10000;`;
-  toast.innerHTML = `<div style="width: 40px; height: 40px; background: ${color.bg}; border-radius: 50%; display: flex; align-items: center; justify-content: center;"><i class="fa ${color.icon}" style="color: white; font-size: 18px;"></i></div><span style="color: #1f2937; font-weight: 500;">${message}</span>`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-}
+  // Handle task edit form submission (global handler)
+  function handleTaskEditFormSubmit(event) {
+    event.preventDefault();
+    console.log('Form submit intercepted - GLOBAL HANDLER');
+
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (!submitButton) {
+      console.error('Submit button not found');
+      return;
+    }
+
+    const originalButtonText = submitButton.innerHTML;
+
+    // Show loading state
+    submitButton.disabled = true;
+    submitButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Updating...';
+
+    // Get form data
+    const formData = new FormData(form);
+
+    console.log('Sending AJAX request to:', form.action);
+
+    // Send AJAX request
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+      }
+    })
+      .then(response => {
+        console.log('Response received:', response.status);
+        return response.json();
+      })
+      .then(data => {
+        console.log('Response data:', data);
+        if (data.success) {
+          // Close sidebar
+          closeTaskEditSidebar();
+
+          // Show success toast
+          if (typeof showToast === 'function') {
+            showToast('Task updated successfully', 'success');
+          } else {
+            showToastLocal('Task updated successfully', 'success');
+          }
+
+          // Update task in DOM (only the specific task card, no full reload)
+          updateTaskInDOM(data.task);
+
+          // Update calendar badge count if task date changed
+          if (typeof updateCalendarBadge === 'function') {
+            updateCalendarBadge();
+          }
+        } else {
+          // Show errors
+          submitButton.disabled = false;
+          submitButton.innerHTML = originalButtonText;
+
+          if (data.errors) {
+            // Display form errors
+            let errorHtml = '<div style="margin: 1rem 0; padding: 0.75rem; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 0.875rem;">';
+            errorHtml += '<strong><i class="fa fa-exclamation-circle"></i> Please correct the errors below:</strong><ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">';
+
+            for (const [field, errors] of Object.entries(data.errors)) {
+              errors.forEach(error => {
+                errorHtml += `<li>${field}: ${error}</li>`;
+              });
+            }
+
+            errorHtml += '</ul></div>';
+
+            // Insert errors before footer
+            const existingErrors = form.querySelector('[style*="fee2e2"]');
+            if (existingErrors) existingErrors.remove();
+
+            const footer = form.querySelector('.sidebar-footer');
+            if (footer) {
+              footer.insertAdjacentHTML('beforebegin', errorHtml);
+            }
+          } else {
+            if (typeof showToast === 'function') {
+              showToast('Failed to update task. Please try again.', 'error');
+            } else {
+              alert('Failed to update task. Please try again.');
+            }
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalButtonText;
+        if (typeof showToast === 'function') {
+          showToast('An error occurred. Please try again.', 'error');
+        } else {
+          alert('An error occurred. Please try again.');
+        }
+      });
+  }
+
+  // Update task in DOM without page reload
+  function updateTaskInDOM(taskData) {
+    const taskElement = document.querySelector(`[data-task-id="${taskData.id}"]`);
+    if (!taskElement) {
+      console.log('Task element not found for ID:', taskData.id);
+      return;
+    }
+
+    console.log('Updating task in DOM:', taskData);
+
+    // Update task name
+    const taskName = taskElement.querySelector('h3.taskName, h4.taskName, .taskName');
+    if (taskName) {
+      taskName.textContent = taskData.name;
+      console.log('Updated name');
+    }
+
+    // Update description (handle both add and remove)
+    let taskDescription = taskElement.querySelector('.task-description, .taskDescription');
+    if (taskData.description && taskData.description.trim() !== '') {
+      if (taskDescription) {
+        taskDescription.textContent = taskData.description;
+        taskDescription.style.display = '';
+        console.log('Updated description');
+      } else {
+        // Create description element if it doesn't exist
+        const footerRow = taskElement.querySelector('.task-footer-row');
+        if (footerRow) {
+          const newDesc = document.createElement('div');
+          newDesc.className = 'task-description';
+          newDesc.textContent = taskData.description;
+          footerRow.insertAdjacentElement('beforebegin', newDesc);
+          console.log('Created new description');
+        }
+      }
+    } else {
+      // Remove description if it exists and was cleared
+      if (taskDescription) {
+        taskDescription.remove();
+        console.log('Removed description');
+      }
+    }
+
+    // Update due date and badges
+    const taskDueDate = taskElement.querySelector('.taskDueDate, span.taskDueDate');
+    const badgeContainer = taskElement.querySelector('.task-date-badges');
+
+    if (taskDueDate && taskData.due_date) {
+      const icon = taskDueDate.querySelector('i');
+      const iconHtml = icon ? icon.outerHTML + ' ' : '<i class="fa fa-calendar-alt"></i> ';
+      taskDueDate.innerHTML = iconHtml + taskData.due_date;
+      console.log('Updated due date');
+    }
+
+    // Update overdue badge
+    if (badgeContainer) {
+      // Remove old badges (but keep the date span)
+      const oldBadges = badgeContainer.querySelectorAll('.badge');
+      oldBadges.forEach(b => b.remove());
+
+      // Add new badge from server response
+      if (taskData.overdue_badge) {
+        badgeContainer.insertAdjacentHTML('beforeend', taskData.overdue_badge);
+        console.log('Added overdue badge');
+      }
+    }
+
+    // Add visual feedback (blue glow effect)
+    taskElement.style.transition = 'all 0.5s ease';
+    taskElement.style.boxShadow = '0 0 0 3px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.25)';
+    taskElement.style.transform = 'scale(1.01)';
+
+    setTimeout(() => {
+      taskElement.style.boxShadow = '';
+      taskElement.style.transform = '';
+    }, 1500);
+
+    console.log('✅ Task updated successfully');
+  }
+
+  // Local toast function (fallback)
+  function showToastLocal(message, type = 'success') {
+    const colors = {
+      success: { bg: '#10b981', icon: 'fa-check-circle' },
+      error: { bg: '#ef4444', icon: 'fa-exclamation-circle' }
+    };
+    const color = colors[type] || colors.success;
+
+    const toast = document.createElement('div');
+    toast.style.cssText = `position: fixed; top: 20px; right: 20px; background: white; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 0.75rem; z-index: 10000;`;
+    toast.innerHTML = `<div style="width: 40px; height: 40px; background: ${color.bg}; border-radius: 50%; display: flex; align-items: center; justify-content: center;"><i class="fa ${color.icon}" style="color: white; font-size: 18px;"></i></div><span style="color: #1f2937; font-weight: 500;">${message}</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
 </script>

@@ -335,7 +335,7 @@ function updateOptionValue(optionId, valueIndex, value) {
         originalOptionValues[optionId] = {};
     }
     const oldValue = variantData[optionId].values[valueIndex];
-    
+
     // Store original value if this is the first time we're editing this field
     if (oldValue && oldValue.trim() && originalOptionValues[optionId][valueIndex] === undefined) {
         originalOptionValues[optionId][valueIndex] = oldValue.trim().toLowerCase();
@@ -887,7 +887,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                     <td colspan="${displayOptions.length}">
                         <div style="display: flex; flex-direction: column;">
                             <span style="font-weight: 600; color: #111827;">${groupValue}</span>
-                            <span style="font-weight: 400; color: #6b7280; font-size: 12px; margin-top: 2px;">Tümünü genişlet</span>
+                            <span style="font-weight: 400; color: #6b7280; font-size: 12px; margin-top: 2px;">Expand all</span>
                         </div>
                     </td>
                     <td id="price_range_${groupId}">${priceRange}</td>
@@ -955,7 +955,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                         ${variantImagesHtml}
                     </div>
                 </td>
-                <td><input type="text" name="variant_sku_${originalIndex + 1}" value="${sku}" style="min-width: 120px;"></td>
+                <td><input type="text" name="variant_sku_${originalIndex + 1}" value="${sku}" style="min-width: 120px;${variantId ? ' background: #f3f4f6; color: #6b7280;' : ''}" ${variantId ? 'readonly title="SKU cannot be changed for existing variants"' : ''}></td>
                 <td><input type="text" name="variant_barcode_${originalIndex + 1}" value="${barcode}" style="min-width: 120px;"></td>
                 <td style="text-align: center;"><input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}></td>
                 <td style="text-align: center;">
@@ -1030,7 +1030,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
                         ${variantImagesHtml}
                     </div>
                 </td>
-                <td><input type="text" name="variant_sku_${index + 1}" value="${sku}" style="min-width: 120px;"></td>
+                <td><input type="text" name="variant_sku_${index + 1}" value="${sku}" style="min-width: 120px;${variantId ? ' background: #f3f4f6; color: #6b7280;' : ''}" ${variantId ? 'readonly title="SKU cannot be changed for existing variants"' : ''}></td>
                 <td><input type="text" name="variant_barcode_${index + 1}" value="${barcode}" style="min-width: 120px;"></td>
                 <td style="text-align: center;"><input type="checkbox" name="variant_featured_${index + 1}" ${featured ? 'checked' : ''}></td>
                 <td style="text-align: center;">
@@ -1518,8 +1518,8 @@ async function openImagePicker(variantIndex) {
     modal.id = 'image_picker_modal';
     modal.className = 'image_modal';
 
-    // Get currently selected images for this variant (by ID, not URL)
-    const selectedImageIds = variantImages[variantIndex].images.map(img => img.id).filter(id => id);
+    // Get currently selected images for this variant (by URL for cross-variant matching)
+    const selectedImageUrls = variantImages[variantIndex].images.map(img => img.url).filter(url => url);
     const primaryIndex = variantImages[variantIndex].primaryIndex;
 
     modal.innerHTML = `
@@ -1539,7 +1539,7 @@ async function openImagePicker(variantIndex) {
                     <p>Drag and drop images here</p>
                 </div>
                 <div class="image_grid" id="image_grid">
-                    ${generateImageGrid(selectedImageIds, primaryIndex)}
+                    ${generateImageGrid(selectedImageUrls, primaryIndex)}
                 </div>
             </div>
             <div class="image_modal_footer">
@@ -1557,15 +1557,15 @@ async function openImagePicker(variantIndex) {
 let uploadedImages = [];
 
 // Generate image grid from uploaded images
-function generateImageGrid(selectedImageIds, primaryIndex) {
+function generateImageGrid(selectedImageUrls, primaryIndex) {
     if (uploadedImages.length === 0) {
         return '<div class="no_images_message"><i class="fa fa-image"></i><p>No images uploaded yet. Use the \"Add File\" button above to add images.</p></div>';
     }
 
     return uploadedImages.map((img, idx) => {
-        // Check if this image is selected by ID (not URL)
-        const isSelected = img.id && selectedImageIds.includes(img.id);
-        const selectedIndex = isSelected ? selectedImageIds.indexOf(img.id) : -1;
+        // Check if this image is selected by URL (for cross-variant matching)
+        const isSelected = img.url && selectedImageUrls.includes(img.url);
+        const selectedIndex = isSelected ? selectedImageUrls.indexOf(img.url) : -1;
         const isPrimary = isSelected && selectedIndex === primaryIndex;
 
         // No variant badges - shared pool
@@ -1668,6 +1668,22 @@ async function handleImageUpload(event) {
             continue;
         }
 
+        // Check for duplicate - skip if file with same name already exists
+        const existingFile = uploadedImages.find(img => img.name === file.name);
+        if (existingFile) {
+            console.log(`File ${file.name} already exists, skipping upload.`);
+            showToast(`⚠️ "${file.name}" already exists`, 'warning');
+            continue;
+        }
+
+        // Store current DOM selections (by URL) BEFORE upload
+        const selectedUrls = new Set();
+        document.querySelectorAll('.image_item.selected').forEach(item => {
+            const url = item.getAttribute('data-url');
+            if (url) selectedUrls.add(url);
+        });
+        console.log('Stored selections before upload:', Array.from(selectedUrls));
+
         // Show progress placeholder
         const grid = document.getElementById('image_grid');
         const placeholder = document.createElement('div');
@@ -1741,14 +1757,39 @@ async function handleImageUpload(event) {
             }
 
             if (data && data.success) {
-                // Remove placeholder and refresh grid
+                // Remove placeholder
                 if (placeholder) placeholder.remove();
 
-                const variantImgs = variantImages[currentVariantIndex];
-                // Fix: Pass image IDs instead of URLs to generateImageGrid
-                const selectedImageIds = variantImgs ? variantImgs.images.map(img => img.id).filter(id => id) : [];
-                const primaryIndex = variantImgs ? variantImgs.primaryIndex : 0;
-                if (grid) grid.innerHTML = generateImageGrid(selectedImageIds, primaryIndex);
+                // Create and add the new image element instead of re-rendering entire grid
+                const newImage = uploadedImages[uploadedImages.length - 1];
+                const newIndex = uploadedImages.length - 1;
+
+                const newElement = document.createElement('div');
+                newElement.className = 'image_item';
+                newElement.setAttribute('data-url', newImage.url);
+                newElement.setAttribute('data-name', newImage.name);
+                newElement.setAttribute('data-index', newIndex);
+                newElement.onclick = function (e) { toggleImageSelection(this, e); };
+
+                newElement.innerHTML = `
+                    <img src="${newImage.url}" alt="${newImage.name}">
+                    <p>${newImage.name}</p>
+                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                `;
+
+                if (grid) grid.appendChild(newElement);
+
+                // Reapply selections to all existing elements
+                if (grid) {
+                    grid.querySelectorAll('.image_item').forEach(item => {
+                        const itemUrl = item.getAttribute('data-url');
+                        if (selectedUrls.has(itemUrl)) {
+                            item.classList.add('selected');
+                        }
+                    });
+                }
 
                 showToast(`✅ ${file.name} uploaded to shared pool!`, 'success');
             } else {
@@ -1832,6 +1873,10 @@ async function removeUploadedImage(index, event) {
     const image = uploadedImages[index];
     if (!image) return;
 
+    // Get the element to remove
+    const elementToRemove = document.querySelector(`.image_item[data-index="${index}"]`);
+    if (!elementToRemove) return;
+
     // Use modern confirmation
     const confirmed = await window.showConfirmDialog(
         'Delete Image?',
@@ -1841,6 +1886,16 @@ async function removeUploadedImage(index, event) {
     );
 
     if (confirmed) {
+        // Store selections AFTER dialog closes (captures current state)
+        const selectedUrls = new Set();
+        document.querySelectorAll('.image_item.selected').forEach(item => {
+            const url = item.getAttribute('data-url');
+            if (url && url !== image.url) {
+                selectedUrls.add(url);
+            }
+        });
+        console.log('Stored selections before delete:', Array.from(selectedUrls));
+
         // If image has DB ID, delete from backend
         if (image.id) {
             try {
@@ -1866,16 +1921,42 @@ async function removeUploadedImage(index, event) {
             }
         }
 
-        // Remove from array
+        // Remove from uploadedImages array
         uploadedImages.splice(index, 1);
 
-        // Refresh the grid
+        // Also remove from variantImages selections if it was selected
+        if (variantImages[currentVariantIndex]) {
+            variantImages[currentVariantIndex].images = variantImages[currentVariantIndex].images.filter(
+                img => img.id !== image.id
+            );
+        }
+
+        // Remove element from DOM
+        elementToRemove.remove();
+
+        // Update data-index attributes for remaining elements
         const grid = document.getElementById('image_grid');
         if (grid) {
-            const variantImgs = variantImages[currentVariantIndex];
-            const selectedImages = variantImgs ? variantImgs.images.map(img => img.url) : [];
-            const primaryIndex = variantImgs ? variantImgs.primaryIndex : 0;
-            grid.innerHTML = generateImageGrid(selectedImages, primaryIndex);
+            grid.querySelectorAll('.image_item').forEach((item, newIndex) => {
+                item.setAttribute('data-index', newIndex);
+                // Update onclick handler for remove button
+                const removeBtn = item.querySelector('.remove_image_btn');
+                if (removeBtn) {
+                    removeBtn.setAttribute('onclick', `removeUploadedImage(${newIndex}, event)`);
+                }
+
+                // Reapply selection if this item was selected
+                const itemUrl = item.getAttribute('data-url');
+                if (selectedUrls.has(itemUrl)) {
+                    item.classList.add('selected');
+                    console.log('Reapplied selection to:', itemUrl);
+                }
+            });
+
+            // Show empty message if no images left
+            if (uploadedImages.length === 0) {
+                grid.innerHTML = '<div class="no_images_message"><i class="fa fa-image"></i><p>No images uploaded yet. Use the "Add File" button above to add images.</p></div>';
+            }
         }
     }
 }

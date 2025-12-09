@@ -650,16 +650,40 @@ class BaseProductView(ModelFormMixin):
                                 all_images_to_update.append(source_file)
                                 print(f"🔗 Linked unlinked file {img_id} to variant {variant_sku} (seq={img_sequence})")
                             else:
-                                # File belongs to another variant - create a NEW copy (allows multi-variant sharing)
-                                new_file = ProductFile(
-                                    product=self.object,
-                                    product_variant=variant,
-                                    file_url=source_file.file_url,
-                                    sequence=img_sequence,
-                                    is_primary=(img_sequence == 0)
-                                )
-                                all_images_to_create.append(new_file)
-                                print(f"🔄 Created copy of file {img_id} for variant {variant_sku} (seq={img_sequence})")
+                                # File belongs to another variant
+                                # Check if this variant already has a file with the same URL (prevent duplicates)
+                                existing_file_with_url = None
+                                variant_files = variant_files_cache.get(variant_sku, {})
+                                for f in variant_files.values():
+                                    if f.file_url == source_file.file_url:
+                                        existing_file_with_url = f
+                                        break
+                                
+                                # Also check in the batch we're about to create
+                                if not existing_file_with_url:
+                                    for pending_file in all_images_to_create:
+                                        if pending_file.product_variant == variant and pending_file.file_url == source_file.file_url:
+                                            existing_file_with_url = pending_file
+                                            break
+                                
+                                if existing_file_with_url:
+                                    # Reuse existing file with same URL
+                                    existing_file_with_url.sequence = img_sequence
+                                    existing_file_with_url.is_primary = (img_sequence == 0)
+                                    if existing_file_with_url not in all_images_to_update:
+                                        all_images_to_update.append(existing_file_with_url)
+                                    print(f"♻️ Reusing existing file with same URL for variant {variant_sku} (seq={img_sequence})")
+                                else:
+                                    # Create a NEW copy (first time sharing this image with this variant)
+                                    new_file = ProductFile(
+                                        product=self.object,
+                                        product_variant=variant,
+                                        file_url=source_file.file_url,
+                                        sequence=img_sequence,
+                                        is_primary=(img_sequence == 0)
+                                    )
+                                    all_images_to_create.append(new_file)
+                                    print(f"🔄 Created copy of file {img_id} for variant {variant_sku} (seq={img_sequence})")
                         else:
                             print(f"❌ WARNING: Image {img_id} not found in shared pool")
             
@@ -1399,6 +1423,7 @@ def get_product_files(request):
     Returns both product files and all variant files in a single unified list.
     Used by file manager modal to show all available files.
     Expects: GET param 'product_id'
+    NOTE: Deduplicates by URL to prevent showing same image multiple times.
     """
     try:
         product_id = request.GET.get('product_id')
@@ -1417,7 +1442,14 @@ def get_product_files(request):
         ).select_related('product_variant').order_by('sequence', 'pk')
         
         file_list = []
+        seen_urls = set()  # Track URLs we've already added to prevent duplicates
+        
         for f in files:
+            # Deduplicate by URL - only add first occurrence
+            if f.file_url in seen_urls:
+                continue
+            seen_urls.add(f.file_url)
+            
             # Add metadata about which variant this file belongs to
             variant_info = None
             if f.product_variant:
@@ -1428,7 +1460,7 @@ def get_product_files(request):
             
             file_list.append({
                 'id': f.pk,
-                'url': f.optimized_url,
+                'url': f.file_url,  # Use file_url for consistency with marketing_tags.py
                 'name': f.file_url.split('/')[-1],
                 'is_primary': f.is_primary,
                 'sequence': f.sequence,

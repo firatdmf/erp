@@ -279,6 +279,37 @@ const modalCSS = `
   font-size: 20px;
 }
 
+/* Delete Button */
+.fm-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0;
+  transition: all 0.2s;
+  z-index: 5;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.fm-file-item:hover .fm-delete-btn {
+  opacity: 1;
+}
+
+.fm-delete-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
 /* Upload Progress Overlay */
 .fm-upload-progress {
   position: absolute;
@@ -391,7 +422,7 @@ function initFileManager() {
     style.innerHTML = modalCSS;
     document.head.appendChild(style);
   }
-  
+
   // Add HTML
   if (!document.getElementById('fileManagerModal')) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
@@ -406,35 +437,35 @@ function attachModalEvents() {
   const uploadZone = document.getElementById('fmUploadZone');
   const fileInput = document.getElementById('fmFileInput');
   const doneBtn = document.getElementById('fmDoneBtn');
-  
+
   // Close modal
   closeBtn.addEventListener('click', closeFileManager);
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeFileManager();
   });
-  
+
   // Upload zone click
   uploadZone.addEventListener('click', () => fileInput.click());
-  
+
   // File input change
   fileInput.addEventListener('change', handleFileSelect);
-  
+
   // Drag & drop
   uploadZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     uploadZone.classList.add('dragover');
   });
-  
+
   uploadZone.addEventListener('dragleave', () => {
     uploadZone.classList.remove('dragover');
   });
-  
+
   uploadZone.addEventListener('drop', (e) => {
     e.preventDefault();
     uploadZone.classList.remove('dragover');
     handleFileDrop(e.dataTransfer.files);
   });
-  
+
   // Done button - sync selection with product grid
   doneBtn.addEventListener('click', syncSelectionToProduct);
 }
@@ -446,7 +477,7 @@ function openFileManager(productId, variantId = null) {
   modal.classList.add('active');
   modal.dataset.productId = productId;
   modal.dataset.variantId = variantId || '';
-  
+
   if (variantId) {
     loadExistingVariantFiles(productId, variantId);
   } else {
@@ -458,7 +489,7 @@ function openFileManager(productId, variantId = null) {
 function closeFileManager() {
   const modal = document.getElementById('fileManagerModal');
   modal.classList.remove('active');
-  
+
   // Clear selections
   document.querySelectorAll('.fm-file-item.selected').forEach(item => {
     item.classList.remove('selected');
@@ -469,22 +500,22 @@ function closeFileManager() {
 async function loadExistingFiles(productId) {
   const grid = document.getElementById('fmFilesGrid');
   const count = document.getElementById('fmFileCount');
-  
+
   // Check if temp mode (product creation)
   const isCreateMode = (productId === 'temp' || productId === null || productId === 'null');
-  
+
   if (isCreateMode) {
     // Load from session (temp files)
     grid.innerHTML = '';
-    
+
     // Get currently displayed images from sortable grid
     const currentImages = Array.from(document.querySelectorAll('.sortable-image'));
-    
+
     if (currentImages.length > 0) {
       currentImages.forEach(img => {
         const fileId = img.dataset.fileId;
         const fileUrl = img.querySelector('img')?.src;
-        
+
         if (fileId && fileUrl) {
           const fileItem = createFileItem({
             id: fileId,
@@ -496,44 +527,44 @@ async function loadExistingFiles(productId) {
           grid.appendChild(fileItem);
         }
       });
-      
+
       count.textContent = currentImages.length;
     } else {
       grid.innerHTML = '<div class="fm-empty"><i class="fa fa-images"></i><p>No files yet. Upload some!</p></div>';
       count.textContent = '0';
     }
-    
+
     updateDoneButton();
     return;
   }
-  
+
   // Existing product mode - fetch from API
   grid.innerHTML = '<div class="fm-empty"><i class="fa fa-spinner fa-spin"></i><p>Loading files...</p></div>';
-  
+
   try {
     const response = await fetch(`/marketing/api/get_product_files/?product_id=${productId}`);
     const data = await response.json();
-    
+
     if (data.success && data.files.length > 0) {
       grid.innerHTML = '';
-      
+
       // Get currently displayed product file IDs
       const currentFileIds = new Set(
         Array.from(document.querySelectorAll('.sortable-image'))
           .map(img => img.dataset.fileId)
       );
-      
+
       data.files.forEach(file => {
         const fileItem = createFileItem(file);
-        
+
         // Auto-select if already in product
         if (currentFileIds.has(String(file.id))) {
           fileItem.classList.add('selected');
         }
-        
+
         grid.appendChild(fileItem);
       });
-      
+
       count.textContent = data.files.length;
       updateDoneButton();
     } else {
@@ -550,23 +581,23 @@ async function loadExistingFiles(productId) {
 async function loadExistingVariantFiles(productId, variantId) {
   const grid = document.getElementById('fmFilesGrid');
   const count = document.getElementById('fmFileCount');
-  
+
   grid.innerHTML = '<div class="fm-empty"><i class="fa fa-spinner fa-spin"></i><p>Loading variant files...</p></div>';
-  
+
   try {
     const response = await fetch(`/marketing/api/get_variant_files/?product_id=${productId}&variant_id=${variantId}`);
     const data = await response.json();
-    
+
     if (data.success && data.files.length > 0) {
       grid.innerHTML = '';
-      
+
       // All variant files are auto-selected
       data.files.forEach(file => {
         const fileItem = createFileItem(file);
         fileItem.classList.add('selected');
         grid.appendChild(fileItem);
       });
-      
+
       count.textContent = data.files.length;
       updateDoneButton();
     } else {
@@ -583,25 +614,130 @@ async function loadExistingVariantFiles(productId, variantId) {
 function createFileItem(file, isNew = false) {
   const div = document.createElement('div');
   div.className = `fm-file-item${isNew ? ' uploading' : ''}`;
-  
+
   // Use pk for existing files, id for temp files
   const fileId = file.pk || file.id;
   const fileUrl = file.file_url || file.url;
-  
+  const isTempFile = file.temp_file || false;
+
   div.dataset.fileId = fileId;
-  
+  div.dataset.isTempFile = isTempFile;
+
   div.innerHTML = `
     <img src="${fileUrl}" alt="${file.name || 'Image'}" class="fm-file-img">
     <div class="fm-file-overlay">
       <div class="fm-file-check"><i class="fa fa-check"></i></div>
     </div>
+    <button type="button" class="fm-delete-btn" title="Delete">
+      <i class="fa fa-trash"></i>
+    </button>
   `;
-  
+
   if (!isNew) {
-    div.addEventListener('click', () => toggleFileSelection(div));
+    // Click on image area toggles selection
+    div.addEventListener('click', (e) => {
+      // Don't toggle if clicking delete button
+      if (!e.target.closest('.fm-delete-btn')) {
+        toggleFileSelection(div);
+      }
+    });
+
+    // Delete button handler
+    const deleteBtn = div.querySelector('.fm-delete-btn');
+    deleteBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteFileFromModal(fileId, div, isTempFile);
+    });
   }
-  
+
   return div;
+}
+
+// Delete file from modal while preserving other selections
+async function deleteFileFromModal(fileId, element, isTempFile = false) {
+  // Store current selections before deletion
+  const selectedFileIds = new Set();
+  document.querySelectorAll('.fm-file-item.selected').forEach(item => {
+    if (item.dataset.fileId !== String(fileId)) {
+      selectedFileIds.add(item.dataset.fileId);
+    }
+  });
+
+  // Show confirmation using the existing dialog
+  const confirmed = await showConfirmDialog(
+    'Delete Image?',
+    'This action cannot be undone.',
+    'Delete',
+    'Cancel'
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  // Show loading state
+  element.style.opacity = '0.5';
+  element.style.pointerEvents = 'none';
+
+  try {
+    // Call delete API
+    const response = await fetch('/marketing/api/instant_delete_file/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ file_id: fileId })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      // Remove element from modal with animation
+      element.style.animation = 'fadeOut 0.3s ease-out';
+      setTimeout(() => {
+        element.remove();
+
+        // Update file count
+        const count = document.getElementById('fmFileCount');
+        if (count) {
+          count.textContent = Math.max(0, parseInt(count.textContent) - 1);
+        }
+
+        // Restore selections to remaining items
+        document.querySelectorAll('.fm-file-item').forEach(item => {
+          if (selectedFileIds.has(item.dataset.fileId)) {
+            item.classList.add('selected');
+          }
+        });
+
+        // Update done button
+        updateDoneButton();
+
+        // Also remove from product grid if exists
+        const productGridItem = document.querySelector(`.sortable-image[data-file-id="${fileId}"]`);
+        if (productGridItem) {
+          productGridItem.remove();
+          if (typeof updatePrimaryBadge === 'function') {
+            updatePrimaryBadge();
+          }
+          if (typeof updateImageOrder === 'function') {
+            updateImageOrder();
+          }
+        }
+      }, 300);
+
+      showToast('🗑️ File deleted!', 'success');
+    } else {
+      throw new Error(data.error || 'Delete failed');
+    }
+  } catch (error) {
+    console.error('Delete error:', error);
+    element.style.opacity = '1';
+    element.style.pointerEvents = 'auto';
+    showToast(`❌ Delete error: ${error.message}`, 'error');
+  }
 }
 
 // Toggle file selection
@@ -614,7 +750,7 @@ function toggleFileSelection(element) {
 function updateDoneButton() {
   const selected = document.querySelectorAll('.fm-file-item.selected').length;
   const btn = document.getElementById('fmDoneBtn');
-  
+
   if (selected > 0) {
     btn.innerHTML = `<i class="fa fa-check"></i> Done (${selected})`;
   } else {
@@ -640,28 +776,47 @@ async function uploadFiles(files) {
   const productId = modal.dataset.productId;
   const variantId = modal.dataset.variantId || null;
   const grid = document.getElementById('fmFilesGrid');
-  
+
+  // Get existing file names from grid
+  const existingFileNames = new Set();
+  grid.querySelectorAll('.fm-file-item .fm-file-img').forEach(img => {
+    // Extract filename from URL
+    const url = img.src || '';
+    const fileName = url.split('/').pop().split('?')[0];
+    if (fileName) existingFileNames.add(fileName);
+  });
+
   for (const file of files) {
+    // Check for duplicate - skip if file with same name already exists
+    if (existingFileNames.has(file.name)) {
+      console.log(`File ${file.name} already exists, skipping upload.`);
+      showToast(`⚠️ "${file.name}" already exists`, 'warning');
+      continue;
+    }
+
     // Create placeholder with progress
     const placeholder = createUploadPlaceholder(file);
     // Add to END of grid, not beginning
     grid.appendChild(placeholder);
-    
+
     // Upload
     const uploadedFile = await uploadSingleFile(file, productId, placeholder, variantId);
-    
+
     if (uploadedFile) {
       console.log('Uploaded file object:', uploadedFile);
-      
+
+      // Add to existing names to prevent duplicates in same batch
+      existingFileNames.add(file.name);
+
       // Replace placeholder with actual file
       const fileItem = createFileItem(uploadedFile);
       console.log('Created file item, dataset.fileId:', fileItem.dataset.fileId);
       placeholder.replaceWith(fileItem);
-      
+
       // Update count
       const count = document.getElementById('fmFileCount');
       count.textContent = parseInt(count.textContent) + 1;
-      
+
       // Update done button
       updateDoneButton();
     } else {
@@ -674,7 +829,7 @@ async function uploadFiles(files) {
 function createUploadPlaceholder(file) {
   const div = document.createElement('div');
   div.className = 'fm-file-item uploading';
-  
+
   const reader = new FileReader();
   reader.onload = (e) => {
     div.innerHTML = `
@@ -694,7 +849,7 @@ function createUploadPlaceholder(file) {
     `;
   };
   reader.readAsDataURL(file);
-  
+
   return div;
 }
 
@@ -702,21 +857,21 @@ function createUploadPlaceholder(file) {
 async function uploadSingleFile(file, productId, placeholder, variantId = null) {
   // Wait for DOM to be ready
   await new Promise(resolve => setTimeout(resolve, 100));
-  
+
   const progressBar = placeholder.querySelector('.fm-progress-bar');
   const progressText = placeholder.querySelector('.fm-progress-text');
-  
+
   if (!progressBar || !progressText) {
     console.warn('Progress elements not found');
     return null;
   }
-  
+
   const formData = new FormData();
   formData.append('file', file);
-  
+
   // Check if product creation mode (productId === 'temp')
   const isCreateMode = (productId === 'temp' || productId === null || productId === 'null');
-  
+
   if (isCreateMode) {
     // Use temporary upload API
     formData.append('file_type', variantId ? 'variant_image' : 'main_image');
@@ -731,7 +886,7 @@ async function uploadSingleFile(file, productId, placeholder, variantId = null) 
       formData.append('variant_id', variantId);
     }
   }
-  
+
   try {
     // Simulate progress
     let progress = 0;
@@ -741,7 +896,7 @@ async function uploadSingleFile(file, productId, placeholder, variantId = null) 
         updateProgress(progressBar, progressText, progress);
       }
     }, 100);
-    
+
     const apiUrl = isCreateMode ? '/marketing/api/temp_upload_file/' : '/marketing/api/instant_upload_file/';
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -750,15 +905,15 @@ async function uploadSingleFile(file, productId, placeholder, variantId = null) 
       },
       body: formData
     });
-    
+
     clearInterval(progressInterval);
     updateProgress(progressBar, progressText, 100);
-    
+
     const data = await response.json();
-    
+
     if (data.success) {
       showToast('✅ File uploaded!', 'success');
-      
+
       // For temp uploads, return file_data with a fake ID for tracking
       if (isCreateMode) {
         return {
@@ -768,7 +923,7 @@ async function uploadSingleFile(file, productId, placeholder, variantId = null) 
           temp_file: true  // Mark as temporary
         };
       }
-      
+
       return data.file;
     } else {
       throw new Error(data.error || 'Upload failed');
@@ -792,12 +947,12 @@ function updateProgress(circle, text, percent) {
 function syncSelectionToProduct() {
   const selectedItems = document.querySelectorAll('.fm-file-item.selected');
   const productGrid = document.getElementById('sortable_images');
-  
+
   if (!productGrid) {
     showToast('❌ Product grid not found', 'error');
     return;
   }
-  
+
   // Get selected file IDs and URLs
   const selectedFiles = Array.from(selectedItems).map(item => {
     const fileId = item.dataset.fileId;
@@ -808,12 +963,12 @@ function syncSelectionToProduct() {
       url: fileUrl
     };
   });
-  
+
   if (selectedFiles.length === 0) {
     showToast('⚠️ No files selected', 'error');
     return;
   }
-  
+
   // Get current grid files to preserve existing elements
   const currentFiles = new Map();
   productGrid.querySelectorAll('.sortable-image').forEach(img => {
@@ -822,14 +977,14 @@ function syncSelectionToProduct() {
       currentFiles.set(fileId, img);
     }
   });
-  
+
   // Clear grid
   productGrid.innerHTML = '';
-  
+
   // Add selected files - reuse existing elements or create new
   selectedFiles.forEach(file => {
     let fileElement;
-    
+
     if (currentFiles.has(file.id)) {
       // Reuse existing element (preserves event handlers)
       fileElement = currentFiles.get(file.id);
@@ -839,20 +994,20 @@ function syncSelectionToProduct() {
       fileElement = createProductFileElement(file.id, file.url);
       console.log('Creating new element for file:', file.id);
     }
-    
+
     productGrid.appendChild(fileElement);
   });
-  
+
   // Update primary badges
   if (typeof updatePrimaryBadge === 'function') {
     updatePrimaryBadge();
   }
-  
+
   // Update image order hidden field
   if (typeof updateImageOrder === 'function') {
     updateImageOrder();
   }
-  
+
   showToast(`✅ ${selectedFiles.length} file(s) synced!`, 'success');
   closeFileManager();
 }
@@ -863,7 +1018,7 @@ function createProductFileElement(fileId, imgSrc) {
   div.className = 'sortable-image';
   div.setAttribute('data-file-id', fileId);
   div.style.cssText = 'position: relative; border: 2px solid #e5e7eb; border-radius: 8px; padding: 10px; background: white; width: 150px; opacity: 1;';
-  
+
   div.innerHTML = `
     <div class="drag-handle" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
       <i class="fa fa-grip-vertical"></i>
@@ -877,14 +1032,14 @@ function createProductFileElement(fileId, imgSrc) {
       </button>
     </div>
   `;
-  
+
   // Add delete handler with logging
   const deleteBtn = div.querySelector('.instant-delete-btn');
-  
+
   // Mark as already having handler
   deleteBtn.dataset.handlerAttached = 'true';
-  
-  deleteBtn.addEventListener('click', function(e) {
+
+  deleteBtn.addEventListener('click', function (e) {
     e.preventDefault();
     e.stopPropagation();
     console.log('Delete clicked for file ID:', fileId);
@@ -894,7 +1049,7 @@ function createProductFileElement(fileId, imgSrc) {
       console.error('instantDeleteFile function not found');
     }
   });
-  
+
   return div;
 }
 
@@ -931,7 +1086,7 @@ function showToast(message, type = 'success') {
   `;
   toast.textContent = message;
   document.body.appendChild(toast);
-  
+
   setTimeout(() => {
     toast.style.animation = 'slideOut 0.3s ease-out';
     setTimeout(() => toast.remove(), 300);

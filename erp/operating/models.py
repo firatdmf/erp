@@ -286,6 +286,19 @@ class Order(models.Model):
     tracking_number = models.CharField(max_length=100, blank=True, null=True)
     shipped_at = models.DateTimeField(blank=True, null=True)
     delivered_at = models.DateTimeField(blank=True, null=True)
+    
+    # e-Arşiv Invoice Tracking
+    ettn = models.CharField(
+        max_length=36,
+        null=True,
+        blank=True,
+        help_text="e-Arşiv Fatura Tanımlama Numarası (ETTN)"
+    )
+    invoice_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="e-Arşiv Fatura oluşturma tarihi"
+    )
 
     def total_value(self):
         # round makes it have two decimals

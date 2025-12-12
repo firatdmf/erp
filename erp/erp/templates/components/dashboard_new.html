@@ -775,6 +775,55 @@
     renderCalendar();
   }
 
+  // Helper to format date to YYYY-MM-DD for calendar operations
+  function formatDateToISO(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Update calendar badges after task date change (called from task_edit_modal.html)
+  window.updateCalendarAfterTaskEdit = function (oldDateStr, newDateStr) {
+    console.log('📅 Calendar sync: Moving task from', oldDateStr, 'to', newDateStr);
+
+    // If dates are the same, no update needed
+    if (oldDateStr === newDateStr) {
+      console.log('📅 Dates are the same, no calendar update needed');
+      return;
+    }
+
+    // Update global tasksData
+    if (window.tasksData) {
+      // Decrement old date count
+      if (window.tasksData[oldDateStr]) {
+        window.tasksData[oldDateStr]--;
+        console.log('📅 Decremented', oldDateStr, 'to', window.tasksData[oldDateStr]);
+        if (window.tasksData[oldDateStr] <= 0) {
+          delete window.tasksData[oldDateStr];
+          console.log('📅 Removed', oldDateStr, 'from tasksData');
+        }
+      }
+
+      // Increment new date count
+      if (window.tasksData[newDateStr]) {
+        window.tasksData[newDateStr]++;
+      } else {
+        window.tasksData[newDateStr] = 1;
+      }
+      console.log('📅 Set', newDateStr, 'to', window.tasksData[newDateStr]);
+    }
+
+    // Re-render calendar to reflect changes
+    if (typeof renderCalendar === 'function') {
+      renderCalendar();
+      console.log('📅 Calendar re-rendered');
+    }
+
+    // NOTE: Task removal from DOM is handled in task_edit_modal.html
+    // We don't call loadTasksForDate here to avoid showing loading spinner
+  };
+
   // Initialize calendar on page load
   document.addEventListener('DOMContentLoaded', function () {
     renderCalendar();

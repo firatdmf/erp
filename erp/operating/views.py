@@ -1052,6 +1052,121 @@ def get_order_status(request, order_id):
 
 
 @csrf_exempt
+def update_order_ettn(request, order_id):
+    """Update order with ETTN (e-Arşiv invoice number)"""
+    if request.method != 'PATCH':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        order = Order.objects.get(pk=order_id)
+        data = json.loads(request.body)
+        
+        ettn = data.get('ettn')
+        invoice_date = data.get('invoice_date')
+        
+        if ettn:
+            order.ettn = ettn
+        if invoice_date:
+            order.invoice_date = invoice_date
+        
+        order.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'ETTN updated successfully',
+            'order_id': order.pk,
+            'ettn': order.ettn
+        }, status=200)
+    except Order.DoesNotExist:
+        return JsonResponse({'error': 'Order not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def get_order_detail_api(request, user_id, order_id):
+    """Get order detail including ETTN for web clients"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from authentication.models import WebClient
+        
+        # Get web client
+        try:
+            web_client = WebClient.objects.get(pk=user_id)
+        except WebClient.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+        
+        # Get order
+        order = Order.objects.get(pk=order_id, web_client=web_client)
+        
+        # Build order data
+        order_data = {
+            'id': order.pk,
+            'order_number': f'ORD-{order.pk}',
+            'status': order.status,
+            'created_at': order.created_at.isoformat(),
+            'updated_at': order.updated_at.isoformat(),
+            'ettn': order.ettn,
+            'invoice_date': order.invoice_date.isoformat() if order.invoice_date else None,
+            
+            # Payment info
+            'payment_id': order.payment_id,
+            'payment_status': order.payment_status,
+            'payment_method': order.payment_method,
+            
+            # Pricing
+            'original_currency': order.original_currency,
+            'original_price': str(order.original_price) if order.original_price else None,
+            'paid_currency': order.paid_currency,
+            'paid_amount': str(order.paid_amount) if order.paid_amount else None,
+            'exchange_rate': str(order.exchange_rate) if order.exchange_rate else None,
+            
+            # Card info
+            'card_type': order.card_type,
+            'card_association': order.card_association,
+            'card_last_four': order.card_last_four,
+            
+            # Addresses
+            'delivery_address_title': order.delivery_address_title,
+            'delivery_address': order.delivery_address,
+            'delivery_city': order.delivery_city,
+            'delivery_country': order.delivery_country,
+            'delivery_phone': order.delivery_phone,
+            
+            'billing_address_title': order.billing_address_title,
+            'billing_address': order.billing_address,
+            'billing_city': order.billing_city,
+            'billing_country': order.billing_country,
+            'billing_phone': order.billing_phone,
+            
+            # Items
+            'items': [
+                {
+                    'id': item.pk,
+                    'product_sku': item.product.sku,
+                    'product_title': item.product.title,
+                    'product_variant_sku': item.product_variant.variant_sku if item.product_variant else None,
+                    'quantity': str(item.quantity),
+                    'price': str(item.price),
+                    'description': item.description,
+                    'status': item.status
+                }
+                for item in order.items.all()
+            ]
+        }
+        
+        return JsonResponse(order_data, status=200)
+    except Order.DoesNotExist:
+        return JsonResponse({'error': 'Order not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
 def create_web_order(request):
     """API endpoint to create orders from web checkout"""
     if request.method != 'POST':

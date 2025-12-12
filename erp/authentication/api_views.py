@@ -1236,6 +1236,8 @@ def get_order_detail(request, user_id, order_id):
             'delivered_at': order.delivered_at.isoformat() if order.delivered_at else None,
             'created_at': order.created_at.isoformat(),
             'updated_at': order.updated_at.isoformat(),
+            'ettn': order.ettn,
+            'invoice_date': order.invoice_date.isoformat() if order.invoice_date else None,
             'items': items_list,
             'total_value': total_value,
         }

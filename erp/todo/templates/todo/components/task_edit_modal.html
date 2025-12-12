@@ -130,9 +130,58 @@
           // Update task in DOM (only the specific task card, no full reload)
           updateTaskInDOM(data.task);
 
-          // Update calendar badge count if task date changed
-          if (typeof updateCalendarBadge === 'function') {
-            updateCalendarBadge();
+          // Update calendar if date changed (using new ISO date fields from backend)
+          if (data.task.old_due_date_iso && data.task.due_date_iso) {
+            if (typeof window.updateCalendarAfterTaskEdit === 'function') {
+              window.updateCalendarAfterTaskEdit(
+                data.task.old_due_date_iso,
+                data.task.due_date_iso
+              );
+            }
+
+            const newDateStr = data.task.due_date_iso;
+            const oldDateStr = data.task.old_due_date_iso;
+
+            // If date changed, check if we need to remove task from current view
+            if (newDateStr !== oldDateStr && window.selectedDate) {
+              // Get current view date in ISO format
+              const viewYear = window.selectedDate.getFullYear();
+              const viewMonth = String(window.selectedDate.getMonth() + 1).padStart(2, '0');
+              const viewDay = String(window.selectedDate.getDate()).padStart(2, '0');
+              const viewDateStr = `${viewYear}-${viewMonth}-${viewDay}`;
+
+              // Get today's date for special "today" logic (shows tasks <= today)
+              const today = new Date();
+              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+              const isViewingToday = window.selectedDate.toDateString() === today.toDateString();
+
+              // Remove task from DOM if:
+              // 1. Viewing a specific date (not today) and task moved away from that date
+              // 2. Viewing "today" and task moved to a future date
+              const shouldRemoveTask =
+                (!isViewingToday && viewDateStr === oldDateStr) ||  // Specific date view
+                (isViewingToday && newDateStr > todayStr && oldDateStr <= todayStr);  // Today view, task moved to future
+
+              if (shouldRemoveTask) {
+                console.log('📅 Task moved to different date, removing from current view');
+                const taskElement = document.querySelector(`[data-task-id="${data.task.id}"]`);
+                if (taskElement) {
+                  // Smooth fade out and remove
+                  taskElement.style.transition = 'all 0.3s ease';
+                  taskElement.style.opacity = '0';
+                  taskElement.style.transform = 'translateX(-20px)';
+                  setTimeout(() => {
+                    taskElement.remove();
+
+                    // Check if there are no more tasks
+                    const tasksList = document.querySelector('.tasks_component ul');
+                    if (tasksList && tasksList.children.length === 0) {
+                      tasksList.innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">No tasks available.</li>';
+                    }
+                  }, 300);
+                }
+              }
+            }
           }
         } else {
           // Show errors

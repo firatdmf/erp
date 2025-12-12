@@ -413,11 +413,22 @@ def search_contacts_and_companies(request):
 def complete_task(request, task_id):
     task = get_object_or_404(Task, pk=task_id)
     task.completed = True
-    task.completed_at = datetime.now()
+    task.completed_at = timezone.now()  # Use timezone-aware datetime
     task.save()
     
+    # Track activity
+    from .models import TaskActivity
+    current_user = request.user.member if hasattr(request.user, 'member') else None
+    TaskActivity.objects.create(
+        task=task, user=current_user, activity_type='completed',
+        new_value='Completed'
+    )
+    
     # Check if it's an AJAX/HTMX request
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    is_htmx = request.headers.get('HX-Request') == 'true'
+    
+    if is_ajax or is_htmx:
         # Return task data for history
         return JsonResponse({
             'success': True,
@@ -503,12 +514,48 @@ def update_task_ajax(request, task_id):
             from datetime import datetime
             due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
             
+            # Save old values before updating (for activity tracking)
+            old_due_date = task.due_date
+            old_name = task.name
+            old_description = task.description
+            old_priority = task.priority
+            
             # Update task
             task.name = name
             task.description = description
             task.due_date = due_date
             task.priority = priority  # Update priority
             task.save()
+            
+            # Track activities
+            from .models import TaskActivity
+            current_user = request.user.member if hasattr(request.user, 'member') else None
+            
+            if old_name != name:
+                TaskActivity.objects.create(
+                    task=task, user=current_user, activity_type='name_updated',
+                    old_value=old_name, new_value=name
+                )
+            
+            if old_description != description:
+                TaskActivity.objects.create(
+                    task=task, user=current_user, activity_type='description_updated',
+                    old_value=old_description[:100] if old_description else None,
+                    new_value=description[:100] if description else None
+                )
+            
+            if old_priority != priority:
+                TaskActivity.objects.create(
+                    task=task, user=current_user, activity_type='priority_changed',
+                    old_value=old_priority, new_value=priority
+                )
+            
+            if old_due_date != due_date:
+                TaskActivity.objects.create(
+                    task=task, user=current_user, activity_type='due_date_changed',
+                    old_value=old_due_date.strftime('%Y-%m-%d'),
+                    new_value=due_date.strftime('%Y-%m-%d')
+                )
             
             # Calculate overdue display (use same classes as tasks.html)
             from datetime import date as dt_date
@@ -527,6 +574,8 @@ def update_task_ajax(request, task_id):
                     'name': task.name,
                     'description': task.description,
                     'due_date': due_date.strftime('%b %d, %Y'),
+                    'due_date_iso': due_date.strftime('%Y-%m-%d'),  # For calendar sync
+                    'old_due_date_iso': old_due_date.strftime('%Y-%m-%d'),  # For calendar sync
                     'priority': task.priority,  # Include priority in response
                     'overdue_badge': overdue_badge
                 }
@@ -543,20 +592,26 @@ def update_task_ajax(request, task_id):
 @login_required
 def task_detail_page(request, task_id):
     from authentication.models import Member
+    from .models import TaskActivity
     
     task = get_object_or_404(Task, pk=task_id)
     task = Task.objects.select_related(
         'member', 'member__user',
         'created_by', 'created_by__user',
         'contact', 'company'
-    ).prefetch_related('comments', 'comments__author', 'comments__author__user').get(pk=task_id)
+    ).prefetch_related(
+        'comments', 'comments__author', 'comments__author__user',
+        'activities', 'activities__user', 'activities__user__user'
+    ).get(pk=task_id)
     
     comments = task.comments.all().order_by('-created_at')
+    activities = task.activities.all().order_by('-created_at')[:50]  # Last 50 activities
     all_members = Member.objects.select_related('user').all()
     
     context = {
         'task': task,
         'comments': comments,
+        'activities': activities,
         'all_members': all_members,
     }
     
@@ -630,6 +685,7 @@ def add_task_comment(request, task_id):
         
         from .models import TaskComment
         from django.utils.timesince import timesince
+        from django.utils.html import escape
         
         comment = TaskComment.objects.create(
             task=task,
@@ -637,20 +693,35 @@ def add_task_comment(request, task_id):
             content=content
         )
         
-        # Return HTML snippet for HTMX
+        # Escape content to prevent XSS
+        safe_content = escape(comment.content)
+        
+        # Return HTML snippet for HTMX matching new modern design
         html = f'''
-        <div class="comment-item" style="display: flex; gap: 1rem;">
-            <div class="comment-avatar" style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem;">
-                {comment.author.user.first_name[0]}{comment.author.user.last_name[0]}
+        <div class="comment-card" style="animation: slideIn 0.3s ease;">
+            <div class="comment-avatar-wrapper">
+                <div class="comment-avatar">{comment.author.user.first_name[0]}{comment.author.user.last_name[0]}</div>
             </div>
-            <div style="flex: 1;">
-                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-                    <span style="font-weight: 600; color: #0f172a; font-size: 0.875rem;">{comment.author.user.first_name} {comment.author.user.last_name}</span>
-                    <span style="font-size: 0.75rem; color: #94a3b8;">az önce</span>
+            <div class="comment-body">
+                <div class="comment-meta">
+                    <span class="comment-author-name">{comment.author.user.first_name} {comment.author.user.last_name}</span>
+                    <span class="comment-timestamp">az önce</span>
                 </div>
-                <div style="color: #475569; font-size: 0.875rem; line-height: 1.6; white-space: pre-wrap;">{comment.content}</div>
+                <div class="comment-text">{safe_content}</div>
             </div>
         </div>
+        <style>
+            @keyframes slideIn {{
+                from {{
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }}
+                to {{
+                    opacity: 1;
+                    transform: translateY(0);
+                }}
+            }}
+        </style>
         <script>
             // Remove empty state message if it exists
             const noComments = document.getElementById('noComments');

@@ -105,3 +105,65 @@ class TaskComment(models.Model):
     
     def __str__(self):
         return f"Comment by {self.author} on {self.task.name}"
+
+
+class TaskActivity(models.Model):
+    """Activity log for task changes"""
+    ACTIVITY_TYPES = [
+        ('created', 'Task Created'),
+        ('completed', 'Task Completed'),
+        ('reopened', 'Task Reopened'),
+        ('priority_changed', 'Priority Changed'),
+        ('status_changed', 'Status Changed'),
+        ('assigned', 'Assigned To'),
+        ('due_date_changed', 'Due Date Changed'),
+        ('description_updated', 'Description Updated'),
+        ('name_updated', 'Name Updated'),
+    ]
+    
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='activities')
+    user = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, related_name='task_activities')
+    activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
+    old_value = models.TextField(blank=True, null=True)
+    new_value = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = 'Task Activities'
+        indexes = [
+            models.Index(fields=['task', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_activity_type_display()} - {self.task.name}"
+    
+    def get_icon(self):
+        """Return icon for activity type"""
+        icons = {
+            'created': 'fa-plus-circle',
+            'completed': 'fa-check-circle',
+            'reopened': 'fa-undo',
+            'priority_changed': 'fa-flag',
+            'status_changed': 'fa-sync-alt',
+            'assigned': 'fa-user-plus',
+            'due_date_changed': 'fa-calendar-alt',
+            'description_updated': 'fa-align-left',
+            'name_updated': 'fa-edit',
+        }
+        return icons.get(self.activity_type, 'fa-circle')
+    
+    def get_color(self):
+        """Return color for activity type"""
+        colors = {
+            'created': '#10b981',      # green
+            'completed': '#10b981',    # green
+            'reopened': '#f59e0b',     # orange
+            'priority_changed': '#8b5cf6',  # purple
+            'status_changed': '#3b82f6',    # blue
+            'assigned': '#6366f1',     # indigo
+            'due_date_changed': '#f97316',  # orange
+            'description_updated': '#64748b',  # gray
+            'name_updated': '#64748b',  # gray
+        }
+        return colors.get(self.activity_type, '#64748b')

@@ -29,6 +29,7 @@ class Task(models.Model):
     description = models.TextField(blank=True, null=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium', db_index=True)
     completed = models.BooleanField(default=False, db_index=True)
+    on_hold = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     # make it either a company or contact

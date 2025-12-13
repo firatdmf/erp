@@ -408,34 +408,63 @@ def search_contacts_and_companies(request):
 
     return JsonResponse({"suggestions": suggestions})
 
-
 # @method_decorator(login_required, name="dispatch")
 def complete_task(request, task_id):
+    """Update task status - supports in_progress, on_hold, completed"""
     task = get_object_or_404(Task, pk=task_id)
-    task.completed = True
-    task.completed_at = timezone.now()  # Use timezone-aware datetime
+    
+    # Get status from POST data or default to completed
+    status = request.POST.get('status', 'completed')
+    old_status = 'completed' if task.completed else ('on_hold' if task.on_hold else 'in_progress')
+    
+    # Update task based on status
+    if status == 'completed':
+        task.completed = True
+        task.on_hold = False
+        task.completed_at = timezone.now()
+        new_status_display = 'Completed'
+        activity_type = 'completed'
+    elif status == 'on_hold':
+        task.completed = False
+        task.on_hold = True
+        task.completed_at = None
+        new_status_display = 'On Hold'
+        activity_type = 'status_changed'
+    else:  # in_progress
+        task.completed = False
+        task.on_hold = False
+        task.completed_at = None
+        new_status_display = 'In Progress'
+        activity_type = 'reopened' if old_status == 'completed' else 'status_changed'
+    
     task.save()
     
     # Track activity
     from .models import TaskActivity
     current_user = request.user.member if hasattr(request.user, 'member') else None
-    TaskActivity.objects.create(
-        task=task, user=current_user, activity_type='completed',
-        new_value='Completed'
-    )
+    
+    old_status_display = 'Completed' if old_status == 'completed' else ('On Hold' if old_status == 'on_hold' else 'In Progress')
+    
+    if old_status != status:
+        TaskActivity.objects.create(
+            task=task, user=current_user, activity_type=activity_type,
+            old_value=old_status_display,
+            new_value=new_status_display
+        )
     
     # Check if it's an AJAX/HTMX request
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     is_htmx = request.headers.get('HX-Request') == 'true'
     
     if is_ajax or is_htmx:
-        # Return task data for history
         return JsonResponse({
             'success': True,
+            'status': status,
+            'status_display': new_status_display,
             'task': {
                 'name': task.name,
                 'description': task.description,
-                'completed_at': task.completed_at.strftime('%b %d, %Y - %I:%M %p')
+                'completed_at': task.completed_at.strftime('%b %d, %Y - %I:%M %p') if task.completed_at else None
             }
         })
     

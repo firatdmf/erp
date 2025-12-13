@@ -1046,8 +1046,7 @@
             </div>
             <div class="comment-body">
               <div class="comment-meta">
-                <span class="comment-author-name">{{ comment.author.user.first_name }} {{ comment.author.user.last_name
-                  }}</span>
+                <span class="comment-author-name">{{ comment.author.user.first_name }} {{ comment.author.user.last_name }}</span>
                 <span class="comment-timestamp">{{ comment.created_at|timesince }} ago</span>
               </div>
               <div class="comment-text">{{ comment.content }}</div>
@@ -1072,9 +1071,39 @@
 
       <!-- Activity Tab -->
       <div id="activityContentTab" class="content-tab-content">
-        <p style="text-align: center; color: #94a3b8; padding: 3rem 0;">
-          Activity history coming soon.
-        </p>
+        <div class="activity-timeline-container">
+          {% for activity in activities %}
+          <div class="activity-item">
+            <div class="activity-icon"
+              style="background-color: {{ activity.get_color }}20; color: {{ activity.get_color }};"><i
+                class="fa {{ activity.get_icon }}"></i></div>
+            <div class="activity-content">
+              <div class="activity-header">
+                <span class="activity-user">{% if activity.user %}{{ activity.user.user.first_name }} {{ activity.user.user.last_name }}{% else %}System{% endif %}</span>
+                <span class="activity-action">{{ activity.get_activity_type_display }}</span>
+              </div>
+              {% if activity.old_value or activity.new_value %}
+              <div class="activity-details">
+                {% if activity.old_value and activity.new_value %}
+                <span class="activity-old-value">{{ activity.old_value }}</span>
+                <i class="fa fa-arrow-right activity-arrow"></i>
+                <span class="activity-new-value">{{ activity.new_value }}</span>
+                {% elif activity.new_value %}
+                <span class="activity-new-value">{{ activity.new_value }}</span>
+                {% endif %}
+              </div>
+              {% endif %}
+              <div class="activity-time">{{ activity.created_at|timesince }} ago</div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="empty-activity">
+            <i class="fa fa-history"></i>
+            <p>No activity yet</p>
+            <span>Activity history will appear here as changes are made to this task.</span>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>
@@ -1089,8 +1118,8 @@
         <span class="detail-label">Status</span>
         <span class="detail-value">
           <span id="taskStatusBadge" class="detail-badge"
-            style="{% if task.completed %}background: #dcfce7; color: #166534; border-color: #dcfce7;{% else %}background: #dbeafe; color: #1e40af; border-color: #dbeafe;{% endif %}">
-            {% if task.completed %}Completed{% else %}In Progress{% endif %}
+            style="{% if task.completed %}background: #dcfce7; color: #166534;{% elif task.on_hold %}background: #fef3c7; color: #d97706;{% else %}background: #dbeafe; color: #1e40af;{% endif %}">
+            {% if task.completed %}Completed{% elif task.on_hold %}On Hold{% else %}In Progress{% endif %}
           </span>
         </span>
       </div>
@@ -1178,8 +1207,8 @@
       </button>
     </div>
 
-    <div class="status-option {% if not task.completed %}selected{% endif %}" onclick="selectStatus(false)"
-      data-status="false">
+    <div class="status-option {% if not task.completed and not task.on_hold %}selected{% endif %}"
+      onclick="selectStatus('in_progress')" data-status="in_progress">
       <div class="status-icon" style="background: #dbeafe; color: #1e40af;">
         <i class="fa fa-clock"></i>
       </div>
@@ -1187,11 +1216,24 @@
         <div class="option-title">In Progress</div>
         <div class="option-desc">Task is ongoing</div>
       </div>
-      <i class="fa fa-check" style="color: #3b82f6; {% if task.completed %}display: none;{% endif %}"></i>
+      <i class="fa fa-check"
+        style="color: #3b82f6; {% if task.completed or task.on_hold %}display: none;{% endif %}"></i>
     </div>
 
-    <div class="status-option {% if task.completed %}selected{% endif %}" onclick="selectStatus(true)"
-      data-status="true">
+    <div class="status-option {% if task.on_hold %}selected{% endif %}" onclick="selectStatus('on_hold')"
+      data-status="on_hold">
+      <div class="status-icon" style="background: #fef3c7; color: #d97706;">
+        <i class="fa fa-pause-circle"></i>
+      </div>
+      <div class="option-label">
+        <div class="option-title">On Hold</div>
+        <div class="option-desc">Task is paused</div>
+      </div>
+      <i class="fa fa-check" style="color: #3b82f6; {% if not task.on_hold %}display: none;{% endif %}"></i>
+    </div>
+
+    <div class="status-option {% if task.completed %}selected{% endif %}" onclick="selectStatus('completed')"
+      data-status="completed">
       <div class="status-icon" style="background: #dcfce7; color: #166534;">
         <i class="fa fa-check-circle"></i>
       </div>
@@ -1203,7 +1245,7 @@
     </div>
 
     <div class="dropdown-actions">
-      <button class="btn-save" onclick="saveStatus()">Save</button>
+      <button class="btn-save" id="statusSaveBtn" onclick="saveStatus()">Save</button>
       <button class="btn-cancel" onclick="closeStatusDropdown()">Cancel</button>
     </div>
   </div>
@@ -1250,7 +1292,8 @@
 </div>
 
 <script>
-  let selectedStatus = {{ task.completed| yesno:"true,false" }};
+  let initialStatus = '{% if task.completed %}completed{% elif task.on_hold %}on_hold{% else %}in_progress{% endif %}';
+  let selectedStatus = initialStatus;
   let selectedUserId = {{ task.member.id }};
 
   // Status Modal Functions
@@ -1262,8 +1305,8 @@
     document.getElementById('statusModal').classList.remove('active');
   }
 
-  function selectStatus(completed) {
-    selectedStatus = completed;
+  function selectStatus(status) {
+    selectedStatus = status;
 
     // Update UI
     document.querySelectorAll('.status-option').forEach(opt => {
@@ -1271,18 +1314,35 @@
       opt.querySelector('.fa-check').style.display = 'none';
     });
 
-    const selected = document.querySelector(`.status-option[data-status="${completed}"]`);
-    selected.classList.add('selected');
-    selected.querySelector('.fa-check').style.display = 'block';
+    const selected = document.querySelector(`.status-option[data-status="${status}"]`);
+    if (selected) {
+      selected.classList.add('selected');
+      selected.querySelector('.fa-check').style.display = 'block';
+    }
   }
 
   function saveStatus() {
+    const btn = document.getElementById('statusSaveBtn');
+
+    // Don't do anything if status hasn't changed
+    if (selectedStatus === initialStatus) {
+      closeStatusDropdown();
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+    }
+
     fetch('/todo/tasks/{{ task.id }}/complete_task', {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
         'X-CSRFToken': '{{ csrf_token }}',
         'X-Requested-With': 'XMLHttpRequest'
-      }
+      },
+      body: `status=${selectedStatus}`
     })
       .then(response => response.json())
       .then(data => {
@@ -1290,62 +1350,95 @@
           // Close modal
           closeStatusDropdown();
 
-          // Update status badge without page reload
+          // Update status badge based on status
           const statusBadge = document.getElementById('taskStatusBadge');
           if (statusBadge) {
-            statusBadge.textContent = 'Completed';
-            statusBadge.style.background = '#dcfce7';
-            statusBadge.style.color = '#166534';
-            statusBadge.style.borderColor = '#dcfce7';
+            statusBadge.textContent = data.status_display;
+            if (data.status === 'completed') {
+              statusBadge.style.background = '#dcfce7';
+              statusBadge.style.color = '#166534';
+            } else if (data.status === 'on_hold') {
+              statusBadge.style.background = '#fef3c7';
+              statusBadge.style.color = '#d97706';
+            } else {
+              statusBadge.style.background = '#dbeafe';
+              statusBadge.style.color = '#1e40af';
+            }
           }
 
-          // Add activity to timeline
-          const activityContainer = document.querySelector('.activity-timeline-container');
-          if (activityContainer) {
-            // Remove empty state if exists
-            const emptyState = activityContainer.querySelector('.empty-activity');
-            if (emptyState) emptyState.remove();
+          // Add activity to timeline only if status changed
+          addActivityToTimeline(data.status, data.status_display);
 
-            // Add new activity at the beginning
-            const activityHtml = `
-              <div class="activity-item" style="animation: slideIn 0.3s ease;">
-                <div class="activity-icon" style="background-color: #10b98120; color: #10b981;">
-                  <i class="fa fa-check-circle"></i>
-                </div>
-                <div class="activity-content">
-                  <div class="activity-header">
-                    <span class="activity-user">{{ request.user.first_name }} {{ request.user.last_name }}</span>
-                    <span class="activity-action">Task Completed</span>
-                  </div>
-                  <div class="activity-details">
-                    <span class="activity-new-value">Completed</span>
-                  </div>
-                  <div class="activity-time">Az önce</div>
-                </div>
-              </div>
-            `;
-            activityContainer.insertAdjacentHTML('afterbegin', activityHtml);
-          }
+          // Update initial status to current
+          initialStatus = data.status;
 
-          // Show success feedback
-          const btn = document.querySelector('.btn-save');
+          // Show success
           if (btn) {
-            const originalText = btn.textContent;
-            btn.textContent = '✓ Saved!';
+            btn.innerHTML = '✓ Saved!';
             btn.style.background = '#10b981';
             setTimeout(() => {
-              btn.textContent = originalText;
+              btn.disabled = false;
+              btn.innerHTML = 'Save';
               btn.style.background = '';
-            }, 2000);
+            }, 1500);
           }
         } else {
           alert('Status could not be changed.');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Save';
+          }
         }
       })
       .catch(error => {
         console.error('Error:', error);
         alert('An error occurred.');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = 'Save';
+        }
       });
+  }
+
+  function addActivityToTimeline(status, statusDisplay) {
+    const activityContainer = document.querySelector('.activity-timeline-container');
+    if (!activityContainer) return;
+
+    // Remove empty state if exists
+    const emptyState = activityContainer.querySelector('.empty-activity');
+    if (emptyState) emptyState.remove();
+
+    // Get icon and color based on status
+    let icon, color;
+    if (status === 'completed') {
+      icon = 'fa-check-circle';
+      color = '#10b981';
+    } else if (status === 'on_hold') {
+      icon = 'fa-pause-circle';
+      color = '#d97706';
+    } else {
+      icon = 'fa-clock';
+      color = '#3b82f6';
+    }
+
+    const activityHtml = `
+      <div class="activity-item" style="animation: slideIn 0.3s ease;">
+        <div class="activity-icon" style="background-color: ${color}20; color: ${color};">
+          <i class="fa ${icon}"></i>
+        </div>
+        <div class="activity-content">
+          <div class="activity-header">
+            <span class="activity-user">{{ request.user.first_name }} {{ request.user.last_name }}</span>
+            <span class="activity-action">Status Changed</span>
+          </div>
+          <div class="activity-details">
+            <span class="activity-new-value">${statusDisplay}</span>
+          </div>
+          <div class="activity-time">Just now</div>
+        </div>
+      </div>
+    `;
+    activityContainer.insertAdjacentHTML('afterbegin', activityHtml);
   }
 
   // Assign User Modal Functions

@@ -155,3 +155,12 @@ class ProductFileAdmin(admin.ModelAdmin):
     )
 
 
+# Product Review Admin
+class ProductReviewAdmin(admin.ModelAdmin):
+    list_display = ('id', 'web_client', 'product', 'rating', 'is_approved', 'created_at')
+    list_filter = ('is_approved', 'rating', 'created_at')
+    search_fields = ('web_client__email', 'product__title', 'comment')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+admin.site.register(ProductReview, ProductReviewAdmin)

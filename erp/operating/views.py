@@ -1175,23 +1175,35 @@ def create_web_order(request):
     try:
         data = json.loads(request.body)
         
-        # Get web client
+        # Get web client (optional for guest checkout)
         from authentication.models import WebClient
         web_client_id = data.get('web_client_id')
-        if not web_client_id:
-            return JsonResponse({'error': 'web_client_id required'}, status=400)
+        is_guest_order = data.get('is_guest_order', False)
+        web_client = None
         
-        try:
-            web_client = WebClient.objects.get(pk=web_client_id)
-        except WebClient.DoesNotExist:
-            return JsonResponse({'error': 'Web client not found'}, status=404)
+        # For non-guest orders, require web_client
+        if not is_guest_order:
+            if not web_client_id:
+                return JsonResponse({'error': 'web_client_id required for non-guest orders'}, status=400)
+            
+            try:
+                web_client = WebClient.objects.get(pk=web_client_id)
+            except WebClient.DoesNotExist:
+                return JsonResponse({'error': 'Web client not found'}, status=404)
         
         # Create order
         with transaction.atomic():
             order = Order.objects.create(
-                web_client=web_client,
+                web_client=web_client,  # Can be None for guest orders
                 status=data.get('status', 'pending'),
                 notes=data.get('notes', ''),
+                
+                # Guest order info
+                is_guest_order=is_guest_order,
+                guest_email=data.get('guest_email'),
+                guest_phone=data.get('guest_phone'),
+                guest_first_name=data.get('guest_first_name'),
+                guest_last_name=data.get('guest_last_name'),
                 
                 # Payment fields
                 payment_id=data.get('payment_id'),
@@ -1261,7 +1273,7 @@ def create_web_order(request):
             return JsonResponse({
                 'success': True,
                 'order_id': order.pk,
-                'order_number': str(order.pk)
+                'order_number': order.order_number or f"DK{str(order.pk).zfill(7)}"
             }, status=201)
             
     except json.JSONDecodeError:
@@ -1269,5 +1281,170 @@ def create_web_order(request):
     except Exception as e:
         return JsonResponse({
             'error': 'Order creation failed',
+            'details': str(e)
+        }, status=500)
+
+
+# -------------------------------- Order Tracking API -------------------------------- #
+
+@csrf_exempt
+def track_order(request):
+    """
+    API endpoint for tracking orders by order_number.
+    
+    GET /operating/orders/track/?order_number=DK0000001
+    
+    Returns order details including status, tracking info, and items.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET method required'}, status=405)
+    
+    order_number = request.GET.get('order_number', '').strip()
+    
+    if not order_number:
+        return JsonResponse({
+            'error': 'order_number parameter is required'
+        }, status=400)
+    
+    try:
+        # Try to find by order_number first
+        order = Order.objects.filter(order_number__iexact=order_number).first()
+        
+        # If not found, try to find by ID (for backward compatibility)
+        if not order and order_number.isdigit():
+            order = Order.objects.filter(pk=int(order_number)).first()
+        
+        if not order:
+            return JsonResponse({
+                'success': False,
+                'error': 'Sipariş bulunamadı',
+                'message': 'Bu sipariş numarası ile eşleşen sipariş bulunamadı.'
+            }, status=404)
+        
+        # Get order items
+        items = []
+        for item in order.items.all():
+            item_data = {
+                'product_sku': item.product.sku if item.product else None,
+                'product_title': item.product.title if item.product else 'Unknown',
+                'variant_sku': item.product_variant.variant_sku if item.product_variant else None,
+                'quantity': str(item.quantity),
+                'price': str(item.price),
+                'status': item.status,
+            }
+            items.append(item_data)
+        
+        # Build response
+        response_data = {
+            'success': True,
+            'order': {
+                'id': order.pk,
+                'order_number': order.order_number or f"DK{str(order.pk).zfill(7)}",
+                'status': order.status,
+                'order_status': order.order_status,
+                'order_status_display': dict(order._meta.get_field('order_status').choices).get(order.order_status, order.order_status) if order.order_status else None,
+                'created_at': order.created_at.isoformat() if order.created_at else None,
+                'updated_at': order.updated_at.isoformat() if order.updated_at else None,
+                
+                # Tracking Info
+                'carrier': order.carrier,
+                'carrier_display': dict(order._meta.get_field('carrier').choices).get(order.carrier, order.carrier) if order.carrier else None,
+                'tracking_number': order.tracking_number,
+                'shipped_at': order.shipped_at.isoformat() if order.shipped_at else None,
+                'delivered_at': order.delivered_at.isoformat() if order.delivered_at else None,
+                
+                # Pricing
+                'original_currency': order.original_currency,
+                'original_price': str(order.original_price) if order.original_price else None,
+                'paid_currency': order.paid_currency,
+                'paid_amount': str(order.paid_amount) if order.paid_amount else None,
+                
+                # Delivery Address
+                'delivery_address': {
+                    'title': order.delivery_address_title,
+                    'address': order.delivery_address,
+                    'city': order.delivery_city,
+                    'country': order.delivery_country,
+                    'phone': order.delivery_phone,
+                },
+                
+                # Items
+                'items': items,
+                'total_items': len(items),
+            }
+        }
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': 'Sipariş sorgulama hatası',
+            'details': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def update_order_status(request, order_id):
+    """
+    API endpoint for updating order status and tracking information.
+    
+    POST /operating/orders/<order_id>/update-status/
+    
+    Body:
+    {
+        "order_status": "shipped",  # pending, confirmed, preparing, shipped, delivered, etc.
+        "carrier": "yurtici",       # yurtici, mng, aras, ptt, ups
+        "tracking_number": "123456789"
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        order = Order.objects.get(pk=order_id)
+        
+        data = json.loads(request.body)
+        
+        # Update order status
+        if 'order_status' in data:
+            order.order_status = data['order_status']
+            
+            # Auto-set shipped_at when status changes to shipped
+            if data['order_status'] == 'shipped' and not order.shipped_at:
+                order.shipped_at = timezone.now()
+            
+            # Auto-set delivered_at when status changes to delivered
+            if data['order_status'] == 'delivered' and not order.delivered_at:
+                order.delivered_at = timezone.now()
+        
+        # Update carrier
+        if 'carrier' in data:
+            order.carrier = data['carrier']
+        
+        # Update tracking number
+        if 'tracking_number' in data:
+            order.tracking_number = data['tracking_number']
+        
+        order.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Sipariş durumu güncellendi',
+            'order_number': order.order_number,
+            'order_status': order.order_status,
+            'carrier': order.carrier,
+            'tracking_number': order.tracking_number
+        })
+        
+    except Order.DoesNotExist:
+        return JsonResponse({
+            'error': 'Sipariş bulunamadı'
+        }, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': 'Durum güncelleme hatası',
             'details': str(e)
         }, status=500)

@@ -596,3 +596,55 @@ class ProductFile(models.Model):
     def __str__(self):
         # return f"{self.product or self.product_variant}"
         return f"{self.product} | {self.file_url}"
+
+
+# ============================================================
+# PRODUCT REVIEWS
+# User ratings and comments for products
+# ============================================================
+from django.core.validators import MinValueValidator, MaxValueValidator
+
+class ProductReview(models.Model):
+    """
+    Product reviews and ratings from authenticated users.
+    Only users who have purchased the product can leave reviews.
+    """
+    web_client = models.ForeignKey(
+        'authentication.WebClient',
+        on_delete=models.CASCADE,
+        related_name='product_reviews',
+        help_text="The user who wrote this review"
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='reviews',
+        help_text="The product being reviewed"
+    )
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Rating from 1 to 5 stars"
+    )
+    comment = models.TextField(
+        blank=True,
+        help_text="Review comment text"
+    )
+    is_approved = models.BooleanField(
+        default=True,
+        help_text="Whether the review is approved and visible"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['web_client', 'product']  # One review per user per product
+        verbose_name = "Product Review"
+        verbose_name_plural = "Product Reviews"
+        indexes = [
+            models.Index(fields=['product', 'is_approved']),
+            models.Index(fields=['web_client']),
+        ]
+    
+    def __str__(self):
+        return f"{self.web_client} - {self.product.title} ({self.rating}⭐)"

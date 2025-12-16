@@ -103,6 +103,17 @@ api_urlpatterns = [
         views.get_order_detail_api,
         name="get_order_detail_api",
     ),
+    # Order Tracking API endpoints
+    path(
+        "orders/track/",
+        views.track_order,
+        name="track_order",
+    ),
+    path(
+        "orders/<int:order_id>/update-status/",
+        views.update_order_status,
+        name="update_order_status",
+    ),
 ]
 
 urlpatterns += htmx_urlpatterns

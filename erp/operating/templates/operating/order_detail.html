@@ -80,14 +80,45 @@
     letter-spacing: 0.025em;
   }
 
-  .status-badge.pending { background: var(--warning-bg); color: var(--warning-text); }
-  .status-badge.in_production { background: #dbeafe; color: #1e40af; }
-  .status-badge.ready { background: var(--success-bg); color: var(--success-text); }
-  .status-badge.shipped { background: #e0e7ff; color: #3730a3; }
-  .status-badge.completed { background: var(--success-bg); color: var(--success-text); }
-  .status-badge.cancelled { background: var(--danger-bg); color: var(--danger-text); }
-  .status-badge.success { background: var(--success-bg); color: var(--success-text); }
-  .status-badge.failed { background: var(--danger-bg); color: var(--danger-text); }
+  .status-badge.pending {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+  }
+
+  .status-badge.in_production {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .status-badge.ready {
+    background: var(--success-bg);
+    color: var(--success-text);
+  }
+
+  .status-badge.shipped {
+    background: #e0e7ff;
+    color: #3730a3;
+  }
+
+  .status-badge.completed {
+    background: var(--success-bg);
+    color: var(--success-text);
+  }
+
+  .status-badge.cancelled {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+  }
+
+  .status-badge.success {
+    background: var(--success-bg);
+    color: var(--success-text);
+  }
+
+  .status-badge.failed {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+  }
 
   /* Grid Layout */
   .order-grid {
@@ -427,7 +458,7 @@
 
 {% block content %}
 <div class="order-detail-container">
-  
+
   <!-- Header -->
   <div class="order-header">
     <div class="order-header-left">
@@ -445,19 +476,19 @@
     </div>
     <div class="order-actions">
       {% if order.status != 'completed' %}
-        <a href="{% url 'operating:edit_order' order.pk %}" class="btn btn-primary">
-          <i class="fa fa-edit"></i> Edit Order
-        </a>
-        <a href="{% url 'operating:order_production' order.pk %}" class="btn btn-secondary">
-          <i class="fa fa-industry"></i> Production
-        </a>
-        <a href="{% url 'operating:order_packing_list' order.pk %}" class="btn btn-secondary">
-          <i class="fa fa-box"></i> Packing List
-        </a>
+      <a href="{% url 'operating:edit_order' order.pk %}" class="btn btn-primary">
+        <i class="fa fa-edit"></i> Edit Order
+      </a>
+      <a href="{% url 'operating:order_production' order.pk %}" class="btn btn-secondary">
+        <i class="fa fa-industry"></i> Production
+      </a>
+      <a href="{% url 'operating:order_packing_list' order.pk %}" class="btn btn-secondary">
+        <i class="fa fa-box"></i> Packing List
+      </a>
       {% else %}
-        <button class="btn btn-secondary" disabled>
-          <i class="fa fa-check"></i> Order Completed
-        </button>
+      <button class="btn btn-secondary" disabled>
+        <i class="fa fa-check"></i> Order Completed
+      </button>
       {% endif %}
       <a href="{% url 'operating:order_list' %}" class="btn btn-secondary">
         <i class="fa fa-arrow-left"></i> Back to Orders
@@ -467,7 +498,7 @@
 
   <!-- Main Grid -->
   <div class="order-grid">
-    
+
     <!-- Left Column: Items -->
     <div>
       <!-- Order Items Card -->
@@ -491,45 +522,45 @@
             </thead>
             <tbody>
               {% for item in order.items.all %}
-                <tr>
-                  <td>
-                    <a href="{% url 'marketing:product_detail' item.product.pk %}" class="product-link">
-                      {{ item.product.title }}
-                    </a>
-                    {% if item.product.description %}
-                      <div class="product-desc">{{ item.product.description|truncatewords:8 }}</div>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if item.description %}
-                      {{ item.description }}
-                    {% else %}
-                      <span style="color: var(--text-muted);">—</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {{ item.quantity }}
-                    {% if item.product.unit_of_measurement %}
-                      {{ item.product.unit_of_measurement }}
-                    {% endif %}
-                  </td>
-                  <td>${{ item.price|floatformat:2 }}</td>
-                  <td><strong>${{ item.subtotal|floatformat:2 }}</strong></td>
-                  <td>
-                    <span class="status-badge {{ item.status }}">{{ item.status|capfirst }}</span>
-                  </td>
-                </tr>
+              <tr>
+                <td>
+                  <a href="{% url 'marketing:product_detail' item.product.pk %}" class="product-link">
+                    {{ item.product.title }}
+                  </a>
+                  {% if item.product.description %}
+                  <div class="product-desc">{{ item.product.description|truncatewords:8 }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.description %}
+                  {{ item.description }}
+                  {% else %}
+                  <span style="color: var(--text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ item.quantity }}
+                  {% if item.product.unit_of_measurement %}
+                  {{ item.product.unit_of_measurement }}
+                  {% endif %}
+                </td>
+                <td>${{ item.price|floatformat:2 }}</td>
+                <td><strong>${{ item.subtotal|floatformat:2 }}</strong></td>
+                <td>
+                  <span class="status-badge {{ item.status }}">{{ item.status|capfirst }}</span>
+                </td>
+              </tr>
               {% empty %}
-                <tr>
-                  <td colspan="6" class="empty-state">
-                    <i class="fa fa-inbox"></i>
-                    <p>No items in this order</p>
-                  </td>
-                </tr>
+              <tr>
+                <td colspan="6" class="empty-state">
+                  <i class="fa fa-inbox"></i>
+                  <p>No items in this order</p>
+                </td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
-          
+
           <!-- Order Total -->
           <div class="order-total">
             <span class="order-total-label">Total Order Value</span>
@@ -541,7 +572,7 @@
 
     <!-- Right Column: Customer & Details -->
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-      
+
       <!-- Customer Info Card -->
       <div class="card" style="min-height: 420px;">
         <div class="card-header">
@@ -550,56 +581,86 @@
         </div>
         <div class="card-body">
           <div class="customer-info">
-            {% if order.web_client %}
-              <div class="customer-type">
-                <i class="fa fa-globe"></i>
-                Web Order (B2C)
+            {% if order.is_guest_order %}
+            <div class="customer-type" style="background: #fef3c7; color: #92400e;">
+              <i class="fa fa-user-secret"></i>
+              Guest Order (No Account)
+            </div>
+            <div class="info-row">
+              <i class="fa fa-user"></i>
+              <div class="info-content">
+                <div class="info-label">Guest Name</div>
+                <div class="info-value">{{ order.guest_first_name }} {{ order.guest_last_name }}</div>
               </div>
-              <div class="info-row">
-                <i class="fa fa-user"></i>
-                <div class="info-content">
-                  <div class="info-label">Customer Name</div>
-                  <div class="info-value">{{ order.web_client.name|default:order.web_client.username }}</div>
-                </div>
+            </div>
+            {% if order.guest_email %}
+            <div class="info-row">
+              <i class="fa fa-envelope"></i>
+              <div class="info-content">
+                <div class="info-label">Email</div>
+                <div class="info-value">{{ order.guest_email }}</div>
               </div>
-              {% if order.web_client.email %}
-                <div class="info-row">
-                  <i class="fa fa-envelope"></i>
-                  <div class="info-content">
-                    <div class="info-label">Email</div>
-                    <div class="info-value">{{ order.web_client.email }}</div>
-                  </div>
-                </div>
-              {% endif %}
-              {% if order.web_client.phone %}
-                <div class="info-row">
-                  <i class="fa fa-phone"></i>
-                  <div class="info-content">
-                    <div class="info-label">Phone</div>
-                    <div class="info-value">{{ order.web_client.phone }}</div>
-                  </div>
-                </div>
-              {% endif %}
+            </div>
+            {% endif %}
+            {% if order.guest_phone %}
+            <div class="info-row">
+              <i class="fa fa-phone"></i>
+              <div class="info-content">
+                <div class="info-label">Phone</div>
+                <div class="info-value">{{ order.guest_phone }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% elif order.web_client %}
+            <div class="customer-type">
+              <i class="fa fa-globe"></i>
+              Web Order (B2C)
+            </div>
+            <div class="info-row">
+              <i class="fa fa-user"></i>
+              <div class="info-content">
+                <div class="info-label">Customer Name</div>
+                <div class="info-value">{{ order.web_client.name|default:order.web_client.username }}</div>
+              </div>
+            </div>
+            {% if order.web_client.email %}
+            <div class="info-row">
+              <i class="fa fa-envelope"></i>
+              <div class="info-content">
+                <div class="info-label">Email</div>
+                <div class="info-value">{{ order.web_client.email }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% if order.web_client.phone %}
+            <div class="info-row">
+              <i class="fa fa-phone"></i>
+              <div class="info-content">
+                <div class="info-label">Phone</div>
+                <div class="info-value">{{ order.web_client.phone }}</div>
+              </div>
+            </div>
+            {% endif %}
             {% elif order.contact %}
-              <div class="customer-type">
-                <i class="fa fa-user"></i>
-                B2B Contact
-              </div>
-              <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="customer-name">
-                <i class="fa fa-user"></i> {{ order.contact.name|capfirst }}
-              </a>
+            <div class="customer-type">
+              <i class="fa fa-user"></i>
+              B2B Contact
+            </div>
+            <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="customer-name">
+              <i class="fa fa-user"></i> {{ order.contact.name|capfirst }}
+            </a>
             {% elif order.company %}
-              <div class="customer-type">
-                <i class="fa fa-briefcase"></i>
-                B2B Company
-              </div>
-              <a href="{% url 'crm:company_detail' order.company.pk %}" class="customer-name">
-                <i class="fa fa-briefcase"></i> {{ order.company.name|capfirst }}
-              </a>
+            <div class="customer-type">
+              <i class="fa fa-briefcase"></i>
+              B2B Company
+            </div>
+            <a href="{% url 'crm:company_detail' order.company.pk %}" class="customer-name">
+              <i class="fa fa-briefcase"></i> {{ order.company.name|capfirst }}
+            </a>
             {% else %}
-              <div style="text-align: center; color: var(--text-muted); padding: 1rem;">
-                No customer assigned
-              </div>
+            <div style="text-align: center; color: var(--text-muted); padding: 1rem;">
+              No customer assigned
+            </div>
             {% endif %}
           </div>
         </div>
@@ -609,188 +670,191 @@
   </div>
 
   <!-- Payment & Address Section (Side by Side) -->
-  {% if order.web_client and order.payment_status or order.delivery_address or order.billing_address %}
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-      
-      <!-- Payment Info (Web Orders) -->
-      {% if order.web_client and order.payment_status %}
-        <div class="card">
-          <div class="card-header">
-            <i class="fa fa-credit-card"></i>
-            <h2>Payment Information</h2>
+  {% if order.payment_status or order.delivery_address or order.billing_address %}
+  <div
+    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <!-- Payment Info (Web Orders & Guest Orders) -->
+    {% if order.payment_status %}
+    <div class="card">
+      <div class="card-header">
+        <i class="fa fa-credit-card"></i>
+        <h2>Payment Information</h2>
+      </div>
+      <div class="card-body">
+        <div class="payment-grid">
+          <div class="payment-item">
+            <div class="info-label">Payment Status</div>
+            <span class="status-badge {{ order.payment_status }}">{{ order.get_payment_status_display }}</span>
           </div>
-          <div class="card-body">
-            <div class="payment-grid">
-              <div class="payment-item">
-                <div class="info-label">Payment Status</div>
-                <span class="status-badge {{ order.payment_status }}">{{ order.get_payment_status_display }}</span>
-              </div>
-              {% if order.payment_method %}
-                <div class="payment-item">
-                  <div class="info-label">Payment Method</div>
-                  <div class="info-value">{{ order.payment_method }}</div>
-                </div>
-              {% endif %}
-              {% if order.paid_amount %}
-                <div class="payment-item">
-                  <div class="info-label">Paid Amount</div>
-                  <div class="info-value">{{ order.paid_amount|floatformat:2 }} {{ order.paid_currency|default:"TRY" }}</div>
-                </div>
-              {% endif %}
-              {% if order.original_price %}
-                <div class="payment-item">
-                  <div class="info-label">Original Price</div>
-                  <div class="info-value">${{ order.original_price|floatformat:2 }}</div>
-                </div>
-              {% endif %}
-              {% if order.card_last_four %}
-                <div class="payment-item">
-                  <div class="info-label">Card</div>
-                  <div class="info-value">
-                    {{ order.card_association|default:"Card" }} •••• {{ order.card_last_four }}
-                  </div>
-                </div>
-              {% endif %}
-              {% if order.payment_id %}
-                <div class="payment-item">
-                  <div class="info-label">Payment ID</div>
-                  <div class="info-value" style="font-size: 0.75rem; word-break: break-all;">{{ order.payment_id }}</div>
-                </div>
-              {% endif %}
+          {% if order.payment_method %}
+          <div class="payment-item">
+            <div class="info-label">Payment Method</div>
+            <div class="info-value">{{ order.payment_method }}</div>
+          </div>
+          {% endif %}
+          {% if order.paid_amount %}
+          <div class="payment-item">
+            <div class="info-label">Paid Amount</div>
+            <div class="info-value">{{ order.paid_amount|floatformat:2 }} {{ order.paid_currency|default:"TRY" }}</div>
+          </div>
+          {% endif %}
+          {% if order.original_price %}
+          <div class="payment-item">
+            <div class="info-label">Original Price</div>
+            <div class="info-value">${{ order.original_price|floatformat:2 }}</div>
+          </div>
+          {% endif %}
+          {% if order.card_last_four %}
+          <div class="payment-item">
+            <div class="info-label">Card</div>
+            <div class="info-value">
+              {{ order.card_association|default:"Card" }} •••• {{ order.card_last_four }}
             </div>
           </div>
-        </div>
-      {% endif %}
-
-      <!-- Delivery & Billing Addresses -->
-      {% if order.delivery_address or order.billing_address %}
-        <div class="card">
-          <div class="card-header">
-            <i class="fa fa-map-marker-alt"></i>
-            <h2>Addresses</h2>
+          {% endif %}
+          {% if order.payment_id %}
+          <div class="payment-item">
+            <div class="info-label">Payment ID</div>
+            <div class="info-value" style="font-size: 0.75rem; word-break: break-all;">{{ order.payment_id }}</div>
           </div>
-          <div class="card-body">
-            {% if order.delivery_address %}
-              <div class="address-block">
-                <div class="address-title">
-                  <i class="fa fa-truck"></i>
-                  Delivery Address
-                  {% if order.delivery_address_title %}
-                    - {{ order.delivery_address_title }}
-                  {% endif %}
-                </div>
-                <div class="address-text">
-                  {{ order.delivery_address }}<br>
-                  {% if order.delivery_city %}{{ order.delivery_city }}, {% endif %}
-                  {% if order.delivery_country %}{{ order.delivery_country }}{% endif %}
-                  {% if order.delivery_phone %}
-                    <br><i class="fa fa-phone"></i> {{ order.delivery_phone }}
-                  {% endif %}
-                </div>
-              </div>
-            {% endif %}
-            
-            {% if order.billing_address %}
-              <div class="address-block">
-                <div class="address-title">
-                  <i class="fa fa-file-invoice"></i>
-                  Billing Address
-                  {% if order.billing_address_title %}
-                    - {{ order.billing_address_title }}
-                  {% endif %}
-                </div>
-                <div class="address-text">
-                  {{ order.billing_address }}<br>
-                  {% if order.billing_city %}{{ order.billing_city }}, {% endif %}
-                  {% if order.billing_country %}{{ order.billing_country }}{% endif %}
-                  {% if order.billing_phone %}
-                    <br><i class="fa fa-phone"></i> {{ order.billing_phone }}
-                  {% endif %}
-                </div>
-              </div>
-            {% endif %}
-          </div>
+          {% endif %}
         </div>
-      {% endif %}
-
+      </div>
     </div>
+    {% endif %}
+
+    <!-- Delivery & Billing Addresses -->
+    {% if order.delivery_address or order.billing_address %}
+    <div class="card">
+      <div class="card-header">
+        <i class="fa fa-map-marker-alt"></i>
+        <h2>Addresses</h2>
+      </div>
+      <div class="card-body">
+        {% if order.delivery_address %}
+        <div class="address-block">
+          <div class="address-title">
+            <i class="fa fa-truck"></i>
+            Delivery Address
+            {% if order.delivery_address_title %}
+            - {{ order.delivery_address_title }}
+            {% endif %}
+          </div>
+          <div class="address-text">
+            {{ order.delivery_address }}<br>
+            {% if order.delivery_city %}{{ order.delivery_city }}, {% endif %}
+            {% if order.delivery_country %}{{ order.delivery_country }}{% endif %}
+            {% if order.delivery_phone %}
+            <br><i class="fa fa-phone"></i> {{ order.delivery_phone }}
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if order.billing_address %}
+        <div class="address-block">
+          <div class="address-title">
+            <i class="fa fa-file-invoice"></i>
+            Billing Address
+            {% if order.billing_address_title %}
+            - {{ order.billing_address_title }}
+            {% endif %}
+          </div>
+          <div class="address-text">
+            {{ order.billing_address }}<br>
+            {% if order.billing_city %}{{ order.billing_city }}, {% endif %}
+            {% if order.billing_country %}{{ order.billing_country }}{% endif %}
+            {% if order.billing_phone %}
+            <br><i class="fa fa-phone"></i> {{ order.billing_phone }}
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
   {% endif %}
 
   <!-- Shipping & QR Section -->
   {% if order.tracking_number or order.qr_code_url %}
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-      
-      <!-- Shipping Tracking -->
-      {% if order.tracking_number %}
-        <div class="card">
-          <div class="card-header">
-            <i class="fa fa-shipping-fast"></i>
-            <h2>Shipping Information</h2>
-          </div>
-          <div class="card-body">
-            <div class="info-row">
-              <i class="fa fa-barcode"></i>
-              <div class="info-content">
-                <div class="info-label">Tracking Number</div>
-                <div class="info-value">{{ order.tracking_number }}</div>
-              </div>
-            </div>
-            {% if order.shipped_at %}
-              <div class="info-row">
-                <i class="fa fa-calendar"></i>
-                <div class="info-content">
-                  <div class="info-label">Shipped At</div>
-                  <div class="info-value">{{ order.shipped_at|date:"M d, Y H:i" }}</div>
-                </div>
-              </div>
-            {% endif %}
-            {% if order.delivered_at %}
-              <div class="info-row">
-                <i class="fa fa-check-circle"></i>
-                <div class="info-content">
-                  <div class="info-label">Delivered At</div>
-                  <div class="info-value">{{ order.delivered_at|date:"M d, Y H:i" }}</div>
-                </div>
-              </div>
-            {% endif %}
+  <div
+    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <!-- Shipping Tracking -->
+    {% if order.tracking_number %}
+    <div class="card">
+      <div class="card-header">
+        <i class="fa fa-shipping-fast"></i>
+        <h2>Shipping Information</h2>
+      </div>
+      <div class="card-body">
+        <div class="info-row">
+          <i class="fa fa-barcode"></i>
+          <div class="info-content">
+            <div class="info-label">Tracking Number</div>
+            <div class="info-value">{{ order.tracking_number }}</div>
           </div>
         </div>
-      {% endif %}
-
-      <!-- QR Code -->
-      {% if order.qr_code_url %}
-        <div class="card">
-          <div class="card-header">
-            <i class="fa fa-qrcode"></i>
-            <h2>Order QR Code</h2>
-          </div>
-          <div class="card-body qr-code">
-            <img src="{{ order.qr_code_url }}" alt="QR Code for Order #{{ order.pk }}" />
+        {% if order.shipped_at %}
+        <div class="info-row">
+          <i class="fa fa-calendar"></i>
+          <div class="info-content">
+            <div class="info-label">Shipped At</div>
+            <div class="info-value">{{ order.shipped_at|date:"M d, Y H:i" }}</div>
           </div>
         </div>
-      {% endif %}
-
+        {% endif %}
+        {% if order.delivered_at %}
+        <div class="info-row">
+          <i class="fa fa-check-circle"></i>
+          <div class="info-content">
+            <div class="info-label">Delivered At</div>
+            <div class="info-value">{{ order.delivered_at|date:"M d, Y H:i" }}</div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
     </div>
+    {% endif %}
+
+    <!-- QR Code -->
+    {% if order.qr_code_url %}
+    <div class="card">
+      <div class="card-header">
+        <i class="fa fa-qrcode"></i>
+        <h2>Order QR Code</h2>
+      </div>
+      <div class="card-body qr-code">
+        <img src="{{ order.qr_code_url }}" alt="QR Code for Order #{{ order.pk }}" />
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
   {% endif %}
 
   <!-- Notes Section (Full Width) -->
   {% if order.notes %}
-    <div class="card" style="margin-bottom: 1.5rem;">
-      <div class="card-header">
-        <i class="fa fa-sticky-note"></i>
-        <h2>Notes</h2>
-      </div>
-      <div class="card-body">
-        <div class="notes-text">{{ order.notes }}</div>
-      </div>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <i class="fa fa-sticky-note"></i>
+      <h2>Notes</h2>
     </div>
+    <div class="card-body">
+      <div class="notes-text">{{ order.notes }}</div>
+    </div>
+  </div>
   {% endif %}
 
   <!-- Delete Button -->
   <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
     <form action="{% url 'operating:delete_order' order.pk %}" method="post">
       {% csrf_token %}
-      <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this order?');">
+      <button type="submit" class="btn btn-danger"
+        onclick="return confirm('Are you sure you want to delete this order?');">
         <i class="fa fa-trash"></i> Delete Order
       </button>
     </form>

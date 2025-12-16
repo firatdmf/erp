@@ -41,4 +41,11 @@ urlpatterns = [
     # Order API endpoints
     path('api/get_user_orders/<int:user_id>/', api_views.get_user_orders, name='get_user_orders'),
     path('api/get_order_detail/<int:user_id>/<int:order_id>/', api_views.get_order_detail, name='get_order_detail'),
+    
+    # Product Review API endpoints
+    path('api/can_review_product/<int:user_id>/<str:product_sku>/', api_views.can_review_product, name='can_review_product'),
+    path('api/add_product_review/<int:user_id>/', api_views.add_product_review, name='add_product_review'),
+    path('api/get_product_reviews/<str:product_sku>/', api_views.get_product_reviews, name='get_product_reviews'),
+    path('api/get_user_reviews/<int:user_id>/', api_views.get_user_reviews, name='get_user_reviews'),
+    path('api/delete_review/<int:user_id>/<int:review_id>/', api_views.delete_review, name='delete_review'),
 ]

@@ -215,6 +215,29 @@ STATUS_CHOICES = [
     ("cancelled", "Cancelled"),
 ]
 
+# Order status choices for customer-facing order tracking
+ORDER_STATUS_CHOICES = [
+    ("pending", "Beklemede"),
+    ("confirmed", "Onaylandı"),
+    ("preparing", "Hazırlanıyor"),
+    ("shipped", "Kargoya Verildi"),
+    ("in_transit", "Yolda"),
+    ("out_for_delivery", "Dağıtımda"),
+    ("delivered", "Teslim Edildi"),
+    ("cancelled", "İptal Edildi"),
+    ("returned", "İade Edildi"),
+]
+
+# Carrier (shipping company) choices
+CARRIER_CHOICES = [
+    ("yurtici", "Yurtiçi Kargo"),
+    ("mng", "MNG Kargo"),
+    ("aras", "Aras Kargo"),
+    ("ptt", "PTT Kargo"),
+    ("ups", "UPS"),
+    ("other", "Diğer"),
+]
+
 
 # Create your models here.
 class Order(models.Model):
@@ -282,6 +305,13 @@ class Order(models.Model):
     billing_country = models.CharField(max_length=100, blank=True, null=True)
     billing_phone = models.CharField(max_length=20, blank=True, null=True)
     
+    # Guest Order Information
+    is_guest_order = models.BooleanField(default=False, help_text="True if order was placed by guest (non-registered user)")
+    guest_email = models.EmailField(blank=True, null=True, help_text="Email address for guest orders")
+    guest_phone = models.CharField(max_length=20, blank=True, null=True, help_text="Phone number for guest orders")
+    guest_first_name = models.CharField(max_length=100, blank=True, null=True, help_text="First name for guest orders")
+    guest_last_name = models.CharField(max_length=100, blank=True, null=True, help_text="Last name for guest orders")
+    
     # Shipping Tracking
     tracking_number = models.CharField(max_length=100, blank=True, null=True)
     shipped_at = models.DateTimeField(blank=True, null=True)
@@ -298,6 +328,28 @@ class Order(models.Model):
         null=True,
         blank=True,
         help_text="e-Arşiv Fatura oluşturma tarihi"
+    )
+    
+    # Order Tracking for Web Orders
+    order_number = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Müşteri sipariş numarası (DK0000001 formatında)"
+    )
+    order_status = models.CharField(
+        max_length=32,
+        choices=ORDER_STATUS_CHOICES,
+        default="pending",
+        help_text="Müşteriye gösterilen sipariş durumu"
+    )
+    carrier = models.CharField(
+        max_length=50,
+        choices=CARRIER_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Kargo şirketi"
     )
 
     def total_value(self):
@@ -334,7 +386,48 @@ class Order(models.Model):
 
         self.save()
 
+    def generate_order_number(self):
+        """Generate order number in DK0000001 format"""
+        # Get the last order with an order_number
+        last_order = Order.objects.filter(
+            order_number__isnull=False
+        ).order_by('-id').first()
+        
+        if last_order and last_order.order_number:
+            # Extract the number part and increment
+            try:
+                last_num = int(last_order.order_number.replace('DK', ''))
+                new_num = last_num + 1
+            except ValueError:
+                new_num = 1
+        else:
+            new_num = 1
+        
+        return f"DK{str(new_num).zfill(7)}"
+
+    def save(self, *args, **kwargs):
+        # Auto-generate order_number for web orders (if they don't have one)
+        is_new = self.pk is None
+        
+        # First save to get ID if new
+        if is_new:
+            super().save(*args, **kwargs)
+        
+        # Generate order_number for web orders that don't have one
+        if not self.order_number and self.web_client:
+            self.order_number = self.generate_order_number()
+            if is_new:
+                # Already saved above, just update the order_number
+                super().save(update_fields=['order_number'])
+                return
+        
+        # Normal save
+        if not is_new:
+            super().save(*args, **kwargs)
+
     def __str__(self):
+        if self.order_number:
+            return f"Order {self.order_number} - {self.get_client()}"
         return f"Order #{self.pk} - {self.contact or self.company} "
 
 

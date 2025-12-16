@@ -1442,3 +1442,275 @@ def get_exchange_rates(request):
     }, status=200)
     response["Access-Control-Allow-Origin"] = "*"
     return response
+
+
+# ==================== PRODUCT REVIEW API ENDPOINTS ====================
+
+@csrf_exempt
+def can_review_product(request, user_id, product_sku):
+    """Check if user has purchased the product and can leave a review"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from operating.models import Order, OrderItem
+        from marketing.models import Product, ProductReview
+        
+        web_client = WebClient.objects.get(id=user_id)
+        
+        # Check if user has purchased this product (paid order with this product)
+        # We check payment_status='success' instead of order status because
+        # order can be in any production stage but payment is completed
+        has_purchased = OrderItem.objects.filter(
+            order__web_client=web_client,
+            order__payment_status='success',  # Payment successful
+            product__sku=product_sku
+        ).exists()
+        
+        # Check if user has already reviewed this product
+        product = Product.objects.filter(sku=product_sku).first()
+        has_reviewed = False
+        existing_review = None
+        
+        if product:
+            existing = ProductReview.objects.filter(web_client=web_client, product=product).first()
+            if existing:
+                has_reviewed = True
+                existing_review = {
+                    'id': existing.id,
+                    'rating': existing.rating,
+                    'comment': existing.comment,
+                    'created_at': existing.created_at.isoformat()
+                }
+        
+        response = JsonResponse({
+            'can_review': has_purchased and not has_reviewed,
+            'has_purchased': has_purchased,
+            'has_reviewed': has_reviewed,
+            'existing_review': existing_review
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def add_product_review(request, user_id):
+    """Add a new product review"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from operating.models import Order, OrderItem
+        from marketing.models import Product, ProductReview
+        
+        data = json.loads(request.body)
+        product_sku = data.get('product_sku')
+        rating = data.get('rating')
+        comment = data.get('comment', '')
+        
+        if not product_sku:
+            return JsonResponse({'error': 'product_sku is required'}, status=400)
+        if not rating or not (1 <= int(rating) <= 5):
+            return JsonResponse({'error': 'rating must be between 1 and 5'}, status=400)
+        
+        web_client = WebClient.objects.get(id=user_id)
+        product = Product.objects.get(sku=product_sku)
+        
+        # Verify purchase (check payment_status='success')
+        has_purchased = OrderItem.objects.filter(
+            order__web_client=web_client,
+            order__payment_status='success',
+            product=product
+        ).exists()
+        
+        if not has_purchased:
+            return JsonResponse({
+                'error': 'You must purchase this product before leaving a review'
+            }, status=403)
+        
+        # Check for existing review
+        if ProductReview.objects.filter(web_client=web_client, product=product).exists():
+            return JsonResponse({
+                'error': 'You have already reviewed this product'
+            }, status=400)
+        
+        # Create review
+        review = ProductReview.objects.create(
+            web_client=web_client,
+            product=product,
+            rating=int(rating),
+            comment=comment
+        )
+        
+        response = JsonResponse({
+            'message': 'Review added successfully',
+            'review': {
+                'id': review.id,
+                'rating': review.rating,
+                'comment': review.comment,
+                'created_at': review.created_at.isoformat()
+            }
+        }, status=201)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Product.DoesNotExist:
+        return JsonResponse({'error': 'Product not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def get_product_reviews(request, product_sku):
+    """Get all approved reviews for a product"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from marketing.models import Product, ProductReview
+        
+        product = Product.objects.get(sku=product_sku)
+        reviews = ProductReview.objects.filter(product=product, is_approved=True).order_by('-created_at')
+        
+        reviews_list = []
+        total_rating = 0
+        for review in reviews:
+            total_rating += review.rating
+            reviews_list.append({
+                'id': review.id,
+                'rating': review.rating,
+                'comment': review.comment,
+                'user_name': review.web_client.name or review.web_client.email.split('@')[0],
+                'created_at': review.created_at.isoformat()
+            })
+        
+        average_rating = round(total_rating / len(reviews_list), 1) if reviews_list else 0
+        
+        response = JsonResponse({
+            'reviews': reviews_list,
+            'total_count': len(reviews_list),
+            'average_rating': average_rating
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except Product.DoesNotExist:
+        return JsonResponse({'error': 'Product not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def get_user_reviews(request, user_id):
+    """Get all reviews by a user"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from marketing.models import ProductReview
+        
+        web_client = WebClient.objects.get(id=user_id)
+        reviews = ProductReview.objects.filter(web_client=web_client).order_by('-created_at')
+        
+        reviews_list = []
+        for review in reviews:
+            product_image = None
+            if review.product.files.exists():
+                first_file = review.product.files.first()
+                if first_file and first_file.file_url:
+                    product_image = first_file.file_url
+            
+            reviews_list.append({
+                'id': review.id,
+                'rating': review.rating,
+                'comment': review.comment,
+                'product_sku': review.product.sku,
+                'product_title': review.product.title,
+                'product_image': product_image,
+                'is_approved': review.is_approved,
+                'created_at': review.created_at.isoformat()
+            })
+        
+        response = JsonResponse({
+            'reviews': reviews_list,
+            'total_count': len(reviews_list)
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def delete_review(request, user_id, review_id):
+    """Delete a user's review"""
+    if request.method == 'OPTIONS':
+        response = JsonResponse({})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "DELETE, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+    
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        from marketing.models import ProductReview
+        
+        web_client = WebClient.objects.get(id=user_id)
+        review = ProductReview.objects.get(id=review_id, web_client=web_client)
+        
+        review.delete()
+        
+        response = JsonResponse({
+            'message': 'Review deleted successfully'
+        }, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+        
+    except WebClient.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except ProductReview.DoesNotExist:
+        return JsonResponse({'error': 'Review not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

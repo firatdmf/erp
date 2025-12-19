@@ -451,6 +451,74 @@ class OrderItem(models.Model):
     )
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True, null=True)
+    
+    # Custom Curtain Fields
+    is_custom_curtain = models.BooleanField(
+        default=False,
+        help_text="Bu bir özel perde siparişi mi?"
+    )
+    custom_mounting_type = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        choices=[
+            ('cornice', 'Korniş'),
+            ('rustic', 'Rustik'),
+        ],
+        help_text="Montaj tipi"
+    )
+    custom_pleat_type = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        choices=[
+            ('flat', 'Yatık Pile'),
+            ('kanun', 'Kanun Pile'),
+            ('pipe', 'Boru Pile'),
+            ('water_wave', 'Su Dalgası'),
+            ('american', 'Amerikan Pile'),
+            ('extrafor', 'Ekstrafor'),
+        ],
+        help_text="Pile tipi"
+    )
+    custom_pleat_density = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Pile yoğunluğu (örn: 1x2, 1x2.5, 1x3)"
+    )
+    custom_width = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Perde eni (cm)"
+    )
+    custom_height = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Perde boyu (cm)"
+    )
+    custom_wing_type = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        choices=[
+            ('single', 'Tek Kanat'),
+            ('double', 'Çift Kanat'),
+        ],
+        help_text="Kanat tipi"
+    )
+    custom_fabric_used_meters = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Kullanılan kumaş miktarı (metre)"
+    )
+    
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
 
     def display_status(self):

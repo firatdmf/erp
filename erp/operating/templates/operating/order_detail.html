@@ -527,7 +527,38 @@
                   <a href="{% url 'marketing:product_detail' item.product.pk %}" class="product-link">
                     {{ item.product.title }}
                   </a>
-                  {% if item.product.description %}
+                  {% if item.is_custom_curtain %}
+                  <div style="margin-top: 0.5rem;">
+                    <span
+                      style="display: inline-block; padding: 0.25rem 0.75rem; background: #7c3aed; color: white; font-size: 0.75rem; font-weight: 700; border-radius: 9999px;">
+                      ✂️ ÖZEL PERDE
+                    </span>
+                    <div
+                      style="background: #f5f3ff; padding: 0.5rem; border-radius: 6px; margin-top: 0.5rem; font-size: 0.8rem; color: #5b21b6;">
+                      {% if item.custom_width and item.custom_height %}
+                      <div>📏 Boyut: {{ item.custom_width }}cm x {{ item.custom_height }}cm</div>
+                      {% endif %}
+                      {% if item.custom_pleat_type %}
+                      <div>🧵 Pile: {{ item.custom_pleat_type }}</div>
+                      {% endif %}
+                      {% if item.custom_pleat_density %}
+                      <div>📊 Pile Sıklığı: {{ item.custom_pleat_density }}</div>
+                      {% endif %}
+                      {% if item.custom_mounting_type %}
+                      <div>🔧 Montaj: {% if item.custom_mounting_type == 'cornice' %}Korniş{% else %}Rustik{% endif %}
+                      </div>
+                      {% endif %}
+                      {% if item.custom_wing_type %}
+                      <div>🪟 Kanat: {% if item.custom_wing_type == 'single' %}Tek{% else %}Çift{% endif %}</div>
+                      {% endif %}
+                      {% if item.custom_fabric_used_meters %}
+                      <div style="font-weight: 600; color: #7c3aed;">🧶 Kumaş: {{ item.custom_fabric_used_meters }}
+                        metre</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                  {% endif %}
+                  {% if item.product.description and not item.is_custom_curtain %}
                   <div class="product-desc">{{ item.product.description|truncatewords:8 }}</div>
                   {% endif %}
                 </td>

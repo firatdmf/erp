@@ -108,8 +108,7 @@ class CreateTask(generic.edit.CreateView):
     model = Task
     form_class = TaskForm
     template_name = "todo/create_task.html"
-    # index here is from the url name
-    success_url = reverse_lazy("index")
+    # Redirect will be handled in form_valid to go to task detail page
 
     def form_valid(self, form):
         print("your member iss")
@@ -121,7 +120,12 @@ class CreateTask(generic.edit.CreateView):
         # If member is not set, assign to creator
         if not form.instance.member:
             form.instance.member = self.request.user.member
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        return response
+    
+    def get_success_url(self):
+        # Redirect to task detail page after creation
+        return reverse('todo:task_detail', kwargs={'task_id': self.object.pk})
 
 
 @method_decorator(login_required, name="dispatch")
@@ -725,30 +729,28 @@ def add_task_comment(request, task_id):
         # Escape content to prevent XSS
         safe_content = escape(comment.content)
         
-        # Return HTML snippet for HTMX matching new modern design
+        # Get author info
+        first_name = comment.author.user.first_name or ''
+        last_name = comment.author.user.last_name or ''
+        initials = f"{first_name[:1]}{last_name[:1]}"
+        full_name = f"{first_name} {last_name}".strip() or "User"
+        
+        # Return HTML snippet for HTMX matching modern design
         html = f'''
-        <div class="comment-card" style="animation: slideIn 0.3s ease;">
-            <div class="comment-avatar-wrapper">
-                <div class="comment-avatar">{comment.author.user.first_name[0]}{comment.author.user.last_name[0]}</div>
-            </div>
-            <div class="comment-body">
+        <div class="comment-row" style="animation: fadeIn 0.3s ease;">
+            <div class="comment-avatar">{initials}</div>
+            <div class="comment-main">
                 <div class="comment-meta">
-                    <span class="comment-author-name">{comment.author.user.first_name} {comment.author.user.last_name}</span>
-                    <span class="comment-timestamp">az önce</span>
+                    <span class="comment-author">{full_name}</span>
+                    <span class="comment-time">just now</span>
                 </div>
                 <div class="comment-text">{safe_content}</div>
             </div>
         </div>
         <style>
-            @keyframes slideIn {{
-                from {{
-                    opacity: 0;
-                    transform: translateY(-10px);
-                }}
-                to {{
-                    opacity: 1;
-                    transform: translateY(0);
-                }}
+            @keyframes fadeIn {{
+                from {{ opacity: 0; transform: translateY(-10px); }}
+                to {{ opacity: 1; transform: translateY(0); }}
             }}
         </style>
         <script>

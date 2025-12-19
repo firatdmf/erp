@@ -1,5 +1,6 @@
 import traceback
 from django.shortcuts import get_object_or_404, render, redirect
+from django.http import JsonResponse
 from django.views import View
 from .models import (
     Order,
@@ -1149,11 +1150,24 @@ def get_order_detail_api(request, user_id, order_id):
                     'id': item.pk,
                     'product_sku': item.product.sku,
                     'product_title': item.product.title,
+                    'product_image': item.product.primary_image.file_url if item.product.primary_image else None,
                     'product_variant_sku': item.product_variant.variant_sku if item.product_variant else None,
                     'quantity': str(item.quantity),
                     'price': str(item.price),
+                    'subtotal': str(item.subtotal()) if item.quantity and item.price else None,
                     'description': item.description,
-                    'status': item.status
+                    'status': item.status,
+                    # Custom Curtain Fields
+                    'is_custom_curtain': item.is_custom_curtain,
+                    'custom_fabric_used_meters': str(item.custom_fabric_used_meters) if item.custom_fabric_used_meters else None,
+                    'custom_attributes': {
+                        'mounting_type': item.custom_mounting_type,
+                        'pleat_type': item.custom_pleat_type,
+                        'pleat_density': item.custom_pleat_density,
+                        'width': str(item.custom_width) if item.custom_width else None,
+                        'height': str(item.custom_height) if item.custom_height else None,
+                        'wing_type': item.custom_wing_type,
+                    } if item.is_custom_curtain else None,
                 }
                 for item in order.items.all()
             ]
@@ -1261,13 +1275,26 @@ def create_web_order(request):
                         pass
                 
                 if product:
+                    # Get custom curtain attributes if present
+                    custom_attrs = item_data.get('custom_attributes', {}) or {}
+                    is_custom = item_data.get('is_custom_curtain', False)
+                    
                     OrderItem.objects.create(
                         order=order,
                         product=product,
                         product_variant=variant,
                         quantity=item_data.get('quantity', 1),
                         price=item_data.get('price', 0),
-                        description=item_data.get('description', '')
+                        description=item_data.get('description', ''),
+                        # Custom Curtain Fields
+                        is_custom_curtain=is_custom,
+                        custom_mounting_type=custom_attrs.get('mountingType') if is_custom else None,
+                        custom_pleat_type=custom_attrs.get('pleatType') if is_custom else None,
+                        custom_pleat_density=custom_attrs.get('pleatDensity') if is_custom else None,
+                        custom_width=custom_attrs.get('width') if is_custom else None,
+                        custom_height=custom_attrs.get('height') if is_custom else None,
+                        custom_wing_type=custom_attrs.get('wingType') if is_custom else None,
+                        custom_fabric_used_meters=item_data.get('custom_fabric_used_meters') if is_custom else None,
                     )
             
             return JsonResponse({
@@ -1327,10 +1354,22 @@ def track_order(request):
             item_data = {
                 'product_sku': item.product.sku if item.product else None,
                 'product_title': item.product.title if item.product else 'Unknown',
+                'product_image': item.product.primary_image.file_url if item.product and item.product.primary_image else None,
                 'variant_sku': item.product_variant.variant_sku if item.product_variant else None,
                 'quantity': str(item.quantity),
                 'price': str(item.price),
                 'status': item.status,
+                # Custom Curtain Fields
+                'is_custom_curtain': item.is_custom_curtain,
+                'custom_fabric_used_meters': str(item.custom_fabric_used_meters) if item.custom_fabric_used_meters else None,
+                'custom_attributes': {
+                    'mounting_type': item.custom_mounting_type,
+                    'pleat_type': item.custom_pleat_type,
+                    'pleat_density': item.custom_pleat_density,
+                    'width': str(item.custom_width) if item.custom_width else None,
+                    'height': str(item.custom_height) if item.custom_height else None,
+                    'wing_type': item.custom_wing_type,
+                } if item.is_custom_curtain else None,
             }
             items.append(item_data)
         
@@ -1448,3 +1487,234 @@ def update_order_status(request, order_id):
             'error': 'Durum güncelleme hatası',
             'details': str(e)
         }, status=500)
+
+
+# ============================================================
+# ORDER ANALYTICS DASHBOARD
+# ============================================================
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum, Count, Avg, F
+from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, TruncYear
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+
+class OrderAnalytics(LoginRequiredMixin, View):
+    """
+    Optimized order analytics dashboard with caching for 10K+ users.
+    - Uses Django cache for expensive queries
+    - Minimized database queries with values_list
+    - Single aggregated queries where possible
+    """
+    template_name = "operating/order_analytics.html"
+    
+    def get(self, request):
+        from django.core.cache import cache
+        
+        # Get filter parameters
+        period = request.GET.get('period', 'monthly')
+        days = int(request.GET.get('days', 365))
+        product_type = request.GET.get('product_type', 'all')
+        
+        # Cache key based on parameters
+        cache_key = f"analytics_{period}_{days}_{product_type}"
+        cached_context = cache.get(cache_key)
+        
+        if cached_context:
+            # Serve from cache (5 minute cache)
+            return render(request, self.template_name, cached_context)
+        
+        # Date range
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # Single optimized query for orders with only needed fields
+        orders = Order.objects.filter(
+            created_at__gte=start_date,
+            paid_amount__isnull=False
+        ).exclude(
+            payment_status='failed'
+        ).only('id', 'created_at', 'paid_amount', 'payment_status', 'web_client_id')
+        
+        # Get order IDs for subqueries (more efficient than __in with queryset)
+        order_ids = list(orders.values_list('id', flat=True))
+        
+        # Summary metrics in single query
+        summary = orders.aggregate(
+            total_orders=Count('id'),
+            total_revenue=Sum('paid_amount'),
+            avg_order_value=Avg('paid_amount'),
+        )
+        
+        # Product counts in single query with conditional annotation
+        from django.db.models import Case, When, IntegerField
+        product_counts = OrderItem.objects.filter(
+            order_id__in=order_ids
+        ).aggregate(
+            custom_count=Count('id', filter=Q(is_custom_curtain=True)),
+            fabric_count=Count('id', filter=Q(is_custom_curtain=False))
+        )
+        
+        custom_curtain_count = product_counts['custom_count']
+        fabric_count = product_counts['fabric_count']
+        
+        # Success rate - single query
+        all_orders_count = Order.objects.filter(created_at__gte=start_date).count()
+        successful_orders = orders.filter(payment_status='success').count()
+        success_rate = (successful_orders / all_orders_count * 100) if all_orders_count > 0 else 0
+        
+        # Optimized trend data query
+        if period == 'daily':
+            truncate_func = TruncDate('created_at')
+        elif period == 'weekly':
+            truncate_func = TruncWeek('created_at')
+        elif period == 'yearly':
+            truncate_func = TruncYear('created_at')
+        else:
+            truncate_func = TruncMonth('created_at')
+        
+        trend_data = list(orders.annotate(
+            date=truncate_func
+        ).values('date').annotate(
+            count=Count('id'),
+            revenue=Sum('paid_amount')
+        ).order_by('date'))
+        
+        # Format trend data for Chart.js
+        chart_labels = []
+        chart_counts = []
+        chart_revenues = []
+        
+        date_formats = {
+            'daily': '%d %b',
+            'weekly': 'Hafta %W',
+            'yearly': '%Y',
+            'monthly': '%b %Y'
+        }
+        fmt = date_formats.get(period, '%b %Y')
+        
+        for item in trend_data:
+            if item['date']:
+                chart_labels.append(item['date'].strftime(fmt))
+                chart_counts.append(item['count'])
+                chart_revenues.append(float(item['revenue'] or 0))
+        
+        # Weekly breakdown - optimized
+        week_start = end_date - timedelta(days=7)
+        weekly_data = list(Order.objects.filter(
+            created_at__gte=week_start,
+            paid_amount__isnull=False
+        ).exclude(
+            payment_status='failed'
+        ).annotate(
+            date=TruncDate('created_at')
+        ).values('date').annotate(
+            count=Count('id'),
+            revenue=Sum('paid_amount')
+        ).order_by('date'))
+        
+        weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        weekly_labels = []
+        weekly_counts = []
+        weekly_revenues = []
+        
+        for item in weekly_data:
+            if item['date']:
+                weekly_labels.append(weekday_names[item['date'].weekday()])
+                weekly_counts.append(item['count'])
+                weekly_revenues.append(float(item['revenue'] or 0))
+        
+        # Top products - single optimized query with product type filter
+        base_items = OrderItem.objects.filter(order_id__in=order_ids)
+        
+        if product_type == 'custom':
+            base_items = base_items.filter(is_custom_curtain=True)
+        elif product_type == 'fabric':
+            base_items = base_items.filter(is_custom_curtain=False)
+        
+        top_products = list(base_items.values(
+            'product__title', 'product__sku', 'is_custom_curtain'
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_revenue=Sum(F('quantity') * F('price')),
+            order_count=Count('order', distinct=True)
+        ).order_by('-total_quantity')[:10])
+        
+        # Top curtains (custom curtains + ready_made_curtain category)
+        top_custom = list(OrderItem.objects.filter(
+            order_id__in=order_ids
+        ).filter(
+            Q(is_custom_curtain=True) | Q(product__category__name='ready_made_curtain')
+        ).values('product__title', 'product__sku').annotate(
+            total_quantity=Count('id'),
+            total_revenue=Sum('price'),
+            order_count=Count('order', distinct=True)
+        ).order_by('-total_quantity')[:5])
+        
+        # Top fabric - exclude custom curtains and ready_made_curtain
+        top_fabric = list(OrderItem.objects.filter(
+            order_id__in=order_ids, is_custom_curtain=False
+        ).exclude(
+            product__category__name='ready_made_curtain'
+        ).values('product__title', 'product__sku').annotate(
+            total_quantity=Sum('quantity'),
+            total_revenue=Sum(F('quantity') * F('price')),
+            order_count=Count('order', distinct=True)
+        ).order_by('-total_quantity')[:5])
+        
+        # Top customers - optimized
+        top_customers = list(orders.filter(
+            web_client__isnull=False
+        ).values(
+            'web_client__id', 'web_client__name', 'web_client__email'
+        ).annotate(
+            order_count=Count('id'),
+            total_spent=Sum('paid_amount')
+        ).order_by('-total_spent')[:10])
+        
+        # Product chart data
+        product_labels = [p['product__title'][:20] if p['product__title'] else 'Unknown' for p in top_products]
+        product_quantities = [float(p['total_quantity'] or 0) for p in top_products]
+        product_revenues = [float(p['total_revenue'] or 0) for p in top_products]
+        
+        context = {
+            'summary': {
+                'total_orders': summary['total_orders'] or 0,
+                'total_revenue': summary['total_revenue'] or Decimal('0'),
+                'avg_order_value': summary['avg_order_value'] or Decimal('0'),
+                'success_rate': round(success_rate, 1),
+                'custom_curtain_count': custom_curtain_count,
+                'fabric_count': fabric_count,
+            },
+            'chart_labels': json.dumps(chart_labels),
+            'chart_counts': json.dumps(chart_counts),
+            'chart_revenues': json.dumps(chart_revenues),
+            'weekly_labels': json.dumps(weekly_labels),
+            'weekly_counts': json.dumps(weekly_counts),
+            'weekly_revenues': json.dumps(weekly_revenues),
+            'top_products': top_products,
+            'top_custom': top_custom,
+            'top_fabric': top_fabric,
+            'product_labels': json.dumps(product_labels),
+            'product_quantities': json.dumps(product_quantities),
+            'product_revenues': json.dumps(product_revenues),
+            'top_customers': top_customers,
+            'period': period,
+            'days': days,
+            'product_type': product_type,
+        }
+        
+        # Cache for 5 minutes
+        cache.set(cache_key, context, 300)
+        
+        # Return JSON for AJAX requests
+        if request.GET.get('format') == 'json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'chart_labels': chart_labels,
+                'chart_revenues': chart_revenues,
+                'period': period,
+            })
+        
+        return render(request, self.template_name, context)
+

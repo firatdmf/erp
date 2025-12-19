@@ -1207,6 +1207,17 @@ def get_order_detail(request, user_id, order_id):
                 'price': str(item.price) if item.price is not None else None,
                 'subtotal': subtotal,
                 'status': item.status,
+                # Custom Curtain Fields
+                'is_custom_curtain': item.is_custom_curtain,
+                'custom_fabric_used_meters': str(item.custom_fabric_used_meters) if item.custom_fabric_used_meters else None,
+                'custom_attributes': {
+                    'mounting_type': item.custom_mounting_type,
+                    'pleat_type': item.custom_pleat_type,
+                    'pleat_density': item.custom_pleat_density,
+                    'width': str(item.custom_width) if item.custom_width else None,
+                    'height': str(item.custom_height) if item.custom_height else None,
+                    'wing_type': item.custom_wing_type,
+                } if item.is_custom_curtain else None,
             })
         
         # Calculate total value safely

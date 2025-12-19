@@ -37,6 +37,7 @@ urlpatterns = [
     path("marketing/",include("marketing.urls")),
     path("operating/",include("operating.urls")),
     path("email/", include("email_automation.urls")),
+    path("notifications/", include("notifications.urls")),
     path("reports/",views.reports.as_view(),name="reports"),
     path("reports/task_report",views.task_report.as_view(),name="task_report"),
     path('accounts/', include('django.contrib.auth.urls')),

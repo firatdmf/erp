@@ -835,7 +835,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
     displayOptions.forEach(name => {
         tableHTML += `<th>${name.toUpperCase()}</th>`;
     });
-    tableHTML += '<th>PRICE</th><th>STOCK</th><th>PHOTO</th><th>SKU</th><th>BARCODE</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
+    tableHTML += '<th>PRICE</th><th>COST</th><th>STOCK</th><th>PHOTO</th><th>SKU</th><th>BARCODE</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
 
     // If grouping is selected, create hierarchical structure
     if (selectedGrouping) {
@@ -923,12 +923,14 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
                 // Try to read current form values first (preserves user input during re-render)
                 const priceInput = document.querySelector(`input[name="variant_price_${originalIndex + 1}"]`);
+                const costInput = document.querySelector(`input[name="variant_cost_${originalIndex + 1}"]`);
                 const quantityInput = document.querySelector(`input[name="variant_quantity_${originalIndex + 1}"]`);
                 const skuInput = document.querySelector(`input[name="variant_sku_${originalIndex + 1}"]`);
                 const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
                 const featuredInput = document.querySelector(`input[name="variant_featured_${originalIndex + 1}"]`);
 
                 const price = priceInput?.value || existingData.price || '';
+                const cost = costInput?.value || existingData.cost || '';
                 const quantity = quantityInput?.value || existingData.quantity || '';
                 const sku = skuInput?.value || existingData.sku || '';
                 const barcode = barcodeInput?.value || existingData.barcode || '';
@@ -946,6 +948,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
                 tableHTML += `
                 <td><input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" oninput="updateGroupPriceRange('${groupId}')"></td>
+                <td><input type="number" name="variant_cost_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${cost}" style="min-width: 100px;"></td>
                 <td><input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
                 <td>
                     <button type="button" class="photo_picker_btn" onclick="openImagePicker(${originalIndex})" title="Select images">
@@ -998,12 +1001,14 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             // Try to read current form values first (preserves user input during re-render)
             const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
+            const costInput = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
             const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
             const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
             const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
             const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
 
             const price = priceInput?.value || existingData.price || '';
+            const cost = costInput?.value || existingData.cost || '';
             const quantity = quantityInput?.value || existingData.quantity || '';
             const sku = skuInput?.value || existingData.sku || '';
             const barcode = barcodeInput?.value || existingData.barcode || '';
@@ -1021,6 +1026,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             tableHTML += `
                 <td><input type="number" name="variant_price_${index + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;"></td>
+                <td><input type="number" name="variant_cost_${index + 1}" step="0.01" placeholder="0.00" value="${cost}" style="min-width: 100px;"></td>
                 <td><input type="number" name="variant_quantity_${index + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
                 <td>
                     <button type="button" class="photo_picker_btn" onclick="openImagePicker(${index})" title="Select images">

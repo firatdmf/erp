@@ -1532,23 +1532,25 @@ class OrderAnalytics(LoginRequiredMixin, View):
         # Single optimized query for orders with only needed fields
         orders = Order.objects.filter(
             created_at__gte=start_date,
-            paid_amount__isnull=False
+            original_price__isnull=False  # Orders with USD price
         ).exclude(
             payment_status='failed'
-        ).only('id', 'created_at', 'paid_amount', 'payment_status', 'web_client_id')
+        ).only('id', 'created_at', 'original_price', 'payment_status', 'web_client_id')
         
         # Get order IDs for subqueries (more efficient than __in with queryset)
         order_ids = list(orders.values_list('id', flat=True))
         
         # Summary metrics in single query
+        # Use original_price for USD revenue (this is the actual order total in USD)
         summary = orders.aggregate(
             total_orders=Count('id'),
-            total_revenue=Sum('paid_amount'),
-            avg_order_value=Avg('paid_amount'),
+            total_revenue=Sum('original_price'),  # USD price from order
+            avg_order_value=Avg('original_price'),
         )
         
         # Product counts in single query with conditional annotation
         from django.db.models import Case, When, IntegerField
+        
         product_counts = OrderItem.objects.filter(
             order_id__in=order_ids
         ).aggregate(
@@ -1558,6 +1560,33 @@ class OrderAnalytics(LoginRequiredMixin, View):
         
         custom_curtain_count = product_counts['custom_count']
         fabric_count = product_counts['fabric_count']
+        
+        # Calculate total profit from order items
+        # Revenue = sum of (price * quantity) for each OrderItem
+        # Cost = sum of (product_cost * quantity) for each OrderItem
+        # Profit = Revenue - Cost
+        order_items = OrderItem.objects.filter(
+            order_id__in=order_ids
+        ).select_related('product', 'product_variant')
+        
+        total_revenue_from_items = Decimal('0')
+        total_cost = Decimal('0')
+        
+        for item in order_items:
+            qty = item.quantity or Decimal('1')  # Default to 1 if null
+            item_revenue = item.price * qty
+            total_revenue_from_items += item_revenue
+            
+            # Get cost from variant or product
+            if item.product_variant and item.product_variant.variant_cost:
+                item_cost = item.product_variant.variant_cost * qty
+            elif item.product and item.product.cost:
+                item_cost = item.product.cost * qty
+            else:
+                item_cost = Decimal('0')
+            total_cost += item_cost
+        
+        total_profit = total_revenue_from_items - total_cost
         
         # Success rate - single query
         all_orders_count = Order.objects.filter(created_at__gte=start_date).count()
@@ -1578,7 +1607,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
             date=truncate_func
         ).values('date').annotate(
             count=Count('id'),
-            revenue=Sum('paid_amount')
+            revenue=Sum('original_price')  # USD
         ).order_by('date'))
         
         # Format trend data for Chart.js
@@ -1604,14 +1633,14 @@ class OrderAnalytics(LoginRequiredMixin, View):
         week_start = end_date - timedelta(days=7)
         weekly_data = list(Order.objects.filter(
             created_at__gte=week_start,
-            paid_amount__isnull=False
+            original_price__isnull=False  # Orders with USD price
         ).exclude(
             payment_status='failed'
         ).annotate(
             date=TruncDate('created_at')
         ).values('date').annotate(
             count=Count('id'),
-            revenue=Sum('paid_amount')
+            revenue=Sum('original_price')  # USD
         ).order_by('date'))
         
         weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -1682,6 +1711,8 @@ class OrderAnalytics(LoginRequiredMixin, View):
             'summary': {
                 'total_orders': summary['total_orders'] or 0,
                 'total_revenue': summary['total_revenue'] or Decimal('0'),
+                'total_profit': total_profit,
+                'total_cost': total_cost,
                 'avg_order_value': summary['avg_order_value'] or Decimal('0'),
                 'success_rate': round(success_rate, 1),
                 'custom_curtain_count': custom_curtain_count,

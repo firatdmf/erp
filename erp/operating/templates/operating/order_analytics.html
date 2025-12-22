@@ -471,7 +471,7 @@
                     <div class="card-icon"><i class="fas fa-wallet"></i></div>
                 </div>
                 <div class="card-label">Total Revenue</div>
-                <div class="card-value">₺{{ summary.total_revenue|floatformat:0|default:"0" }}</div>
+                <div class="card-value">${{ summary.total_revenue|floatformat:0|default:"0" }}</div>
             </div>
             <div class="summary-card">
                 <div class="card-header">
@@ -493,6 +493,24 @@
                 </div>
                 <div class="card-label">Fabric</div>
                 <div class="card-value">{{ summary.fabric_count|default:"0" }}</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #10b981, #059669);"><i
+                            class="fas fa-chart-line"></i></div>
+                </div>
+                <div class="card-label">Total Profit</div>
+                <div class="card-value" style="color: #10b981;">${{ summary.total_profit|floatformat:0|default:"0" }}
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);"><i
+                            class="fas fa-coins"></i></div>
+                </div>
+                <div class="card-label">Total Cost</div>
+                <div class="card-value" style="color: #ef4444;">${{ summary.total_cost|floatformat:0|default:"0" }}
+                </div>
             </div>
         </div>
 
@@ -760,7 +778,7 @@
             data: {
                 labels: mainLabels,
                 datasets: [{
-                    label: 'Revenue (₺)',
+                    label: 'Revenue ($)',
                     data: mainRevenues,
                     borderColor: '#d4a800',
                     backgroundColor: gradient,
@@ -790,7 +808,7 @@
                         displayColors: false,
                         callbacks: {
                             label: function (context) {
-                                return '₺' + context.parsed.y.toLocaleString('tr-TR');
+                                return '$' + context.parsed.y.toLocaleString('en-US');
                             }
                         }
                     }
@@ -812,7 +830,7 @@
                         ticks: {
                             color: '#888888',
                             callback: function (value) {
-                                return '₺' + value.toLocaleString('tr-TR');
+                                return '$' + value.toLocaleString('en-US');
                             }
                         }
                     }

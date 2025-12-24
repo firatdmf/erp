@@ -105,13 +105,14 @@ class ProductVariantAdmin(admin.ModelAdmin):
     list_display = (
         "variant_sku",
         "variant_price",
+        "variant_cost",
         "variant_quantity",
         "product",
         "variant_featured",
-        "attribute_summary",
     )
     search_fields = ("variant_sku", "product__sku", "variant_barcode")
-    readonly_fields = ("attribute_summary",)
+    list_select_related = ("product",)  # Optimize ForeignKey queries
+    list_per_page = 50  # Limit items per page for better performance
 
 
 admin.site.register(Product, ProductAdmin)

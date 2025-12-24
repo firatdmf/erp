@@ -1,0 +1,113 @@
+<!-- Summary Cards -->
+<div class="summary-cards">
+    <div class="summary-card">
+        <div class="card-icon revenue"><i class="fas fa-dollar-sign"></i></div>
+        <div class="card-label">Total Revenue</div>
+        <div class="card-value">${{ total_revenue|floatformat:2|default:"0" }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="card-icon profit"><i class="fas fa-chart-line"></i></div>
+        <div class="card-label">Total Profit</div>
+        <div class="card-value profit">${{ total_profit|floatformat:2|default:"0" }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="card-icon cost"><i class="fas fa-coins"></i></div>
+        <div class="card-label">Total Cost</div>
+        <div class="card-value cost">${{ total_cost|floatformat:2|default:"0" }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="card-icon orders"><i class="fas fa-shopping-cart"></i></div>
+        <div class="card-label">Total Orders</div>
+        <div class="card-value">{{ order_count }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="card-icon week"><i class="fas fa-calendar-week"></i></div>
+        <div class="card-label">Last 7 Days</div>
+        <div class="card-value">${{ week_revenue|floatformat:2|default:"0" }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="card-icon month"><i class="fas fa-calendar-alt"></i></div>
+        <div class="card-label">Last 30 Days</div>
+        <div class="card-value">${{ month_revenue|floatformat:2|default:"0" }}</div>
+    </div>
+</div>
+
+<!-- Orders Table -->
+<div class="orders-section">
+    <div class="orders-header">
+        <h2><i class="fas fa-list"></i> Orders</h2>
+        <span class="orders-count">{{ order_count }} orders</span>
+    </div>
+
+    {% if orders %}
+    <table class="orders-table">
+        <thead>
+            <tr>
+                <th>Order #</th>
+                <th>Customer</th>
+                <th>Date</th>
+                <th>Revenue</th>
+                <th>Cost</th>
+                <th>Profit</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td class="order-number">{{ order.order_number }}</td>
+                <td class="customer-name">{{ order.customer_name }}</td>
+                <td>{{ order.date|date:"d M Y, H:i" }}</td>
+                <td class="revenue-cell">${{ order.revenue|floatformat:2 }}</td>
+                <td class="cost-cell">${{ order.cost|floatformat:2 }}</td>
+                <td class="profit-cell {% if order.profit >= 0 %}profit-positive{% else %}profit-negative{% endif %}">
+                    ${{ order.profit|floatformat:2 }}
+                </td>
+                <td>
+                    <span class="status-badge status-{{ order.status }}">
+                        {{ order.status }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="pagination-wrapper">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}&days={{ days_filter }}{% if search_query %}&search={{ search_query }}{% endif %}"
+            hx-get="?page={{ page_obj.previous_page_number }}&days={{ days_filter }}{% if search_query %}&search={{ search_query }}{% endif %}"
+            hx-target="#dashboard-content" hx-swap="innerHTML">
+            <i class="fas fa-chevron-left"></i> Prev
+        </a>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+        <span class="current">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+            href="?page={{ num }}&days={{ days_filter }}{% if search_query %}&search={{ search_query }}{% endif %}"
+            hx-get="?page={{ num }}&days={{ days_filter }}{% if search_query %}&search={{ search_query }}{% endif %}"
+            hx-target="#dashboard-content" hx-swap="innerHTML">{{ num }}</a>
+            {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&days={{ days_filter }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                hx-get="?page={{ page_obj.next_page_number }}&days={{ days_filter }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                hx-target="#dashboard-content" hx-swap="innerHTML">
+                Next <i class="fas fa-chevron-right"></i>
+            </a>
+            {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <p>No orders found{% if search_query %} matching "{{ search_query }}"{% endif %}</p>
+    </div>
+    {% endif %}
+</div>

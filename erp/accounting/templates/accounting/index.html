@@ -1,18 +1,332 @@
 {% extends 'base.html' %}
 {% load static %}
+
 {% block css %}
-  <link rel="stylesheet" href="{% static 'accounting/css/index.css' %}" />
+<style>
+    /* ============================================
+   BOOKS PAGE - Modern Design
+   ============================================ */
+    .books-page {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+        min-height: 100vh;
+    }
+
+    /* Header */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .page-header h1 i {
+        color: var(--accent-primary);
+    }
+
+    .page-header p {
+        color: var(--text-secondary);
+        margin: 0.25rem 0 0;
+        font-size: 0.9rem;
+    }
+
+    /* Create Button */
+    .btn-create {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-create:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+        color: white;
+        text-decoration: none;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .quick-action-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid var(--border-color);
+        transition: all 0.2s;
+    }
+
+    .quick-action-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        border-color: var(--accent-primary);
+        text-decoration: none;
+    }
+
+    .quick-action-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .quick-action-icon.sales {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+    }
+
+    .quick-action-icon.book {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        color: white;
+    }
+
+    .quick-action-content h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .quick-action-content p {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin: 0.25rem 0 0;
+    }
+
+    /* Books Grid */
+    .books-section {
+        background: white;
+        border-radius: 16px;
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+    }
+
+    .section-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .section-header h2 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .section-header .badge {
+        background: var(--bg-secondary);
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .books-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+
+    .book-card {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+    }
+
+    .book-card:hover {
+        background: white;
+        border-color: var(--accent-primary);
+        transform: translateX(4px);
+        text-decoration: none;
+    }
+
+    .book-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .book-info h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .book-info p {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin: 0.25rem 0 0;
+    }
+
+    /* Empty State */
+    .empty-state {
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #d1d5db;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        color: var(--text-primary);
+        margin: 0 0 0.5rem;
+    }
+
+    .empty-state p {
+        color: var(--text-secondary);
+        margin: 0 0 1.5rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .books-page {
+            padding: 1rem;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .quick-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .books-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 {% endblock %}
+
 {% block content %}
-  <div class="accounting_index_page">
-    <p>Welcome to the accounting index</p>
-    <h3>Books (<a href="{% url 'accounting:create_book' %}">Click here to create a book</a>)</h3> 
-    
-    {% for book in books %}
-      <p>
-        <a href="{% url 'accounting:book_detail' book.id %}">{{ book.name }}</a>
-      </p>
-    {% endfor %}
-    
-  </div>
+<div class="books-page">
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-book-open"></i> Accounting Books</h1>
+            <p>Manage your financial books and records</p>
+        </div>
+        <a href="{% url 'accounting:create_book' %}" class="btn-create">
+            <i class="fas fa-plus"></i> Create New Book
+        </a>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <a href="{% url 'accounting:sales_dashboard' %}" class="quick-action-card">
+            <div class="quick-action-icon sales">
+                <i class="fas fa-chart-bar"></i>
+            </div>
+            <div class="quick-action-content">
+                <h3>Sales Dashboard</h3>
+                <p>View orders, revenue, and profit analytics</p>
+            </div>
+        </a>
+        <a href="{% url 'accounting:create_book' %}" class="quick-action-card">
+            <div class="quick-action-icon book">
+                <i class="fas fa-plus-circle"></i>
+            </div>
+            <div class="quick-action-content">
+                <h3>Create Book</h3>
+                <p>Start a new accounting book</p>
+            </div>
+        </a>
+    </div>
+
+    <!-- Books List -->
+    <div class="books-section">
+        <div class="section-header">
+            <h2><i class="fas fa-folder-open"></i> Your Books</h2>
+            <span class="badge">{{ books|length }} book{{ books|length|pluralize:"s" }}</span>
+        </div>
+
+        {% if books %}
+        <div class="books-grid">
+            {% for book in books %}
+            <a href="{% url 'accounting:book_detail' book.id %}" class="book-card">
+                <div class="book-icon">
+                    <i class="fas fa-book"></i>
+                </div>
+                <div class="book-info">
+                    <h3>{{ book.name }}</h3>
+                    <p>Click to view details</p>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-book"></i>
+            <h3>No books yet</h3>
+            <p>Create your first accounting book to get started</p>
+            <a href="{% url 'accounting:create_book' %}" class="btn-create">
+                <i class="fas fa-plus"></i> Create Book
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}

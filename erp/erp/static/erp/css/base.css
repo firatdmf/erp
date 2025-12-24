@@ -3,28 +3,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Fuzzy+Bubbles:wght@400;700&display=swap');
+
 :root {
   font-size: 16px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
-  
+
   /* Modern color palette - Sade beyaz/gri/mavi tonları */
   --text-primary: #1e293b;
   --text-secondary: #64748b;
   --text-muted: #94a3b8;
-  
+
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
   --bg-hover: #f1f5f9;
-  
+
   --accent-primary: #3b82f6;
   --accent-hover: #2563eb;
   --accent-light: #dbeafe;
-  
+
   --border-color: #e2e8f0;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  
+
   --transition-speed: 200ms;
   --border-radius: 12px;
   --border-radius-sm: 8px;
@@ -46,8 +47,8 @@ main {
   min-height: 100vh;
 }
 
-button{
-  cursor:pointer;
+button {
+  cursor: pointer;
 }
 
 .navbar {
@@ -62,7 +63,8 @@ button{
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  overflow-y: hidden; /* no internal scroll */
+  overflow-y: hidden;
+  /* no internal scroll */
   overflow-x: hidden;
 }
 
@@ -78,12 +80,14 @@ button{
 
 .navbar-nav {
   list-style: none;
-  padding: 0.3rem 0 1.0rem 0; /* üst az, alt biraz daha fazla boşluk */
+  padding: 0.3rem 0 1.0rem 0;
+  /* üst az, alt biraz daha fazla boşluk */
   margin: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between; /* öğeleri tüm yükseklikte dağıt */
+  justify-content: space-between;
+  /* öğeleri tüm yükseklikte dağıt */
   width: 100%;
   height: 100%;
 }
@@ -147,13 +151,13 @@ button{
   width:100%;
 } */
 
-.navbar #searchButton{
+.navbar #searchButton {
   cursor: pointer;
 }
 
 .navbar .overlay #searchInput {
   width: 100%;
-  padding:0;
+  padding: 0;
 }
 
 .navbar .overlay {
@@ -186,6 +190,7 @@ button{
     opacity: 0;
     transform: translateY(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -251,24 +256,29 @@ button{
 .nav-item .nav-separator {
   padding: 0.1rem 0;
 }
+
 .nav-item .nav-separator-line {
   border-bottom: 1px solid var(--border-color);
   margin: 0.1rem auto;
   width: 60%;
 }
+
 .nav-link {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: auto;
-  padding: 0.75rem 0;       /* çok daha büyük hover alanı (üst-alt) */
-  margin: 0.25rem 0;        /* itemler arası daha fazla boşluk */
+  padding: 0.75rem 0;
+  /* çok daha büyük hover alanı (üst-alt) */
+  margin: 0.25rem 0;
+  /* itemler arası daha fazla boşluk */
   color: var(--text-secondary);
   text-decoration: none;
   transition: all var(--transition-speed) ease;
   position: relative;
-  font-size: 0.65rem;       /* biraz daha küçült */
+  font-size: 0.65rem;
+  /* biraz daha küçült */
   font-weight: 500;
 }
 
@@ -279,7 +289,8 @@ button{
 }
 
 .nav-link:hover i {
-  transform: scale(1.2); /* eskiye daha yakın, daha belirgin hover */
+  transform: scale(1.2);
+  /* eskiye daha yakın, daha belirgin hover */
 }
 
 .nav-link.active {
@@ -295,7 +306,8 @@ button{
 }
 
 .nav-link i {
-  font-size: 1.05rem;  /* ikonları daha da küçült, hover alanı daha da büyüsün */
+  font-size: 1.05rem;
+  /* ikonları daha da küçült, hover alanı daha da büyüsün */
   transition: transform var(--transition-speed) ease;
 }
 
@@ -348,8 +360,10 @@ a:hover {
 .logo {
   font-weight: 700;
   font-family: "Fuzzy Bubbles", sans-serif;
-  margin-bottom: 0.55rem;         /* logo altı daha fazla boşluk */
-  padding: 0.75rem 0 0.6rem;      /* üst-alt çok daha fazla boşluk */
+  margin-bottom: 0.55rem;
+  /* logo altı daha fazla boşluk */
+  padding: 0.75rem 0 0.6rem;
+  /* üst-alt çok daha fazla boşluk */
   text-align: center;
   color: teal;
   width: 100%;
@@ -357,9 +371,11 @@ a:hover {
 }
 
 .logo-text {
-  font-size: 1.25rem;  /* logo boyutunu küçült */
+  font-size: 1.25rem;
+  /* logo boyutunu küçült */
   letter-spacing: 0.5px;
 }
+
 /* 
 .logo .logo-text, .logo i {
   transform: rotate(360deg);
@@ -443,7 +459,7 @@ a:hover {
   display: block;
 }
 
-.nav-item{
+.nav-item {
   position: relative;
 }
 
@@ -467,6 +483,7 @@ a:hover {
     opacity: 0;
     transform: translateX(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -550,7 +567,7 @@ a:hover {
   color: var(--accent-primary);
 }
 
-#addExpanded .futureFeature{
+#addExpanded .futureFeature {
   text-decoration: line-through;
 }
 
@@ -641,20 +658,65 @@ a:hover {
 }
 
 
+/* Accounting menüsü için stil - Marketing ile aynı yapı */
+#accountingButton {
+  position: relative;
+}
+
+#accountingButton .nav-link {
+  position: relative;
+}
+
+/* Accounting menüsü için hover bridge */
+#accountingButton::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 10px;
+  height: 100%;
+  background: transparent;
+  z-index: 9998;
+}
+
+/* Accounting menüsü hover durumu */
+#accountingButton:hover #accountingExpanded,
+#accountingButton:hover::after,
+#accountingExpanded:hover {
+  display: block;
+}
+
+#accountingExpanded {
+  display: none;
+  position: fixed;
+  left: 6rem;
+  background-color: var(--bg-primary);
+  width: 340px;
+  padding: 0;
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  z-index: 9999;
+  animation: slideIn 0.25s ease;
+  overflow: hidden;
+}
+
 
 /* Below is for countdown */
 /* ------------------------------------------------ */
 /* general styling */
 
 
-.countDown h3{
-  margin:0;
-  padding:0;
+.countDown h3 {
+  margin: 0;
+  padding: 0;
 }
-.countDown ul{
-  padding:0;
-  margin:0;
+
+.countDown ul {
+  padding: 0;
+  margin: 0;
 }
+
 .countDown li {
   display: inline-block;
   /* font-size: 1.5em; */
@@ -683,11 +745,11 @@ a:hover {
   .countDown h3 {
     font-size: calc(1.5rem * var(--smaller));
   }
-  
+
   .countDown li {
     font-size: calc(1.125rem * var(--smaller));
   }
-  
+
   .countDown li span {
     font-size: calc(3.375rem * var(--smaller));
   }
@@ -777,7 +839,8 @@ header .header-link i {
 /* ------------------------------------------------ */
 /* Modern Buttons */
 /* ------------------------------------------------ */
-button, .btn {
+button,
+.btn {
   padding: 0.625rem 1.25rem;
   border-radius: var(--border-radius-sm);
   border: 1px solid var(--border-color);
@@ -792,18 +855,21 @@ button, .btn {
   gap: 0.5rem;
 }
 
-button:hover, .btn:hover {
+button:hover,
+.btn:hover {
   background-color: var(--bg-hover);
   border-color: var(--accent-primary);
 }
 
-button.primary, .btn-primary {
+button.primary,
+.btn-primary {
   background-color: var(--accent-primary);
   color: white;
   border-color: var(--accent-primary);
 }
 
-button.primary:hover, .btn-primary:hover {
+button.primary:hover,
+.btn-primary:hover {
   background-color: var(--accent-hover);
 }
 
@@ -1266,20 +1332,53 @@ tbody td {
   font-weight: 700;
 }
 
-.mt-1 { margin-top: 0.5rem; }
-.mt-2 { margin-top: 1rem; }
-.mt-3 { margin-top: 1.5rem; }
-.mt-4 { margin-top: 2rem; }
+.mt-1 {
+  margin-top: 0.5rem;
+}
 
-.mb-1 { margin-bottom: 0.5rem; }
-.mb-2 { margin-bottom: 1rem; }
-.mb-3 { margin-bottom: 1.5rem; }
-.mb-4 { margin-bottom: 2rem; }
+.mt-2 {
+  margin-top: 1rem;
+}
 
-.p-1 { padding: 0.5rem; }
-.p-2 { padding: 1rem; }
-.p-3 { padding: 1.5rem; }
-.p-4 { padding: 2rem; }
+.mt-3 {
+  margin-top: 1.5rem;
+}
+
+.mt-4 {
+  margin-top: 2rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-2 {
+  margin-bottom: 1rem;
+}
+
+.mb-3 {
+  margin-bottom: 1.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 2rem;
+}
+
+.p-1 {
+  padding: 0.5rem;
+}
+
+.p-2 {
+  padding: 1rem;
+}
+
+.p-3 {
+  padding: 1.5rem;
+}
+
+.p-4 {
+  padding: 2rem;
+}
 
 .flex {
   display: flex;
@@ -1297,9 +1396,17 @@ tbody td {
   justify-content: space-between;
 }
 
-.gap-1 { gap: 0.5rem; }
-.gap-2 { gap: 1rem; }
-.gap-3 { gap: 1.5rem; }
+.gap-1 {
+  gap: 0.5rem;
+}
+
+.gap-2 {
+  gap: 1rem;
+}
+
+.gap-3 {
+  gap: 1.5rem;
+}
 
 .rounded {
   border-radius: var(--border-radius-sm);
@@ -1329,17 +1436,17 @@ tbody td {
     margin-left: 5rem;
     padding: 1rem 1.5rem;
   }
-  
+
   .navbar {
     width: 5rem;
   }
-  
+
   header .line {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .nav-item #addExpanded {
     left: 5rem;
   }
@@ -1350,7 +1457,7 @@ tbody td {
     margin-left: 0;
     padding: 1rem;
   }
-  
+
   .navbar {
     width: 100%;
     height: auto;
@@ -1359,26 +1466,26 @@ tbody td {
     border-right: none;
     border-top: 1px solid var(--border-color);
   }
-  
+
   .navbar-nav {
     flex-direction: row;
     overflow-x: auto;
   }
-  
+
   .logo {
     display: none;
   }
-  
+
   .last2items {
     margin-top: 0;
     display: flex;
     flex-direction: row;
   }
-  
+
   .link-text {
     display: none;
   }
-  
+
   .nav-link {
     height: 3.5rem;
     min-width: 3.5rem;
@@ -1466,10 +1573,12 @@ tbody td {
     stroke-dasharray: 1, 150;
     stroke-dashoffset: 0;
   }
+
   50% {
     stroke-dasharray: 90, 150;
     stroke-dashoffset: -35;
   }
+
   100% {
     stroke-dasharray: 90, 150;
     stroke-dashoffset: -124;

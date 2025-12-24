@@ -1,0 +1,23 @@
+📡 Connected Order notification signal
+📡 Connected Task notification signal
+📡 Connected TaskActivity notification signal
+📡 Connected TaskComment notification signal
+Checking orders for 'deene'...
+Total orders found: 35
+Total Sum(original_price) for all: 277.80
+Failed orders: 0
+Null original_price: 0
+Valid orders count: 35
+Valid Sum(original_price): 277.80
+
+Top 10 Valid Orders:
+ID: 89, Created: 2025-12-18 16:31:53.189598+00:00, Price: 54.80, Status: success
+ID: 88, Created: 2025-12-18 16:14:18.841427+00:00, Price: 43.90, Status: success
+ID: 85, Created: 2025-12-18 09:50:58.888885+00:00, Price: 31.90, Status: success
+ID: 86, Created: 2025-12-18 12:36:46.517849+00:00, Price: 27.40, Status: success
+ID: 87, Created: 2025-12-18 14:11:59.815095+00:00, Price: 23.25, Status: success
+ID: 65, Created: 2025-12-11 16:20:42.577506+00:00, Price: 10.05, Status: success
+ID: 53, Created: 2025-12-10 23:18:42.304833+00:00, Price: 5.70, Status: success
+ID: 66, Created: 2025-12-11 16:27:45.763679+00:00, Price: 3.35, Status: success
+ID: 69, Created: 2025-12-11 16:45:09.944701+00:00, Price: 3.30, Status: success
+ID: 73, Created: 2025-12-11 17:09:56.487512+00:00, Price: 3.00, Status: success

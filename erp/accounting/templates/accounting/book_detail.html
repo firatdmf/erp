@@ -1,68 +1,392 @@
 {% extends 'base.html' %}
-
 {% load static %}
 {% load accounting_tags %}
+
 {% block css %}
-  <link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" />
+<style>
+  /* ============================================
+   BOOK DETAIL PAGE - Modern Design
+   ============================================ */
+  .book-detail-page {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+  }
+
+  .breadcrumb a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: color 0.2s;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--accent-primary);
+  }
+
+  .breadcrumb span {
+    color: var(--text-secondary);
+  }
+
+  .breadcrumb .current {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  /* Header */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .page-header-left h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .page-header-left h1 i {
+    color: #f59e0b;
+  }
+
+  .page-header-left p {
+    color: var(--text-secondary);
+    margin: 0.5rem 0 0;
+    font-size: 0.9rem;
+  }
+
+  /* Stakeholders Badge */
+  .stakeholders-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f3f4f6;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .stakeholders-badge i {
+    color: #8b5cf6;
+  }
+
+  /* Quick Actions Grid */
+  .quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .action-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+  }
+
+  .action-card:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  }
+
+  .action-card h3 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .action-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .action-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .action-link:hover {
+    background: var(--accent-light);
+    color: var(--accent-primary);
+    transform: translateX(4px);
+    text-decoration: none;
+  }
+
+  .action-link i {
+    width: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+  }
+
+  .action-link:hover i {
+    color: var(--accent-primary);
+  }
+
+  /* Icon Colors */
+  .action-card.equity h3 i {
+    color: #10b981;
+  }
+
+  .action-card.transactions h3 i {
+    color: #3b82f6;
+  }
+
+  .action-card.accounts h3 i {
+    color: #f59e0b;
+  }
+
+  .action-card.stakeholders h3 i {
+    color: #8b5cf6;
+  }
+
+  /* KPI Dashboard Container */
+  .kpi-section {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+  }
+
+  .kpi-section h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .kpi-section h2 i {
+    color: #3b82f6;
+  }
+
+  /* Stakeholders Section */
+  .stakeholders-section {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+  }
+
+  .stakeholders-section h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .stakeholders-section h2 i {
+    color: #8b5cf6;
+  }
+
+  .stakeholder-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .stakeholder-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f3f4f6;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+  }
+
+  .stakeholder-chip i {
+    color: #8b5cf6;
+  }
+
+  .empty-stakeholders {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: 1rem;
+    text-align: center;
+    background: #f9fafb;
+    border-radius: 10px;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .book-detail-page {
+      padding: 1rem;
+    }
+
+    .page-header {
+      flex-direction: column;
+    }
+
+    .quick-actions-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
 {% endblock %}
+
 {% block content %}
-  <p>
-    <a href="{% url 'accounting:index' %}"><--- Accounting Index Page</a>
-  </p>
-  <p>
-    <b>Book:</b> {{ Book.name }}
-  </p>
-  {% if book.stakeholders %}
-    <ul>
-      <b>The Stakeholders:</b>
-      {% for stakeholder in book.stakeholders.all %}
-        <li>
-          <span class="underline">{{ stakeholder.member.user.first_name }} {{ Stakeholder.member.user.last_name }}</span>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>There are no stakeholders at this company.</p>
-  {% endif %}
+<div class="book-detail-page">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <a href="{% url 'accounting:index' %}">
+      <i class="fas fa-book-open"></i> Books
+    </a>
+    <span>/</span>
+    <span class="current">{{ book.name }}</span>
+  </div>
 
-  <div class="dashboard">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="page-header-left">
+      <h1><i class="fas fa-book"></i> {{ book.name }}</h1>
+      <p>Manage your book entries, transactions, and stakeholders</p>
+    </div>
+    {% if book.stakeholders.count > 0 %}
+    <div class="stakeholders-badge">
+      <i class="fas fa-users"></i>
+      {{ book.stakeholders.count }} Stakeholder{{ book.stakeholders.count|pluralize:"s" }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- KPI Dashboard -->
+  <div class="kpi-section">
+    <h2><i class="fas fa-chart-pie"></i> Financial Overview</h2>
     {% kpi_dashboard_component book_pk=book.pk %}
+  </div>
 
-  <ul>
-    <li>
-      <a href="{% url 'accounting:add_stakeholderbook' book.id %}">Add Stakeholder</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:add_equity_capital' book.id %}">Add Capital</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:add_equity_revenue' book.id %}">Add Revenue</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:add_equity_expense' book.id %}">Add Expense</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:equity_expense_list' book.id %}">See Expenses</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:add_equity_divident' book.id %}">Pay Divident</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:make_in_transfer' book.id %}">Make in Transfer</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:make_currency_exchange' book.id %}">Make Currency Exchange</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:add_accounts_receivable' book.id %}">Add Accounts Receivable</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:add_accounts_payable' book.id %}">Add Accounts Payable</a>
-    </li>
-    <li>
-      <a href="{% url 'accounting:cash_transaction_entry_list' book.id %}">See all Transactions</a>
-    </li>
-  </ul>
+  <!-- Quick Actions -->
+  <div class="quick-actions-grid">
+    <!-- Equity Actions -->
+    <div class="action-card equity">
+      <h3><i class="fas fa-coins"></i> Equity & Capital</h3>
+      <div class="action-links">
+        <a href="{% url 'accounting:add_equity_capital' book.id %}" class="action-link">
+          <i class="fas fa-plus-circle"></i> Add Capital
+        </a>
+        <a href="{% url 'accounting:add_equity_revenue' book.id %}" class="action-link">
+          <i class="fas fa-arrow-up"></i> Add Revenue
+        </a>
+        <a href="{% url 'accounting:add_equity_expense' book.id %}" class="action-link">
+          <i class="fas fa-arrow-down"></i> Add Expense
+        </a>
+        <a href="{% url 'accounting:add_equity_divident' book.id %}" class="action-link">
+          <i class="fas fa-hand-holding-usd"></i> Pay Dividend
+        </a>
+      </div>
+    </div>
 
-  {% comment %} {% book_component csrf_token=csrf_token selected_book=Book %} {% endcomment %}
+    <!-- Transactions -->
+    <div class="action-card transactions">
+      <h3><i class="fas fa-exchange-alt"></i> Transactions</h3>
+      <div class="action-links">
+        <a href="{% url 'accounting:cash_transaction_entry_list' book.id %}" class="action-link">
+          <i class="fas fa-list"></i> View All Transactions
+        </a>
+        <a href="{% url 'accounting:equity_expense_list' book.id %}" class="action-link">
+          <i class="fas fa-file-invoice-dollar"></i> View Expenses
+        </a>
+        <a href="{% url 'accounting:make_in_transfer' book.id %}" class="action-link">
+          <i class="fas fa-random"></i> Make Transfer
+        </a>
+        <a href="{% url 'accounting:make_currency_exchange' book.id %}" class="action-link">
+          <i class="fas fa-sync-alt"></i> Currency Exchange
+        </a>
+      </div>
+    </div>
+
+    <!-- Accounts -->
+    <div class="action-card accounts">
+      <h3><i class="fas fa-file-invoice"></i> Accounts</h3>
+      <div class="action-links">
+        <a href="{% url 'accounting:add_accounts_receivable' book.id %}" class="action-link">
+          <i class="fas fa-file-import"></i> Add Receivable
+        </a>
+        <a href="{% url 'accounting:add_accounts_payable' book.id %}" class="action-link">
+          <i class="fas fa-file-export"></i> Add Payable
+        </a>
+      </div>
+    </div>
+
+    <!-- Stakeholders -->
+    <div class="action-card stakeholders">
+      <h3><i class="fas fa-user-plus"></i> Stakeholders</h3>
+      <div class="action-links">
+        <a href="{% url 'accounting:add_stakeholderbook' book.id %}" class="action-link">
+          <i class="fas fa-plus"></i> Add Stakeholder
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stakeholders List -->
+  {% if book.stakeholders.count > 0 %}
+  <div class="stakeholders-section">
+    <h2><i class="fas fa-users"></i> Current Stakeholders</h2>
+    <div class="stakeholder-list">
+      {% for stakeholder in book.stakeholders.all %}
+      <div class="stakeholder-chip">
+        <i class="fas fa-user-circle"></i>
+        {{ stakeholder.member.user.first_name }} {{ stakeholder.member.user.last_name }}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="stakeholders-section">
+    <h2><i class="fas fa-users"></i> Stakeholders</h2>
+    <div class="empty-stakeholders">
+      <i class="fas fa-user-slash"></i> No stakeholders added yet.
+      <a href="{% url 'accounting:add_stakeholderbook' book.id %}">Add one now</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

@@ -55,6 +55,7 @@ def variant_form(variants, product, current_url):
                     "variant_sku": variant.variant_sku,
                     "variant_attribute_values": variant_attribute_values,
                     "variant_price": variant.variant_price,
+                    "variant_cost": variant.variant_cost,
                     "variant_quantity": variant.variant_quantity,
                     "variant_barcode": variant.variant_barcode,
                     "variant_featured": variant.variant_featured,

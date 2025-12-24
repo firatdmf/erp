@@ -1419,3 +1419,162 @@ class GetAssetAccountsReceivable(generic.edit.FormView):
 
 #     return render(request, "accounting/kpi_dashboard.html", context)
 
+
+# ============================================================================
+# SALES DASHBOARD VIEW - Modern order listing with profit calculation
+# ============================================================================
+from operating.models import Order, OrderItem
+from django.core.paginator import Paginator
+
+
+@method_decorator(login_required, name="dispatch")
+class SalesDashboardView(View):
+    """Modern sales dashboard showing orders with revenue, cost, and profit."""
+    
+    template_name = "accounting/sales_dashboard.html"
+    
+    def get(self, request):
+        # Get filter parameters
+        days_filter = request.GET.get('days', '365')  # Default to 1 year
+        search_query = request.GET.get('search', '').strip()
+        page = request.GET.get('page', 1)
+        
+        # Calculate date range
+        try:
+            days = int(days_filter)
+        except ValueError:
+            days = 365
+        
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=days)
+        
+        # Base queryset - orders with original_price (web orders)
+        orders = Order.objects.filter(
+            created_at__gte=start_date,
+            original_price__isnull=False
+        ).exclude(
+            payment_status='failed'
+        ).select_related('web_client').prefetch_related(
+            'items__product', 'items__product_variant'
+        ).order_by('-created_at')
+        
+        # Search filter by customer name
+        if search_query:
+            orders = orders.filter(
+                Q(web_client__name__icontains=search_query) |
+                Q(web_client__username__icontains=search_query) |
+                Q(guest_first_name__icontains=search_query) |
+                Q(guest_last_name__icontains=search_query) |
+                Q(order_number__icontains=search_query)
+            )
+        
+        # Calculate totals and build order list with profit
+        total_revenue = Decimal('0')
+        total_cost = Decimal('0')
+        order_list = []
+        
+        for order in orders:
+            # Get customer name
+            if order.web_client:
+                customer_name = order.web_client.name or order.web_client.username or "Unknown"
+            elif order.guest_first_name or order.guest_last_name:
+                customer_name = f"{order.guest_first_name or ''} {order.guest_last_name or ''}".strip()
+            else:
+                customer_name = "Unknown Customer"
+            
+            # Calculate order revenue, cost, and profit from items
+            order_revenue = Decimal('0')
+            order_profit = Decimal('0')
+            
+            for item in order.items.all():
+                qty = item.quantity or Decimal('1')
+                item_revenue = item.price * qty
+                order_revenue += item_revenue
+                
+                # Calculate profit based on item type
+                item_profit = Decimal('0')
+                
+                # Get variant cost and price
+                variant_cost = Decimal('0')
+                variant_price = Decimal('0')
+                
+                if item.product_variant:
+                    variant_cost = item.product_variant.variant_cost or Decimal('0')
+                    variant_price = item.product_variant.variant_price or Decimal('0')
+                elif item.product:
+                    variant_cost = item.product.cost or Decimal('0')
+                    variant_price = item.product.price or Decimal('0')
+                
+                if item.is_custom_curtain:
+                    # Custom Curtain: Profit = Fabric Amount * (Variant Price - Variant Cost)
+                    # We use variant_price (list price) as the fabric selling price base
+                    fabric_amount = item.custom_fabric_used_meters or Decimal('0')
+                    unit_margin = variant_price - variant_cost
+                    # User requested to multiply by quantity as well (e.g. 2 curtains of 12m each)
+                    item_profit = qty * fabric_amount * unit_margin
+                else:
+                    # Standard Item: Profit = Quantity * (Sold Price - Cost)
+                    # Sold Price is item.price
+                    unit_margin = item.price - variant_cost
+                    item_profit = qty * unit_margin
+                
+                order_profit += item_profit
+            
+            # Derive cost from Revenue and Profit to ensure consistency (Revenue - Cost = Profit)
+            # Cost = Revenue - Profit
+            order_cost = order_revenue - order_profit
+            
+            total_revenue += order_revenue
+            total_cost += order_cost
+            
+            order_list.append({
+                'id': order.id,
+                'order_number': order.order_number or f"ORD-{order.id}",
+                'customer_name': customer_name or "Unknown",
+                'date': order.created_at,
+                'revenue': order_revenue,
+                'cost': order_cost,
+                'profit': order_profit,
+                'status': order.order_status or order.payment_status or 'pending',
+                'payment_status': order.payment_status,
+            })
+        
+        total_profit = total_revenue - total_cost
+        order_count = len(order_list)
+        
+        # Paginate
+        paginator = Paginator(order_list, 20)  # 20 per page
+        page_obj = paginator.get_page(page)
+        
+        # Period stats
+        week_ago = end_date - timedelta(days=7)
+        month_ago = end_date - timedelta(days=30)
+        
+        week_revenue = sum(
+            o['revenue'] for o in order_list 
+            if o['date'] >= week_ago
+        )
+        month_revenue = sum(
+            o['revenue'] for o in order_list 
+            if o['date'] >= month_ago
+        )
+        
+        context = {
+            'orders': page_obj,
+            'page_obj': page_obj,
+            'total_revenue': total_revenue,
+            'total_cost': total_cost,
+            'total_profit': total_profit,
+            'order_count': order_count,
+            'week_revenue': week_revenue,
+            'month_revenue': month_revenue,
+            'year_revenue': total_revenue,
+            'days_filter': days_filter,
+            'search_query': search_query,
+        }
+        
+        # Return partial template for HTMX requests
+        if request.headers.get('HX-Request'):
+            return render(request, 'accounting/partials/sales_content.html', context)
+        
+        return render(request, self.template_name, context)

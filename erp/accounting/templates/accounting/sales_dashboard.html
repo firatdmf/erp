@@ -1,0 +1,565 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+    /* ============================================
+   SALES DASHBOARD - Modern Design with HTMX
+   ============================================ */
+    :root {
+        --primary-gold: #d4a800;
+        --success-green: #10b981;
+        --danger-red: #ef4444;
+        --bg-dark: #1a1a2e;
+        --bg-card: #ffffff;
+        --text-primary: #1f2937;
+        --text-secondary: #6b7280;
+        --border-color: #e5e7eb;
+    }
+
+    .sales-dashboard {
+        padding: 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
+        background: #f8fafc;
+        min-height: 100vh;
+    }
+
+    /* Header */
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .dashboard-header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .dashboard-header p {
+        color: var(--text-secondary);
+        margin: 0.25rem 0 0;
+        font-size: 0.9rem;
+    }
+
+    /* Summary Cards */
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2rem;
+    }
+
+    .summary-card {
+        background: var(--bg-card);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .summary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+
+    .card-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+    }
+
+    .card-icon.revenue {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+    }
+
+    .card-icon.profit {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+
+    .card-icon.cost {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+    }
+
+    .card-icon.orders {
+        background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        color: white;
+    }
+
+    .card-icon.week {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+
+    .card-icon.month {
+        background: linear-gradient(135deg, #06b6d4, #0891b2);
+        color: white;
+    }
+
+    .card-label {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+    }
+
+    .card-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .card-value.profit {
+        color: var(--success-green);
+    }
+
+    .card-value.cost {
+        color: var(--danger-red);
+    }
+
+    /* Filters Section */
+    .filters-section {
+        background: var(--bg-card);
+        border-radius: 16px;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .filter-group label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+
+    .date-tabs {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .date-tab {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: white;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 0.85rem;
+        text-decoration: none;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .date-tab:hover {
+        border-color: var(--primary-gold);
+        color: var(--primary-gold);
+    }
+
+    .date-tab.active {
+        background: var(--primary-gold);
+        border-color: var(--primary-gold);
+        color: white;
+    }
+
+    /* Search Box - Fixed */
+    .search-box {
+        flex: 1;
+        min-width: 200px;
+        max-width: 350px;
+        position: relative;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 0.65rem 1rem 0.65rem 2.5rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--primary-gold);
+    }
+
+    .search-box .search-icon {
+        position: absolute;
+        left: 0.85rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+        pointer-events: none;
+    }
+
+    /* Loading Indicator */
+    .htmx-indicator {
+        display: none;
+    }
+
+    .htmx-request .htmx-indicator {
+        display: inline-block;
+    }
+
+    .htmx-request.htmx-indicator {
+        display: inline-block;
+    }
+
+    /* Orange Rotating Dots Loading */
+    .loading-spinner {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20px;
+        height: 20px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .loading-spinner::after {
+        content: '';
+        display: block;
+        font-size: 5px;
+        width: 1em;
+        height: 1em;
+        animation: dotSpinner 800ms infinite linear;
+        border-radius: 0.5em;
+        box-shadow:
+            rgba(245, 158, 11, 1) 1.5em 0 0 0,
+            rgba(245, 158, 11, 0.75) 1.1em 1.1em 0 0,
+            rgba(245, 158, 11, 0.6) 0 1.5em 0 0,
+            rgba(245, 158, 11, 0.45) -1.1em 1.1em 0 0,
+            rgba(245, 158, 11, 0.35) -1.5em 0 0 0,
+            rgba(245, 158, 11, 0.25) -1.1em -1.1em 0 0,
+            rgba(245, 158, 11, 0.2) 0 -1.5em 0 0,
+            rgba(245, 158, 11, 0.15) 1.1em -1.1em 0 0;
+    }
+
+    .htmx-request .loading-spinner,
+    .loading-spinner.htmx-request {
+        display: flex;
+    }
+
+    @keyframes dotSpinner {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Content Loading State */
+    #dashboard-content {
+        transition: opacity 0.2s;
+    }
+
+    #dashboard-content.htmx-request {
+        opacity: 0.5;
+    }
+
+    /* Orders Table */
+    .orders-section {
+        background: var(--bg-card);
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    .orders-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .orders-header h2 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .orders-count {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        background: #f3f4f6;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+    }
+
+    .orders-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .orders-table th {
+        background: #f9fafb;
+        padding: 0.85rem 1rem;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .orders-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.9rem;
+        color: var(--text-primary);
+    }
+
+    .orders-table tbody tr:hover {
+        background: #fafafa;
+    }
+
+    .orders-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .order-number {
+        font-weight: 600;
+        color: var(--primary-gold);
+    }
+
+    .customer-name {
+        font-weight: 500;
+    }
+
+    .revenue-cell {
+        font-weight: 600;
+        color: #3b82f6;
+    }
+
+    .cost-cell {
+        color: var(--danger-red);
+    }
+
+    .profit-cell {
+        font-weight: 700;
+    }
+
+    .profit-positive {
+        color: var(--success-green);
+    }
+
+    .profit-negative {
+        color: var(--danger-red);
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.3rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: capitalize;
+    }
+
+    .status-success {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .status-pending {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .status-shipped {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .status-delivered {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .status-processing {
+        background: #e0e7ff;
+        color: #4f46e5;
+    }
+
+    /* Pagination */
+    .pagination-wrapper {
+        padding: 1.25rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .pagination-wrapper a,
+    .pagination-wrapper span {
+        padding: 0.5rem 0.85rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .pagination-wrapper a {
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+    }
+
+    .pagination-wrapper a:hover {
+        border-color: var(--primary-gold);
+        color: var(--primary-gold);
+    }
+
+    .pagination-wrapper .current {
+        background: var(--primary-gold);
+        color: white;
+        border: 1px solid var(--primary-gold);
+    }
+
+    /* Empty State */
+    .empty-state {
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        color: #d1d5db;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state p {
+        color: var(--text-secondary);
+        font-size: 1rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .sales-dashboard {
+            padding: 1rem;
+        }
+
+        .summary-cards {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .filters-section {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-box {
+            min-width: 100%;
+            max-width: 100%;
+        }
+
+        .orders-table {
+            font-size: 0.8rem;
+        }
+
+        .orders-table th,
+        .orders-table td {
+            padding: 0.65rem 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sales-dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1><i class="fas fa-chart-bar"></i> Sales Dashboard</h1>
+            <p>Manage and analyze your order data</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-section">
+        <div class="filter-group">
+            <label>Period:</label>
+            <div class="date-tabs">
+                <button type="button" class="date-tab {% if days_filter == '7' %}active{% endif %}"
+                    hx-get="{% url 'accounting:sales_dashboard' %}?days=7{% if search_query %}&search={{ search_query }}{% endif %}"
+                    hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#dashboard-content"
+                    onclick="updateActiveTab(this)">7 Days</button>
+                <button type="button" class="date-tab {% if days_filter == '30' %}active{% endif %}"
+                    hx-get="{% url 'accounting:sales_dashboard' %}?days=30{% if search_query %}&search={{ search_query }}{% endif %}"
+                    hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#dashboard-content"
+                    onclick="updateActiveTab(this)">30 Days</button>
+                <button type="button" class="date-tab {% if days_filter == '365' %}active{% endif %}"
+                    hx-get="{% url 'accounting:sales_dashboard' %}?days=365{% if search_query %}&search={{ search_query }}{% endif %}"
+                    hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#dashboard-content"
+                    onclick="updateActiveTab(this)">1 Year</button>
+                <button type="button" class="date-tab {% if days_filter == '9999' %}active{% endif %}"
+                    hx-get="{% url 'accounting:sales_dashboard' %}?days=9999{% if search_query %}&search={{ search_query }}{% endif %}"
+                    hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#dashboard-content"
+                    onclick="updateActiveTab(this)">All Time</button>
+            </div>
+        </div>
+        <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="search-input" name="search" placeholder="Search customer or order..."
+                value="{{ search_query }}" hx-get="{% url 'accounting:sales_dashboard' %}"
+                hx-trigger="keyup changed delay:400ms, search" hx-target="#dashboard-content" hx-swap="innerHTML"
+                hx-indicator="#search-spinner" hx-include="[name='days_filter']">
+            <input type="hidden" name="days_filter" value="{{ days_filter }}">
+            <div id="search-spinner" class="loading-spinner htmx-indicator"></div>
+        </div>
+    </div>
+
+    <!-- Dynamic Content Area -->
+    <div id="dashboard-content">
+        {% include 'accounting/partials/sales_content.html' %}
+    </div>
+</div>
+
+<script>
+    function updateActiveTab(clickedBtn) {
+        document.querySelectorAll('.date-tab').forEach(btn => btn.classList.remove('active'));
+        clickedBtn.classList.add('active');
+    }
+
+    // Update URL without reload
+    document.body.addEventListener('htmx:afterRequest', function (evt) {
+        if (evt.detail.elt.classList.contains('date-tab') || evt.detail.elt.id === 'search-input') {
+            const url = new URL(evt.detail.pathInfo.requestPath, window.location.origin);
+            window.history.pushState({}, '', url);
+        }
+    });
+</script>
+{% endblock %}

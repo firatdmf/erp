@@ -219,11 +219,13 @@
               <li>
                 {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
                 {% if entry.entry_type == 'Contact' %}
-                <a href="{% url 'crm:contact_detail' entry.id %}"><i class="fas fa-user" aria-hidden="true"></i> {{
-                  entry.name }} - {{ entry.created_at }}</a>
+                <a href="{% url 'crm:contact_detail' entry.id %}">
+                  <i class="fas fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                </a>
                 {% elif entry.entry_type == 'Company' %}
-                <a href="{% url 'crm:company_detail' entry.id %}"><i class="fas fa-briefcase" aria-hidden="true"></i> {{
-                  entry.name }} - {{ entry.created_at }}</a>
+                <a href="{% url 'crm:company_detail' entry.id %}">
+                  <i class="fas fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
+                </a>
                 {% endif %}
               </li>
               {% endfor %}
@@ -295,11 +297,46 @@
           <span class="link-text">Contacts</span>
         </a>
       </li> {% endcomment %}
-      <li class="nav-item">
-        <a href="{% url 'accounting:index' %}" class="nav-link">
+      <li class="nav-item" id="accountingButton">
+        <a href="#accounting" class="nav-link">
           <i class="fa-solid fa-money-bill fa-2x" aria-hidden="true"></i>
           <span class="link-text">Accounting</span>
         </a>
+        <div id="accountingExpanded"
+          style="top: 195px !important; max-height: 90vh !important; overflow-y: auto !important;">
+          <div class="add-menu-header">
+            <i class="fas fa-money-bill" aria-hidden="true"></i>
+            <h2>Accounting</h2>
+          </div>
+          <div class="add-menu-section">
+            <h3>Books</h3>
+            <ul>
+              <li>
+                <a href="{% url 'accounting:index' %}">
+                  <i class="fas fa-book" aria-hidden="true"></i>
+                  <span>View Books</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'accounting:create_book' %}">
+                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                  <span>Create Book</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="add-menu-section">
+            <h3>Reports</h3>
+            <ul>
+              <li>
+                <a href="{% url 'accounting:sales_dashboard' %}">
+                  <i class="fas fa-chart-bar" aria-hidden="true"></i>
+                  <span>Sales Dashboard</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
       </li>
       <li class="nav-item" id="marketingButton">
         <a href="#marketing" class="nav-link">
@@ -1003,7 +1040,7 @@
   </div>
 
   <script>
-    // Configure HTMX to include CSRF token in all requests
+    // Configure HTMX tCSRF token in all requests
     document.body.addEventListener('htmx:configRequest', (event) => {
       event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
     });
@@ -2490,8 +2527,7 @@
 
     <!-- Notification System JavaScript -->
     <script>
-      // Notification state
-      let notificationDropdownOpen = false;
+      // Notification let notificationDropdownOpen = false;
       let notificationPollInterval = null;
 
       // Toggle notification dropdown

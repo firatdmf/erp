@@ -470,6 +470,9 @@ class BaseProductView(ModelFormMixin):
             for key, value in variant_data.items():
                 if key not in non_model_fields:
                     old_value = getattr(variant, key, None)
+                    # Debug: Log variant_cost specifically
+                    if key == "variant_cost":
+                        print(f"  🔍 DEBUG variant_cost: old={old_value}, new={value}, will_update={old_value != value}")
                     if old_value != value:
                         setattr(variant, key, value)
                         changed_fields.add(key)

@@ -1570,23 +1570,39 @@ class OrderAnalytics(LoginRequiredMixin, View):
         ).select_related('product', 'product_variant')
         
         total_revenue_from_items = Decimal('0')
-        total_cost = Decimal('0')
+        total_profit = Decimal('0')
         
         for item in order_items:
             qty = item.quantity or Decimal('1')  # Default to 1 if null
             item_revenue = item.price * qty
             total_revenue_from_items += item_revenue
             
-            # Get cost from variant or product
-            if item.product_variant and item.product_variant.variant_cost:
-                item_cost = item.product_variant.variant_cost * qty
-            elif item.product and item.product.cost:
-                item_cost = item.product.cost * qty
+            # Profit logic sync with SalesDashboard
+            item_profit = Decimal('0')
+            variant_cost = Decimal('0')
+            variant_price = Decimal('0')
+            
+            if item.product_variant:
+                variant_cost = item.product_variant.variant_cost or Decimal('0')
+                variant_price = item.product_variant.variant_price or Decimal('0')
+            elif item.product:
+                variant_cost = item.product.cost or Decimal('0')
+                variant_price = item.product.price or Decimal('0')
+            
+            if item.is_custom_curtain:
+                # Custom Curtain: Profit = Qty * Fabric Amount * (Variant Price - Variant Cost)
+                fabric_amount = item.custom_fabric_used_meters or Decimal('0')
+                unit_margin = variant_price - variant_cost
+                item_profit = qty * fabric_amount * unit_margin
             else:
-                item_cost = Decimal('0')
-            total_cost += item_cost
+                # Standard Item: Profit = Qty * (Sold Price - Cost)
+                unit_margin = item.price - variant_cost
+                item_profit = qty * unit_margin
+                
+            total_profit += item_profit
         
-        total_profit = total_revenue_from_items - total_cost
+        # Derive total cost from Revenue and Profit to ensure consistency
+        total_cost = total_revenue_from_items - total_profit
         
         # Success rate - single query
         all_orders_count = Order.objects.filter(created_at__gte=start_date).count()
@@ -1603,11 +1619,13 @@ class OrderAnalytics(LoginRequiredMixin, View):
         else:
             truncate_func = TruncMonth('created_at')
         
-        trend_data = list(orders.annotate(
+        trend_data = list(OrderItem.objects.filter(
+            order_id__in=order_ids
+        ).annotate(
             date=truncate_func
         ).values('date').annotate(
-            count=Count('id'),
-            revenue=Sum('original_price')  # USD
+            count=Count('order', distinct=True),
+            revenue=Sum(F('quantity') * F('price'))  # Calculate from items
         ).order_by('date'))
         
         # Format trend data for Chart.js
@@ -1617,7 +1635,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
         
         date_formats = {
             'daily': '%d %b',
-            'weekly': 'Hafta %W',
+            'weekly': 'Week %W',
             'yearly': '%Y',
             'monthly': '%b %Y'
         }
@@ -1631,16 +1649,14 @@ class OrderAnalytics(LoginRequiredMixin, View):
         
         # Weekly breakdown - optimized
         week_start = end_date - timedelta(days=7)
-        weekly_data = list(Order.objects.filter(
-            created_at__gte=week_start,
-            original_price__isnull=False  # Orders with USD price
-        ).exclude(
-            payment_status='failed'
+        weekly_data = list(OrderItem.objects.filter(
+            order_id__in=order_ids,  # Use order_ids which is already filtered by date
+            order__created_at__gte=week_start
         ).annotate(
-            date=TruncDate('created_at')
+            date=TruncDate('order__created_at')
         ).values('date').annotate(
-            count=Count('id'),
-            revenue=Sum('original_price')  # USD
+            count=Count('order', distinct=True),
+            revenue=Sum(F('quantity') * F('price'))  # Calculate from items
         ).order_by('date'))
         
         weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -1693,13 +1709,18 @@ class OrderAnalytics(LoginRequiredMixin, View):
         ).order_by('-total_quantity')[:5])
         
         # Top customers - optimized
-        top_customers = list(orders.filter(
-            web_client__isnull=False
+        # Top customers - optimized - calculate from items as original_price is unreliable
+        top_customers = list(OrderItem.objects.filter(
+            order_id__in=order_ids,
+            order__web_client__isnull=False
         ).values(
-            'web_client__id', 'web_client__name', 'web_client__email'
+            'order__web_client__id', 'order__web_client__name', 'order__web_client__email'
         ).annotate(
-            order_count=Count('id'),
-            total_spent=Sum('paid_amount')
+            web_client__id=F('order__web_client__id'),
+            web_client__name=F('order__web_client__name'),
+            web_client__email=F('order__web_client__email'),
+            order_count=Count('order', distinct=True),
+            total_spent=Sum(F('quantity') * F('price'))
         ).order_by('-total_spent')[:10])
         
         # Product chart data
@@ -1710,10 +1731,10 @@ class OrderAnalytics(LoginRequiredMixin, View):
         context = {
             'summary': {
                 'total_orders': summary['total_orders'] or 0,
-                'total_revenue': summary['total_revenue'] or Decimal('0'),
-                'total_profit': total_profit,
+                'total_revenue': total_revenue_from_items,  # From OrderItem prices (correct)
+                'total_profit': total_profit,  # Revenue - Cost
                 'total_cost': total_cost,
-                'avg_order_value': summary['avg_order_value'] or Decimal('0'),
+                'avg_order_value': total_revenue_from_items / (summary['total_orders'] or 1),
                 'success_rate': round(success_rate, 1),
                 'custom_curtain_count': custom_curtain_count,
                 'fabric_count': fabric_count,

@@ -29,7 +29,11 @@
     </select>
   </div>
 
-  <table id="variant_table" style="width: 100%; margin-top: 20px; border-collapse: collapse;"></table>
+  <!-- Scrollable Table Wrapper for Mobile -->
+  <div id="variant_table_wrapper"
+    style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 20px;">
+    <table id="variant_table" style="width: 100%; min-width: 500px; border-collapse: collapse;"></table>
+  </div>
 
   <!-- Hidden input for tracking deleted variant files -->
   <input type="hidden" id="deleted_variant_files" name="deleted_variant_files" value="">

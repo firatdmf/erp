@@ -128,6 +128,34 @@
       transform: rotate(360deg);
     }
   }
+
+  /* Mobile Responsive - Dashboard Tabs */
+  @media (max-width: 768px) {
+    .main-tabs-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex-wrap: nowrap;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .main-tabs-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .main-tab {
+      flex-shrink: 0;
+      white-space: nowrap;
+      padding: 10px 16px;
+      font-size: 0.875rem;
+    }
+
+    .main-tab .count-badge {
+      padding: 2px 8px;
+      font-size: 0.75rem;
+    }
+  }
 </style>
 {% endblock %}
 

@@ -9,7 +9,7 @@
   <title>{% block title %}ERP{% endblock %}</title>
 
   <!-- CSS Files -->
-  <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=4.3" />
+  <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=4.4" />
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
@@ -187,6 +187,152 @@
 
     .selected-contact.active {
       display: flex;
+    }
+
+    /* ===== MOBILE RESPONSIVE FIXES ===== */
+    @media (max-width: 768px) {
+
+      /* Mobile: Main area adjustments */
+      main {
+        margin-left: 0 !important;
+        padding: 1rem !important;
+        padding-bottom: 6rem !important;
+      }
+
+      /* Mobile: Bottom navbar */
+      .navbar {
+        width: 100% !important;
+        height: auto !important;
+        bottom: 0 !important;
+        top: auto !important;
+        left: 0 !important;
+        border-right: none !important;
+        border-top: 1px solid #e2e8f0 !important;
+        position: fixed !important;
+      }
+
+      .navbar-nav {
+        flex-direction: row !important;
+        justify-content: space-around !important;
+        width: 100% !important;
+        padding: 0.5rem 0 !important;
+      }
+
+      .logo {
+        display: none !important;
+      }
+
+      .link-text {
+        display: none !important;
+      }
+
+      .nav-link {
+        height: 3.5rem !important;
+        min-width: 3.5rem !important;
+        padding: 0.5rem !important;
+      }
+
+      .last2items {
+        display: flex !important;
+        flex-direction: row !important;
+        margin-top: 0 !important;
+      }
+
+      /* Mobile: Dropdown menus - CENTERED above bottom navbar */
+      .nav-item #addExpanded,
+      #marketingExpanded,
+      #operatingExpanded,
+      #accountingExpanded {
+        position: fixed !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        bottom: 5rem !important;
+        top: auto !important;
+        width: calc(100vw - 2rem) !important;
+        max-width: 340px !important;
+        max-height: 50vh !important;
+        overflow-y: auto !important;
+        z-index: 99999 !important;
+      }
+
+      /* Mobile: Remove hover bridge */
+      #addButton::after,
+      #marketingButton::after,
+      #operatingButton::after,
+      #accountingButton::after {
+        display: none !important;
+      }
+
+      /* Mobile: Sidebar modals full width */
+      .sidebar-modal {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        border-radius: 0 !important;
+      }
+
+      .sidebar-content {
+        padding: 1rem !important;
+      }
+
+      .sidebar-header {
+        padding: 1rem !important;
+      }
+
+      .sidebar-footer {
+        padding: 1rem !important;
+        flex-direction: column !important;
+      }
+
+      .sidebar-footer .btn {
+        width: 100% !important;
+      }
+
+      /* Mobile: Stats bar vertical */
+      .stats-bar {
+        flex-direction: column !important;
+        gap: 1rem !important;
+        padding: 1rem !important;
+      }
+
+      .stat-divider {
+        display: none !important;
+      }
+
+      /* Mobile: Dashboard tabs horizontal scroll */
+      .main-tabs-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        flex-wrap: nowrap !important;
+        padding-bottom: 4px !important;
+      }
+
+      .main-tab {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        padding: 10px 16px !important;
+        font-size: 0.875rem !important;
+      }
+
+      /* Mobile: Search Overlay Responsive */
+      .navbar .overlay {
+        padding-top: 2rem !important;
+        align-items: flex-start !important;
+        z-index: 999999 !important;
+      }
+
+      .navbar .overlay .overlayContent {
+        width: 95% !important;
+        max-width: 100% !important;
+        padding: 1.5rem !important;
+        max-height: 85vh !important;
+        overflow-y: auto !important;
+        margin-top: 1rem !important;
+      }
+
+      .navbar .overlay #searchInput {
+        font-size: 16px !important;
+        /* Prevent zoom on iOS */
+      }
     }
   </style>
 </head>
@@ -2747,12 +2893,10 @@
               window.location.href = link;
             }
             notification.close();
-          };
-
-          // Auto close after 5 seconds
-          setTimeout(() => notification.close(), 5000);
+            // Auto close after 5 seconds
+            setTimeout(() => notification.close(), 5000);
+          }
         }
-      }
     </script>
 </body>
 

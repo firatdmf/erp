@@ -25,14 +25,8 @@
   <div class="search-section">
     <div class="search-box-modern">
       <i class="fa fa-search search-icon"></i>
-      <input 
-        type="text" 
-        id="instantSearch" 
-        placeholder="Search products by name, SKU, or barcode..." 
-        value="{{ request.GET.search }}"
-        class="search-input-modern"
-        autocomplete="off"
-      >
+      <input type="text" id="instantSearch" placeholder="Search products by name, SKU, or barcode..."
+        value="{{ request.GET.search }}" class="search-input-modern" autocomplete="off">
       <div class="search-status" id="searchStatus" style="display: none;">
         <i class="fa fa-spinner fa-spin"></i>
       </div>
@@ -60,22 +54,17 @@
       </thead>
       <tbody>
         {% for product in products %}
-        <tr class="product-row" id="product-row-{{ product.id }}" onclick="window.location='{% url 'marketing:product_detail' product.id %}'" style="cursor: pointer;">
+        <tr class="product-row" id="product-row-{{ product.id }}"
+          onclick="window.location='{% url 'marketing:product_detail' product.id %}'" style="cursor: pointer;">
           <td>
             <div class="product-image-cell">
               {% if product.primary_image %}
-                <img 
-                  src="{{ product.primary_image.thumbnail_url }}" 
-                  alt="{{ product.title }}" 
-                  class="product-thumbnail"
-                  loading="lazy"
-                  width="80" 
-                  height="80"
-                >
+              <img src="{{ product.primary_image.thumbnail_url }}" alt="{{ product.title }}" class="product-thumbnail"
+                loading="lazy" width="80" height="80">
               {% else %}
-                <div class="product-image-placeholder">
-                  <i class="fa fa-image"></i>
-                </div>
+              <div class="product-image-placeholder">
+                <i class="fa fa-image"></i>
+              </div>
               {% endif %}
             </div>
           </td>
@@ -86,43 +75,45 @@
             <div class="product-info">
               <div class="product-title">{{ product.title }}</div>
               {% if product.description %}
-                <div class="product-description">{{ product.description|truncatewords:15|striptags }}</div>
+              <div class="product-description">{{ product.description|truncatewords:15|striptags }}</div>
               {% endif %}
             </div>
           </td>
           <td>
             {% if product.category %}
-              <span class="badge badge-category">{{ product.category.name|title }}</span>
+            <span class="badge badge-category">{{ product.category.name|title }}</span>
             {% else %}
-              <span class="text-muted">-</span>
+            <span class="text-muted">-</span>
             {% endif %}
           </td>
           <td>
             {% if product.price %}
-              <span class="product-price">${{ product.price }}</span>
+            <span class="product-price">${{ product.price }}</span>
             {% else %}
-              <span class="text-muted">-</span>
+            <span class="text-muted">-</span>
             {% endif %}
           </td>
           <td>
             {% if product.quantity %}
-              <span class="product-quantity">{{ product.quantity }} {{ product.unit_of_measurement|default:"units" }}</span>
+            <span class="product-quantity">{{ product.quantity }} {{ product.unit_of_measurement|default:"units"
+              }}</span>
             {% else %}
-              <span class="text-muted">0</span>
+            <span class="text-muted">0</span>
             {% endif %}
           </td>
           <td>
             {% if product.variant_count > 0 %}
-              <span class="badge badge-variants">{{ product.variant_count }} variant{{ product.variant_count|pluralize }}</span>
+            <span class="badge badge-variants">{{ product.variant_count }} variant{{ product.variant_count|pluralize
+              }}</span>
             {% else %}
-              <span class="text-muted">-</span>
+            <span class="text-muted">-</span>
             {% endif %}
           </td>
           <td>
             {% if product.featured %}
-              <span class="badge badge-featured">Featured</span>
+            <span class="badge badge-featured">Featured</span>
             {% else %}
-              <span class="badge badge-regular">Regular</span>
+            <span class="badge badge-regular">Regular</span>
             {% endif %}
           </td>
           <td>
@@ -133,7 +124,8 @@
               <a href="{% url 'marketing:product_edit' product.id %}" class="btn-icon" title="Edit">
                 <i class="fa fa-edit"></i>
               </a>
-              <button type="button" class="btn-icon btn-delete" onclick="openDeleteModal({{ product.id }}, '{{ product.title|escapejs }}')" title="Delete">
+              <button type="button" class="btn-icon btn-delete"
+                onclick="openDeleteModal({{ product.id }}, '{{ product.title|escapejs }}')" title="Delete">
                 <i class="fa fa-trash"></i>
               </button>
             </div>
@@ -161,32 +153,37 @@
     </div>
     <div class="pagination">
       {% if page_obj.has_previous %}
-        <a href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="pagination-btn" title="First"><i class="fa fa-angles-left"></i></a>
-        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
+      <a href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="pagination-btn"
+        title="First"><i class="fa fa-angles-left"></i></a>
+      <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+        class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
       {% else %}
-        <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
-        <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
+      <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
+      <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
       {% endif %}
 
       {% for num in page_obj.paginator.page_range %}
-        {% if page_obj.number == num %}
-          <span class="pagination-btn active">{{ num }}</span>
-        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-          <a href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="pagination-btn">{{ num }}</a>
+      {% if page_obj.number == num %}
+      <span class="pagination-btn active">{{ num }}</span>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+        href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+        class="pagination-btn">{{ num }}</a>
         {% endif %}
-      {% endfor %}
+        {% endfor %}
 
-      {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
-        <a href="?page={{ paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
-      {% else %}
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+          class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
+        <a href="?page={{ paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+          class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
+        {% else %}
         <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
         <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
-      {% endif %}
+        {% endif %}
     </div>
   </div>
   {% endif %}
-  
+
 </div>
 
 <!-- Modern Delete Modal -->
@@ -199,7 +196,8 @@
       </div>
       <h3>Delete Product</h3>
       <p>Are you sure you want to delete "<span id="deleteProductName"></span>"?</p>
-      <p class="warning-text">This action cannot be undone. All product data, variants, and images will be permanently deleted.</p>
+      <p class="warning-text">This action cannot be undone. All product data, variants, and images will be permanently
+        deleted.</p>
     </div>
     <div class="delete-modal-footer">
       <button type="button" class="btn btn-cancel" onclick="closeDeleteModal()">
@@ -214,171 +212,171 @@
 </div>
 
 <script>
-// Instant Search with Debounce (renamed to avoid conflict with base.html search_component)
-let productSearchTimeout = null;
-let lastProductSearchQuery = '';
+  // Instant Search with Debounce (renamed to avoid conflict with base.html search_component)
+  let productSearchTimeout = null;
+  let lastProductSearchQuery = '';
 
-const productSearchInput = document.getElementById('instantSearch');
-const productSearchStatus = document.getElementById('searchStatus');
-const productSearchClear = document.getElementById('searchClear');
-const productTableBody = document.querySelector('.products-table tbody');
+  const productSearchInput = document.getElementById('instantSearch');
+  const productSearchStatus = document.getElementById('searchStatus');
+  const productSearchClear = document.getElementById('searchClear');
+  const productTableBody = document.querySelector('.products-table tbody');
 
-if (productSearchInput) {
-  // Show/hide clear button
-  productSearchInput.addEventListener('input', function(e) {
-    const query = e.target.value.trim();
-    
-    // Clear previous timeout
-    if (productSearchTimeout) {
-      clearTimeout(productSearchTimeout);
-    }
-    
-    // Don't search if empty or same as last query
-    if (query === '' && lastProductSearchQuery === '') {
-      productSearchClear.style.display = 'none';
-      productSearchStatus.style.display = 'none';
-      return;
-    }
-    
-    // Show loading spinner, hide clear button while loading
-    productSearchStatus.style.display = 'flex';
-    productSearchClear.style.display = 'none';
-    
-    // Debounce: wait 500ms after user stops typing
-    productSearchTimeout = setTimeout(() => {
-      performProductSearch(query);
-    }, 500);
-  });
-  
-  // Handle Enter key
-  productSearchInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
+  if (productSearchInput) {
+    // Show/hide clear button
+    productSearchInput.addEventListener('input', function (e) {
+      const query = e.target.value.trim();
+
+      // Clear previous timeout
       if (productSearchTimeout) {
         clearTimeout(productSearchTimeout);
       }
-      // Show loading immediately
+
+      // Don't search if empty or same as last query
+      if (query === '' && lastProductSearchQuery === '') {
+        productSearchClear.style.display = 'none';
+        productSearchStatus.style.display = 'none';
+        return;
+      }
+
+      // Show loading spinner, hide clear button while loading
       productSearchStatus.style.display = 'flex';
       productSearchClear.style.display = 'none';
-      performProductSearch(e.target.value.trim());
-    }
-  });
-}
 
-function clearSearch() {
-  productSearchInput.value = '';
-  productSearchClear.style.display = 'none';
-  productSearchStatus.style.display = 'flex';
-  lastProductSearchQuery = '';
-  
-  // Reload page without search param
-  window.location.href = '{% url "marketing:product_list" %}';
-}
+      // Debounce: wait 500ms after user stops typing
+      productSearchTimeout = setTimeout(() => {
+        performProductSearch(query);
+      }, 500);
+    });
 
-async function performProductSearch(query) {
-  lastProductSearchQuery = query;
-  
-  try {
-    // Build URL with search param
-    const url = query ? `{% url "marketing:product_list" %}?search=${encodeURIComponent(query)}` : '{% url "marketing:product_list" %}';
-    
-    // Fetch new results
-    const response = await fetch(url, {
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest'
+    // Handle Enter key
+    productSearchInput.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (productSearchTimeout) {
+          clearTimeout(productSearchTimeout);
+        }
+        // Show loading immediately
+        productSearchStatus.style.display = 'flex';
+        productSearchClear.style.display = 'none';
+        performProductSearch(e.target.value.trim());
       }
     });
-    
-    if (!response.ok) throw new Error('Search failed');
-    
-    const html = await response.text();
-    
-    // Parse response and extract table body
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const newTbody = doc.querySelector('.products-table tbody');
-    const newCount = doc.querySelector('.product-count');
-    const newPagination = doc.querySelector('.pagination-container');
-    
-    if (newTbody && productTableBody) {
-      // Smooth transition
-      productTableBody.style.opacity = '0.5';
-      
-      setTimeout(() => {
-        productTableBody.innerHTML = newTbody.innerHTML;
-        productTableBody.style.opacity = '1';
-        
-        // Update product count
-        if (newCount) {
-          document.querySelector('.product-count').textContent = newCount.textContent;
-        }
-        
-        // Update pagination
-        const currentPagination = document.querySelector('.pagination-container');
-        if (newPagination && currentPagination) {
-          currentPagination.innerHTML = newPagination.innerHTML;
-        } else if (!newPagination && currentPagination) {
-          currentPagination.innerHTML = '';
-        }
-        
-        // Hide loading, show clear button if query exists
-        productSearchStatus.style.display = 'none';
-        productSearchClear.style.display = query ? 'flex' : 'none';
-      }, 150);
-    }
-  } catch (error) {
-    console.error('Search error:', error);
-    productSearchStatus.style.display = 'none';
-    productSearchClear.style.display = lastProductSearchQuery ? 'flex' : 'none';
   }
-}
 
-// Delete Modal Functions
-let currentDeleteProductId = null;
+  function clearSearch() {
+    productSearchInput.value = '';
+    productSearchClear.style.display = 'none';
+    productSearchStatus.style.display = 'flex';
+    lastProductSearchQuery = '';
 
-function openDeleteModal(productId, productTitle) {
-  currentDeleteProductId = productId;
-  document.getElementById('deleteProductName').textContent = productTitle;
-  document.getElementById('deleteModal').classList.add('show');
-}
+    // Reload page without search param
+    window.location.href = '{% url "marketing:product_list" %}';
+  }
 
-function closeDeleteModal() {
-  document.getElementById('deleteModal').classList.remove('show');
-  currentDeleteProductId = null;
-}
+  async function performProductSearch(query) {
+    lastProductSearchQuery = query;
 
-function confirmDelete() {
-  if (!currentDeleteProductId) return;
-  
-  // Store ID before closing modal (modal close resets it)
-  const productId = currentDeleteProductId;
-  
-  // Close modal immediately
-  closeDeleteModal();
-  
-  // Animate row deletion instantly (optimistic UI)
-  const row = document.getElementById(`product-row-${productId}`);
-  if (row) {
-    row.style.transition = 'all 0.3s ease';
-    row.style.backgroundColor = '#fee2e2';
-    row.style.transform = 'translateX(-20px)';
-    row.style.opacity = '0';
-    
-    setTimeout(() => {
-      row.remove();
-      
-      // Update product count
-      const countEl = document.querySelector('.product-count');
-      if (countEl) {
-        const currentCount = parseInt(countEl.textContent);
-        const newCount = currentCount - 1;
-        countEl.textContent = `${newCount} product${newCount !== 1 ? 's' : ''}`;
+    try {
+      // Build URL with search param
+      const url = query ? `{% url "marketing:product_list" %}?search=${encodeURIComponent(query)}` : '{% url "marketing:product_list" %}';
+
+      // Fetch new results
+      const response = await fetch(url, {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+
+      if (!response.ok) throw new Error('Search failed');
+
+      const html = await response.text();
+
+      // Parse response and extract table body
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const newTbody = doc.querySelector('.products-table tbody');
+      const newCount = doc.querySelector('.product-count');
+      const newPagination = doc.querySelector('.pagination-container');
+
+      if (newTbody && productTableBody) {
+        // Smooth transition
+        productTableBody.style.opacity = '0.5';
+
+        setTimeout(() => {
+          productTableBody.innerHTML = newTbody.innerHTML;
+          productTableBody.style.opacity = '1';
+
+          // Update product count
+          if (newCount) {
+            document.querySelector('.product-count').textContent = newCount.textContent;
+          }
+
+          // Update pagination
+          const currentPagination = document.querySelector('.pagination-container');
+          if (newPagination && currentPagination) {
+            currentPagination.innerHTML = newPagination.innerHTML;
+          } else if (!newPagination && currentPagination) {
+            currentPagination.innerHTML = '';
+          }
+
+          // Hide loading, show clear button if query exists
+          productSearchStatus.style.display = 'none';
+          productSearchClear.style.display = query ? 'flex' : 'none';
+        }, 150);
       }
-      
-      // Show empty state if no products left
-      const tbody = document.querySelector('.products-table tbody');
-      if (tbody && tbody.children.length === 0) {
-        tbody.innerHTML = `
+    } catch (error) {
+      console.error('Search error:', error);
+      productSearchStatus.style.display = 'none';
+      productSearchClear.style.display = lastProductSearchQuery ? 'flex' : 'none';
+    }
+  }
+
+  // Delete Modal Functions
+  let currentDeleteProductId = null;
+
+  function openDeleteModal(productId, productTitle) {
+    currentDeleteProductId = productId;
+    document.getElementById('deleteProductName').textContent = productTitle;
+    document.getElementById('deleteModal').classList.add('show');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    currentDeleteProductId = null;
+  }
+
+  function confirmDelete() {
+    if (!currentDeleteProductId) return;
+
+    // Store ID before closing modal (modal close resets it)
+    const productId = currentDeleteProductId;
+
+    // Close modal immediately
+    closeDeleteModal();
+
+    // Animate row deletion instantly (optimistic UI)
+    const row = document.getElementById(`product-row-${productId}`);
+    if (row) {
+      row.style.transition = 'all 0.3s ease';
+      row.style.backgroundColor = '#fee2e2';
+      row.style.transform = 'translateX(-20px)';
+      row.style.opacity = '0';
+
+      setTimeout(() => {
+        row.remove();
+
+        // Update product count
+        const countEl = document.querySelector('.product-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent);
+          const newCount = currentCount - 1;
+          countEl.textContent = `${newCount} product${newCount !== 1 ? 's' : ''}`;
+        }
+
+        // Show empty state if no products left
+        const tbody = document.querySelector('.products-table tbody');
+        if (tbody && tbody.children.length === 0) {
+          tbody.innerHTML = `
           <tr>
             <td colspan="9" class="empty-state">
               <div class="empty-state-content">
@@ -388,191 +386,190 @@ function confirmDelete() {
             </td>
           </tr>
         `;
-      }
-    }, 300);
-  }
-  
-  // Delete in background (fire and forget)
-  fetch(`/marketing/product/${productId}/delete/`, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
-      'Content-Type': 'application/json'
+        }
+      }, 300);
     }
-  }).catch(error => {
-    console.error('Background delete error:', error);
-    // Silent fail - user already sees deletion
+
+    // Delete in background (fire and forget)
+    fetch(`/marketing/product/${productId}/delete/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'Content-Type': 'application/json'
+      }
+    }).catch(error => {
+      console.error('Background delete error:', error);
+      // Silent fail - user already sees deletion
+    });
+  }
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  // Close modal on ESC key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      closeDeleteModal();
+    }
   });
-}
-
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
-
-// Close modal on ESC key
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    closeDeleteModal();
-  }
-});
 </script>
 
 <style>
-.btn-delete {
-  color: #dc2626 !important;
-  transition: all 0.2s;
-}
+  .btn-delete {
+    color: #dc2626 !important;
+    transition: all 0.2s;
+  }
 
-.btn-delete:hover {
-  background: #fef2f2 !important;
-  transform: scale(1.1);
-}
+  .btn-delete:hover {
+    background: #fef2f2 !important;
+    transform: scale(1.1);
+  }
 
-/* Modern Delete Modal */
-.delete-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
+  /* Modern Delete Modal */
+  .delete-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
 
-.delete-modal.show {
-  opacity: 1;
-  pointer-events: all;
-}
+  .delete-modal.show {
+    opacity: 1;
+    pointer-events: all;
+  }
 
-.delete-modal-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-}
+  .delete-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+  }
 
-.delete-modal-content {
-  position: relative;
-  background: white;
-  border-radius: 16px;
-  max-width: 480px;
-  width: 90%;
-  padding: 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  transform: scale(0.9);
-  transition: transform 0.3s ease;
-}
+  .delete-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 16px;
+    max-width: 480px;
+    width: 90%;
+    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+  }
 
-.delete-modal.show .delete-modal-content {
-  transform: scale(1);
-}
+  .delete-modal.show .delete-modal-content {
+    transform: scale(1);
+  }
 
-.delete-modal-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
+  .delete-modal-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
 
-.delete-icon-wrapper {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 16px;
-  background: #fef2f2;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+  .delete-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    background: #fef2f2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-.delete-icon-wrapper i {
-  font-size: 32px;
-  color: #dc2626;
-}
+  .delete-icon-wrapper i {
+    font-size: 32px;
+    color: #dc2626;
+  }
 
-.delete-modal-header h3 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 12px;
-}
+  .delete-modal-header h3 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 12px;
+  }
 
-.delete-modal-header p {
-  font-size: 15px;
-  color: #6b7280;
-  margin: 8px 0;
-  line-height: 1.5;
-}
+  .delete-modal-header p {
+    font-size: 15px;
+    color: #6b7280;
+    margin: 8px 0;
+    line-height: 1.5;
+  }
 
-.delete-modal-header p span {
-  font-weight: 600;
-  color: #111827;
-}
+  .delete-modal-header p span {
+    font-weight: 600;
+    color: #111827;
+  }
 
-.warning-text {
-  font-size: 13px !important;
-  color: #dc2626 !important;
-  background: #fef2f2;
-  padding: 12px;
-  border-radius: 8px;
-  margin-top: 16px !important;
-}
+  .warning-text {
+    font-size: 13px !important;
+    color: #dc2626 !important;
+    background: #fef2f2;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 16px !important;
+  }
 
-.delete-modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
+  .delete-modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
 
-.delete-modal-footer .btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
+  .delete-modal-footer .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
 
-.delete-modal-footer .btn-cancel {
-  background: #f3f4f6;
-  color: #374151;
-}
+  .delete-modal-footer .btn-cancel {
+    background: #f3f4f6;
+    color: #374151;
+  }
 
-.delete-modal-footer .btn-cancel:hover {
-  background: #e5e7eb;
-}
+  .delete-modal-footer .btn-cancel:hover {
+    background: #e5e7eb;
+  }
 
-.delete-modal-footer .btn-danger {
-  background: #dc2626;
-  color: white;
-}
+  .delete-modal-footer .btn-danger {
+    background: #dc2626;
+    color: white;
+  }
 
-.delete-modal-footer .btn-danger:hover {
-  background: #b91c1c;
-}
+  .delete-modal-footer .btn-danger:hover {
+    background: #b91c1c;
+  }
 
-.delete-modal-footer .btn-danger:disabled {
-  background: #fca5a5;
-  cursor: not-allowed;
-}
-
+  .delete-modal-footer .btn-danger:disabled {
+    background: #fca5a5;
+    cursor: not-allowed;
+  }
 </style>
 {% endblock content %}

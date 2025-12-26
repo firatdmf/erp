@@ -385,6 +385,14 @@ function removeOption(optionId) {
     if (element) element.remove();
     updateVariantTable();
     updateGroupingOptions();
+
+    // Check if all options are deleted - restore Add Product Variants button
+    if (Object.keys(variantData).length === 0) {
+        const trigger = document.getElementById('add_variant_trigger');
+        const component = document.getElementById('variant_component');
+        if (trigger) trigger.style.display = 'block';
+        if (component) component.style.display = 'none';
+    }
 }
 
 // Remove value - same logic as deleteVariantRow but for multiple variants

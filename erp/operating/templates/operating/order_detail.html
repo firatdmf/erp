@@ -437,10 +437,23 @@
   }
 
   @media (max-width: 768px) {
+    .order-detail-container {
+      padding: 1rem;
+    }
+
     .order-header {
       flex-direction: column;
       align-items: flex-start;
       gap: 1rem;
+    }
+
+    .order-header-left h1 {
+      font-size: 1.5rem;
+    }
+
+    .order-meta {
+      flex-direction: column;
+      gap: 0.5rem;
     }
 
     .order-actions {
@@ -451,6 +464,60 @@
     .order-actions .btn {
       width: 100%;
       justify-content: center;
+    }
+
+    /* Grid stacks on mobile */
+    .order-grid {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Card compacting */
+    .card-header {
+      padding: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .card-body {
+      padding: 1rem;
+    }
+
+    /* Table horizontal scroll */
+    .items-table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      font-size: 0.875rem;
+    }
+
+    .items-table th,
+    .items-table td {
+      padding: 0.75rem 0.5rem;
+      white-space: nowrap;
+    }
+
+    /* Hide description column on mobile */
+    .items-table th:nth-child(2),
+    .items-table td:nth-child(2) {
+      display: none;
+    }
+
+    /* Order total compact */
+    .order-total {
+      flex-direction: column;
+      text-align: center;
+      gap: 0.5rem;
+      padding: 1rem;
+    }
+
+    /* Payment grid stack */
+    .payment-grid {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Address blocks compact */
+    .address-block {
+      padding: 0.75rem;
     }
   }
 </style>

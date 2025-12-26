@@ -1207,32 +1207,19 @@ input[type=file]::-webkit-file-upload-button {
 @media (max-width: 768px) {
   .variant_component {
     padding: 10px !important;
-    max-width: 100% !important;
-    overflow-x: hidden !important;
   }
 
   .variant_options_wrapper {
     margin-bottom: 16px;
-    max-width: 100% !important;
   }
 
   .variant_option_card {
     padding: 12px !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
   }
 
   .option_header {
     flex-direction: column;
     gap: 8px;
-  }
-
-  .drag_handle {
-    display: none !important;
-  }
-
-  .option_name_input {
-    width: 100% !important;
   }
 
   .option_name input,
@@ -1241,30 +1228,13 @@ input[type=file]::-webkit-file-upload-button {
   .value_input {
     width: 100% !important;
     max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  /* Value field wrapper */
-  .value_field_wrapper {
-    flex-wrap: nowrap !important;
-    width: 100% !important;
-  }
-
-  .drag_handle_small {
-    display: none !important;
-  }
-
-  .btn_remove_value {
-    flex-shrink: 0 !important;
   }
 
   /* Grouping section responsive */
   .variant_grouping {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 8px !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
 
   .variant_grouping select {
@@ -1272,75 +1242,63 @@ input[type=file]::-webkit-file-upload-button {
     min-width: unset !important;
   }
 
-  /* Table wrapper scroll - CRITICAL for overflow fix */
+  /* Table wrapper scroll */
   #variant_table_wrapper {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    margin: 0 -10px;
+    padding: 0 10px;
+    width: calc(100% + 20px) !important;
   }
 
-  /* Table scroll */
+  /* Table scroll  */
   #variant_table {
     display: table !important;
     min-width: 600px !important;
-    font-size: 11px !important;
-    table-layout: auto !important;
+    font-size: 12px !important;
   }
 
   #variant_table th,
   #variant_table td {
-    padding: 6px 4px !important;
+    padding: 8px 6px !important;
     white-space: nowrap !important;
   }
 
   #variant_table input[type="text"],
   #variant_table input[type="number"] {
-    min-width: 50px !important;
-    width: 60px !important;
-    padding: 4px 6px !important;
-    font-size: 11px !important;
+    min-width: 60px !important;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
   }
 
   /* Buttons full width */
   .add_option_button,
   .add_another_option,
-  .btn_add_value {
+  .btn_add_value,
+  #create_table_button {
     width: 100% !important;
     justify-content: center !important;
     box-sizing: border-box !important;
-    text-align: center !important;
-  }
-
-  #create_table_button {
-    width: 100% !important;
-    box-sizing: border-box !important;
-    text-align: center !important;
   }
 
   .option_actions {
-    flex-direction: column !important;
-    gap: 8px !important;
-    width: 100% !important;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .btn_remove_option {
     width: 100% !important;
-    text-align: center !important;
-    box-sizing: border-box !important;
   }
 
   /* Images preview compact */
   .variant_images_preview {
-    grid-template-columns: repeat(3, 45px) !important;
-    gap: 4px !important;
+    grid-template-columns: repeat(3, 50px) !important;
+    gap: 6px !important;
   }
 
   .variant_thumb {
-    width: 45px !important;
-    height: 45px !important;
+    width: 50px !important;
+    height: 50px !important;
   }
 
   /* Photo picker modal responsive */
@@ -1348,39 +1306,10 @@ input[type=file]::-webkit-file-upload-button {
     width: 95vw !important;
     max-width: unset !important;
     margin: 10px !important;
-    max-height: 90vh !important;
-    overflow-y: auto !important;
   }
 
   .picker_images_grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 8px !important;
-  }
-
-  /* Add Another Value button compact */
-  .btn_add_value {
-    padding: 8px 12px !important;
-    font-size: 12px !important;
-  }
-
-  /* Option values section */
-  .option_values_section {
-    width: 100% !important;
-  }
-
-  .option_values_list {
-    width: 100% !important;
-  }
-
-  /* Delete variant button compact */
-  .btn_delete_variant {
-    padding: 4px 6px !important;
-    font-size: 11px !important;
-  }
-
-  /* Photo picker button */
-  .photo_picker_btn {
-    padding: 6px 10px !important;
-    font-size: 12px !important;
   }
 }

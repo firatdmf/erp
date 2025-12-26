@@ -182,7 +182,7 @@
     background: #fee2e2;
     color: #991b1b;
   }
-  
+
   .status-badge.success {
     background: #dcfce7;
     color: #166534;
@@ -273,6 +273,72 @@
   .empty-state p {
     margin-bottom: 1.5rem;
   }
+
+  /* ===== MOBILE RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    .orders-header {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .orders-header h1 {
+      font-size: 1.5rem;
+    }
+
+    .btn-create-order {
+      width: 100%;
+      justify-content: center;
+      padding: 0.875rem 1rem;
+    }
+
+    /* Tab buttons scroll */
+    .tab-buttons {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex-wrap: nowrap;
+      padding-bottom: 4px;
+    }
+
+    .tab-button {
+      flex-shrink: 0;
+      white-space: nowrap;
+      padding: 0.625rem 1rem;
+      font-size: 0.875rem;
+    }
+
+    /* Table horizontal scroll wrapper */
+    .orders-table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      font-size: 0.875rem;
+    }
+
+    .orders-table th,
+    .orders-table td {
+      padding: 0.75rem 0.5rem;
+      white-space: nowrap;
+    }
+
+    /* Hide QR column on mobile */
+    .orders-table th:nth-child(6),
+    .orders-table td:nth-child(6) {
+      display: none;
+    }
+
+    /* Compact action button */
+    .btn-view {
+      padding: 0.375rem 0.625rem;
+      font-size: 0.75rem;
+    }
+
+    .client-info {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -307,198 +373,198 @@
     <!-- All Orders Tab -->
     <div class="tab-content active" id="tab-all">
       {% if orders %}
-        <table class="orders-table">
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Client</th>
-              <th>Order Value</th>
-              <th>QR</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for order in orders %}
-              <tr>
-                <td><strong>#{{ order.pk }}</strong></td>
-                <td>
-                  <span class="status-badge {{ order.status }}">
-                    {{ order.get_status_display }}
-                  </span>
-                </td>
-                <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
-                <td>
-                  <div class="client-info">
-                    {% if order.contact %}
-                      <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
-                        <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
-                      </a>
-                    {% elif order.company %}
-                      <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
-                        <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
-                      </a>
-                    {% elif order.web_client %}
-                      <span class="web-client-badge">
-                        <i class="fa fa-globe"></i>
-                        {{ order.web_client.name|default:order.web_client.username }}
-                      </span>
-                    {% else %}
-                      <span style="color: var(--text-muted);">—</span>
-                    {% endif %}
-                  </div>
-                </td>
-                <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
-                <td>
-                  {% if order.qr_code_url %}
-                    <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
-                  {% else %}
-                    <span style="color: var(--text-muted);">—</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
-                    <i class="fa fa-eye"></i> View
-                  </a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <table class="orders-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Client</th>
+            <th>Order Value</th>
+            <th>QR</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+          <tr>
+            <td><strong>#{{ order.pk }}</strong></td>
+            <td>
+              <span class="status-badge {{ order.status }}">
+                {{ order.get_status_display }}
+              </span>
+            </td>
+            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+            <td>
+              <div class="client-info">
+                {% if order.contact %}
+                <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
+                  <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
+                </a>
+                {% elif order.company %}
+                <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
+                  <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
+                </a>
+                {% elif order.web_client %}
+                <span class="web-client-badge">
+                  <i class="fa fa-globe"></i>
+                  {{ order.web_client.name|default:order.web_client.username }}
+                </span>
+                {% else %}
+                <span style="color: var(--text-muted);">—</span>
+                {% endif %}
+              </div>
+            </td>
+            <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
+            <td>
+              {% if order.qr_code_url %}
+              <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
+              {% else %}
+              <span style="color: var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
+                <i class="fa fa-eye"></i> View
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
       {% else %}
-        <div class="empty-state">
-          <i class="fa fa-shopping-cart"></i>
-          <h3>No orders yet</h3>
-          <p>Create your first order to get started</p>
-          <a href="{% url 'operating:create_order' %}" class="btn-create-order">
-            <i class="fa fa-plus"></i>
-            Create Order
-          </a>
-        </div>
+      <div class="empty-state">
+        <i class="fa fa-shopping-cart"></i>
+        <h3>No orders yet</h3>
+        <p>Create your first order to get started</p>
+        <a href="{% url 'operating:create_order' %}" class="btn-create-order">
+          <i class="fa fa-plus"></i>
+          Create Order
+        </a>
+      </div>
       {% endif %}
     </div>
 
     <!-- B2B Orders Tab -->
     <div class="tab-content" id="tab-b2b">
       {% if b2b_orders %}
-        <table class="orders-table">
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Client</th>
-              <th>Order Value</th>
-              <th>QR</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for order in b2b_orders %}
-              <tr>
-                <td><strong>#{{ order.pk }}</strong></td>
-                <td>
-                  <span class="status-badge {{ order.status }}">
-                    {{ order.get_status_display }}
-                  </span>
-                </td>
-                <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
-                <td>
-                  <div class="client-info">
-                    {% if order.contact %}
-                      <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
-                        <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
-                      </a>
-                    {% elif order.company %}
-                      <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
-                        <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
-                      </a>
-                    {% endif %}
-                  </div>
-                </td>
-                <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
-                <td>
-                  {% if order.qr_code_url %}
-                    <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
-                  {% else %}
-                    <span style="color: var(--text-muted);">—</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
-                    <i class="fa fa-eye"></i> View
-                  </a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <table class="orders-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Client</th>
+            <th>Order Value</th>
+            <th>QR</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in b2b_orders %}
+          <tr>
+            <td><strong>#{{ order.pk }}</strong></td>
+            <td>
+              <span class="status-badge {{ order.status }}">
+                {{ order.get_status_display }}
+              </span>
+            </td>
+            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+            <td>
+              <div class="client-info">
+                {% if order.contact %}
+                <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
+                  <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
+                </a>
+                {% elif order.company %}
+                <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
+                  <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
+                </a>
+                {% endif %}
+              </div>
+            </td>
+            <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
+            <td>
+              {% if order.qr_code_url %}
+              <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
+              {% else %}
+              <span style="color: var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
+                <i class="fa fa-eye"></i> View
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
       {% else %}
-        <div class="empty-state">
-          <i class="fa fa-briefcase"></i>
-          <h3>No B2B orders</h3>
-          <p>Orders from companies and contacts will appear here</p>
-        </div>
+      <div class="empty-state">
+        <i class="fa fa-briefcase"></i>
+        <h3>No B2B orders</h3>
+        <p>Orders from companies and contacts will appear here</p>
+      </div>
       {% endif %}
     </div>
 
     <!-- B2C Orders Tab -->
     <div class="tab-content" id="tab-b2c">
       {% if b2c_orders %}
-        <table class="orders-table">
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Customer</th>
-              <th>Payment</th>
-              <th>Order Value</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for order in b2c_orders %}
-              <tr>
-                <td><strong>#{{ order.pk }}</strong></td>
-                <td>
-                  <span class="status-badge {{ order.status }}">
-                    {{ order.get_status_display }}
-                  </span>
-                </td>
-                <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
-                <td>
-                  <span class="web-client-badge">
-                    <i class="fa fa-globe"></i>
-                    {{ order.web_client.name|default:order.web_client.username }}
-                  </span>
-                </td>
-                <td>
-                  {% if order.payment_status %}
-                    <span class="status-badge {{ order.payment_status }}">
-                      {{ order.get_payment_status_display }}
-                    </span>
-                  {% else %}
-                    <span style="color: var(--text-muted);">—</span>
-                  {% endif %}
-                </td>
-                <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
-                <td>
-                  <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
-                    <i class="fa fa-eye"></i> View
-                  </a>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <table class="orders-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Customer</th>
+            <th>Payment</th>
+            <th>Order Value</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in b2c_orders %}
+          <tr>
+            <td><strong>#{{ order.pk }}</strong></td>
+            <td>
+              <span class="status-badge {{ order.status }}">
+                {{ order.get_status_display }}
+              </span>
+            </td>
+            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+            <td>
+              <span class="web-client-badge">
+                <i class="fa fa-globe"></i>
+                {{ order.web_client.name|default:order.web_client.username }}
+              </span>
+            </td>
+            <td>
+              {% if order.payment_status %}
+              <span class="status-badge {{ order.payment_status }}">
+                {{ order.get_payment_status_display }}
+              </span>
+              {% else %}
+              <span style="color: var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+            <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
+            <td>
+              <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
+                <i class="fa fa-eye"></i> View
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
       {% else %}
-        <div class="empty-state">
-          <i class="fa fa-globe"></i>
-          <h3>No web orders</h3>
-          <p>Orders from your website will appear here</p>
-        </div>
+      <div class="empty-state">
+        <i class="fa fa-globe"></i>
+        <h3>No web orders</h3>
+        <p>Orders from your website will appear here</p>
+      </div>
       {% endif %}
     </div>
   </div>
@@ -509,11 +575,11 @@
   document.querySelectorAll('.tab-button').forEach(button => {
     button.addEventListener('click', () => {
       const tabName = button.dataset.tab;
-      
+
       // Update active button
       document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
       button.classList.add('active');
-      
+
       // Update active content
       document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
       document.getElementById(`tab-${tabName}`).classList.add('active');

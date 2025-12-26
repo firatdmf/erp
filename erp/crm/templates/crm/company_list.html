@@ -11,7 +11,7 @@
   <div class="page-header">
     <div class="header-left">
       <h1>Companies</h1>
-      <span class="product-count">{{ paginator.count|default:companies.count }} compan{{ paginator.count|default:companies.count|pluralize:"y,ies" }}</span>
+            <span class="product-count">{{ paginator.count|default:companies.count }} compan{{ paginator.count|default:companies.count|pluralize:"y,ies" }}</span>
     </div>
     <div class="header-right">
       <a href="#" onclick="openCompanySidebar(); return false;" class="btn btn-primary">
@@ -25,15 +25,10 @@
   <div class="search-section">
     <div class="search-box-modern">
       <i class="fa fa-search search-icon"></i>
-      <input 
-        type="text" 
-        id="instantSearch" 
-        placeholder="Search companies by name, email, or phone..." 
-        class="search-input-modern"
-        autocomplete="off"
-        value="{{ search_query }}"
-      >
-      <button type="button" class="search-clear" id="searchClear" style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
+      <input type="text" id="instantSearch" placeholder="Search companies by name, email, or phone..."
+        class="search-input-modern" autocomplete="off" value="{{ search_query }}">
+      <button type="button" class="search-clear" id="searchClear"
+        style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
         <i class="fa fa-times"></i>
       </button>
     </div>
@@ -55,7 +50,8 @@
       </thead>
       <tbody id="companiesTableBody">
         {% for company in companies %}
-        <tr class="product-row" id="company-row-{{ company.id }}" onclick="window.location='{% url 'crm:company_detail' company.id %}'" style="cursor: pointer;">
+        <tr class="product-row" id="company-row-{{ company.id }}"
+          onclick="window.location='{% url 'crm:company_detail' company.id %}'" style="cursor: pointer;">
           <td>
             <div class="product-image-placeholder">
               <i class="fa fa-building"></i>
@@ -68,34 +64,35 @@
           </td>
           <td>
             {% if company.email %}
-              <span class="text-muted" style="font-size: 0.875rem;">{{ company.email|first }}</span>
+            <span class="text-muted" style="font-size: 0.875rem;">{{ company.email|first }}</span>
             {% else %}
-              <span class="text-muted">-</span>
+            <span class="text-muted">-</span>
             {% endif %}
           </td>
           <td>
             {% if company.phone %}
-              <span class="text-muted" style="font-size: 0.875rem;">{{ company.phone|first }}</span>
+            <span class="text-muted" style="font-size: 0.875rem;">{{ company.phone|first }}</span>
             {% else %}
-              <span class="text-muted">-</span>
+            <span class="text-muted">-</span>
             {% endif %}
           </td>
           <td>
             {% if company.status == 'prospect' %}
-              <span class="badge badge-category">Prospect</span>
+            <span class="badge badge-category">Prospect</span>
             {% elif company.status == 'qualified' %}
-              <span class="badge badge-featured">Qualified</span>
+            <span class="badge badge-featured">Qualified</span>
             {% elif company.status == 'customer' %}
-              <span class="badge" style="background: #ede9fe; color: #7c3aed; border: 1px solid #ddd6fe;">Customer</span>
+            <span class="badge" style="background: #ede9fe; color: #7c3aed; border: 1px solid #ddd6fe;">Customer</span>
             {% else %}
-              <span class="badge badge-regular">{{ company.status|title|default:"Unknown" }}</span>
+            <span class="badge badge-regular">{{ company.status|title|default:"Unknown" }}</span>
             {% endif %}
           </td>
           <td>
             {% if company.contacts_count > 0 %}
-              <span class="badge badge-variants">{{ company.contacts_count }} contact{{ company.contacts_count|pluralize }}</span>
+            <span class="badge badge-variants">{{ company.contacts_count }} contact{{ company.contacts_count|pluralize
+              }}</span>
             {% else %}
-              <span class="text-muted">-</span>
+            <span class="text-muted">-</span>
             {% endif %}
           </td>
           <td>
@@ -106,7 +103,8 @@
               <a href="{% url 'crm:update_company' company.id %}" class="btn-icon" title="Edit">
                 <i class="fa fa-edit"></i>
               </a>
-              <button type="button" class="btn-icon btn-delete" onclick="openDeleteModal({{ company.id }}, '{{ company.name|escapejs }}')", title="Delete">
+              <button type="button" class="btn-icon btn-delete"
+                onclick="openDeleteModal({{ company.id }}, '{{ company.name|escapejs }}')" , title="Delete">
                 <i class="fa fa-trash"></i>
               </button>
             </div>
@@ -134,228 +132,233 @@
     </div>
     <div class="pagination">
       {% if page_obj.has_previous %}
-        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn" title="First"><i class="fa fa-angles-left"></i></a>
-        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn"
+        title="First"><i class="fa fa-angles-left"></i></a>
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
+        class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
       {% else %}
-        <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
-        <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
+      <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
+      <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
       {% endif %}
 
       {% for num in page_obj.paginator.page_range %}
-        {% if page_obj.number == num %}
-          <span class="pagination-btn active">{{ num }}</span>
-        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-          <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">{{ num }}</a>
+      {% if page_obj.number == num %}
+      <span class="pagination-btn active">{{ num }}</span>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+        href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">{{ num
+        }}</a>
         {% endif %}
-      {% endfor %}
+        {% endfor %}
 
-      {% if page_obj.has_next %}
-        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
-        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}" class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
-      {% else %}
+        {% if page_obj.has_next %}
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}"
+          class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}"
+          class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
+        {% else %}
         <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
         <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
-      {% endif %}
+        {% endif %}
     </div>
   </div>
   {% endif %}
 </div>
 
 <style>
-.pagination-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 0;
-  margin-top: 1rem;
-}
+  .pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 0;
+    margin-top: 1rem;
+  }
 
-.pagination-info {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
+  .pagination-info {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
 
-.pagination {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
+  .pagination {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
 
-.pagination-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 36px;
-  height: 36px;
-  padding: 0 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-primary);
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
+  .pagination-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
 
-.pagination-btn:hover:not(.disabled):not(.active) {
-  background: var(--bg-hover);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-}
+  .pagination-btn:hover:not(.disabled):not(.active) {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
 
-.pagination-btn.active {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
-  color: white;
-  font-weight: 600;
-}
+  .pagination-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+    font-weight: 600;
+  }
 
-.pagination-btn.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+  .pagination-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
-/* Modern Delete Modal */
-.delete-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
+  /* Modern Delete Modal */
+  .delete-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
 
-.delete-modal.show {
-  opacity: 1;
-  pointer-events: all;
-}
+  .delete-modal.show {
+    opacity: 1;
+    pointer-events: all;
+  }
 
-.delete-modal-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-}
+  .delete-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+  }
 
-.delete-modal-content {
-  position: relative;
-  background: white;
-  border-radius: 16px;
-  max-width: 480px;
-  width: 90%;
-  padding: 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  transform: scale(0.9);
-  transition: transform 0.3s ease;
-}
+  .delete-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 16px;
+    max-width: 480px;
+    width: 90%;
+    padding: 32px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+  }
 
-.delete-modal.show .delete-modal-content {
-  transform: scale(1);
-}
+  .delete-modal.show .delete-modal-content {
+    transform: scale(1);
+  }
 
-.delete-modal-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
+  .delete-modal-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
 
-.delete-icon-wrapper {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 16px;
-  background: #fef2f2;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+  .delete-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    background: #fef2f2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-.delete-icon-wrapper i {
-  font-size: 32px;
-  color: #dc2626;
-}
+  .delete-icon-wrapper i {
+    font-size: 32px;
+    color: #dc2626;
+  }
 
-.delete-modal-header h3 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111827;
-  margin: 0 0 12px;
-}
+  .delete-modal-header h3 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 12px;
+  }
 
-.delete-modal-header p {
-  font-size: 15px;
-  color: #6b7280;
-  margin: 8px 0;
-  line-height: 1.5;
-}
+  .delete-modal-header p {
+    font-size: 15px;
+    color: #6b7280;
+    margin: 8px 0;
+    line-height: 1.5;
+  }
 
-.delete-modal-header p span {
-  font-weight: 600;
-  color: #111827;
-}
+  .delete-modal-header p span {
+    font-weight: 600;
+    color: #111827;
+  }
 
-.warning-text {
-  font-size: 13px !important;
-  color: #dc2626 !important;
-  background: #fef2f2;
-  padding: 12px;
-  border-radius: 8px;
-  margin-top: 16px !important;
-}
+  .warning-text {
+    font-size: 13px !important;
+    color: #dc2626 !important;
+    background: #fef2f2;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 16px !important;
+  }
 
-.delete-modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
+  .delete-modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
 
-.delete-modal-footer .btn {
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
+  .delete-modal-footer .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
 
-.delete-modal-footer .btn-cancel {
-  background: #f3f4f6;
-  color: #374151;
-}
+  .delete-modal-footer .btn-cancel {
+    background: #f3f4f6;
+    color: #374151;
+  }
 
-.delete-modal-footer .btn-cancel:hover {
-  background: #e5e7eb;
-}
+  .delete-modal-footer .btn-cancel:hover {
+    background: #e5e7eb;
+  }
 
-.delete-modal-footer .btn-danger {
-  background: #dc2626;
-  color: white;
-}
+  .delete-modal-footer .btn-danger {
+    background: #dc2626;
+    color: white;
+  }
 
-.delete-modal-footer .btn-danger:hover {
-  background: #b91c1c;
-}
+  .delete-modal-footer .btn-danger:hover {
+    background: #b91c1c;
+  }
 
-.btn-delete {
-  color: #dc2626 !important;
-  transition: all 0.2s;
-}
+  .btn-delete {
+    color: #dc2626 !important;
+    transition: all 0.2s;
+  }
 
-.btn-delete:hover {
-  background: #fef2f2 !important;
-  transform: scale(1.1);
-}
+  .btn-delete:hover {
+    background: #fef2f2 !important;
+    transform: scale(1.1);
+  }
 </style>
 
 <!-- Modern Delete Modal -->
@@ -368,7 +371,8 @@
       </div>
       <h3>Delete Company</h3>
       <p>Are you sure you want to delete "<span id="deleteCompanyName"></span>"?</p>
-      <p class="warning-text">This action cannot be undone. All company data and associated contacts will be affected.</p>
+      <p class="warning-text">This action cannot be undone. All company data and associated contacts will be affected.
+      </p>
     </div>
     <div class="delete-modal-footer">
       <button type="button" class="btn btn-cancel" onclick="closeDeleteModal()">
@@ -383,80 +387,80 @@
 </div>
 
 <script>
-// Backend search functionality
-const searchInput = document.getElementById('instantSearch');
-const searchClear = document.getElementById('searchClear');
+  // Backend search functionality
+  const searchInput = document.getElementById('instantSearch');
+  const searchClear = document.getElementById('searchClear');
 
-if (searchInput) {
-  // Navigate to search URL with debounce
-  let searchTimeout;
-  searchInput.addEventListener('input', function(e) {
-    const query = e.target.value.trim();
-    searchClear.style.display = query ? 'flex' : 'none';
-    
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      if (query) {
-        window.location.href = '{% url "crm:company_list" %}?search=' + encodeURIComponent(query);
-      } else {
-        window.location.href = '{% url "crm:company_list" %}';
-      }
-    }, 500); // 500ms debounce
-  });
-}
+  if (searchInput) {
+    // Navigate to search URL with debounce
+    let searchTimeout;
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.trim();
+      searchClear.style.display = query ? 'flex' : 'none';
 
-function clearSearch() {
-  searchInput.value = '';
-  searchClear.style.display = 'none';
-  window.location.href = '{% url "crm:company_list" %}';
-}
-
-// Delete Modal Functions
-let currentDeleteCompanyId = null;
-
-function openDeleteModal(companyId, companyName) {
-  currentDeleteCompanyId = companyId;
-  document.getElementById('deleteCompanyName').textContent = companyName;
-  document.getElementById('deleteModal').classList.add('show');
-}
-
-function closeDeleteModal() {
-  document.getElementById('deleteModal').classList.remove('show');
-  currentDeleteCompanyId = null;
-}
-
-function confirmDelete() {
-  if (!currentDeleteCompanyId) return;
-  
-  const companyId = currentDeleteCompanyId;
-  closeDeleteModal();
-  
-  // Optimistic UI - Animate row deletion instantly
-  const row = document.getElementById(`company-row-${companyId}`);
-  if (row) {
-    row.style.transition = 'all 0.3s ease';
-    row.style.backgroundColor = '#fee2e2';
-    row.style.transform = 'translateX(-20px)';
-    row.style.opacity = '0';
-    
-    setTimeout(() => {
-      row.remove();
-      
-      // Update company count
-      const countEl = document.querySelector('.product-count');
-      if (countEl) {
-        const match = countEl.textContent.match(/\d+/);
-        if (match) {
-          const currentCount = parseInt(match[0]);
-          const newCount = currentCount - 1;
-          countEl.textContent = `${newCount} compan${newCount !== 1 ? 'ies' : 'y'}`;
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        if (query) {
+          window.location.href = '{% url "crm:company_list" %}?search=' + encodeURIComponent(query);
+        } else {
+          window.location.href = '{% url "crm:company_list" %}';
         }
-      }
-      
-      // Show empty state if no companies left
-      const tbody = document.getElementById('companiesTableBody');
-      if (tbody && tbody.querySelectorAll('tr:not(.empty-state)').length === 0) {
-        tbody.innerHTML = `
+      }, 500); // 500ms debounce
+    });
+  }
+
+  function clearSearch() {
+    searchInput.value = '';
+    searchClear.style.display = 'none';
+    window.location.href = '{% url "crm:company_list" %}';
+  }
+
+  // Delete Modal Functions
+  let currentDeleteCompanyId = null;
+
+  function openDeleteModal(companyId, companyName) {
+    currentDeleteCompanyId = companyId;
+    document.getElementById('deleteCompanyName').textContent = companyName;
+    document.getElementById('deleteModal').classList.add('show');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    currentDeleteCompanyId = null;
+  }
+
+  function confirmDelete() {
+    if (!currentDeleteCompanyId) return;
+
+    const companyId = currentDeleteCompanyId;
+    closeDeleteModal();
+
+    // Optimistic UI - Animate row deletion instantly
+    const row = document.getElementById(`company-row-${companyId}`);
+    if (row) {
+      row.style.transition = 'all 0.3s ease';
+      row.style.backgroundColor = '#fee2e2';
+      row.style.transform = 'translateX(-20px)';
+      row.style.opacity = '0';
+
+      setTimeout(() => {
+        row.remove();
+
+        // Update company count
+        const countEl = document.querySelector('.product-count');
+        if (countEl) {
+          const match = countEl.textContent.match(/\d+/);
+          if (match) {
+            const currentCount = parseInt(match[0]);
+            const newCount = currentCount - 1;
+            countEl.textContent = `${newCount} compan${newCount !== 1 ? 'ies' : 'y'}`;
+          }
+        }
+
+        // Show empty state if no companies left
+        const tbody = document.getElementById('companiesTableBody');
+        if (tbody && tbody.querySelectorAll('tr:not(.empty-state)').length === 0) {
+          tbody.innerHTML = `
           <tr>
             <td colspan="7" class="empty-state">
               <div class="empty-state-content">
@@ -466,42 +470,42 @@ function confirmDelete() {
             </td>
           </tr>
         `;
-      }
-    }, 300);
-  }
-  
-  // Delete in background
-  fetch(`/crm/company/delete/${companyId}/`, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': getCookie('csrftoken'),
-      'Content-Type': 'application/json'
+        }
+      }, 300);
     }
-  }).catch(error => {
-    console.error('Background delete error:', error);
+
+    // Delete in background
+    fetch(`/crm/company/delete/${companyId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'Content-Type': 'application/json'
+      }
+    }).catch(error => {
+      console.error('Background delete error:', error);
+    });
+  }
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  // Close modal on ESC key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      closeDeleteModal();
+    }
   });
-}
-
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
-
-// Close modal on ESC key
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    closeDeleteModal();
-  }
-});
 </script>
 {% endblock content %}

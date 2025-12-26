@@ -463,12 +463,12 @@
   .products-table {
     font-size: 0.8125rem;
   }
-  
+
   .products-table thead th,
   .products-table tbody td {
     padding: 0.75rem;
   }
-  
+
   .product-thumbnail,
   .product-image-placeholder {
     width: 50px;
@@ -482,19 +482,19 @@
     align-items: flex-start;
     gap: 1rem;
   }
-  
+
   .search-box-modern {
     max-width: 100%;
   }
-  
+
   .table-container {
     overflow-x: auto;
   }
-  
+
   .products-table {
     min-width: 900px;
   }
-  
+
   .product-thumbnail,
   .product-image-placeholder {
     width: 40px;

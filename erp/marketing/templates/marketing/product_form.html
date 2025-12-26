@@ -3,8 +3,94 @@
 {% load marketing_tags %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}">
-<!-- No custom sortable styles needed -->
+<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v=4">
+<!-- Mobile Responsive Styles -->
+<style>
+  @media (max-width: 768px) {
+    #Product_Form_Page {
+      padding: 10px !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+    }
+
+    .form-header {
+      padding: 10px 0 !important;
+    }
+
+    .form-header h1 {
+      font-size: 1.25rem !important;
+    }
+
+    .modern-form {
+      padding: 15px !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    .form-section {
+      margin-bottom: 20px !important;
+      max-width: 100% !important;
+    }
+
+    .form-row {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 15px !important;
+    }
+
+    .form-group {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    /* CRITICAL: Form Actions Buttons */
+    .form-actions {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 10px !important;
+      padding: 15px 0 !important;
+      max-width: 100% !important;
+    }
+
+    .form-actions .btn,
+    .form-actions a,
+    .form-actions button {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      text-align: center !important;
+      display: block !important;
+      padding: 14px 20px !important;
+    }
+
+    .form-actions .btn-secondary {
+      order: 2 !important;
+    }
+
+    .form-actions .btn-primary {
+      order: 1 !important;
+    }
+
+    /* Checkbox group */
+    .checkbox-group {
+      flex-direction: column !important;
+      gap: 12px !important;
+    }
+
+    /* Attributes section */
+    .attributes-info-box {
+      flex-direction: column !important;
+    }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -194,10 +280,12 @@
     <!-- Product Attributes -->
     <div class="form-section" id="product_attributes_section">
       <div class="form-section-title">
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; width: 100%;">
+        <div
+          style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; width: 100%;">
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <span style="font-weight: 600; color: #111827;">Product Attributes</span>
-            <span style="color: #6b7280; font-weight: 400; font-size: 13px;">Additional properties like fabric type, width, length</span>
+            <span style="color: #6b7280; font-weight: 400; font-size: 13px;">Additional properties like fabric type,
+              width, length</span>
           </div>
           <button type="button" class="btn-add-attribute" onclick="addProductAttribute()">
             <i class="fa fa-plus"></i> Add Attribute
@@ -212,16 +300,12 @@
           <div class="attribute-field">
             <label class="attribute-label">Attribute Name</label>
             <input type="text" class="attribute-input" name="attribute_names[]" placeholder="e.g. Fabric Type"
-              value="{{ attr.name }}"
-              oninput="scheduleAttributeSave()"
-              required>
+              value="{{ attr.name }}" oninput="scheduleAttributeSave()" required>
           </div>
           <div class="attribute-field">
             <label class="attribute-label">Value</label>
             <input type="text" class="attribute-input" name="attribute_values[]" placeholder="e.g. Cotton"
-              value="{{ attr.value }}"
-              oninput="scheduleAttributeSave()"
-              required>
+              value="{{ attr.value }}" oninput="scheduleAttributeSave()" required>
           </div>
           <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
             <i class="fa fa-trash"></i>
@@ -240,150 +324,169 @@
 
       <div class="attributes-info-box">
         <i class="fa fa-info-circle"></i>
-        <span><strong>Product-level attributes</strong> apply to all variants. You can customize them per-variant in the variants table.</span>
+        <span><strong>Product-level attributes</strong> apply to all variants. You can customize them per-variant in the
+          variants table.</span>
       </div>
     </div>
 
     <style>
-    /* Product Attributes Modern Styles */
-    .btn-add-attribute {
-      padding: 10px 18px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
-      transition: all 0.2s ease;
-      white-space: nowrap;
-    }
-    .btn-add-attribute:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
-    }
-    .attributes-container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-top: 20px;
-    }
-    .attribute-card {
-      display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 16px;
-      padding: 16px 20px;
-      background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      transition: all 0.2s ease;
-      align-items: end;
-    }
-    .attribute-card:hover {
-      border-color: #667eea;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
-    }
-    .attribute-field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-width: 0;
-    }
-    .attribute-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .attribute-input {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 8px;
-      font-size: 14px;
-      background: white;
-      transition: all 0.2s ease;
-      box-sizing: border-box;
-    }
-    .attribute-input:focus {
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-    .attribute-input::placeholder {
-      color: #94a3b8;
-    }
-    .attribute-delete-btn {
-      width: 42px;
-      height: 42px;
-      background: white;
-      color: #94a3b8;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .attribute-delete-btn:hover {
-      background: #fef2f2;
-      border-color: #fca5a5;
-      color: #ef4444;
-    }
-    .empty-placeholder {
-      padding: 32px;
-      text-align: center;
-      color: #94a3b8;
-      background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
-      border: 2px dashed #e2e8f0;
-      border-radius: 12px;
-      margin-top: 20px;
-    }
-    .empty-placeholder i {
-      font-size: 32px;
-      margin-bottom: 12px;
-      display: block;
-      opacity: 0.6;
-    }
-    .empty-placeholder p {
-      margin: 0;
-      font-size: 14px;
-    }
-    .attributes-info-box {
-      margin-top: 20px;
-      padding: 14px 16px;
-      background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
-      border: 1px solid #bfdbfe;
-      border-left: 4px solid #3b82f6;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #1e40af;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      line-height: 1.5;
-    }
-    .attributes-info-box i {
-      color: #3b82f6;
-      margin-top: 2px;
-    }
-    @media (max-width: 768px) {
-      .attribute-card {
-        grid-template-columns: 1fr;
+      /* Product Attributes Modern Styles */
+      .btn-add-attribute {
+        padding: 10px 18px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+
+      .btn-add-attribute:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+      }
+
+      .attributes-container {
+        display: flex;
+        flex-direction: column;
         gap: 12px;
+        margin-top: 20px;
       }
-      .attribute-delete-btn {
+
+      .attribute-card {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 16px;
+        padding: 16px 20px;
+        background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        align-items: end;
+      }
+
+      .attribute-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+      }
+
+      .attribute-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .attribute-label {
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .attribute-input {
         width: 100%;
-        height: 38px;
+        padding: 12px 14px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
       }
-    }
+
+      .attribute-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .attribute-input::placeholder {
+        color: #94a3b8;
+      }
+
+      .attribute-delete-btn {
+        width: 42px;
+        height: 42px;
+        background: white;
+        color: #94a3b8;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .attribute-delete-btn:hover {
+        background: #fef2f2;
+        border-color: #fca5a5;
+        color: #ef4444;
+      }
+
+      .empty-placeholder {
+        padding: 32px;
+        text-align: center;
+        color: #94a3b8;
+        background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 2px dashed #e2e8f0;
+        border-radius: 12px;
+        margin-top: 20px;
+      }
+
+      .empty-placeholder i {
+        font-size: 32px;
+        margin-bottom: 12px;
+        display: block;
+        opacity: 0.6;
+      }
+
+      .empty-placeholder p {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .attributes-info-box {
+        margin-top: 20px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+        border: 1px solid #bfdbfe;
+        border-left: 4px solid #3b82f6;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #1e40af;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        line-height: 1.5;
+      }
+
+      .attributes-info-box i {
+        color: #3b82f6;
+        margin-top: 2px;
+      }
+
+      @media (max-width: 768px) {
+        .attribute-card {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .attribute-delete-btn {
+          width: 100%;
+          height: 38px;
+        }
+      }
     </style>
 
     <!-- Variants -->
@@ -432,7 +535,7 @@
   // ============== PRODUCT ATTRIBUTES ==============
   let attributeCounter = 0;
   let attributeSaveTimeout = null;
-  const PRODUCT_ID = {% if product %}{{ product.id }}{% else %}null{% endif %};
+  const PRODUCT_ID = {% if product %}{ { product.id } } {% else %} null{% endif %};
 
   function addProductAttribute() {
     const container = document.getElementById('product_attributes_container');
@@ -467,13 +570,13 @@
     container.appendChild(card);
     attributeCounter++;
     console.log('✅ Added attribute card');
-    
+
     // Animate the card to appear
     requestAnimationFrame(() => {
       card.style.opacity = '1';
       card.style.transform = 'translateY(0)';
     });
-    
+
     // Focus on the new name input
     const nameInput = card.querySelector('.attr-name-input');
     if (nameInput) nameInput.focus();
@@ -492,7 +595,7 @@
       console.log('🗑️ Removed attribute card');
     }
   }
-  
+
   // Schedule attribute save with debounce (500ms delay)
   function scheduleAttributeSave() {
     if (!PRODUCT_ID) {
@@ -501,30 +604,30 @@
       updateLocalProductAttributes();
       return;
     }
-    
+
     // Clear previous timeout
     if (attributeSaveTimeout) {
       clearTimeout(attributeSaveTimeout);
     }
-    
+
     // Show saving indicator
     showAttributeSaveStatus('saving');
-    
+
     // Schedule save after 500ms of no typing
     attributeSaveTimeout = setTimeout(() => {
       saveProductAttributes();
     }, 500);
   }
-  
+
   // Collect current attributes from DOM
   function collectAttributesFromDOM() {
     const attributes = [];
     const cards = document.querySelectorAll('#product_attributes_container .attribute-card');
-    
+
     cards.forEach(card => {
       const nameInput = card.querySelector('input[name="attribute_names[]"]');
       const valueInput = card.querySelector('input[name="attribute_values[]"]');
-      
+
       if (nameInput && valueInput) {
         const name = nameInput.value.trim();
         const value = valueInput.value.trim();
@@ -533,10 +636,10 @@
         }
       }
     });
-    
+
     return attributes;
   }
-  
+
   // Update local productAttributes variable for variant modal
   function updateLocalProductAttributes() {
     const attrs = collectAttributesFromDOM();
@@ -548,13 +651,13 @@
     window.product_attributes_data = JSON.stringify(attrs);
     console.log('📝 Updated local productAttributes:', attrs);
   }
-  
+
   // Save product attributes via AJAX
   async function saveProductAttributes() {
     if (!PRODUCT_ID) return;
-    
+
     const attributes = collectAttributesFromDOM();
-    
+
     try {
       const response = await fetch('/marketing/api/save_product_attributes/', {
         method: 'POST',
@@ -567,9 +670,9 @@
           attributes: attributes
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         showAttributeSaveStatus('saved');
         // Update local data for variant modal
@@ -587,7 +690,7 @@
       console.error('❌ Save error:', error);
     }
   }
-  
+
   // Show save status indicator
   function showAttributeSaveStatus(status) {
     let indicator = document.getElementById('attr_save_status');
@@ -601,10 +704,10 @@
         sectionTitle.appendChild(indicator);
       }
     }
-    
+
     if (!indicator) return;
-    
-    switch(status) {
+
+    switch (status) {
       case 'saving':
         indicator.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
         indicator.style.color = '#6b7280';
@@ -627,7 +730,7 @@
         break;
     }
   }
-  
+
   // Get CSRF token
   function getCsrfToken() {
     const name = 'csrftoken';
@@ -644,9 +747,9 @@
     }
     return cookieValue;
   }
-  
+
   // Add event listeners to existing attribute inputs on page load
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     const existingInputs = document.querySelectorAll('#product_attributes_container input');
     existingInputs.forEach(input => {
       input.addEventListener('input', scheduleAttributeSave);

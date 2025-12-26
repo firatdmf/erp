@@ -3,185 +3,283 @@
 {% load marketing_tags %}
 
 {% block css %}
-  <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v={{ request.timestamp|default:'2' }}" />
+<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v={{ request.timestamp|default:'3' }}" />
+<style>
+  /* ===== MOBILE RESPONSIVE - INLINE ===== */
+  @media (max-width: 768px) {
+
+    .ProductCreatePage,
+    #Product_Form_Page {
+      padding: 10px !important;
+    }
+
+    .ProductCreatePage h1,
+    #Product_Form_Page h1 {
+      font-size: 1.25rem !important;
+      margin-bottom: 1rem !important;
+    }
+
+    .form-section h2 {
+      font-size: 1rem !important;
+    }
+
+    /* Stack form rows */
+    .form-row {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 1rem !important;
+    }
+
+    .form-field {
+      width: 100% !important;
+    }
+
+    /* Variant table horizontal scroll */
+    #variant_table,
+    table {
+      display: block !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      width: 100% !important;
+      font-size: 0.8rem !important;
+    }
+
+    #variant_table th,
+    #variant_table td,
+    table th,
+    table td {
+      padding: 0.5rem 0.4rem !important;
+      white-space: nowrap !important;
+      min-width: 60px !important;
+    }
+
+    /* Variant component */
+    .variant_component,
+    .variant_container {
+      padding: 10px !important;
+    }
+
+    .variantCard {
+      padding: 10px !important;
+      margin-bottom: 10px !important;
+    }
+
+    .option_name input,
+    .optionValues input {
+      width: 100% !important;
+      margin-bottom: 8px !important;
+    }
+
+    /* Buttons full width */
+    .add_another_option,
+    .add_another_value,
+    #create_table_button,
+    .displayVariantJSON,
+    #add-productfile-form,
+    #product_form_submit_button,
+    button[type="submit"] {
+      width: 100% !important;
+      padding: 12px !important;
+      text-align: center !important;
+      display: block !important;
+      margin-bottom: 8px !important;
+      box-sizing: border-box !important;
+    }
+
+    /* Options section */
+    .productfile-form {
+      padding: 10px !important;
+    }
+
+    /* Grouping By dropdown */
+    select {
+      width: 100% !important;
+      padding: 10px !important;
+    }
+  }
+</style>
 {% endblock %}
 {% block content %}
-  <div class="ProductCreatePage">
-    <h1>Create Product Formm</h1>
-    <form id="product_form" method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-      
-      <div class="form-section">
-        <h2>Basic Informationnn</h2>
+<div class="ProductCreatePage">
+  <h1>Create Product Formm</h1>
+  <form id="product_form" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="form-section">
+      <h2>Basic Informationnn</h2>
+      <div class="form-field">
+        {{ form.title.label_tag }}
+        {{ form.title }}
+        {{ form.title.errors }}
+      </div>
+
+      <div class="form-field">
+        {{ form.description.label_tag }}
+        {{ form.description }}
+        {{ form.description.errors }}
+      </div>
+
+      <div class="form-row">
         <div class="form-field">
-          {{ form.title.label_tag }}
-          {{ form.title }}
-          {{ form.title.errors }}
+          {{ form.sku.label_tag }}
+          {{ form.sku }}
+          {{ form.sku.errors }}
         </div>
-        
         <div class="form-field">
-          {{ form.description.label_tag }}
-          {{ form.description }}
-          {{ form.description.errors }}
-        </div>
-        
-        <div class="form-row">
-          <div class="form-field">
-            {{ form.sku.label_tag }}
-            {{ form.sku }}
-            {{ form.sku.errors }}
-          </div>
-          <div class="form-field">
-            {{ form.barcode.label_tag }}
-            {{ form.barcode }}
-            {{ form.barcode.errors }}
-          </div>
+          {{ form.barcode.label_tag }}
+          {{ form.barcode }}
+          {{ form.barcode.errors }}
         </div>
       </div>
-      
-      <div class="form-section">
-        <h2>Pricing & Inventoryyy</h2>
-        <div class="form-row">
-          <div class="form-field">
-            {{ form.price.label_tag }}
-            {{ form.price }}
-            {{ form.price.errors }}
-          </div>
-          <div class="form-field">
-            {{ form.quantity.label_tag }}
-            {{ form.quantity }}
-            {{ form.quantity.errors }}
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-field">
-            {{ form.unit_of_weight.label_tag }}
-            {{ form.unit_of_weight }}
-            {{ form.unit_of_weight.errors }}
-          </div>
-          <div class="form-field">
-            {{ form.minimum_inventory_level.label_tag }}
-            {{ form.minimum_inventory_level }}
-            {{ form.minimum_inventory_level.errors }}
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-field">
-            {{ form.weight.label_tag }}
-            {{ form.weight }}
-            {{ form.weight.errors }}
-          </div>
-          <div class="form-field">
-            {{ form.cost.label_tag }}
-            {{ form.cost }}
-            {{ form.cost.errors }}
-          </div>
-        </div>
-      </div>
-      
-      <div class="form-section">
-        <h2>Additional Details</h2>
-        <div class="form-row">
-          <div class="form-field">
-            {{ form.vendor.label_tag }}
-            {{ form.vendor }}
-            {{ form.vendor.errors }}
-          </div>
-          <div class="form-field">
-            {{ form.primary_image.label_tag }}
-            {{ form.primary_image }}
-            {{ form.primary_image.errors }}
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-field">
-            {{ form.featured.label_tag }}
-            {{ form.featured }}
-            {{ form.featured.errors }}
-          </div>
-          <div class="form-field">
-            {{ form.selling_while_out_of_stock.label_tag }}
-            {{ form.selling_while_out_of_stock }}
-            {{ form.selling_while_out_of_stock.errors }}
-          </div>
-        </div>
-        
+    </div>
+
+    <div class="form-section">
+      <h2>Pricing & Inventoryyy</h2>
+      <div class="form-row">
         <div class="form-field">
-          {{ form.has_variants.label_tag }}
-          {{ form.has_variants }}
-          {{ form.has_variants.errors }}
+          {{ form.price.label_tag }}
+          {{ form.price }}
+          {{ form.price.errors }}
+        </div>
+        <div class="form-field">
+          {{ form.quantity.label_tag }}
+          {{ form.quantity }}
+          {{ form.quantity.errors }}
         </div>
       </div>
 
-      <div class="variant_component" id="variant_component">
-        <div class="variant_container" id="variant_container">
-          <div class="variantCard" id="variantCard_1">
-            <div class="option_name">
-              <div>Option Name</div>
-              <input type="text" placeholder="Add Option Name" name="variant_name_1" id="variant_name_1">
-            </div>
-            <div class="optionValues">
-              <div>Option Values</div>
-              <input type="text" placeholder="Add Option Value 1" name="variant_name_1_value_1" id="variant_name_1_value_1">
-              <input type="text" placeholder="Add Option Value 2" name="variant_name_1_value_2" id="variant_name_1_value_2">
-              <div class="add_another_value" id="add_another_value_3" onClick=add_another_value(this)>+ Add Another Option
-                Value</div>
-              <div id="error_message_option_value_1" class="alert"></div>
-            </div>
-          </div>
-          <div id="add_another_name_2" class="add_another_option" onClick=add_another_name(this)>+ Add Another Option
-          </div>
-          <div id="error_message_option_name" class="alert"></div>
+      <div class="form-row">
+        <div class="form-field">
+          {{ form.unit_of_weight.label_tag }}
+          {{ form.unit_of_weight }}
+          {{ form.unit_of_weight.errors }}
         </div>
-    
-    
-        <br />
-    
-        <div onClick=createTable() id="create_table_button">Create Variant Table</div>
-        <div class="displayVariantJSON" onClick=displayVariantJSON(this)>Display Variant JSON</div>
-        <br />
-    
-    
-        <table id="variant_table">
-          <!-- <button onclick=tableSubmit()>Submit</button> -->
-        </table>
-    
-        <input type="hidden" id="variant_json" name="variant_json">
-    
+        <div class="form-field">
+          {{ form.minimum_inventory_level.label_tag }}
+          {{ form.minimum_inventory_level }}
+          {{ form.minimum_inventory_level.errors }}
+        </div>
       </div>
 
-      <div id="product_files_form">
-        <h2>Product Files</h2>
-        {% comment %} ManagementForm form is used by the formset to manage the collection of forms contained in the formset. {% endcomment %}
-        {{ productfile_formset.management_form }}
-        <div id="productfile-forms">
-          {% for form in productfile_formset %}
-            <div class="productfile-form">
-              {{ form.errors }}
-              {{ form.as_p }}
-            </div>
-          {% endfor %}
+      <div class="form-row">
+        <div class="form-field">
+          {{ form.weight.label_tag }}
+          {{ form.weight }}
+          {{ form.weight.errors }}
         </div>
-        <button type="button" id="add-productfile-form">Add Another File</button>
+        <div class="form-field">
+          {{ form.cost.label_tag }}
+          {{ form.cost }}
+          {{ form.cost.errors }}
+        </div>
       </div>
-      
-      {% variant_form current_url=request.path product=product variants=variants %}
-      <button type="submit" id="product_form_submit_button">Submit</button>
-    </form>
-  </div>
-  {% block js %}
-    {% comment %} <script src="{% static 'marketing/js/product_form.js' %}"></script> {% endcomment %}
-    <script>
-      document.getElementById('add-productfile-form').addEventListener('click', function() {
-        var formIdx = document.querySelectorAll('.productfile-form').length;
-        var newForm = document.querySelector('.productfile-form').cloneNode(true);
-        newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx);
-        document.getElementById('productfile-forms').appendChild(newForm);
-      });
-    </script>
-  {% endblock %}
+    </div>
+
+    <div class="form-section">
+      <h2>Additional Details</h2>
+      <div class="form-row">
+        <div class="form-field">
+          {{ form.vendor.label_tag }}
+          {{ form.vendor }}
+          {{ form.vendor.errors }}
+        </div>
+        <div class="form-field">
+          {{ form.primary_image.label_tag }}
+          {{ form.primary_image }}
+          {{ form.primary_image.errors }}
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-field">
+          {{ form.featured.label_tag }}
+          {{ form.featured }}
+          {{ form.featured.errors }}
+        </div>
+        <div class="form-field">
+          {{ form.selling_while_out_of_stock.label_tag }}
+          {{ form.selling_while_out_of_stock }}
+          {{ form.selling_while_out_of_stock.errors }}
+        </div>
+      </div>
+
+      <div class="form-field">
+        {{ form.has_variants.label_tag }}
+        {{ form.has_variants }}
+        {{ form.has_variants.errors }}
+      </div>
+    </div>
+
+    <div class="variant_component" id="variant_component">
+      <div class="variant_container" id="variant_container">
+        <div class="variantCard" id="variantCard_1">
+          <div class="option_name">
+            <div>Option Name</div>
+            <input type="text" placeholder="Add Option Name" name="variant_name_1" id="variant_name_1">
+          </div>
+          <div class="optionValues">
+            <div>Option Values</div>
+            <input type="text" placeholder="Add Option Value 1" name="variant_name_1_value_1"
+              id="variant_name_1_value_1">
+            <input type="text" placeholder="Add Option Value 2" name="variant_name_1_value_2"
+              id="variant_name_1_value_2">
+            <div class="add_another_value" id="add_another_value_3" onClick=add_another_value(this)>+ Add Another Option
+              Value</div>
+            <div id="error_message_option_value_1" class="alert"></div>
+          </div>
+        </div>
+        <div id="add_another_name_2" class="add_another_option" onClick=add_another_name(this)>+ Add Another Option
+        </div>
+        <div id="error_message_option_name" class="alert"></div>
+      </div>
+
+
+      <br />
+
+      <div onClick=createTable() id="create_table_button">Create Variant Table</div>
+      <div class="displayVariantJSON" onClick=displayVariantJSON(this)>Display Variant JSON</div>
+      <br />
+
+
+      <table id="variant_table">
+        <!-- <button onclick=tableSubmit()>Submit</button> -->
+      </table>
+
+      <input type="hidden" id="variant_json" name="variant_json">
+
+    </div>
+
+    <div id="product_files_form">
+      <h2>Product Files</h2>
+      {% comment %} ManagementForm form is used by the formset to manage the collection of forms contained in the
+      formset. {% endcomment %}
+      {{ productfile_formset.management_form }}
+      <div id="productfile-forms">
+        {% for form in productfile_formset %}
+        <div class="productfile-form">
+          {{ form.errors }}
+          {{ form.as_p }}
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" id="add-productfile-form">Add Another File</button>
+    </div>
+
+    {% variant_form current_url=request.path product=product variants=variants %}
+    <button type="submit" id="product_form_submit_button">Submit</button>
+  </form>
+</div>
+{% block js %}
+{% comment %}
+<script src="{% static 'marketing/js/product_form.js' %}"></script> {% endcomment %}
+<script>
+  document.getElementById('add-productfile-form').addEventListener('click', function () {
+    var formIdx = document.querySelectorAll('.productfile-form').length;
+    var newForm = document.querySelector('.productfile-form').cloneNode(true);
+    newForm.innerHTML = newForm.innerHTML.replace(/__prefix__/g, formIdx);
+    document.getElementById('productfile-forms').appendChild(newForm);
+  });
+</script>
+{% endblock %}
 {% endblock %}

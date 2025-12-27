@@ -11,7 +11,8 @@
   <div class="page-header">
     <div class="header-left">
       <h1>Companies</h1>
-            <span class="product-count">{{ paginator.count|default:companies.count }} compan{{ paginator.count|default:companies.count|pluralize:"y,ies" }}</span>
+      <span class="product-count">{{ paginator.count|default:companies.count }} {% if
+        paginator.count|default:companies.count == 1 %}Company{% else %}Companies{% endif %}</span>
     </div>
     <div class="header-right">
       <a href="#" onclick="openCompanySidebar(); return false;" class="btn btn-primary">
@@ -36,6 +37,80 @@
 
   <!-- Companies Table -->
   <div class="table-container">
+    <!-- Mobile Scroll Indicator -->
+    <div class="scroll-indicator" id="scrollIndicator">
+      <i class="fa fa-arrows-left-right"></i>
+      <span>Scrollable</span>
+    </div>
+    <style>
+      .scroll-indicator {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #64748b;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        width: fit-content;
+
+      }
+
+      .scroll-indicator i {
+        font-size: 10px;
+      }
+
+      @keyframes bounce-x {
+
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+
+        50% {
+          transform: translateX(5px);
+        }
+      }
+
+      @keyframes pulse {
+
+        0%,
+        100% {
+          opacity: 1;
+        }
+
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .scroll-indicator {
+          display: inline-flex;
+        }
+
+        .table-container {
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        .products-table {
+          min-width: 700px;
+        }
+
+        /* Hide some columns on mobile */
+        .products-table th:nth-child(3),
+        .products-table td:nth-child(3),
+        .products-table th:nth-child(6),
+        .products-table td:nth-child(6) {
+          display: none;
+        }
+      }
+    </style>
     <table class="products-table">
       <thead>
         <tr>

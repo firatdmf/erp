@@ -963,7 +963,6 @@ class ProductCreate(BaseProductView, generic.CreateView):
 
 @method_decorator(login_required, name="dispatch")
 class ProductEdit(BaseProductView, generic.UpdateView):
-    template_name = "marketing/product_edit.html"
     template_name = "marketing/product_form.html"
     
     def dispatch(self, request, *args, **kwargs):

@@ -535,7 +535,7 @@
   // ============== PRODUCT ATTRIBUTES ==============
   let attributeCounter = 0;
   let attributeSaveTimeout = null;
-  const PRODUCT_ID = {% if product %}{ { product.id } } {% else %} null{% endif %};
+  const PRODUCT_ID = {% if product %}{{ product.id }}{% else %}null{% endif %};
 
   function addProductAttribute() {
     const container = document.getElementById('product_attributes_container');

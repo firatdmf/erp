@@ -95,8 +95,7 @@
           </td>
           <td>
             {% if product.quantity %}
-            <span class="product-quantity">{{ product.quantity }} {{ product.unit_of_measurement|default:"units"
-              }}</span>
+            <span class="product-quantity">{{ product.quantity }} {{ product.unit_of_measurement|default:"units"}}</span>
             {% else %}
             <span class="text-muted">0</span>
             {% endif %}

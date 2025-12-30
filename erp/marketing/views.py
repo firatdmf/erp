@@ -2341,3 +2341,66 @@ def get_product(request):
             "variant_attributes": variant_attributes_data,  # Variant-level attributes
         }
     )
+
+
+# ============================================================
+# DISCOUNT CODE API ENDPOINTS
+# İndirim kodu doğrulama ve kullanım takibi
+# ============================================================
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def validate_discount_code(request):
+    """İndirim kodunu doğrula - Next.js frontend için"""
+    from marketing.models import DiscountCode
+    
+    try:
+        data = json.loads(request.body)
+        code = data.get('code', '').strip().upper()
+        
+        if not code:
+            return JsonResponse({'success': False, 'error': 'Kod girilmedi'})
+        
+        try:
+            discount = DiscountCode.objects.get(code__iexact=code, is_active=True)
+            return JsonResponse({
+                'success': True,
+                'discount_percentage': float(discount.discount_percentage),
+                'code': discount.code
+            })
+        except DiscountCode.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Geçersiz indirim kodu'})
+            
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def increment_discount_usage(request):
+    """Başarılı siparişte kullanım sayısını artır"""
+    from marketing.models import DiscountCode
+    
+    try:
+        data = json.loads(request.body)
+        code = data.get('code', '').strip().upper()
+        
+        if code:
+            try:
+                discount = DiscountCode.objects.get(code__iexact=code, is_active=True)
+                discount.usage_count += 1
+                discount.save()
+                return JsonResponse({'success': True, 'new_count': discount.usage_count})
+            except DiscountCode.DoesNotExist:
+                pass
+        
+        return JsonResponse({'success': False, 'error': 'Kod bulunamadı'})
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+

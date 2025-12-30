@@ -648,3 +648,49 @@ class ProductReview(models.Model):
     
     def __str__(self):
         return f"{self.web_client} - {self.product.title} ({self.rating}⭐)"
+
+
+# ============================================================
+# DISCOUNT CODES
+# İndirim kodları - fenomenler için
+# ============================================================
+class DiscountCode(models.Model):
+    """İndirim kodları - influencerlara verilecek kodlar"""
+    code = models.CharField(
+        max_length=50, 
+        unique=True, 
+        verbose_name="İndirim Kodu",
+        help_text="Fenomene verilecek benzersiz kod (örn: KARVEN10)"
+    )
+    discount_percentage = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        verbose_name="İndirim Yüzdesi",
+        help_text="Yüzde olarak indirim miktarı (örn: 10.00 için %10)"
+    )
+    is_active = models.BooleanField(
+        default=True, 
+        verbose_name="Aktif",
+        help_text="Kod aktif mi?"
+    )
+    usage_count = models.PositiveIntegerField(
+        default=0, 
+        verbose_name="Kullanım Sayısı",
+        help_text="Bu kodla kaç başarılı sipariş oluşturuldu"
+    )
+    influencer_name = models.CharField(
+        max_length=100, 
+        blank=True, 
+        verbose_name="Fenomen Adı",
+        help_text="Bu kodu kullanacak fenomenin adı (opsiyonel)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "İndirim Kodu"
+        verbose_name_plural = "İndirim Kodları"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.code} ({self.discount_percentage}%)"
+

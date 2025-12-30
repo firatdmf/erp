@@ -30,4 +30,8 @@ urlpatterns = [
     path("api/link_files_to_variant/",views.link_files_to_variant,name="link_files_to_variant"),
     path("api/save_product_attributes/",views.save_product_attributes,name="save_product_attributes"),
     path("api/get_product_attributes/",views.get_product_attributes,name="get_product_attributes"),
+    # Discount code API endpoints
+    path("api/validate_discount_code/",views.validate_discount_code,name="validate_discount_code"),
+    path("api/increment_discount_usage/",views.increment_discount_usage,name="increment_discount_usage"),
 ]
+

@@ -1110,6 +1110,12 @@
       <h1 class="task-title" style="margin: 0;">{{ task.name }}</h1>
 
       <div style="display: flex; gap: 0.75rem;">
+        <button onclick="openTaskEditSidebar('{{ task.id }}')" class="action-btn"
+          style="background: #3b82f6; color: white; border-color: #3b82f6;">
+          <i class="fa fa-edit"></i>
+          Edit Task
+        </button>
+
         <button onclick="toggleStatusDropdown()" class="action-btn" style="position: relative;">
           <i class="fa fa-sync-alt"></i>
           Change Status
@@ -1678,4 +1684,6 @@
   }
 
 </script>
+
+{% include 'todo/components/task_edit_modal.html' %}
 {% endblock %}

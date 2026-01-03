@@ -232,6 +232,91 @@
 
   // Update task in DOM without page reload
   function updateTaskInDOM(taskData) {
+    // Check if we're on the task detail page
+    const isTaskDetailPage = document.querySelector('.task-detail-page') !== null;
+
+    if (isTaskDetailPage) {
+      // Update task detail page elements
+      console.log('Updating task detail page:', taskData);
+
+      // Update task title
+      const taskTitle = document.querySelector('.task-title');
+      if (taskTitle && taskData.name) {
+        taskTitle.textContent = taskData.name;
+        // Add highlight animation
+        taskTitle.style.transition = 'background-color 0.5s ease';
+        taskTitle.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        setTimeout(() => {
+          taskTitle.style.backgroundColor = '';
+        }, 1500);
+      }
+
+      // Update description
+      const descriptionEl = document.querySelector('.task-description');
+      if (descriptionEl) {
+        if (taskData.description && taskData.description.trim() !== '') {
+          descriptionEl.textContent = taskData.description;
+          descriptionEl.style.display = '';
+        } else {
+          descriptionEl.innerHTML = '<em style="color: #94a3b8;">No description added.</em>';
+        }
+        // Add highlight animation
+        descriptionEl.style.transition = 'background-color 0.5s ease';
+        descriptionEl.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        setTimeout(() => {
+          descriptionEl.style.backgroundColor = '';
+        }, 1500);
+      }
+
+      // Update priority badge in sidebar
+      const priorityBadge = document.querySelector('.priority-badge');
+      if (priorityBadge && taskData.priority) {
+        const priorityColors = {
+          'low': { bg: '#d1fae5', color: '#065f46' },
+          'medium': { bg: '#fed7aa', color: '#92400e' },
+          'high': { bg: '#fecaca', color: '#991b1b' },
+          'urgent': { bg: '#fca5a5', color: '#7f1d1d' }
+        };
+        const priorityDisplay = {
+          'low': 'Low',
+          'medium': 'Medium',
+          'high': 'High',
+          'urgent': 'Urgent'
+        };
+        const priorityStyle = priorityColors[taskData.priority] || priorityColors['medium'];
+        priorityBadge.style.background = priorityStyle.bg;
+        priorityBadge.style.color = priorityStyle.color;
+        priorityBadge.textContent = priorityDisplay[taskData.priority] || taskData.priority;
+      }
+
+      // Update due date in sidebar
+      const dueDateValue = document.querySelector('.detail-value');
+      if (dueDateValue && taskData.due_date) {
+        // Find the due date row and update it
+        const detailItems = document.querySelectorAll('.detail-item');
+        detailItems.forEach(item => {
+          const label = item.querySelector('.detail-label');
+          if (label && (label.textContent.includes('Due Date') || label.textContent.includes('Bitiş'))) {
+            const value = item.querySelector('.detail-value');
+            if (value) {
+              value.innerHTML = '<i class="fa fa-calendar-alt"></i> ' + taskData.due_date;
+              // Add highlight animation
+              value.style.transition = 'background-color 0.5s ease';
+              value.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+              value.style.borderRadius = '4px';
+              setTimeout(() => {
+                value.style.backgroundColor = '';
+              }, 1500);
+            }
+          }
+        });
+      }
+
+      console.log('✅ Task detail page updated successfully');
+      return;
+    }
+
+    // Original logic for task list/cards
     const taskElement = document.querySelector(`[data-task-id="${taskData.id}"]`);
     if (!taskElement) {
       console.log('Task element not found for ID:', taskData.id);

@@ -622,8 +622,8 @@
           {{ task.due_date|date:"Y-m-d" }}
         </td>
         <td class="actions-cell" onclick="event.stopPropagation();">
-          <button class="btn-actions" onclick="showTaskMenu({{ task.id }}, event)">
-            <i class="fa fa-ellipsis-h"></i>
+          <button class="btn-actions" onclick="openTaskEditSidebar('{{ task.id }}')" title="Edit Task">
+            <i class="fa fa-edit"></i>
           </button>
         </td>
         <!-- Hidden cells for search (not displayed but searchable) -->
@@ -659,7 +659,9 @@
     <div style="display: flex; gap: 0.5rem; align-items: center;">
       {% for num in tasks.paginator.page_range %}
       {% if tasks.number == num %}
-      <button class="filter-btn" style="background: #3b82f6; color: white; font-weight: 600; width: auto; padding: 0.5rem 0.75rem;">{{ num }}</button>
+      <button class="filter-btn"
+        style="background: #3b82f6; color: white; font-weight: 600; width: auto; padding: 0.5rem 0.75rem;">{{ num
+        }}</button>
       {% elif num > tasks.number|add:'-3' and num < tasks.number|add:'3' %} <button onclick="loadTaskPage({{ num }})"
         class="filter-btn" style="width: auto; padding: 0.5rem 0.75rem;">{{ num }}</button>
         {% endif %}

@@ -2037,7 +2037,8 @@ def get_products(request):
     products = products.select_related("primary_image", "category").prefetch_related(
         'variants',
         'variants__product_variant_attribute_values',
-        'variants__product_variant_attribute_values__product_variant_attribute'
+        'variants__product_variant_attribute_values__product_variant_attribute',
+        'attributes'  # Prefetch product attributes for discount_rate
     )
 
     # Convert to list to execute query once
@@ -2065,6 +2066,10 @@ def get_products(request):
             "sku": p.sku,
             "price": p.price,
             "primary_image": p.primary_image.file_url if p.primary_image else None,
+            "product_attributes": [
+                {"name": attr.name, "value": attr.value, "sequence": attr.sequence}
+                for attr in p.attributes.all()
+            ],
         }
         for p in products_list
     ]

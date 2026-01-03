@@ -399,13 +399,27 @@ def create_google_client(request):
         # Check if already exists
         if WebClient.objects.filter(email=email).exists():
             web_client = WebClient.objects.get(email=email)
+            
+            # If user was registered with credentials but not verified,
+            # activate them now since Google has verified the email
+            if not web_client.is_active:
+                web_client.is_active = True
+                web_client.save()
+                print(f"[GOOGLE LOGIN] Activated existing user: {email}")
+            
+            # Update name if not set
+            if not web_client.name and name:
+                web_client.name = name
+                web_client.save()
+            
             return JsonResponse({
                 'message': 'User already exists',
                 'user': {
                     'id': web_client.id,
                     'username': web_client.username,
                     'email': web_client.email,
-                    'name': web_client.name
+                    'name': web_client.name,
+                    'is_active': web_client.is_active
                 }
             }, status=200)
         

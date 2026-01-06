@@ -1,0 +1,632 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v={{ request.timestamp|default:'3' }}" />
+<style>
+    .blog-form-page {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .form-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-section h2 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+        text-align: left;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .form-input,
+    .form-textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-input:focus,
+    .form-textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .markdown-editor {
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+
+    .image-upload-section {
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .image-upload-section:hover {
+        border-color: #667eea;
+        background: #f5f3ff;
+    }
+
+    /* Prevent persistent pressed/focused appearance */
+    .image-upload-section:focus,
+    .image-upload-section:active {
+        outline: none;
+        border-color: #d1d5db;
+        background: transparent;
+    }
+
+    .image-upload-section.has-image {
+        border-style: solid;
+        border-color: #667eea;
+    }
+
+    .image-preview {
+        max-width: 300px;
+        max-height: 200px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+    .upload-icon {
+        font-size: 2rem;
+        color: #9ca3af;
+        margin-bottom: 0.5rem;
+    }
+
+    .upload-text {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+
+    /* Image preview wrapper with actions */
+    .image-preview-wrapper {
+        position: relative;
+        border: 2px solid #667eea;
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        background: #f9fafb;
+    }
+
+    .image-preview-wrapper .image-preview {
+        max-width: 100%;
+        max-height: 200px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+    }
+
+    .image-actions {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+    }
+
+    .btn-change-image,
+    .btn-delete-image {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .btn-change-image {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    .btn-change-image:hover {
+        background: #dbeafe;
+    }
+
+    .btn-delete-image {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .btn-delete-image:hover {
+        background: #fee2e2;
+    }
+
+    /* Hide file inputs completely */
+    input[type="file"] {
+        position: absolute !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .tabs {
+        display: flex;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 1rem;
+    }
+
+    .tab {
+        padding: 0.75rem 1.25rem;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        color: #6b7280;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .tab:hover {
+        color: #667eea;
+    }
+
+    .tab.active {
+        color: #667eea;
+        border-bottom-color: #667eea;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .btn-submit {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.875rem 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-cancel {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.875rem 1.5rem;
+        background: #f3f4f6;
+        color: #374151;
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        text-decoration: none;
+        margin-right: 1rem;
+        transition: all 0.2s;
+    }
+
+    .btn-cancel:hover {
+        background: #e5e7eb;
+    }
+
+    .checkbox-wrapper {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 0.5rem !important;
+        text-align: left !important;
+        width: auto !important;
+    }
+
+    .checkbox-wrapper label {
+        margin: 0 !important;
+        cursor: pointer;
+        display: inline !important;
+        width: auto !important;
+    }
+
+    .checkbox-wrapper input[type="checkbox"] {
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        display: inline-block !important;
+        margin: 0 !important;
+        flex-shrink: 0;
+    }
+
+    /* Loading state */
+    .btn-submit.loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+        .blog-form-page {
+            padding: 1rem;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .tabs {
+            overflow-x: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="blog-form-page">
+    <div class="page-header">
+        <h1><i class="fas fa-newspaper"></i> {{ page_title }}</h1>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="blogForm">
+        {% csrf_token %}
+
+        <!-- Basic Info -->
+        <div class="form-section">
+            <h2><i class="fas fa-info-circle"></i> Basic Information</h2>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="id_slug">URL Slug *</label>
+                    {{ form.slug }}
+                    {% if form.slug.errors %}
+                    <div class="error">{{ form.slug.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="id_author">Author</label>
+                    {{ form.author }}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="id_published_at">Publish Date *</label>
+                    {{ form.published_at }}
+                </div>
+
+                <div class="form-group">
+                    <label>Category (Turkish) *</label>
+                    {{ form.category_tr }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-wrapper">
+                    {{ form.is_published }}
+                    <label for="id_is_published">Publish</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Images -->
+        <div class="form-section">
+            <h2><i class="fas fa-images"></i> Images</h2>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Cover Image (for list view)</label>
+                    <div class="image-upload-container" id="coverContainer">
+                        <div class="image-upload-section" id="coverUpload" onclick="triggerUpload('cover')"
+                            style="{% if object.cover_image %}display: none;{% endif %}">
+                            <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                            <div class="upload-text">Click to upload cover image</div>
+                        </div>
+                        <div class="image-preview-wrapper" id="coverPreviewWrapper"
+                            style="{% if not object.cover_image %}display: none;{% endif %}">
+                            <img src="{{ object.cover_image|default:'' }}" class="image-preview" id="coverPreview">
+                            <div class="image-actions">
+                                <button type="button" class="btn-change-image" onclick="triggerUpload('cover')">
+                                    <i class="fas fa-sync-alt"></i> Change
+                                </button>
+                                <button type="button" class="btn-delete-image" onclick="deleteImage('cover')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="file" id="coverFileInput" accept="image/*" onchange="uploadImage(this, 'cover')">
+                    <input type="hidden" id="id_cover_image" name="cover_image"
+                        value="{{ object.cover_image|default:'' }}">
+                </div>
+
+                <div class="form-group">
+                    <label>Hero Image (for detail page)</label>
+                    <div class="image-upload-container" id="heroContainer">
+                        <div class="image-upload-section" id="heroUpload" onclick="triggerUpload('hero')"
+                            style="{% if object.hero_image %}display: none;{% endif %}">
+                            <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                            <div class="upload-text">Click to upload hero image</div>
+                        </div>
+                        <div class="image-preview-wrapper" id="heroPreviewWrapper"
+                            style="{% if not object.hero_image %}display: none;{% endif %}">
+                            <img src="{{ object.hero_image|default:'' }}" class="image-preview" id="heroPreview">
+                            <div class="image-actions">
+                                <button type="button" class="btn-change-image" onclick="triggerUpload('hero')">
+                                    <i class="fas fa-sync-alt"></i> Change
+                                </button>
+                                <button type="button" class="btn-delete-image" onclick="deleteImage('hero')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="file" id="heroFileInput" accept="image/*" onchange="uploadImage(this, 'hero')">
+                    <input type="hidden" id="id_hero_image" name="hero_image"
+                        value="{{ object.hero_image|default:'' }}">
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Tabs -->
+        <div class="form-section">
+            <h2><i class="fas fa-language"></i> Content (Multilingual)</h2>
+
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('tr')">🇹🇷 Turkish</div>
+                <div class="tab" onclick="switchTab('en')">🇬🇧 English</div>
+                <div class="tab" onclick="switchTab('ru')">🇷🇺 Russian</div>
+                <div class="tab" onclick="switchTab('pl')">🇵🇱 Polish</div>
+            </div>
+
+            <!-- Turkish Content -->
+            <div class="tab-content active" id="tab-tr">
+                <div class="form-group">
+                    <label>Title (TR) *</label>
+                    {{ form.title_tr }}
+                </div>
+                <div class="form-group">
+                    <label>Excerpt (TR) *</label>
+                    {{ form.excerpt_tr }}
+                </div>
+                <div class="form-group">
+                    <label>Content (TR) * - Markdown supported</label>
+                    {{ form.content_tr }}
+                </div>
+            </div>
+
+            <!-- English Content -->
+            <div class="tab-content" id="tab-en">
+                <div class="form-group">
+                    <label>Title (EN)</label>
+                    {{ form.title_en }}
+                </div>
+                <div class="form-group">
+                    <label>Excerpt (EN)</label>
+                    {{ form.excerpt_en }}
+                </div>
+                <div class="form-group">
+                    <label>Content (EN) - Markdown supported</label>
+                    {{ form.content_en }}
+                </div>
+                <div class="form-group">
+                    <label>Category (EN)</label>
+                    {{ form.category_en }}
+                </div>
+            </div>
+
+            <!-- Russian Content -->
+            <div class="tab-content" id="tab-ru">
+                <div class="form-group">
+                    <label>Title (RU)</label>
+                    {{ form.title_ru }}
+                </div>
+                <div class="form-group">
+                    <label>Excerpt (RU)</label>
+                    {{ form.excerpt_ru }}
+                </div>
+                <div class="form-group">
+                    <label>Content (RU) - Markdown supported</label>
+                    {{ form.content_ru }}
+                </div>
+                <div class="form-group">
+                    <label>Category (RU)</label>
+                    {{ form.category_ru }}
+                </div>
+            </div>
+
+            <!-- Polish Content -->
+            <div class="tab-content" id="tab-pl">
+                <div class="form-group">
+                    <label>Title (PL)</label>
+                    {{ form.title_pl }}
+                </div>
+                <div class="form-group">
+                    <label>Excerpt (PL)</label>
+                    {{ form.excerpt_pl }}
+                </div>
+                <div class="form-group">
+                    <label>Content (PL) - Markdown supported</label>
+                    {{ form.content_pl }}
+                </div>
+                <div class="form-group">
+                    <label>Category (PL)</label>
+                    {{ form.category_pl }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-section" style="display: flex; justify-content: flex-end;">
+            <a href="{% url 'marketing:blog_list' %}" class="btn-cancel">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <i class="fas fa-save"></i> Save
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function switchTab(lang) {
+        // Update tab buttons
+        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        document.getElementById('tab-' + lang).classList.add('active');
+    }
+
+    function triggerUpload(type) {
+        document.getElementById(type + 'FileInput').click();
+    }
+
+    async function uploadImage(input, type) {
+        if (!input.files || !input.files[0]) return;
+
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', type);
+        formData.append('slug', document.getElementById('id_slug').value || 'temp');
+
+        // Show loading state on upload section
+        const uploadSection = document.getElementById(type + 'Upload');
+        const previewWrapper = document.getElementById(type + 'PreviewWrapper');
+
+        uploadSection.style.display = 'block';
+        uploadSection.innerHTML = '<div class="upload-icon"><i class="fas fa-spinner fa-spin"></i></div><div class="upload-text">Uploading...</div>';
+        previewWrapper.style.display = 'none';
+
+        try {
+            const response = await fetch('{% url "marketing:upload_blog_image" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update the hidden input
+                document.getElementById('id_' + type + '_image').value = data.url;
+
+                // Show preview with actions
+                uploadSection.style.display = 'none';
+                previewWrapper.style.display = 'block';
+                document.getElementById(type + 'Preview').src = data.url;
+            } else {
+                alert('Failed to upload image: ' + data.error);
+                resetUploadSection(type);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+            resetUploadSection(type);
+        }
+    }
+
+    function resetUploadSection(type) {
+        const uploadSection = document.getElementById(type + 'Upload');
+        uploadSection.style.display = 'block';
+        uploadSection.innerHTML = '<div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div><div class="upload-text">Click to upload ' + type + ' image</div>';
+        document.getElementById(type + 'PreviewWrapper').style.display = 'none';
+    }
+
+    async function deleteImage(type) {
+        if (!confirm('Are you sure you want to delete this image?')) return;
+
+        const imageUrl = document.getElementById('id_' + type + '_image').value;
+
+        if (imageUrl) {
+            try {
+                // Call API to delete from Cloudinary
+                const response = await fetch('{% url "marketing:delete_blog_image" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ url: imageUrl })
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                    console.warn('Could not delete from Cloudinary:', data.error);
+                }
+            } catch (error) {
+                console.warn('Error deleting from Cloudinary:', error);
+            }
+        }
+
+        // Clear the hidden input and reset UI
+        document.getElementById('id_' + type + '_image').value = '';
+        resetUploadSection(type);
+    }
+
+    // Form submit with loading state
+    document.getElementById('blogForm').addEventListener('submit', function () {
+        const btn = document.getElementById('submitBtn');
+        btn.classList.add('loading');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    });
+</script>
+{% endblock %}

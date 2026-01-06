@@ -694,3 +694,122 @@ class DiscountCode(models.Model):
     def __str__(self):
         return f"{self.code} ({self.discount_percentage}%)"
 
+
+# ============================================================
+# BLOG POSTS
+# Blog yazıları - çok dilli destek ile
+# ============================================================
+class BlogPost(models.Model):
+    """Blog post with multilingual support"""
+    
+    slug = models.SlugField(max_length=200, unique=True, help_text="URL-friendly identifier")
+    
+    # Multilingual Title
+    title_tr = models.CharField(max_length=300, verbose_name="Başlık (TR)")
+    title_en = models.CharField(max_length=300, blank=True, verbose_name="Title (EN)")
+    title_ru = models.CharField(max_length=300, blank=True, verbose_name="Заголовок (RU)")
+    title_pl = models.CharField(max_length=300, blank=True, verbose_name="Tytuł (PL)")
+    
+    # Multilingual Excerpt (short description for list view)
+    excerpt_tr = models.TextField(verbose_name="Özet (TR)")
+    excerpt_en = models.TextField(blank=True, verbose_name="Excerpt (EN)")
+    excerpt_ru = models.TextField(blank=True, verbose_name="Краткое описание (RU)")
+    excerpt_pl = models.TextField(blank=True, verbose_name="Streszczenie (PL)")
+    
+    # Multilingual Content (Markdown format)
+    content_tr = models.TextField(verbose_name="İçerik (TR)")
+    content_en = models.TextField(blank=True, verbose_name="Content (EN)")
+    content_ru = models.TextField(blank=True, verbose_name="Содержание (RU)")
+    content_pl = models.TextField(blank=True, verbose_name="Treść (PL)")
+    
+    # Multilingual Category
+    category_tr = models.CharField(max_length=100, verbose_name="Kategori (TR)")
+    category_en = models.CharField(max_length=100, blank=True, verbose_name="Category (EN)")
+    category_ru = models.CharField(max_length=100, blank=True, verbose_name="Категория (RU)")
+    category_pl = models.CharField(max_length=100, blank=True, verbose_name="Kategoria (PL)")
+    
+    # Images (Cloudinary URLs)
+    cover_image = models.URLField(blank=True, verbose_name="Kapak Resmi (Liste)")
+    hero_image = models.URLField(blank=True, verbose_name="Hero Resmi (Detay)")
+    
+    # Meta
+    author = models.CharField(max_length=200, default='Karven Home Collection')
+    published_at = models.DateField(verbose_name="Yayın Tarihi")
+    is_published = models.BooleanField(default=False, verbose_name="Yayında mı?")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-published_at']
+        verbose_name = "Blog Yazısı"
+        verbose_name_plural = "Blog Yazıları"
+    
+    def __str__(self):
+        return self.title_tr
+    
+    def delete(self, *args, **kwargs):
+        """Delete cover and hero images from Cloudinary when deleting the post"""
+        for image_url in [self.cover_image, self.hero_image]:
+            if image_url and 'cloudinary.com' in image_url:
+                match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", image_url)
+                if match:
+                    public_id = match.group(1)
+                    try:
+                        cloudinary_destroy(public_id)
+                    except Exception as e:
+                        print(f"Failed to delete Cloudinary resource {public_id}: {e}")
+        super().delete(*args, **kwargs)
+
+
+class BlogFile(models.Model):
+    """Blog post images - stored on Cloudinary"""
+    
+    blog_post = models.ForeignKey(
+        BlogPost,
+        on_delete=models.CASCADE,
+        related_name='files',
+        null=False,
+        blank=False
+    )
+    
+    # Cloudinary URL
+    file_url = models.URLField(blank=True, null=True)
+    
+    # File type: 'cover', 'hero', 'content'
+    FILE_TYPE_CHOICES = [
+        ('cover', 'Kapak Resmi'),
+        ('hero', 'Hero Resmi'),
+        ('content', 'İçerik Resmi'),
+    ]
+    file_type = models.CharField(
+        max_length=20,
+        choices=FILE_TYPE_CHOICES,
+        default='content'
+    )
+    
+    # Alt text for accessibility
+    alt_text = models.CharField(max_length=255, blank=True)
+    
+    sequence = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['sequence', 'pk']
+        verbose_name = "Blog Dosyası"
+        verbose_name_plural = "Blog Dosyaları"
+    
+    def delete(self, *args, **kwargs):
+        """Delete from Cloudinary when deleting the record"""
+        if self.file_url:
+            match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", self.file_url)
+            if match:
+                public_id = match.group(1)
+                try:
+                    cloudinary_destroy(public_id)
+                except Exception as e:
+                    print(f"Failed to delete Cloudinary resource {public_id}: {e}")
+        super().delete(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.blog_post.title_tr} - {self.file_type}"

@@ -87,3 +87,50 @@ ProductFileFormSet = inlineformset_factory(
     Product, ProductFile, form=ProductFileForm, extra=1, can_delete=True
 )
 
+
+# ============================================================
+# BLOG FORMS
+# ============================================================
+class BlogPostForm(forms.ModelForm):
+    class Meta:
+        model = BlogPost
+        fields = [
+            'slug', 'author', 'published_at', 'is_published',
+            'title_tr', 'title_en', 'title_ru', 'title_pl',
+            'excerpt_tr', 'excerpt_en', 'excerpt_ru', 'excerpt_pl',
+            'content_tr', 'content_en', 'content_ru', 'content_pl',
+            'category_tr', 'category_en', 'category_ru', 'category_pl',
+            # cover_image and hero_image handled manually in template via hidden inputs
+        ]
+        widgets = {
+            'slug': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'url-friendly-slug'}),
+            'author': forms.TextInput(attrs={'class': 'form-input'}),
+            'published_at': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
+            'title_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Türkçe Başlık'}),
+            'title_en': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'English Title'}),
+            'title_ru': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Русский заголовок'}),
+            'title_pl': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Polski tytuł'}),
+            'excerpt_tr': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'excerpt_en': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'excerpt_ru': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'excerpt_pl': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'content_tr': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
+            'content_en': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
+            'content_ru': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
+            'content_pl': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
+            'category_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategori'}),
+            'category_en': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Category'}),
+            'category_ru': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Категория'}),
+            'category_pl': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategoria'}),
+        }
+
+
+class BlogFileForm(forms.ModelForm):
+    class Meta:
+        model = BlogFile
+        fields = ['file_url', 'file_type', 'alt_text', 'sequence']
+
+
+BlogFileFormSet = inlineformset_factory(
+    BlogPost, BlogFile, form=BlogFileForm, extra=1, can_delete=True
+)

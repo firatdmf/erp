@@ -1,0 +1,383 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+    .blog-list-page {
+        padding: 2rem;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .btn-create {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .btn-create:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        color: white !important;
+    }
+
+    .blog-table {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .blog-table th {
+        background: #f9fafb;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #374151;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .blog-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+    }
+
+    .blog-table tr:hover {
+        background: #f9fafb;
+    }
+
+    .blog-cover {
+        width: 80px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: 6px;
+        background: #e5e7eb;
+    }
+
+    .blog-title {
+        font-weight: 500;
+        color: #1f2937;
+    }
+
+    .blog-slug {
+        font-size: 0.75rem;
+        color: #6b7280;
+        font-family: monospace;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .status-published {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-draft {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-action {
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.15s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-edit {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    .btn-edit:hover {
+        background: #dbeafe;
+    }
+
+    .btn-delete {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .btn-delete:hover {
+        background: #fee2e2;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #6b7280;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: #d1d5db;
+    }
+
+    /* Delete Modal */
+    .delete-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+    }
+
+    .delete-modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .delete-modal {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+        transform: scale(0.9);
+        transition: transform 0.2s ease;
+    }
+
+    .delete-modal-overlay.active .delete-modal {
+        transform: scale(1);
+    }
+
+    .delete-modal-icon {
+        font-size: 3rem;
+        color: #ef4444;
+        margin-bottom: 1rem;
+    }
+
+    .delete-modal h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 0.5rem;
+    }
+
+    .delete-modal p {
+        color: #6b7280;
+        margin-bottom: 1.5rem;
+    }
+
+    .delete-modal-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+    }
+
+    .btn-modal-cancel {
+        padding: 0.75rem 1.5rem;
+        background: #f3f4f6;
+        color: #374151;
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-modal-cancel:hover {
+        background: #e5e7eb;
+    }
+
+    .btn-modal-delete {
+        padding: 0.75rem 1.5rem;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-modal-delete:hover {
+        background: #dc2626;
+    }
+
+    /* HTMX loading indicator */
+    .htmx-request .btn-modal-delete {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .htmx-request .btn-modal-delete::after {
+        content: '...';
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="blog-list-page">
+    <div class="page-header">
+        <h1><i class="fas fa-newspaper"></i> Blog Posts</h1>
+        <a href="{% url 'marketing:blog_create' %}" class="btn-create">
+            <i class="fas fa-plus"></i> New Blog Post
+        </a>
+    </div>
+
+    <table class="blog-table" id="blogTable">
+        <thead>
+            <tr>
+                <th>Cover</th>
+                <th>Title</th>
+                <th>Category</th>
+                <th>Published</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for post in blog_posts %}
+            <tr id="blog-row-{{ post.pk }}">
+                <td>
+                    {% if post.cover_image %}
+                    <img src="{{ post.cover_image }}" alt="{{ post.title_tr }}" class="blog-cover">
+                    {% else %}
+                    <div class="blog-cover" style="display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-image" style="color: #9ca3af;"></i>
+                    </div>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="blog-title">{{ post.title_tr }}</div>
+                    <div class="blog-slug">/{{ post.slug }}</div>
+                </td>
+                <td>{{ post.category_tr }}</td>
+                <td>{{ post.published_at|date:"M d, Y" }}</td>
+                <td>
+                    {% if post.is_published %}
+                    <span class="status-badge status-published">Published</span>
+                    {% else %}
+                    <span class="status-badge status-draft">Draft</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="actions">
+                        <a href="{% url 'marketing:blog_edit' post.pk %}" class="btn-action btn-edit">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <button type="button" class="btn-action btn-delete"
+                            onclick="showDeleteModal({{ post.pk }}, '{{ post.title_tr|escapejs }}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">
+                    <div class="empty-state">
+                        <i class="fas fa-newspaper"></i>
+                        <p>No blog posts yet.</p>
+                        <a href="{% url 'marketing:blog_create' %}" class="btn-create"
+                            style="display: inline-flex; margin-top: 1rem;">
+                            <i class="fas fa-plus"></i> Create your first blog post
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="delete-modal-overlay" id="deleteModal">
+    <div class="delete-modal">
+        <div class="delete-modal-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>Delete Blog Post?</h3>
+        <p>Are you sure you want to delete "<span id="deletePostTitle"></span>"? This action cannot be undone.</p>
+        <div class="delete-modal-actions">
+            <button type="button" class="btn-modal-cancel" onclick="hideDeleteModal()">Cancel</button>
+            <button type="button" class="btn-modal-delete" id="confirmDeleteBtn" hx-delete="" hx-target=""
+                hx-swap="outerHTML swap:0.2s" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                onclick="hideDeleteModal()">
+                Delete
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let deletePostId = null;
+
+    function showDeleteModal(postId, postTitle) {
+        deletePostId = postId;
+        document.getElementById('deletePostTitle').textContent = postTitle;
+        document.getElementById('deleteModal').classList.add('active');
+
+        // Update HTMX attributes for the delete button
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        deleteBtn.setAttribute('hx-delete', '{% url "marketing:blog_delete" 0 %}'.replace('0', postId));
+        deleteBtn.setAttribute('hx-target', '#blog-row-' + postId);
+
+        // Re-process HTMX attributes
+        htmx.process(deleteBtn);
+    }
+
+    function hideDeleteModal() {
+        document.getElementById('deleteModal').classList.remove('active');
+        deletePostId = null;
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            hideDeleteModal();
+        }
+    });
+
+    // Close modal on overlay click
+    document.getElementById('deleteModal').addEventListener('click', function (e) {
+        if (e.target === this) {
+            hideDeleteModal();
+        }
+    });
+</script>
+{% endblock %}

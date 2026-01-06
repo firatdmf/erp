@@ -2409,3 +2409,258 @@ def increment_discount_usage(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
+
+# ============================================================
+# BLOG VIEWS
+# Blog yönetimi - liste, oluşturma, düzenleme, silme
+# ============================================================
+from .models import BlogPost, BlogFile
+from .forms import BlogPostForm, BlogFileFormSet
+
+
+class BlogList(generic.ListView):
+    """Blog list view"""
+    model = BlogPost
+    template_name = "marketing/blog_list.html"
+    context_object_name = "blog_posts"
+    paginate_by = 20
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search_query = self.request.GET.get('search', '').strip()
+        
+        if search_query:
+            queryset = queryset.filter(
+                models.Q(title_tr__icontains=search_query) |
+                models.Q(title_en__icontains=search_query) |
+                models.Q(slug__icontains=search_query)
+            )
+        
+        return queryset.order_by('-published_at')
+
+
+class BlogCreate(generic.CreateView):
+    """Blog create view"""
+    model = BlogPost
+    form_class = BlogPostForm
+    template_name = "marketing/blog_form.html"
+    
+    def get_success_url(self):
+        return reverse('marketing:blog_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = 'New Blog Post'
+        context['is_edit'] = False
+        return context
+    
+    def form_valid(self, form):
+        # Save the form first to get the object
+        self.object = form.save(commit=False)
+        
+        # Manually handle cover_image and hero_image from hidden inputs
+        cover_image = self.request.POST.get('cover_image', '')
+        hero_image = self.request.POST.get('hero_image', '')
+        
+        if cover_image:
+            self.object.cover_image = cover_image
+        if hero_image:
+            self.object.hero_image = hero_image
+        
+        self.object.save()
+        return redirect(self.get_success_url())
+
+
+class BlogEdit(generic.UpdateView):
+    """Blog edit view"""
+    model = BlogPost
+    form_class = BlogPostForm
+    template_name = "marketing/blog_form.html"
+    
+    def get_success_url(self):
+        return reverse('marketing:blog_list')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f'Edit: {self.object.title_tr}'
+        context['is_edit'] = True
+        return context
+    
+    def form_valid(self, form):
+        # Save the form first to get the object
+        self.object = form.save(commit=False)
+        
+        # Manually handle cover_image and hero_image from hidden inputs
+        cover_image = self.request.POST.get('cover_image', '')
+        hero_image = self.request.POST.get('hero_image', '')
+        
+        # Update images if provided (empty string means keep existing)
+        if cover_image:
+            self.object.cover_image = cover_image
+        if hero_image:
+            self.object.hero_image = hero_image
+        
+        self.object.save()
+        return redirect(self.get_success_url())
+
+
+class BlogDelete(generic.DeleteView):
+    """Blog delete view - supports HTMX"""
+    model = BlogPost
+    template_name = "marketing/blog_confirm_delete.html"
+    
+    def get_success_url(self):
+        return reverse('marketing:blog_list')
+    
+    def delete(self, request, *args, **kwargs):
+        """Handle DELETE request - for HTMX, return empty response to remove row"""
+        self.object = self.get_object()
+        self.object.delete()
+        
+        # Check if this is an HTMX request
+        if request.headers.get('HX-Request'):
+            # Return empty response - HTMX will remove the target element
+            return HttpResponse('')
+        
+        # Regular request - redirect to list
+        return redirect(self.get_success_url())
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def upload_blog_image(request):
+    """Upload image to Cloudinary for blog - returns URL"""
+    try:
+        if 'file' not in request.FILES:
+            return JsonResponse({'success': False, 'error': 'No file provided'}, status=400)
+        
+        file = request.FILES['file']
+        image_type = request.POST.get('type', 'content')  # cover, hero, or content
+        blog_slug = request.POST.get('slug', 'temp')
+        
+        # Upload to Cloudinary
+        folder = f"media/blog/{blog_slug}"
+        result = cloudinary_upload(
+            file,
+            folder=folder,
+            resource_type="image",
+        )
+        
+        url = result.get('secure_url')
+        
+        return JsonResponse({
+            'success': True,
+            'url': url,
+            'type': image_type
+        })
+        
+    except CloudinaryError as e:
+        return JsonResponse({'success': False, 'error': f'Cloudinary error: {str(e)}'}, status=500)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def delete_blog_image(request):
+    """Delete image from Cloudinary"""
+    try:
+        import json
+        data = json.loads(request.body)
+        url = data.get('url', '')
+        
+        if not url:
+            return JsonResponse({'success': False, 'error': 'No URL provided'}, status=400)
+        
+        # Extract public_id from Cloudinary URL
+        if 'cloudinary.com' in url:
+            try:
+                # Get the path after /upload/
+                parts = url.split('/upload/')
+                if len(parts) > 1:
+                    path = parts[1]
+                    # Remove version prefix (v1234567890/) if present
+                    if path.startswith('v') and '/' in path:
+                        path = path.split('/', 1)[1]
+                    # Remove file extension
+                    public_id = path.rsplit('.', 1)[0]
+                    
+                    # Delete from Cloudinary
+                    from cloudinary import uploader as cloudinary_uploader
+                    result = cloudinary_uploader.destroy(public_id)
+                    
+                    if result.get('result') == 'ok':
+                        return JsonResponse({'success': True})
+                    else:
+                        return JsonResponse({'success': False, 'error': f'Cloudinary: {result}'})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f'Parse error: {str(e)}'})
+        
+        return JsonResponse({'success': False, 'error': 'Not a Cloudinary URL'})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def get_blog_posts(request):
+    """API: Get all published blog posts for frontend"""
+    posts = BlogPost.objects.filter(is_published=True).order_by('-published_at')
+    
+    data = []
+    for post in posts:
+        data.append({
+            'slug': post.slug,
+            'title_tr': post.title_tr,
+            'title_en': post.title_en or post.title_tr,
+            'title_ru': post.title_ru or post.title_tr,
+            'title_pl': post.title_pl or post.title_tr,
+            'excerpt_tr': post.excerpt_tr,
+            'excerpt_en': post.excerpt_en or post.excerpt_tr,
+            'excerpt_ru': post.excerpt_ru or post.excerpt_tr,
+            'excerpt_pl': post.excerpt_pl or post.excerpt_tr,
+            'category_tr': post.category_tr,
+            'category_en': post.category_en or post.category_tr,
+            'category_ru': post.category_ru or post.category_tr,
+            'category_pl': post.category_pl or post.category_tr,
+            'cover_image': post.cover_image,
+            'published_at': post.published_at.isoformat(),
+            'author': post.author,
+        })
+    
+    return JsonResponse({'posts': data})
+
+
+@csrf_exempt
+def get_blog_post(request, slug):
+    """API: Get single blog post by slug for frontend"""
+    try:
+        post = BlogPost.objects.get(slug=slug, is_published=True)
+    except BlogPost.DoesNotExist:
+        return JsonResponse({'error': 'Post not found'}, status=404)
+    
+    data = {
+        'slug': post.slug,
+        'title_tr': post.title_tr,
+        'title_en': post.title_en or post.title_tr,
+        'title_ru': post.title_ru or post.title_tr,
+        'title_pl': post.title_pl or post.title_tr,
+        'excerpt_tr': post.excerpt_tr,
+        'excerpt_en': post.excerpt_en or post.excerpt_tr,
+        'excerpt_ru': post.excerpt_ru or post.excerpt_tr,
+        'excerpt_pl': post.excerpt_pl or post.excerpt_tr,
+        'content_tr': post.content_tr,
+        'content_en': post.content_en or post.content_tr,
+        'content_ru': post.content_ru or post.content_tr,
+        'content_pl': post.content_pl or post.content_tr,
+        'category_tr': post.category_tr,
+        'category_en': post.category_en or post.category_tr,
+        'category_ru': post.category_ru or post.category_tr,
+        'category_pl': post.category_pl or post.category_tr,
+        'cover_image': post.cover_image,
+        'hero_image': post.hero_image,
+        'published_at': post.published_at.isoformat(),
+        'author': post.author,
+    }
+    
+    return JsonResponse(data)

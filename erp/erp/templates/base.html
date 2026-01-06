@@ -423,6 +423,12 @@
                   <span>Order</span>
                 </a>
               </li>
+              <li>
+                <a href="{% url 'marketing:blog_create' %}">
+                  <i class="fas fa-newspaper" aria-hidden="true"></i>
+                  <span>Blog</span>
+                </a>
+              </li>
             </ul>
           </div>
         </div>
@@ -490,7 +496,7 @@
           <i class="fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
           <span class="link-text">Marketing</span>
         </a>
-        <div id="marketingExpanded">
+        <div id="marketingExpanded" style="max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-bullseye" aria-hidden="true"></i>
             <h2>Marketing</h2>
@@ -525,6 +531,23 @@
                 <a href="{% url 'crm:contact_list' %}">
                   <i class="fas fa-users" aria-hidden="true"></i>
                   <span>Contacts</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="add-menu-section">
+            <h3>Blog</h3>
+            <ul>
+              <li>
+                <a href="{% url 'marketing:blog_create' %}">
+                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                  <span>Create Blog Post</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'marketing:blog_list' %}">
+                  <i class="fas fa-newspaper" aria-hidden="true"></i>
+                  <span>Blog List</span>
                 </a>
               </li>
             </ul>

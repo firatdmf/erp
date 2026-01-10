@@ -23,6 +23,59 @@ from .models import (
 from .forms import ProductForm, ProductFileFormSet
 from cloudinary.uploader import upload as cloudinary_upload
 from cloudinary.exceptions import Error as CloudinaryError
+from django.conf import settings as django_settings
+
+# Bunny CDN support
+from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
+
+
+def smart_upload(file, folder, resource_type="image"):
+    """
+    Smart upload function that uses Bunny CDN when enabled, otherwise Cloudinary.
+    Returns: URL of the uploaded file
+    """
+    use_bunny = getattr(django_settings, 'USE_BUNNY_CDN', False)
+    print(f"[DEBUG] smart_upload called - USE_BUNNY_CDN={use_bunny}")
+    
+    if use_bunny:
+        # Use Bunny CDN
+        # Extract filename from file object
+        filename = getattr(file, 'name', 'image.jpg')
+        path = f"{folder}/{filename}"
+        print(f"[DEBUG] Uploading to Bunny CDN: {path}")
+        return upload_to_bunny(file, path)
+    else:
+        # Use Cloudinary
+        print(f"[DEBUG] Uploading to Cloudinary: {folder}")
+        result = cloudinary_upload(file, folder=folder, resource_type=resource_type)
+        return result.get('secure_url')
+
+
+def smart_delete(url):
+    """
+    Smart delete function that detects storage type from URL and deletes accordingly.
+    """
+    if not url:
+        return False
+    
+    bunny_cdn_url = getattr(django_settings, 'BUNNY_CDN_URL', '')
+    
+    if bunny_cdn_url and url.startswith(bunny_cdn_url):
+        # Delete from Bunny CDN
+        return delete_from_bunny(url)
+    elif 'cloudinary.com' in url:
+        # Delete from Cloudinary
+        import re
+        from cloudinary import uploader as cloudinary_uploader
+        match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", url)
+        if match:
+            public_id = match.group(1)
+            try:
+                result = cloudinary_uploader.destroy(public_id)
+                return result.get('result') == 'ok'
+            except Exception:
+                return False
+    return False
 
 
 # ----------------------------------------------
@@ -267,10 +320,7 @@ class BaseProductView(ModelFormMixin):
             for index, file_obj in enumerate(self.request.FILES.getlist("no_variant_file")):
                 try:
                     folder = f"media/product_images/product_{product.sku}"
-                    upload_result = cloudinary_upload(
-                        file_obj, folder=folder, resource_type="image"
-                    )
-                    url = upload_result.get("secure_url")
+                    url = smart_upload(file_obj, folder)
                     if url:
                         product_file = ProductFile.objects.create(
                             product=product,
@@ -279,9 +329,9 @@ class BaseProductView(ModelFormMixin):
                             sequence=index,
                         )
                         uploaded_files.append(product_file)
-                except CloudinaryError:
+                except Exception as e:
                     print(
-                        f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
+                        f"There was a CDN error in uploading file: {file_obj}, error: {e}"
                     )
                     continue
             
@@ -754,10 +804,7 @@ class BaseProductView(ModelFormMixin):
         for index, file_obj in enumerate(self.request.FILES.getlist("no_variant_file")):
             try:
                 folder = f"media/product_images/product_{self.object.sku}"
-                upload_result = cloudinary_upload(
-                    file_obj, folder=folder, resource_type="image"
-                )
-                url = upload_result.get("secure_url")
+                url = smart_upload(file_obj, folder)
                 if url:
                     product_file = ProductFile.objects.create(
                         product=self.object,
@@ -767,7 +814,7 @@ class BaseProductView(ModelFormMixin):
                     )
                     uploaded_main_files.append(product_file)
                     print(f"Uploaded main product file {product_file.pk} with variants")
-            except CloudinaryError:
+            except Exception as e:
                 print(
                     f"There was a cloudinary error in uploading file: {file_obj}, but we will continue"
                 )
@@ -911,10 +958,7 @@ class ProductCreate(BaseProductView, generic.CreateView):
                 if primary_image_file:
                     try:
                         folder = f"media/product_images/product_{self.object.sku}"
-                        upload_result = cloudinary_upload(
-                            primary_image_file, folder=folder, resource_type="image"
-                        )
-                        url = upload_result.get("secure_url")
+                        url = smart_upload(primary_image_file, folder)
                         if url:
                             product_file = ProductFile.objects.create(
                                 product=self.object,
@@ -923,8 +967,8 @@ class ProductCreate(BaseProductView, generic.CreateView):
                             )
                             self.object.primary_image = product_file
                             self.object.save()
-                    except CloudinaryError as e:
-                        print(f"Cloudinary error uploading primary image: {e}")
+                    except Exception as e:
+                        print(f"CDN error uploading primary image: {e}")
                 
                 # Handle variants from sidebar
                 variants_json = self.request.POST.get("variants_json", "[]")
@@ -1239,24 +1283,19 @@ def instant_upload_file(request):
             except ProductVariant.DoesNotExist:
                 return JsonResponse({'success': False, 'error': 'Variant not found'}, status=404)
         
-        # Upload to Cloudinary
+        # Upload to CDN (Bunny or Cloudinary)
         try:
             folder = f"media/product_images/product_{product.sku}"
             if variant:
                 folder = f"{folder}/variant_{variant.variant_sku}"
             
-            upload_result = cloudinary_upload(
-                file,
-                folder=folder,
-                resource_type="image"
-            )
-            file_url = upload_result.get('secure_url')
+            file_url = smart_upload(file, folder)
             
             if not file_url:
-                return JsonResponse({'success': False, 'error': 'Cloudinary upload failed'}, status=500)
+                return JsonResponse({'success': False, 'error': 'CDN upload failed'}, status=500)
             
-        except CloudinaryError as e:
-            return JsonResponse({'success': False, 'error': f'Cloudinary error: {str(e)}'}, status=500)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'CDN error: {str(e)}'}, status=500)
         
         # Get next sequence number
         if variant:
@@ -1628,14 +1667,17 @@ def temp_upload_file(request):
         variant_temp_id = request.POST.get('variant_temp_id')  # Only for variant images
         sequence = int(request.POST.get('sequence', 0))
         
-        # Upload to Cloudinary in a temporary folder
+        # Upload to CDN in a temporary folder
         folder = f"media/temp_product_files/{request.user.username}_{int(time.time())}"
-        upload_result = cloudinary_upload(file, folder=folder, resource_type="image")
+        try:
+            file_url = smart_upload(file, folder)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Upload failed: {str(e)}'}, status=500)
         
-        file_url = upload_result.get('secure_url')
-        public_id = upload_result.get('public_id')
+        # For Bunny CDN, we don't have public_id - use URL path instead
+        public_id = file_url.split('/')[-1] if file_url else None
         
-        if not file_url or not public_id:
+        if not file_url:
             return JsonResponse({'success': False, 'error': 'Upload failed'}, status=500)
         
         # Store in session
@@ -2529,7 +2571,7 @@ class BlogDelete(generic.DeleteView):
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_blog_image(request):
-    """Upload image to Cloudinary for blog - returns URL"""
+    """Upload image to CDN for blog - uses Bunny CDN if enabled, otherwise Cloudinary"""
     try:
         if 'file' not in request.FILES:
             return JsonResponse({'success': False, 'error': 'No file provided'}, status=400)
@@ -2538,15 +2580,9 @@ def upload_blog_image(request):
         image_type = request.POST.get('type', 'content')  # cover, hero, or content
         blog_slug = request.POST.get('slug', 'temp')
         
-        # Upload to Cloudinary
+        # Upload using smart_upload (Bunny CDN or Cloudinary)
         folder = f"media/blog/{blog_slug}"
-        result = cloudinary_upload(
-            file,
-            folder=folder,
-            resource_type="image",
-        )
-        
-        url = result.get('secure_url')
+        url = smart_upload(file, folder)
         
         return JsonResponse({
             'success': True,
@@ -2555,7 +2591,7 @@ def upload_blog_image(request):
         })
         
     except CloudinaryError as e:
-        return JsonResponse({'success': False, 'error': f'Cloudinary error: {str(e)}'}, status=500)
+        return JsonResponse({'success': False, 'error': f'CDN error: {str(e)}'}, status=500)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -2563,7 +2599,7 @@ def upload_blog_image(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def delete_blog_image(request):
-    """Delete image from Cloudinary"""
+    """Delete image from CDN (Bunny or Cloudinary)"""
     try:
         import json
         data = json.loads(request.body)
@@ -2572,31 +2608,13 @@ def delete_blog_image(request):
         if not url:
             return JsonResponse({'success': False, 'error': 'No URL provided'}, status=400)
         
-        # Extract public_id from Cloudinary URL
-        if 'cloudinary.com' in url:
-            try:
-                # Get the path after /upload/
-                parts = url.split('/upload/')
-                if len(parts) > 1:
-                    path = parts[1]
-                    # Remove version prefix (v1234567890/) if present
-                    if path.startswith('v') and '/' in path:
-                        path = path.split('/', 1)[1]
-                    # Remove file extension
-                    public_id = path.rsplit('.', 1)[0]
-                    
-                    # Delete from Cloudinary
-                    from cloudinary import uploader as cloudinary_uploader
-                    result = cloudinary_uploader.destroy(public_id)
-                    
-                    if result.get('result') == 'ok':
-                        return JsonResponse({'success': True})
-                    else:
-                        return JsonResponse({'success': False, 'error': f'Cloudinary: {result}'})
-            except Exception as e:
-                return JsonResponse({'success': False, 'error': f'Parse error: {str(e)}'})
+        # Use smart_delete to handle both Bunny CDN and Cloudinary
+        success = smart_delete(url)
         
-        return JsonResponse({'success': False, 'error': 'Not a Cloudinary URL'})
+        if success:
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Delete failed or file not found'})
         
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

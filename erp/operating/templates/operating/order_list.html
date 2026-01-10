@@ -427,6 +427,12 @@
               <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
                 <i class="fa fa-eye"></i> View
               </a>
+              {% if order.web_client %}
+              <a href="{% url 'operating:web_order_status' order.pk %}" class="btn-view"
+                style="background: #dbeafe; border-color: #93c5fd; margin-left: 4px;">
+                <i class="fa fa-truck"></i> Shipping
+              </a>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
@@ -553,6 +559,10 @@
             <td>
               <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
                 <i class="fa fa-eye"></i> View
+              </a>
+              <a href="{% url 'operating:web_order_status' order.pk %}" class="btn-view"
+                style="background: #dbeafe; border-color: #93c5fd; margin-left: 4px;">
+                <i class="fa fa-truck"></i> Shipping
               </a>
             </td>
           </tr>

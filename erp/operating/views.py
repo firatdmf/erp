@@ -2,6 +2,7 @@ import traceback
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import JsonResponse
 from django.views import View
+from django.contrib import messages
 from .models import (
     Order,
     OrderItemUnit,
@@ -1770,3 +1771,121 @@ class OrderAnalytics(LoginRequiredMixin, View):
         
         return render(request, self.template_name, context)
 
+
+class WebOrderStatusEdit(View):
+    """
+    Dedicated view for updating shipping status of web orders.
+    Only accessible for  orders with web_client (web orders).
+    """
+    template_name = "operating/web_order_status.html"
+    
+    def get(self, request, pk):
+        from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
+        
+        order = get_object_or_404(Order, pk=pk)
+        
+        # Only allow web orders
+        if not order.web_client and not order.is_guest_order:
+            messages.error(request, "This is not a web order.")
+            return redirect('operating:order_detail', pk=pk)
+        
+        # English status choices for admin UI
+        status_choices_en = [
+            ("pending", "Pending"),
+            ("confirmed", "Confirmed"),
+            ("preparing", "Preparing"),
+            ("shipped", "Shipped"),
+            ("in_transit", "In Transit"),
+            ("out_for_delivery", "Out for Delivery"),
+            ("delivered", "Delivered"),
+            ("cancelled", "Cancelled"),
+            ("returned", "Returned"),
+        ]
+        
+        # English carrier choices
+        carrier_choices_en = [
+            ("yurtici", "Yurtiçi Kargo"),
+            ("mng", "MNG Kargo"),
+            ("aras", "Aras Kargo"),
+            ("ptt", "PTT Kargo"),
+            ("ups", "UPS"),
+            ("other", "Other"),
+        ]
+        
+        context = {
+            'order': order,
+            'status_choices': status_choices_en,
+            'carrier_choices': carrier_choices_en,
+        }
+        return render(request, self.template_name, context)
+    
+    def post(self, request, pk):
+        from django.utils import timezone
+        
+        order = get_object_or_404(Order, pk=pk)
+        
+        # Only allow web orders
+        if not order.web_client and not order.is_guest_order:
+            messages.error(request, "This is not a web order.")
+            return redirect('operating:order_detail', pk=pk)
+        
+        # English status choices for admin UI
+        status_choices_en = [
+            ("pending", "Pending"),
+            ("confirmed", "Confirmed"),
+            ("preparing", "Preparing"),
+            ("shipped", "Shipped"),
+            ("in_transit", "In Transit"),
+            ("out_for_delivery", "Out for Delivery"),
+            ("delivered", "Delivered"),
+            ("cancelled", "Cancelled"),
+            ("returned", "Returned"),
+        ]
+        
+        # English carrier choices
+        carrier_choices_en = [
+            ("yurtici", "Yurtiçi Kargo"),
+            ("mng", "MNG Kargo"),
+            ("aras", "Aras Kargo"),
+            ("ptt", "PTT Kargo"),
+            ("ups", "UPS"),
+            ("other", "Other"),
+        ]
+        
+        # Get form data
+        new_status = request.POST.get('order_status')
+        carrier = request.POST.get('carrier')
+        tracking_number = request.POST.get('tracking_number')
+        
+        old_status = order.order_status
+        
+        # Update order fields
+        if new_status:
+            order.order_status = new_status
+            
+            # Auto-set shipped_at when status changes to shipped
+            if new_status == 'shipped' and old_status != 'shipped' and not order.shipped_at:
+                order.shipped_at = timezone.now()
+            
+            # Auto-set delivered_at when status changes to delivered
+            if new_status == 'delivered' and old_status != 'delivered' and not order.delivered_at:
+                order.delivered_at = timezone.now()
+        
+        if carrier:
+            order.carrier = carrier
+        
+        if tracking_number:
+            order.tracking_number = tracking_number
+        
+        order.save()
+        
+        status_label = dict(status_choices_en).get(new_status, new_status)
+        messages.success(request, f"Order status updated successfully: {status_label}")
+        
+        # Stay on the same page to show updated data
+        context = {
+            'order': order,
+            'status_choices': status_choices_en,
+            'carrier_choices': carrier_choices_en,
+        }
+        return render(request, self.template_name, context)

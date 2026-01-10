@@ -602,6 +602,13 @@
                     </span>
                     <div
                       style="background: #f5f3ff; padding: 0.5rem; border-radius: 6px; margin-top: 0.5rem; font-size: 0.8rem; color: #5b21b6;">
+                      {% if item.product.sku %}
+                      <div style="font-weight: 600; color: #1e40af;">🏷️ SKU: {{ item.product.sku }}</div>
+                      {% endif %}
+                      {% if item.product_variant %}
+                      <div style="font-weight: 600; color: #7c3aed;">🎨 Renk: {{ item.product_variant.variant_sku }}
+                      </div>
+                      {% endif %}
                       {% if item.custom_width and item.custom_height %}
                       <div>📏 Boyut: {{ item.custom_width }}cm x {{ item.custom_height }}cm</div>
                       {% endif %}

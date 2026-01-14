@@ -1591,10 +1591,17 @@ class OrderAnalytics(LoginRequiredMixin, View):
                 variant_price = item.product.price or Decimal('0')
             
             if item.is_custom_curtain:
-                # Custom Curtain: Profit = Qty * Fabric Amount * (Variant Price - Variant Cost)
+                # Custom Curtain Formula:
+                # Profit = Total Price - (Fabric Amount × (variant_cost + 1)) - (Total Price × 0.145)
+                # Where:
+                #   - Total Price = item.price × quantity (item_revenue)
+                #   - Fabric Amount = custom_fabric_used_meters
+                #   - variant_cost + 1 = fabric cost + labor/overhead per meter
+                #   - 0.145 = 14.5% commission (payment processor/marketplace fee)
                 fabric_amount = item.custom_fabric_used_meters or Decimal('0')
-                unit_margin = variant_price - variant_cost
-                item_profit = qty * fabric_amount * unit_margin
+                fabric_cost_with_labor = fabric_amount * (variant_cost + Decimal('1'))
+                commission = item_revenue * Decimal('0.145')
+                item_profit = item_revenue - fabric_cost_with_labor - commission
             else:
                 # Standard Item: Profit = Qty * (Sold Price - Cost)
                 unit_margin = item.price - variant_cost

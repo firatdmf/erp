@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import api_stock_update
+from . import views_csv_stock
 app_name = "marketing"
 
 
@@ -33,6 +34,9 @@ urlpatterns = [
     # Discount code API endpoints
     path("api/validate_discount_code/",views.validate_discount_code,name="validate_discount_code"),
     path("api/increment_discount_usage/",views.increment_discount_usage,name="increment_discount_usage"),
+    
+    # CSV Stock Update
+    path("api/csv_stock_update/", views_csv_stock.csv_stock_update, name="csv_stock_update"),
     
     # Blog routes
     path("blog_list/",views.BlogList.as_view(),name="blog_list"),

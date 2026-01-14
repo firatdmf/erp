@@ -1506,12 +1506,17 @@ class SalesDashboardView(View):
                     variant_price = item.product.price or Decimal('0')
                 
                 if item.is_custom_curtain:
-                    # Custom Curtain: Profit = Fabric Amount * (Variant Price - Variant Cost)
-                    # We use variant_price (list price) as the fabric selling price base
+                    # Custom Curtain Formula:
+                    # Profit = Total Price - (Fabric Amount × (variant_cost + 1)) - (Total Price × 0.145)
+                    # Where:
+                    #   - Total Price = item.price × quantity
+                    #   - Fabric Amount = custom_fabric_used_meters
+                    #   - variant_cost + 1 = fabric cost + labor/overhead per meter
+                    #   - 0.145 = 14.5% commission (payment processor/marketplace fee)
                     fabric_amount = item.custom_fabric_used_meters or Decimal('0')
-                    unit_margin = variant_price - variant_cost
-                    # User requested to multiply by quantity as well (e.g. 2 curtains of 12m each)
-                    item_profit = qty * fabric_amount * unit_margin
+                    fabric_cost_with_labor = fabric_amount * (variant_cost + Decimal('1'))
+                    commission = item_revenue * Decimal('0.145')
+                    item_profit = item_revenue - fabric_cost_with_labor - commission
                 else:
                     # Standard Item: Profit = Quantity * (Sold Price - Cost)
                     # Sold Price is item.price

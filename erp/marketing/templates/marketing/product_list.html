@@ -11,9 +11,14 @@
   <div class="page-header">
     <div class="header-left">
       <h1>Products</h1>
-      <span class="product-count">{{ paginator.count|default:products.count }} product{{ paginator.count|default:products.count|pluralize }}</span>
+      <span class="product-count">{{ paginator.count|default:products.count }}
+        product{{paginator.count|default:products.count|pluralize }}</span>
     </div>
     <div class="header-right">
+      <button type="button" class="btn btn-secondary" onclick="openCsvModal()">
+        <i class="fa fa-sync-alt"></i>
+        Update Stock
+      </button>
       <a href="{% url 'marketing:product_create' %}" class="btn btn-primary">
         <i class="fa fa-plus"></i>
         Add Product
@@ -95,14 +100,15 @@
           </td>
           <td>
             {% if product.quantity %}
-            <span class="product-quantity">{{ product.quantity }} {{ product.unit_of_measurement|default:"units"}}</span>
+            <span class="product-quantity">{{ product.quantity }} {{product.unit_of_measurement|default:"units"}}</span>
             {% else %}
             <span class="text-muted">0</span>
             {% endif %}
           </td>
           <td>
             {% if product.variant_count > 0 %}
-            <span class="badge badge-variants">{{ product.variant_count }} variant{{ product.variant_count|pluralize}}</span>
+            <span class="badge badge-variants">{{ product.variant_count }}
+              variant{{product.variant_count|pluralize}}</span>
             {% else %}
             <span class="text-muted">-</span>
             {% endif %}
@@ -208,6 +214,110 @@
     </div>
   </div>
 </div>
+
+<!-- CSV Stock Update Modal -->
+<div id="csvModal" class="csv-modal">
+  <div class="csv-modal-overlay"></div>
+  <div class="csv-modal-content">
+    <div class="csv-modal-header">
+      <div class="csv-icon-wrapper">
+        <i class="fa fa-sync-alt"></i>
+      </div>
+      <h3>Bulk Stock Update</h3>
+      <p>Upload a CSV file to update variant stock quantities</p>
+      <button type="button" class="csv-modal-close" onclick="closeCsvModal()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="csv-modal-body">
+      <form id="csvUploadForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="csv-upload-area" id="csvUploadArea">
+          <input type="file" id="csvFileInput" name="csv_file" accept=".csv" style="display: none;">
+          <div class="upload-icon">
+            <i class="fa fa-cloud-upload-alt"></i>
+          </div>
+          <p class="upload-text">Drag and drop your CSV file or</p>
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('csvFileInput').click()">
+            Choose File
+          </button>
+          <p class="upload-hint">Required columns: Kodu (SKU), Miktar (Quantity)</p>
+        </div>
+
+        <div id="csvFileName" class="csv-file-name" style="display: none;">
+          <i class="fa fa-file-csv"></i>
+          <span id="selectedFileName"></span>
+          <button type="button" class="btn-remove-file" onclick="clearCsvFile()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+      </form>
+
+      <!-- Results Area -->
+      <div id="csvResults" class="csv-results" style="display: none;">
+        <div class="results-header">
+          <i class="fa fa-check-circle"></i>
+          <span id="resultsMessage"></span>
+        </div>
+        <div class="results-stats">
+          <div class="stat-item">
+            <span class="stat-value" id="statTotal">0</span>
+            <span class="stat-label">Total Rows</span>
+          </div>
+          <div class="stat-item stat-success">
+            <span class="stat-value" id="statMatched">0</span>
+            <span class="stat-label">Matched</span>
+          </div>
+          <div class="stat-item stat-updated">
+            <span class="stat-value" id="statUpdated">0</span>
+            <span class="stat-label">Updated</span>
+          </div>
+          <div class="stat-item stat-warning">
+            <span class="stat-value" id="statNotFound">0</span>
+            <span class="stat-label">Not Found</span>
+          </div>
+        </div>
+        <div id="notFoundList" class="not-found-list" style="display: none;">
+          <p class="not-found-title">SKUs not found:</p>
+          <div id="notFoundItems"></div>
+        </div>
+
+        <!-- Updated Variants List -->
+        <div id="updatedList" class="updated-list" style="display: none;">
+          <p class="updated-title">Updated Variants:</p>
+          <div class="updated-table-wrapper">
+            <table class="updated-table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Old Qty</th>
+                  <th>New Qty</th>
+                </tr>
+              </thead>
+              <tbody id="updatedItems"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Area -->
+      <div id="csvError" class="csv-error" style="display: none;">
+        <i class="fa fa-exclamation-circle"></i>
+        <span id="errorMessage"></span>
+      </div>
+    </div>
+
+    <div class="csv-modal-footer">
+      <button type="button" class="btn btn-cancel" onclick="closeCsvModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" id="csvUploadBtn" onclick="uploadCsv()" disabled>
+        <i class="fa fa-upload"></i>
+        Upload & Update
+      </button>
+    </div>
+  </div>
+</div>
+
 
 <script>
   // Instant Search with Debounce (renamed to avoid conflict with base.html search_component)
@@ -420,8 +530,196 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       closeDeleteModal();
+      closeCsvModal();
     }
   });
+
+  // ============================================
+  // CSV Stock Update Modal Functions
+  // ============================================
+
+  function openCsvModal() {
+    resetCsvModal();
+    document.getElementById('csvModal').classList.add('show');
+  }
+
+  function closeCsvModal() {
+    const modal = document.getElementById('csvModal');
+    modal.classList.add('closing');
+    setTimeout(() => {
+      modal.classList.remove('show', 'closing');
+      resetCsvModal();
+    }, 150);
+  }
+
+  function resetCsvModal() {
+    document.getElementById('csvFileInput').value = '';
+    document.getElementById('csvFileName').style.display = 'none';
+    document.getElementById('csvUploadArea').style.display = 'flex';
+    document.getElementById('csvResults').style.display = 'none';
+    document.getElementById('csvError').style.display = 'none';
+
+    const uploadBtn = document.getElementById('csvUploadBtn');
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fa fa-upload"></i> Upload & Update';
+    uploadBtn.classList.remove('btn-success');
+    uploadBtn.onclick = uploadCsv;
+
+    // Show Cancel button again
+    document.querySelector('.csv-modal-footer .btn-cancel').style.display = '';
+  }
+
+  function clearCsvFile() {
+    document.getElementById('csvFileInput').value = '';
+    document.getElementById('csvFileName').style.display = 'none';
+    document.getElementById('csvUploadArea').style.display = 'flex';
+    document.getElementById('csvUploadBtn').disabled = true;
+    document.getElementById('csvError').style.display = 'none';
+  }
+
+  // File input change handler
+  document.getElementById('csvFileInput').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (file) {
+      document.getElementById('selectedFileName').textContent = file.name;
+      document.getElementById('csvFileName').style.display = 'flex';
+      document.getElementById('csvUploadArea').style.display = 'none';
+      document.getElementById('csvUploadBtn').disabled = false;
+      document.getElementById('csvError').style.display = 'none';
+      document.getElementById('csvResults').style.display = 'none';
+    }
+  });
+
+  // Drag and drop handlers
+  const uploadArea = document.getElementById('csvUploadArea');
+
+  uploadArea.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    this.classList.add('drag-over');
+  });
+
+  uploadArea.addEventListener('dragleave', function (e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+  });
+
+  uploadArea.addEventListener('drop', function (e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) {
+      document.getElementById('csvFileInput').files = e.dataTransfer.files;
+      document.getElementById('selectedFileName').textContent = file.name;
+      document.getElementById('csvFileName').style.display = 'flex';
+      document.getElementById('csvUploadArea').style.display = 'none';
+      document.getElementById('csvUploadBtn').disabled = false;
+    } else {
+      showCsvError('Sadece CSV dosyaları kabul edilir');
+    }
+  });
+
+  async function uploadCsv() {
+    const fileInput = document.getElementById('csvFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) {
+      showCsvError('Lütfen bir CSV dosyası seçin');
+      return;
+    }
+
+    const uploadBtn = document.getElementById('csvUploadBtn');
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading...';
+
+    document.getElementById('csvError').style.display = 'none';
+    document.getElementById('csvResults').style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('csv_file', file);
+    formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+
+    try {
+      const response = await fetch('{% url "marketing:csv_stock_update" %}', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showCsvResults(data);
+      } else {
+        showCsvError(data.error || 'Unknown error occurred');
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<i class="fa fa-upload"></i> Upload & Update';
+      }
+    } catch (error) {
+      console.error('CSV upload error:', error);
+      showCsvError('Sunucu hatası oluştu');
+      uploadBtn.disabled = false;
+      uploadBtn.innerHTML = '<i class="fa fa-upload"></i> Upload & Update';
+    }
+  }
+
+  function showCsvResults(data) {
+    const resultsDiv = document.getElementById('csvResults');
+    const uploadBtn = document.getElementById('csvUploadBtn');
+
+    document.getElementById('resultsMessage').textContent = data.message;
+    document.getElementById('statTotal').textContent = data.total_rows;
+    document.getElementById('statMatched').textContent = data.matched;
+    document.getElementById('statUpdated').textContent = data.updated;
+    document.getElementById('statNotFound').textContent = data.not_found_count;
+
+    // Show not found items if any
+    if (data.not_found && data.not_found.length > 0) {
+      const notFoundDiv = document.getElementById('notFoundList');
+      const notFoundItems = document.getElementById('notFoundItems');
+      notFoundItems.innerHTML = data.not_found.map(sku =>
+        `<span class="not-found-sku">${sku}</span>`
+      ).join('');
+      notFoundDiv.style.display = 'block';
+    } else {
+      document.getElementById('notFoundList').style.display = 'none';
+    }
+
+    // Show updated variants table
+    if (data.updated_variants && data.updated_variants.length > 0) {
+      const updatedDiv = document.getElementById('updatedList');
+      const updatedItems = document.getElementById('updatedItems');
+      updatedItems.innerHTML = data.updated_variants.map(v => `
+        <tr>
+          <td><code>${v.sku}</code></td>
+          <td class="old-value">${v.old}</td>
+          <td class="new-value">${v.new}</td>
+        </tr>
+      `).join('');
+      updatedDiv.style.display = 'block';
+    } else {
+      document.getElementById('updatedList').style.display = 'none';
+    }
+
+    resultsDiv.style.display = 'block';
+    resultsDiv.classList.add('show');
+
+    // Change button to Done and make it clickable
+    uploadBtn.innerHTML = '<i class="fa fa-check"></i> Done';
+    uploadBtn.classList.add('btn-success');
+    uploadBtn.disabled = false;
+    uploadBtn.onclick = function () {
+      closeCsvModal();
+      window.location.reload();
+    };
+
+    // Hide Cancel button after success
+    document.querySelector('.csv-modal-footer .btn-cancel').style.display = 'none';
+  }
+
+  function showCsvError(message) {
+    const errorDiv = document.getElementById('csvError');
+    document.getElementById('errorMessage').textContent = message;
+    errorDiv.style.display = 'flex';
+  }
 </script>
 
 <style>
@@ -568,6 +866,454 @@
   .delete-modal-footer .btn-danger:disabled {
     background: #fca5a5;
     cursor: not-allowed;
+  }
+
+  /* ============================================
+   * CSV Stock Update Modal Styles
+   * ============================================ */
+
+  .btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-secondary:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+  }
+
+  .csv-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .csv-modal.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .csv-modal.closing .csv-modal-content {
+    transform: scale(0.9) translateY(20px);
+    opacity: 0;
+  }
+
+  .csv-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+  }
+
+  .csv-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 16px;
+    max-width: 520px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    opacity: 0;
+    transition: all 0.15s ease;
+  }
+
+  .csv-modal.show .csv-modal-content {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  .csv-modal-header {
+    padding: 24px 24px 16px;
+    text-align: center;
+    position: relative;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .csv-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.2s;
+  }
+
+  .csv-modal-close:hover {
+    color: #374151;
+  }
+
+  .csv-icon-wrapper {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 12px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .csv-icon-wrapper i {
+    font-size: 24px;
+    color: white;
+  }
+
+  .csv-modal-header h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px;
+  }
+
+  .csv-modal-header p {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0;
+  }
+
+  .csv-modal-body {
+    padding: 24px;
+  }
+
+  .csv-upload-area {
+    border: 2px dashed #d1d5db;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .csv-upload-area:hover,
+  .csv-upload-area.drag-over {
+    border-color: #3b82f6;
+    background: #dbeafe;
+  }
+
+  .upload-icon {
+    width: 48px;
+    height: 48px;
+    background: #f3f4f6;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .upload-icon i {
+    font-size: 24px;
+    color: #6b7280;
+  }
+
+  .upload-text {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0;
+  }
+
+  .upload-hint {
+    font-size: 12px;
+    color: #9ca3af;
+    margin: 0;
+  }
+
+  .btn-outline {
+    background: white;
+    border: 1px solid #3b82f6;
+    color: #3b82f6;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-outline:hover {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .csv-file-name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: #dbeafe;
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    margin-top: 16px;
+  }
+
+  .csv-file-name i {
+    font-size: 24px;
+    color: #3b82f6;
+  }
+
+  .csv-file-name span {
+    flex: 1;
+    font-weight: 500;
+    color: #111827;
+  }
+
+  .btn-remove-file {
+    background: none;
+    border: none;
+    color: #dc2626;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 16px;
+  }
+
+  .csv-results {
+    margin-top: 20px;
+    padding: 20px;
+    background: #dbeafe;
+    border-radius: 12px;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    color: #2563eb;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .results-header i {
+    font-size: 20px;
+  }
+
+  .results-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .stat-item {
+    text-align: center;
+    padding: 12px 8px;
+    background: white;
+    border-radius: 8px;
+  }
+
+  .stat-value {
+    display: block;
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-success .stat-value {
+    color: #3b82f6;
+  }
+
+  .stat-updated .stat-value {
+    color: #3b82f6;
+  }
+
+  .stat-warning .stat-value {
+    color: #f59e0b;
+  }
+
+  .not-found-list {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #bfdbfe;
+  }
+
+  .not-found-title {
+    font-size: 12px;
+    color: #6b7280;
+    margin: 0 0 8px;
+  }
+
+  .not-found-sku {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 4px;
+    font-size: 11px;
+    margin: 2px;
+  }
+
+  /* Updated Variants Table */
+  .updated-list {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #bfdbfe;
+  }
+
+  .updated-title {
+    font-size: 12px;
+    color: #2563eb;
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+
+  .updated-table-wrapper {
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid #bfdbfe;
+  }
+
+  .updated-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .updated-table th {
+    background: #eff6ff;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #1e40af;
+    position: sticky;
+    top: 0;
+  }
+
+  .updated-table td {
+    padding: 8px 12px;
+    border-top: 1px solid #bfdbfe;
+  }
+
+  .updated-table tr:nth-child(even) {
+    background: #f9fafb;
+  }
+
+  .updated-table code {
+    background: #e5e7eb;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #1f2937;
+  }
+
+  .old-value {
+    color: #dc2626;
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+
+  .new-value {
+    color: #2563eb;
+    font-weight: 600;
+  }
+
+  .csv-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    margin-top: 16px;
+    color: #dc2626;
+    font-size: 14px;
+  }
+
+  .csv-error i {
+    font-size: 18px;
+  }
+
+  .csv-modal-footer {
+    padding: 16px 24px 24px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .csv-modal-footer .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .csv-modal-footer .btn-primary {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .csv-modal-footer .btn-primary:hover:not(:disabled) {
+    background: #2563eb;
+  }
+
+  .csv-modal-footer .btn-primary:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+  }
+
+  .csv-modal-footer .btn-success {
+    background: #3b82f6 !important;
+  }
+
+  @media (max-width: 480px) {
+    .results-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 </style>
 {% endblock content %}

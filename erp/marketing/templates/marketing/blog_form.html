@@ -421,6 +421,25 @@
                         value="{{ object.hero_image|default:'' }}">
                 </div>
             </div>
+
+            <!-- Inline Content Images -->
+            <div class="form-group" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb;">
+                <label><i class="fas fa-image"></i> Upload Image for Content (Inline)</label>
+                <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0.75rem;">
+                    Upload an image and copy the markdown code to paste into your content.
+                </p>
+                <div class="image-upload-section" id="inlineUpload" onclick="triggerUpload('inline')"
+                    style="padding: 1.5rem;">
+                    <div class="upload-icon"><i class="fas fa-plus-circle"></i></div>
+                    <div class="upload-text">Click to upload an inline image</div>
+                </div>
+                <input type="file" id="inlineFileInput" accept="image/*" onchange="uploadInlineImage(this)">
+
+                <!-- Uploaded inline images list -->
+                <div id="inlineImagesList" style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
         </div>
 
         <!-- Content Tabs -->
@@ -622,6 +641,137 @@
         resetUploadSection(type);
     }
 
+    // Inline image upload for markdown content
+    async function uploadInlineImage(input) {
+        if (!input.files || !input.files[0]) return;
+
+        const file = input.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'inline');
+        formData.append('slug', document.getElementById('id_slug').value || 'temp');
+
+        // Show loading state
+        const uploadSection = document.getElementById('inlineUpload');
+        const originalHTML = uploadSection.innerHTML;
+        uploadSection.innerHTML = '<div class="upload-icon"><i class="fas fa-spinner fa-spin"></i></div><div class="upload-text">Uploading...</div>';
+
+        try {
+            const response = await fetch('{% url "marketing:upload_blog_image" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Reset upload section
+                uploadSection.innerHTML = originalHTML;
+
+                // Add to inline images list
+                addInlineImageItem(data.url, file.name);
+
+                // Show success message
+                showToast('✅ Image uploaded! Click "Copy" to get markdown code.');
+            } else {
+                alert('Failed to upload image: ' + data.error);
+                uploadSection.innerHTML = originalHTML;
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+            uploadSection.innerHTML = originalHTML;
+        }
+
+        // Clear input for next upload
+        input.value = '';
+    }
+
+    // Add inline image item to the list
+    function addInlineImageItem(url, name) {
+        const container = document.getElementById('inlineImagesList');
+        const markdownCode = `![${name}](${url})`;
+
+        const item = document.createElement('div');
+        item.className = 'inline-image-item';
+        item.style.cssText = 'display: flex; flex-direction: column; align-items: center; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem; width: 150px;';
+
+        item.innerHTML = `
+            <img src="${url}" alt="${name}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 6px; margin-bottom: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <button type="button" onclick="copyMarkdown('${markdownCode.replace(/'/g, "\\'")}')" style="flex: 1; background: #667eea; color: white; border: none; border-radius: 4px; padding: 0.4rem; font-size: 0.75rem; cursor: pointer;">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+                <button type="button" onclick="deleteInlineImage(this, '${url}')" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 0.4rem 0.6rem; font-size: 0.75rem; cursor: pointer;">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+
+        container.appendChild(item);
+    }
+
+    // Copy markdown code to clipboard
+    function copyMarkdown(code) {
+        navigator.clipboard.writeText(code).then(() => {
+            showToast('✅ Markdown code copied! Paste it into your content.');
+        }).catch(err => {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = code;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showToast('✅ Markdown code copied!');
+        });
+    }
+
+    // Delete inline image
+    async function deleteInlineImage(btn, url) {
+        if (!confirm('Delete this image?')) return;
+
+        try {
+            const response = await fetch('{% url "marketing:delete_blog_image" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ url: url })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                btn.closest('.inline-image-item').remove();
+                showToast('🗑️ Image deleted!');
+            }
+        } catch (error) {
+            console.warn('Error deleting image:', error);
+            btn.closest('.inline-image-item').remove();
+        }
+    }
+
+    // Toast notification
+    function showToast(message) {
+        // Remove existing toast
+        const existing = document.querySelector('.blog-toast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'blog-toast';
+        toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: #1f2937; color: white; padding: 1rem 1.5rem; border-radius: 8px; font-size: 0.9rem; z-index: 9999; animation: fadeIn 0.3s ease;';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     // Form submit with loading state
     document.getElementById('blogForm').addEventListener('submit', function () {
         const btn = document.getElementById('submitBtn');
@@ -629,4 +779,30 @@
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     });
 </script>
+
+<style>
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+    }
+</style>
 {% endblock %}

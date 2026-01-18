@@ -531,6 +531,14 @@ class ProductFile(models.Model):
 
     is_primary = models.BooleanField(default=False)
     sequence = models.PositiveIntegerField(default=0)
+    
+    # File type to distinguish images from videos
+    FILE_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('video', 'Video'),
+    ]
+    file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='image')
+
 
     @property
     def optimized_url(self):
@@ -562,6 +570,33 @@ class ProductFile(models.Model):
             "/upload/w_80,h_80,c_fill,f_auto,q_auto:low/"
         )
         return urlunparse(parts._replace(path=optimized_path))
+    
+    @property
+    def video_thumbnail_url(self):
+        """
+        Returns thumbnail URL for video files (first frame).
+        Uses Cloudinary's video-to-image transformation.
+        """
+        if not self.file_url or self.file_type != 'video':
+            return None
+        
+        parts = urlparse(self.file_url)
+        # Convert video to image thumbnail (jpg from first frame)
+        # w_300 = width, h_200 = height, c_fill = crop to fill, so_0 = start offset 0 (first frame)
+        optimized_path = parts.path.replace(
+            "/upload/", 
+            "/upload/w_300,h_200,c_fill,so_0,f_jpg/"
+        )
+        # Change extension to .jpg for the thumbnail
+        if optimized_path.endswith(('.mp4', '.mov', '.webm', '.avi')):
+            optimized_path = optimized_path.rsplit('.', 1)[0] + '.jpg'
+        return urlunparse(parts._replace(path=optimized_path))
+    
+    @property
+    def is_video(self):
+        """Helper property to check if file is a video."""
+        return self.file_type == 'video'
+
 
     # only works on single delete, not bulk delete. For bulk we use signals.py
     def delete(self, *args, **kwargs):

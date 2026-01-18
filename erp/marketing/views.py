@@ -29,13 +29,21 @@ from django.conf import settings as django_settings
 from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
 
 
-def smart_upload(file, folder, resource_type="image"):
+def smart_upload(file, folder, resource_type="image", remove_audio=True):
     """
     Smart upload function that uses Bunny CDN when enabled, otherwise Cloudinary.
+    For videos, audio is removed by default to reduce file size.
+    
+    Args:
+        file: File object to upload
+        folder: Target folder path
+        resource_type: 'image' or 'video'
+        remove_audio: If True, removes audio from video files (default: True)
+    
     Returns: URL of the uploaded file
     """
     use_bunny = getattr(django_settings, 'USE_BUNNY_CDN', False)
-    print(f"[DEBUG] smart_upload called - USE_BUNNY_CDN={use_bunny}")
+    print(f"[DEBUG] smart_upload called - USE_BUNNY_CDN={use_bunny}, resource_type={resource_type}")
     
     if use_bunny:
         # Use Bunny CDN
@@ -46,9 +54,39 @@ def smart_upload(file, folder, resource_type="image"):
         return upload_to_bunny(file, path)
     else:
         # Use Cloudinary
-        print(f"[DEBUG] Uploading to Cloudinary: {folder}")
-        result = cloudinary_upload(file, folder=folder, resource_type=resource_type)
+        print(f"[DEBUG] Uploading to Cloudinary: {folder}, resource_type={resource_type}")
+        
+        # Build upload options
+        upload_options = {
+            'folder': folder,
+            'resource_type': resource_type
+        }
+        
+        # For videos, remove audio to reduce file size
+        if resource_type == 'video' and remove_audio:
+            # Cloudinary transformation to remove audio: audio_codec = none
+            upload_options['transformation'] = [{'audio_codec': 'none'}]
+            print(f"[DEBUG] Video upload with audio removal enabled")
+        
+        result = cloudinary_upload(file, **upload_options)
         return result.get('secure_url')
+
+
+def get_file_type_from_name(filename):
+    """
+    Determine if a file is an image or video based on its extension.
+    Returns: 'image' or 'video'
+    """
+    if not filename:
+        return 'image'
+    
+    filename_lower = filename.lower()
+    video_extensions = ('.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v', '.wmv')
+    
+    if filename_lower.endswith(video_extensions):
+        return 'video'
+    return 'image'
+
 
 
 def smart_delete(url):
@@ -1283,13 +1321,18 @@ def instant_upload_file(request):
             except ProductVariant.DoesNotExist:
                 return JsonResponse({'success': False, 'error': 'Variant not found'}, status=404)
         
+        # Detect file type (image or video)
+        file_type = get_file_type_from_name(file.name)
+        resource_type = file_type  # 'image' or 'video'
+        
         # Upload to CDN (Bunny or Cloudinary)
         try:
             folder = f"media/product_images/product_{product.sku}"
             if variant:
                 folder = f"{folder}/variant_{variant.variant_sku}"
             
-            file_url = smart_upload(file, folder)
+            # Pass resource_type for video uploads (audio will be removed automatically)
+            file_url = smart_upload(file, folder, resource_type=resource_type)
             
             if not file_url:
                 return JsonResponse({'success': False, 'error': 'CDN upload failed'}, status=500)
@@ -1303,13 +1346,14 @@ def instant_upload_file(request):
         else:
             max_seq = ProductFile.objects.filter(product=product, product_variant__isnull=True).aggregate(models.Max('sequence'))['sequence__max'] or -1
         
-        # Save to database
+        # Save to database with file_type
         product_file = ProductFile.objects.create(
             product=product,
             product_variant=variant,
             file_url=file_url,
             sequence=max_seq + 1,
-            is_primary=False
+            is_primary=False,
+            file_type=file_type  # 'image' or 'video'
         )
         
         # If uploading to a variant, always ensure product primary is first variant's first image
@@ -1333,9 +1377,12 @@ def instant_upload_file(request):
             'success': True,
             'file': {
                 'id': product_file.pk,
+                'pk': product_file.pk,
                 'url': file_url,
+                'file_url': file_url,
                 'sequence': product_file.sequence,
-                'is_primary': product_file.is_primary
+                'is_primary': product_file.is_primary,
+                'file_type': file_type
             }
         })
         
@@ -1501,11 +1548,15 @@ def get_product_files(request):
             
             file_list.append({
                 'id': f.pk,
+                'pk': f.pk,
                 'url': f.file_url,  # Use file_url for consistency with marketing_tags.py
+                'file_url': f.file_url,
                 'name': f.file_url.split('/')[-1],
                 'is_primary': f.is_primary,
                 'sequence': f.sequence,
-                'variant': variant_info  # NEW: Shows which variant owns this file (if any)
+                'file_type': f.file_type,  # 'image' or 'video'
+                'video_thumbnail_url': f.video_thumbnail_url if f.file_type == 'video' else None,
+                'variant': variant_info  # Shows which variant owns this file (if any)
             })
         
         return JsonResponse({
@@ -1667,10 +1718,15 @@ def temp_upload_file(request):
         variant_temp_id = request.POST.get('variant_temp_id')  # Only for variant images
         sequence = int(request.POST.get('sequence', 0))
         
+        # Detect media type (image or video)
+        media_type = get_file_type_from_name(file.name)
+        resource_type = media_type  # 'image' or 'video'
+        
         # Upload to CDN in a temporary folder
         folder = f"media/temp_product_files/{request.user.username}_{int(time.time())}"
         try:
-            file_url = smart_upload(file, folder)
+            # Pass resource_type for video uploads (audio will be removed automatically)
+            file_url = smart_upload(file, folder, resource_type=resource_type)
         except Exception as e:
             return JsonResponse({'success': False, 'error': f'Upload failed: {str(e)}'}, status=500)
         
@@ -1688,7 +1744,8 @@ def temp_upload_file(request):
             'url': file_url,
             'public_id': public_id,
             'name': file.name,
-            'sequence': sequence
+            'sequence': sequence,
+            'media_type': media_type  # 'image' or 'video'
         }
         
         if file_type == 'main_image':

@@ -223,7 +223,7 @@
         <div id="sortable_images" style="display: flex; flex-wrap: wrap; gap: 15px;">
           {% for file in product.files.all %}
           {% if not file.product_variant %}
-          <div class="sortable-image" data-file-id="{{ file.pk }}"
+          <div class="sortable-image" data-file-id="{{ file.pk }}" data-file-type="{{ file.file_type }}"
             style="position: relative; border: 2px solid {% if file.is_primary %}#667eea{% else %}#e5e7eb{% endif %}; border-radius: 8px; padding: 10px; background: white; width: 150px;">
             {% if file.is_primary %}
             <div class="primary-badge"
@@ -235,10 +235,25 @@
               style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
               <i class="fa fa-grip-vertical"></i>
             </div>
+            {% if file.is_video %}
+            <!-- Video file: show thumbnail with play icon -->
+            <div style="position: relative;">
+              <a href="{{ file.file_url }}" target="_blank" style="pointer-events: none;">
+                <img src="{{ file.video_thumbnail_url|default:file.file_url }}"
+                  style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none; background: #1a1a2e;" />
+              </a>
+              <div
+                style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+                <i class="fa fa-play" style="color: white; font-size: 16px; margin-left: 3px;"></i>
+              </div>
+            </div>
+            {% else %}
+            <!-- Image file: show image directly -->
             <a href="{{ file.optimized_url }}" target="_blank" style="pointer-events: none;">
               <img src="{{ file.optimized_url }}"
                 style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;" />
             </a>
+            {% endif %}
             <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px;">
               <button type="button" class="instant-delete-btn" data-file-id="{{ file.pk }}"
                 style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
@@ -535,7 +550,7 @@
   // ============== PRODUCT ATTRIBUTES ==============
   let attributeCounter = 0;
   let attributeSaveTimeout = null;
-  const PRODUCT_ID = {% if product %}{{ product.id }}{% else %}null{% endif %};
+  
 
   function addProductAttribute() {
     const container = document.getElementById('product_attributes_container');

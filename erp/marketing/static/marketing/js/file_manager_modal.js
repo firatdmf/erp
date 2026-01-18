@@ -15,10 +15,10 @@ const modalHTML = `
     <div class="fm-modal-body">
       <!-- Upload Area -->
       <div class="fm-upload-zone" id="fmUploadZone">
-        <input type="file" id="fmFileInput" multiple accept="image/*" style="display: none;">
+        <input type="file" id="fmFileInput" multiple accept="image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/avi" style="display: none;">
         <i class="fa fa-cloud-upload"></i>
         <p>Drag & drop files here or <span class="fm-browse">browse</span></p>
-        <small>Supports: JPG, PNG, GIF, WebP</small>
+        <small>Supports: JPG, PNG, GIF, WebP, MP4, MOV, WebM</small>
       </div>
       
       <!-- Files Grid -->
@@ -410,6 +410,37 @@ const modalCSS = `
     height: 120px;
   }
 }
+
+/* Video Play Icon Overlay */
+.fm-video-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 50px;
+  height: 50px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.fm-video-overlay i {
+  color: white;
+  font-size: 20px;
+  margin-left: 3px;
+}
+
+.fm-file-video {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+  background: #1a1a2e;
+}
 </style>
 `;
 
@@ -620,18 +651,44 @@ function createFileItem(file, isNew = false) {
   const fileUrl = file.file_url || file.url;
   const isTempFile = file.temp_file || false;
 
+  // Detect if file is a video
+  const fileType = file.file_type || file.media_type || detectFileType(fileUrl);
+  const isVideo = fileType === 'video';
+
   div.dataset.fileId = fileId;
   div.dataset.isTempFile = isTempFile;
+  div.dataset.fileType = fileType;
 
-  div.innerHTML = `
-    <img src="${fileUrl}" alt="${file.name || 'Image'}" class="fm-file-img">
-    <div class="fm-file-overlay">
-      <div class="fm-file-check"><i class="fa fa-check"></i></div>
-    </div>
-    <button type="button" class="fm-delete-btn" title="Delete">
-      <i class="fa fa-trash"></i>
-    </button>
-  `;
+  // Generate appropriate HTML based on file type
+  if (isVideo) {
+    // For videos, show a thumbnail with play icon overlay
+    const thumbnailUrl = file.video_thumbnail_url || getVideoThumbnailUrl(fileUrl);
+    div.innerHTML = `
+      <div style="position: relative;">
+        <img src="${thumbnailUrl}" alt="${file.name || 'Video'}" class="fm-file-img" onerror="this.src='${fileUrl}'">
+        <div class="fm-video-overlay">
+          <i class="fa fa-play"></i>
+        </div>
+      </div>
+      <div class="fm-file-overlay">
+        <div class="fm-file-check"><i class="fa fa-check"></i></div>
+      </div>
+      <button type="button" class="fm-delete-btn" title="Delete">
+        <i class="fa fa-trash"></i>
+      </button>
+    `;
+  } else {
+    // For images, show the image directly
+    div.innerHTML = `
+      <img src="${fileUrl}" alt="${file.name || 'Image'}" class="fm-file-img">
+      <div class="fm-file-overlay">
+        <div class="fm-file-check"><i class="fa fa-check"></i></div>
+      </div>
+      <button type="button" class="fm-delete-btn" title="Delete">
+        <i class="fa fa-trash"></i>
+      </button>
+    `;
+  }
 
   if (!isNew) {
     // Click on image area toggles selection
@@ -653,6 +710,31 @@ function createFileItem(file, isNew = false) {
 
   return div;
 }
+
+// Detect file type from URL
+function detectFileType(url) {
+  if (!url) return 'image';
+  // Use regex to match exact extensions at end of URL (or before query string)
+  // This avoids false positives like .avif matching .avi
+  if (/\.(mp4|mov|webm|avi|mkv|m4v|wmv)(\?.*)?$/i.test(url)) {
+    return 'video';
+  }
+  return 'image';
+}
+
+// Generate Cloudinary video thumbnail URL
+function getVideoThumbnailUrl(videoUrl) {
+  if (!videoUrl) return '';
+  // Cloudinary transformation to get video thumbnail (first frame as jpg)
+  // w_300 = width, h_200 = height, c_fill = crop fill, so_0 = start offset 0
+  const transformedUrl = videoUrl.replace(
+    '/upload/',
+    '/upload/w_300,h_200,c_fill,so_0,f_jpg/'
+  );
+  // Change extension to .jpg
+  return transformedUrl.replace(/\.(mp4|mov|webm|avi|mkv|m4v|wmv)$/i, '.jpg');
+}
+
 
 // Delete file from modal while preserving other selections
 async function deleteFileFromModal(fileId, element, isTempFile = false) {
@@ -957,10 +1039,12 @@ function syncSelectionToProduct() {
   const selectedFiles = Array.from(selectedItems).map(item => {
     const fileId = item.dataset.fileId;
     const fileUrl = item.querySelector('.fm-file-img').src;
-    console.log('Selected file:', fileId, fileUrl);
+    const fileType = item.dataset.fileType || detectFileType(fileUrl);
+    console.log('Selected file:', fileId, fileUrl, 'type:', fileType);
     return {
       id: fileId,
-      url: fileUrl
+      url: fileUrl,
+      fileType: fileType
     };
   });
 
@@ -990,9 +1074,9 @@ function syncSelectionToProduct() {
       fileElement = currentFiles.get(file.id);
       console.log('Reusing existing element for file:', file.id);
     } else {
-      // Create new element
-      fileElement = createProductFileElement(file.id, file.url);
-      console.log('Creating new element for file:', file.id);
+      // Create new element with file type
+      fileElement = createProductFileElement(file.id, file.url, file.fileType);
+      console.log('Creating new element for file:', file.id, 'type:', file.fileType);
     }
 
     productGrid.appendChild(fileElement);
@@ -1013,25 +1097,52 @@ function syncSelectionToProduct() {
 }
 
 // Create product file element (matching existing style)
-function createProductFileElement(fileId, imgSrc) {
+function createProductFileElement(fileId, fileSrc, fileType = 'image') {
   const div = document.createElement('div');
   div.className = 'sortable-image';
   div.setAttribute('data-file-id', fileId);
+  div.setAttribute('data-file-type', fileType);
   div.style.cssText = 'position: relative; border: 2px solid #e5e7eb; border-radius: 8px; padding: 10px; background: white; width: 150px; opacity: 1;';
 
-  div.innerHTML = `
-    <div class="drag-handle" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
-      <i class="fa fa-grip-vertical"></i>
-    </div>
-    <a href="${imgSrc}" target="_blank" style="pointer-events: none;">
-      <img src="${imgSrc}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;"/>
-    </a>
-    <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px;">
-      <button type="button" class="instant-delete-btn" data-file-id="${fileId}" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
-        <i class="fa fa-trash"></i> Delete
-      </button>
-    </div>
-  `;
+  const isVideo = fileType === 'video';
+  const thumbnailUrl = isVideo ? getVideoThumbnailUrl(fileSrc) : fileSrc;
+
+  if (isVideo) {
+    // Video element with play icon overlay
+    div.innerHTML = `
+      <div class="drag-handle" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none; z-index: 3;">
+        <i class="fa fa-grip-vertical"></i>
+      </div>
+      <div style="position: relative;">
+        <a href="${fileSrc}" target="_blank" style="pointer-events: none;">
+          <img src="${thumbnailUrl}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none; background: #1a1a2e;" onerror="this.src='${fileSrc}'"/>
+        </a>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center; pointer-events: none;">
+          <i class="fa fa-play" style="color: white; font-size: 16px; margin-left: 3px;"></i>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px;">
+        <button type="button" class="instant-delete-btn" data-file-id="${fileId}" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
+          <i class="fa fa-trash"></i> Delete
+        </button>
+      </div>
+    `;
+  } else {
+    // Image element
+    div.innerHTML = `
+      <div class="drag-handle" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
+        <i class="fa fa-grip-vertical"></i>
+      </div>
+      <a href="${fileSrc}" target="_blank" style="pointer-events: none;">
+        <img src="${fileSrc}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;"/>
+      </a>
+      <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px;">
+        <button type="button" class="instant-delete-btn" data-file-id="${fileId}" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
+          <i class="fa fa-trash"></i> Delete
+        </button>
+      </div>
+    `;
+  }
 
   // Add delete handler with logging
   const deleteBtn = div.querySelector('.instant-delete-btn');

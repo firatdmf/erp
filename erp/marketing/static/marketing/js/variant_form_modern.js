@@ -1144,15 +1144,36 @@ function renderVariantImages(variantIndex) {
     // Build simple HTML
     const html = variantImg.images.map((img, idx) => {
         const isPrimary = idx === 0;
-        return `
-            <div class="variant-sortable-image" data-image-id="${img.id}" style="position: relative; border: 2px solid ${isPrimary ? '#667eea' : '#e5e7eb'}; border-radius: 6px; padding: 4px; background: white; width: 60px; height: 60px; cursor: move;">
-                ${isPrimary ? '<div style="position: absolute; top: -6px; left: 4px; background: #667eea; color: white; padding: 1px 4px; border-radius: 8px; font-size: 8px; font-weight: 600; z-index: 1;">PRIMARY</div>' : ''}
-                <img src="${img.url}" alt="Variant image" style="width: 100%; height: 50px; object-fit: cover; border-radius: 4px;">
-                <button type="button" class="remove-variant-btn" onclick="event.stopPropagation(); removeVariantImage(${variantIndex}, ${idx})" style="position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; border: none; border-radius: 3px; padding: 1px 3px; font-size: 8px; cursor: pointer;">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-        `;
+        // Detect if file is a video
+        const isVideo = isVideoFile(img.url) || img.file_type === 'video';
+        const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
+
+        if (isVideo) {
+            return `
+                <div class="variant-sortable-image" data-image-id="${img.id}" data-file-type="video" style="position: relative; border: 2px solid ${isPrimary ? '#667eea' : '#e5e7eb'}; border-radius: 6px; padding: 4px; background: #1a1a2e; width: 60px; height: 60px; cursor: move;">
+                    ${isPrimary ? '<div style="position: absolute; top: -6px; left: 4px; background: #667eea; color: white; padding: 1px 4px; border-radius: 8px; font-size: 8px; font-weight: 600; z-index: 1;">PRIMARY</div>' : ''}
+                    <div style="position: relative; width: 100%; height: 50px;">
+                        <img src="${thumbnailUrl}" alt="Variant video" style="width: 100%; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.style.background='#1a1a2e'">
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa fa-play" style="color: white; font-size: 8px; margin-left: 1px;"></i>
+                        </div>
+                    </div>
+                    <button type="button" class="remove-variant-btn" onclick="event.stopPropagation(); removeVariantImage(${variantIndex}, ${idx})" style="position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; border: none; border-radius: 3px; padding: 1px 3px; font-size: 8px; cursor: pointer;">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="variant-sortable-image" data-image-id="${img.id}" data-file-type="image" style="position: relative; border: 2px solid ${isPrimary ? '#667eea' : '#e5e7eb'}; border-radius: 6px; padding: 4px; background: white; width: 60px; height: 60px; cursor: move;">
+                    ${isPrimary ? '<div style="position: absolute; top: -6px; left: 4px; background: #667eea; color: white; padding: 1px 4px; border-radius: 8px; font-size: 8px; font-weight: 600; z-index: 1;">PRIMARY</div>' : ''}
+                    <img src="${img.url}" alt="Variant image" style="width: 100%; height: 50px; object-fit: cover; border-radius: 4px;">
+                    <button type="button" class="remove-variant-btn" onclick="event.stopPropagation(); removeVariantImage(${variantIndex}, ${idx})" style="position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; border: none; border-radius: 3px; padding: 1px 3px; font-size: 8px; cursor: pointer;">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }
     }).join('');
 
     // Initialize sortable after rendering
@@ -1500,7 +1521,8 @@ async function openImagePicker(variantIndex) {
                     url: file.url,
                     name: file.name,
                     variant: file.variant || null,  // Include variant info from API
-                    file: null  // No file object needed (already uploaded)
+                    file: null,  // No file object needed (already uploaded)
+                    file_type: file.file_type || 'image'  // 'image' or 'video'
                 }));
                 console.log(`Loaded ${uploadedImages.length} files from shared pool`);
             }
@@ -1514,13 +1536,15 @@ async function openImagePicker(variantIndex) {
             const mainImages = mainImageGrid.querySelectorAll('.sortable-image');
             uploadedImages = Array.from(mainImages).map((imgDiv, idx) => {
                 const img = imgDiv.querySelector('img');
+                const fileType = imgDiv.dataset.fileType || (isVideoFile(img?.src) ? 'video' : 'image');
                 return {
                     id: imgDiv.dataset.fileId || `temp_${idx}`,
                     url: img ? img.src : '',
-                    name: `Image ${idx + 1}`,
+                    name: `File ${idx + 1}`,
                     variant: null,
                     file: null,
-                    temp_file: true  // Mark as temporary
+                    temp_file: true,  // Mark as temporary
+                    file_type: fileType
                 };
             });
             console.log(`Loaded ${uploadedImages.length} temp files from main grid`);
@@ -1549,8 +1573,9 @@ async function openImagePicker(variantIndex) {
                     <button type="button" class="btn_upload" onclick="document.getElementById('image_file_input').click()">
                         <i class="fa fa-plus"></i> Add File
                     </button>
-                    <input type="file" id="image_file_input" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(event)">
-                    <p>Drag and drop images here</p>
+                    <input type="file" id="image_file_input" accept="image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/avi" multiple style="display: none;" onchange="handleImageUpload(event)">
+                    <p>Drag and drop images or videos here</p>
+                    <small style="color: #6b7280;">Supports: JPG, PNG, GIF, WebP, MP4, MOV, WebM</small>
                 </div>
                 <div class="image_grid" id="image_grid">
                     ${generateImageGrid(selectedImageUrls, primaryIndex)}
@@ -1573,7 +1598,7 @@ let uploadedImages = [];
 // Generate image grid from uploaded images
 function generateImageGrid(selectedImageUrls, primaryIndex) {
     if (uploadedImages.length === 0) {
-        return '<div class="no_images_message"><i class="fa fa-image"></i><p>No images uploaded yet. Use the \"Add File\" button above to add images.</p></div>';
+        return '<div class="no_images_message"><i class="fa fa-image"></i><p>No files uploaded yet. Use the \"Add File\" button above to add images or videos.</p></div>';
     }
 
     return uploadedImages.map((img, idx) => {
@@ -1582,19 +1607,58 @@ function generateImageGrid(selectedImageUrls, primaryIndex) {
         const selectedIndex = isSelected ? selectedImageUrls.indexOf(img.url) : -1;
         const isPrimary = isSelected && selectedIndex === primaryIndex;
 
+        // Detect if file is a video
+        const isVideo = isVideoFile(img.url) || img.file_type === 'video';
+        const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
+
         // No variant badges - shared pool
 
-        return `
-            <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" onclick="toggleImageSelection(this, event)">
-                <img src="${img.url}" alt="${img.name}">
-                <p>${img.name}</p>
-                <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
-                    <i class="fa fa-trash"></i>
-                </button>
-            </div>
-        `;
+        if (isVideo) {
+            return `
+                <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="video" onclick="toggleImageSelection(this, event)">
+                    <div style="position: relative;">
+                        <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.background='#1a1a2e'">
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa fa-play" style="color: white; font-size: 12px; margin-left: 2px;"></i>
+                        </div>
+                    </div>
+                    <p>${img.name}</p>
+                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="image" onclick="toggleImageSelection(this, event)">
+                    <img src="${img.url}" alt="${img.name}">
+                    <p>${img.name}</p>
+                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        }
     }).join('');
 }
+
+// Helper function to check if a file is a video
+function isVideoFile(url) {
+    if (!url) return false;
+    const lowerUrl = url.toLowerCase();
+    // Use regex to match exact extensions at end of URL (or before query string)
+    // This avoids false positives like .avif matching .avi
+    return /\.(mp4|mov|webm|avi|mkv|m4v|wmv)(\?.*)?$/i.test(lowerUrl);
+}
+
+// Generate video thumbnail URL for Cloudinary
+function getVideoThumbnailUrlVariant(videoUrl) {
+    if (!videoUrl) return '';
+    // Cloudinary transformation for video thumbnail
+    const transformed = videoUrl.replace('/upload/', '/upload/w_150,h_150,c_fill,so_0,f_jpg/');
+    return transformed.replace(/\.(mp4|mov|webm|avi|mkv|m4v)$/i, '.jpg');
+}
+
 
 // Set primary image (only one can be primary)
 function setPrimaryImage(imageIndex, event) {
@@ -1676,9 +1740,13 @@ async function handleImageUpload(event) {
 
     // Process each file
     for (const file of files) {
-        // Check if it's an image
-        if (!file.type.startsWith('image/')) {
-            console.warn(`${file.name} is not an image file.`);
+        // Check if it's an image or video
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+
+        if (!isImage && !isVideo) {
+            console.warn(`${file.name} is not a supported file type.`);
+            showToast(`⚠️ "${file.name}" is not a supported file type`, 'warning');
             continue;
         }
 

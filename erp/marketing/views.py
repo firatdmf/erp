@@ -558,9 +558,11 @@ class BaseProductView(ModelFormMixin):
             for key, value in variant_data.items():
                 if key not in non_model_fields:
                     old_value = getattr(variant, key, None)
-                    # Debug: Log variant_cost specifically
+                    # Debug: Log variant_cost and variant_featured specifically
                     if key == "variant_cost":
                         print(f"  🔍 DEBUG variant_cost: old={old_value}, new={value}, will_update={old_value != value}")
+                    if key == "variant_featured":
+                        print(f"  🔍 DEBUG variant_featured: sku={variant.variant_sku}, old={old_value} (type={type(old_value).__name__}), new={value} (type={type(value).__name__}), will_update={old_value != value}")
                     if old_value != value:
                         setattr(variant, key, value)
                         changed_fields.add(key)
@@ -2468,6 +2470,9 @@ def validate_discount_code(request):
         
         try:
             discount = DiscountCode.objects.get(code__iexact=code, is_active=True)
+            # Check if code is still valid (not exceeded max_uses)
+            if not discount.is_valid():
+                return JsonResponse({'success': False, 'error': 'Bu indirim kodu kullanım limitine ulaşmış'})
             return JsonResponse({
                 'success': True,
                 'discount_percentage': float(discount.discount_percentage),
@@ -2739,3 +2744,102 @@ def get_blog_post(request, slug):
     }
     
     return JsonResponse(data)
+
+
+# ============================================================
+# NEWSLETTER SUBSCRIPTION API
+# Bülten aboneliği - tek kullanımlık indirim kodu oluşturma
+# ============================================================
+import uuid
+import re
+from django.core.mail import send_mail
+from django.conf import settings
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def newsletter_subscribe(request):
+    """
+    Newsletter subscription endpoint.
+    - Validates email and phone are not already registered
+    - Generates a unique single-use 5% discount code
+    - Sends email with the discount code
+    - Saves subscription to database
+    """
+    from marketing.models import DiscountCode, WebSubscription
+    
+    try:
+        data = json.loads(request.body)
+        email = data.get('email', '').strip().lower()
+        phone = data.get('phone', '').strip()
+        
+        # Validate inputs
+        if not email:
+            return JsonResponse({'success': False, 'error': 'E-posta adresi gereklidir'})
+        if not phone:
+            return JsonResponse({'success': False, 'error': 'Telefon numarası gereklidir'})
+        
+        # Basic email validation
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, email):
+            return JsonResponse({'success': False, 'error': 'Geçersiz e-posta adresi'})
+        
+        # Normalize phone number (remove spaces, dashes, parentheses)
+        phone_normalized = re.sub(r'[\s\-\(\)]+', '', phone)
+        if len(phone_normalized) < 10:
+            return JsonResponse({'success': False, 'error': 'Geçersiz telefon numarası'})
+        
+        # Check if email already exists
+        if WebSubscription.objects.filter(email=email).exists():
+            return JsonResponse({
+                'success': False, 
+                'error': 'Bu e-posta adresi zaten kayıtlı'
+            })
+        
+        # Check if phone already exists
+        if WebSubscription.objects.filter(phone=phone_normalized).exists():
+            return JsonResponse({
+                'success': False, 
+                'error': 'Bu telefon numarası zaten kayıtlı'
+            })
+        
+        # Generate unique discount code
+        code_prefix = "HOSGELDIN"
+        unique_suffix = uuid.uuid4().hex[:6].upper()
+        discount_code_str = f"{code_prefix}{unique_suffix}"
+        
+        # Ensure code is unique
+        while DiscountCode.objects.filter(code=discount_code_str).exists():
+            unique_suffix = uuid.uuid4().hex[:6].upper()
+            discount_code_str = f"{code_prefix}{unique_suffix}"
+        
+        # Create the discount code (5%, single-use)
+        discount_code = DiscountCode.objects.create(
+            code=discount_code_str,
+            discount_percentage=5.00,
+            is_active=True,
+            max_uses=1,  # Single use
+            influencer_name=f"Newsletter: {email}"
+        )
+        
+        # Create the subscription
+        subscription = WebSubscription.objects.create(
+            email=email,
+            phone=phone_normalized,
+            discount_code=discount_code,
+            is_active=True
+        )
+        
+        # Note: Email is sent by Next.js frontend using its nodemailer setup
+        # This keeps email configuration centralized in demfirat
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Aboneliğiniz başarıyla tamamlandı! İndirim kodunuz e-posta adresinize gönderildi.',
+            'code': discount_code_str  # Return code for frontend to display and send email
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Geçersiz istek formatı'}, status=400)
+    except Exception as e:
+        print(f"[NEWSLETTER] Subscription error: {e}")
+        return JsonResponse({'success': False, 'error': 'Bir hata oluştu, lütfen tekrar deneyin'}, status=500)

@@ -713,6 +713,11 @@ class DiscountCode(models.Model):
         verbose_name="Kullanım Sayısı",
         help_text="Bu kodla kaç başarılı sipariş oluşturuldu"
     )
+    max_uses = models.PositiveIntegerField(
+        default=0, 
+        verbose_name="Maksimum Kullanım",
+        help_text="0 = sınırsız, 1 = tek kullanımlık"
+    )
     influencer_name = models.CharField(
         max_length=100, 
         blank=True, 
@@ -728,6 +733,54 @@ class DiscountCode(models.Model):
     
     def __str__(self):
         return f"{self.code} ({self.discount_percentage}%)"
+    
+    def is_valid(self):
+        """Check if code is active and under usage limit"""
+        if not self.is_active:
+            return False
+        if self.max_uses > 0 and self.usage_count >= self.max_uses:
+            return False
+        return True
+
+
+# ============================================================
+# WEB SUBSCRIPTIONS
+# Bülten abonelikleri - email ve telefon ile
+# ============================================================
+class WebSubscription(models.Model):
+    """Newsletter subscriptions - email and phone are unique"""
+    email = models.EmailField(
+        unique=True,
+        verbose_name="E-posta",
+        help_text="Abone e-posta adresi"
+    )
+    phone = models.CharField(
+        max_length=20,
+        unique=True,
+        verbose_name="Telefon",
+        help_text="Abone telefon numarası"
+    )
+    discount_code = models.ForeignKey(
+        DiscountCode,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='subscriptions',
+        verbose_name="İndirim Kodu"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Aktif"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Bülten Aboneliği"
+        verbose_name_plural = "Bülten Abonelikleri"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.email} - {self.phone}"
 
 
 # ============================================================

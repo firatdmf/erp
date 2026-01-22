@@ -170,9 +170,19 @@ admin.site.register(ProductReview, ProductReviewAdmin)
 # Discount Code Admin
 @admin.register(DiscountCode)
 class DiscountCodeAdmin(admin.ModelAdmin):
-    list_display = ('code', 'discount_percentage', 'influencer_name', 'usage_count', 'is_active', 'created_at')
+    list_display = ('code', 'discount_percentage', 'influencer_name', 'usage_count', 'max_uses', 'is_active', 'created_at')
     list_filter = ('is_active', 'created_at')
     search_fields = ('code', 'influencer_name')
     readonly_fields = ('usage_count', 'created_at')
+    ordering = ('-created_at',)
+
+
+# Web Subscription Admin
+@admin.register(WebSubscription)
+class WebSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('email', 'phone', 'discount_code', 'is_active', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('email', 'phone')
+    readonly_fields = ('created_at',)
     ordering = ('-created_at',)
 

@@ -47,5 +47,7 @@ urlpatterns = [
     path("api/delete_blog_image/",views.delete_blog_image,name="delete_blog_image"),
     path("api/get_blog_posts/",views.get_blog_posts,name="get_blog_posts"),
     path("api/get_blog_post/<slug:slug>/",views.get_blog_post,name="get_blog_post"),
+    # Newsletter subscription
+    path("api/subscribe/",views.newsletter_subscribe,name="newsletter_subscribe"),
 ]
 

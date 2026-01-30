@@ -1,14 +1,142 @@
 {% extends 'base.html' %}
-{% block content %}
-  {% load static %}
-  {% block css %}
-    {% comment %} <link rel="stylesheet" href="{% static 'operating/css/create_order.css' %}" /> {% endcomment %}
-  {% endblock %}
+{% load static %}
 
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    
-    <input type="submit" value="Submit" />
-  </form>
+{% block css %}
+<style>
+  .page-container {
+    background: #f8fafc;
+    min-height: 100vh;
+    padding: 32px 40px;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  .form-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  .form-header {
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  .form-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+
+  .form-desc {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  /* Form Fields */
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 6px;
+  }
+
+  .form-control {
+    width: 100%;
+    height: 42px;
+    padding: 0 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #0f172a;
+    transition: all 0.2s;
+    background: white;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .btn-submit {
+    width: 100%;
+    height: 48px;
+    background: #3b82f6;
+    color: white;
+    font-weight: 600;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 12px;
+  }
+
+  .btn-submit:hover {
+    background: #2563eb;
+  }
+
+  /* Help text */
+  .helptext {
+    display: block;
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+  <div class="form-card">
+    <div class="form-header">
+      <h1 class="form-title">New Raw Material</h1>
+      <p class="form-desc">Define a new raw material for manufacturing.</p>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <!-- Render form manually or loop -->
+      {% for field in form %}
+      <div class="form-group">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}
+        <span class="helptext">{{ field.help_text }}</span>
+        {% endif %}
+        {% for error in field.errors %}
+        <div style="color: #dc2626; font-size: 12px; margin-top: 4px;">{{ error }}</div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <button type="submit" class="btn-submit">All Materials</button>
+    </form>
+
+    <div style="text-align: center; margin-top: 16px;">
+      <a href="{% url 'operating:raw_material_good_list' %}"
+        style="color: #64748b; font-size: 13px; text-decoration: none;">Cancel</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Add class to all input fields automatically
+  document.querySelectorAll('input, select, textarea').forEach(el => {
+    el.classList.add('form-control');
+  });
+</script>
 {% endblock %}

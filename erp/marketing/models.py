@@ -221,7 +221,7 @@ class Product(models.Model):
         choices=QUANTITY_UNIT_TYPE_CHOICES,
         null=True,
         blank=True,
-        default=QUANTITY_UNIT_TYPE_CHOICES[0],
+        default=QUANTITY_UNIT_TYPE_CHOICES[0][0],
     )
 
     quantity = models.DecimalField(
@@ -245,7 +245,7 @@ class Product(models.Model):
     weight = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     unit_of_weight = models.CharField(
         choices=WEIGHT_UNIT_TYPE_CHOICES,
-        default=WEIGHT_UNIT_TYPE_CHOICES[0],
+        default=WEIGHT_UNIT_TYPE_CHOICES[0][0],
         blank=True,
         null=True,
     )

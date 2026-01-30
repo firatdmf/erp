@@ -14,12 +14,23 @@ def task_dictsortreversed(sort_type):
 
 @register.filter
 def task_sort(tasks, sort_type):
-    if sort_type == 'dictsort':
-        return tasks.order_by('due_date')
-    elif sort_type == 'dictsortreversed':
-        return tasks.order_by('-due_date')
+    # Handle both QuerySet and list objects
+    if hasattr(tasks, 'order_by'):
+        # It's a QuerySet
+        if sort_type == 'dictsort':
+            return tasks.order_by('due_date')
+        elif sort_type == 'dictsortreversed':
+            return tasks.order_by('-due_date')
+        else:
+            return tasks
     else:
-        return tasks
+        # It's a list
+        if sort_type == 'dictsort':
+            return sorted(tasks, key=lambda x: x.due_date if x.due_date else date.max)
+        elif sort_type == 'dictsortreversed':
+            return sorted(tasks, key=lambda x: x.due_date if x.due_date else date.min, reverse=True)
+        else:
+            return tasks
     
 
     

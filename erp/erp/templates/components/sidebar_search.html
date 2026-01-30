@@ -1,0 +1,86 @@
+<div id="searchSidebar" class="search-sidebar">
+    <div class="search-sidebar-content">
+        <!-- Header: Matching "Add Contact" structure -->
+        <div class="search-header-styled">
+            <button class="sidebar-close-styled" onclick="closeSearchSidebar()">
+                <i class="fas fa-times"></i> Close
+            </button>
+            <div class="sidebar-title-styled">
+                <i class="fas fa-search"></i>
+                <h2>Quick Search</h2>
+            </div>
+        </div>
+
+        <!-- Search Input Section -->
+        <div class="search-input-section">
+            <div class="search-input-wrapper-styled">
+                <i class="fas fa-search"></i>
+                <input type="text" id="globalSearchInput" placeholder="Type to search..." autocomplete="off">
+                <i class="fas fa-times-circle clear-input-icon hidden" id="clearSearchBtn" onclick="clearSearch()"></i>
+            </div>
+        </div>
+
+        <!-- Main Layout -->
+        <div class="search-layout">
+            <!-- Left Tabs -->
+            <div class="search-tabs">
+                <div class="tab-item active" onclick="switchTab('all')" data-tab="all">
+                    <span>All</span>
+                </div>
+                <div class="tab-item" onclick="switchTab('recent')" data-tab="recent">
+                    <span>Recent</span>
+                </div>
+                <div class="tab-item" onclick="switchTab('menu')" data-tab="menu">
+                    <span>Navigation</span>
+                </div>
+                <div class="tab-item" onclick="switchTab('contacts')" data-tab="contacts">
+                    <span>Contacts</span>
+                </div>
+                <div class="tab-item" onclick="switchTab('products')" data-tab="products">
+                    <span>Products</span>
+                </div>
+                <div class="tab-item" onclick="switchTab('orders')" data-tab="orders">
+                    <span>Orders</span>
+                </div>
+            </div>
+
+            <!-- Right Content -->
+            <div class="search-results-wrapper">
+                <div id="loadingSpinner" class="loading-spinner hidden">
+                    <div class="spinner-ring"></div>
+                </div>
+
+                <div id="searchResults" class="search-results-list">
+                    <!-- Content injected via JS -->
+                </div>
+
+                <!-- Initial State -->
+                <div id="defaultState" class="default-state">
+                    {% if last_ten_entities %}
+                    <div class="result-section" data-section="recent">
+                        <div class="section-title">
+                            Recent Activity
+                        </div>
+                        {% for entry in last_ten_entities %}
+                        <div class="result-card" data-type="{{ entry.entry_type }}"
+                            onclick="window.location.href='{% if entry.entry_type == 'Contact' %}{% url 'crm:contact_detail' entry.id %}{% else %}{% url 'crm:company_detail' entry.id %}{% endif %}'">
+                            <div
+                                class="result-icon {% if entry.entry_type == 'Contact' %}contact{% else %}company{% endif %}">
+                                <i
+                                    class="fas {% if entry.entry_type == 'Contact' %}fa-user{% else %}fa-building{% endif %}"></i>
+                            </div>
+                            <div class="result-info">
+                                <span class="result-name">{{ entry.name }}</span>
+                                <span class="result-meta">{{ entry.entry_type }} • {{ entry.created_at|date:"M d"
+                                    }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="search-backdrop" onclick="closeSearchSidebar()"></div>
+</div>

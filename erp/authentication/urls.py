@@ -9,6 +9,8 @@ urlpatterns = [
     path('signup/',views.signup,name = 'signup'),
     path('signin/',views.signin,name = 'signin'),
     path('signout/',views.signout,name = 'signout'),
+    path('settings/update_profile/', views.update_profile, name='update_profile'),
+    path('settings/change_password/', views.change_password_settings, name='change_password_settings'),
     
     # WebClient API endpoints
     path('api/create_web_client/', api_views.create_web_client, name='create_web_client'),

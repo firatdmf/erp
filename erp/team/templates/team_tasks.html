@@ -1,0 +1,742 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ team.name }} Tasks | Nejum ERP{% endblock %}
+
+{% block css %}
+<style>
+  :root {
+    --tm-bg: #f8fafc;
+    --tm-primary: #3b82f6;
+    --tm-text-main: #1e293b;
+    --tm-text-muted: #64748b;
+    --tm-border: #e2e8f0;
+    --tm-card-bg: #ffffff;
+  }
+
+  body {
+    background: var(--tm-bg);
+    overflow: hidden;
+  }
+
+  .kanban-container {
+    height: calc(100vh - 70px);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 2rem;
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--tm-text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .breadcrumb a {
+    color: var(--tm-text-muted);
+    text-decoration: none;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--tm-primary);
+  }
+
+  /* Header */
+  .kanban-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .kanban-header h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--tm-text-main);
+    margin: 0;
+  }
+
+  .header-right {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .member-preview {
+    display: flex;
+  }
+
+  .member-preview .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid white;
+    margin-left: -8px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .member-preview .avatar:first-child {
+    margin-left: 0;
+  }
+
+  .view-toggle {
+    display: flex;
+    background: white;
+    border: 1px solid var(--tm-border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .view-btn {
+    padding: 0.5rem 0.75rem;
+    background: none;
+    border: none;
+    color: var(--tm-text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .view-btn.active {
+    background: var(--tm-primary);
+    color: white;
+  }
+
+  .btn-create-task {
+    background: var(--tm-primary);
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .btn-create-task:hover {
+    background: #2563eb;
+  }
+
+  /* Kanban Board */
+  .kanban-board {
+    flex: 1;
+    display: flex;
+    gap: 1.25rem;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+  }
+
+  .kanban-column {
+    min-width: 280px;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 0.75rem;
+  }
+
+  .column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .column-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--tm-text-main);
+  }
+
+  .column-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .dot-todo {
+    background: #94a3b8;
+  }
+
+  .dot-progress {
+    background: #3b82f6;
+  }
+
+  .dot-review {
+    background: #a855f7;
+  }
+
+  .dot-done {
+    background: #10b981;
+  }
+
+  .column-count {
+    background: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--tm-text-muted);
+  }
+
+  .column-menu {
+    color: var(--tm-text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+  }
+
+  .column-tasks {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    overflow-y: auto;
+    min-height: 100px;
+  }
+
+  /* Task Card */
+  .task-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    cursor: grab;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s;
+  }
+
+  .task-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .task-card.dragging {
+    opacity: 0.5;
+    transform: rotate(3deg);
+  }
+
+  .priority-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .priority-high {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .priority-medium {
+    background: #ffedd5;
+    color: #ea580c;
+  }
+
+  .priority-low {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  .task-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--tm-text-main);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .task-image {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+  }
+
+  .task-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .due-date {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: var(--tm-text-muted);
+  }
+
+  .due-date.overdue {
+    color: #dc2626;
+  }
+
+  .due-date.soon {
+    color: #ea580c;
+  }
+
+  .task-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 0.6rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .task-done-icon {
+    color: #10b981;
+    font-size: 1rem;
+  }
+
+  /* Add Task Button */
+  .add-task-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    color: var(--tm-text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    margin-top: 0.5rem;
+  }
+
+  .add-task-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--tm-text-main);
+  }
+
+  /* Add Section */
+  .add-section {
+    min-width: 280px;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 0.5rem;
+  }
+
+  .add-section-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    color: var(--tm-text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .add-section-btn:hover {
+    background: #e2e8f0;
+    color: var(--tm-text-main);
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    padding: 1rem;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    padding: 1.5rem;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+
+  .modal-content h2 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 0 0 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--tm-text-main);
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.65rem;
+    border: 1px solid var(--tm-border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--tm-primary);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  @media (max-width: 480px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  .btn-cancel {
+    padding: 0.65rem 1rem;
+    background: #f1f5f9;
+    border: none;
+    border-radius: 8px;
+    color: var(--tm-text-muted);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-submit {
+    padding: 0.65rem 1rem;
+    background: var(--tm-primary);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="kanban-container">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <a href="{% url 'team:team_list' %}">Teams</a>
+    <span>/</span>
+    <a href="?team_id={{ team.id }}">{{ team.name }}</a>
+    <span>/</span>
+    <span>Tasks</span>
+  </div>
+
+  <!-- Header -->
+  <div class="kanban-header">
+    <h1>{{ team.name }} Tasks</h1>
+    <div class="header-right">
+      <div class="member-preview">
+        {% for member in members|slice:":4" %}
+        <div class="avatar"
+          style="background: {% cycle '#dbeafe' '#d1fae5' '#ede9fe' '#ffedd5' %}; color: {% cycle '#2563eb' '#059669' '#7c3aed' '#ea580c' %};">
+          {{ member.user.first_name|first|upper }}{{ member.user.last_name|first|upper }}
+        </div>
+        {% endfor %}
+        {% if members.count > 4 %}
+        <div class="avatar" style="background: #e2e8f0; color: var(--tm-text-muted);">+{{ members.count|add:"-4" }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active"><i class="fas fa-th-large"></i> Board</button>
+        <button class="view-btn"><i class="fas fa-list"></i> List</button>
+      </div>
+      <button onclick="openTaskModal()" class="btn-create-task">
+        <i class="fas fa-plus"></i> Create Task
+      </button>
+    </div>
+  </div>
+
+  <!-- Kanban Board -->
+  <div class="kanban-board">
+    <!-- To Do Column -->
+    <div class="kanban-column" data-status="todo">
+      <div class="column-header">
+        <div class="column-title">
+          <span class="column-dot dot-todo"></span>
+          To Do
+          <span class="column-count">{{ pending_tasks.count }}</span>
+        </div>
+        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
+      </div>
+      <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
+        {% for task in pending_tasks %}
+        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
+          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+          <div class="task-title">{{ task.title }}</div>
+          <div class="task-footer">
+            <div class="due-date {% if task.is_overdue %}overdue{% endif %}">
+              <i class="fas fa-calendar"></i>
+              {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
+            </div>
+            <div class="task-avatar" style="background: #dbeafe; color: #2563eb;">
+              {{ task.assigned_to.first_name|first|upper }}{{ task.assigned_to.last_name|first|upper }}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="add-task-btn" onclick="openTaskModal('todo')">
+        <i class="fas fa-plus"></i> Add Task
+      </div>
+    </div>
+
+    <!-- In Progress Column -->
+    <div class="kanban-column" data-status="in_progress">
+      <div class="column-header">
+        <div class="column-title">
+          <span class="column-dot dot-progress"></span>
+          In Progress
+          <span class="column-count">{{ in_progress_tasks.count }}</span>
+        </div>
+        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
+      </div>
+      <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
+        {% for task in in_progress_tasks %}
+        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
+          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+          <div class="task-title">{{ task.title }}</div>
+          <div class="task-footer">
+            <div class="due-date {% if task.is_overdue %}overdue{% endif %}">
+              <i class="fas fa-clock"></i>
+              {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
+            </div>
+            <div class="task-avatar" style="background: #d1fae5; color: #059669;">
+              {{ task.assigned_to.first_name|first|upper }}{{ task.assigned_to.last_name|first|upper }}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="add-task-btn" onclick="openTaskModal('in_progress')">
+        <i class="fas fa-plus"></i> Add Task
+      </div>
+    </div>
+
+    <!-- Review Column -->
+    <div class="kanban-column" data-status="review">
+      <div class="column-header">
+        <div class="column-title">
+          <span class="column-dot dot-review"></span>
+          Review
+          <span class="column-count">{{ review_tasks.count }}</span>
+        </div>
+        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
+      </div>
+      <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
+        {% for task in review_tasks %}
+        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
+          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+          <div class="task-title">{{ task.title }}</div>
+          <div class="task-footer">
+            <div class="due-date">
+              <i class="fas fa-calendar"></i>
+              {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
+            </div>
+            <div class="task-avatar" style="background: #ede9fe; color: #7c3aed;">
+              {{ task.assigned_to.first_name|first|upper }}{{ task.assigned_to.last_name|first|upper }}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="add-task-btn" onclick="openTaskModal('review')">
+        <i class="fas fa-plus"></i> Add Task
+      </div>
+    </div>
+
+    <!-- Done Column -->
+    <div class="kanban-column" data-status="done">
+      <div class="column-header">
+        <div class="column-title">
+          <span class="column-dot dot-done"></span>
+          Done
+          <span class="column-count">{{ completed_tasks.count }}</span>
+        </div>
+        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
+      </div>
+      <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
+        {% for task in completed_tasks %}
+        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
+          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+          <div class="task-title">{{ task.title }}</div>
+          <div class="task-footer">
+            <div class="due-date">
+              <i class="fas fa-calendar"></i>
+              {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
+            </div>
+            <i class="fas fa-check-circle task-done-icon"></i>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Add Section -->
+    <div class="add-section">
+      <div class="add-section-btn">
+        <i class="fas fa-plus"></i> Add Section
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Task Modal -->
+<div id="taskModal" class="modal-overlay">
+  <div class="modal-content">
+    <h2>Create New Task</h2>
+    <form id="taskForm">
+      <input type="hidden" name="status" id="taskStatus" value="todo">
+      <div class="form-group">
+        <label>Task Title *</label>
+        <input type="text" name="title" class="form-control" placeholder="What needs to be done?" required>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea name="description" class="form-control" rows="3" placeholder="Add more details..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Assign To</label>
+          <select name="assigned_to" class="form-control">
+            {% for member in members %}
+            <option value="{{ member.user.id }}">{{ member.user.get_full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select name="priority" class="form-control">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" name="due_date" class="form-control">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-submit">Create Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Modal
+  function openTaskModal(status = 'todo') {
+    document.getElementById('taskStatus').value = status;
+    document.getElementById('taskModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('taskModal').style.display = 'none';
+  }
+
+  window.onclick = function (e) {
+    if (e.target.classList.contains('modal-overlay')) {
+      e.target.style.display = 'none';
+    }
+  }
+
+  // Drag and Drop
+  function allowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+  }
+
+  function drag(ev) {
+    ev.dataTransfer.setData("taskId", ev.target.dataset.id);
+    ev.target.classList.add('dragging');
+  }
+
+  function drop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.style.background = '';
+    const taskId = ev.dataTransfer.getData("taskId");
+    const card = document.querySelector(`.task-card[data-id="${taskId}"]`);
+    const newStatus = ev.currentTarget.closest('.kanban-column').dataset.status;
+
+    if (card) {
+      card.classList.remove('dragging');
+      ev.currentTarget.appendChild(card);
+
+      // Update server
+      fetch(`/team/task/${taskId}/status/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: `status=${newStatus}`
+      });
+    }
+  }
+
+  // Create Task
+  document.getElementById('taskForm').onsubmit = function (e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+
+    fetch('{% url "team:team_tasks" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.error || 'Error creating task');
+        }
+      });
+  };
+</script>
+{% endblock %}

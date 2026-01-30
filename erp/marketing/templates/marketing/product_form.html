@@ -3,7 +3,7 @@
 {% load marketing_tags %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v=4">
+<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v=26">
 <!-- Mobile Responsive Styles -->
 <style>
   @media (max-width: 768px) {
@@ -95,6 +95,25 @@
 
 {% block content %}
 <div id="Product_Form_Page">
+  {% if form.errors %}
+  <div class="alert alert-danger"
+    style="background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+    <h4 style="margin-top: 0; display: flex; align-items: center; gap: 10px;">
+      <i class="fa fa-exclamation-circle"></i> Please fix the following errors:
+    </h4>
+    <ul style="margin-bottom: 0; padding-left: 20px;">
+      {% for field in form %}
+      {% for error in field.errors %}
+      <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+      {% endfor %}
+      {% endfor %}
+      {% for error in form.non_field_errors %}
+      <li>{{ error }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   <div class="form-header">
     <h1>
       <i class="fa fa-tag"></i>
@@ -106,435 +125,393 @@
     </h1>
   </div>
 
-  <form method="post" id="product_form" class="modern-form" enctype="multipart/form-data">
+  <div class="form-header">
+    <div class="header-left">
+      <a href="{% url 'marketing:product_list' %}" class="back-button">
+        <i class="fa fa-arrow-left"></i>
+      </a>
+      <h1>
+        {% if not is_update %}
+        Add Product
+        {% else %}
+        Edit Product
+        {% endif %}
+      </h1>
+      {% if not is_update %}
+      <span class="status-badge unsaved">Unsaved</span>
+      {% endif %}
+    </div>
+    <div class="header-right">
+      <a href="{% url 'marketing:product_list' %}" class="btn btn-secondary">Discard</a>
+      <button type="submit" form="product_form" class="btn btn-primary">Save Product</button>
+    </div>
+  </div>
+
+  <form method="post" id="product_form" class="product-form-layout" enctype="multipart/form-data">
     {% csrf_token %}
 
-    <!-- Basic Information -->
-    <div class="form-section">
-      <div class="form-section-title">Basic Information</div>
+    <!-- LEFT COLUMN (MAIN CONTENT) -->
+    <div class="form-main-column">
 
-      <div class="form-group">
-        <label for="id_title">Product Title<span class="required">*</span></label>
-        {{ form.title }}
-      </div>
-
-      <div class="form-group">
-        <label for="id_description">Description</label>
-        {{ form.description }}
-      </div>
-
-      <div class="form-row">
+      <!-- 1. General Information -->
+      <div class="form-card">
+        <div class="form-card-title">General Information</div>
         <div class="form-group">
-          <label for="id_sku">SKU<span class="required">*</span></label>
-          {{ form.sku }}
+          <label for="id_title">Title</label>
+          {{ form.title }}
         </div>
         <div class="form-group">
-          <label for="id_barcode">Barcode</label>
-          {{ form.barcode }}
+          <label for="id_description">Description</label>
+          {{ form.description }}
         </div>
       </div>
+
+      <!-- 2. Media -->
+      <div class="form-card" id="product_images_section">
+        <div class="form-card-header">
+          <div class="form-card-title">Media</div>
+          {% if product %}
+          <button type="button" id="openFileManagerBtn" class="btn-link">
+            <i class="fa fa-plus"></i> Add from URL
+          </button>
+          {% endif %}
+        </div>
+
+        {% if product %}
+        <div id="variants_image_notice" class="info-notice" style="display: none;">
+          <i class="fa fa-info-circle"></i>
+          <span>Product images are synced from the first variant.</span>
+        </div>
+
+        <!-- Images Container -->
+        <div class="media-gallery-container">
+          <div id="sortable_images" class="media-grid">
+            {% for file in product.files.all %}
+            {% if not file.product_variant %}
+            <div class="media-item sortable-image" data-file-id="{{ file.pk }}" data-file-type="{{ file.file_type }}">
+              <div class="media-preview">
+                {% if file.is_video %}
+                <img src="{{ file.video_thumbnail_url|default:file.file_url }}" />
+                <div class="play-icon"><i class="fa fa-play"></i></div>
+                {% else %}
+                <img src="{{ file.optimized_url }}" />
+                {% endif %}
+              </div>
+              <div class="media-actions">
+                <button type="button" class="icon-btn delete-btn instant-delete-btn" data-file-id="{{ file.pk }}">
+                  <i class="fa fa-trash"></i>
+                </button>
+                <div class="drag-handle"><i class="fa fa-grip-vertical"></i></div>
+              </div>
+              {% if file.is_primary %}
+              <div class="primary-tag">Primary</div>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            <!-- Upload Placeholder (Visual only, triggers modal) -->
+            <div class="media-upload-placeholder" onclick="document.getElementById('openFileManagerBtn').click()">
+              <div class="placeholder-content">
+                <i class="fa fa-images"></i>
+                <span>Add Media</span>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="image_order" name="image_order" value="">
+          <input type="hidden" id="deleted_files" name="deleted_files" value="">
+        </div>
+
+        {% else %}
+        <!-- Create Mode Media Placeholder -->
+        <div class="media-empty-state">
+          <div class="empty-content">
+            <i class="fa fa-image"></i>
+            <button type="button" id="openFileManagerBtnCreate" class="btn btn-secondary">
+              Upload New
+            </button>
+            <span class="help-text">Accepts images, videos, or 3D models</span>
+          </div>
+
+          <div id="sortable_images" class="media-grid mt-3">
+            <!-- Uploaded images appear here -->
+          </div>
+          <input type="hidden" id="image_order" name="image_order" value="">
+        </div>
+        {% endif %}
+      </div>
+
+
+
+
+
+      <!-- 6. Variants (PRESERVED) -->
+      <div class="form-card">
+        <div class="form-card-title">Variants</div>
+        <div class="form-description">Add options like size or color to create variants for this product.</div>
+        {% variant_form current_url=request.path product=product variants=variants %}
+      </div>
+
+      <!-- 7. Manufacturing Recipe (BOM) -->
+      <div class="form-card" id="manufacturing_section">
+        <div class="form-card-header">
+          <div class="form-card-title">
+            <i class="fa fa-industry"></i> Manufacturing Recipe (BOM)
+          </div>
+          <div class="toggle-item" style="margin: 0; gap: 10px;">
+            <span class="toggle-label" style="font-size: 0.9rem; font-weight: 500;">Track Manufacturing</span>
+            <label class="switch-container">
+              <input type="checkbox" id="track_manufacturing_toggle" name="track_manufacturing" {% if product and product.bill_of_materials and product.bill_of_materials.track_manufacturing %}checked{% endif %}>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div id="bom_content" style="display: none; margin-top: 1rem;">
+          <!-- Material Search -->
+          <div class="bom-search-container" style="position: relative; margin-bottom: 1rem;">
+            <div class="input-icon-wrapper">
+              <i class="fa fa-search input-icon"
+                style="left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; position: absolute;"></i>
+              <input type="text" id="bom_material_search" class="form-input"
+                placeholder="Search raw materials to add..." style="padding-left: 2.5rem;">
+            </div>
+            <div id="bom_search_results" class="dropdown-menu"
+              style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; border: 1px solid #e5e7eb; border-radius: 6px; background: white; margin-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            </div>
+          </div>
+
+          <!-- Materials Table -->
+          <div class="table-responsive">
+            <table class="modern-table" id="bom_table">
+              <thead>
+                <tr>
+                  <th style="width: 40%;">Raw Material</th>
+                  <th style="width: 20%;">Qty Used</th>
+                  <th style="width: 20%;">Unit Cost</th>
+                  <th style="width: 15%;">Total Cost</th>
+                  <th style="width: 5%;"></th>
+                </tr>
+              </thead>
+              <tbody id="bom_table_body">
+                <!-- Rows will be added here via JS -->
+                {% if product and product.bill_of_materials %}
+                {% for item in product.bill_of_materials.items.all %}
+                <tr data-material-id="{{ item.raw_material.id }}">
+                  <td>
+                    <div class="bom-item-name">{{ item.raw_material.name }}</div>
+                    <div class="bom-item-sku text-muted" style="font-size: 0.8rem;">{{ item.raw_material.sku }}</div>
+                    <input type="hidden" name="bom_material_id[]" value="{{ item.raw_material.id }}">
+                  </td>
+                  <td>
+                    <div class="input-group" style="display: flex; align-items: center; gap: 5px;">
+                      <input type="number" step="0.0001" class="form-input bom-qty-input" name="bom_quantity[]"
+                        value="{{ item.quantity }}" style="width: 80px; padding: 4px 8px;">
+                      <span class="unit-badge">{{ item.raw_material.unit_of_measurement }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cost-display" data-unit-cost="{{ item.raw_material.unit_cost|default:0 }}">
+                      ${{ item.raw_material.unit_cost|default:0|floatformat:2 }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="total-cost-display fw-bold">
+                      <!-- Calc via JS -->
+                    </div>
+                  </td>
+                  <td>
+                    <button type="button" class="btn-icon text-danger remove-bom-row">
+                      <i class="fa fa-times"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+              </tbody>
+              <tfoot>
+                <tr style="background-color: #f9fafb;">
+                  <td colspan="3" class="text-right" style="text-align: right; padding-right: 1rem; font-weight: 600;">
+                    Total Material Cost per Unit:</td>
+                  <td colspan="2" style="font-size: 1.1rem; font-weight: 700; color: #111827;" id="bom_grand_total">
+                    $0.00</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div id="bom_empty_state" style="text-align: center; padding: 2rem; color: #6b7280; display: none;">
+            <i class="fa fa-flask" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+            <p>No materials added. Search above to create a recipe.</p>
+          </div>
+        </div>
+      </div>
+
+
+
     </div>
 
-    <!-- Pricing & Inventory -->
-    <div class="form-section">
-      <div class="form-section-title">Pricing & Inventory</div>
+    <!-- RIGHT COLUMN (SIDEBAR) -->
+    <div class="form-sidebar-column">
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="id_price">Price</label>
-          {{ form.price }}
+
+
+      <!-- Sales Channels -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title">Sales Channels</div>
+
+        <div class="toggle-item">
+          <div class="toggle-info">
+            <span class="toggle-label">Online Store</span>
+            <span class="toggle-desc">Listed on website</span>
+          </div>
+          <label class="switch-container">
+            {{ form.featured }}
+            <span class="switch-slider"></span>
+          </label>
         </div>
-        <div class="form-group">
-          <label for="id_quantity">Quantity</label>
-          {{ form.quantity }}
+
+        <div class="channel-divider"></div>
+
+        <div class="toggle-item">
+          <div class="toggle-info">
+            <span class="toggle-label">Point of Sale</span>
+            <span class="toggle-desc">Selling policy enabled</span>
+          </div>
+          <label class="switch-container">
+            {{ form.selling_while_out_of_stock }}
+            <span class="switch-slider"></span>
+          </label>
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="id_unit_of_measurement">Unit of Measurement</label>
-          {{ form.unit_of_measurement }}
-        </div>
-        <div class="form-group">
-          <label for="id_minimum_inventory_level">Min. Inventory Level</label>
-          {{ form.minimum_inventory_level }}
-        </div>
-      </div>
-    </div>
-
-    <!-- Product Details -->
-    <div class="form-section">
-      <div class="form-section-title">Product Details</div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="id_weight">Weight</label>
-          {{ form.weight }}
-        </div>
-        <div class="form-group">
-          <label for="id_unit_of_weight">Weight Unit</label>
-          {{ form.unit_of_weight }}
+      <!-- Pricing (Moved to Sidebar) -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title">Pricing</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="id_price">Price</label>
+            {{ form.price }}
+          </div>
+          <div class="form-group">
+            <label for="id_cost">Cost per item</label>
+            {{ form.cost }}
+          </div>
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="id_type">Product Type</label>
-          {{ form.type }}
+      <!-- Inventory (Moved to Sidebar) -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title">Inventory</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="id_sku">SKU (Stock Keeping Unit)</label>
+            {{ form.sku }}
+          </div>
+          <div class="form-group">
+            <label for="id_barcode">Barcode (ISBN, UPC, GTIN, etc.)</label>
+            {{ form.barcode }}
+          </div>
         </div>
+        <div style="height: 15px;"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="id_quantity">Quantity</label>
+            {{ form.quantity }}
+          </div>
+          <div class="form-group">
+            <label for="id_minimum_inventory_level">Min. Inventory Level</label>
+            {{ form.minimum_inventory_level }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipping (Moved to Sidebar) -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title">Shipping</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="id_weight">Weight</label>
+            {{ form.weight }}
+          </div>
+          <div class="form-group">
+            <label for="id_unit_of_weight">Unit</label>
+            {{ form.unit_of_weight }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Product Attributes (Moved to Sidebar) -->
+      <div class="form-card sidebar-card" id="product_attributes_section">
+        <div class="form-card-header">
+          <div class="form-card-title">Product Attributes</div>
+          <button type="button" class="btn-link" onclick="addProductAttribute()">
+            <i class="fa fa-plus"></i> Add Attribute
+          </button>
+        </div>
+
+        <div id="product_attributes_container" class="attributes-container">
+          {% if product %}
+          {% for attr in product.attributes.all %}
+          <div class="attribute-card">
+            <div class="attribute-inputs">
+              <div class="attribute-input-wrapper">
+                <input type="text" class="attribute-input" name="attribute_names[]" placeholder="Name (e.g. Color)"
+                  value="{{ attr.name }}" oninput="scheduleAttributeSave()" required>
+              </div>
+              <div class="attribute-input-wrapper">
+                <input type="text" class="attribute-input" name="attribute_values[]" placeholder="Value (e.g. Red)"
+                  value="{{ attr.value }}" oninput="scheduleAttributeSave()" required>
+              </div>
+            </div>
+            <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+
+        {% if not product.attributes.all %}
+        <div id="empty_attributes_placeholder" class="empty-placeholder">
+          <p>No attributes yet.</p>
+        </div>
+        {% endif %}
+
+        <div id="attr_save_status"></div>
+      </div>
+
+      <!-- Product Organization -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title">Product Organization</div>
+
         <div class="form-group">
           <label for="id_category">Category</label>
           {{ form.category }}
         </div>
-      </div>
 
-      <div class="form-group">
-        <label for="id_supplier">Supplier</label>
-        {{ form.supplier }}
-      </div>
-    </div>
-
-    <!-- Product Images -->
-    <div class="form-section" id="product_images_section">
-      <div class="form-section-title">Product Images</div>
-
-      {% if product %}
-      <!-- Upload Button - Opens File Manager Modal -->
-      <div class="form-group">
-        <button type="button" id="openFileManagerBtn"
-          style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;"
-          onmouseover="this.style.background='#5568d3'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'"
-          onmouseout="this.style.background='#667eea'; this.style.transform=''; this.style.boxShadow=''">
-          <i class="fa fa-images"></i> Manage Files
-        </button>
-        <small style="color: #6b7280; display: block; margin-top: 8px;">Drag to reorder • First image is primary</small>
-      </div>
-
-      <div id="variants_image_notice"
-        style="display: none; padding: 15px; background: #f0f9ff; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e40af; margin-top: 15px;">
-        <i class="fa fa-info-circle"></i> <strong>Product images will be automatically taken from the first
-          variant.</strong><br>
-        <small style="margin-top: 4px; display: block;">To change product images, modify the first variant's
-          images.</small>
-      </div>
-
-      <!-- All Product Images - Single Grid -->
-      <div style="margin-top: 20px;">
-        <div id="sortable_images" style="display: flex; flex-wrap: wrap; gap: 15px;">
-          {% for file in product.files.all %}
-          {% if not file.product_variant %}
-          <div class="sortable-image" data-file-id="{{ file.pk }}" data-file-type="{{ file.file_type }}"
-            style="position: relative; border: 2px solid {% if file.is_primary %}#667eea{% else %}#e5e7eb{% endif %}; border-radius: 8px; padding: 10px; background: white; width: 150px;">
-            {% if file.is_primary %}
-            <div class="primary-badge"
-              style="position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;">
-              PRIMARY
-            </div>
-            {% endif %}
-            <div class="drag-handle"
-              style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: grab; user-select: none;">
-              <i class="fa fa-grip-vertical"></i>
-            </div>
-            {% if file.is_video %}
-            <!-- Video file: show thumbnail with play icon -->
-            <div style="position: relative;">
-              <a href="{{ file.file_url }}" target="_blank" style="pointer-events: none;">
-                <img src="{{ file.video_thumbnail_url|default:file.file_url }}"
-                  style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none; background: #1a1a2e;" />
-              </a>
-              <div
-                style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center; pointer-events: none;">
-                <i class="fa fa-play" style="color: white; font-size: 16px; margin-left: 3px;"></i>
-              </div>
-            </div>
-            {% else %}
-            <!-- Image file: show image directly -->
-            <a href="{{ file.optimized_url }}" target="_blank" style="pointer-events: none;">
-              <img src="{{ file.optimized_url }}"
-                style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; pointer-events: none; user-select: none;" />
-            </a>
-            {% endif %}
-            <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px;">
-              <button type="button" class="instant-delete-btn" data-file-id="{{ file.pk }}"
-                style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 11px; width: 100%;">
-                <i class="fa fa-trash"></i> Delete
-              </button>
-            </div>
-          </div>
-          {% endif %}
-          {% endfor %}
-        </div>
-        <input type="hidden" id="image_order" name="image_order" value="">
-        <input type="hidden" id="deleted_files" name="deleted_files" value="">
-      </div>
-      {% else %}
-      <!-- Product creation mode - uses file manager modal with temp upload -->
-      <div id="product_images_content">
         <div class="form-group">
-          <button type="button" id="openFileManagerBtnCreate"
-            style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;"
-            onmouseover="this.style.background='#5568d3'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'"
-            onmouseout="this.style.background='#667eea'; this.style.transform=''; this.style.boxShadow=''">
-            <i class="fa fa-images"></i> Manage Files
-          </button>
-          <small style="color: #6b7280; display: block; margin-top: 8px;">Drag to reorder • First image is
-            primary</small>
+          <label for="id_type">Product Type</label>
+          {{ form.type }}
         </div>
 
-        <!-- Product Images Grid (same as edit mode) -->
-        <div style="margin-top: 20px;">
-          <div id="sortable_images" style="display: flex; flex-wrap: wrap; gap: 15px;">
-            <!-- Uploaded images will appear here -->
-          </div>
-          <input type="hidden" id="image_order" name="image_order" value="">
+        <div class="form-group">
+          <label for="id_supplier">Vendor</label>
+          {{ form.supplier }}
         </div>
-      </div>
-      {% endif %}
-    </div>
 
-    <!-- Product Attributes -->
-    <div class="form-section" id="product_attributes_section">
-      <div class="form-section-title">
-        <div
-          style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; width: 100%;">
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <span style="font-weight: 600; color: #111827;">Product Attributes</span>
-            <span style="color: #6b7280; font-weight: 400; font-size: 13px;">Additional properties like fabric type,
-              width, length</span>
-          </div>
-          <button type="button" class="btn-add-attribute" onclick="addProductAttribute()">
-            <i class="fa fa-plus"></i> Add Attribute
-          </button>
+        <div class="form-group">
+          <label>Collections</label>
+          <input type="text" class="form-input" placeholder="Search collections...">
+        </div>
+
+        <div class="form-group">
+          <label>Tags</label>
+          <input type="text" class="form-input" placeholder="Vintage, Summer, Cotton">
         </div>
       </div>
 
-      <div id="product_attributes_container" class="attributes-container">
-        {% if product %}
-        {% for attr in product.attributes.all %}
-        <div class="attribute-card">
-          <div class="attribute-field">
-            <label class="attribute-label">Attribute Name</label>
-            <input type="text" class="attribute-input" name="attribute_names[]" placeholder="e.g. Fabric Type"
-              value="{{ attr.name }}" oninput="scheduleAttributeSave()" required>
-          </div>
-          <div class="attribute-field">
-            <label class="attribute-label">Value</label>
-            <input type="text" class="attribute-input" name="attribute_values[]" placeholder="e.g. Cotton"
-              value="{{ attr.value }}" oninput="scheduleAttributeSave()" required>
-          </div>
-          <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
-            <i class="fa fa-trash"></i>
-          </button>
-        </div>
-        {% endfor %}
-        {% endif %}
-      </div>
-
-      {% if not product.attributes.all %}
-      <div id="empty_attributes_placeholder" class="empty-placeholder">
-        <i class="fa fa-tags"></i>
-        <p>No attributes yet. Click "Add Attribute" to create product attributes.</p>
-      </div>
-      {% endif %}
-
-      <div class="attributes-info-box">
-        <i class="fa fa-info-circle"></i>
-        <span><strong>Product-level attributes</strong> apply to all variants. You can customize them per-variant in the
-          variants table.</span>
-      </div>
-    </div>
-
-    <style>
-      /* Product Attributes Modern Styles */
-      .btn-add-attribute {
-        padding: 10px 18px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
-        transition: all 0.2s ease;
-        white-space: nowrap;
-      }
-
-      .btn-add-attribute:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
-      }
-
-      .attributes-container {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        margin-top: 20px;
-      }
-
-      .attribute-card {
-        display: grid;
-        grid-template-columns: 1fr 1fr auto;
-        gap: 16px;
-        padding: 16px 20px;
-        background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        transition: all 0.2s ease;
-        align-items: end;
-      }
-
-      .attribute-card:hover {
-        border-color: #667eea;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
-      }
-
-      .attribute-field {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        min-width: 0;
-      }
-
-      .attribute-label {
-        font-size: 12px;
-        font-weight: 500;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .attribute-input {
-        width: 100%;
-        padding: 12px 14px;
-        border: 1.5px solid #e2e8f0;
-        border-radius: 8px;
-        font-size: 14px;
-        background: white;
-        transition: all 0.2s ease;
-        box-sizing: border-box;
-      }
-
-      .attribute-input:focus {
-        outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-      }
-
-      .attribute-input::placeholder {
-        color: #94a3b8;
-      }
-
-      .attribute-delete-btn {
-        width: 42px;
-        height: 42px;
-        background: white;
-        color: #94a3b8;
-        border: 1.5px solid #e2e8f0;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-
-      .attribute-delete-btn:hover {
-        background: #fef2f2;
-        border-color: #fca5a5;
-        color: #ef4444;
-      }
-
-      .empty-placeholder {
-        padding: 32px;
-        text-align: center;
-        color: #94a3b8;
-        background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
-        border: 2px dashed #e2e8f0;
-        border-radius: 12px;
-        margin-top: 20px;
-      }
-
-      .empty-placeholder i {
-        font-size: 32px;
-        margin-bottom: 12px;
-        display: block;
-        opacity: 0.6;
-      }
-
-      .empty-placeholder p {
-        margin: 0;
-        font-size: 14px;
-      }
-
-      .attributes-info-box {
-        margin-top: 20px;
-        padding: 14px 16px;
-        background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
-        border: 1px solid #bfdbfe;
-        border-left: 4px solid #3b82f6;
-        border-radius: 8px;
-        font-size: 13px;
-        color: #1e40af;
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        line-height: 1.5;
-      }
-
-      .attributes-info-box i {
-        color: #3b82f6;
-        margin-top: 2px;
-      }
-
-      @media (max-width: 768px) {
-        .attribute-card {
-          grid-template-columns: 1fr;
-          gap: 12px;
-        }
-
-        .attribute-delete-btn {
-          width: 100%;
-          height: 38px;
-        }
-      }
-    </style>
-
-    <!-- Variants -->
-    <div class="form-section">
-      <div class="form-section-title">Product Variants</div>
-      {% variant_form current_url=request.path product=product variants=variants %}
-    </div>
-
-    <!-- Options -->
-    <div class="form-section">
-      <div class="form-section-title">Options</div>
-      <div class="checkbox-group">
-        <label class="checkbox-label">
-          {{ form.featured }}
-          <span>Featured Product</span>
-        </label>
-        <label class="checkbox-label">
-          {{ form.selling_while_out_of_stock }}
-          <span>Allow Selling When Out of Stock</span>
-        </label>
-      </div>
-    </div>
-
-    <!-- Form Actions -->
-    <div class="form-actions">
-      <a href="{% url 'marketing:index' %}" class="btn btn-secondary">Cancel</a>
-      <button type="submit" class="btn btn-primary">
-        {% if not is_update %}
-        Create Product
-        {% else %}
-        Update Product
-        {% endif %}
-      </button>
     </div>
   </form>
 </div>
@@ -550,7 +527,7 @@
   // ============== PRODUCT ATTRIBUTES ==============
   let attributeCounter = 0;
   let attributeSaveTimeout = null;
-  
+
 
   function addProductAttribute() {
     const container = document.getElementById('product_attributes_container');
@@ -562,21 +539,21 @@
 
     const card = document.createElement('div');
     card.className = 'attribute-card';
-    card.style.cssText = 'opacity: 0; transform: translateY(-10px); transition: opacity 0.3s ease, transform 0.3s ease;';
+    card.style.cssText = 'opacity: 0; transform: translateY(-5px); transition: all 0.2s ease;';
     card.innerHTML = `
-      <div class="attribute-field">
-        <label class="attribute-label">Attribute Name</label>
-        <input type="text" class="attribute-input attr-name-input" name="attribute_names[]" 
-               placeholder="e.g. Fabric Type" 
-               oninput="scheduleAttributeSave()"
-               required>
-      </div>
-      <div class="attribute-field">
-        <label class="attribute-label">Value</label>
-        <input type="text" class="attribute-input attr-value-input" name="attribute_values[]" 
-               placeholder="e.g. Cotton" 
-               oninput="scheduleAttributeSave()"
-               required>
+      <div class="attribute-inputs">
+        <div class="attribute-input-wrapper">
+          <input type="text" class="attribute-input attr-name-input" name="attribute_names[]" 
+                 placeholder="Name (e.g. Material)" 
+                 oninput="scheduleAttributeSave()"
+                 required>
+        </div>
+        <div class="attribute-input-wrapper">
+          <input type="text" class="attribute-input attr-value-input" name="attribute_values[]" 
+                 placeholder="Value (e.g. Wool)" 
+                 oninput="scheduleAttributeSave()"
+                 required>
+        </div>
       </div>
       <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
         <i class="fa fa-trash"></i>
@@ -740,11 +717,178 @@
         }, 2000);
         break;
       case 'error':
-        indicator.innerHTML = '<i class="fa fa-exclamation-triangle"></i> Error';
+        indicator.innerHTML = '<i class="fa fa-exclamation-circle"></i> Error';
         indicator.style.color = '#ef4444';
         break;
     }
   }
+
+  // ============== MANUFACTURING (BOM) LOGIC ==============
+  const bomToggle = document.getElementById('track_manufacturing_toggle');
+  const bomContent = document.getElementById('bom_content');
+  const bomSearch = document.getElementById('bom_material_search');
+  const bomSearchResults = document.getElementById('bom_search_results');
+  const bomTableBody = document.getElementById('bom_table_body');
+  const bomEmptyState = document.getElementById('bom_empty_state');
+  const bomGrandTotal = document.getElementById('bom_grand_total');
+
+  if (bomToggle) {
+    // Toggle Visibility
+    function toggleBomContent() {
+      if (bomToggle.checked) {
+        bomContent.style.display = 'block';
+        updateBomEmptyState();
+      } else {
+        bomContent.style.display = 'none';
+      }
+    }
+    bomToggle.addEventListener('change', toggleBomContent);
+    // Init state
+    toggleBomContent();
+
+    // Search Autocomplete
+    let searchTimeout;
+    bomSearch.addEventListener('input', function () {
+      const query = this.value.trim();
+      clearTimeout(searchTimeout);
+
+      if (query.length < 2) {
+        bomSearchResults.style.display = 'none';
+        return;
+      }
+
+      searchTimeout = setTimeout(() => {
+        fetch(`/operating/raw_material_search/?q=${encodeURIComponent(query)}`)
+          .then(res => res.json())
+          .then(data => {
+            bomSearchResults.innerHTML = '';
+            if (data.length > 0) {
+              data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'dropdown-item';
+                div.style.padding = '8px 12px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid #f3f4f6';
+                div.innerHTML = `
+                  <div style="font-weight: 500;">${item.name}</div>
+                  <div style="font-size: 0.8rem; color: #6b7280;">SKU: ${item.sku} | Stock: ${item.stock} ${item.unit}</div>
+                `;
+                div.addEventListener('click', () => {
+                  addBomRow(item);
+                  bomSearch.value = '';
+                  bomSearchResults.style.display = 'none';
+                });
+                bomSearchResults.append(div);
+              });
+              bomSearchResults.style.display = 'block';
+            } else {
+              bomSearchResults.style.display = 'none';
+            }
+          });
+      }, 300);
+    });
+
+    // Hide dropdown on outside click
+    document.addEventListener('click', function (e) {
+      if (!bomSearch.contains(e.target) && !bomSearchResults.contains(e.target)) {
+        bomSearchResults.style.display = 'none';
+      }
+    });
+
+    // Add Row
+    function addBomRow(material) {
+      // Check if already exists
+      const existing = bomTableBody.querySelector(`tr[data-material-id="${material.id}"]`);
+      if (existing) {
+        // Flash visualization
+        existing.style.backgroundColor = '#f0f9ff';
+        setTimeout(() => existing.style.backgroundColor = '', 500);
+        return;
+      }
+
+      const tr = document.createElement('tr');
+      tr.dataset.materialId = material.id;
+      tr.innerHTML = `
+        <td>
+          <div class="bom-item-name" style="font-weight: 500;">${material.name}</div>
+          <div class="bom-item-sku text-muted" style="font-size: 0.8rem;">${material.sku}</div>
+          <input type="hidden" name="bom_material_id[]" value="${material.id}">
+        </td>
+        <td>
+          <div class="input-group" style="display: flex; align-items: center; gap: 5px;">
+            <input type="number" step="0.0001" class="form-input bom-qty-input" name="bom_quantity[]" value="1" style="width: 80px; padding: 4px 8px;">
+            <span class="unit-badge" style="background:#f3f4f6; padding:2px 6px; border-radius:4px; font-size:0.8rem;">${material.unit || 'unit'}</span>
+          </div>
+        </td>
+        </td>
+        <td>
+          <div class="cost-display" data-unit-cost="${material.cost || 0}">
+            $${parseFloat(material.cost || 0).toFixed(2)}
+          </div>
+        </td>
+        <td>
+          <div class="total-cost-display fw-bold">$0.00</div>
+        </td>
+        <td>
+          <button type="button" class="btn-icon text-danger remove-bom-row" style="background:none; border:none; color:#ef4444; cursor:pointer;">
+            <i class="fa fa-times"></i>
+          </button>
+        </td>
+      `;
+      bomTableBody.appendChild(tr);
+      updateBomEmptyState();
+
+      // Hook up events
+      tr.querySelector('.bom-qty-input').addEventListener('input', calculateBomTotals);
+      tr.querySelector('.remove-bom-row').addEventListener('click', function () {
+        tr.remove();
+        updateBomEmptyState();
+        calculateBomTotals();
+      });
+
+      // Ideally fetch cost
+      // For now default 0
+    }
+
+    // Helper: Update Empty State
+    function updateBomEmptyState() {
+      if (bomTableBody.children.length === 0) {
+        bomEmptyState.style.display = 'block';
+        document.getElementById('bom_table').style.display = 'none';
+      } else {
+        bomEmptyState.style.display = 'none';
+        document.getElementById('bom_table').style.display = 'table';
+      }
+    }
+
+    // Helper: Calculate Totals
+    function calculateBomTotals() {
+      let grandTotal = 0;
+      bomTableBody.querySelectorAll('tr').forEach(row => {
+        const qty = parseFloat(row.querySelector('.bom-qty-input').value) || 0;
+        const costDiv = row.querySelector('.cost-display');
+        const unitCost = parseFloat(costDiv.dataset.unitCost) || 0;
+        const total = qty * unitCost;
+
+        row.querySelector('.total-cost-display').textContent = '$' + total.toFixed(2);
+        grandTotal += total;
+      });
+      bomGrandTotal.textContent = '$' + grandTotal.toFixed(2);
+    }
+
+    // Init existing rows logic
+    bomTableBody.querySelectorAll('tr').forEach(row => {
+      row.querySelector('.bom-qty-input').addEventListener('input', calculateBomTotals);
+      row.querySelector('.remove-bom-row').addEventListener('click', function () {
+        row.remove();
+        updateBomEmptyState();
+        calculateBomTotals();
+      });
+    });
+    calculateBomTotals();
+    updateBomEmptyState();
+  }
+
 
   // Get CSRF token
   function getCsrfToken() {
@@ -811,35 +955,7 @@
   }
 
   function updatePrimaryBadge() {
-    const container = document.getElementById('sortable_images');
-    if (!container) return;
-
-    // Remove all primary badges safely
-    try {
-      container.querySelectorAll('.primary-badge').forEach(badge => badge.remove());
-      container.querySelectorAll('.sortable-image').forEach(img => {
-        if (img && img.style) {
-          img.style.borderColor = '#e5e7eb';
-        }
-      });
-    } catch (e) {
-      console.warn('Error removing badges:', e);
-    }
-
-    // Add primary badge to first image
-    const firstImage = container.querySelector('.sortable-image');
-    if (firstImage) {
-      firstImage.style.borderColor = '#667eea';
-
-      // Check if badge already exists
-      if (!firstImage.querySelector('.primary-badge')) {
-        const badge = document.createElement('div');
-        badge.className = 'primary-badge';
-        badge.style.cssText = 'position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;';
-        badge.textContent = 'PRIMARY';
-        firstImage.insertBefore(badge, firstImage.firstChild);
-      }
-    }
+    // Deprecated: Duplicate badge removal
   }
 
   function previewImages(event) {
@@ -877,7 +993,7 @@
         `;
 
         previewCard.innerHTML = `
-          ${index === 0 ? '<div class="primary-badge" style="position: absolute; top: -8px; left: 10px; background: #667eea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; z-index: 1;">PRIMARY</div>' : ''}
+          ${index === 0 ? '' : ''}
           <div style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 5px 8px; border-radius: 4px; font-size: 12px;">
             <i class="fa fa-grip-vertical"></i>
           </div>
@@ -1075,5 +1191,80 @@
   }
 });
 </script>
+
+<!-- Variant Detail Edit Modal -->
+<div id="variant_detail_modal" class="variant-modal" style="display: none;">
+  <div class="variant-modal-overlay" onclick="closeVariantDetailModal()"></div>
+  <div class="variant-modal-content">
+    <div class="variant-modal-header">
+      <h3 id="variant_modal_title">Edit Variant</h3>
+      <button type="button" class="modal-close-btn" onclick="closeVariantDetailModal()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="variant-modal-body">
+      <!-- Active/Delete Checkbox -->
+      <div class="form-group checkbox-wrapper">
+        <label class="custom-checkbox">
+          <input type="checkbox" id="modal_variant_active" checked>
+          <span class="checkmark"></span>
+          <span class="label-text">Create this variant</span>
+        </label>
+      </div>
+
+      <hr class="modal-divider">
+
+      <!-- Price & Cost -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="modal_variant_price">Price</label>
+          <div class="input-with-icon">
+            <span class="currency-symbol">$</span>
+            <input type="number" id="modal_variant_price" class="form-input" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="modal_variant_cost">Cost per item</label>
+          <div class="input-with-icon">
+            <span class="currency-label">Cost</span>
+            <span class="currency-symbol">$</span>
+            <input type="number" id="modal_variant_cost" class="form-input" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+      </div>
+
+      <hr class="modal-divider">
+
+      <!-- Inventory Section -->
+      <h4 class="section-title">Inventory</h4>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="modal_variant_sku">SKU (Stock Keeping Unit)</label>
+          <input type="text" id="modal_variant_sku" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label for="modal_variant_barcode">Barcode (ISBN, UPC, GTIN, etc.)</label>
+          <input type="text" id="modal_variant_barcode" class="form-input">
+        </div>
+      </div>
+
+      <div class="modal-info-text">
+        Save the product to edit more variant details.
+      </div>
+
+    </div>
+
+    <div class="variant-modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeVariantDetailModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="saveVariantDetailModal()">Done</button>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

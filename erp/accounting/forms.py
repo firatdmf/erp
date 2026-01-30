@@ -73,12 +73,14 @@ class EquityCapitalForm(forms.ModelForm):
             members = StakeholderBook.objects.filter(book=book).values_list(
                 "member", flat=True
             )
-            self.fields["member"].queryset = Member.objects.filter(pk__in=members)
+            # Use select_related to fetch the user related object in the same query to avoid N+1 problem
+            self.fields["member"].queryset = Member.objects.filter(pk__in=members).select_related("user")
 
             # Get the cash accounts assigned to the book
+            # Use select_related to fetch currency and book to avoid N+1
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
-            ).order_by("name")
+            ).select_related("currency", "book").order_by("name")
 
 
 class EquityRevenueForm(forms.ModelForm):
@@ -128,7 +130,7 @@ class EquityExpenseForm(forms.ModelForm):
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
-            ).order_by("name")
+            ).select_related("currency", "book").order_by("name")
             # self.fields["book"].queryset = Book.objects.filter(book=book)
 
 
@@ -149,13 +151,13 @@ class EquityDividentForm(forms.ModelForm):
         if book:
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
-            ).order_by("name")
+            ).select_related("currency", "book").order_by("name")
             # The values_list method in Django's QuerySet API is used to create a list (or tuple) of values from the specified fields of the model.
             # The flat=True argument ensures that the result is a flat list rather than a list of tuples.
             members = StakeholderBook.objects.filter(book=book).values_list(
                 "member", flat=True
             )
-            self.fields["member"].queryset = Member.objects.filter(id__in=members)
+            self.fields["member"].queryset = Member.objects.filter(id__in=members).select_related("user")
 
 
 class InTransferForm(forms.ModelForm):

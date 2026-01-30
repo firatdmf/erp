@@ -1,9 +1,11 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
+from django.contrib.auth import update_session_auth_hash
 
 # Create your views here.
 from django.contrib.auth.models import User
 from .models import Member
+from .forms import UpdateProfileForm, CustomPasswordChangeForm
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 
@@ -110,3 +112,54 @@ def signout(request):
     logout(request)
     messages.success(request, "Logged out successfully")
     return redirect("index")
+
+
+@login_required
+def update_profile(request):
+    if request.method == "POST":
+        form = UpdateProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Profile updated successfully!")
+            return HttpResponse("""
+                <div class="alert alert-success" role="alert" style="padding: 1rem; background-color: #d1fae5; color: #065f46; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <i class="fas fa-check-circle"></i> Profile updated successfully!
+                </div>
+            """)
+        else:
+            errors = form.errors.as_text()
+            return HttpResponse(f"""
+                <div class="alert alert-danger" role="alert" style="padding: 1rem; background-color: #fee2e2; color: #991b1b; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <i class="fas fa-exclamation-circle"></i> Error updating profile: {errors}
+                </div>
+            """)
+    return HttpResponse(status=405) # Method Not Allowed
+
+
+@login_required
+def change_password_settings(request):
+    if request.method == "POST":
+        form = CustomPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)  # Important!
+            messages.success(request, "Password changed successfully!")
+            return HttpResponse("""
+                <div class="alert alert-success" role="alert" style="padding: 1rem; background-color: #d1fae5; color: #065f46; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <i class="fas fa-check-circle"></i> Password changed successfully!
+                </div>
+            """)
+        else:
+             # Basic error formatting
+            error_html = "<ul>"
+            for field, errors in form.errors.items():
+                for error in errors:
+                    error_html += f"<li>{error}</li>"
+            error_html += "</ul>"
+            
+            return HttpResponse(f"""
+                <div class="alert alert-danger" role="alert" style="padding: 1rem; background-color: #fee2e2; color: #991b1b; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <i class="fas fa-exclamation-circle"></i> Error changing password: {error_html}
+                </div>
+            """)
+    return HttpResponse(status=405)

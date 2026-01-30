@@ -1,0 +1,139 @@
+<style>
+    /* Scoped styles for the Capital form */
+    #addCapitalForm {
+        padding: 0.5rem;
+    }
+
+    #addCapitalForm p {
+        margin-bottom: 1.25rem;
+    }
+
+    #addCapitalForm label {
+        display: block;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #374151;
+        /* Gray-700 */
+        margin-bottom: 0.4rem;
+    }
+
+    #addCapitalForm input[type="text"],
+    #addCapitalForm input[type="number"],
+    #addCapitalForm input[type="date"],
+    #addCapitalForm select,
+    #addCapitalForm textarea {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        background-color: #fff;
+        border: 1px solid #d1d5db;
+        /* Gray-300 */
+        border-radius: 8px;
+        font-size: 0.95rem;
+        color: #1f2937;
+        /* Gray-900 */
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        box-sizing: border-box;
+        /* Critical for responsiveness */
+    }
+
+    #addCapitalForm input:focus,
+    #addCapitalForm select:focus,
+    #addCapitalForm textarea:focus {
+        border-color: #4b5563;
+        /* Gray-600 */
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.1);
+    }
+
+    #addCapitalForm textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    /* Help text styling if django renders it */
+    #addCapitalForm .helptext {
+        display: block;
+        margin-top: 0.25rem;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+
+    .form-footer {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+    }
+
+    #btnSaveCapital {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        /* Reduced padding */
+        background-color: #000000;
+        /* Black */
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        /* Slightly lighter weight */
+        font-size: 0.9rem;
+        /* Reduced font size */
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    #btnSaveCapital:hover {
+        background-color: #1f2937;
+        /* Gray-900 */
+        transform: translateY(-1px);
+    }
+
+    #btnSaveCapital:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    #btnCancelCapital {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        /* Reduced padding */
+        background-color: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        color: #374151;
+        font-weight: 500;
+        /* Slightly lighter weight */
+        font-size: 0.9rem;
+        /* Reduced font size */
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+    }
+
+    #btnCancelCapital:hover {
+        background-color: #f3f4f6;
+        border-color: #9ca3af;
+    }
+</style>
+
+<form id="addCapitalForm" method="post" onsubmit="submitAddCapitalForm(event)">
+    {% csrf_token %}
+    <div class="form-body">
+        {{ form.as_p }}
+    </div>
+    <div class="form-footer">
+        <button type="button" id="btnCancelCapital" onclick="closeAddCapitalSidebar()">
+            Cancel
+        </button>
+        <button type="submit" id="btnSaveCapital">
+            <span class="btn-text">Add Capital</span>
+            <span class="spinner-border" style="display: none;">
+                <i class="fas fa-spinner fa-spin"></i>
+            </span>
+        </button>
+    </div>
+</form>

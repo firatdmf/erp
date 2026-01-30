@@ -90,6 +90,12 @@ class RawMaterialGood(models.Model):
             f"{self.name} | {(self.sku) if self.sku != self.pk else self.supplier_sku}"
         )
 
+    @property
+    def unit_cost(self):
+        # Fetch the latest cost from receipts
+        latest_item = self.items.select_related('receipt').order_by('-receipt__date', '-id').first()
+        return latest_item.unit_cost if latest_item else 0
+
 
 # when we save this model, we create an libability accounts payable
 class RawMaterialGoodReceipt(models.Model):
@@ -201,6 +207,53 @@ class RawMaterialGoodItem(models.Model):
             raise ValueError({"error": "raw_material_good quantity did not update"})
 
         return super().save(*args, **kwargs)
+
+
+class BillOfMaterials(models.Model):
+    """
+    Connects a Product to its Manufacturing Recipe.
+    """
+    product = models.OneToOneField(
+        Product, 
+        on_delete=models.CASCADE, 
+        related_name="bill_of_materials"
+    )
+    track_manufacturing = models.BooleanField(
+        default=False, 
+        help_text="If enabled, this product can be manufactured from raw materials."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"BOM: {self.product.title}"
+
+
+class BillOfMaterialsItem(models.Model):
+    """
+    A single raw material item within a BOM.
+    """
+    bill_of_materials = models.ForeignKey(
+        BillOfMaterials, 
+        on_delete=models.CASCADE, 
+        related_name="items"
+    )
+    raw_material = models.ForeignKey(
+        RawMaterialGood, 
+        on_delete=models.CASCADE,
+        related_name="bom_usages"
+    )
+    # Quantity required to produce 1 unit of the Product
+    quantity = models.DecimalField(
+        max_digits=10, 
+        decimal_places=4, 
+        help_text="Amount of raw material used to produce 1 unit of the product"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.raw_material.name} ({self.quantity} {self.raw_material.unit_of_measurement}) for {self.bill_of_materials.product.title}"
 
 
 STATUS_CHOICES = [

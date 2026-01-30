@@ -130,28 +130,91 @@ class ProductList(generic.ListView):
     context_object_name = "products"
     paginate_by = 25  # Show 25 products per page
     
+    def get_template_names(self):
+        if self.request.headers.get("HX-Request"):
+            return ["marketing/partials/product_list_rows.html"]
+        return ["marketing/product_list.html"]
+    
     def get_queryset(self):
-        from django.db.models import Count
+        from django.db.models import Count, Sum, Value, DecimalField, F
+        from django.db.models.functions import Coalesce
         
         queryset = super().get_queryset()
         search_query = self.request.GET.get('search', '').strip()
         
         if search_query:
-            # Search by title, SKU, or barcode (case-insensitive)
+            # Search by title or SKU (case-insensitive)
             queryset = queryset.filter(
                 models.Q(title__icontains=search_query) |
-                models.Q(sku__icontains=search_query) |
-                models.Q(barcode__icontains=search_query)
+                models.Q(sku__icontains=search_query)
             )
         
-        # Optimize: Annotate variant count (single query) + select_related
+        # Optimize: Annotate variant count and total stock
+        # Use Value(0) with DecimalField to match variant_quantity type (Decimal)
         return queryset.select_related(
             'category', 
             'primary_image', 
             'supplier'
+        ).prefetch_related(
+            'attributes', # Product attributes
         ).annotate(
-            variant_count=Count('variants')  # Efficient count in SQL
-        ).order_by('title')
+            variant_count=Count('variants'),
+            total_stock=Coalesce(
+                Sum('variants__variant_quantity'), 
+                F('quantity'),
+                Value(0, output_field=DecimalField())
+            )
+        ).order_by('title')[:50] # Limit results to 50 for speed
+
+
+@login_required
+def product_variants(request, pk):
+    """
+    Returns the variants list HTML for a specific product.
+    Used for lazy loading via HTMX.
+    """
+    from django.db.models import Prefetch
+    
+    product = get_object_or_404(Product, pk=pk)
+    variants = product.variants.select_related('product').prefetch_related(
+        Prefetch('files', queryset=ProductFile.objects.order_by('-is_primary', 'sequence')),
+        'product_variant_attribute_values__product_variant_attribute'
+    ).all()
+    
+    return render(request, 'marketing/partials/product_variants.html', {
+        'product': product,
+        'variants': variants
+    })
+
+
+@require_http_methods(["POST"])
+@login_required
+def product_bulk_delete(request):
+    """
+    Handle bulk deletion of products via HTMX.
+    Expects 'product_ids' in POST data (list of IDs).
+    """
+    product_ids = request.POST.getlist('product_ids')
+    
+    if not product_ids:
+        # Try retrieving from json body if not in form data (though HTMX usually sends form data)
+        try:
+            data = json.loads(request.body)
+            product_ids = data.get('product_ids', [])
+        except json.JSONDecodeError:
+            pass
+            
+    if product_ids:
+        # Filter by owner or permissions if needed (assuming all internal users can delete for now)
+        count, _ = Product.objects.filter(id__in=product_ids).delete()
+        print(f"🗑️ Bulk deleted {count} products: IDs {product_ids}")
+        
+        # HTMX Response: Trigger a refresh of the product list
+        response = HttpResponse()
+        response['HX-Refresh'] = "true"  # Simple way: full page reload
+        return response
+    
+    return HttpResponseBadRequest("No products selected")
 
 
 class ProductDetail(generic.DetailView):
@@ -731,17 +794,11 @@ class BaseProductView(ModelFormMixin):
                             if source_file.product_variant_id == variant.id:
                                 # Just update sequence/primary
                                 source_file.sequence = img_sequence
-                                source_file.is_primary = (img_sequence == 0)
+                                source_file.is_primary = False  # Changed ownership, reset primary
+                                source_file.save()
+                                
                                 all_images_to_update.append(source_file)
-                                print(f"✅ Updated file {img_id} for variant {variant_sku} (seq={img_sequence})")
-                            elif source_file.product_variant_id is None:
-                                # File is unlinked (not assigned to any variant yet)
-                                # Link it directly instead of creating a copy
-                                source_file.product_variant = variant
-                                source_file.sequence = img_sequence
-                                source_file.is_primary = (img_sequence == 0)
-                                all_images_to_update.append(source_file)
-                                print(f"🔗 Linked unlinked file {img_id} to variant {variant_sku} (seq={img_sequence})")
+                                print(f"✅ Linked existing file {img_id} to variant {variant_sku} (seq={img_sequence})")
                             else:
                                 # File belongs to another variant
                                 # Check if this variant already has a file with the same URL (prevent duplicates)
@@ -772,6 +829,7 @@ class BaseProductView(ModelFormMixin):
                                         product=self.object,
                                         product_variant=variant,
                                         file_url=source_file.file_url,
+                                        file_type=source_file.file_type,
                                         sequence=img_sequence,
                                         is_primary=(img_sequence == 0)
                                     )
@@ -894,18 +952,39 @@ class BaseProductView(ModelFormMixin):
         total_handle_time = time.time() - handle_start
         print(f"\n⏱️  TOTAL handle_variants: {total_handle_time:.3f}s")
 
+    def handle_bom(self, product):
+        """
+        Handle Bill of Materials logic (track_manufacturing toggle).
+        """
+        from operating.models import BillOfMaterials
+        
+        # Check if 'track_manufacturing' is active in POST data (checkbox)
+        track_manufacturing = self.request.POST.get('track_manufacturing') == 'on'
+        
+        # Get or create the BOM for this product
+        bom, created = BillOfMaterials.objects.get_or_create(product=product)
+        
+        # Update the status
+        if bom.track_manufacturing != track_manufacturing:
+            bom.track_manufacturing = track_manufacturing
+            bom.save()
+            print(f"🏭 Updated manufacturing tracking for {product}: {track_manufacturing}")
+
 
 # ----------------------------------------------
 # Product Create / Edit Views
 # ----------------------------------------------
 @method_decorator(login_required, name="dispatch")
 class ProductCreate(BaseProductView, generic.CreateView):
-    template_name = "marketing/product_create.html"
     template_name = "marketing/product_form.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["is_update"] = False
+        # For new products, pass empty variants list and None for product
+        # The template tag handles None gracefully
+        context["variants"] = []
+        context["product"] = None
         return context
 
     def form_valid(self, form):
@@ -1031,6 +1110,9 @@ class ProductCreate(BaseProductView, generic.CreateView):
             if not variants_json_str:
                 variants_json_str = self.request.POST.get("variants_json", "[]")
             self.handle_variants(self.object, variants_json_str)
+
+            # Handle Manufacturing Recipe (BOM)
+            self.handle_bom(self.object)
 
         return super().form_valid(form)
 
@@ -1194,6 +1276,11 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             attr_start = time.time()
             self.handle_attributes(self.object)
             print(f"⏱️  Handle attributes: {time.time() - attr_start:.3f}s")
+
+            # Handle Manufacturing Recipe (BOM)
+            bom_start = time.time()
+            self.handle_bom(self.object)
+            print(f"⏱️  Handle BOM: {time.time() - bom_start:.3f}s")
 
             variants_json = self.request.POST.get("variants_json", "[]")
             # Always process variants (needed for image changes)

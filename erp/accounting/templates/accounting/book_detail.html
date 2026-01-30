@@ -5,13 +5,23 @@
 {% block css %}
 <style>
   /* ============================================
-   BOOK DETAIL PAGE - Modern Design
+   BOOK DETAIL PAGE - Pixel Perfect Matches
    ============================================ */
+  :root {
+    --bg-page: #f8fafc;
+    --bg-surface: #ffffff;
+    --text-main: #1e293b;
+    --text-sub: #64748b;
+    --border-light: #e2e8f0;
+  }
+
   .book-detail-page {
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
     min-height: 100vh;
+    background-color: var(--bg-page);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 
   /* Breadcrumb */
@@ -19,12 +29,13 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
     font-size: 0.9rem;
+    color: #94a3b8;
   }
 
   .breadcrumb a {
-    color: var(--text-secondary);
+    color: #94a3b8;
     text-decoration: none;
     display: flex;
     align-items: center;
@@ -33,15 +44,11 @@
   }
 
   .breadcrumb a:hover {
-    color: var(--accent-primary);
-  }
-
-  .breadcrumb span {
-    color: var(--text-secondary);
+    color: var(--text-main);
   }
 
   .breadcrumb .current {
-    color: var(--text-primary);
+    color: var(--text-main);
     font-weight: 500;
   }
 
@@ -51,210 +58,249 @@
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 2rem;
-    flex-wrap: wrap;
-    gap: 1rem;
+    background: transparent;
   }
 
-  .page-header-left h1 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
+  .header-main-info {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+  }
+
+  .header-icon-box {
+    width: 64px;
+    height: 64px;
+    background: #ffedd5;
+    /* Orange-100 */
+    color: #f97316;
+    /* Orange-500 */
+    border-radius: 12px;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    justify-content: center;
+    font-size: 1.75rem;
+    flex-shrink: 0;
   }
 
-  .page-header-left h1 i {
-    color: #f59e0b;
+  .header-text h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0 0 0.25rem 0;
+    line-height: 1.2;
   }
 
-  .page-header-left p {
-    color: var(--text-secondary);
-    margin: 0.5rem 0 0;
-    font-size: 0.9rem;
+  .header-text p {
+    color: var(--text-sub);
+    font-size: 1rem;
+    margin: 0;
   }
 
   /* Stakeholders Badge */
-  .stakeholders-badge {
+  .stakeholder-count-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    background: #f3f4f6;
+    background: #f3e8ff;
+    /* Purple-100 */
+    color: #7c3aed;
+    /* Purple-600 */
     padding: 0.5rem 1rem;
-    border-radius: 20px;
+    border-radius: 8px;
     font-size: 0.85rem;
-    color: var(--text-secondary);
+    font-weight: 600;
+    white-space: nowrap;
   }
 
-  .stakeholders-badge i {
+  /* KPI Section Wrapper */
+  .financial-overview-card {
+    background: var(--bg-surface);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-light);
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .card-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 1.5rem;
+  }
+
+  .card-header-title i.blue-icon {
+    color: #3b82f6;
+    /* Blue-500 */
+    background: #eff6ff;
+    padding: 6px;
+    border-radius: 50%;
+    font-size: 0.9rem;
+  }
+
+  .card-header-title i.orange-icon {
+    color: #f97316;
+    background: #ffedd5;
+    padding: 6px;
+    border-radius: 50%;
+    font-size: 0.9rem;
+  }
+
+  .card-header-title i.purple-icon {
     color: #8b5cf6;
+    background: #f3e8ff;
+    padding: 6px;
+    border-radius: 50%;
+    font-size: 0.9rem;
   }
 
   /* Quick Actions Grid */
-  .quick-actions-grid {
+  .quick-actions-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 3.5rem;
   }
 
-  .action-card {
-    background: white;
+  .action-column-card {
+    background: var(--bg-surface);
     border-radius: 16px;
     padding: 1.5rem;
-    border: 1px solid var(--border-color);
-    transition: all 0.2s;
-  }
-
-  .action-card:hover {
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-  }
-
-  .action-card h3 {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 0 0 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .action-links {
+    border: 1px solid var(--border-light);
+    height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
   }
 
-  .action-link {
+  .action-column-header {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background: var(--bg-secondary);
-    border-radius: 10px;
-    text-decoration: none;
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: all 0.2s;
+    gap: 0.5rem;
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
   }
 
-  .action-link:hover {
-    background: var(--accent-light);
-    color: var(--accent-primary);
-    transform: translateX(4px);
-    text-decoration: none;
+  .action-column-header i {
+    font-size: 1rem;
   }
 
-  .action-link i {
-    width: 20px;
-    text-align: center;
-    color: var(--text-secondary);
-    transition: color 0.2s;
-  }
-
-  .action-link:hover i {
-    color: var(--accent-primary);
-  }
-
-  /* Icon Colors */
-  .action-card.equity h3 i {
+  .action-column-header i.green {
     color: #10b981;
   }
 
-  .action-card.transactions h3 i {
+  .action-column-header i.blue {
     color: #3b82f6;
   }
 
-  .action-card.accounts h3 i {
+  .action-column-header i.orange {
     color: #f59e0b;
   }
 
-  .action-card.stakeholders h3 i {
+  .action-column-header i.purple {
     color: #8b5cf6;
   }
 
-  /* KPI Dashboard Container */
-  .kpi-section {
-    background: white;
-    border-radius: 16px;
-    padding: 1.5rem;
-    border: 1px solid var(--border-color);
-    margin-bottom: 2rem;
-  }
-
-  .kpi-section h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0 0 1rem;
+  .action-list {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .kpi-section h2 i {
-    color: #3b82f6;
-  }
-
-  /* Stakeholders Section */
-  .stakeholders-section {
-    background: white;
-    border-radius: 16px;
-    padding: 1.5rem;
-    border: 1px solid var(--border-color);
-    margin-bottom: 2rem;
-  }
-
-  .stakeholders-section h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0 0 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .stakeholders-section h2 i {
-    color: #8b5cf6;
-  }
-
-  .stakeholder-list {
-    display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 0.75rem;
   }
 
-  .stakeholder-chip {
+  .action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    /* Force left alignment */
+    text-align: left;
+    /* Ensure text aligns left */
+    gap: 0.875rem;
+    padding: 1rem 1.25rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    text-decoration: none;
+    color: #475569;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .action-btn:hover {
+    background: #ffffff;
+    color: var(--text-main);
+    border-color: #cbd5e1;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+  }
+
+  .action-btn i {
+    width: 24px;
+    /* Integrated width for consistent alignment */
+    text-align: center;
+    color: #94a3b8;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  /* Specific styling based on screenshot observation */
+  .action-column-card {
+    min-width: 260px;
+    /* Ensure columns don't get too squashed */
+  }
+
+  /* Stakeholders Footer */
+  .stakeholders-footer-card {
+    background: var(--bg-surface);
+    border-radius: 16px;
+    padding: 2rem;
+    border: 1px solid var(--border-light);
+    margin-top: 1rem;
+  }
+
+  .current-stakeholder-item {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    background: #f3f4f6;
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    color: var(--text-primary);
+    gap: 1rem;
+    background: #f8fafc;
+    border: 1px solid var(--border-light);
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
   }
 
-  .stakeholder-chip i {
-    color: #8b5cf6;
+  .stakeholder-initials {
+    width: 40px;
+    height: 40px;
+    background: #e0e7ff;
+    color: #4f46e5;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
   }
 
-  .empty-stakeholders {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    padding: 1rem;
-    text-align: center;
-    background: #f9fafb;
-    border-radius: 10px;
+  .stakeholder-name {
+    font-weight: 500;
+    color: var(--text-main);
   }
 
   /* Responsive */
+  @media (max-width: 1200px) {
+    .quick-actions-row {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
   @media (max-width: 768px) {
     .book-detail-page {
       padding: 1rem;
@@ -262,9 +308,10 @@
 
     .page-header {
       flex-direction: column;
+      gap: 1rem;
     }
 
-    .quick-actions-grid {
+    .quick-actions-row {
       grid-template-columns: 1fr;
     }
   }
@@ -276,7 +323,7 @@
   <!-- Breadcrumb -->
   <div class="breadcrumb">
     <a href="{% url 'accounting:index' %}">
-      <i class="fas fa-book-open"></i> Books
+      <i class="fas fa-book"></i> Books
     </a>
     <span>/</span>
     <span class="current">{{ book.name }}</span>
@@ -284,109 +331,133 @@
 
   <!-- Header -->
   <div class="page-header">
-    <div class="page-header-left">
-      <h1><i class="fas fa-book"></i> {{ book.name }}</h1>
-      <p>Manage your book entries, transactions, and stakeholders</p>
+    <div class="header-main-info">
+      <div class="header-icon-box">
+        <i class="fas fa-wallet"></i>
+      </div>
+      <div class="header-text">
+        <h1>{{ book.name }}</h1>
+        <p>Manage your book entries, transactions, and stakeholders</p>
+      </div>
     </div>
+
     {% if book.stakeholders.count > 0 %}
-    <div class="stakeholders-badge">
-      <i class="fas fa-users"></i>
+    <div class="stakeholder-count-badge">
+      <i class="fas fa-users" style="margin-right: 6px;"></i>
       {{ book.stakeholders.count }} Stakeholder{{ book.stakeholders.count|pluralize:"s" }}
     </div>
     {% endif %}
   </div>
 
-  <!-- KPI Dashboard -->
-  <div class="kpi-section">
-    <h2><i class="fas fa-chart-pie"></i> Financial Overview</h2>
+  <!-- Financial Overview Card -->
+  <div class="financial-overview-card">
+    <div class="card-header-title">
+      <i class="fas fa-chart-pie blue-icon"></i> Financial Overview
+    </div>
     {% kpi_dashboard_component book_pk=book.pk %}
   </div>
 
-  <!-- Quick Actions -->
-  <div class="quick-actions-grid">
-    <!-- Equity Actions -->
-    <div class="action-card equity">
-      <h3><i class="fas fa-coins"></i> Equity & Capital</h3>
-      <div class="action-links">
-        <a href="{% url 'accounting:add_equity_capital' book.id %}" class="action-link">
+  <!-- Quick Actions Grid -->
+  <div class="quick-actions-row">
+    <!-- Equity & Capital -->
+    <div class="action-column-card">
+      <div class="action-column-header">
+        <i class="fas fa-chart-line green"></i> Equity & Capital
+      </div>
+      <div class="action-list">
+        <a href="#" onclick="openAddCapitalSidebar('{% url 'accounting:add_equity_capital' book.id %}'); return false;"
+          class="action-btn">
           <i class="fas fa-plus-circle"></i> Add Capital
         </a>
-        <a href="{% url 'accounting:add_equity_revenue' book.id %}" class="action-link">
+        <a href="#" onclick="openAddRevenueSidebar('{% url 'accounting:add_equity_revenue' book.id %}'); return false;"
+          class="action-btn">
           <i class="fas fa-arrow-up"></i> Add Revenue
         </a>
-        <a href="{% url 'accounting:add_equity_expense' book.id %}" class="action-link">
+        <a href="#" onclick="openAddExpenseSidebar('{% url 'accounting:add_equity_expense' book.id %}'); return false;"
+          class="action-btn">
           <i class="fas fa-arrow-down"></i> Add Expense
         </a>
-        <a href="{% url 'accounting:add_equity_divident' book.id %}" class="action-link">
+        <a href="#"
+          onclick="openAddDividendSidebar('{% url 'accounting:add_equity_divident' book.id %}'); return false;"
+          class="action-btn">
           <i class="fas fa-hand-holding-usd"></i> Pay Dividend
         </a>
       </div>
     </div>
 
     <!-- Transactions -->
-    <div class="action-card transactions">
-      <h3><i class="fas fa-exchange-alt"></i> Transactions</h3>
-      <div class="action-links">
-        <a href="{% url 'accounting:cash_transaction_entry_list' book.id %}" class="action-link">
+    <div class="action-column-card">
+      <div class="action-column-header">
+        <i class="fas fa-exchange-alt blue"></i> Transactions
+      </div>
+      <div class="action-list">
+        <a href="{% url 'accounting:cash_transaction_entry_list' book.id %}" class="action-btn">
           <i class="fas fa-list"></i> View All Transactions
         </a>
-        <a href="{% url 'accounting:equity_expense_list' book.id %}" class="action-link">
+        <a href="{% url 'accounting:equity_expense_list' book.id %}" class="action-btn">
           <i class="fas fa-file-invoice-dollar"></i> View Expenses
         </a>
-        <a href="{% url 'accounting:make_in_transfer' book.id %}" class="action-link">
+        <a href="{% url 'accounting:make_in_transfer' book.id %}" class="action-btn">
           <i class="fas fa-random"></i> Make Transfer
         </a>
-        <a href="{% url 'accounting:make_currency_exchange' book.id %}" class="action-link">
+        <a href="{% url 'accounting:make_currency_exchange' book.id %}" class="action-btn">
           <i class="fas fa-sync-alt"></i> Currency Exchange
         </a>
       </div>
     </div>
 
     <!-- Accounts -->
-    <div class="action-card accounts">
-      <h3><i class="fas fa-file-invoice"></i> Accounts</h3>
-      <div class="action-links">
-        <a href="{% url 'accounting:add_accounts_receivable' book.id %}" class="action-link">
+    <div class="action-column-card">
+      <div class="action-column-header">
+        <i class="fas fa-landmark orange"></i> Accounts
+      </div>
+      <div class="action-list">
+        <a href="{% url 'accounting:add_accounts_receivable' book.id %}" class="action-btn">
           <i class="fas fa-file-import"></i> Add Receivable
         </a>
-        <a href="{% url 'accounting:add_accounts_payable' book.id %}" class="action-link">
+        <a href="{% url 'accounting:add_accounts_payable' book.id %}" class="action-btn">
           <i class="fas fa-file-export"></i> Add Payable
         </a>
       </div>
     </div>
 
-    <!-- Stakeholders -->
-    <div class="action-card stakeholders">
-      <h3><i class="fas fa-user-plus"></i> Stakeholders</h3>
-      <div class="action-links">
-        <a href="{% url 'accounting:add_stakeholderbook' book.id %}" class="action-link">
-          <i class="fas fa-plus"></i> Add Stakeholder
+    <!-- Stakeholders Actions -->
+    <div class="action-column-card">
+      <div class="action-column-header">
+        <i class="fas fa-users purple"></i> Stakeholders
+      </div>
+      <div class="action-list">
+        <a href="{% url 'accounting:add_stakeholderbook' book.id %}" class="action-btn">
+          <i class="fas fa-user-plus"></i> Add Stakeholder
         </a>
       </div>
     </div>
   </div>
 
-  <!-- Stakeholders List -->
-  {% if book.stakeholders.count > 0 %}
-  <div class="stakeholders-section">
-    <h2><i class="fas fa-users"></i> Current Stakeholders</h2>
-    <div class="stakeholder-list">
+  <!-- Current Stakeholders Footer -->
+  <div class="stakeholders-footer-card">
+    <div class="card-header-title" style="margin-bottom: 1rem;">
+      <i class="fas fa-users purple-icon"></i> Current Stakeholders
+    </div>
+
+    {% if book.stakeholders.count > 0 %}
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
       {% for stakeholder in book.stakeholders.all %}
-      <div class="stakeholder-chip">
-        <i class="fas fa-user-circle"></i>
-        {{ stakeholder.member.user.first_name }} {{ stakeholder.member.user.last_name }}
+      <div class="current-stakeholder-item">
+        <div class="stakeholder-initials">
+          {{ stakeholder.member.user.first_name|first }}{{ stakeholder.member.user.last_name|first }}
+        </div>
+        <div class="stakeholder-name">
+          {{ stakeholder.member.user.first_name }} {{ stakeholder.member.user.last_name }}
+        </div>
       </div>
       {% endfor %}
     </div>
-  </div>
-  {% else %}
-  <div class="stakeholders-section">
-    <h2><i class="fas fa-users"></i> Stakeholders</h2>
-    <div class="empty-stakeholders">
-      <i class="fas fa-user-slash"></i> No stakeholders added yet.
-      <a href="{% url 'accounting:add_stakeholderbook' book.id %}">Add one now</a>
+    {% else %}
+    <div style="color: #94a3b8; font-size: 0.9rem; padding: 0.5rem 0;">
+      No stakeholders added yet.
     </div>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 {% endblock %}

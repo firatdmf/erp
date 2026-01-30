@@ -1,0 +1,63 @@
+<div class="variant-header">
+    <div class="variant-title">Variants ({{ variants|length }})</div>
+    <a href="{% url 'marketing:product_edit' product.id %}" class="add-variant-link">
+        <i class="fa fa-pencil"></i> Edit Variants
+    </a>
+</div>
+
+{% if variants %}
+<table class="v-table">
+    <thead>
+        <tr>
+            <th style="text-align: left; padding-left: 16px; color: #94a3b8; font-size: 11px; font-weight: 600;">VARIANT
+            </th>
+            <th style="text-align: left; color: #94a3b8; font-size: 11px; font-weight: 600;">ATTRIBUTES</th>
+            <th style="text-align: center; color: #94a3b8; font-size: 11px; font-weight: 600;">STOCK</th>
+            <th style="text-align: right; color: #94a3b8; font-size: 11px; font-weight: 600;">PRICE</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for variant in variants %}
+        <tr>
+            <td>
+                <div class="v-name">
+                    <div class="v-dot"></div>
+                    <span style="font-family: 'JetBrains Mono', monospace; color: #475569;">{{variant.variant_sku}}</span>
+                    <!-- Preview Images -->
+                    {% if variant.files.exists %}
+                    <div style="display: flex; align-items: center; gap: -4px; margin-left: 8px;">
+                        {% for file in variant.files.all|slice:":3" %}
+                        <img src="{{ file.file_url }}"
+                            style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1px solid white; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    {% for val in variant.product_variant_attribute_values.all %}
+                    <span
+                        style="background: white; border: 1px solid #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #64748b;">
+                        {{ val.product_variant_attribute.name }}: <span
+                            style="font-weight: 600; color: #334155;">{{val.product_variant_attribute_value }}</span>
+                    </span>
+                    {% endfor %}
+                </div>
+            </td>
+            <td style="text-align: center;">
+                <span style="font-weight: 600; font-size: 13px; color: #334155;">{{ variant.variant_quantity }}</span>
+            </td>
+            <td style="text-align: right;">
+                <span
+                    style="font-weight: 600; color: #0f172a;">${{variant.variant_price|default:product.price|default:"0.00"}}</span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="text-align: center; padding: 20px; color: #64748b;">
+    <p>No active variants found for this product.</p>
+</div>
+{% endif %}

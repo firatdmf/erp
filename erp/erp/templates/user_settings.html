@@ -1,4 +1,15 @@
+```html
 {% extends "base.html" %}
 {% block content %}
+<style>
+    .full-width {
+        grid-column: 1 / -1;
+    }
+
+    @media (min-width: 768px) {
+        /* Redundant .full-width override removed as per instruction */
+    }
+</style>
 <h2>This is the settings page</h2>
 {% endblock %}
+```

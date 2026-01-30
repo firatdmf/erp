@@ -690,8 +690,10 @@
     {% endif %}
 
     // If no data, show placeholder
-    if (mainLabels.length === 0) {
+    if (!mainLabels || mainLabels.length === 0) {
         mainLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    }
+    if (!mainRevenues || mainRevenues.length === 0) {
         mainRevenues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     }
 
@@ -702,8 +704,8 @@
         if (isWeeklyView) {
             btn.classList.add('active');
             btn.innerHTML = '<i class="fas fa-chart-line"></i> Main Chart';
-            updateChart(weeklyLabels.length > 0 ? weeklyLabels : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                weeklyRevenues.length > 0 ? weeklyRevenues : [0, 0, 0, 0, 0, 0, 0]);
+            updateChart(weeklyLabels && weeklyLabels.length > 0 ? weeklyLabels : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                weeklyRevenues && weeklyRevenues.length > 0 ? weeklyRevenues : [0, 0, 0, 0, 0, 0, 0]);
         } else {
             btn.classList.remove('active');
             btn.innerHTML = '<i class="fas fa-calendar-week"></i> Last 7 Days';
@@ -712,10 +714,12 @@
     }
 
     function updateChart(labels, data) {
-        if (salesChart) {
+        if (salesChart && salesChart.data) {
             salesChart.data.labels = labels;
             salesChart.data.datasets[0].data = data;
             salesChart.update('active');
+        } else {
+            console.error("Chart or Chart data not found during update");
         }
     }
 
@@ -763,9 +767,22 @@
     // Wait for DOM
     document.addEventListener('DOMContentLoaded', function () {
         var canvas = document.getElementById('salesChart');
-        if (!canvas) return;
+        if (!canvas) {
+            console.error("Sales chart canvas not found");
+            return;
+        }
+
+        if (typeof Chart === 'undefined') {
+            console.error("Chart.js library not loaded");
+            const container = canvas.parentElement;
+            if (container) {
+                container.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;"><i class="fas fa-exclamation-triangle"></i><p>Chart library failed to load.</p></div>';
+            }
+            return;
+        }
 
         var ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
         // Create gradient
         var gradient = ctx.createLinearGradient(0, 0, 0, 300);
@@ -836,7 +853,6 @@
                     }
                 }
             }
-        }
         });
     });
 </script>

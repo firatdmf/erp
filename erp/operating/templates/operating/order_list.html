@@ -4,596 +4,596 @@
 
 {% block css %}
 <style>
-  .orders-container {
-    max-width: 1400px;
-    margin: 0 auto;
-  }
+    .orders-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
 
-  .orders-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-  }
-
-  .orders-header h1 {
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-  }
-
-  .btn-create-order {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    background: var(--accent-primary);
-    color: white;
-    border-radius: var(--border-radius-sm);
-    text-decoration: none;
-    font-weight: 500;
-    transition: all var(--transition-speed);
-    border: none;
-    cursor: pointer;
-  }
-
-  .btn-create-order:hover {
-    background: var(--accent-hover);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-  }
-
-  /* Tab System */
-  .tab-container {
-    margin-bottom: 2rem;
-  }
-
-  .tab-buttons {
-    display: flex;
-    gap: 0.5rem;
-    border-bottom: 2px solid var(--border-color);
-    margin-bottom: 1.5rem;
-  }
-
-  .tab-button {
-    padding: 0.75rem 1.5rem;
-    background: none;
-    border: none;
-    border-bottom: 3px solid transparent;
-    color: var(--text-secondary);
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition-speed);
-    position: relative;
-    bottom: -2px;
-  }
-
-  .tab-button:hover {
-    color: var(--accent-primary);
-  }
-
-  .tab-button.active {
-    color: var(--accent-primary);
-    border-bottom-color: var(--accent-primary);
-  }
-
-  .tab-badge {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    background: var(--bg-hover);
-    color: var(--text-secondary);
-    border-radius: 12px;
-    font-size: 0.875rem;
-    margin-left: 0.5rem;
-  }
-
-  .tab-button.active .tab-badge {
-    background: var(--accent-light);
-    color: var(--accent-primary);
-  }
-
-  .tab-content {
-    display: none;
-  }
-
-  .tab-content.active {
-    display: block;
-  }
-
-  /* Modern Table */
-  .orders-table {
-    width: 100%;
-    background: white;
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border-color);
-  }
-
-  .orders-table thead {
-    background: var(--bg-secondary);
-  }
-
-  .orders-table th {
-    padding: 1rem 1.25rem;
-    text-align: left;
-    font-weight: 600;
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid var(--border-color);
-  }
-
-  .orders-table td {
-    padding: 1rem 1.25rem;
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .orders-table tbody tr {
-    transition: background var(--transition-speed);
-  }
-
-  .orders-table tbody tr:hover {
-    background: var(--bg-hover);
-  }
-
-  .orders-table tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  /* Status Badge */
-  .status-badge {
-    display: inline-block;
-    padding: 0.375rem 0.75rem;
-    border-radius: 16px;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .status-badge.pending {
-    background: #fef3c7;
-    color: #92400e;
-  }
-
-  .status-badge.in_production {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-
-  .status-badge.ready {
-    background: #d1fae5;
-    color: #065f46;
-  }
-
-  .status-badge.shipped {
-    background: #e0e7ff;
-    color: #3730a3;
-  }
-
-  .status-badge.completed {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .status-badge.cancelled {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-
-  .status-badge.success {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  /* Client Column */
-  .client-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .client-icon {
-    color: var(--text-secondary);
-  }
-
-  .client-link {
-    color: var(--accent-primary);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color var(--transition-speed);
-  }
-
-  .client-link:hover {
-    color: var(--accent-hover);
-    text-decoration: underline;
-  }
-
-  .web-client-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.25rem 0.625rem;
-    background: var(--accent-light);
-    color: var(--accent-primary);
-    border-radius: 12px;
-    font-size: 0.875rem;
-  }
-
-  /* QR Code */
-  .qr-code-img {
-    height: 50px;
-    width: 50px;
-    object-fit: contain;
-  }
-
-  /* Action Button */
-  .btn-view {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.5rem 1rem;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border-radius: var(--border-radius-sm);
-    text-decoration: none;
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all var(--transition-speed);
-    border: 1px solid var(--border-color);
-  }
-
-  .btn-view:hover {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-  }
-
-  /* Empty State */
-  .empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: var(--text-secondary);
-  }
-
-  .empty-state i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    opacity: 0.5;
-  }
-
-  .empty-state h3 {
-    font-size: 1.25rem;
-    margin-bottom: 0.5rem;
-    color: var(--text-primary);
-  }
-
-  .empty-state p {
-    margin-bottom: 1.5rem;
-  }
-
-  /* ===== MOBILE RESPONSIVE ===== */
-  @media (max-width: 768px) {
     .orders-header {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: flex-start;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
     }
 
     .orders-header h1 {
-      font-size: 1.5rem;
+        font-size: 2rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
     }
 
     .btn-create-order {
-      width: 100%;
-      justify-content: center;
-      padding: 0.875rem 1rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: var(--accent-primary);
+        color: white;
+        border-radius: var(--border-radius-sm);
+        text-decoration: none;
+        font-weight: 500;
+        transition: all var(--transition-speed);
+        border: none;
+        cursor: pointer;
     }
 
-    /* Tab buttons scroll */
+    .btn-create-order:hover {
+        background: var(--accent-hover);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    /* Tab System */
+    .tab-container {
+        margin-bottom: 2rem;
+    }
+
     .tab-buttons {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      flex-wrap: nowrap;
-      padding-bottom: 4px;
+        display: flex;
+        gap: 0.5rem;
+        border-bottom: 2px solid var(--border-color);
+        margin-bottom: 1.5rem;
     }
 
     .tab-button {
-      flex-shrink: 0;
-      white-space: nowrap;
-      padding: 0.625rem 1rem;
-      font-size: 0.875rem;
+        padding: 0.75rem 1.5rem;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: var(--text-secondary);
+        font-weight: 500;
+        cursor: pointer;
+        transition: all var(--transition-speed);
+        position: relative;
+        bottom: -2px;
     }
 
-    /* Table horizontal scroll wrapper */
+    .tab-button:hover {
+        color: var(--accent-primary);
+    }
+
+    .tab-button.active {
+        color: var(--accent-primary);
+        border-bottom-color: var(--accent-primary);
+    }
+
+    .tab-badge {
+        display: inline-block;
+        padding: 0.125rem 0.5rem;
+        background: var(--bg-hover);
+        color: var(--text-secondary);
+        border-radius: 12px;
+        font-size: 0.875rem;
+        margin-left: 0.5rem;
+    }
+
+    .tab-button.active .tab-badge {
+        background: var(--accent-light);
+        color: var(--accent-primary);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Modern Table */
     .orders-table {
-      display: block;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      font-size: 0.875rem;
+        width: 100%;
+        background: white;
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
     }
 
-    .orders-table th,
+    .orders-table thead {
+        background: var(--bg-secondary);
+    }
+
+    .orders-table th {
+        padding: 1rem 1.25rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--border-color);
+    }
+
     .orders-table td {
-      padding: 0.75rem 0.5rem;
-      white-space: nowrap;
+        padding: 1rem 1.25rem;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--border-color);
     }
 
-    /* Hide QR column on mobile */
-    .orders-table th:nth-child(6),
-    .orders-table td:nth-child(6) {
-      display: none;
+    .orders-table tbody tr {
+        transition: background var(--transition-speed);
     }
 
-    /* Compact action button */
-    .btn-view {
-      padding: 0.375rem 0.625rem;
-      font-size: 0.75rem;
+    .orders-table tbody tr:hover {
+        background: var(--bg-hover);
     }
 
+    .orders-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    /* Status Badge */
+    .status-badge {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        border-radius: 16px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .status-badge.pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-badge.in_production {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .status-badge.ready {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-badge.shipped {
+        background: #e0e7ff;
+        color: #3730a3;
+    }
+
+    .status-badge.completed {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-badge.cancelled {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .status-badge.success {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    /* Client Column */
     .client-info {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
-  }
+
+    .client-icon {
+        color: var(--text-secondary);
+    }
+
+    .client-link {
+        color: var(--accent-primary);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color var(--transition-speed);
+    }
+
+    .client-link:hover {
+        color: var(--accent-hover);
+        text-decoration: underline;
+    }
+
+    .web-client-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.25rem 0.625rem;
+        background: var(--accent-light);
+        color: var(--accent-primary);
+        border-radius: 12px;
+        font-size: 0.875rem;
+    }
+
+    /* QR Code */
+    .qr-code-img {
+        height: 50px;
+        width: 50px;
+        object-fit: contain;
+    }
+
+    /* Action Button */
+    .btn-view {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.5rem 1rem;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border-radius: var(--border-radius-sm);
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all var(--transition-speed);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-view:hover {
+        background: var(--accent-primary);
+        color: white;
+        border-color: var(--accent-primary);
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--text-secondary);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .empty-state h3 {
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-primary);
+    }
+
+    .empty-state p {
+        margin-bottom: 1.5rem;
+    }
+
+    /* ===== MOBILE RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .orders-header {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .orders-header h1 {
+            font-size: 1.5rem;
+        }
+
+        .btn-create-order {
+            width: 100%;
+            justify-content: center;
+            padding: 0.875rem 1rem;
+        }
+
+        /* Tab buttons scroll */
+        .tab-buttons {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            padding-bottom: 4px;
+        }
+
+        .tab-button {
+            flex-shrink: 0;
+            white-space: nowrap;
+            padding: 0.625rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        /* Table horizontal scroll wrapper */
+        .orders-table {
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            font-size: 0.875rem;
+        }
+
+        .orders-table th,
+        .orders-table td {
+            padding: 0.75rem 0.5rem;
+            white-space: nowrap;
+        }
+
+        /* Hide QR column on mobile */
+        .orders-table th:nth-child(6),
+        .orders-table td:nth-child(6) {
+            display: none;
+        }
+
+        /* Compact action button */
+        .btn-view {
+            padding: 0.375rem 0.625rem;
+            font-size: 0.75rem;
+        }
+
+        .client-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="orders-container">
-  <!-- Header -->
-  <div class="orders-header">
-    <h1>Orders</h1>
-    <a href="{% url 'operating:create_order' %}" class="btn-create-order">
-      <i class="fa fa-plus"></i>
-      Create New Order
-    </a>
-  </div>
-
-  <!-- Tab System -->
-  <div class="tab-container">
-    <div class="tab-buttons">
-      <button class="tab-button active" data-tab="all">
-        All Orders
-        <span class="tab-badge">{{ total_count }}</span>
-      </button>
-      <button class="tab-button" data-tab="b2b">
-        B2B Orders
-        <span class="tab-badge">{{ b2b_count }}</span>
-      </button>
-      <button class="tab-button" data-tab="b2c">
-        B2C Orders (Web)
-        <span class="tab-badge">{{ b2c_count }}</span>
-      </button>
-    </div>
-
-    <!-- All Orders Tab -->
-    <div class="tab-content active" id="tab-all">
-      {% if orders %}
-      <table class="orders-table">
-        <thead>
-          <tr>
-            <th>Order ID</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Client</th>
-            <th>Order Value</th>
-            <th>QR</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for order in orders %}
-          <tr>
-            <td><strong>#{{ order.pk }}</strong></td>
-            <td>
-              <span class="status-badge {{ order.status }}">
-                {{ order.get_status_display }}
-              </span>
-            </td>
-            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
-            <td>
-              <div class="client-info">
-                {% if order.contact %}
-                <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
-                  <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
-                </a>
-                {% elif order.company %}
-                <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
-                  <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
-                </a>
-                {% elif order.web_client %}
-                <span class="web-client-badge">
-                  <i class="fa fa-globe"></i>
-                  {{ order.web_client.name|default:order.web_client.username }}
-                </span>
-                {% else %}
-                <span style="color: var(--text-muted);">—</span>
-                {% endif %}
-              </div>
-            </td>
-            <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
-            <td>
-              {% if order.qr_code_url %}
-              <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
-              {% else %}
-              <span style="color: var(--text-muted);">—</span>
-              {% endif %}
-            </td>
-            <td>
-              <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
-                <i class="fa fa-eye"></i> View
-              </a>
-              {% if order.web_client %}
-              <a href="{% url 'operating:web_order_status' order.pk %}" class="btn-view"
-                style="background: #dbeafe; border-color: #93c5fd; margin-left: 4px;">
-                <i class="fa fa-truck"></i> Shipping
-              </a>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <div class="empty-state">
-        <i class="fa fa-shopping-cart"></i>
-        <h3>No orders yet</h3>
-        <p>Create your first order to get started</p>
+    <!-- Header -->
+    <div class="orders-header">
+        <h1>Orders</h1>
         <a href="{% url 'operating:create_order' %}" class="btn-create-order">
-          <i class="fa fa-plus"></i>
-          Create Order
+            <i class="fa fa-plus"></i>
+            Create New Order
         </a>
-      </div>
-      {% endif %}
     </div>
 
-    <!-- B2B Orders Tab -->
-    <div class="tab-content" id="tab-b2b">
-      {% if b2b_orders %}
-      <table class="orders-table">
-        <thead>
-          <tr>
-            <th>Order ID</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Client</th>
-            <th>Order Value</th>
-            <th>QR</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for order in b2b_orders %}
-          <tr>
-            <td><strong>#{{ order.pk }}</strong></td>
-            <td>
-              <span class="status-badge {{ order.status }}">
-                {{ order.get_status_display }}
-              </span>
-            </td>
-            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
-            <td>
-              <div class="client-info">
-                {% if order.contact %}
-                <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
-                  <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
-                </a>
-                {% elif order.company %}
-                <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
-                  <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
-                </a>
-                {% endif %}
-              </div>
-            </td>
-            <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
-            <td>
-              {% if order.qr_code_url %}
-              <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
-              {% else %}
-              <span style="color: var(--text-muted);">—</span>
-              {% endif %}
-            </td>
-            <td>
-              <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
-                <i class="fa fa-eye"></i> View
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <div class="empty-state">
-        <i class="fa fa-briefcase"></i>
-        <h3>No B2B orders</h3>
-        <p>Orders from companies and contacts will appear here</p>
-      </div>
-      {% endif %}
-    </div>
+    <!-- Tab System -->
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-button active" data-tab="all">
+                All Orders
+                <span class="tab-badge">{{ total_count }}</span>
+            </button>
+            <button class="tab-button" data-tab="b2b">
+                B2B Orders
+                <span class="tab-badge">{{ b2b_count }}</span>
+            </button>
+            <button class="tab-button" data-tab="b2c">
+                B2C Orders (Web)
+                <span class="tab-badge">{{ b2c_count }}</span>
+            </button>
+        </div>
 
-    <!-- B2C Orders Tab -->
-    <div class="tab-content" id="tab-b2c">
-      {% if b2c_orders %}
-      <table class="orders-table">
-        <thead>
-          <tr>
-            <th>Order ID</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Customer</th>
-            <th>Payment</th>
-            <th>Order Value</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for order in b2c_orders %}
-          <tr>
-            <td><strong>#{{ order.pk }}</strong></td>
-            <td>
-              <span class="status-badge {{ order.status }}">
-                {{ order.get_status_display }}
-              </span>
-            </td>
-            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
-            <td>
-              <span class="web-client-badge">
+        <!-- All Orders Tab -->
+        <div class="tab-content active" id="tab-all">
+            {% if orders %}
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Client</th>
+                        <th>Order Value</th>
+                        <th>QR</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><strong>#{{ order.pk }}</strong></td>
+                        <td>
+                            <span class="status-badge {{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                        <td>
+                            <div class="client-info">
+                                {% if order.contact %}
+                                <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
+                                    <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
+                                </a>
+                                {% elif order.company %}
+                                <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
+                                    <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
+                                </a>
+                                {% elif order.web_client %}
+                                <span class="web-client-badge">
+                                    <i class="fa fa-globe"></i>
+                                    {{ order.web_client.name|default:order.web_client.username }}
+                                </span>
+                                {% else %}
+                                <span style="color: var(--text-muted);">—</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
+                        <td>
+                            {% if order.qr_code_url %}
+                            <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
+                            {% else %}
+                            <span style="color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
+                                <i class="fa fa-eye"></i> View
+                            </a>
+                            {% if order.web_client %}
+                            <a href="{% url 'operating:web_order_status' order.pk %}" class="btn-view"
+                                style="background: #dbeafe; border-color: #93c5fd; margin-left: 4px;">
+                                <i class="fa fa-truck"></i> Shipping
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa fa-shopping-cart"></i>
+                <h3>No orders yet</h3>
+                <p>Create your first order to get started</p>
+                <a href="{% url 'operating:create_order' %}" class="btn-create-order">
+                    <i class="fa fa-plus"></i>
+                    Create Order
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- B2B Orders Tab -->
+        <div class="tab-content" id="tab-b2b">
+            {% if b2b_orders %}
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Client</th>
+                        <th>Order Value</th>
+                        <th>QR</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in b2b_orders %}
+                    <tr>
+                        <td><strong>#{{ order.pk }}</strong></td>
+                        <td>
+                            <span class="status-badge {{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                        <td>
+                            <div class="client-info">
+                                {% if order.contact %}
+                                <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="client-link">
+                                    <i class="fa fa-user client-icon"></i> {{ order.contact.name|capfirst }}
+                                </a>
+                                {% elif order.company %}
+                                <a href="{% url 'crm:company_detail' order.company.pk %}" class="client-link">
+                                    <i class="fa fa-briefcase client-icon"></i> {{ order.company.name|capfirst }}
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
+                        <td>
+                            {% if order.qr_code_url %}
+                            <img src="{{ order.qr_code_url }}" class="qr-code-img" alt="QR Code" />
+                            {% else %}
+                            <span style="color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
+                                <i class="fa fa-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa fa-briefcase"></i>
+                <h3>No B2B orders</h3>
+                <p>Orders from companies and contacts will appear here</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- B2C Orders Tab -->
+        <div class="tab-content" id="tab-b2c">
+            {% if b2c_orders %}
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Customer</th>
+                        <th>Payment</th>
+                        <th>Order Value</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in b2c_orders %}
+                    <tr>
+                        <td><strong>#{{ order.pk }}</strong></td>
+                        <td>
+                            <span class="status-badge {{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                        <td>
+                            <span class="web-client-badge">
+                                <i class="fa fa-globe"></i>
+                                {{ order.web_client.name|default:order.web_client.username }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if order.payment_status %}
+                            <span class="status-badge {{ order.payment_status }}">
+                                {{ order.get_payment_status_display }}
+                            </span>
+                            {% else %}
+                            <span style="color: var(--text-muted);">—</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
+                        <td>
+                            <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
+                                <i class="fa fa-eye"></i> View
+                            </a>
+                            <a href="{% url 'operating:web_order_status' order.pk %}" class="btn-view"
+                                style="background: #dbeafe; border-color: #93c5fd; margin-left: 4px;">
+                                <i class="fa fa-truck"></i> Shipping
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
                 <i class="fa fa-globe"></i>
-                {{ order.web_client.name|default:order.web_client.username }}
-              </span>
-            </td>
-            <td>
-              {% if order.payment_status %}
-              <span class="status-badge {{ order.payment_status }}">
-                {{ order.get_payment_status_display }}
-              </span>
-              {% else %}
-              <span style="color: var(--text-muted);">—</span>
-              {% endif %}
-            </td>
-            <td><strong>${{ order.total_value|floatformat:2 }}</strong></td>
-            <td>
-              <a href="{% url 'operating:order_detail' order.pk %}" class="btn-view">
-                <i class="fa fa-eye"></i> View
-              </a>
-              <a href="{% url 'operating:web_order_status' order.pk %}" class="btn-view"
-                style="background: #dbeafe; border-color: #93c5fd; margin-left: 4px;">
-                <i class="fa fa-truck"></i> Shipping
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <div class="empty-state">
-        <i class="fa fa-globe"></i>
-        <h3>No web orders</h3>
-        <p>Orders from your website will appear here</p>
-      </div>
-      {% endif %}
+                <h3>No web orders</h3>
+                <p>Orders from your website will appear here</p>
+            </div>
+            {% endif %}
+        </div>
     </div>
-  </div>
 </div>
 
 <script>
-  // Tab switching functionality
-  document.querySelectorAll('.tab-button').forEach(button => {
-    button.addEventListener('click', () => {
-      const tabName = button.dataset.tab;
+    // Tab switching functionality
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
 
-      // Update active button
-      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-      button.classList.add('active');
+            // Update active button
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
 
-      // Update active content
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-      document.getElementById(`tab-${tabName}`).classList.add('active');
+            // Update active content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        });
     });
-  });
 </script>
 {% endblock %}

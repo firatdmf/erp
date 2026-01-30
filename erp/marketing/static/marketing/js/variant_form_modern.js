@@ -2,6 +2,7 @@
 let optionCounter = 0;
 let variantData = {};
 let variantImages = {}; // Store images for each variant: { variantIndex: { images: [], primaryIndex: 0 } }
+let currentEditingVariantIndex = null;
 let productAttributes = []; // Product-level attributes to show in variant table
 
 // Initialize on page load
@@ -829,6 +830,7 @@ function updateVariantTable() {
 }
 
 // Render variant table with given combinations
+// Render variant table with given combinations
 function renderVariantTable(combinations, selectedGrouping = null) {
     const table = document.getElementById('variant_table');
     if (!table) return;
@@ -838,12 +840,134 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         .filter(d => d.name)
         .map(d => d.name);
 
-    // Build table HTML
-    let tableHTML = '<thead><tr><th>ACTIONS</th>';
+    // Build table HTML - Cost, SKU, Barcode columns are removed from view
+    let tableHTML = '<thead><tr><th style="width: 50px;"></th><th style="width: 60px;">PHOTO</th>';
     displayOptions.forEach(name => {
         tableHTML += `<th>${name.toUpperCase()}</th>`;
     });
-    tableHTML += '<th>PRICE</th><th>COST</th><th>STOCK</th><th>PHOTO</th><th>SKU</th><th>BARCODE</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
+    tableHTML += '<th>PRICE</th><th>STOCK</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
+
+    // Helper to generate row HTML (avoids duplication between grouped/ungrouped)
+    const generateRowHTML = (combo, originalIndex, displayOptions, groupId = '') => {
+        // Skip deleted variants
+        if (deletedVariantIndices.has(originalIndex)) return '';
+
+        // Create key for looking up existing data
+        const attrKey = Object.entries(combo)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, val]) => `${key}:${val}`)
+            .join('|');
+
+        const existingData = existingVariantData[attrKey] || {};
+        const variantId = existingData.variant_id || '';
+        const variantProductAttrs = existingData.product_attributes || [];
+
+        // Load images if not already loaded
+        if (existingData.images && existingData.images.length > 0 && !variantImages[originalIndex]) {
+            variantImages[originalIndex] = {
+                images: existingData.images,
+                primaryIndex: 0
+            };
+        }
+
+        // Prepare image content
+        const variantImg = variantImages[originalIndex];
+        const hasImages = variantImg && variantImg.images && variantImg.images.length > 0;
+        const primaryImg = hasImages ? variantImg.images[0] : null;
+
+        const imgContent = primaryImg
+            ? `<img src="${primaryImg.url}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e7eb;">`
+            : `<div style="width: 40px; height: 40px; border: 1px dashed #d1d5db; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #6b7280; background: #f9fafb;"><i class="fa fa-image"></i></div>`;
+
+        const countBadge = (hasImages && variantImg.images.length > 1)
+            ? `<span style="position: absolute; top: -5px; right: -5px; background: #667eea; color: white; font-size: 9px; padding: 1px 4px; border-radius: 8px; font-weight: 600;">${variantImg.images.length}</span>`
+            : '';
+
+        // Retrieve current values (DOM > existingData > default)
+        const priceInput = document.querySelector(`input[name="variant_price_${originalIndex + 1}"]`);
+        const quantityInput = document.querySelector(`input[name="variant_quantity_${originalIndex + 1}"]`);
+        const featuredInput = document.querySelector(`input[name="variant_featured_${originalIndex + 1}"]`);
+        // Hidden inputs
+        const costInput = document.querySelector(`input[name="variant_cost_${originalIndex + 1}"]`);
+        const skuInput = document.querySelector(`input[name="variant_sku_${originalIndex + 1}"]`);
+        const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
+        const activeInput = document.querySelector(`input[name="variant_active_${originalIndex + 1}"]`);
+
+        const price = priceInput?.value || existingData.price || '';
+        const quantity = quantityInput?.value || existingData.quantity || '';
+        const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
+        const cost = costInput?.value || existingData.cost || '';
+        const sku = skuInput?.value || existingData.sku || existingData.item_code || ''; // fallback to item_code if sku missing
+        const barcode = barcodeInput?.value || existingData.barcode || '';
+        const active = activeInput ? (activeInput.value === 'true') : (existingData.is_active !== false);
+
+        // Row HTML
+        // Add onclick to open modal, but stop propagation for interactive elements
+        let rowHTML = `<tr class="variant_row ${groupId}" data-variant-index="${originalIndex}" data-variant-id="${variantId}" style="cursor: pointer;" onclick="openVariantDetailModal(${originalIndex})">`;
+
+        // Delete button
+        rowHTML += `<td style="padding-left: 14px; vertical-align: middle;">
+            <button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${originalIndex}, event); event.stopPropagation();" title="Delete variant" style="background: white; border: 1px solid #d1d5db; color: #6b7280; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'; this.style.background='#fef2f2';" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#6b7280'; this.style.background='white';">
+                <i class="fa fa-trash" style="font-size: 14px;"></i>
+            </button>
+        </td>`;
+
+        // Photo Column
+        rowHTML += `
+            <td style="text-align: center; vertical-align: middle;">
+                <div onclick="openImagePicker(${originalIndex}); event.stopPropagation();" style="cursor: pointer; display: inline-block; position: relative;" title="Manage Images">
+                    ${imgContent}
+                    ${countBadge}
+                    <div style="position: absolute; bottom: -5px; right: -5px; background: white; border: 1px solid #e5e7eb; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 8px;">
+                        <i class="fa fa-plus" style="color: #667eea;"></i>
+                    </div>
+                </div>
+            </td>`;
+
+        // Option Values (Non-editable text)
+        displayOptions.forEach(optionName => {
+            const value = combo[optionName] || '';
+            rowHTML += `<td><span style="font-weight: 500;">${value}</span></td>`;
+        });
+
+        // Price Input
+        rowHTML += `<td>
+            <input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" onclick="event.stopPropagation()" oninput="updateGroupPriceRange('${groupId}')">
+        </td>`;
+
+        // Stock Input
+        rowHTML += `<td>
+            <input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;" onclick="event.stopPropagation()">
+        </td>`;
+
+        // Featured Checkbox - using toggle switch
+        rowHTML += `<td style="text-align: center;">
+            <label class="custom-checkbox" style="margin: 0; justify-content: center; gap: 0;" onclick="event.stopPropagation()">
+                <input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}>
+                <span class="checkmark"></span>
+            </label>
+        </td>`;
+
+        // Attributes Button
+        rowHTML += `<td style="text-align: center;">
+            <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${originalIndex}, ''); event.stopPropagation();" 
+                    style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;"
+                    onmouseover="this.style.borderColor='#667eea'; this.style.color='#667eea';"
+                    onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#374151';">
+                <i class="fa fa-tags"></i>
+                <span class="attr-count" id="attr_count_${originalIndex}">${variantProductAttrs.length}</span>
+            </button>
+        </td>`;
+
+        // HIDDEN INPUTS for Modal Fields
+        rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
+        rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}">`;
+        rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
+        rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
+
+        rowHTML += `</tr>`;
+        return rowHTML;
+    };
 
     // If grouping is selected, create hierarchical structure
     if (selectedGrouping) {
@@ -885,13 +1009,15 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             // Group header row (collapsible)
             const groupId = `group_${groupValue.replace(/\s+/g, '_')}`;
-            const variantCount = variants.filter(v => !deletedVariantIndices.has(v.originalIndex)).length;
-            const extraColsCount = 6; // barcode, sku, photo, stock, featured, attributes
+            const extraColsCount = 3; // stock, featured, attributes
+            // Colspan logic: 1 (Action) + 1 (Photo) + Options + 1 (Price) + 3 (Extra)
+
             tableHTML += `
-                <tr class="group_header_row" style="background: #f3f4f6; font-weight: 600; cursor: pointer;" onclick="toggleGroupCollapse('${groupId}')">
+                <tr class="group_header_row" style="font-weight: 600; cursor: pointer;" onclick="toggleGroupCollapse('${groupId}')">
                     <td>
                         <i class="fa fa-chevron-down group_toggle_icon" id="icon_${groupId}" style="transition: transform 0.2s;"></i>
                     </td>
+                    <td></td>
                     <td colspan="${displayOptions.length}">
                         <div style="display: flex; flex-direction: column;">
                             <span style="font-weight: 600; color: #111827;">${groupValue}</span>
@@ -905,158 +1031,13 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             // Render all variants in this group
             variants.forEach(({ combo, originalIndex }) => {
-                // Skip deleted variants
-                if (deletedVariantIndices.has(originalIndex)) return;
-
-                // Create key for looking up existing data - MUST BE FIRST
-                const attrKey = Object.entries(combo)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([key, val]) => `${key}:${val}`)
-                    .join('|');
-
-                const existingData = existingVariantData[attrKey] || {};
-                const variantId = existingData.variant_id || '';
-
-                // Get existing product attributes for this variant
-                const variantProductAttrs = existingData.product_attributes || [];
-
-                tableHTML += `<tr class="variant_row ${groupId}" data-variant-index="${originalIndex}" data-variant-id="${variantId}" style="background: white;">`;
-                tableHTML += `<td style="padding-left: 30px;"><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${originalIndex}, event)" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
-
-                // Show all option values
-                displayOptions.forEach(optionName => {
-                    const value = combo[optionName] || '';
-                    tableHTML += `<td>${value}</td>`;
-                });
-
-                // Try to read current form values first (preserves user input during re-render)
-                const priceInput = document.querySelector(`input[name="variant_price_${originalIndex + 1}"]`);
-                const costInput = document.querySelector(`input[name="variant_cost_${originalIndex + 1}"]`);
-                const quantityInput = document.querySelector(`input[name="variant_quantity_${originalIndex + 1}"]`);
-                const skuInput = document.querySelector(`input[name="variant_sku_${originalIndex + 1}"]`);
-                const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
-                const featuredInput = document.querySelector(`input[name="variant_featured_${originalIndex + 1}"]`);
-
-                const price = priceInput?.value || existingData.price || '';
-                const cost = costInput?.value || existingData.cost || '';
-                const quantity = quantityInput?.value || existingData.quantity || '';
-                const sku = skuInput?.value || existingData.sku || '';
-                const barcode = barcodeInput?.value || existingData.barcode || '';
-                const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
-
-                // Load existing images for this variant
-                if (existingData.images && existingData.images.length > 0 && !variantImages[originalIndex]) {
-                    variantImages[originalIndex] = {
-                        images: existingData.images,
-                        primaryIndex: 0
-                    };
-                }
-
-                const variantImagesHtml = renderVariantImages(originalIndex);
-
-                tableHTML += `
-                <td><input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" oninput="updateGroupPriceRange('${groupId}')"></td>
-                <td><input type="number" name="variant_cost_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${cost}" style="min-width: 100px;"></td>
-                <td><input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
-                <td>
-                    <button type="button" class="photo_picker_btn" onclick="openImagePicker(${originalIndex})" title="Select images">
-                        <i class="fa fa-camera"></i>
-                    </button>
-                    <div class="variant_images_preview" id="variant_images_${originalIndex}">
-                        ${variantImagesHtml}
-                    </div>
-                </td>
-                <td><input type="text" name="variant_sku_${originalIndex + 1}" value="${sku}" style="min-width: 120px;${variantId ? ' background: #f3f4f6; color: #6b7280;' : ''}" ${variantId ? 'readonly title="SKU cannot be changed for existing variants"' : ''}></td>
-                <td><input type="text" name="variant_barcode_${originalIndex + 1}" value="${barcode}" style="min-width: 120px;"></td>
-                <td style="text-align: center;"><input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}></td>
-                <td style="text-align: center;">
-                    <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${originalIndex}, '${sku}')" 
-                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);"
-                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.3)'"
-                            onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.2)'">
-                        <i class="fa fa-tags"></i>
-                        <span class="attr-count" id="attr_count_${originalIndex}">${variantProductAttrs.length}</span>
-                    </button>
-                </td>
-            </tr>`;
+                tableHTML += generateRowHTML(combo, originalIndex, displayOptions, groupId);
             });
         });
     } else {
         // No grouping - show all variants flat
         allCombinations.forEach((combo, index) => {
-            // Skip deleted variants
-            if (deletedVariantIndices.has(index)) return;
-
-            // Create key for looking up existing data - MUST BE FIRST
-            const attrKey = Object.entries(combo)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([key, val]) => `${key}:${val}`)
-                .join('|');
-
-            const existingData = existingVariantData[attrKey] || {};
-            const variantId = existingData.variant_id || '';
-
-            // Get existing product attributes for this variant
-            const variantProductAttrs = existingData.product_attributes || [];
-
-            tableHTML += `<tr data-variant-index="${index}" data-variant-id="${variantId}"><td><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${index}, event)" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
-
-            // Show all option values
-            displayOptions.forEach(optionName => {
-                const value = combo[optionName] || '';
-                tableHTML += `<td>${value}</td>`;
-            });
-
-            // Try to read current form values first (preserves user input during re-render)
-            const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
-            const costInput = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
-            const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
-            const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
-            const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
-            const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
-
-            const price = priceInput?.value || existingData.price || '';
-            const cost = costInput?.value || existingData.cost || '';
-            const quantity = quantityInput?.value || existingData.quantity || '';
-            const sku = skuInput?.value || existingData.sku || '';
-            const barcode = barcodeInput?.value || existingData.barcode || '';
-            const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
-
-            // Load existing images for this variant
-            if (existingData.images && existingData.images.length > 0 && !variantImages[index]) {
-                variantImages[index] = {
-                    images: existingData.images,
-                    primaryIndex: 0
-                };
-            }
-
-            const variantImagesHtml = renderVariantImages(index);
-
-            tableHTML += `
-                <td><input type="number" name="variant_price_${index + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;"></td>
-                <td><input type="number" name="variant_cost_${index + 1}" step="0.01" placeholder="0.00" value="${cost}" style="min-width: 100px;"></td>
-                <td><input type="number" name="variant_quantity_${index + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
-                <td>
-                    <button type="button" class="photo_picker_btn" onclick="openImagePicker(${index})" title="Select images">
-                        <i class="fa fa-camera"></i>
-                    </button>
-                    <div class="variant_images_preview" id="variant_images_${index}">
-                        ${variantImagesHtml}
-                    </div>
-                </td>
-                <td><input type="text" name="variant_sku_${index + 1}" value="${sku}" style="min-width: 120px;${variantId ? ' background: #f3f4f6; color: #6b7280;' : ''}" ${variantId ? 'readonly title="SKU cannot be changed for existing variants"' : ''}></td>
-                <td><input type="text" name="variant_barcode_${index + 1}" value="${barcode}" style="min-width: 120px;"></td>
-                <td style="text-align: center;"><input type="checkbox" name="variant_featured_${index + 1}" ${featured ? 'checked' : ''}></td>
-                <td style="text-align: center;">
-                    <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${index}, '${sku}')" 
-                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);"
-                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.3)'"
-                            onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.2)'">
-                        <i class="fa fa-tags"></i>
-                        <span class="attr-count" id="attr_count_${index}">${variantProductAttrs.length}</span>
-                    </button>
-                </td>
-            </tr>`;
+            tableHTML += generateRowHTML(combo, index, displayOptions, '');
         });
     }
 
@@ -1421,16 +1402,6 @@ function updatePrimaryBadgeAfterSort(variantIndex) {
     container.querySelectorAll('.variant-sortable-image').forEach(img => {
         img.style.borderColor = '#e5e7eb';
     });
-
-    // Add badge to first
-    const first = container.querySelector('.variant-sortable-image');
-    if (first) {
-        first.style.borderColor = '#667eea';
-        const badge = document.createElement('div');
-        badge.textContent = 'PRIMARY';
-        badge.style.cssText = 'position: absolute; top: -6px; left: 4px; background: #667eea; color: white; padding: 1px 4px; border-radius: 8px; font-size: 8px; font-weight: 600;';
-        first.insertBefore(badge, first.firstChild);
-    }
 }
 
 // Remove image from variant - INSTANT delete with confirmation
@@ -1493,6 +1464,7 @@ async function removeVariantImage(variantIndex, imageIndex) {
 
 // Open image picker modal
 let currentVariantIndex = null;
+let selectionOrder = []; // Track selection order [url1, url2, ...]
 
 async function openImagePicker(variantIndex) {
     currentVariantIndex = variantIndex;
@@ -1502,63 +1474,97 @@ async function openImagePicker(variantIndex) {
         variantImages[variantIndex] = { images: [], primaryIndex: 0 };
     }
 
-    // CLEAR uploadedImages and reload from scratch to prevent duplicates
-    uploadedImages = [];
+    // Initialize selectionOrder from existing images for this variant
+    // This preserves the established order
+    selectionOrder = variantImages[variantIndex].images.map(img => img.url).filter(url => url);
+
+    // Global uploadedImages array initialization
+    if (!uploadedImages) uploadedImages = [];
+
+    // Helper to add unique images to uploadedImages
+    const addUniqueImage = (newImg) => {
+        if (!newImg.url) return;
+        const exists = uploadedImages.some(img => img.url === newImg.url);
+        if (!exists) {
+            uploadedImages.push(newImg);
+        }
+    };
+
+    // 1. Merge images from CURRENT variant (and all other variants)
+    Object.values(variantImages).forEach(vData => {
+        if (vData.images) {
+            vData.images.forEach(img => {
+                addUniqueImage({
+                    id: img.id,
+                    url: img.url,
+                    name: img.name,
+                    variant: null,
+                    file: img.file,
+                    file_type: img.file_type || 'image'
+                });
+            });
+        }
+    });
+
+    // 2. Scrape Main Product Images from DOM (Universal - works for both Edit and Create)
+    const mainImageGrid = document.getElementById('sortable_images');
+    if (mainImageGrid) {
+        const mainImages = mainImageGrid.querySelectorAll('.sortable-image');
+        Array.from(mainImages).forEach((imgDiv, idx) => {
+            const img = imgDiv.querySelector('img');
+            const imgUrl = img ? img.src : '';
+
+            if (imgUrl) {
+                const fileType = imgDiv.dataset.fileType || (isVideoFile(imgUrl) ? 'video' : 'image');
+                addUniqueImage({
+                    id: imgDiv.dataset.fileId || `main_img_${idx}`, // Use distinct ID prefix
+                    url: imgUrl,
+                    name: `Main Image ${idx + 1}`,
+                    variant: null,
+                    file: null,
+                    temp_file: true,
+                    from_main: true, // Flag to identify origin
+                    file_type: fileType
+                });
+            }
+        });
+    }
 
     // Check if product edit or create mode
     const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
-    const isCreateMode = window.location.pathname.includes('/product_create/');
 
+    // 3. In Edit Mode, fetch server-side pool (this catches images uploaded but not yet in DOM or variants)
     if (productEditMatch) {
-        // Edit mode: Load from API
         try {
             const response = await fetch(`/marketing/api/get_product_files/?product_id=${productEditMatch}`);
             const data = await response.json();
             if (data.success && data.files) {
-                // Replace uploadedImages with fresh data from API
-                uploadedImages = data.files.map(file => ({
-                    id: file.id,
-                    url: file.url,
-                    name: file.name,
-                    variant: file.variant || null,  // Include variant info from API
-                    file: null,  // No file object needed (already uploaded)
-                    file_type: file.file_type || 'image'  // 'image' or 'video'
-                }));
-                console.log(`Loaded ${uploadedImages.length} files from shared pool`);
+                data.files.forEach(file => {
+                    addUniqueImage({
+                        id: file.id,
+                        url: file.url,
+                        name: file.name,
+                        variant: file.variant || null,
+                        file: null,
+                        file_type: file.file_type || 'image'
+                    });
+                });
+                console.log(`Synced with server pool. Total images: ${uploadedImages.length}`);
             }
         } catch (error) {
             console.error('Error loading product files:', error);
         }
-    } else if (isCreateMode) {
-        // Create mode: Load from main product images grid (temp files)
-        const mainImageGrid = document.getElementById('sortable_images');
-        if (mainImageGrid) {
-            const mainImages = mainImageGrid.querySelectorAll('.sortable-image');
-            uploadedImages = Array.from(mainImages).map((imgDiv, idx) => {
-                const img = imgDiv.querySelector('img');
-                const fileType = imgDiv.dataset.fileType || (isVideoFile(img?.src) ? 'video' : 'image');
-                return {
-                    id: imgDiv.dataset.fileId || `temp_${idx}`,
-                    url: img ? img.src : '',
-                    name: `File ${idx + 1}`,
-                    variant: null,
-                    file: null,
-                    temp_file: true,  // Mark as temporary
-                    file_type: fileType
-                };
-            });
-            console.log(`Loaded ${uploadedImages.length} temp files from main grid`);
-        }
     }
+
+    // Sort uploadedImages? Maybe put selected ones first? 
+    // For now, preservation of order or simple append is fine.
+    // Maybe Main images first?
+    // uploadedImages.sort((a, b) => (a.from_main === b.from_main) ? 0 : a.from_main ? -1 : 1);
 
     // Create modal
     const modal = document.createElement('div');
     modal.id = 'image_picker_modal';
     modal.className = 'image_modal';
-
-    // Get currently selected images for this variant (by URL for cross-variant matching)
-    const selectedImageUrls = variantImages[variantIndex].images.map(img => img.url).filter(url => url);
-    const primaryIndex = variantImages[variantIndex].primaryIndex;
 
     modal.innerHTML = `
         <div class="image_modal_content">
@@ -1578,7 +1584,7 @@ async function openImagePicker(variantIndex) {
                     <small style="color: #6b7280;">Supports: JPG, PNG, GIF, WebP, MP4, MOV, WebM</small>
                 </div>
                 <div class="image_grid" id="image_grid">
-                    ${generateImageGrid(selectedImageUrls, primaryIndex)}
+                    ${generateImageGrid()}
                 </div>
             </div>
             <div class="image_modal_footer">
@@ -1589,24 +1595,22 @@ async function openImagePicker(variantIndex) {
     `;
 
     document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('show'), 10);
+    setTimeout(() => {
+        modal.classList.add('show');
+        updateSelectionBadges(); // Apply numbers after rendering
+    }, 10);
 }
 
 // Store uploaded images globally
 let uploadedImages = [];
 
 // Generate image grid from uploaded images
-function generateImageGrid(selectedImageUrls, primaryIndex) {
+function generateImageGrid() {
     if (uploadedImages.length === 0) {
         return '<div class="no_images_message"><i class="fa fa-image"></i><p>No files uploaded yet. Use the \"Add File\" button above to add images or videos.</p></div>';
     }
 
     return uploadedImages.map((img, idx) => {
-        // Check if this image is selected by URL (for cross-variant matching)
-        const isSelected = img.url && selectedImageUrls.includes(img.url);
-        const selectedIndex = isSelected ? selectedImageUrls.indexOf(img.url) : -1;
-        const isPrimary = isSelected && selectedIndex === primaryIndex;
-
         // Detect if file is a video
         const isVideo = isVideoFile(img.url) || img.file_type === 'video';
         const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
@@ -1615,7 +1619,7 @@ function generateImageGrid(selectedImageUrls, primaryIndex) {
 
         if (isVideo) {
             return `
-                <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="video" onclick="toggleImageSelection(this, event)">
+                <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="video" onclick="toggleImageSelection(this, event)">
                     <div style="position: relative;">
                         <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.background='#1a1a2e'">
                         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
@@ -1630,7 +1634,7 @@ function generateImageGrid(selectedImageUrls, primaryIndex) {
             `;
         } else {
             return `
-                <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="image" onclick="toggleImageSelection(this, event)">
+                <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="image" onclick="toggleImageSelection(this, event)">
                     <img src="${img.url}" alt="${img.name}">
                     <p>${img.name}</p>
                     <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
@@ -1659,65 +1663,92 @@ function getVideoThumbnailUrlVariant(videoUrl) {
     return transformed.replace(/\.(mp4|mov|webm|avi|mkv|m4v)$/i, '.jpg');
 }
 
-
-// Set primary image (only one can be primary)
-function setPrimaryImage(imageIndex, event) {
-    event.stopPropagation(); // Don't trigger toggleImageSelection
-
-    const clickedItem = document.querySelector(`.image_item[data-index="${imageIndex}"]`);
-    if (!clickedItem || !clickedItem.classList.contains('selected')) {
-        return; // Only selected images can be primary
-    }
-
-    // Remove primary from all checkboxes
-    document.querySelectorAll('.image_checkbox input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-    });
-
-    // Set this one as primary
-    const thisCheckbox = clickedItem.querySelector('input[type="checkbox"]');
-    if (thisCheckbox) {
-        thisCheckbox.checked = true;
-    }
-}
-
-// Toggle image selection
+// Toggle image selection with Order Tracking
 function toggleImageSelection(element, event) {
-    // Don't toggle if clicking on checkbox or remove button
-    if (event.target.closest('.image_checkbox') || event.target.closest('.remove_image_btn')) {
+    // Don't toggle if clicking on remove button or other controls
+    if (event.target.closest('.remove_image_btn')) {
         return;
     }
 
+    const url = element.getAttribute('data-url');
     const isCurrentlySelected = element.classList.contains('selected');
-    const checkboxContainer = element.querySelector('.image_checkbox');
-    const checkbox = element.querySelector('input[type="checkbox"]');
 
     if (isCurrentlySelected) {
         // Deselect
-        const wasPrimary = checkbox && checkbox.checked;
         element.classList.remove('selected');
-        if (checkboxContainer) checkboxContainer.style.display = 'none';
-        if (checkbox) checkbox.checked = false;
-
-        // If this was primary, make first selected image primary
-        if (wasPrimary) {
-            const remainingSelected = document.querySelectorAll('.image_item.selected');
-            if (remainingSelected.length > 0) {
-                const firstCheckbox = remainingSelected[0].querySelector('input[type="checkbox"]');
-                if (firstCheckbox) firstCheckbox.checked = true;
-            }
-        }
+        // Remove from selectionOrder
+        selectionOrder = selectionOrder.filter(u => u !== url);
     } else {
         // Select
         element.classList.add('selected');
-        if (checkboxContainer) checkboxContainer.style.display = 'block';
-
-        // If this is the first selected image, make it primary
-        const allSelected = document.querySelectorAll('.image_item.selected');
-        if (allSelected.length === 1) {
-            if (checkbox) checkbox.checked = true;
+        // Add to selectionOrder if not present
+        if (url && !selectionOrder.includes(url)) {
+            selectionOrder.push(url);
         }
     }
+
+    // Update visual numbering
+    updateSelectionBadges();
+}
+
+// Update badges on all images to reflect their order in selectionOrder
+function updateSelectionBadges() {
+    // Remove all existing badges
+    document.querySelectorAll('.selection_badge').forEach(el => el.remove());
+
+    // Check each image item
+    const allItems = document.querySelectorAll('.image_item');
+    allItems.forEach(item => {
+        const url = item.getAttribute('data-url');
+        const orderIndex = selectionOrder.indexOf(url);
+
+        if (orderIndex !== -1) {
+            // It's selected
+            if (!item.classList.contains('selected')) {
+                item.classList.add('selected');
+            }
+
+            // Add badge
+            const badge = document.createElement('div');
+            badge.className = 'selection_badge';
+            badge.textContent = orderIndex + 1;
+
+            // Styling for the badge
+            const isPrimary = orderIndex === 0;
+            const bgColor = isPrimary ? '#10b981' : '#667eea'; // Green for primary (1), Blue for others
+
+            badge.style.cssText = `
+                position: absolute; 
+                top: 8px; 
+                left: 8px; 
+                background: ${bgColor}; 
+                color: white; 
+                width: 24px; 
+                height: 24px; 
+                border-radius: 50%; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                font-weight: 600; 
+                font-size: 12px; 
+                z-index: 10; 
+                border: 2px solid white; 
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                pointer-events: none;
+            `;
+
+            item.appendChild(badge);
+
+            // Add visual border
+            item.style.borderColor = bgColor;
+            item.style.backgroundColor = isPrimary ? '#f0fdf4' : '#f0f4ff';
+        } else {
+            // Not selected
+            item.classList.remove('selected');
+            item.style.borderColor = '#e5e7eb';
+            item.style.backgroundColor = 'white';
+        }
+    });
 }
 
 // Handle image upload - INSTANT upload to Cloudinary
@@ -1757,14 +1788,6 @@ async function handleImageUpload(event) {
             showToast(`⚠️ "${file.name}" already exists`, 'warning');
             continue;
         }
-
-        // Store current DOM selections (by URL) BEFORE upload
-        const selectedUrls = new Set();
-        document.querySelectorAll('.image_item.selected').forEach(item => {
-            const url = item.getAttribute('data-url');
-            if (url) selectedUrls.add(url);
-        });
-        console.log('Stored selections before upload:', Array.from(selectedUrls));
 
         // Show progress placeholder
         const grid = document.getElementById('image_grid');
@@ -1842,7 +1865,7 @@ async function handleImageUpload(event) {
                 // Remove placeholder
                 if (placeholder) placeholder.remove();
 
-                // Create and add the new image element instead of re-rendering entire grid
+                // Create and add the new image element
                 const newImage = uploadedImages[uploadedImages.length - 1];
                 const newIndex = uploadedImages.length - 1;
 
@@ -1863,17 +1886,9 @@ async function handleImageUpload(event) {
 
                 if (grid) grid.appendChild(newElement);
 
-                // Reapply selections to all existing elements
-                if (grid) {
-                    grid.querySelectorAll('.image_item').forEach(item => {
-                        const itemUrl = item.getAttribute('data-url');
-                        if (selectedUrls.has(itemUrl)) {
-                            item.classList.add('selected');
-                        }
-                    });
-                }
-
                 showToast(`✅ ${file.name} uploaded to shared pool!`, 'success');
+
+                // Note: Newly uploaded image is not selected by default, so we don't need to update badges yet
             } else {
                 throw new Error(data.error || 'Upload failed');
             }
@@ -1896,56 +1911,71 @@ function getVariantId(variantIndex) {
     return (variantId && variantId.trim()) ? variantId : null;
 }
 
-// Confirm image selection
+// Confirm image selection using the Selection Order
 async function confirmImageSelection() {
-    const selectedItems = document.querySelectorAll('.image_item.selected');
-
-    if (selectedItems.length === 0) {
-        alert('Please select at least one image.');
-        return;
+    if (selectionOrder.length === 0) {
+        // Allow clearing selection? User said "First selected is primary", implying selection.
+        // But if they unchecked everything, they might want to clear images.
+        // Let's allow it if they really want, or just return.
+        // If they click Done with nothing selected, it clears the variant images.
     }
 
     const images = [];
 
-    selectedItems.forEach((item) => {
-        const imageUrl = item.getAttribute('data-url');
-        const imageName = item.getAttribute('data-name');
-
-        // Find the actual file object from uploadedImages
-        const uploadedImg = uploadedImages.find(img => img.url === imageUrl);
-
-        images.push({
-            url: imageUrl,
-            name: imageName,
-            file: uploadedImg ? uploadedImg.file : null,
-            id: uploadedImg ? uploadedImg.id : null
-        });
+    // Construct images array in the order of selectionOrder
+    selectionOrder.forEach(url => {
+        const uploadedImg = uploadedImages.find(img => img.url === url);
+        if (uploadedImg) {
+            images.push({
+                url: url,
+                name: uploadedImg.name,
+                file: uploadedImg.file,
+                id: uploadedImg.id,
+                file_type: uploadedImg.file_type // Ensure file_type is carried over
+            });
+        }
     });
 
-    // Store selected images - first image is always primary
+    // Store selected images
     variantImages[currentVariantIndex] = {
         images: images,
-        primaryIndex: 0  // First image is always primary
+        primaryIndex: 0  // First image in the ordered list is always primary
     };
 
-    console.log(`Variant ${currentVariantIndex} images:`, variantImages[currentVariantIndex]);
+    console.log(`Variant ${currentVariantIndex} images updated (count: ${images.length})`);
 
-    // Note: Images are NOT linked to variant here
-    // They will be linked when form is submitted
-    showToast(`✅ ${images.length} image(s) selected for variant`, 'success');
+    showToast(`✅ ${images.length} image(s) updated for variant`, 'success');
 
-    // Update preview in table
-    updateVariantImagePreview(currentVariantIndex);
+    // Also update the simple icon in the table (we changed the render function to use a single icon)
+    // We need to re-render that cell ideally, or just the whole table row content?
+    // updateVariantTable() might be too heavy.
+    // Ideally updateVariantImagePreview should handle the DOM update for the icon column now.
+    // But updateVariantImagePreview implementation in our previous step was assuming the OLD layout (inside a div id="variant_images_X").
+    // We moved the image to a new column.
+
+    // Let's trigger a table update to be safe and clean, or update the specific cell manually.
+    // For now, let's call updateVariantTable() if it's cheap enough, or better:
+    // Update the innerHTML of the cell wrapper.
+    updateVariantIconInTable(currentVariantIndex);
 
     closeImagePicker();
 }
 
-// Update variant image preview in table
-function updateVariantImagePreview(variantIndex) {
-    const previewContainer = document.getElementById(`variant_images_${variantIndex}`);
-    if (!previewContainer) return;
+// Helper to update the specific icon cell in table without re-rendering whole table
+function updateVariantIconInTable(variantIndex) {
+    // We need to find the cell for this variant
+    // In grouped view, finding by index is tricky if we don't have direct reference.
+    // But we have data-variant-index on the TR.
+    const row = document.querySelector(`tr[data-variant-index="${variantIndex}"]`);
+    if (!row) return; // Might be hidden or filtered?
 
-    previewContainer.innerHTML = renderVariantImages(variantIndex);
+    // Re-render the table to be 100% sure we get the correct state including grouping/badges etc.
+    const select = document.getElementById('grouping_select');
+    const selectedGrouping = select ? select.value : null;
+
+    if (typeof renderVariantTable === 'function') {
+        renderVariantTable(allCombinations, selectedGrouping);
+    }
 }
 
 // Remove uploaded image - INSTANT delete
@@ -2818,3 +2848,93 @@ function checkDuplicateSku(input) {
 }
 
 
+
+// Variant Detail Modal Functions
+
+function openVariantDetailModal(variantIndex) {
+    currentEditingVariantIndex = variantIndex;
+    const modal = document.getElementById('variant_detail_modal');
+    if (!modal) return;
+
+    // Get current values from hidden inputs
+    // We can rely on the hidden inputs we just generated in renderVariantTable
+    // Note: renderVariantTable MUST have been called at least once.
+
+    // Select inputs using variant index (1-based for name attributes)
+    const idx = variantIndex + 1;
+    const price = document.querySelector(`input[name="variant_price_${idx}"]`)?.value || '';
+    const cost = document.querySelector(`input[name="variant_cost_${idx}"]`)?.value || '';
+    const sku = document.querySelector(`input[name="variant_sku_${idx}"]`)?.value || '';
+    const barcode = document.querySelector(`input[name="variant_barcode_${idx}"]`)?.value || '';
+    const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
+    const isActive = activeInput ? (activeInput.value === 'true') : true;
+
+    // Populate modal inputs
+    const priceEl = document.getElementById('modal_variant_price');
+    const costEl = document.getElementById('modal_variant_cost');
+    const skuEl = document.getElementById('modal_variant_sku');
+    const barcodeEl = document.getElementById('modal_variant_barcode');
+    const activeEl = document.getElementById('modal_variant_active');
+
+    if (priceEl) priceEl.value = price;
+    if (costEl) costEl.value = cost;
+    if (skuEl) skuEl.value = sku;
+    if (barcodeEl) barcodeEl.value = barcode;
+    if (activeEl) activeEl.checked = isActive;
+
+    const titleEl = document.getElementById('variant_modal_title');
+    if (titleEl) titleEl.textContent = `Edit Variant #${idx}`;
+
+    modal.style.display = 'flex';
+}
+
+function closeVariantDetailModal() {
+    const modal = document.getElementById('variant_detail_modal');
+    if (modal) {
+        modal.style.display = 'none';
+        // Remove hash to clean URL if needed
+        // window.location.hash = '';
+    }
+    currentEditingVariantIndex = null;
+}
+
+function saveVariantDetailModal() {
+    if (currentEditingVariantIndex === null) return;
+
+    const idx = currentEditingVariantIndex + 1;
+
+    // Get values from modal
+    const price = document.getElementById('modal_variant_price').value;
+    const cost = document.getElementById('modal_variant_cost').value;
+    const sku = document.getElementById('modal_variant_sku').value;
+    const barcode = document.getElementById('modal_variant_barcode').value;
+    const isActive = document.getElementById('modal_variant_active').checked;
+
+    // Update DOM inputs (hidden and visible)
+    const priceInput = document.querySelector(`input[name="variant_price_${idx}"]`);
+    const costInput = document.querySelector(`input[name="variant_cost_${idx}"]`);
+    const skuInput = document.querySelector(`input[name="variant_sku_${idx}"]`);
+    const barcodeInput = document.querySelector(`input[name="variant_barcode_${idx}"]`);
+    const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
+
+    if (priceInput) priceInput.value = price;
+    if (costInput) costInput.value = cost;
+    if (skuInput) skuInput.value = sku;
+    if (barcodeInput) barcodeInput.value = barcode;
+    if (activeInput) activeInput.value = isActive;
+
+    // Trigger price range update if explicit group row exists
+    const row = document.querySelector(`tr[data-variant-index="${currentEditingVariantIndex}"]`);
+    if (row && row.classList.length > 1) {
+        row.classList.forEach(cls => {
+            if (cls.startsWith('group_')) {
+                // Check if updateGroupPriceRange exists before calling
+                if (typeof updateGroupPriceRange === 'function') {
+                    updateGroupPriceRange(cls);
+                }
+            }
+        });
+    }
+
+    closeVariantDetailModal();
+}

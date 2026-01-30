@@ -1,13 +1,13 @@
 // this will be adjusted and exported at the end to the server
-let order_data = {
+var order_data = {
   "order_items": [
     // { "item_no": 1, "product": { "sku": "", "variant": false }, "description": "", "quantity": 1, "price": 1 },
   ]
-}
+};
 
-const order_items_table = document.getElementById("order_items_table");
+var order_items_table;
+var submit_order_button;
 
-// index starts from 1, so the first row will be 1
 const generate_order_item_row = (index, sku, variant, itemId = null) => {
   console.log("your index is", index);
 
@@ -25,9 +25,9 @@ const generate_order_item_row = (index, sku, variant, itemId = null) => {
           <th>Delete</th>
         </tr>`
   }
-  
+
   const itemIdField = itemId ? `<input type="hidden" name="item_id_${index}" id="item_id_${index}" value="${itemId}" />` : '';
-  
+
   return `
     ${table_header}
       <tr>
@@ -70,14 +70,14 @@ const selectProduct = (sku, variant) => {
     }, 3000);
     return;
   }
-  
+
   const newItem = {
     "sku": sku,
     "variant": variant, // true if it is a variant, false if it is a parent product
     "quantity": 1,
     "price": 0
   };
-  
+
   order_data.order_items.push(newItem);
 
   console.log("order_data.order_items", order_data.order_items);
@@ -91,20 +91,23 @@ const selectProduct = (sku, variant) => {
 
 // Function to add event listeners to a specific row
 const addRowEventListeners = (index) => {
+  if (!order_items_table) return;
   const qtyInput = order_items_table.querySelector(`.quantity-input[data-index="${index}"]`);
   const priceInput = order_items_table.querySelector(`.price-input[data-index="${index}"]`);
   const totalInput = order_items_table.querySelector(`.total-input[data-index="${index}"]`);
 
+  if (!qtyInput || !priceInput || !totalInput) return;
+
   function updateTotal() {
     const qty = parseFloat(qtyInput.value) || 0;
     const price = parseFloat(priceInput.value) || 0;
-    
+
     // Update order_data with the new values
     if (order_data.order_items[index - 1]) {
       order_data.order_items[index - 1].quantity = qty;
       order_data.order_items[index - 1].price = price;
     }
-    
+
     totalInput.value = (qty * price).toFixed(2);
   }
 
@@ -117,6 +120,7 @@ const addRowEventListeners = (index) => {
 
 // Function to initialize event listeners for existing items (edit mode)
 const initializeExistingItems = () => {
+  if (!order_items_table) return;
   const rows = order_items_table.querySelectorAll('tr');
   rows.forEach((row, index) => {
     if (index > 0) { // Skip header row
@@ -125,42 +129,13 @@ const initializeExistingItems = () => {
   });
 }
 
-
-
-// This is to handle product row deletions
-order_items_table.addEventListener('click', function (e) {
-  if (e.target.classList.contains('delete-row-btn')) {
-    const tr = e.target.closest('tr');
-    if (tr) tr.remove();
-    // Optionally, remove from order_data.order_items as well:
-    const skuInput = tr.querySelector('input[readonly]');
-    if (skuInput) {
-      order_data.order_items = order_data.order_items.filter(item => item.sku !== skuInput.value);
-    }
-    // Remove table header if no more order items
-    // Find all rows except header
-    const rows = order_items_table.querySelectorAll('tr');
-    // If only the header remains, or no rows at all, remove the header
-    if (order_data.order_items.length === 0) {
-      const header = order_items_table.querySelector('tr');
-      if (header) header.remove();
-    }
-  }
-});
-
-
 const collectOrderItemsFromTable = () => {
   const items = [];
-  // Find all rows except the header
-  // We'll count rows by checking for inputs with id="sku_X"
   let index = 1;
   while (true) {
     const skuInput = document.getElementById(`sku_${index}`);
     if (!skuInput) {
-      // If no more rows, break
-      // (or continue if you want to allow gaps in numbering)
       index++;
-      // If you want to allow gaps, comment out the break and use continue
       if (index > 1000) break; // safety to avoid infinite loop
       continue;
     }
@@ -185,47 +160,84 @@ const collectOrderItemsFromTable = () => {
         quantity: quantity,
         price: price
       };
-      
+
       // Include item_id for existing items (edit mode)
       if (itemId) {
         item.item_id = itemId;
       }
-      
+
       items.push(item);
     }
     index++;
-    if (index > 1000) break; // safety to avoid infinite loop
+    if (index > 1000) break;
   }
   return items;
 }
 
-const submit_order_button = document.getElementById("submit_order_button");
+// Main initialization function
+function initOrderForm() {
+  console.log("Initializing Order Form logic...");
+  order_items_table = document.getElementById("order_items_table");
+  submit_order_button = document.getElementById("submit_order_button");
 
+  if (!order_items_table || !submit_order_button) {
+    console.warn("Order form elements not found. Skipping init.");
+    return;
+  }
 
-// const generate_order_list_button = document.getElementById("generate_order_list_button");
-// generate_order_list_button.addEventListener("click", (e) => {
-//   // e.preventDefault();
-//   // order_data.order_items = collectOrderItemsFromTable();
-//   // console.log(order_data);
-//   // Here you can send order_data to the server or process it further
-//   collectOrderItemsFromTable();
-// });
+  // Clear previous event listeners (by replacing element if needed, but simple re-attach is okay if mostly adding)
+  // Actually, if we re-run this, we might attach double listeners to submit button.
+  // Better to clone and replace submit button to clear listeners
+  var newBtn = submit_order_button.cloneNode(true);
+  submit_order_button.parentNode.replaceChild(newBtn, submit_order_button);
+  submit_order_button = newBtn;
 
-submit_order_button.addEventListener("click", (e) => {
-  e.preventDefault();
-  order_data.order_items = collectOrderItemsFromTable();
-  const product_json = JSON.stringify(order_data.order_items);
-  const product_json_input = document.getElementById("product_json_input");
-  product_json_input.value = product_json;
-  console.log("Final order data to submit:", order_data);
+  // Also handle table click listener. 
+  // Since table logic is static, we can attach listener to a static wrapper or check if attached.
+  // For simplicity, we'll re-attach but check if we can remove old one. 
+  // Anonymous functions are hard to remove. Use named handler.
 
-  // Submit the form programmatically
-  submit_order_button.form.submit();
-});
+  order_items_table.removeEventListener('click', handleTableClick);
+  order_items_table.addEventListener('click', handleTableClick);
 
-// Initialize event listeners for existing items when page loads (for edit mode)
-document.addEventListener('DOMContentLoaded', function() {
+  submit_order_button.addEventListener("click", (e) => {
+    e.preventDefault();
+    order_data.order_items = collectOrderItemsFromTable();
+    const product_json = JSON.stringify(order_data.order_items);
+    const product_json_input = document.getElementById("product_json_input");
+    if (product_json_input) product_json_input.value = product_json;
+    console.log("Final order data to submit:", order_data);
+
+    // Submit the form programmatically
+    submit_order_button.form.submit();
+  });
+
   if (order_items_table && order_items_table.querySelectorAll('tr').length > 1) {
     initializeExistingItems();
+  }
+}
+
+function handleTableClick(e) {
+  if (e.target.classList.contains('delete-row-btn')) {
+    const tr = e.target.closest('tr');
+    if (tr) tr.remove();
+    // Optionally, remove from order_data.order_items as well:
+    const skuInput = tr.querySelector('input[readonly]');
+    if (skuInput) {
+      order_data.order_items = order_data.order_items.filter(item => item.sku !== skuInput.value);
+    }
+    // Remove table header if no more order items
+    // If only the header remains, or no rows at all, remove the header
+    if (order_data.order_items.length === 0) {
+      const header = order_items_table.querySelector('tr');
+      if (header) header.remove();
+    }
+  }
+}
+
+// Auto-init on load if elements exist
+document.addEventListener('DOMContentLoaded', function () {
+  if (document.getElementById("order_items_table")) {
+    initOrderForm();
   }
 });

@@ -256,8 +256,19 @@
   <!-- TAB 2: My Tasks -->
   <div id="myTasksTabContent" class="main-tab-content">
     <div id="myTasksList">
-      <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-        <i class="fa fa-spinner fa-spin"></i> Loading tasks...
+      <div class="skeleton-loader-container" style="padding: 1rem;">
+        <div class="skeleton-card">
+          <div class="skeleton-text" style="width: 40%;"></div>
+          <div class="skeleton-text" style="width: 80%;"></div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton-text" style="width: 40%;"></div>
+          <div class="skeleton-text" style="width: 80%;"></div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton-text" style="width: 40%;"></div>
+          <div class="skeleton-text" style="width: 80%;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -265,8 +276,19 @@
   <!-- TAB 3: Assigned Tasks -->
   <div id="assignedTasksTabContent" class="main-tab-content">
     <div id="assignedTasksList">
-      <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-        <i class="fa fa-spinner fa-spin"></i> Loading tasks...
+      <div class="skeleton-loader-container" style="padding: 1rem;">
+        <div class="skeleton-card">
+          <div class="skeleton-text" style="width: 40%;"></div>
+          <div class="skeleton-text" style="width: 80%;"></div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton-text" style="width: 40%;"></div>
+          <div class="skeleton-text" style="width: 80%;"></div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton-text" style="width: 40%;"></div>
+          <div class="skeleton-text" style="width: 80%;"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -402,62 +424,8 @@
       }
     }
   }
-  // Instant search function that queries backend with loading indicator
-  window.instantSearchTasks = function (inputElement) {
-    const searchQuery = inputElement.value.trim();
-
-    // Debounce search to avoid too many requests (increased to 600ms for smoother UX)
-    if (window.searchTimeout) {
-      clearTimeout(window.searchTimeout);
-    }
-
-    // Show loading indicator immediately
-    const searchWrapper = inputElement.closest('.search-wrapper');
-    let loadingSpinner = searchWrapper ? searchWrapper.querySelector('.search-loading') : null;
-
-    if (!loadingSpinner && searchWrapper) {
-      loadingSpinner = document.createElement('div');
-      loadingSpinner.className = 'search-loading';
-      loadingSpinner.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
-      loadingSpinner.style.cssText = 'position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: #3b82f6; font-size: 1rem; pointer-events: none;';
-      searchWrapper.style.position = 'relative';
-      searchWrapper.appendChild(loadingSpinner);
-    }
-
-    if (loadingSpinner) {
-      loadingSpinner.style.display = 'block';
-    }
-
-    window.searchTimeout = setTimeout(() => {
-      // Always go to page 1 when searching
-      const url = `/todo/task_report/?tab=${window.currentTab}&page=1&search=${encodeURIComponent(searchQuery)}`;
-
-      fetch(url, {
-        method: 'GET',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-      })
-        .then(response => response.text())
-        .then(html => {
-          const container = window.currentTab === 'myTasks' ?
-            document.getElementById('myTasksList') :
-            document.getElementById('assignedTasksList');
-          if (container) {
-            container.innerHTML = html;
-          }
-          // Hide loading spinner
-          if (loadingSpinner) {
-            loadingSpinner.style.display = 'none';
-          }
-        })
-        .catch(error => {
-          console.error('Search error:', error);
-          // Hide loading spinner on error
-          if (loadingSpinner) {
-            loadingSpinner.style.display = 'none';
-          }
-        });
-    }, 600); // Wait 600ms after user stops typing (smoother experience)
-  };
+  // Server-side search removed to prefer client-side search as requested.
+  // window.instantSearchTasks = function (inputElement) { ... }
 
   window.loadTaskPage = function (pageNumber) {
     const searchInput = document.getElementById('taskSearchInput');
@@ -639,10 +607,19 @@
     }
   }
 
+  // Skeleton Loader Template
+  const SKELETON_LOADER_HTML = `
+    <div class="skeleton-loader-container" style="padding: 1rem;">
+      <div class="skeleton-card"><div class="skeleton-text" style="width: 40%;"></div><div class="skeleton-text" style="width: 80%;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-text" style="width: 40%;"></div><div class="skeleton-text" style="width: 80%;"></div></div>
+      <div class="skeleton-card"><div class="skeleton-text" style="width: 40%;"></div><div class="skeleton-text" style="width: 80%;"></div></div>
+    </div>
+  `;
+
   // Load My Tasks (without calendar filter)
   function loadMyTasks(page = 1, search = '') {
     const container = document.getElementById('myTasksList');
-    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading...</div>';
+    container.innerHTML = SKELETON_LOADER_HTML;
 
     fetch(`/todo/task_report/?tab=myTasks&page=${page}&search=${encodeURIComponent(search)}`, {
       method: 'GET',
@@ -664,7 +641,7 @@
   // Load Assigned Tasks
   function loadAssignedTasks(page = 1, search = '') {
     const container = document.getElementById('assignedTasksList');
-    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading...</div>';
+    container.innerHTML = SKELETON_LOADER_HTML;
 
     fetch(`/todo/task_report/?tab=assignedTasks&page=${page}&search=${encodeURIComponent(search)}`, {
       method: 'GET',
@@ -774,7 +751,7 @@
     const dateStr = `${year}-${month}-${day}`;
     const tasksContainer = document.getElementById('tasksContainer');
 
-    tasksContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading tasks...</div>';
+    tasksContainer.innerHTML = SKELETON_LOADER_HTML;
 
     fetch(`/dashboard/?date=${dateStr}&tab=${currentTaskTab}`, {
       method: 'GET',

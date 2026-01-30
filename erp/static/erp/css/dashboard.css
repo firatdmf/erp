@@ -68,43 +68,35 @@
 
 /* Color coding for different metrics */
 #money-in {
-    color: #10b981;
-    /* Green */
+    color: #10b981; /* Green */
 }
 
 #money-out {
-    color: #ef4444;
-    /* Red */
+    color: #ef4444; /* Red */
 }
 
 #burn {
-    color: #f59e0b;
-    /* Amber */
+    color: #f59e0b; /* Amber */
 }
 
 #growth {
-    color: #8b5cf6;
-    /* Purple */
+    color: #8b5cf6; /* Purple */
 }
 
 #ar {
-    color: #14b8a6;
-    /* Teal */
+    color: #14b8a6; /* Teal */
 }
 
 #ap {
-    color: #ec4899;
-    /* Pink */
+    color: #ec4899; /* Pink */
 }
 
 #runway {
-    color: #06b6d4;
-    /* Cyan */
+    color: #06b6d4; /* Cyan */
 }
 
 #alive {
-    color: #10b981;
-    /* Green */
+    color: #10b981; /* Green */
 }
 
 
@@ -113,21 +105,21 @@
     .DashboardPage {
         margin: -1rem;
     }
-
+    
     .scoreboard {
         grid-template-columns: 1fr;
         gap: 1rem;
         padding: 1rem;
     }
-
+    
     .scoreboard-item:first-child {
         grid-column: span 1;
     }
-
+    
     .scoreboard-item span {
         font-size: 1.5rem;
     }
-
+    
     #cash {
         font-size: 2rem;
     }

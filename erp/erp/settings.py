@@ -112,6 +112,7 @@ INSTALLED_APPS = [
     "marketing",
     "email_automation",  # Email automation system
     "notifications",  # Notification system
+    "team",  # Team management system
     "django_htmx",
     # below is to host images
     "cloudinary",

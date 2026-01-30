@@ -1,0 +1,90 @@
+{% for product in products %}
+<tr class="product-row" data-id="{{ product.id }}" onclick="toggleVariants({{ product.id }}, this, event)"
+    style="cursor: pointer;">
+    <td>
+        <div class="custom-checkbox row-checkbox" onclick="toggleRowCheckbox(this, event)">
+            <input type="checkbox" name="product_ids" value="{{ product.id }}" style="display: none;">
+        </div>
+    </td>
+    <td>
+        <div class="product-image-box {% if not product.primary_image %}placeholder{% endif %}">
+            {% if product.primary_image %}
+            <img src="{{ product.primary_image.thumbnail_url }}">
+            {% else %}
+            <i class="fa fa-image"></i>
+            {% endif %}
+        </div>
+    </td>
+    <td>
+        <a href="{% url 'marketing:product_detail' product.id %}" class="product-name">{{ product.title }}</a>
+        <div class="product-updated">Updated recently</div>
+    </td>
+    <td>
+        <span class="sku-badge">{{ product.sku|default:"-" }}</span>
+    </td>
+    <td>
+        <span style="font-weight: 500; font-size: 13px;">{{ product.category.name|title|default:"-" }}</span>
+    </td>
+    <td>
+        {% for attr in product.attributes.all|slice:":3" %}
+        <span class="attr-tag" title="{{ attr.name }}: {{ attr.value }}">{{ attr.value }}</span>
+        {% empty %}
+        <span style="color: #cbd5e1; font-size: 12px;">-</span>
+        {% endfor %}
+    </td>
+    <td style="text-align: center;">
+        {% with stock=product.total_stock %}
+        <div class="stock-val">{{ stock|floatformat:0|default:"0" }}</div>
+        {% if stock > 500 %}
+        <span class="stock-status-text text-success">High Stock</span>
+        {% elif stock > 0 %}
+        <span class="stock-status-text text-warning">Restock</span>
+        {% else %}
+        <span class="stock-status-text text-danger">OOS</span>
+        {% endif %}
+        {% endwith %}
+    </td>
+    <td>
+        <div style="font-weight: 600; color: #0f172a;">${{ product.price|default:"0.00" }}</div>
+    </td>
+    <td>
+        {% if product.featured %}
+        <span class="status-pill pill-premium">Featured</span>
+        {% else %}
+        <span class="status-pill pill-active">Regular</span>
+        {% endif %}
+    </td>
+    <td>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            <a href="{% url 'marketing:product_edit' product.id %}" class="btn-expand"
+                style="text-decoration: none; color: inherit;">
+                <i class="fa fa-pencil"></i>
+            </a>
+            <button class="btn-expand" onclick="toggleVariants({{ product.id }}, this.closest('tr')); return false;">
+                <i class="fa fa-chevron-right"></i>
+            </button>
+        </div>
+    </td>
+</tr>
+
+<!-- Expanded Variants Row (Lazy Loaded) -->
+<tr class="variant-row" id="variants-{{ product.id }}">
+    <td colspan="10" style="padding: 0; border: none;">
+        <div class="variant-box" hx-get="{% url 'marketing:product_variants' product.id %}"
+            hx-trigger="variant-load once" hx-swap="innerHTML">
+            <div style="text-align: center; padding: 20px; color: #94a3b8;">
+                <i class="fa fa-spinner fa-spin"></i> Loading variants...
+            </div>
+        </div>
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="10" style="text-align: center; padding: 48px;">
+        <div style="margin-bottom: 16px; font-size: 48px; color: #e2e8f0;">
+            <i class="fa fa-box-open"></i>
+        </div>
+        <h3 style="margin: 0; color: #64748b;">No products found</h3>
+    </td>
+</tr>
+{% endfor %}

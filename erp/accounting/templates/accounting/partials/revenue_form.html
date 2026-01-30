@@ -1,0 +1,135 @@
+<style>
+    /* Scoped styles for the Revenue form */
+    #addRevenueForm {
+        padding: 0.5rem;
+    }
+
+    #addRevenueForm p {
+        margin-bottom: 1.25rem;
+    }
+
+    #addRevenueForm label {
+        display: block;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #374151;
+        /* Gray-700 */
+        margin-bottom: 0.4rem;
+    }
+
+    #addRevenueForm input[type="text"],
+    #addRevenueForm input[type="number"],
+    #addRevenueForm input[type="date"],
+    #addRevenueForm select,
+    #addRevenueForm textarea {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        background-color: #fff;
+        border: 1px solid #d1d5db;
+        /* Gray-300 */
+        border-radius: 8px;
+        font-size: 0.95rem;
+        color: #1f2937;
+        /* Gray-900 */
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        box-sizing: border-box;
+        /* Critical for responsiveness */
+    }
+
+    #addRevenueForm input:focus,
+    #addRevenueForm select:focus,
+    #addRevenueForm textarea:focus {
+        border-color: #4b5563;
+        /* Gray-600 */
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.1);
+    }
+
+    #addRevenueForm textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    /* Help text styling if django renders it */
+    #addRevenueForm .helptext {
+        display: block;
+        margin-top: 0.25rem;
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+
+    .form-footer {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+    }
+
+    #btnSaveRevenue {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        /* Reduced padding */
+        background-color: #000000;
+        /* Black */
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    #btnSaveRevenue:hover {
+        background-color: #1f2937;
+        /* Gray-900 */
+        transform: translateY(-1px);
+    }
+
+    #btnSaveRevenue:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    #btnCancelRevenue {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        /* Reduced padding */
+        background-color: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        color: #374151;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+    }
+
+    #btnCancelRevenue:hover {
+        background-color: #f3f4f6;
+        border-color: #9ca3af;
+    }
+</style>
+
+<form id="addRevenueForm" method="post" onsubmit="submitAddRevenueForm(event)">
+    {% csrf_token %}
+    <div class="form-body">
+        {{ form.as_p }}
+    </div>
+    <div class="form-footer">
+        <button type="button" id="btnCancelRevenue" onclick="closeAddRevenueSidebar()">
+            Cancel
+        </button>
+        <button type="submit" id="btnSaveRevenue">
+            <span class="btn-text">Add Revenue</span>
+            <span class="spinner-border" style="display: none;">
+                <i class="fas fa-spinner fa-spin"></i>
+            </span>
+        </button>
+    </div>
+</form>

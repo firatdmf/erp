@@ -35,7 +35,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-secondary);
-  text-transform: uppercase;
+  /* text-transform: uppercase; removed per user request */
   letter-spacing: 0.5px;
 }
 
@@ -80,6 +80,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  text-transform: none;
 }
 
 .section-header h3 i {
@@ -114,6 +115,7 @@
   color: var(--text-primary);
   min-width: 150px;
   text-align: center;
+  text-transform: none;
 }
 
 .btn-icon {

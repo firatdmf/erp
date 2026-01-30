@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<style>
+    /* ============================================
+   * Raw Materials - Modern Design
+   * ============================================ */
+
+    .page-container {
+        background: #f8fafc;
+        min-height: 100vh;
+        padding: 32px 40px;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        color: #0f172a;
+    }
+
+    /* Header Section */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 24px;
+    }
+
+    .header-title h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 4px 0;
+        letter-spacing: -0.5px;
+    }
+
+    .header-title p {
+        font-size: 14px;
+        color: #64748b;
+        margin: 0;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        /* Allow wrapping on small screens */
+    }
+
+    .page-search-wrapper {
+        position: relative;
+        flex: 0 0 320px;
+    }
+
+    .page-search-input {
+        width: 100%;
+        height: 44px;
+        padding: 0 16px 0 44px !important;
+        /* Force padding for icon */
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: white;
+        font-size: 14px;
+        color: #0f172a;
+        transition: all 0.2s;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        box-sizing: border-box;
+        /* Ensure padding doesn't affect width */
+    }
+
+    .page-search-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .page-search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    .actions-right {
+        margin-left: auto;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        /* Allow buttons to stack if needed */
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-wrapper {
+            flex: 1 1 100%;
+            width: 100%;
+        }
+
+        .actions-right {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        .actions-right .btn-primary,
+        .actions-right .btn-secondary {
+            flex: 1;
+            justify-content: center;
+        }
+    }
+
+    .btn-primary {
+        height: 44px;
+        padding: 0 20px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+        white-space: nowrap;
+        /* Prevent text wrapping inside button */
+    }
+
+    .btn-secondary {
+        height: 44px;
+        padding: 0 20px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        white-space: nowrap;
+    }
+
+    .btn-secondary:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+
+    /* Table Design */
+    .table-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    .modern-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .modern-table th {
+        background: #f8fafc;
+        padding: 16px 20px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modern-table td {
+        padding: 16px 20px;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 14px;
+        color: #334155;
+    }
+
+    .modern-table tr:hover {
+        background: #f8fafc;
+    }
+
+    /* Status Badges */
+    .badge {
+        display: inline-flex;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .badge-blue {
+        background: #eff6ff;
+        color: #3b82f6;
+    }
+
+    .badge-purple {
+        background: #f3e8ff;
+        color: #a855f7;
+    }
+
+    .sku-badge {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: #475569;
+        background: #f1f5f9;
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+
+    <!-- Header -->
+    <div class="page-header">
+        <div class="header-title">
+            <h1>Raw Materials</h1>
+            <p>Manage raw materials inventory and definitions.</p>
+        </div>
+    </div>
+
+    <!-- Filters & Actions -->
+    <div class="filter-bar">
+        <div class="page-search-wrapper">
+            <i class="fa fa-search page-search-icon"></i>
+            <form method="get" action="">
+                <input type="text" class="page-search-input" name="search" placeholder="Search by name, SKU..."
+                    value="{{ search_query }}">
+            </form>
+        </div>
+
+        <div class="actions-right">
+            <a href="{% url 'operating:create_raw_material_good_receipt' %}" class="btn-secondary">
+                <i class="fa fa-boxes"></i> Stock Receipt
+            </a>
+            <a href="{% url 'operating:create_raw_material_good' %}" class="btn-primary">
+                <i class="fa fa-plus"></i> New Material
+            </a>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-card">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>SKU</th>
+                    <th>Type</th>
+                    <th>Unit</th>
+                    <th style="text-align: right;">Quantity</th>
+                    <th style="width: 100px; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for material in raw_materials %}
+                <tr id="row-{{ material.id }}">
+                    <td>
+                        <a href="#" onclick="openEditRawMaterialSidebar({{ material.id }}); return false;"
+                            style="font-weight: 600; color: #0f172a; text-decoration: none;">{{ material.name }}</a>
+                    </td>
+                    <td><span class="sku-badge">{{ material.sku }}</span></td>
+                    <td>
+                        {% if material.raw_type == 'direct' %}
+                        <span class="badge badge-blue">Direct</span>
+                        {% else %}
+                        <span class="badge badge-purple">Indirect</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-transform: capitalize;">{{ material.unit_of_measurement }}</td>
+                    <td style="text-align: right; font-weight: 600;">
+                        {{ material.quantity|default:"0" }}
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick="openEditRawMaterialSidebar({{ material.id }})" class="action-btn edit-btn"
+                            title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteRawMaterial({{ material.id }})" class="action-btn delete-btn"
+                            title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: #64748b;">
+                        <i class="fa fa-box-open" style="font-size: 24px; margin-bottom: 12px; display: block;"></i>
+                        No raw materials found. Start by creating one!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- Edit Raw Material Sidebar Modal -->
+<div id="editRawMaterialSidebarOverlay" class="sidebar-overlay" onclick="closeEditRawMaterialSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+        <div class="sidebar-header">
+            <button class="sidebar-close" onclick="closeEditRawMaterialSidebar()">
+                <i class="fas fa-times"></i> Close
+            </button>
+            <div class="sidebar-title">
+                <i class="fas fa-pen"></i>
+                <h2>Edit Raw Material</h2>
+            </div>
+        </div>
+        <div class="sidebar-content">
+            <div id="editLoadingState" style="text-align: center; padding: 40px; display: none;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #3b82f6;"></i>
+                <p style="margin-top: 10px; color: #6b7280;">Loading details...</p>
+            </div>
+
+            <form id="editRawMaterialForm" method="post" onsubmit="submitEditRawMaterialForm(event); return false;"
+                enctype="multipart/form-data" style="display: none;">
+                {% csrf_token %}
+                <input type="hidden" name="id" id="edit_rm_id">
+
+                <div class="form-group">
+                    <label for="edit_rm_name">Name <span style="color: #ef4444;">*</span></label>
+                    <input type="text" name="name" id="edit_rm_name" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_rm_sku">SKU</label>
+                    <input type="text" name="sku" id="edit_rm_sku" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_rm_supplier_sku">Supplier SKU</label>
+                    <input type="text" name="supplier_sku" id="edit_rm_supplier_sku" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_rm_type">Type</label>
+                    <select name="raw_type" id="edit_rm_type" class="form-input">
+                        <option value="direct">Direct (Production)</option>
+                        <option value="indirect">Indirect (Overhead)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_rm_unit">Unit of Measurement</label>
+                    <select name="unit_of_measurement" id="edit_rm_unit" class="form-input">
+                        <option value="units">Unit</option>
+                        <option value="mt">Meter</option>
+                        <option value="kg">Kilogram</option>
+                        <option value="l">Liter</option>
+                        <option value="bx">Box</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_rm_quantity">Current Quantity</label>
+                    <input type="number" name="quantity" id="edit_rm_quantity" class="form-input" step="0.01">
+                </div>
+
+                <div class="sidebar-footer">
+                    <button type="submit" id="editRmSubmitBtn" class="btn btn-primary">
+                        <span class="btn-text">Save Changes</span>
+                        <span class="btn-spinner" style="display: none;">
+                            <svg class="spinner-icon" viewBox="0 0 50 50">
+                                <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5">
+                                </circle>
+                            </svg>
+                            Saving...
+                        </span>
+                    </button>
+                    <button type="button" class="btn btn-secondary"
+                        onclick="closeEditRawMaterialSidebar()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Action Buttons */
+    .action-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 6px;
+        transition: all 0.2s;
+        margin: 0 2px;
+    }
+
+    .edit-btn {
+        color: #3b82f6;
+    }
+
+    .edit-btn:hover {
+        background: #eff6ff;
+    }
+
+    .delete-btn {
+        color: #ef4444;
+    }
+
+    .delete-btn:hover {
+        background: #fef2f2;
+    }
+</style>
+
+<script>
+    let currentEditId = null;
+
+    function openEditRawMaterialSidebar(id) {
+        currentEditId = id;
+        document.getElementById('editRawMaterialSidebarOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        const loader = document.getElementById('editLoadingState');
+        const form = document.getElementById('editRawMaterialForm');
+
+        loader.style.display = 'block';
+        form.style.display = 'none';
+
+        // Fetch Data
+        fetch(`/operating/raw_material_good/${id}/get/json`)
+            .then(res => res.json())
+            .then(response => {
+                if (response.success) {
+                    const data = response.data;
+                    document.getElementById('edit_rm_id').value = data.id;
+                    document.getElementById('edit_rm_name').value = data.name;
+                    document.getElementById('edit_rm_sku').value = data.sku;
+                    document.getElementById('edit_rm_supplier_sku').value = data.supplier_sku;
+                    document.getElementById('edit_rm_type').value = data.raw_type;
+                    document.getElementById('edit_rm_unit').value = data.unit_of_measurement;
+                    document.getElementById('edit_rm_quantity').value = data.quantity;
+
+                    loader.style.display = 'none';
+                    form.style.display = 'block';
+                } else {
+                    alert('Failed to load data.');
+                    closeEditRawMaterialSidebar();
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error fetching data.');
+                closeEditRawMaterialSidebar();
+            });
+    }
+
+    function closeEditRawMaterialSidebar() {
+        document.getElementById('editRawMaterialSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+        currentEditId = null;
+    }
+
+    function submitEditRawMaterialForm(event) {
+        event.preventDefault();
+        const form = document.getElementById('editRawMaterialForm');
+        const submitBtn = document.getElementById('editRmSubmitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+        // Loading state
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch(`/operating/raw_material_good/${currentEditId}/update/json`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success toast (reusing global if available or simple alert)
+                    const toast = document.getElementById('toastNotification') || null;
+                    if (toast) {
+                        toast.querySelector('.toast-message-global').textContent = data.message;
+                        toast.classList.add('show');
+                        setTimeout(() => toast.classList.remove('show'), 3000);
+                    } else {
+                        alert(data.message);
+                    }
+
+                    closeEditRawMaterialSidebar();
+                    // Reload page to reflect changes
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    alert('Error: ' + (data.errors || 'Update failed'));
+                    btnText.style.display = 'inline';
+                    btnSpinner.style.display = 'none';
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('An error occurred.');
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            });
+    }
+
+    function deleteRawMaterial(id) {
+        if (!confirm('Are you sure you want to delete this raw material? This action cannot be undone.')) return;
+
+        fetch(`/operating/raw_material_good/${id}/delete/json`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById(`row-${id}`).remove();
+                    // Show success toast
+                    const toast = document.getElementById('toastNotification') || null;
+                    if (toast) {
+                        toast.querySelector('.toast-message-global').textContent = data.message;
+                        toast.classList.add('show');
+                        setTimeout(() => toast.classList.remove('show'), 3000);
+                    }
+                } else {
+                    alert('Error: ' + (data.errors || 'Delete failed'));
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('An error occurred during deletion.');
+            });
+    }
+</script>
+{% endblock %}

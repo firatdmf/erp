@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=4.4" />
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=9" />
 
   <!-- HTMX -->
   <script src="{% static 'erp/htmx.min.js' %}" defer></script>
@@ -19,6 +20,8 @@
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script> {% endcomment %}
   {% comment %}Unsaved changes handler - now inline in base.html script section{% endcomment %}
   {% block css %}
+  <link rel="stylesheet" href="{% static 'todo/css/components/tasks_new.css' %}" />
+  <link rel="stylesheet" href="{% static 'operating/css/create_order.css' %}" />
   {% endblock %}
   <style>
     /* Dynamic Email/Phone Fields - Modern Circular Buttons */
@@ -338,47 +341,104 @@
 </head>
 
 <body>
-  {% with member=user.member %}
-  <nav class="navbar">
-    <ul class="navbar-nav">
-      <li class="logo">
-        <a href="{% url 'index' %}" class="nav-link"><span id="nejum_logo_text"
-            class="link-text logo-text">nejum</span></a>
-      </li>
-      <li class="nav-item" id="searchButton">
-        <a class="nav-link">
-          <i class="fa-solid fa-search fa-2x"></i>
-          <span class="link-text" id="searchButton">Search</span>
-        </a>
-      </li>
+  <!-- Global Top Bar -->
+  <div class="global-top-bar">
+    <div class="top-bar-left">
+      <span class="welcome-text">Welcome to the base page, {{ user.first_name }} {{ user.last_name }}!</span>
+      <span class="header-date">{% now 'F j, Y' %}</span>
+    </div>
 
-      <div class="overlay" id="searchOverlay">
-        <div class="overlayContent">
-          {% comment %} <input type="text" name="searchInput" id="searchInput"
-            placeholder="Search for a company or contact..." /> {% endcomment %}
-          {% comment %} <div class="searchResults"></div> {% endcomment %}
-          {% search_component csrf_token=csrf_token %}
-          <div class="recent">
-            <h4>Recent</h4>
-            <ul>
-              {% for entry in last_ten_entities %}
-              <li>
-                {% comment %} <p>{{ company.name }} - {{ company.created_at }}</p> {% endcomment %}
-                {% if entry.entry_type == 'Contact' %}
-                <a href="{% url 'crm:contact_detail' entry.id %}">
-                  <i class="fas fa-user" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
-                </a>
-                {% elif entry.entry_type == 'Company' %}
-                <a href="{% url 'crm:company_detail' entry.id %}">
-                  <i class="fas fa-briefcase" aria-hidden="true"></i> {{ entry.name }} - {{ entry.created_at }}
-                </a>
-                {% endif %}
-              </li>
-              {% endfor %}
-            </ul>
+    <div class="top-bar-center">
+      <div class="search-container" id="searchContainer">
+        <!-- Single Search Box with Input -->
+        <div class="search-box-wrapper" id="searchBoxWrapper">
+          <i class="fas fa-search search-icon"></i>
+          <div class="search-filter-chips" id="cmdFilterChips"></div>
+          <input type="text" class="search-input" id="cmdSearchInput" placeholder="Search..." autocomplete="off"
+            onfocus="openSearchDropdown()" />
+          <div class="search-shortcut" id="searchShortcut">
+            <kbd>Ctrl</kbd><kbd>K</kbd>
+          </div>
+          <button class="search-clear-btn hidden" id="cmdClearBtn" onclick="clearCmdSearch(); event.stopPropagation();">
+            <i class="fas fa-times-circle"></i>
+          </button>
+          <button class="filter-toggle-btn hidden" id="filterToggle"
+            onclick="toggleCmdFilterMenu(); event.stopPropagation();" title="Filter">
+            <i class="fas fa-sliders-h"></i>
+          </button>
+        </div>
+
+        <!-- Dropdown Panel (no separate search header) -->
+        <div class="search-dropdown-panel" id="searchDropdownPanel">
+          <div class="search-dropdown-tabs" id="cmdModalTabs">
+            <button class="cmd-tab active" data-tab="all" onclick="setCmdTab('all')">All</button>
+            <button class="cmd-tab" data-tab="contacts" onclick="setCmdTab('contacts')">Contacts</button>
+            <button class="cmd-tab" data-tab="products" onclick="setCmdTab('products')">Products</button>
+            <button class="cmd-tab" data-tab="orders" onclick="setCmdTab('orders')">Orders</button>
+            <button class="cmd-tab" data-tab="menu" onclick="setCmdTab('menu')">Navigation</button>
+          </div>
+
+          <div class="search-dropdown-body" id="cmdModalBody">
+            <div class="search-section" id="cmdRecentSection">
+              <div class="section-header">
+                <span>RECENT SEARCHES</span>
+                <button class="clear-recent-btn" onclick="clearCmdRecentSearches()">Clear history</button>
+              </div>
+              <div class="recent-list" id="cmdRecentList"></div>
+            </div>
+            <div class="search-results-container" id="cmdResultsContainer"></div>
+            <div class="search-empty-state hidden" id="cmdEmptyState">
+              <i class="fas fa-search"></i>
+              <p>Search for something...</p>
+            </div>
+            <div class="filter-menu hidden" id="cmdFilterMenu">
+              <div class="filter-menu-header">Filter by category</div>
+              <div class="filter-menu-list" id="cmdFilterMenuList"></div>
+            </div>
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="top-bar-right">
+      <div class="notification-container">
+        <button class="top-bar-btn" onclick="toggleNotifications()" id="topBarNotificationBell">
+          <i class="far fa-bell"></i>
+          <span class="notification-dot hidden" id="notificationBadge"></span>
+        </button>
+        <div class="notification-dropdown" id="notificationDropdown">
+          <div class="notification-header">
+            <h3>Notifications</h3>
+            <button class="mark-all-read-btn" onclick="markAllNotificationsRead()">
+              <i class="fas fa-check-double"></i>
+            </button>
+          </div>
+          <div class="notification-list" id="notificationList">
+            <div class="notification-empty">
+              <i class="far fa-bell-slash"></i>
+              <p>No new notifications</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a href="{% url 'user_settings' %}" class="top-bar-btn" title="Settings">
+        <i class="fas fa-cog"></i>
+      </a>
+      <a href="{% url 'authentication:signout' %}" class="top-bar-btn" title="Sign Out">
+        <i class="fas fa-sign-out-alt"></i>
+      </a>
+    </div>
+  </div>
+
+  {% with member=user.member %}
+  <nav class="navbar">
+    <ul class="navbar-nav">
+      <!-- Logo in sidebar -->
+      <li class="logo">
+        <a href="{% url 'index' %}" class="nav-link">
+          <span id="nejum_logo_text" class="link-text logo-text">nejum</span>
+        </a>
+      </li>
 
       <li class="nav-item" id="addButton">
         <a href="#add" class="nav-link">
@@ -418,7 +478,7 @@
                 </a>
               </li>
               <li>
-                <a href="{% url 'operating:create_order' %}">
+                <a href="#" onclick="openOrderSidebar(); return false;">
                   <i class="fas fa-shopping-cart" aria-hidden="true"></i>
                   <span>Order</span>
                 </a>
@@ -442,6 +502,53 @@
           {% comment %} <i class="fas fa-table-columns fa-2x" aria-hidden="true"></i> {% endcomment %}
           <span class="link-text">Home</span>
         </a>
+      </li>
+      <li class="nav-item" id="teamButton">
+        <a href="#team" class="nav-link">
+          <i class="fas fa-users fa-2x" aria-hidden="true"></i>
+          <span class="link-text">My Team</span>
+        </a>
+        <div id="teamExpanded" style="top: 135px !important; max-height: 90vh !important; overflow-y: auto !important;">
+          <div class="add-menu-header">
+            <i class="fas fa-users" aria-hidden="true"></i>
+            <h2>My Team</h2>
+          </div>
+          <div class="add-menu-section">
+            <h3>Team Management</h3>
+            <ul>
+              <li>
+                <a href="{% url 'team:team_list' %}">
+                  <i class="fas fa-list" aria-hidden="true"></i>
+                  <span>Team Members</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'team:team_tasks' %}">
+                  <i class="fas fa-tasks" aria-hidden="true"></i>
+                  <span>Assign Tasks</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'team:team_messages' %}">
+                  <i class="fas fa-comments" aria-hidden="true"></i>
+                  <span>Messages</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'team:team_roles' %}">
+                  <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                  <span>Manage Roles</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'team:team_meetings' %}">
+                  <i class="fas fa-video" aria-hidden="true"></i>
+                  <span>Schedule Meetings</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
       </li>
       {% comment %} <li class="nav-item">
         <a href="{% url 'crm:index' %}" class="nav-link">
@@ -470,7 +577,7 @@
                 </a>
               </li>
               <li>
-                <a href="{% url 'accounting:create_book' %}">
+                <a href="#" onclick="openBookSidebar(); return false;">
                   <i class="fas fa-plus-circle" aria-hidden="true"></i>
                   <span>Create Book</span>
                 </a>
@@ -496,7 +603,8 @@
           <i class="fa-solid fa-bullseye fa-2x" aria-hidden="true"></i>
           <span class="link-text">Marketing</span>
         </a>
-        <div id="marketingExpanded" style="max-height: 90vh !important; overflow-y: auto !important;">
+        <div id="marketingExpanded"
+          style="top: 255px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-bullseye" aria-hidden="true"></i>
             <h2>Marketing</h2>
@@ -560,7 +668,7 @@
           <span class="link-text">Operating</span>
         </a>
         <div id="operatingExpanded"
-          style="top: 10px !important; max-height: 90vh !important; overflow-y: auto !important;">
+          style="top: 315px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-cogs" aria-hidden="true"></i>
             <h2>Operating</h2>
@@ -586,19 +694,25 @@
             <h3>Raw Materials</h3>
             <ul>
               <li>
-                <a href="{% url 'operating:create_raw_material_good' %}">
+                <a href="{% url 'operating:raw_material_good_list' %}">
+                  <i class="fas fa-list" aria-hidden="true"></i>
+                  <span>Raw Material List</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" onclick="openRawMaterialSidebar(); return false;">
                   <i class="fas fa-cube" aria-hidden="true"></i>
                   <span>Create Raw Material Good</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'operating:create_raw_material_good_receipt' %}">
+                <a href="#" onclick="openRawMaterialReceiptSidebar(); return false;">
                   <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
                   <span>Create Raw Material Good Receipt</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'operating:create_raw_material_good_item' %}">
+                <a href="#" onclick="openRawMaterialItemSidebar(); return false;">
                   <i class="fas fa-plus-square" aria-hidden="true"></i>
                   <span>Create Raw Material Good Item</span>
                 </a>
@@ -609,7 +723,7 @@
             <h3>Orders</h3>
             <ul>
               <li>
-                <a href="{% url 'operating:create_order' %}">
+                <a href="#" onclick="openOrderSidebar(); return false;">
                   <i class="fas fa-plus-circle" aria-hidden="true"></i>
                   <span>Create Order</span>
                 </a>
@@ -645,86 +759,13 @@
     </ul>
   </nav>
   <main>
-    <header>
-      <div class="line">
-        <div class="header-left">
-          {% if member %}
-          <p>Welcome to the base page, {{ member.user.first_name|title }}!</p>
-          {% elif user %}
-          <p>Welcome to the base page, {{ user.first_name|title }}!</p>
-          {% endif %}
-          {% if member.company_name %}
-          <p>We love, {{ member.company_name|upper }}!</p>
-          {% endif %}
-          <span>{% now 'F j, Y' %}</span>
-        </div>
-        <div class="header-right">
-          <a href="{% url 'user_settings' %}" class="header-link">
-            <i class="fas fa-wrench" aria-hidden="true"></i>
-            <span>Settings</span>
-          </a>
-          <a href="{% url 'authentication:signout' %}" class="header-link">
-            <i class="fas fa-sign-out" aria-hidden="true"></i>
-            <span>Sign Out</span>
-          </a>
-          <!-- Notification Bell (far right) -->
-          <div class="notification-container">
-            <button class="notification-bell" onclick="toggleNotifications()" id="notificationBell"
-              title="Notifications">
-              <i class="fas fa-bell"></i>
-              <span class="notification-badge hidden" id="notificationBadge"></span>
-            </button>
-            <div class="notification-dropdown" id="notificationDropdown">
-              <div class="notification-header">
-                <h3>Notifications</h3>
-                <button class="mark-all-read-btn" onclick="markAllNotificationsRead()" title="Mark all as read">
-                  <i class="fas fa-check-double"></i>
-                </button>
-              </div>
-              <div class="notification-list" id="notificationList">
-                <div class="notification-empty">
-                  <i class="fas fa-bell-slash"></i>
-                  <p>No notifications</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {% comment %}
-        <div class="countDown">
-          <div class="container">
-            <div id="countdown">
-              <ul>
-                <li>
-                  <span id="days"></span>days
-                </li>
-                <li>
-                  <span id="hours"></span>Hours
-                </li>
-                <li>
-                  <span id="minutes"></span>Minutes
-                </li>
-                <li>
-                  <span id="seconds"></span>Seconds
-                </li>
-              </ul>
-              <p>... left for my project.</p>
-            </div>
-            <div id="content" class="emoji">
-              <span>🥳</span>
-              <span>🎉</span>
-              <span>🎂</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      {% endcomment %}
-    </header>
     {% block content %}
 
     {% endblock %}
   </main>
   {% endwith %}
+
+  <script src="{% static 'erp/js/command_palette.js' %}"></script>
 
   <!-- Task Sidebar Modal -->
   <div id="taskSidebarOverlay" class="sidebar-overlay" onclick="closeTaskSidebar()">
@@ -2451,6 +2492,226 @@
   <!-- Task Edit Sidebar Modal -->
   {% include 'todo/components/task_edit_modal.html' %}
 
+  <!-- Raw Material Sidebar Modal -->
+  <div id="rawMaterialSidebarOverlay" class="sidebar-overlay" onclick="closeRawMaterialSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeRawMaterialSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-cube"></i>
+          <h2>Add Raw Material</h2>
+        </div>
+      </div>
+      <div class="sidebar-content">
+        <form id="rawMaterialForm" method="post" onsubmit="submitRawMaterialForm(event); return false;"
+          enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="form-group">
+            <label for="id_rm_name">Name <span style="color: #ef4444;">*</span></label>
+            <input type="text" name="name" id="id_rm_name" class="form-input" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label for="id_rm_sku">SKU (Optional)</label>
+            <input type="text" name="sku" id="id_rm_sku" class="form-input" placeholder="Leave empty to auto-generate">
+            <small style="color: #6b7280; font-size: 12px; display: block; margin-top: 4px;">Will be auto-generated if
+              left empty.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="id_rm_supplier_sku">Supplier SKU</label>
+            <input type="text" name="supplier_sku" id="id_rm_supplier_sku" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label for="id_rm_type">Type</label>
+            <select name="raw_type" id="id_rm_type" class="form-input">
+              <option value="direct" selected>Direct (Production)</option>
+              <option value="indirect">Indirect (Overhead)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="id_rm_unit">Unit of Measurement</label>
+            <select name="unit_of_measurement" id="id_rm_unit" class="form-input">
+              <option value="units" selected>Unit</option>
+              <option value="mt">Meter</option>
+              <option value="kg">Kilogram</option>
+              <option value="l">Liter</option>
+              <option value="bx">Box</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="id_rm_quantity">Initial Quantity</label>
+            <input type="number" name="quantity" id="id_rm_quantity" class="form-input" step="0.01" value="0">
+          </div>
+
+          <div class="sidebar-footer">
+            <button type="submit" id="rmSubmitBtn" class="btn btn-primary">
+              <span class="btn-text">Create Raw Material</span>
+              <span class="btn-spinner" style="display: none;">
+                <svg class="spinner-icon" viewBox="0 0 50 50">
+                  <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                </svg>
+                Creating...
+              </span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="closeRawMaterialSidebar()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raw Material Receipt Sidebar Modal -->
+  <div id="rawMaterialReceiptSidebarOverlay" class="sidebar-overlay" onclick="closeRawMaterialReceiptSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeRawMaterialReceiptSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fa-solid fa-file-lines"></i>
+          <h2>Add Receipt</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="rawMaterialReceiptSidebarContent">
+        <!-- HTMX target -->
+      </div>
+    </div>
+  </div>
+  </div>
+  </div>
+
+  <!-- Raw Material Item Sidebar Modal -->
+  <div id="rawMaterialItemSidebarOverlay" class="sidebar-overlay" onclick="closeRawMaterialItemSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeRawMaterialItemSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-plus-square"></i>
+          <h2>Add Item to Receipt</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="rawMaterialItemSidebarContent">
+        <!-- HTMX target -->
+      </div>
+    </div>
+  </div>
+  </div>
+  </div>
+
+  <!-- Order Sidebar Modal -->
+  <div id="orderSidebarOverlay" class="sidebar-overlay" onclick="closeOrderSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeOrderSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-shopping-cart"></i>
+          <h2>Create Order</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="orderSidebarContent">
+        <!-- HTMX loading target -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Book Sidebar Modal -->
+  <div id="bookSidebarOverlay" class="sidebar-overlay" onclick="closeBookSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeBookSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-book"></i>
+          <h2>Create Book</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="bookSidebarContent">
+        <!-- HTMX loading target -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Capital Sidebar Modal -->
+  <div id="addCapitalSidebarOverlay" class="sidebar-overlay" onclick="closeAddCapitalSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeAddCapitalSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-coins text-success"></i>
+          <h2>Add Equity Capital</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="addCapitalSidebarContent">
+        <!-- HTMX loading target -->
+      </div>
+    </div>
+  </div>
+
+  <div id="addRevenueSidebarOverlay" class="sidebar-overlay" onclick="closeAddRevenueSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeAddRevenueSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-arrow-up text-success"></i>
+          <h2>Add Equity Revenue</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="addRevenueSidebarContent">
+        <!-- HTMX loading target -->
+      </div>
+    </div>
+  </div>
+
+  <div id="addExpenseSidebarOverlay" class="sidebar-overlay" onclick="closeAddExpenseSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeAddExpenseSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-arrow-down text-danger"></i>
+          <h2>Add Equity Expense</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="addExpenseSidebarContent">
+        <!-- HTMX loading target -->
+      </div>
+    </div>
+  </div>
+
+  <div id="addDividendSidebarOverlay" class="sidebar-overlay" onclick="closeAddDividendSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeAddDividendSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-hand-holding-usd text-primary"></i>
+          <h2>Pay Dividend</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="addDividendSidebarContent">
+        <!-- HTMX loading target -->
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toastNotification" class="toast-notification-global">
     <div class="toast-content-global">
@@ -2460,12 +2721,7 @@
 
     <!-- Notification System Styles -->
     <style>
-      /* Notification Container */
-      .notification-container {
-        position: relative;
-        display: inline-block;
-        margin-right: 16px;
-      }
+      /* Notification Container style removed to fix spacing issues - handled in command_palette.css */
 
       /* Notification Bell Button */
       .notification-bell {
@@ -2921,7 +3177,574 @@
           }
         }
       }
+
+      // Order Sidebar Functions
+      function openOrderSidebar() {
+        const overlay = document.getElementById('orderSidebarOverlay');
+        const content = document.getElementById('orderSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        // Always reload to get a fresh form
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+
+        // Use HTMX to load content
+        htmx.ajax('GET', '{% url "operating:create_order" %}', { target: '#orderSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeOrderSidebar() {
+        document.getElementById('orderSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      // Book Sidebar Functions
+      function openBookSidebar() {
+        const overlay = document.getElementById('bookSidebarOverlay');
+        const content = document.getElementById('bookSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+
+        htmx.ajax('GET', '{% url "accounting:create_book" %}', { target: '#bookSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeBookSidebar() {
+        document.getElementById('bookSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitBookForm(event) {
+        event.preventDefault();
+        const form = document.getElementById('bookForm');
+        const submitBtn = document.getElementById('bookSubmitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+        // Loading state
+        if (btnText) btnText.style.display = 'none';
+        if (btnSpinner) btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch('{% url "accounting:create_book" %}', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              const toastMessage = toast.querySelector('.toast-message-global');
+              toastMessage.textContent = 'Book created successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+
+              closeBookSidebar();
+              if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+              }
+            } else {
+              alert('Error: ' + (data.errors ? JSON.stringify(data.errors) : 'Failed to create book'));
+              if (btnText) btnText.style.display = 'inline';
+              if (btnSpinner) btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Add Capital Sidebar Functions
+      let currentCapitalUrl = '';
+
+      function openAddCapitalSidebar(url) {
+        currentCapitalUrl = url;
+        const overlay = document.getElementById('addCapitalSidebarOverlay');
+        const content = document.getElementById('addCapitalSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+
+        htmx.ajax('GET', url, { target: '#addCapitalSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeAddCapitalSidebar() {
+        document.getElementById('addCapitalSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitAddCapitalForm(event) {
+        event.preventDefault();
+        const form = document.getElementById('addCapitalForm');
+        const submitBtn = document.getElementById('btnSaveCapital');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.spinner-border');
+
+        // Loading state
+        if (btnText) btnText.style.display = 'none';
+        if (btnSpinner) btnSpinner.classList.remove('d-none');
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        // currentCapitalUrl should have been set when opening
+        fetch(currentCapitalUrl, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              const toastMessage = toast.querySelector('.toast-message-global');
+              toastMessage.textContent = data.message || 'Capital added successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+
+              closeAddCapitalSidebar();
+              if (data.redirect_url) {
+                // Refresh the page or go to redirect url to show updated data
+                window.location.reload();
+              }
+            } else {
+              // Simple error alert for now, could be better
+              alert('Error: ' + (data.errors ? JSON.stringify(data.errors) : 'Failed to add capital'));
+              if (btnText) btnText.style.display = 'inline';
+              if (btnSpinner) btnSpinner.classList.add('d-none');
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.classList.add('d-none');
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Raw Material Sidebar Functions
+      function openRawMaterialSidebar() {
+        document.getElementById('rawMaterialSidebarOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+          if (typeof initializeFormTracking === 'function') {
+            initializeFormTracking('rawMaterialForm');
+          }
+          document.getElementById('id_rm_name').focus();
+        }, 300);
+      }
+
+      function closeRawMaterialSidebar() {
+        const overlay = document.getElementById('rawMaterialSidebarOverlay');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+        document.getElementById('rawMaterialForm').reset();
+        if (typeof resetFormTracking === 'function') resetFormTracking();
+      }
+
+      function submitRawMaterialForm(event) {
+        event.preventDefault();
+        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
+
+        const form = document.getElementById('rawMaterialForm');
+        const submitBtn = document.getElementById('rmSubmitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+        // Loading state
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch('{% url "operating:create_raw_material_good_json" %}', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              const toastMessage = toast.querySelector('.toast-message-global');
+              toastMessage.textContent = data.message || 'Raw Material created successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+
+              closeRawMaterialSidebar();
+            } else {
+              alert('Error: ' + (data.errors || 'Failed to create raw material'));
+              btnText.style.display = 'inline';
+              btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Raw Material Receipt Sidebar Functions
+      function openRawMaterialReceiptSidebar() {
+        const overlay = document.getElementById('rawMaterialReceiptSidebarOverlay');
+        const content = document.getElementById('rawMaterialReceiptSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        // Show loading state
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+
+        // HTMX load
+        htmx.ajax('GET', '{% url "operating:create_raw_material_receipt_partial" %}', { target: '#rawMaterialReceiptSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeRawMaterialReceiptSidebar() {
+        const overlay = document.getElementById('rawMaterialReceiptSidebarOverlay');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitRawMaterialReceiptForm(event) {
+        event.preventDefault();
+        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
+
+        const form = document.getElementById('rawMaterialReceiptForm');
+        const submitBtn = document.getElementById('rmReceiptSubmitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+        // Loading state
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch('{% url "operating:create_raw_material_good_receipt_json" %}', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              const toastMessage = toast.querySelector('.toast-message-global');
+              toastMessage.textContent = data.message || 'Receipt created successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+
+              closeRawMaterialReceiptSidebar();
+            } else {
+              alert('Error: ' + (data.errors || 'Failed to create receipt'));
+              btnText.style.display = 'inline';
+              btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Raw Material Item Sidebar Functions
+      function openRawMaterialItemSidebar(receiptId = null) {
+        const overlay = document.getElementById('rawMaterialItemSidebarOverlay');
+        const content = document.getElementById('rawMaterialItemSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        // Show loading state
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+
+        // HTMX load with optional receipt param
+        let url = '{% url "operating:create_raw_material_item_partial" %}';
+        if (receiptId) {
+          url += '?receipt=' + receiptId;
+        }
+
+        htmx.ajax('GET', url, { target: '#rawMaterialItemSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeRawMaterialItemSidebar() {
+        const overlay = document.getElementById('rawMaterialItemSidebarOverlay');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitRawMaterialItemForm(event) {
+        event.preventDefault();
+        if (window.formChangeTracker) window.formChangeTracker.setSubmitting();
+
+        const form = document.getElementById('rawMaterialItemForm');
+        const submitBtn = document.getElementById('rmItemSubmitBtn');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+
+        // Loading state
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch('{% url "operating:create_raw_material_good_item_json" %}', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              const toastMessage = toast.querySelector('.toast-message-global');
+              toastMessage.textContent = data.message || 'Item added successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+
+              closeRawMaterialItemSidebar();
+            } else {
+              alert('Error: ' + (data.errors || 'Failed to add item'));
+              btnText.style.display = 'inline';
+              btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Add Capital JS (assumed to be earlier, adding Revenue JS here)
+      let currentRevenueUrl = '';
+
+      function openAddRevenueSidebar(url) {
+        currentRevenueUrl = url;
+        const overlay = document.getElementById('addRevenueSidebarOverlay');
+        const content = document.getElementById('addRevenueSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+
+        htmx.ajax('GET', url, { target: '#addRevenueSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeAddRevenueSidebar() {
+        document.getElementById('addRevenueSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitAddRevenueForm(event) {
+        event.preventDefault();
+        const form = document.getElementById('addRevenueForm');
+        const submitBtn = document.getElementById('btnSaveRevenue');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.spinner-border');
+
+        // Loading state
+        if (btnText) btnText.style.display = 'none';
+        if (btnSpinner) btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch(currentRevenueUrl, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              const toastMessage = toast.querySelector('.toast-message-global');
+              toastMessage.textContent = data.message || 'Revenue added successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+
+              closeAddRevenueSidebar();
+              if (data.redirect_url) {
+                // If the redirect URL is the current page, just reload
+                if (window.location.href.includes(data.redirect_url) || data.redirect_url === window.location.pathname) {
+                  window.location.reload();
+                } else {
+                  window.location.href = data.redirect_url;
+                }
+              }
+            } else {
+              alert('Error: ' + JSON.stringify(data.errors));
+              if (btnText) btnText.style.display = 'inline';
+              if (btnSpinner) btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Add Expense Sidebar Functions
+      let currentExpenseUrl = '';
+
+      function openAddExpenseSidebar(url) {
+        currentExpenseUrl = url;
+        const overlay = document.getElementById('addExpenseSidebarOverlay');
+        const content = document.getElementById('addExpenseSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+        htmx.ajax('GET', url, { target: '#addExpenseSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeAddExpenseSidebar() {
+        document.getElementById('addExpenseSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitAddExpenseForm(event) {
+        event.preventDefault();
+        const form = document.getElementById('addExpenseForm');
+        const submitBtn = document.getElementById('btnSaveExpense');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.spinner-border');
+
+        if (btnText) btnText.style.display = 'none';
+        if (btnSpinner) btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+        fetch(currentExpenseUrl, {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              toast.querySelector('.toast-message-global').textContent = data.message || 'Expense added successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+              closeAddExpenseSidebar();
+              if (data.redirect_url) window.location.reload();
+            } else {
+              alert('Error: ' + JSON.stringify(data.errors));
+              if (btnText) btnText.style.display = 'inline';
+              if (btnSpinner) btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Pay Dividend Sidebar Functions
+      let currentDividendUrl = '';
+
+      function openAddDividendSidebar(url) {
+        currentDividendUrl = url;
+        const overlay = document.getElementById('addDividendSidebarOverlay');
+        const content = document.getElementById('addDividendSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+        htmx.ajax('GET', url, { target: '#addDividendSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeAddDividendSidebar() {
+        document.getElementById('addDividendSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitAddDividendForm(event) {
+        event.preventDefault();
+        const form = document.getElementById('addDividendForm');
+        const submitBtn = document.getElementById('btnSaveDividend');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.spinner-border');
+
+        if (btnText) btnText.style.display = 'none';
+        if (btnSpinner) btnSpinner.style.display = 'inline-flex';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+        fetch(currentDividendUrl, {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              toast.querySelector('.toast-message-global').textContent = data.message || 'Dividend paid successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+              closeAddDividendSidebar();
+              if (data.redirect_url) window.location.reload();
+            } else {
+              alert('Error: ' + JSON.stringify(data.errors));
+              if (btnText) btnText.style.display = 'inline';
+              if (btnSpinner) btnSpinner.style.display = 'none';
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
     </script>
+    <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
 </body>
 
 </html>

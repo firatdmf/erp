@@ -11,8 +11,7 @@
   <div class="page-header">
     <div class="header-left">
       <h1>Companies</h1>
-      <span class="product-count">{{ paginator.count|default:companies.count }} {% if
-        paginator.count|default:companies.count == 1 %}Company{% else %}Companies{% endif %}</span>
+      <span class="product-count">{{ paginator.count|default:companies.count }} {% if paginator.count|default:companies.count == 1 %}Company{% else %}Companies{% endif %}</span>
     </div>
     <div class="header-right">
       <a href="#" onclick="openCompanySidebar(); return false;" class="btn btn-primary">

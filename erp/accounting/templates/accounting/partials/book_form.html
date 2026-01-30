@@ -1,0 +1,10 @@
+<form id="bookForm" method="post" action="{% url 'accounting:create_book' %}" onsubmit="submitBookForm(event)">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div style="margin-top: 20px;">
+        <button type="submit" id="bookSubmitBtn" class="btn btn-primary">
+            <span class="btn-text">Save</span>
+            <span class="btn-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i> Saving...</span>
+        </button>
+    </div>
+</form>

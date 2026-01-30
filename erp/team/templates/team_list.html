@@ -1,0 +1,794 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Team Overview | Nejum ERP{% endblock %}
+
+{% block css %}
+<style>
+  :root {
+    --tm-bg: #f8fafc;
+    --tm-primary: #3b82f6;
+    --tm-primary-hover: #2563eb;
+    --tm-text-main: #1e293b;
+    --tm-text-muted: #64748b;
+    --tm-border: #e2e8f0;
+    --tm-card-bg: #ffffff;
+    --tm-success: #10b981;
+    --tm-warning: #f59e0b;
+    --tm-radius: 16px;
+  }
+
+  body {
+    background: var(--tm-bg);
+  }
+
+  .tm-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  /* Header */
+  .tm-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+  }
+
+  .tm-page-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--tm-text-main);
+    margin: 0 0 0.25rem;
+  }
+
+  .tm-page-header p {
+    color: var(--tm-text-muted);
+    margin: 0;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .search-box {
+    position: relative;
+  }
+
+  .search-box input {
+    padding: 0.75rem 1rem 0.75rem 2.75rem;
+    border: 1px solid var(--tm-border);
+    border-radius: 10px;
+    width: 280px;
+    font-size: 0.9rem;
+    background: white;
+  }
+
+  .search-box input:focus {
+    outline: none;
+    border-color: var(--tm-primary);
+  }
+
+  .search-box i {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--tm-text-muted);
+  }
+
+  .btn-create {
+    background: var(--tm-primary);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    border-radius: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-create:hover {
+    background: var(--tm-primary-hover);
+    transform: translateY(-1px);
+  }
+
+  /* Tabs */
+  .tm-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--tm-border);
+    padding-bottom: 0;
+  }
+
+  .tm-tab {
+    padding: 0.75rem 1.25rem;
+    color: var(--tm-text-muted);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .tm-tab:hover {
+    color: var(--tm-text-main);
+  }
+
+  .tm-tab.active {
+    color: var(--tm-primary);
+    border-bottom-color: var(--tm-primary);
+  }
+
+  .tab-count {
+    background: #e0e7ff;
+    color: var(--tm-primary);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    font-weight: 600;
+  }
+
+  /* Team Cards Grid */
+  .teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .team-card {
+    background: var(--tm-card-bg);
+    border-radius: var(--tm-radius);
+    padding: 1.5rem;
+    border: 1px solid var(--tm-border);
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .team-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+
+  .card-menu {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    color: var(--tm-text-muted);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .team-card:hover .card-menu {
+    opacity: 1;
+  }
+
+  .card-menu:hover {
+    background: #f1f5f9;
+  }
+
+  .card-dropdown {
+    display: none;
+    position: absolute;
+    top: 2.5rem;
+    right: 1rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 160px;
+    z-index: 50;
+    overflow: hidden;
+  }
+
+  .card-dropdown.show {
+    display: block;
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: var(--tm-text-main);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: background 0.15s;
+  }
+
+  .dropdown-item:hover {
+    background: #f8fafc;
+  }
+
+  .dropdown-item i {
+    color: var(--tm-text-muted);
+    width: 16px;
+  }
+
+  .dropdown-divider {
+    height: 1px;
+    background: var(--tm-border);
+    margin: 0.25rem 0;
+  }
+
+  .card-header {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .team-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+  }
+
+  .icon-blue {
+    background: #dbeafe;
+    color: #2563eb;
+  }
+
+  .icon-green {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  .icon-orange {
+    background: #ffedd5;
+    color: #ea580c;
+  }
+
+  .icon-purple {
+    background: #ede9fe;
+    color: #7c3aed;
+  }
+
+  .icon-red {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .icon-teal {
+    background: #ccfbf1;
+    color: #0d9488;
+  }
+
+  .card-title h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--tm-text-main);
+    margin: 0 0 0.15rem;
+  }
+
+  .card-title .updated {
+    font-size: 0.75rem;
+    color: var(--tm-text-muted);
+  }
+
+  .card-description {
+    color: var(--tm-text-muted);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Member Avatars */
+  .member-avatars {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .avatar-stack {
+    display: flex;
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid white;
+    margin-left: -8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .avatar:first-child {
+    margin-left: 0;
+  }
+
+  .avatar-more {
+    background: #e2e8f0;
+    color: var(--tm-text-muted);
+  }
+
+  .member-count {
+    margin-left: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--tm-text-muted);
+  }
+
+  /* Card Actions */
+  .card-actions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--tm-border);
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 0.6rem;
+    border: none;
+    background: #f8fafc;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--tm-text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+
+  .action-btn:hover {
+    background: #e2e8f0;
+    color: var(--tm-text-main);
+  }
+
+  .action-badge {
+    background: var(--tm-primary);
+    color: white;
+    padding: 0.1rem 0.4rem;
+    border-radius: 99px;
+    font-size: 0.65rem;
+    font-weight: 700;
+  }
+
+  /* Create Card */
+  .create-card {
+    border: 2px dashed var(--tm-border);
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .create-card:hover {
+    border-color: var(--tm-primary);
+    background: #eff6ff;
+  }
+
+  .create-icon {
+    width: 56px;
+    height: 56px;
+    background: #e0e7ff;
+    color: var(--tm-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .create-card h4 {
+    color: var(--tm-text-main);
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+  }
+
+  .create-card p {
+    color: var(--tm-text-muted);
+    font-size: 0.85rem;
+    margin: 0;
+    text-align: center;
+    max-width: 180px;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
+  .modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--tm-border);
+  }
+
+  .modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--tm-text-main);
+    margin: 0;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--tm-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--tm-text-main);
+    font-size: 0.875rem;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--tm-border);
+    border-radius: 10px;
+    font-size: 0.9rem;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--tm-primary);
+  }
+
+  .color-picker {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .color-option {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .color-option:hover {
+    transform: scale(1.1);
+  }
+
+  .color-option.selected {
+    border-color: var(--tm-text-main);
+  }
+
+  .btn-secondary {
+    padding: 0.75rem 1.25rem;
+    border: 1px solid var(--tm-border);
+    background: white;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--tm-text-muted);
+  }
+
+  .btn-primary {
+    padding: 0.75rem 1.25rem;
+    border: none;
+    background: var(--tm-primary);
+    color: white;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    background: var(--tm-primary-hover);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .tm-container {
+      padding: 1rem;
+    }
+
+    .tm-page-header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .header-actions {
+      width: 100%;
+      flex-direction: column;
+    }
+
+    .search-box input {
+      width: 100%;
+    }
+
+    .btn-create {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .teams-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tm-container">
+  <!-- Header -->
+  <div class="tm-page-header">
+    <div>
+      <h1>Team Overview</h1>
+      <p>Manage your teams, members, and permissions.</p>
+    </div>
+    <div class="header-actions">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="teamSearch" placeholder="Search teams...">
+      </div>
+      <button onclick="openCreateModal()" class="btn-create">
+        <i class="fas fa-plus"></i> Create Team
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tm-tabs">
+    <a href="?filter=all" class="tm-tab {% if filter != 'favorites' and filter != 'archived' %}active{% endif %}">
+      All Teams <span class="tab-count">{{ all_count }}</span>
+    </a>
+    <a href="?filter=favorites" class="tm-tab {% if filter == 'favorites' %}active{% endif %}">Favorites</a>
+    <a href="?filter=archived" class="tm-tab {% if filter == 'archived' %}active{% endif %}">Archived</a>
+  </div>
+
+  <!-- Teams Grid -->
+  <div class="teams-grid" id="teamsGrid">
+    {% for team in teams %}
+    <div class="team-card" data-name="{{ team.name|lower }}">
+      <div class="card-menu" onclick="toggleDropdown(event, {{ team.id }})"><i class="fas fa-ellipsis-h"></i></div>
+      <div class="card-dropdown" id="dropdown-{{ team.id }}">
+        <a href="{% url 'team:team_roles' %}?team_id={{ team.id }}" class="dropdown-item">
+          <i class="fas fa-users-cog"></i> Manage Members
+        </a>
+        <a href="{% url 'team:team_messages' %}?team_id={{ team.id }}" class="dropdown-item">
+          <i class="fas fa-comment-alt"></i> Messages
+        </a>
+        <a href="{% url 'team:team_tasks' %}?team_id={{ team.id }}" class="dropdown-item">
+          <i class="fas fa-tasks"></i> Tasks
+        </a>
+        <div class="dropdown-divider"></div>
+        <a href="#" class="dropdown-item" onclick="toggleFavorite({{ team.id }})">
+          <i class="fas fa-star"></i> Add to Favorites
+        </a>
+        <a href="#" class="dropdown-item" onclick="archiveTeam({{ team.id }})" style="color: #dc2626;">
+          <i class="fas fa-archive"></i> Archive Team
+        </a>
+      </div>
+      <div class="card-header">
+        <div class="team-icon icon-{{ team.icon_color }}">
+          <i
+            class="fas fa-{% if team.icon_color == 'blue' %}bullhorn{% elif team.icon_color == 'green' %}code{% elif team.icon_color == 'orange' %}headset{% elif team.icon_color == 'purple' %}palette{% elif team.icon_color == 'red' %}chart-line{% else %}users{% endif %}"></i>
+        </div>
+        <div class="card-title">
+          <h3>{{ team.name }}</h3>
+          <span class="updated">Updated {{ team.updated_at|timesince }} ago</span>
+        </div>
+      </div>
+      <p class="card-description">{{ team.description|default:"No description provided." }}</p>
+      <div class="member-avatars">
+        <div class="avatar-stack">
+          {% for member in team.member_objects.all|slice:":3" %}
+          <div class="avatar"
+            style="background: {% cycle '#dbeafe' '#d1fae5' '#ede9fe' %}; color: {% cycle '#2563eb' '#059669' '#7c3aed' %};">
+            {{ member.user.first_name|first|upper }}{{ member.user.last_name|first|upper }}
+          </div>
+          {% endfor %}
+          {% if team.members.count > 3 %}
+          <div class="avatar avatar-more">+{{ team.members.count|add:"-3" }}</div>
+          {% endif %}
+        </div>
+        <span class="member-count">{{ team.members.count }} members</span>
+      </div>
+      <div class="card-actions">
+        <a href="{% url 'team:team_messages' %}?team_id={{ team.id }}" class="action-btn">
+          <i class="fas fa-comment-alt"></i> Messages
+        </a>
+        <a href="{% url 'team:team_tasks' %}?team_id={{ team.id }}" class="action-btn">
+          <i class="fas fa-check-circle"></i> Tasks
+          {% if team.get_task_count > 0 %}
+          <span class="action-badge">{{ team.get_task_count }}</span>
+          {% endif %}
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Create New Team Card -->
+    <div class="team-card create-card" onclick="openCreateModal()">
+      <div class="create-icon"><i class="fas fa-plus"></i></div>
+      <h4>Create New Team</h4>
+      <p>Start a new project or group and invite members.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Create Team Modal -->
+<div id="createTeamModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Create New Team</h2>
+    </div>
+    <form id="createTeamForm">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Team Name *</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. Marketing, Engineering" required>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="What does this team do?"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Icon Color</label>
+          <div class="color-picker">
+            <div class="color-option selected" data-color="blue" style="background: #dbeafe;"></div>
+            <div class="color-option" data-color="green" style="background: #d1fae5;"></div>
+            <div class="color-option" data-color="orange" style="background: #ffedd5;"></div>
+            <div class="color-option" data-color="purple" style="background: #ede9fe;"></div>
+            <div class="color-option" data-color="red" style="background: #fee2e2;"></div>
+            <div class="color-option" data-color="teal" style="background: #ccfbf1;"></div>
+          </div>
+          <input type="hidden" name="icon_color" value="blue">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary">Create Team</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Modal functions
+  function openCreateModal() {
+    document.getElementById('createTeamModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('createTeamModal').style.display = 'none';
+  }
+
+  window.onclick = function (e) {
+    if (e.target.classList.contains('modal-overlay')) {
+      e.target.style.display = 'none';
+    }
+  }
+
+  // Color picker
+  document.querySelectorAll('.color-option').forEach(opt => {
+    opt.onclick = function () {
+      document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+      this.classList.add('selected');
+      document.querySelector('[name=icon_color]').value = this.dataset.color;
+    };
+  });
+
+  // Create team form
+  document.getElementById('createTeamForm').onsubmit = function (e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+
+    fetch('{% url "team:create_team" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.error || 'Error creating team');
+        }
+      });
+  };
+
+  // Search
+  document.getElementById('teamSearch').addEventListener('input', function () {
+    const query = this.value.toLowerCase();
+    document.querySelectorAll('.team-card:not(.create-card)').forEach(card => {
+      card.style.display = card.dataset.name.includes(query) ? 'block' : 'none';
+    });
+  });
+
+  // Dropdown toggle
+  function toggleDropdown(event, teamId) {
+    event.stopPropagation();
+    // Close all other dropdowns
+    document.querySelectorAll('.card-dropdown.show').forEach(d => {
+      if (d.id !== 'dropdown-' + teamId) d.classList.remove('show');
+    });
+    document.getElementById('dropdown-' + teamId).classList.toggle('show');
+  }
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', function () {
+    document.querySelectorAll('.card-dropdown.show').forEach(d => d.classList.remove('show'));
+  });
+
+  // Toggle favorite
+  function toggleFavorite(teamId) {
+    fetch('/team/' + teamId + '/favorite/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    }).then(() => window.location.reload());
+  }
+
+  // Archive team
+  function archiveTeam(teamId) {
+    if (confirm('Are you sure you want to archive this team?')) {
+      fetch('/team/' + teamId + '/archive/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+      }).then(() => window.location.reload());
+    }
+  }
+</script>
+{% endblock %}

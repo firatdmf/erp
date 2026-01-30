@@ -214,6 +214,20 @@ class OrderDetail(DetailView):
 class OrderCreate(View):
     def get(self, request):
         form = OrderForm()
+        if request.headers.get("HX-Request"):
+            # Return partial for sidebar
+            # We need to manually construct formset if needed, but OrderForm usually handles basics?
+            # Wait, create_order.html uses {{ formset.management_form }}.
+            # OrderCreate view currently DOES NOT pass a formset in GET context (see original code).
+            # Original code: creates OrderForm(), passes {"form": form}.
+            # But template references {{ formset.management_form }}. This implies formset might be missing or empty?
+            # Let's check post method: commented out # order_item_formset = OrderItemFormSet(request.POST)
+            # It seems the formset is handled via JS building JSON, so management_form might be unused or expected to be manually added?
+            # In create_order.html, {{ formset.management_form }} is used.
+            # If I don't pass 'formset', {{ formset.management_form }} renders nothing (if variable missing).
+            # So I will just pass form.
+            return render(request, "operating/partials/create_order_form.html", {"form": form})
+            
         return render(
             request,
             "operating/create_order.html",
@@ -1526,8 +1540,10 @@ class OrderAnalytics(LoginRequiredMixin, View):
             # Serve from cache (5 minute cache)
             return render(request, self.template_name, cached_context)
         
+        from django.utils import timezone
+        
         # Date range
-        end_date = datetime.now()
+        end_date = timezone.now()
         start_date = end_date - timedelta(days=days)
         
         # Single optimized query for orders with only needed fields
@@ -1896,3 +1912,271 @@ class WebOrderStatusEdit(View):
             'carrier_choices': carrier_choices_en,
         }
         return render(request, self.template_name, context)
+
+# -----------------------------------------------------------------------------
+# HTMX / API Views
+# -----------------------------------------------------------------------------
+
+def raw_material_search(request):
+    """
+    Returns JSON list of raw materials matching the query.
+    Used for BOM autocomplete.
+    """
+    query = request.GET.get("q", "")
+    if len(query) < 2:
+        return JsonResponse([], safe=False)
+
+    materials = RawMaterialGood.objects.filter(
+        Q(name__icontains=query) | Q(sku__icontains=query)
+    ).prefetch_related('items', 'items__receipt').values("id", "name", "sku", "unit_of_measurement", "quantity")[:10]
+
+    results = []
+    for mat in materials:
+        # Calculate latest cost
+        # We can't easily do this in the header query without complex subqueries or annotations
+        # Since we limit to 10, a separate query per item is acceptable or we use the prefetch if we iterate objects
+        # But we used .values(). Let's fetch objects instead to use methods or easy related lookups
+        pass 
+
+    # Re-doing the query to return objects to easily property/related access
+    materials_objs = RawMaterialGood.objects.filter(
+        Q(name__icontains=query) | Q(sku__icontains=query)
+    ).prefetch_related('items', 'items__receipt')[:10]
+
+    for mat in materials_objs:
+        # Find latest item by receipt date
+        latest_item = mat.items.select_related('receipt').order_by('-receipt__date', '-id').first()
+        cost = latest_item.unit_cost if latest_item else 0
+
+        results.append({
+            "id": mat.id,
+            "name": mat.name,
+            "sku": mat.sku,
+            "unit": mat.unit_of_measurement,
+            "stock": mat.quantity or 0,
+            "cost": cost
+        })
+    
+    return JsonResponse(results, safe=False)
+
+
+class RawMaterialGoodList(ListView):
+    model = RawMaterialGood
+    template_name = "operating/raw_material_good_list.html"
+    context_object_name = "raw_materials"
+    paginate_by = 20
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search_query = self.request.GET.get('search', '').strip()
+        
+        if search_query:
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) |
+                Q(sku__icontains=search_query) |
+                Q(supplier_sku__icontains=search_query)
+            )
+        return queryset.order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['search_query'] = self.request.GET.get('search', '')
+        return context
+
+
+@require_POST
+def create_raw_material_good_json(request):
+    from django.forms import modelform_factory
+    
+    try:
+        RawMaterialGoodForm = modelform_factory(RawMaterialGood, fields="__all__")
+        form = RawMaterialGoodForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            instance = form.save()
+            return JsonResponse({
+                "success": True,
+                "message": f"Raw Material '{instance.name}' created successfully.",
+                "data": {
+                    "id": instance.pk,
+                    "name": instance.name,
+                    "sku": instance.sku
+                }
+            })
+        else:
+            # Convert form errors to a simple string
+            errors = dict(form.errors.items())
+            error_msg = "Validation failed"
+            if errors:
+                first_field = list(errors.keys())[0]
+                first_error = errors[first_field][0]
+                error_msg = f"{first_field}: {first_error}"
+                
+            return JsonResponse({
+                "success": False,
+                "errors": error_msg,
+                "field_errors": errors
+            })
+            
+    except Exception as e:
+        return JsonResponse({"success": False, "errors": str(e)})
+
+
+@require_POST
+def create_raw_material_good_receipt_json(request):
+    from django.forms import modelform_factory
+    
+    try:
+        RawMaterialGoodReceiptForm = modelform_factory(RawMaterialGoodReceipt, fields="__all__")
+        form = RawMaterialGoodReceiptForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            instance = form.save()
+            return JsonResponse({
+                "success": True,
+                "message": f"Receipt #{instance.receipt_number} from {instance.supplier} created successfully.",
+                "data": {
+                    "id": instance.pk,
+                    "receipt_number": instance.receipt_number,
+                    "supplier": str(instance.supplier)
+                }
+            })
+        else:
+            errors = dict(form.errors.items())
+            error_msg = "Validation failed"
+            if errors:
+                first_field = list(errors.keys())[0]
+                first_error = errors[first_field][0]
+                error_msg = f"{first_field}: {first_error}"
+                
+            return JsonResponse({
+                "success": False,
+                "errors": error_msg,
+                "field_errors": errors
+            })
+            
+    except Exception as e:
+        return JsonResponse({"success": False, "errors": str(e)})
+
+
+@require_POST
+def create_raw_material_good_item_json(request):
+    from django.forms import modelform_factory
+    
+    try:
+        RawMaterialGoodItemForm = modelform_factory(RawMaterialGoodItem, fields="__all__")
+        form = RawMaterialGoodItemForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            instance = form.save()
+            return JsonResponse({
+                "success": True,
+                "message": f"Added {instance.quantity} of {instance.raw_material_good.name} successfully.",
+                "data": {
+                    "id": instance.pk,
+                    "quantity": instance.quantity,
+                    "raw_material": instance.raw_material_good.name
+                }
+            })
+        else:
+            errors = dict(form.errors.items())
+            error_msg = "Validation failed"
+            if errors:
+                first_field = list(errors.keys())[0]
+                first_error = errors[first_field][0]
+                error_msg = f"{first_field}: {first_error}"
+                
+            return JsonResponse({
+                "success": False,
+                "errors": error_msg,
+                "field_errors": errors
+            })
+            
+    except Exception as e:
+        return JsonResponse({"success": False, "errors": str(e)})
+
+
+def get_raw_material_good_json(request, pk):
+    raw_material = get_object_or_404(RawMaterialGood, pk=pk)
+    return JsonResponse({
+        "success": True,
+        "data": {
+            "id": raw_material.pk,
+            "name": raw_material.name,
+            "sku": raw_material.sku,
+            "supplier_sku": raw_material.supplier_sku or "",
+            "raw_type": raw_material.raw_type,
+            "unit_of_measurement": raw_material.unit_of_measurement,
+            "quantity": raw_material.quantity
+        }
+    })
+
+
+@require_POST
+def update_raw_material_good_json(request, pk):
+    raw_material = get_object_or_404(RawMaterialGood, pk=pk)
+    from django.forms import modelform_factory
+    
+    try:
+        RawMaterialGoodForm = modelform_factory(RawMaterialGood, fields="__all__")
+        form = RawMaterialGoodForm(request.POST, request.FILES, instance=raw_material)
+        
+        if form.is_valid():
+            instance = form.save()
+            return JsonResponse({
+                "success": True,
+                "message": f"Raw Material '{instance.name}' updated successfully."
+            })
+        else:
+            errors = dict(form.errors.items())
+            error_msg = "Validation failed"
+            if errors:
+                first_field = list(errors.keys())[0]
+                first_error = errors[first_field][0]
+                error_msg = f"{first_field}: {first_error}"
+                
+            return JsonResponse({
+                "success": False,
+                "errors": error_msg,
+                "field_errors": errors
+            })
+            
+    except Exception as e:
+        return JsonResponse({"success": False, "errors": str(e)})
+
+
+@require_POST
+def delete_raw_material_good_json(request, pk):
+    try:
+        raw_material = get_object_or_404(RawMaterialGood, pk=pk)
+        raw_material.delete()
+        return JsonResponse({
+            "success": True, 
+            "message": "Raw material deleted successfully."
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "errors": str(e)})
+
+
+def create_raw_material_receipt_partial(request):
+    from django.forms import modelform_factory
+    from django import forms
+    from datetime import date
+    RawMaterialGoodReceiptForm = modelform_factory(RawMaterialGoodReceipt, fields="__all__", widgets={
+        "date": forms.DateInput(attrs={"type": "date"}),
+    })
+    form = RawMaterialGoodReceiptForm(initial={"date": date.today().strftime("%Y-%m-%d")})
+    return render(request, "operating/partials/raw_material_receipt_form.html", {"form": form})
+
+
+def create_raw_material_item_partial(request):
+    from django.forms import modelform_factory
+    RawMaterialGoodItemForm = modelform_factory(RawMaterialGoodItem, fields="__all__")
+    
+    # Pre-fill receipt if provided in GET
+    initial = {}
+    if 'receipt' in request.GET:
+        initial['receipt'] = request.GET.get('receipt')
+        
+    form = RawMaterialGoodItemForm(initial=initial)
+    return render(request, "operating/partials/raw_material_item_form.html", {"form": form})

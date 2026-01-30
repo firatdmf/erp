@@ -1,7 +1,7 @@
 {% load todo_filters %}
 {% load static %}
 {% block css %}
-<link rel="stylesheet" href="{% static 'todo/css/components/tasks_new.css' %}" />
+{% comment %} CSS moved to base.html to prevent FOUC {% endcomment %}
 {% endblock %}
 <div class="tasks_component">
   {% comment %} {{ page_type }} {% endcomment %}
@@ -140,7 +140,50 @@
     {% endif %}
     {% endif %}
     {% empty %}
+    {% if not team_tasks %}
     <li>No tasks available.</li>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Team Tasks Section -->
+    {% for task in team_tasks %}
+    <li class="taskComponent team-task-card" data-task-id="team-{{ task.id }}">
+      <!-- Compact Card Header -->
+      <div class="task-card-header">
+        <h3 class="taskName">
+          <span style="color: #7c3aed; font-size: 0.75rem; margin-right: 0.5rem;"><i class="fas fa-users"></i></span>
+          {{ task.title }}
+        </h3>
+        <div class="task-date-badges">
+          <span class="taskDueDate">
+            <i class="fa fa-calendar-alt"></i> {{ task.due_date|date:"M. d, Y" }}
+          </span>
+          <span class="badge" style="background: #ede9fe; color: #7c3aed;">{{ task.team.name }}</span>
+        </div>
+      </div>
+
+      <!-- Task Description -->
+      {% if task.description %}
+      <div class="task-description">
+        {{ task.description|truncatewords:15 }}
+      </div>
+      {% endif %}
+
+      <!-- Footer: Priority & Status -->
+      <div class="task-footer-row">
+        <div class="task-assignee">
+          <span class="badge" style="background: 
+            {% if task.priority == 'high' %}#fecaca; color: #dc2626;
+            {% elif task.priority == 'medium' %}#fed7aa; color: #ea580c;
+            {% else %}#d1fae5; color: #059669;{% endif %}">
+            {{ task.get_priority_display }}
+          </span>
+          <span class="badge" style="background: #dbeafe; color: #2563eb; margin-left: 0.5rem;">
+            {{ task.get_status_display }}
+          </span>
+        </div>
+      </div>
+    </li>
     {% endfor %}
   </ul>
 </div>

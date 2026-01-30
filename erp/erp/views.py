@@ -81,6 +81,7 @@ class Dashboard(View):
             from django.template.loader import render_to_string
             from datetime import datetime
             from django.utils import timezone
+            from team.models import TeamTask
             
             try:
                 date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
@@ -88,6 +89,7 @@ class Dashboard(View):
                 
                 # Get current user's member
                 current_member = request.user.member if hasattr(request.user, 'member') else None
+                current_user = request.user
                 print(f"\n=== Dashboard AJAX Debug ===")
                 print(f"Date: {date_obj}, Tab: {task_tab}")
                 print(f"Current member: {current_member} (ID: {current_member.id if current_member else None})")
@@ -102,13 +104,29 @@ class Dashboard(View):
                 
                 print(f"Base query count: {base_query.count()}")
                 
-                # Apply tab filter
+                # Apply tab filter - only show myTasks for calendar
                 if task_tab == 'myTasks':
-                    tasks = base_query.filter(member=current_member).select_related('contact', 'company', 'member', 'created_by').order_by('-due_date')
-                    print(f"My Tasks count: {tasks.count()}")
+                    tasks = list(base_query.filter(member=current_member).select_related('contact', 'company', 'member', 'created_by').order_by('-due_date'))
+                    print(f"My Tasks count: {len(tasks)}")
+                    
+                    # Also get TeamTasks assigned to user
+                    if date_obj == today:
+                        team_tasks_query = TeamTask.objects.filter(
+                            assigned_to=current_user,
+                            due_date__lte=today
+                        ).exclude(status='done')
+                    else:
+                        team_tasks_query = TeamTask.objects.filter(
+                            assigned_to=current_user,
+                            due_date=date_obj
+                        ).exclude(status='done')
+                    
+                    team_tasks = list(team_tasks_query.select_related('team', 'assigned_to', 'assigned_by').order_by('-due_date'))
+                    print(f"Team Tasks count: {len(team_tasks)}")
                 else:  # assignedTasks
-                    tasks = base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by').order_by('-due_date')
-                    print(f"Assigned Tasks count: {tasks.count()}")
+                    tasks = list(base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by').order_by('-due_date'))
+                    team_tasks = []
+                    print(f"Assigned Tasks count: {len(tasks)}")
                     for t in tasks:
                         print(f"  - Task ID {t.id}: {t.name} -> {t.member}")
                 print(f"========================\n")
@@ -116,6 +134,7 @@ class Dashboard(View):
                 # Render tasks using the same template
                 html = render_to_string('todo/components/tasks.html', {
                     'tasks': tasks,
+                    'team_tasks': team_tasks if task_tab == 'myTasks' else [],
                     'sort_type': 'dictsortreversed',
                     'page_type': 'dashboard_calendar',
                     'csrf_token': request.META.get('CSRF_COOKIE'),
@@ -131,3 +150,155 @@ class Dashboard(View):
     
 
     
+
+
+# ------------------- Search Redesign -------------------
+
+from django.db.models import Q
+from django.http import JsonResponse
+from django.urls import reverse
+
+class GlobalSearch(View):
+    def get(self, request, *args, **kwargs):
+        query = request.GET.get('q', '').strip()
+        search_type = request.GET.get('type', 'all')
+        results = []
+
+        # If query is empty, we might want to return "Recent" items for specific tabs
+        if not query or len(query) < 2:
+            if search_type == 'products':
+                from marketing.models import Product
+                # Return last 50 products
+                recent_products = Product.objects.all().order_by('-id')[:50]
+                for p in recent_products:
+                    try:
+                        url = reverse('marketing:product_edit', args=[p.id])
+                    except:
+                        url = '#'
+                    results.append({
+                        'type': 'Product',
+                        'name': p.title,
+                        'detail': p.sku,
+                        'url': url,
+                        'icon': 'fa-box'
+                    })
+                return JsonResponse({'results': results})
+            
+            elif search_type == 'orders':
+                from operating.models import Order
+                # Return last 50 orders
+                recent_orders = Order.objects.all().order_by('-id')[:50]
+                for o in recent_orders:
+                     try:
+                        url = reverse('operating:order_detail', args=[o.id])
+                     except:
+                        url = '#'
+                     results.append({
+                        'type': 'Order',
+                        'name': o.order_number or f"Order #{o.id}",
+                        'detail': o.get_status_display(),
+                        'url': url,
+                        'icon': 'fa-shopping-cart'
+                    })
+                return JsonResponse({'results': results})
+            
+            # For other cases (all, contacts, etc.) return empty or let frontend handle defaults
+            return JsonResponse({'results': []})
+
+        limit = 50 if search_type != 'all' else 5
+
+        # 1. Contacts
+        if search_type in ['all', 'contacts']:
+            contacts = Contact.objects.filter(
+                Q(name__icontains=query)
+            )[:limit]
+            for c in contacts:
+                try:
+                    url = reverse('crm:contact_detail', args=[c.id])
+                except:
+                    url = '#'
+                results.append({
+                    'type': 'Contact',
+                    'name': c.name,
+                    'detail': c.email[0] if c.email else '',
+                    'url': url,
+                    'icon': 'fa-user'
+                })
+
+        # 2. Companies
+        if search_type in ['all', 'contacts']:  # Group contacts/companies under 'contacts' tab or all
+            companies = Company.objects.filter(name__icontains=query)[:limit]
+            for c in companies:
+                try:
+                    url = reverse('crm:company_detail', args=[c.id])
+                except:
+                    url = '#'
+                results.append({
+                    'type': 'Company',
+                    'name': c.name,
+                    'detail': c.status,
+                    'url': url,
+                    'icon': 'fa-building'
+                })
+
+        # 3. Products
+        if search_type in ['all', 'products']:
+            from marketing.models import Product
+            products = Product.objects.filter(
+                Q(title__icontains=query) | Q(sku__icontains=query)
+            )[:limit]
+            for p in products:
+                try:
+                    url = reverse('marketing:product_edit', args=[p.id])
+                except:
+                    url = '#'
+                results.append({
+                    'type': 'Product',
+                    'name': p.title,
+                    'detail': p.sku,
+                    'url': url,
+                    'icon': 'fa-box'
+                })
+            
+        # 4. Tasks (Todo) -- Mapped to 'orders' tab? No, maybe 'all' only or add 'tasks' tab. 
+        # User didn't ask for task tab specifically but we have it.
+        # Let's include in 'all' or if we add a 'search-tasks' tab. 
+        # For now 'all' only unless user asks.
+        if search_type == 'all':
+            tasks = Task.objects.filter(name__icontains=query)[:5]
+            for t in tasks:
+                try:
+                    url = reverse('todo:task_detail', args=[t.id])
+                except:
+                    url = '#'
+                results.append({
+                    'type': 'Task',
+                    'name': t.name,
+                    'detail': t.priority,
+                    'url': url,
+                    'icon': 'fa-check-circle'
+                })
+            
+        # 5. Orders
+        if search_type in ['all', 'orders']:
+            from operating.models import Order
+            order_filter = Q(order_number__icontains=query)
+            # Only add id filter if query is numeric
+            if query.isdigit():
+                order_filter |= Q(id=int(query))
+            orders = Order.objects.filter(order_filter)[:limit]
+            for o in orders:
+                 try:
+                    url = reverse('operating:order_detail', args=[o.id])
+                 except:
+                    url = '#'
+                 results.append({
+                    'type': 'Order',
+                    'name': o.order_number or f"Order #{o.id}",
+                    'detail': o.get_status_display(),
+                    'url': url,
+                    'icon': 'fa-shopping-cart'
+                })
+
+        return JsonResponse({'results': results})
+

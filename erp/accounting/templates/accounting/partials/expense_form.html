@@ -1,0 +1,125 @@
+<style>
+    /* Scoped styles for the Expense form */
+    #addExpenseForm {
+        padding: 0.5rem;
+    }
+
+    #addExpenseForm p {
+        margin-bottom: 1.25rem;
+    }
+
+    #addExpenseForm label {
+        display: block;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #374151;
+        /* Gray-700 */
+        margin-bottom: 0.4rem;
+    }
+
+    #addExpenseForm input[type="text"],
+    #addExpenseForm input[type="number"],
+    #addExpenseForm input[type="date"],
+    #addExpenseForm select,
+    #addExpenseForm textarea {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        background-color: #fff;
+        border: 1px solid #d1d5db;
+        /* Gray-300 */
+        border-radius: 8px;
+        font-size: 0.95rem;
+        color: #1f2937;
+        /* Gray-900 */
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        box-sizing: border-box;
+        /* Critical for responsiveness */
+    }
+
+    #addExpenseForm input:focus,
+    #addExpenseForm select:focus,
+    #addExpenseForm textarea:focus {
+        border-color: #4b5563;
+        /* Gray-600 */
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.1);
+    }
+
+    #addExpenseForm textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .form-footer {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+    }
+
+    #btnSaveExpense {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        background-color: #000000;
+        /* Black */
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    #btnSaveExpense:hover {
+        background-color: #1f2937;
+        /* Gray-900 */
+        transform: translateY(-1px);
+    }
+
+    #btnSaveExpense:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    #btnCancelExpense {
+        flex: 1;
+        padding: 0.5rem 1rem;
+        background-color: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        color: #374151;
+        font-weight: 500;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+    }
+
+    #btnCancelExpense:hover {
+        background-color: #f3f4f6;
+        border-color: #9ca3af;
+    }
+</style>
+
+<form id="addExpenseForm" method="post" onsubmit="submitAddExpenseForm(event)">
+    {% csrf_token %}
+    <div class="form-body">
+        {{ form.as_p }}
+    </div>
+    <div class="form-footer">
+        <button type="button" id="btnCancelExpense" onclick="closeAddExpenseSidebar()">
+            Cancel
+        </button>
+        <button type="submit" id="btnSaveExpense">
+            <span class="btn-text">Add Expense</span>
+            <span class="spinner-border" style="display: none;">
+                <i class="fas fa-spinner fa-spin"></i>
+            </span>
+        </button>
+    </div>
+</form>

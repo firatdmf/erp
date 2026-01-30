@@ -32,6 +32,11 @@ urlpatterns = [
         name="export_packing_list_excel",
     ),
     path(
+        "raw_material_good/list",
+        views.RawMaterialGoodList.as_view(),
+        name="raw_material_good_list",
+    ),
+    path(
         "raw_material_good/create",
         views.RawMaterialGoodCreate.as_view(),
         name="create_raw_material_good",
@@ -81,12 +86,54 @@ urlpatterns = [
         views.generate_pdf_qr_for_order_item_units,
         name="generate_pdf_qr_for_order_item_units",
     ),
+    path(
+        "raw_material_good/create/json",
+        views.create_raw_material_good_json,
+        name="create_raw_material_good_json",
+    ),
+    path(
+        "raw_material_good_receipt/create/json",
+        views.create_raw_material_good_receipt_json,
+        name="create_raw_material_good_receipt_json",
+    ),
+    path(
+        "raw_material_good_item/create/json",
+        views.create_raw_material_good_item_json,
+        name="create_raw_material_good_item_json",
+    ),
+    path(
+        "raw_material_good_receipt/create/partial",
+        views.create_raw_material_receipt_partial,
+        name="create_raw_material_receipt_partial",
+    ),
+    path(
+        "raw_material_good_item/create/partial",
+        views.create_raw_material_item_partial,
+        name="create_raw_material_item_partial",
+    ),
+    path(
+        "raw_material_good/<int:pk>/get/json",
+        views.get_raw_material_good_json,
+        name="get_raw_material_good_json",
+    ),
+    path(
+        "raw_material_good/<int:pk>/update/json",
+        views.update_raw_material_good_json,
+        name="update_raw_material_good_json",
+    ),
+    path(
+        "raw_material_good/<int:pk>/delete/json",
+        views.delete_raw_material_good_json,
+        name="delete_raw_material_good_json",
+    ),
 ]
 htmx_urlpatterns = [
     path(
         "product_autocomplete/", views.product_autocomplete, name="product_autocomplete"
     ),
     path("start_production/", views.start_production, name="start_production"),
+    # BOM Autocomplete
+    path("raw_material_search/", views.raw_material_search, name="raw_material_search"),
 ]
 
 api_urlpatterns = [

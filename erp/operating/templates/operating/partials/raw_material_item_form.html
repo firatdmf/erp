@@ -1,0 +1,28 @@
+<form id="rawMaterialItemForm" method="post" onsubmit="submitRawMaterialItemForm(event); return false;"
+    enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {% for field in form %}
+    <div class="form-group">
+        <label for="{{ field.id_for_label }}">{{ field.label }} {% if field.field.required %}<span
+                style="color: #ef4444;">*</span>{% endif %}</label>
+        {{ field }}
+        {% if field.help_text %}
+        <small style="color: #6b7280; font-size: 12px; display: block; margin-top: 4px;">{{ field.help_text }}</small>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="sidebar-footer">
+        <button type="submit" id="rmItemSubmitBtn" class="btn btn-primary">
+            <span class="btn-text">Add Item</span>
+            <span class="btn-spinner" style="display: none;">
+                <svg class="spinner-icon" viewBox="0 0 50 50">
+                    <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                </svg>
+                Creating...
+            </span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="closeRawMaterialItemSidebar()">Cancel</button>
+    </div>
+</form>

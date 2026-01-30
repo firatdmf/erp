@@ -95,6 +95,28 @@ class CreateBook(generic.edit.CreateView):
     form_class = BookForm
     template_name = "accounting/create_book.html"
 
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return ["accounting/partials/book_form.html"]
+        return [self.template_name]
+
+    def form_valid(self, form):
+        self.object = form.save()
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'redirect_url': self.get_success_url()
+            })
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors.as_json()
+            }, status=400)
+        return super().form_invalid(form)
+
     # Takes you to the newly created book's detail page
     def get_success_url(self) -> str:
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.object.pk})
@@ -357,6 +379,11 @@ class AddEquityCapital(generic.edit.CreateView):
     form_class = EquityCapitalForm
     template_name = "accounting/add_equity_capital.html"
 
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return ["accounting/partials/capital_form.html"]
+        return [self.template_name]
+
     # # This sends to the form data the book we are in. We need this so we can show the cash accounts only associated with this book.
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -420,16 +447,29 @@ class AddEquityCapital(generic.edit.CreateView):
             form.add_error(None, "Form error: in handle_equity_transaction function")
             return self.form_invalid(form)
 
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Capital added successfully!',
+                'redirect_url': self.get_success_url()
+            })
+
         # This method saves the form instance to the database and then redirects the user to a success URL.
         return super().form_valid(form)
 
     def get_success_url(self) -> str:
         return reverse(
-            "accounting:add_equity_capital", kwargs={"pk": self.kwargs.get("pk")}
+            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
         )
 
     # what happens when form validation fails
     def form_invalid(self, form):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors.as_json()
+            }, status=400)
+            
         # Optionally log errors here
         for field in form:
             for error in field.errors:
@@ -444,6 +484,11 @@ class AddEquityRevenue(generic.edit.CreateView):
     model = EquityRevenue
     form_class = EquityRevenueForm
     template_name = "accounting/add_equity_revenue.html"
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return ["accounting/partials/revenue_form.html"]
+        return [self.template_name]
 
     # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
     def get_form_kwargs(self):
@@ -492,16 +537,29 @@ class AddEquityRevenue(generic.edit.CreateView):
             form.add_error(None, "Form error: in handle_equity_transaction function")
             return self.form_invalid(form)
 
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Revenue added successfully!',
+                'redirect_url': self.get_success_url()
+            })
+
         # This method saves the form instance to the database and then redirects the user to a success URL.
         return super().form_valid(form)
 
     def get_success_url(self) -> str:
         return reverse(
-            "accounting:add_equity_revenue", kwargs={"pk": self.kwargs.get("pk")}
+            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
         )
 
     # what happens when form validation fails
     def form_invalid(self, form):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors.as_json()
+            }, status=400)
+
         # Optionally log errors here
         for field in form:
             for error in field.errors:
@@ -516,6 +574,11 @@ class AddEquityExpense(generic.edit.CreateView):
     model = EquityExpense
     form_class = EquityExpenseForm
     template_name = "accounting/add_equity_expense.html"
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return ["accounting/partials/expense_form.html"]
+        return [self.template_name]
 
     # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
     def get_form_kwargs(self):
@@ -560,16 +623,29 @@ class AddEquityExpense(generic.edit.CreateView):
             form.add_error(None, "Form error: in handle_equity_transaction function")
             return self.form_invalid(form)
 
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Expense added successfully!',
+                'redirect_url': self.get_success_url()
+            })
+
         # This method saves the form instance to the database and then redirects the user to a success URL.
         return super().form_valid(form)
 
     def get_success_url(self) -> str:
         return reverse(
-            "accounting:add_equity_expense", kwargs={"pk": self.kwargs.get("pk")}
+            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
         )
 
     # what happens when form validation fails
     def form_invalid(self, form):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors.as_json()
+            }, status=400)
+
         # Optionally log errors here
         for field in form:
             for error in field.errors:
@@ -584,6 +660,11 @@ class AddEquityDivident(generic.edit.CreateView):
     model = EquityDivident
     form_class = EquityDividentForm
     template_name = "accounting/add_equity_divident.html"
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return ["accounting/partials/dividend_form.html"]
+        return [self.template_name]
 
     # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
     def get_form_kwargs(self):
@@ -626,16 +707,29 @@ class AddEquityDivident(generic.edit.CreateView):
             form.add_error(None, "Form error: in handle_equity_transaction function")
             return self.form_invalid(form)
 
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': 'Dividend paid successfully!',
+                'redirect_url': self.get_success_url()
+            })
+
         # This method saves the form instance to the database and then redirects the user to a success URL.
         return super().form_valid(form)
 
     def get_success_url(self) -> str:
         return reverse(
-            "accounting:add_equity_divident", kwargs={"pk": self.kwargs.get("pk")}
+            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
         )
 
     # what happens when form validation fails
     def form_invalid(self, form):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors.as_json()
+            }, status=400)
+
         # Optionally log errors here
         for field in form:
             for error in field.errors:

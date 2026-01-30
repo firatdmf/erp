@@ -1,51 +1,55 @@
 {% extends 'base.html' %}
 {% block content %}
-  {% load static %}
-  {% block css %}
-    <link rel="stylesheet" href="{% static 'operating/css/create_order.css' %}" />
-  {% endblock %}
+{% load static %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'operating/css/create_order.css' %}" />
+{% endblock %}
 
-  <div class="create_order_page">
-    {% if messages %}
-      <ul class="messages">
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-    <h1>Create Order</h1>
+<div class="create_order_page">
+  {% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+    <li>{{ message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <h1>Create Order</h1>
 
-    <form method="post">
-      {% csrf_token %}
+  <form method="post">
+    {% csrf_token %}
 
-      {{ formset.management_form }} {# ✅ MOVE THIS HERE #}
+    {{ formset.management_form }} {# ✅ MOVE THIS HERE #}
 
-      <div id="customer-fields">
-        <label for="customer">Customer</label>
-        <input id="customer-input" name="customer" type="text" hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms" hx-target="#customer-search-results" hx-swap="innerHTML" autocomplete="off" placeholder="Search by contact or company name" />
-        <input type="hidden" id="customer-type" name="customer_type" />
-        <input type="hidden" id="customer-pk" name="customer_pk" />
-      </div>
-      <div id="customer-search-results"></div>
+    <div id="customer-fields">
+      <label for="customer">Customer</label>
+      <input id="customer-input" name="customer" type="text" hx-get="{% url 'crm:customer_autocomplete' %}"
+        hx-trigger="keyup changed delay:300ms" hx-target="#customer-search-results" hx-swap="innerHTML"
+        autocomplete="off" placeholder="Search by contact or company name" />
+      <input type="hidden" id="customer-type" name="customer_type" />
+      <input type="hidden" id="customer-pk" name="customer_pk" />
+    </div>
+    <div id="customer-search-results"></div>
 
-      <br />
+    <br />
 
-      <div id="product-fields">
-        <label for="product">Product</label>
-        <input class="border px-2 py-1 rounded w-full" id="product-input" name="product" type="text" autocomplete="off" placeholder="Search by name, SKU, or variant SKU..." hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms" hx-target="#product-search-results" hx-swap="innerHTML" />
-      </div>
-      <div id="product-search-results" class="relative z-10"></div>
-      <div id="product_autocomplete_error"></div>
+    <div id="product-fields">
+      <label for="product">Product</label>
+      <input class="border px-2 py-1 rounded w-full" id="product-input" name="product" type="text" autocomplete="off"
+        placeholder="Search by name, SKU, or variant SKU..." hx-get="{% url 'operating:product_autocomplete' %}"
+        hx-trigger="keyup changed delay:200ms" hx-target="#product-search-results" hx-swap="innerHTML" />
+    </div>
+    <div id="product-search-results" class="relative z-10"></div>
+    <div id="product_autocomplete_error"></div>
 
-      {% comment %}order form{% endcomment %}
-      {{ form.as_p }}
-      <table class="hidden" id="order_items_table"></table>
-      <input type="hidden" id="product_json_input" name="product_json_input" />
-      <button type="submit" id="submit_order_button">Submit Order</button>
-      {% comment %} <div id="generate_order_list_button">Generate order list</div> {% endcomment %}
-    </form>
-  </div>
-  {% block js %}
-    <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
-  {% endblock %}
+    {% comment %}order form{% endcomment %}
+    {{ form.as_p }}
+    <table class="hidden" id="order_items_table"></table>
+    <input type="hidden" id="product_json_input" name="product_json_input" />
+    <button type="submit" id="submit_order_button">Submit Order</button>
+    {% comment %} <div id="generate_order_list_button">Generate order list</div> {% endcomment %}
+  </form>
+</div>
+{% block js %}
+
+{% endblock %}
 {% endblock %}

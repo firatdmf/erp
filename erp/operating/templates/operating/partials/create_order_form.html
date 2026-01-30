@@ -1,0 +1,53 @@
+<div class="create_order_page">
+    <form method="post" id="createOrderForm" action="{% url 'operating:create_order' %}">
+        {% csrf_token %}
+
+        {{ formset.management_form }}
+
+        <div id="customer-fields" class="form-group mb-4">
+            <label for="customer" class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+            <input id="customer-input" name="customer" type="text"
+                class="form-input w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
+                hx-target="#customer-search-results" hx-swap="innerHTML" autocomplete="off"
+                placeholder="Search by contact or company name" />
+            <input type="hidden" id="customer-type" name="customer_type" />
+            <input type="hidden" id="customer-pk" name="customer_pk" />
+        </div>
+        <div id="customer-search-results" class="relative"></div>
+
+        <div id="product-fields" class="form-group mb-4">
+            <label for="product" class="block text-sm font-medium text-gray-700 mb-1">Add Product</label>
+            <input
+                class="form-input w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                id="product-input" name="product" type="text" autocomplete="off"
+                placeholder="Search by name, SKU, or variant SKU..." hx-get="{% url 'operating:product_autocomplete' %}"
+                hx-trigger="keyup changed delay:200ms" hx-target="#product-search-results" hx-swap="innerHTML" />
+        </div>
+        <div id="product-search-results" class="relative z-10"></div>
+        <div id="product_autocomplete_error"></div>
+
+        <div class="order-items-container mt-4 mb-6">
+            <table class="w-full border-collapse" id="order_items_table">
+                <!-- Header will be injected by JS -->
+            </table>
+        </div>
+
+        {% comment %} Hidden Fields {% endcomment %}
+        {{ form.as_p }}
+        <input type="hidden" id="product_json_input" name="product_json_input" />
+
+        <div class="sidebar-footer">
+            <button type="submit" id="submit_order_button" class="btn btn-primary w-full justify-center">
+                Place Order
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // re-initialize the order form logic when this partial is loaded
+    if (typeof initOrderForm === 'function') {
+        initOrderForm();
+    }
+</script>

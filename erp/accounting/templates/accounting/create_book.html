@@ -3,12 +3,9 @@
 {% load static %}
 {% load accounting_tags %}
 {% block css %}
-  {% comment %} <link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" /> {% endcomment %}
+{% comment %}
+<link rel="stylesheet" href="{% static 'accounting/cs/index.css' %}" /> {% endcomment %}
 {% endblock %}
 {% block content %}
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <input type="submit" value="Save">
-</form>
+{% include "accounting/partials/book_form.html" %}
 {% endblock %}

@@ -1,1319 +1,946 @@
 {% extends "base.html" %}
 {% load static %}
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
-{% endblock %}
-
-{% block content %}
-<div class="product-list-container">
-  <!-- Header Section -->
-  <div class="page-header">
-    <div class="header-left">
-      <h1>Products</h1>
-      <span class="product-count">{{ paginator.count|default:products.count }}
-        product{{paginator.count|default:products.count|pluralize }}</span>
-    </div>
-    <div class="header-right">
-      <button type="button" class="btn btn-secondary" onclick="openCsvModal()">
-        <i class="fa fa-sync-alt"></i>
-        Update Stock
-      </button>
-      <a href="{% url 'marketing:product_create' %}" class="btn btn-primary">
-        <i class="fa fa-plus"></i>
-        Add Product
-      </a>
-    </div>
-  </div>
-
-  <!-- Search Section - Centered -->
-  <div class="search-section">
-    <div class="search-box-modern">
-      <i class="fa fa-search search-icon"></i>
-      <input type="text" id="instantSearch" placeholder="Search products by name, SKU, or barcode..."
-        value="{{ request.GET.search }}" class="search-input-modern" autocomplete="off">
-      <div class="search-status" id="searchStatus" style="display: none;">
-        <i class="fa fa-spinner fa-spin"></i>
-      </div>
-      <button type="button" class="search-clear" id="searchClear" style="display: none;" onclick="clearSearch()">
-        <i class="fa fa-times"></i>
-      </button>
-    </div>
-  </div>
-
-  <!-- Products Table -->
-  <div class="table-container">
-    <table class="products-table">
-      <thead>
-        <tr>
-          <th style="width: 80px;">Image</th>
-          <th style="width: 120px;">SKU</th>
-          <th>Product</th>
-          <th style="width: 120px;">Category</th>
-          <th style="width: 100px;">Price</th>
-          <th style="width: 100px;">Quantity</th>
-          <th style="width: 100px;">Variants</th>
-          <th style="width: 80px;">Status</th>
-          <th style="width: 100px;">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for product in products %}
-        <tr class="product-row" id="product-row-{{ product.id }}"
-          onclick="window.location='{% url 'marketing:product_detail' product.id %}'" style="cursor: pointer;">
-          <td>
-            <div class="product-image-cell">
-              {% if product.primary_image %}
-              <img src="{{ product.primary_image.thumbnail_url }}" alt="{{ product.title }}" class="product-thumbnail"
-                loading="lazy" width="80" height="80">
-              {% else %}
-              <div class="product-image-placeholder">
-                <i class="fa fa-image"></i>
-              </div>
-              {% endif %}
-            </div>
-          </td>
-          <td>
-            <span class="product-sku">{{ product.sku|default:"-" }}</span>
-          </td>
-          <td>
-            <div class="product-info">
-              <div class="product-title">{{ product.title }}</div>
-              {% if product.description %}
-              <div class="product-description">{{ product.description|truncatewords:15|striptags }}</div>
-              {% endif %}
-            </div>
-          </td>
-          <td>
-            {% if product.category %}
-            <span class="badge badge-category">{{ product.category.name|title }}</span>
-            {% else %}
-            <span class="text-muted">-</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if product.price %}
-            <span class="product-price">${{ product.price }}</span>
-            {% else %}
-            <span class="text-muted">-</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if product.quantity %}
-            <span class="product-quantity">{{ product.quantity }} {{product.unit_of_measurement|default:"units"}}</span>
-            {% else %}
-            <span class="text-muted">0</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if product.variant_count > 0 %}
-            <span class="badge badge-variants">{{ product.variant_count }}
-              variant{{product.variant_count|pluralize}}</span>
-            {% else %}
-            <span class="text-muted">-</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if product.featured %}
-            <span class="badge badge-featured">Featured</span>
-            {% else %}
-            <span class="badge badge-regular">Regular</span>
-            {% endif %}
-          </td>
-          <td>
-            <div class="action-buttons" onclick="event.stopPropagation();">
-              <a href="{% url 'marketing:product_detail' product.id %}" class="btn-icon" title="View">
-                <i class="fa fa-eye"></i>
-              </a>
-              <a href="{% url 'marketing:product_edit' product.id %}" class="btn-icon" title="Edit">
-                <i class="fa fa-edit"></i>
-              </a>
-              <button type="button" class="btn-icon btn-delete"
-                onclick="openDeleteModal({{ product.id }}, '{{ product.title|escapejs }}')" title="Delete">
-                <i class="fa fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="9" class="empty-state">
-            <div class="empty-state-content">
-              <i class="fa fa-box-open"></i>
-              <p>No products found</p>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Pagination -->
-  {% if is_paginated %}
-  <div class="pagination-container">
-    <div class="pagination-info">
-      Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} products
-    </div>
-    <div class="pagination">
-      {% if page_obj.has_previous %}
-      <a href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="pagination-btn"
-        title="First"><i class="fa fa-angles-left"></i></a>
-      <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-        class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
-      {% else %}
-      <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
-      <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
-      {% endif %}
-
-      {% for num in page_obj.paginator.page_range %}
-      {% if page_obj.number == num %}
-      <span class="pagination-btn active">{{ num }}</span>
-      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
-        href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-        class="pagination-btn">{{ num }}</a>
-        {% endif %}
-        {% endfor %}
-
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-          class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
-        <a href="?page={{ paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-          class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
-        {% else %}
-        <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
-        <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
-        {% endif %}
-    </div>
-  </div>
-  {% endif %}
-
-</div>
-
-<!-- Modern Delete Modal -->
-<div id="deleteModal" class="delete-modal">
-  <div class="delete-modal-overlay" onclick="closeDeleteModal()"></div>
-  <div class="delete-modal-content">
-    <div class="delete-modal-header">
-      <div class="delete-icon-wrapper">
-        <i class="fa fa-exclamation-triangle"></i>
-      </div>
-      <h3>Delete Product</h3>
-      <p>Are you sure you want to delete "<span id="deleteProductName"></span>"?</p>
-      <p class="warning-text">This action cannot be undone. All product data, variants, and images will be permanently
-        deleted.</p>
-    </div>
-    <div class="delete-modal-footer">
-      <button type="button" class="btn btn-cancel" onclick="closeDeleteModal()">
-        Cancel
-      </button>
-      <button type="button" class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()">
-        <i class="fa fa-trash"></i>
-        Delete Product
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- CSV Stock Update Modal -->
-<div id="csvModal" class="csv-modal">
-  <div class="csv-modal-overlay"></div>
-  <div class="csv-modal-content">
-    <div class="csv-modal-header">
-      <div class="csv-icon-wrapper">
-        <i class="fa fa-sync-alt"></i>
-      </div>
-      <h3>Bulk Stock Update</h3>
-      <p>Upload a CSV file to update variant stock quantities</p>
-      <button type="button" class="csv-modal-close" onclick="closeCsvModal()">
-        <i class="fa fa-times"></i>
-      </button>
-    </div>
-
-    <div class="csv-modal-body">
-      <form id="csvUploadForm" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="csv-upload-area" id="csvUploadArea">
-          <input type="file" id="csvFileInput" name="csv_file" accept=".csv" style="display: none;">
-          <div class="upload-icon">
-            <i class="fa fa-cloud-upload-alt"></i>
-          </div>
-          <p class="upload-text">Drag and drop your CSV file or</p>
-          <button type="button" class="btn btn-outline" onclick="document.getElementById('csvFileInput').click()">
-            Choose File
-          </button>
-          <p class="upload-hint">Required columns: Kodu (SKU), Miktar (Quantity)</p>
-        </div>
-
-        <div id="csvFileName" class="csv-file-name" style="display: none;">
-          <i class="fa fa-file-csv"></i>
-          <span id="selectedFileName"></span>
-          <button type="button" class="btn-remove-file" onclick="clearCsvFile()">
-            <i class="fa fa-times"></i>
-          </button>
-        </div>
-      </form>
-
-      <!-- Results Area -->
-      <div id="csvResults" class="csv-results" style="display: none;">
-        <div class="results-header">
-          <i class="fa fa-check-circle"></i>
-          <span id="resultsMessage"></span>
-        </div>
-        <div class="results-stats">
-          <div class="stat-item">
-            <span class="stat-value" id="statTotal">0</span>
-            <span class="stat-label">Total Rows</span>
-          </div>
-          <div class="stat-item stat-success">
-            <span class="stat-value" id="statMatched">0</span>
-            <span class="stat-label">Matched</span>
-          </div>
-          <div class="stat-item stat-updated">
-            <span class="stat-value" id="statUpdated">0</span>
-            <span class="stat-label">Updated</span>
-          </div>
-          <div class="stat-item stat-warning">
-            <span class="stat-value" id="statNotFound">0</span>
-            <span class="stat-label">Not Found</span>
-          </div>
-        </div>
-        <div id="notFoundList" class="not-found-list" style="display: none;">
-          <p class="not-found-title">SKUs not found:</p>
-          <div id="notFoundItems"></div>
-        </div>
-
-        <!-- Updated Variants List -->
-        <div id="updatedList" class="updated-list" style="display: none;">
-          <p class="updated-title">Updated Variants:</p>
-          <div class="updated-table-wrapper">
-            <table class="updated-table">
-              <thead>
-                <tr>
-                  <th>SKU</th>
-                  <th>Old Qty</th>
-                  <th>New Qty</th>
-                </tr>
-              </thead>
-              <tbody id="updatedItems"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Error Area -->
-      <div id="csvError" class="csv-error" style="display: none;">
-        <i class="fa fa-exclamation-circle"></i>
-        <span id="errorMessage"></span>
-      </div>
-    </div>
-
-    <div class="csv-modal-footer">
-      <button type="button" class="btn btn-cancel" onclick="closeCsvModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" id="csvUploadBtn" onclick="uploadCsv()" disabled>
-        <i class="fa fa-upload"></i>
-        Upload & Update
-      </button>
-    </div>
-  </div>
-</div>
-
-
-<script>
-  // Instant Search with Debounce (renamed to avoid conflict with base.html search_component)
-  let productSearchTimeout = null;
-  let lastProductSearchQuery = '';
-
-  const productSearchInput = document.getElementById('instantSearch');
-  const productSearchStatus = document.getElementById('searchStatus');
-  const productSearchClear = document.getElementById('searchClear');
-  const productTableBody = document.querySelector('.products-table tbody');
-
-  if (productSearchInput) {
-    // Show/hide clear button
-    productSearchInput.addEventListener('input', function (e) {
-      const query = e.target.value.trim();
-
-      // Clear previous timeout
-      if (productSearchTimeout) {
-        clearTimeout(productSearchTimeout);
-      }
-
-      // Don't search if empty or same as last query
-      if (query === '' && lastProductSearchQuery === '') {
-        productSearchClear.style.display = 'none';
-        productSearchStatus.style.display = 'none';
-        return;
-      }
-
-      // Show loading spinner, hide clear button while loading
-      productSearchStatus.style.display = 'flex';
-      productSearchClear.style.display = 'none';
-
-      // Debounce: wait 500ms after user stops typing
-      productSearchTimeout = setTimeout(() => {
-        performProductSearch(query);
-      }, 500);
-    });
-
-    // Handle Enter key
-    productSearchInput.addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (productSearchTimeout) {
-          clearTimeout(productSearchTimeout);
-        }
-        // Show loading immediately
-        productSearchStatus.style.display = 'flex';
-        productSearchClear.style.display = 'none';
-        performProductSearch(e.target.value.trim());
-      }
-    });
-  }
-
-  function clearSearch() {
-    productSearchInput.value = '';
-    productSearchClear.style.display = 'none';
-    productSearchStatus.style.display = 'flex';
-    lastProductSearchQuery = '';
-
-    // Reload page without search param
-    window.location.href = '{% url "marketing:product_list" %}';
-  }
-
-  async function performProductSearch(query) {
-    lastProductSearchQuery = query;
-
-    try {
-      // Build URL with search param
-      const url = query ? `{% url "marketing:product_list" %}?search=${encodeURIComponent(query)}` : '{% url "marketing:product_list" %}';
-
-      // Fetch new results
-      const response = await fetch(url, {
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      });
-
-      if (!response.ok) throw new Error('Search failed');
-
-      const html = await response.text();
-
-      // Parse response and extract table body
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const newTbody = doc.querySelector('.products-table tbody');
-      const newCount = doc.querySelector('.product-count');
-      const newPagination = doc.querySelector('.pagination-container');
-
-      if (newTbody && productTableBody) {
-        // Smooth transition
-        productTableBody.style.opacity = '0.5';
-
-        setTimeout(() => {
-          productTableBody.innerHTML = newTbody.innerHTML;
-          productTableBody.style.opacity = '1';
-
-          // Update product count
-          if (newCount) {
-            document.querySelector('.product-count').textContent = newCount.textContent;
-          }
-
-          // Update pagination
-          const currentPagination = document.querySelector('.pagination-container');
-          if (newPagination && currentPagination) {
-            currentPagination.innerHTML = newPagination.innerHTML;
-          } else if (!newPagination && currentPagination) {
-            currentPagination.innerHTML = '';
-          }
-
-          // Hide loading, show clear button if query exists
-          productSearchStatus.style.display = 'none';
-          productSearchClear.style.display = query ? 'flex' : 'none';
-        }, 150);
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      productSearchStatus.style.display = 'none';
-      productSearchClear.style.display = lastProductSearchQuery ? 'flex' : 'none';
-    }
-  }
-
-  // Delete Modal Functions
-  let currentDeleteProductId = null;
-
-  function openDeleteModal(productId, productTitle) {
-    currentDeleteProductId = productId;
-    document.getElementById('deleteProductName').textContent = productTitle;
-    document.getElementById('deleteModal').classList.add('show');
-  }
-
-  function closeDeleteModal() {
-    document.getElementById('deleteModal').classList.remove('show');
-    currentDeleteProductId = null;
-  }
-
-  function confirmDelete() {
-    if (!currentDeleteProductId) return;
-
-    // Store ID before closing modal (modal close resets it)
-    const productId = currentDeleteProductId;
-
-    // Close modal immediately
-    closeDeleteModal();
-
-    // Animate row deletion instantly (optimistic UI)
-    const row = document.getElementById(`product-row-${productId}`);
-    if (row) {
-      row.style.transition = 'all 0.3s ease';
-      row.style.backgroundColor = '#fee2e2';
-      row.style.transform = 'translateX(-20px)';
-      row.style.opacity = '0';
-
-      setTimeout(() => {
-        row.remove();
-
-        // Update product count
-        const countEl = document.querySelector('.product-count');
-        if (countEl) {
-          const currentCount = parseInt(countEl.textContent);
-          const newCount = currentCount - 1;
-          countEl.textContent = `${newCount} product${newCount !== 1 ? 's' : ''}`;
-        }
-
-        // Show empty state if no products left
-        const tbody = document.querySelector('.products-table tbody');
-        if (tbody && tbody.children.length === 0) {
-          tbody.innerHTML = `
-          <tr>
-            <td colspan="9" class="empty-state">
-              <div class="empty-state-content">
-                <i class="fa fa-box-open"></i>
-                <p>No products found</p>
-              </div>
-            </td>
-          </tr>
-        `;
-        }
-      }, 300);
-    }
-
-    // Delete in background (fire and forget)
-    fetch(`/marketing/product/${productId}/delete/`, {
-      method: 'POST',
-      headers: {
-        'X-CSRFToken': getCookie('csrftoken'),
-        'Content-Type': 'application/json'
-      }
-    }).catch(error => {
-      console.error('Background delete error:', error);
-      // Silent fail - user already sees deletion
-    });
-  }
-
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  }
-
-  // Close modal on ESC key
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-      closeDeleteModal();
-      closeCsvModal();
-    }
-  });
-
-  // ============================================
-  // CSV Stock Update Modal Functions
-  // ============================================
-
-  function openCsvModal() {
-    resetCsvModal();
-    document.getElementById('csvModal').classList.add('show');
-  }
-
-  function closeCsvModal() {
-    const modal = document.getElementById('csvModal');
-    modal.classList.add('closing');
-    setTimeout(() => {
-      modal.classList.remove('show', 'closing');
-      resetCsvModal();
-    }, 150);
-  }
-
-  function resetCsvModal() {
-    document.getElementById('csvFileInput').value = '';
-    document.getElementById('csvFileName').style.display = 'none';
-    document.getElementById('csvUploadArea').style.display = 'flex';
-    document.getElementById('csvResults').style.display = 'none';
-    document.getElementById('csvError').style.display = 'none';
-
-    const uploadBtn = document.getElementById('csvUploadBtn');
-    uploadBtn.disabled = true;
-    uploadBtn.innerHTML = '<i class="fa fa-upload"></i> Upload & Update';
-    uploadBtn.classList.remove('btn-success');
-    uploadBtn.onclick = uploadCsv;
-
-    // Show Cancel button again
-    document.querySelector('.csv-modal-footer .btn-cancel').style.display = '';
-  }
-
-  function clearCsvFile() {
-    document.getElementById('csvFileInput').value = '';
-    document.getElementById('csvFileName').style.display = 'none';
-    document.getElementById('csvUploadArea').style.display = 'flex';
-    document.getElementById('csvUploadBtn').disabled = true;
-    document.getElementById('csvError').style.display = 'none';
-  }
-
-  // File input change handler
-  document.getElementById('csvFileInput').addEventListener('change', function (e) {
-    const file = e.target.files[0];
-    if (file) {
-      document.getElementById('selectedFileName').textContent = file.name;
-      document.getElementById('csvFileName').style.display = 'flex';
-      document.getElementById('csvUploadArea').style.display = 'none';
-      document.getElementById('csvUploadBtn').disabled = false;
-      document.getElementById('csvError').style.display = 'none';
-      document.getElementById('csvResults').style.display = 'none';
-    }
-  });
-
-  // Drag and drop handlers
-  const uploadArea = document.getElementById('csvUploadArea');
-
-  uploadArea.addEventListener('dragover', function (e) {
-    e.preventDefault();
-    this.classList.add('drag-over');
-  });
-
-  uploadArea.addEventListener('dragleave', function (e) {
-    e.preventDefault();
-    this.classList.remove('drag-over');
-  });
-
-  uploadArea.addEventListener('drop', function (e) {
-    e.preventDefault();
-    this.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.csv')) {
-      document.getElementById('csvFileInput').files = e.dataTransfer.files;
-      document.getElementById('selectedFileName').textContent = file.name;
-      document.getElementById('csvFileName').style.display = 'flex';
-      document.getElementById('csvUploadArea').style.display = 'none';
-      document.getElementById('csvUploadBtn').disabled = false;
-    } else {
-      showCsvError('Sadece CSV dosyaları kabul edilir');
-    }
-  });
-
-  async function uploadCsv() {
-    const fileInput = document.getElementById('csvFileInput');
-    const file = fileInput.files[0];
-
-    if (!file) {
-      showCsvError('Lütfen bir CSV dosyası seçin');
-      return;
-    }
-
-    const uploadBtn = document.getElementById('csvUploadBtn');
-    uploadBtn.disabled = true;
-    uploadBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Uploading...';
-
-    document.getElementById('csvError').style.display = 'none';
-    document.getElementById('csvResults').style.display = 'none';
-
-    const formData = new FormData();
-    formData.append('csv_file', file);
-    formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
-
-    try {
-      const response = await fetch('{% url "marketing:csv_stock_update" %}', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        showCsvResults(data);
-      } else {
-        showCsvError(data.error || 'Unknown error occurred');
-        uploadBtn.disabled = false;
-        uploadBtn.innerHTML = '<i class="fa fa-upload"></i> Upload & Update';
-      }
-    } catch (error) {
-      console.error('CSV upload error:', error);
-      showCsvError('Sunucu hatası oluştu');
-      uploadBtn.disabled = false;
-      uploadBtn.innerHTML = '<i class="fa fa-upload"></i> Upload & Update';
-    }
-  }
-
-  function showCsvResults(data) {
-    const resultsDiv = document.getElementById('csvResults');
-    const uploadBtn = document.getElementById('csvUploadBtn');
-
-    document.getElementById('resultsMessage').textContent = data.message;
-    document.getElementById('statTotal').textContent = data.total_rows;
-    document.getElementById('statMatched').textContent = data.matched;
-    document.getElementById('statUpdated').textContent = data.updated;
-    document.getElementById('statNotFound').textContent = data.not_found_count;
-
-    // Show not found items if any
-    if (data.not_found && data.not_found.length > 0) {
-      const notFoundDiv = document.getElementById('notFoundList');
-      const notFoundItems = document.getElementById('notFoundItems');
-      notFoundItems.innerHTML = data.not_found.map(sku =>
-        `<span class="not-found-sku">${sku}</span>`
-      ).join('');
-      notFoundDiv.style.display = 'block';
-    } else {
-      document.getElementById('notFoundList').style.display = 'none';
-    }
-
-    // Show updated variants table
-    if (data.updated_variants && data.updated_variants.length > 0) {
-      const updatedDiv = document.getElementById('updatedList');
-      const updatedItems = document.getElementById('updatedItems');
-      updatedItems.innerHTML = data.updated_variants.map(v => `
-        <tr>
-          <td><code>${v.sku}</code></td>
-          <td class="old-value">${v.old}</td>
-          <td class="new-value">${v.new}</td>
-        </tr>
-      `).join('');
-      updatedDiv.style.display = 'block';
-    } else {
-      document.getElementById('updatedList').style.display = 'none';
-    }
-
-    resultsDiv.style.display = 'block';
-    resultsDiv.classList.add('show');
-
-    // Change button to Done and make it clickable
-    uploadBtn.innerHTML = '<i class="fa fa-check"></i> Done';
-    uploadBtn.classList.add('btn-success');
-    uploadBtn.disabled = false;
-    uploadBtn.onclick = function () {
-      closeCsvModal();
-      window.location.reload();
-    };
-
-    // Hide Cancel button after success
-    document.querySelector('.csv-modal-footer .btn-cancel').style.display = 'none';
-  }
-
-  function showCsvError(message) {
-    const errorDiv = document.getElementById('csvError');
-    document.getElementById('errorMessage').textContent = message;
-    errorDiv.style.display = 'flex';
-  }
-</script>
-
 <style>
-  .btn-delete {
-    color: #dc2626 !important;
-    transition: all 0.2s;
+  /* ============================================
+ * Product Catalog - Premium Modern Design
+ * ============================================ */
+
+  /* Base & Typography */
+  .product-catalog {
+    background: #f8fafc;
+    min-height: 100vh;
+    padding: 32px 40px;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #0f172a;
   }
 
-  .btn-delete:hover {
-    background: #fef2f2 !important;
-    transform: scale(1.1);
-  }
-
-  /* Modern Delete Modal */
-  .delete-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 10000;
+  /* Header Section */
+  .catalog-header {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-  }
-
-  .delete-modal.show {
-    opacity: 1;
-    pointer-events: all;
-  }
-
-  .delete-modal-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
-  }
-
-  .delete-modal-content {
-    position: relative;
-    background: white;
-    border-radius: 16px;
-    max-width: 480px;
-    width: 90%;
-    padding: 32px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transform: scale(0.9);
-    transition: transform 0.3s ease;
-  }
-
-  .delete-modal.show .delete-modal-content {
-    transform: scale(1);
-  }
-
-  .delete-modal-header {
-    text-align: center;
+    justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 24px;
   }
 
-  .delete-icon-wrapper {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 16px;
-    background: #fef2f2;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .delete-icon-wrapper i {
-    font-size: 32px;
-    color: #dc2626;
-  }
-
-  .delete-modal-header h3 {
+  .catalog-title h1 {
     font-size: 24px;
     font-weight: 700;
-    color: #111827;
-    margin: 0 0 12px;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.5px;
   }
 
-  .delete-modal-header p {
-    font-size: 15px;
-    color: #6b7280;
-    margin: 8px 0;
-    line-height: 1.5;
-  }
-
-  .delete-modal-header p span {
-    font-weight: 600;
-    color: #111827;
-  }
-
-  .warning-text {
-    font-size: 13px !important;
-    color: #dc2626 !important;
-    background: #fef2f2;
-    padding: 12px;
-    border-radius: 8px;
-    margin-top: 16px !important;
-  }
-
-  .delete-modal-footer {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-  }
-
-  .delete-modal-footer .btn {
-    padding: 10px 20px;
-    border-radius: 8px;
+  .catalog-title p {
     font-size: 14px;
-    font-weight: 600;
-    border: none;
+    color: #64748b;
+    margin: 0;
+  }
+
+  .compact-mode {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+  }
+
+  .toggle-switch {
+    width: 36px;
+    height: 20px;
+    background: #e2e8f0;
+    border-radius: 10px;
+    position: relative;
     cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .toggle-switch.active {
+    background: #3b82f6;
+  }
+
+  .toggle-switch.active::after {
+    left: 18px;
+  }
+
+  /* Filter Bar */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .catalog-search-wrapper {
+    position: relative;
+    flex: 0 0 320px;
+  }
+
+  .catalog-search-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 16px 0 44px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: white;
+    font-size: 14px;
+    color: #0f172a;
     transition: all 0.2s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
-  .delete-modal-footer .btn-cancel {
-    background: #f3f4f6;
-    color: #374151;
+  .catalog-search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
-  .delete-modal-footer .btn-cancel:hover {
-    background: #e5e7eb;
+  .catalog-search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
   }
 
-  .delete-modal-footer .btn-danger {
-    background: #dc2626;
-    color: white;
-  }
-
-  .delete-modal-footer .btn-danger:hover {
-    background: #b91c1c;
-  }
-
-  .delete-modal-footer .btn-danger:disabled {
-    background: #fca5a5;
-    cursor: not-allowed;
-  }
-
-  /* ============================================
-   * CSV Stock Update Modal Styles
-   * ============================================ */
-
-  .btn-secondary {
-    background: #f3f4f6;
-    color: #374151;
-    border: 1px solid #d1d5db;
-    padding: 10px 16px;
-    border-radius: 8px;
-    font-weight: 600;
-    transition: all 0.2s;
-    display: inline-flex;
+  .filter-btn {
+    height: 44px;
+    padding: 0 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: white;
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+    display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  .btn-secondary:hover {
-    background: #e5e7eb;
-    border-color: #9ca3af;
-  }
-
-  .csv-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.15s ease;
-  }
-
-  .csv-modal.show {
-    opacity: 1;
-    pointer-events: all;
-  }
-
-  .csv-modal.closing .csv-modal-content {
-    transform: scale(0.9) translateY(20px);
-    opacity: 0;
-  }
-
-  .csv-modal-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-  }
-
-  .csv-modal-content {
-    position: relative;
-    background: white;
-    border-radius: 16px;
-    max-width: 520px;
-    width: 95%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transform: scale(0.9);
-    opacity: 0;
-    transition: all 0.15s ease;
-  }
-
-  .csv-modal.show .csv-modal-content {
-    transform: scale(1);
-    opacity: 1;
-  }
-
-  .csv-modal-header {
-    padding: 24px 24px 16px;
-    text-align: center;
-    position: relative;
-    border-bottom: 1px solid #f3f4f6;
-  }
-
-  .csv-modal-close {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: none;
-    border: none;
-    font-size: 20px;
-    color: #9ca3af;
     cursor: pointer;
-    padding: 4px;
-    transition: color 0.2s;
+    transition: all 0.15s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
-  .csv-modal-close:hover {
-    color: #374151;
+  .filter-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
   }
 
-  .csv-icon-wrapper {
-    width: 56px;
-    height: 56px;
-    margin: 0 auto 12px;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    border-radius: 50%;
+  .filter-btn i {
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .actions-right {
+    margin-left: auto;
     display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .csv-icon-wrapper i {
-    font-size: 24px;
-    color: white;
-  }
-
-  .csv-modal-header h3 {
-    font-size: 20px;
-    font-weight: 700;
-    color: #111827;
-    margin: 0 0 4px;
-  }
-
-  .csv-modal-header p {
-    font-size: 14px;
-    color: #6b7280;
-    margin: 0;
-  }
-
-  .csv-modal-body {
-    padding: 24px;
-  }
-
-  .csv-upload-area {
-    border: 2px dashed #d1d5db;
-    border-radius: 12px;
-    padding: 32px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     gap: 12px;
   }
 
-  .csv-upload-area:hover,
-  .csv-upload-area.drag-over {
-    border-color: #3b82f6;
-    background: #dbeafe;
-  }
-
-  .upload-icon {
-    width: 48px;
-    height: 48px;
-    background: #f3f4f6;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .upload-icon i {
-    font-size: 24px;
-    color: #6b7280;
-  }
-
-  .upload-text {
-    font-size: 14px;
-    color: #6b7280;
-    margin: 0;
-  }
-
-  .upload-hint {
-    font-size: 12px;
-    color: #9ca3af;
-    margin: 0;
-  }
-
-  .btn-outline {
-    background: white;
-    border: 1px solid #3b82f6;
-    color: #3b82f6;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-outline:hover {
+  .btn-primary {
+    height: 44px;
+    padding: 0 20px;
     background: #3b82f6;
     color: white;
-  }
-
-  .csv-file-name {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px;
-    background: #dbeafe;
-    border: 1px solid #3b82f6;
-    border-radius: 8px;
-    margin-top: 16px;
-  }
-
-  .csv-file-name i {
-    font-size: 24px;
-    color: #3b82f6;
-  }
-
-  .csv-file-name span {
-    flex: 1;
-    font-weight: 500;
-    color: #111827;
-  }
-
-  .btn-remove-file {
-    background: none;
     border: none;
-    color: #dc2626;
-    cursor: pointer;
-    padding: 4px;
-    font-size: 16px;
-  }
-
-  .csv-results {
-    margin-top: 20px;
-    padding: 20px;
-    background: #dbeafe;
-    border-radius: 12px;
-    animation: slideIn 0.3s ease;
-  }
-
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .results-header {
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 16px;
-    color: #2563eb;
-    font-weight: 600;
-    font-size: 16px;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
   }
 
-  .results-header i {
+  .btn-primary:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+  }
+
+  /* Table Design */
+  .table-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+  }
+
+  .product-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .product-table th {
+    background: #f8fafc;
+    padding: 16px 20px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .product-table td {
+    padding: 16px 20px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 14px;
+    color: #334155;
+  }
+
+  .product-row:hover {
+    background: #f8fafc;
+  }
+
+  .product-row.expanded {
+    background: #eff6ff;
+  }
+
+  /* Checkbox */
+  .custom-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .custom-checkbox:hover {
+    border-color: #3b82f6;
+  }
+
+  /* Image */
+  .product-image-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f1f5f9;
+    border: 1px solid #f1f5f9;
+  }
+
+  .product-image-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .product-image-box.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cbd5e1;
     font-size: 20px;
   }
 
-  .results-stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-  }
-
-  .stat-item {
-    text-align: center;
-    padding: 12px 8px;
-    background: white;
-    border-radius: 8px;
-  }
-
-  .stat-value {
+  /* Product Info */
+  .product-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0284c7;
+    /* Brand Blue */
+    text-decoration: none;
     display: block;
-    font-size: 24px;
-    font-weight: 700;
-    color: #111827;
+    margin-bottom: 3px;
   }
 
-  .stat-label {
+  .product-updated {
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  /* SKU Badge */
+  .sku-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 4px 8px;
+    border-radius: 6px;
+    letter-spacing: -0.5px;
+  }
+
+  /* Attributes */
+  .attr-tag {
+    display: inline-flex;
+    padding: 4px 10px;
+    background: #f1f5f9;
+    color: #475569;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+    margin-right: 6px;
+  }
+
+  /* Stock */
+  .stock-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .stock-status-text {
     font-size: 11px;
-    color: #6b7280;
+    font-weight: 600;
+    display: block;
+    margin-top: 2px;
+  }
+
+  .text-success {
+    color: #16a34a;
+  }
+
+  .text-warning {
+    color: #d97706;
+  }
+
+  .text-danger {
+    color: #dc2626;
+  }
+
+  /* Status Badges */
+  .status-pill {
+    display: inline-flex;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .pill-active {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  .pill-low {
+    background: #ffedd5;
+    color: #c2410c;
+  }
+
+  .pill-discontinued {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+
+  .pill-premium {
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+
+  /* Expand Button */
+  .btn-expand {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .btn-expand:hover {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+
+  .expanded .btn-expand {
+    transform: rotate(90deg);
+    background: #dbeafe;
+    color: #3b82f6;
+  }
+
+  /* Variant Row */
+  .variant-row {
+    display: none;
+  }
+
+  .variant-row.show {
+    display: table-row;
+  }
+
+  .variant-box {
+    background: #f8fafc;
+    padding: 24px 32px 24px 84px;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: inset 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  }
+
+  .variant-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .variant-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
-  .stat-success .stat-value {
-    color: #3b82f6;
-  }
-
-  .stat-updated .stat-value {
-    color: #3b82f6;
-  }
-
-  .stat-warning .stat-value {
-    color: #f59e0b;
-  }
-
-  .not-found-list {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid #bfdbfe;
-  }
-
-  .not-found-title {
+  .add-variant-link {
     font-size: 12px;
-    color: #6b7280;
-    margin: 0 0 8px;
-  }
-
-  .not-found-sku {
-    display: inline-block;
-    padding: 4px 8px;
-    background: #fef3c7;
-    color: #92400e;
-    border-radius: 4px;
-    font-size: 11px;
-    margin: 2px;
-  }
-
-  /* Updated Variants Table */
-  .updated-list {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid #bfdbfe;
-  }
-
-  .updated-title {
-    font-size: 12px;
-    color: #2563eb;
-    margin: 0 0 8px;
     font-weight: 600;
+    color: #3b82f6;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
-  .updated-table-wrapper {
-    max-height: 200px;
-    overflow-y: auto;
-    border-radius: 8px;
-    border: 1px solid #bfdbfe;
+  .add-variant-link:hover {
+    text-decoration: underline;
   }
 
-  .updated-table {
+  .v-table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
   }
 
-  .updated-table th {
-    background: #eff6ff;
-    padding: 8px 12px;
-    text-align: left;
-    font-weight: 600;
-    color: #1e40af;
-    position: sticky;
-    top: 0;
-  }
-
-  .updated-table td {
-    padding: 8px 12px;
-    border-top: 1px solid #bfdbfe;
-  }
-
-  .updated-table tr:nth-child(even) {
-    background: #f9fafb;
-  }
-
-  .updated-table code {
-    background: #e5e7eb;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    color: #1f2937;
-  }
-
-  .old-value {
-    color: #dc2626;
-    text-decoration: line-through;
-    opacity: 0.7;
-  }
-
-  .new-value {
-    color: #2563eb;
-    font-weight: 600;
-  }
-
-  .csv-error {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  .v-table td {
     padding: 12px 16px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 8px;
-    margin-top: 16px;
-    color: #dc2626;
-    font-size: 14px;
+    font-size: 13px;
+    color: #334155;
+    border-bottom: 1px solid #e2e8f0;
+    background: transparent;
   }
 
-  .csv-error i {
-    font-size: 18px;
+  .v-table tr:last-child td {
+    border-bottom: none;
   }
 
-  .csv-modal-footer {
-    padding: 16px 24px 24px;
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    border-top: 1px solid #f3f4f6;
-  }
-
-  .csv-modal-footer .btn {
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s;
+  .v-name {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+    font-weight: 500;
   }
 
-  .csv-modal-footer .btn-primary {
+  .v-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     background: #3b82f6;
-    color: white;
+    box-shadow: 0 0 0 2px #dbeafe;
   }
 
-  .csv-modal-footer .btn-primary:hover:not(:disabled) {
-    background: #2563eb;
+  /* Modals (Hidden by Default) */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: none;
+    /* Hidden by default */
+    align-items: center;
+    justify-content: center;
   }
 
-  .csv-modal-footer .btn-primary:disabled {
-    background: #d1d5db;
-    cursor: not-allowed;
+  .modal-backdrop.show {
+    display: flex;
   }
 
-  .csv-modal-footer .btn-success {
-    background: #3b82f6 !important;
+  .modal-card {
+    background: white;
+    width: 100%;
+    max-width: 440px;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: modalSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  @media (max-width: 480px) {
-    .results-stats {
-      grid-template-columns: repeat(2, 1fr);
+  @keyframes modalSlide {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
     }
   }
+
+  .modal-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+
+  .modal-icon.danger {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+
+  .modal-icon.info {
+    background: #eff6ff;
+    color: #3b82f6;
+  }
+
+  .modal-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+
+  .modal-desc {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .btn-secondary {
+    padding: 10px 20px;
+    background: white;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-secondary:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+
+  .btn-danger {
+    padding: 10px 20px;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2);
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
+  }
+
+  /* Pagination Top Border */
+  .pagination-container {
+    border-top: 1px solid #e2e8f0;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    /* Subtle contrast footer */
+  }
+
+  /* Fixed height pagination buttons */
+  .pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    min-width: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    line-height: 1;
+  }
+
+  .pagination-btn.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+  }
+
+  .pagination-btn.neutral {
+    background: white;
+    border-color: #cbd5e1;
+    color: #475569;
+  }
+
+  .pagination-btn.neutral:hover {
+    border-color: #94a3b8;
+    color: #0f172a;
+    background: #f8fafc;
+  }
 </style>
+{% endblock %}
+
+{% block content %}
+<div class="product-catalog">
+
+  <!-- Header -->
+  <div class="catalog-header">
+    <div class="catalog-title">
+      <h1>Product Catalog</h1>
+      <p>Manage inventory, variants, and pricing.</p>
+    </div>
+    <div class="compact-mode">
+      <span>Compact Mode</span>
+      <div style="width: 12px;"></div>
+      <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+    </div>
+  </div>
+
+  <!-- Tools Bar -->
+  <div class="filter-bar">
+    <div class="catalog-search-wrapper" style="width: 280px; position: relative;">
+      <i class="fa fa-search catalog-search-icon"></i>
+      <input type="text" class="catalog-search-input" id="instantSearch" placeholder="Filter by SKU, name..."
+        value="{{ request.GET.search }}" style="padding-left: 40px; height: 36px; font-size: 13px;"
+        hx-get="{% url 'marketing:product_list' %}" hx-trigger="keyup changed delay:300ms, search"
+        hx-target="#product-table-body" hx-indicator="#search-loader" name="search">
+      <div id="search-loader" class="htmx-indicator"
+        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
+        <i class="fa fa-spinner fa-spin" style="color: #94a3b8; font-size: 14px;"></i>
+      </div>
+    </div>
+
+    <div class="actions-right">
+      <!-- Bulk Actions (Hidden by default) -->
+      <div id="bulkActions"
+        style="display: none; align-items: center; gap: 12px; margin-right: 12px; animation: fadeIn 0.2s;">
+        <span style="font-size: 13px; color: #64748b; font-weight: 500;">
+          <span id="selectedCount">0</span> selected
+        </span>
+        <button class="btn-danger" style="padding: 10px 16px; font-size: 13px;" onclick="openBulkDeleteModal()">
+          <i class="fa fa-trash"></i> Delete
+        </button>
+      </div>
+
+      <button class="filter-btn" onclick="document.getElementById('csvModal').classList.add('show')">
+        <i class="fa fa-download"></i> Export
+      </button>
+      <!-- Moved to right side --> <a href="{% url 'marketing:product_create' %}" class="btn-primary">
+        <i class="fa fa-plus"></i> Product
+      </a>
+    </div>
+  </div>
+
+  <!-- Data Table Card -->
+  <div class="table-card">
+    <form id="bulkForm">
+      <table class="product-table">
+        <thead>
+          <tr>
+            <th style="width: 48px;">
+              <div class="custom-checkbox" onclick="toggleAllCheckboxes(this)"></div>
+            </th>
+            <th style="width: 72px;">IMAGE</th>
+            <th>PRODUCT NAME</th>
+            <th>SKU</th>
+            <th>CATEGORY</th>
+            <th>ATTRIBUTES</th>
+            <th style="text-align: center;">STOCK</th>
+            <th>PRICE</th>
+            <th>STATUS</th>
+            <th style="width: 48px;"></th>
+          </tr>
+        </thead>
+        <tbody id="product-table-body">
+          {% include "marketing/partials/product_list_rows.html" %}
+        </tbody>
+      </table>
+    </form>
+
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="pagination-container">
+      <div style="font-size: 13px; color: #64748b;">
+        Showing <span style="font-weight: 600; color: #0f172a;">{{ page_obj.start_index }}-{{
+          page_obj.end_index}}</span> of {{ paginator.count }} products
+      </div>
+      <div style="display: flex; gap: 6px;">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+          class="pagination-btn neutral">Previous</a>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+        <span class="pagination-btn active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+          href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+          class="pagination-btn neutral">{{ num }}</a>
+          {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
+            class="pagination-btn neutral">Next</a>
+          {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-backdrop" id="deleteModal">
+  <div class="modal-card">
+    <div class="modal-icon danger"><i class="fa fa-exclamation-triangle"></i></div>
+    <h3 class="modal-title">Delete Product</h3>
+    <p class="modal-desc">Are you sure you want to delete <strong id="delProdName"></strong>? This action cannot be
+      undone.</p>
+    <div class="modal-actions">
+      <button class="btn-secondary"
+        onclick="document.getElementById('deleteModal').classList.remove('show')">Cancel</button>
+      <button class="btn-danger" onclick="confirmDelete()">Delete Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV Modal -->
+<div class="modal-backdrop" id="csvModal">
+  <div class="modal-card">
+    <div class="modal-icon info" style="background: #3b82f6; color: white;">
+      <i class="fas fa-sync-alt"></i>
+    </div>
+    <h3 class="modal-title">Bulk Stock Update</h3>
+    <p class="modal-desc">Upload a CSV file to update variant stock quantities</p>
+
+    <div
+      style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 32px; margin-bottom: 24px; background: #f8fafc; text-align: center;">
+      <div
+        style="width: 48px; height: 48px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #64748b;">
+        <i class="fas fa-cloud-upload-alt"></i>
+      </div>
+      <p style="font-size: 14px; color: #64748b; margin-bottom: 16px;">Drag and drop your CSV file or</p>
+      <label for="csvFile"
+        style="display: inline-block; padding: 8px 16px; background: white; border: 1px solid #3b82f6; color: #3b82f6; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;">
+        Choose File
+      </label>
+      <input type="file" id="csvFile" style="display: none;"
+        onchange="this.previousElementSibling.textContent = this.files[0].name">
+      <p style="font-size: 12px; color: #94a3b8; margin-top: 16px;">Required columns: Kodu (SKU), Miktar (Quantity)</p>
+    </div>
+
+    <div class="modal-actions" style="justify-content: space-between; align-items: center;">
+      <button class="btn-secondary" style="border: none; color: #0f172a; font-weight: 600;"
+        onclick="document.getElementById('csvModal').classList.remove('show')">Cancel</button>
+      <button class="btn-primary"
+        style="background: #e2e8f0; color: #94a3b8; border: none; box-shadow: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; display: flex; align-items: center; gap: 8px;"
+        onclick="alert('Upload functionality to be implemented')">
+        <i class="fas fa-upload"></i> Upload & Update
+      </button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Bulk Delete Modal -->
+<div class="modal-backdrop" id="bulkDeleteModal">
+  <div class="modal-card">
+    <div class="modal-icon danger"><i class="fa fa-exclamation-triangle"></i></div>
+    <h3 class="modal-title">Delete Products</h3>
+    <p class="modal-desc">
+      Are you sure you want to delete <strong id="bulkDelCount">0</strong> selected products?
+      This action cannot be undone.
+    </p>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="document.getElementById('bulkDeleteModal').classList.remove('show')">
+        Cancel
+      </button>
+      <button class="btn-danger" hx-post="{% url 'marketing:product_bulk_delete' %}" hx-trigger="click"
+        hx-include="#bulkForm input[name='product_ids']:checked" hx-target="body">
+        Yes, Delete All
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Toggle Variants
+  function toggleVariants(pid, tr, event) {
+    // If event is provided (row click), check source
+    if (event) {
+      const target = event.target;
+      // Ignore clicks on interactive elements
+      if (target.closest('a') ||
+        target.closest('button') ||
+        target.closest('input') ||
+        target.closest('.custom-checkbox')) {
+        return;
+      }
+    }
+
+    tr.classList.toggle('expanded');
+    const variantRow = document.getElementById('variants-' + pid);
+    if (variantRow) {
+      variantRow.classList.toggle('show');
+
+      // Trigger lazy load if expanding
+      if (variantRow.classList.contains('show')) {
+        const box = variantRow.querySelector('.variant-box');
+        // Trigger HTMX if found
+        if (box && typeof htmx !== 'undefined') {
+          htmx.trigger(box, 'variant-load');
+        }
+      }
+    }
+
+    // Rotate chevron if present
+    const chevron = tr.querySelector('.btn-expand i');
+    if (chevron && tr.classList.contains('expanded')) {
+      chevron.style.transform = 'rotate(90deg)';
+    } else if (chevron) {
+      chevron.style.transform = '';
+    }
+  }
+
+  // Bulk Selection Logic
+  function toggleAllCheckboxes(headerCheckbox) {
+    const isChecked = !headerCheckbox.classList.contains('active');
+
+    if (isChecked) {
+      headerCheckbox.classList.add('active');
+      headerCheckbox.style.backgroundColor = '#3b82f6';
+      headerCheckbox.style.borderColor = '#3b82f6';
+      headerCheckbox.innerHTML = '<i class="fa fa-check" style="color: white; font-size: 12px; display: block; text-align: center; line-height: 18px;"></i>';
+    } else {
+      headerCheckbox.classList.remove('active');
+      headerCheckbox.style.backgroundColor = '';
+      headerCheckbox.style.borderColor = '';
+      headerCheckbox.innerHTML = '';
+    }
+
+    const checkboxes = document.querySelectorAll('.row-checkbox');
+    checkboxes.forEach(cb => {
+      const input = cb.querySelector('input');
+      input.checked = isChecked;
+      updateCheckboxVisual(cb, isChecked);
+    });
+    updateBulkActions();
+  }
+
+  // Row Checkbox Handling - Inline Function
+  function toggleRowCheckbox(checkboxDiv, event) {
+    if (event) {
+      event.preventDefault(); // Prevent default browser behavior
+      event.stopPropagation(); // Stop bubbling
+    }
+
+    // Determine new state based on current VISUAL state (source of truth for user)
+    const isActive = checkboxDiv.classList.contains('active');
+    const newState = !isActive;
+
+    const input = checkboxDiv.querySelector('input');
+    input.checked = newState; // Force input to match desired state
+
+    updateCheckboxVisual(checkboxDiv, newState);
+    updateBulkActions();
+  }
+
+  function updateCheckboxVisual(container, isChecked) {
+    let icon = container.querySelector('i.fa-check');
+
+    if (isChecked) {
+      container.classList.add('active');
+      container.style.backgroundColor = '#3b82f6';
+      container.style.borderColor = '#3b82f6';
+      if (!icon) {
+        // Add icon if not present
+        const i = document.createElement('i');
+        i.className = 'fa fa-check';
+        i.style.cssText = 'color: white; font-size: 12px; display: block; text-align: center; line-height: 18px; pointer-events: none;';
+        container.appendChild(i);
+      }
+    } else {
+      container.classList.remove('active');
+      container.style.backgroundColor = '';
+      container.style.borderColor = '';
+      if (icon) {
+        icon.remove();
+      }
+    }
+  }
+
+  function updateBulkActions() {
+    const selected = document.querySelectorAll('input[name="product_ids"]:checked').length;
+    const bulkActions = document.getElementById('bulkActions');
+    const searchWrapper = document.querySelector('.catalog-search-wrapper');
+
+    if (selected > 0) {
+      bulkActions.style.display = 'flex';
+      document.getElementById('selectedCount').textContent = selected;
+    } else {
+      bulkActions.style.display = 'none';
+      searchWrapper.style.display = 'block';
+    }
+  }
+
+  function openBulkDeleteModal() {
+    const selected = document.querySelectorAll('input[name="product_ids"]:checked').length;
+    if (selected === 0) return;
+    document.getElementById('bulkDelCount').textContent = selected;
+    document.getElementById('bulkDeleteModal').classList.add('show');
+  }
+
+  // Global Modal Close on ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.classList.remove('show'));
+    }
+  });
+</script>
 {% endblock content %}

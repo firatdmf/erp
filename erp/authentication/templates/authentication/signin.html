@@ -4,24 +4,388 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Sign In - Nejum ERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4F46E5;
+            /* Indigo 600 */
+            --primary-hover: #4338CA;
+            /* Indigo 700 */
+            --bg-color: #F9FAFB;
+            --text-color: #111827;
+            --text-secondary: #6B7280;
+            --border-color: #D1D5DB;
+            --input-bg: #FFFFFF;
+            --radius: 12px;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Split Layout */
+        .split-screen {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Left Side - Premium V2 Design */
+        .left-pane {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 3rem;
+            overflow: hidden;
+            background-color: #0F172A;
+            /* Fallback dark bg */
+        }
+
+        /* Animated Mesh Gradient Background */
+        .left-pane-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+            z-index: 1;
+        }
+
+        /* Floating Orbs */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 2;
+            opacity: 0.8;
+            animation: float 20s infinite ease-in-out alternate;
+        }
+
+        .orb-1 {
+            top: -10%;
+            left: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: #4F46E5;
+            animation-duration: 25s;
+        }
+
+        .orb-2 {
+            bottom: -10%;
+            right: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: #7C3AED;
+            animation-duration: 30s;
+            animation-direction: alternate-reverse;
+        }
+
+        .orb-3 {
+            top: 40%;
+            left: 40%;
+            width: 30vw;
+            height: 30vw;
+            background: #06B6D4;
+            /* Cyan accent */
+            opacity: 0.4;
+            animation-duration: 22s;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            100% {
+                transform: translate(50px, 50px) rotate(10deg);
+            }
+        }
+
+        /* Noise Texture */
+        .noise-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            pointer-events: none;
+        }
+
+        /* Glassmorphism Card */
+        .brand-content {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            padding: 3rem;
+            border-radius: 24px;
+            box-shadow: var(--glass-shadow);
+            max-width: 500px;
+            width: 100%;
+            transition: transform 0.3s ease;
+        }
+
+        .brand-content:hover {
+            transform: translateY(-5px);
+        }
+
+        .brand-content h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #FFFFFF 0%, #E0E7FF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .brand-content p {
+            font-size: 1.125rem;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            margin: 0 auto;
+        }
+
+        /* Right Side - Form */
+        .right-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            background-color: white;
+            position: relative;
+            z-index: 20;
+            /* Ensure form is above background elements just in case */
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+            padding: 2rem;
+        }
+
+        .login-header {
+            margin-bottom: 2.5rem;
+        }
+
+        .login-header h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .login-header p {
+            color: var(--text-secondary);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            color: var(--text-color);
+            background-color: var(--input-bg);
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 0.875rem;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin-top: 1rem;
+        }
+
+        .submit-btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .error-message {
+            background-color: #FECACA;
+            color: #991B1B;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 900px) {
+            .split-screen {
+                flex-direction: column;
+            }
+
+            .left-pane {
+                flex: 0 0 240px;
+                /* Slightly taller for mobile header feel */
+                padding: 1.5rem;
+                overflow: hidden;
+            }
+
+            .orb {
+                filter: blur(40px);
+                /* Reduce blur load on mobile */
+            }
+
+            .brand-content {
+                padding: 1.5rem;
+                background: rgba(255, 255, 255, 0.15);
+                /* More visible on mobile */
+            }
+
+            .brand-content h1 {
+                font-size: 2rem;
+            }
+
+            .brand-content p {
+                display: none;
+                /* Hide description on mobile to save space */
+            }
+
+            .right-pane {
+                flex: 1;
+                border-top-left-radius: 24px;
+                border-top-right-radius: 24px;
+                margin-top: -24px;
+                z-index: 20;
+                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <h3>Sign In</h3>
-    <p>{{errorMessage}}</p>
-    <form action="{% url 'authentication:signin' %}" method="post">
-        {% csrf_token %}
-        <label for="">Username</label>
-        <input type="text" id="username" name="username" placeholder="Enter your username"
-            required> 
-        <br>    
-        <label for="">Password</label>
-        <input type="password" id="password" name="password" placeholder="Enter your password" required>
-        <br>
-        <input type="hidden" name="next" value="{{ next }}">
-        <button type="submit">Sign In</button>
-    </form>
+    <div class="split-screen">
+        <!-- Left Side -->
+        <div class="left-pane">
+            <div class="left-pane-bg"></div>
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+            <div class="noise-overlay"></div>
+
+            <div class="brand-content">
+                <h1>Nejum ERP</h1>
+                <p>Seamlessly manage your business with our intelligent enterprise resource planning solution.</p>
+            </div>
+        </div>
+
+        <!-- Right Side -->
+        <div class="right-pane">
+            <div class="login-container">
+                <div class="login-header">
+                    <h2>Welcome back</h2>
+                    <p>Please enter your details to sign in.</p>
+                </div>
+
+                {% if errorMessage %}
+                <div class="error-message">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                        <path
+                            d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z" />
+                    </svg>
+                    {{ errorMessage }}
+                </div>
+                {% endif %}
+
+                <form action="{% url 'authentication:signin' %}" method="post">
+                    {% csrf_token %}
+
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" placeholder="Enter your username"
+                            class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="••••••••" class="form-input"
+                            required>
+                    </div>
+
+                    <input type="hidden" name="next" value="{{ next }}">
+
+                    <button type="submit" class="submit-btn">Sign In</button>
+
+                    <div style="margin-top: 1.5rem; text-align: center;">
+                        <span style="color: var(--text-secondary); font-size: 0.9rem;">Don't have an account? </span>
+                        <a href="{% url 'authentication:signup' %}"
+                            style="color: var(--primary-color); font-weight: 500; text-decoration: none; font-size: 0.9rem;">Sign
+                            up</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

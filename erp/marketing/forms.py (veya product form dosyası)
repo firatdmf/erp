@@ -1,0 +1,21 @@
+from django import forms
+from .models import Product
+
+class ProductForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = ['title', 'description', 'sku', 'barcode', 'price', 'quantity', 'unit_of_weight', 'minimum_inventory_level', 'weight', 'cost', 'vendor', 'primary_image', 'featured', 'selling_while_out_of_stock', 'has_variants']
+
+    featured = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'toggle-input'
+        })
+    )
+    
+    selling_while_out_of_stock = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'toggle-input'
+        })
+    )

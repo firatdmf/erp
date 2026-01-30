@@ -1,0 +1,685 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Multi-Team Management | Nejum ERP{% endblock %}
+
+{% block css %}
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background: #f5f7fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .dashboard-container {
+    display: flex;
+    min-height: calc(100vh - 80px);
+  }
+
+  /* Sidebar */
+  .dashboard-sidebar {
+    width: 280px;
+    background: white;
+    padding: 2rem 1.5rem;
+    border-right: 1px solid #e5e7eb;
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    margin-bottom: 2rem;
+  }
+
+  .sidebar-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #9ca3af;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+  }
+
+  .team-list {
+    list-style: none;
+  }
+
+  .team-item {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+    color: #4b5563;
+    border-left: 3px solid transparent;
+  }
+
+  .team-item:hover {
+    background: #f3f4f6;
+    color: #2563eb;
+    border-left-color: #2563eb;
+  }
+
+  .team-item.active {
+    background: #eff6ff;
+    color: #2563eb;
+    border-left-color: #2563eb;
+    font-weight: 600;
+  }
+
+  .team-item-count {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    float: right;
+    background: #f3f4f6;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  /* Main Content */
+  .dashboard-content {
+    flex: 1;
+    padding: 2rem;
+    overflow-y: auto;
+  }
+
+  .content-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+
+  .content-header h1 {
+    font-size: 2rem;
+    color: #111827;
+    margin: 0;
+  }
+
+  .header-search {
+    flex: 1;
+    max-width: 400px;
+    margin: 0 2rem;
+    position: relative;
+  }
+
+  .header-search input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+  }
+
+  .header-search input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .header-search i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  /* Team Tabs */
+  .team-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .team-tab {
+    padding: 1rem 1.5rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 500;
+    color: #6b7280;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+  }
+
+  .team-tab:hover {
+    color: #111827;
+  }
+
+  .team-tab.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+  }
+
+  /* Team Members Grid */
+  .members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .member-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s;
+  }
+
+  .member-card:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+  }
+
+  .member-header {
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .member-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin: 0 auto 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  .member-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.25rem;
+  }
+
+  .member-role {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+  }
+
+  .member-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+  }
+
+  .status-dot.offline {
+    background: #d1d5db;
+  }
+
+  .member-footer {
+    padding: 0 1.5rem 1.5rem;
+    display: flex;
+    gap: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+    padding-top: 1rem;
+  }
+
+  .member-action {
+    flex: 1;
+    padding: 0.75rem;
+    border: none;
+    background: #f3f4f6;
+    color: #4b5563;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .member-action:hover {
+    background: #e5e7eb;
+    color: #2563eb;
+  }
+
+  /* Create Team Card */
+  .create-team-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .create-team-card:hover {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+  }
+
+  .create-team-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: #2563eb;
+  }
+
+  .create-team-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.5rem;
+  }
+
+  .create-team-subtext {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal.active {
+    display: flex;
+  }
+
+  .modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .modal-header {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-label {
+    display: block;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #2563eb;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+
+  .btn-secondary {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+
+  .btn-secondary:hover {
+    background: #e5e7eb;
+  }
+
+  .modal-footer {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 768px) {
+    .dashboard-container {
+      flex-direction: column;
+    }
+
+    .dashboard-sidebar {
+      width: 100%;
+      padding: 1rem;
+    }
+
+    .members-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .content-header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .header-search {
+      max-width: 100%;
+      margin: 0;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  <!-- Sidebar -->
+  <div class="dashboard-sidebar">
+    <div class="sidebar-section">
+      <h3 class="sidebar-title">My Teams</h3>
+      <ul class="team-list">
+        {% for team in user_teams %}
+          <li class="team-item {% if team.id == active_team.id %}active{% endif %}" onclick="switchTeam({{ team.id }})">
+            {{ team.name }}
+            <span class="team-item-count">{{ team.member_objects.count }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="sidebar-section">
+      <button class="btn btn-primary" onclick="openCreateTeamModal()" style="width: 100%; padding: 0.75rem;">
+        + Create Team
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="dashboard-content">
+    <div class="content-header">
+      <h1>Multi-Team Management</h1>
+      <div class="header-search">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Search members, teams or roles..." id="searchInput">
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="openAddMemberModal()">
+          + Add Member
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Active Teams</div>
+        <div class="stat-value">{{ active_team_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Headcount</div>
+        <div class="stat-value">{{ total_members }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Tasks in Progress</div>
+        <div class="stat-value">{{ tasks_in_progress }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Online</div>
+        <div class="stat-value">{{ online_members }}</div>
+      </div>
+    </div>
+
+    <!-- Team Selection Tabs -->
+    <div class="team-tabs">
+      <button class="team-tab active" onclick="filterTeam('all')">All Teams</button>
+      {% for team in user_teams %}
+        <button class="team-tab" onclick="filterTeam({{ team.id }})">{{ team.name }}</button>
+      {% endfor %}
+    </div>
+
+    <!-- Members Grid -->
+    <div class="members-grid" id="membersGrid">
+      {% if team_members %}
+        {% for member in team_members %}
+          <div class="member-card">
+            <div class="member-header">
+              <div class="member-avatar">
+                {{ member.user.first_name|first|upper }}{{ member.user.last_name|first|upper }}
+              </div>
+              <div class="member-name">{{ member.user.get_full_name }}</div>
+              <div class="member-role">{{ member.get_role_display }}</div>
+              <div class="member-status">
+                <span class="status-dot"></span>
+                <span>Active</span>
+              </div>
+            </div>
+            <div class="member-footer">
+              <button class="member-action" title="Message">
+                <i class="fas fa-comment"></i>
+              </button>
+              <button class="member-action" title="Assign Task">
+                <i class="fas fa-tasks"></i>
+              </button>
+              <button class="member-action" title="Schedule">
+                <i class="fas fa-calendar"></i>
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="create-team-card" onclick="openAddMemberModal()">
+          <div class="create-team-icon">👥</div>
+          <div class="create-team-text">No Members Yet</div>
+          <div class="create-team-subtext">Add members to get started</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Create Team Modal -->
+<div class="modal" id="createTeamModal">
+  <div class="modal-content">
+    <div class="modal-header">Create New Team</div>
+    <form id="createTeamForm">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Team Name</label>
+        <input type="text" class="form-input" name="team_name" placeholder="e.g. Marketing Team" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-input" name="description" placeholder="What is this team about?" style="resize: vertical; min-height: 100px;"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('createTeamModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Team</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Member Modal -->
+<div class="modal" id="addMemberModal">
+  <div class="modal-content">
+    <div class="modal-header">Add New Member</div>
+    <form id="addMemberForm">
+      {% csrf_token %}
+      <div class="form-group">
+        <label class="form-label">Find users to invite</label>
+        <input type="text" class="form-input" id="memberSearch" placeholder="Search by name or email...">
+        <div id="memberSearchResults" style="margin-top: 1rem;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-input" name="role" required>
+          <option value="member">Member</option>
+          <option value="manager">Manager</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addMemberModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Member</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openCreateTeamModal() {
+    document.getElementById('createTeamModal').classList.add('active');
+  }
+
+  function openAddMemberModal() {
+    document.getElementById('addMemberModal').classList.add('active');
+  }
+
+  function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('active');
+  }
+
+  function switchTeam(teamId) {
+    window.location.href = `/team/dashboard/?team=${teamId}`;
+  }
+
+  function filterTeam(teamId) {
+    // Implementation for filtering teams
+  }
+
+  document.getElementById('createTeamForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('/team/create-team/', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        closeModal('createTeamModal');
+        location.reload();
+      }
+    });
+  });
+
+  document.getElementById('addMemberForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('/team/add-member/', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        closeModal('addMemberModal');
+        location.reload();
+      }
+    });
+  });
+
+  // Close modals on background click
+  document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.classList.remove('active');
+      }
+    });
+  });
+</script>
+{% endblock %}

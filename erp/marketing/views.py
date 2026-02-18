@@ -29,16 +29,14 @@ from django.conf import settings as django_settings
 from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
 
 
-def smart_upload(file, folder, resource_type="image", remove_audio=True):
+def smart_upload(file, folder, resource_type="image"):
     """
     Smart upload function that uses Bunny CDN when enabled, otherwise Cloudinary.
-    For videos, audio is removed by default to reduce file size.
     
     Args:
         file: File object to upload
         folder: Target folder path
         resource_type: 'image' or 'video'
-        remove_audio: If True, removes audio from video files (default: True)
     
     Returns: URL of the uploaded file
     """
@@ -56,17 +54,11 @@ def smart_upload(file, folder, resource_type="image", remove_audio=True):
         # Use Cloudinary
         print(f"[DEBUG] Uploading to Cloudinary: {folder}, resource_type={resource_type}")
         
-        # Build upload options
+        # Build upload options - no transformations for faster uploads
         upload_options = {
             'folder': folder,
             'resource_type': resource_type
         }
-        
-        # For videos, remove audio to reduce file size
-        if resource_type == 'video' and remove_audio:
-            # Cloudinary transformation to remove audio: audio_codec = none
-            upload_options['transformation'] = [{'audio_codec': 'none'}]
-            print(f"[DEBUG] Video upload with audio removal enabled")
         
         result = cloudinary_upload(file, **upload_options)
         return result.get('secure_url')
@@ -313,8 +305,8 @@ class ProductDetail(generic.DetailView):
         response = super().get(request, *args, **kwargs)
         
         # Clear cleanup URLs after template has rendered
-        if 'cloudinary_cleanup_urls' in request.session:
-            del request.session['cloudinary_cleanup_urls']
+        if 'cdn_cleanup_urls' in self.request.session:
+            del self.request.session['cdn_cleanup_urls']
             print("🗑️ Cleared Cloudinary cleanup URLs from session")
         
         return response
@@ -754,8 +746,7 @@ class BaseProductView(ModelFormMixin):
         total_attr_time = 0
         total_image_time = 0
         
-        # Collect all images to create/update across all variants
-        all_images_to_create = []  # New copies for sharing
+        # Collect all images to update across all variants
         all_images_to_update = []  # Updates for existing files
         
         for variant_data in variants_data:
@@ -794,47 +785,20 @@ class BaseProductView(ModelFormMixin):
                             if source_file.product_variant_id == variant.id:
                                 # Just update sequence/primary
                                 source_file.sequence = img_sequence
-                                source_file.is_primary = False  # Changed ownership, reset primary
-                                source_file.save()
-                                
-                                all_images_to_update.append(source_file)
-                                print(f"✅ Linked existing file {img_id} to variant {variant_sku} (seq={img_sequence})")
+                                source_file.is_primary = (img_sequence == 0)
+                                if source_file not in all_images_to_update:
+                                    all_images_to_update.append(source_file)
+                                print(f"✅ Updated existing file {img_id} for variant {variant_sku} (seq={img_sequence})")
                             else:
-                                # File belongs to another variant
-                                # Check if this variant already has a file with the same URL (prevent duplicates)
-                                existing_file_with_url = None
-                                variant_files = variant_files_cache.get(variant_sku, {})
-                                for f in variant_files.values():
-                                    if f.file_url == source_file.file_url:
-                                        existing_file_with_url = f
-                                        break
-                                
-                                # Also check in the batch we're about to create
-                                if not existing_file_with_url:
-                                    for pending_file in all_images_to_create:
-                                        if pending_file.product_variant == variant and pending_file.file_url == source_file.file_url:
-                                            existing_file_with_url = pending_file
-                                            break
-                                
-                                if existing_file_with_url:
-                                    # Reuse existing file with same URL
-                                    existing_file_with_url.sequence = img_sequence
-                                    existing_file_with_url.is_primary = (img_sequence == 0)
-                                    if existing_file_with_url not in all_images_to_update:
-                                        all_images_to_update.append(existing_file_with_url)
-                                    print(f"♻️ Reusing existing file with same URL for variant {variant_sku} (seq={img_sequence})")
-                                else:
-                                    # Create a NEW copy (first time sharing this image with this variant)
-                                    new_file = ProductFile(
-                                        product=self.object,
-                                        product_variant=variant,
-                                        file_url=source_file.file_url,
-                                        file_type=source_file.file_type,
-                                        sequence=img_sequence,
-                                        is_primary=(img_sequence == 0)
-                                    )
-                                    all_images_to_create.append(new_file)
-                                    print(f"🔄 Created copy of file {img_id} for variant {variant_sku} (seq={img_sequence})")
+                                # File belongs to another variant or is unlinked
+                                # FIXED: Instead of creating a copy, just update the file's variant link
+                                # This prevents duplicate records
+                                source_file.product_variant = variant
+                                source_file.sequence = img_sequence
+                                source_file.is_primary = (img_sequence == 0)
+                                if source_file not in all_images_to_update:
+                                    all_images_to_update.append(source_file)
+                                print(f"🔗 Linked file {img_id} to variant {variant_sku} (seq={img_sequence})")
                         else:
                             print(f"❌ WARNING: Image {img_id} not found in shared pool")
             
@@ -845,16 +809,15 @@ class BaseProductView(ModelFormMixin):
             # and linked here via unlinked_files_dict above. No need for file upload here.
             index += 1
         
-        # Bulk create new file copies (for multi-variant sharing)
-        if all_images_to_create:
-            ProductFile.objects.bulk_create(all_images_to_create)
+        # No longer creating copies - just updating existing files
+        # Remove bulk_create for images since we're only updating now
         
         # Bulk update existing files (including product_variant link for newly assigned files)
         if all_images_to_update:
             ProductFile.objects.bulk_update(all_images_to_update, ['product_variant', 'sequence', 'is_primary'])
         
         variant_loop_time = time.time() - variant_loop_start
-        print(f"  ✓ Processed variant images: {variant_loop_time:.3f}s (created {len(all_images_to_create)}, updated {len(all_images_to_update)} files)")
+        print(f"  ✓ Processed variant images: {variant_loop_time:.3f}s (updated {len(all_images_to_update)} files)")
         print(f"    - Images: {total_image_time:.3f}s")
         
         # Handle primary variant image selection
@@ -1322,11 +1285,11 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         redirect_start = time.time()
         response = super().form_valid(form)
         
-        # Pass Cloudinary URLs to be deleted asynchronously after redirect
+        # Pass CDN URLs to be deleted asynchronously after redirect
         if cloudinary_urls_to_delete:
             # Store in session for next page load to trigger cleanup
-            self.request.session['cloudinary_cleanup_urls'] = cloudinary_urls_to_delete
-            print(f"🗑️  Scheduled {len(cloudinary_urls_to_delete)} Cloudinary files for async deletion")
+            self.request.session['cdn_cleanup_urls'] = cloudinary_urls_to_delete
+            print(f"🗑️  Scheduled {len(cloudinary_urls_to_delete)} CDN files for async deletion")
         
         print(f"⏱️  Redirect response: {time.time() - redirect_start:.3f}s")
         print(f"\n⏱️  TOTAL form_valid: {time.time() - form_valid_start:.3f}s\n")
@@ -1640,6 +1603,7 @@ def get_product_files(request):
                 'pk': f.pk,
                 'url': f.file_url,  # Use file_url for consistency with marketing_tags.py
                 'file_url': f.file_url,
+                'optimized_url': f.optimized_url,
                 'name': f.file_url.split('/')[-1],
                 'is_primary': f.is_primary,
                 'sequence': f.sequence,
@@ -1748,9 +1712,9 @@ def link_files_to_variant(request):
 
 @require_http_methods(["POST"])
 @login_required
-def async_delete_cloudinary_files(request):
+def async_delete_cdn_files(request):
     """
-    AJAX endpoint to delete files from Cloudinary in background.
+    AJAX endpoint to delete files from CDN (Bunny or Cloudinary) in background.
     Called after page redirect to not block user.
     Expects JSON: {"file_urls": ["url1", "url2", ...]}
     """
@@ -1766,17 +1730,13 @@ def async_delete_cloudinary_files(request):
         
         for file_url in file_urls:
             if file_url:
-                # Extract public_id from Cloudinary URL
-                import re
-                match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", file_url)
-                if match:
-                    public_id = match.group(1)
-                    try:
-                        from cloudinary.uploader import destroy as cloudinary_destroy
-                        cloudinary_destroy(public_id)
+                try:
+                    # Use smart_delete to handle both Bunny and Cloudinary
+                    success = smart_delete(file_url)
+                    if success:
                         deleted_count += 1
-                    except Exception as e:
-                        errors.append(f"Failed to delete {public_id}: {str(e)}")
+                except Exception as e:
+                    errors.append(f"Failed to delete {file_url}: {str(e)}")
         
         return JsonResponse({
             'success': True,
@@ -1875,26 +1835,26 @@ def cleanup_temp_files(request):
         
         # Delete main images
         for file_data in temp_files.get('main_images', []):
-            public_id = file_data.get('public_id')
-            if public_id:
+            url = file_data.get('url')
+            if url:
                 try:
-                    from cloudinary.uploader import destroy as cloudinary_destroy
-                    cloudinary_destroy(public_id)
+                    # Use smart_delete to handle both Bunny and Cloudinary
+                    smart_delete(url)
                     deleted_count += 1
                 except Exception as e:
-                    errors.append(f"Failed to delete {public_id}: {str(e)}")
+                    errors.append(f"Failed to delete {url}: {str(e)}")
         
         # Delete variant images
         for variant_id, files in temp_files.get('variant_images', {}).items():
             for file_data in files:
-                public_id = file_data.get('public_id')
-                if public_id:
+                url = file_data.get('url')
+                if url:
                     try:
-                        from cloudinary.uploader import destroy as cloudinary_destroy
-                        cloudinary_destroy(public_id)
+                        # Use smart_delete to handle both Bunny and Cloudinary
+                        smart_delete(url)
                         deleted_count += 1
                     except Exception as e:
-                        errors.append(f"Failed to delete {public_id}: {str(e)}")
+                        errors.append(f"Failed to delete {url}: {str(e)}")
         
         # Clear session
         del request.session['temp_product_files']
@@ -2828,6 +2788,8 @@ def get_blog_post(request, slug):
         'hero_image': post.hero_image,
         'published_at': post.published_at.isoformat(),
         'author': post.author,
+        'header_content': post.header_content,
+        'footer_content': post.footer_content,
     }
     
     return JsonResponse(data)

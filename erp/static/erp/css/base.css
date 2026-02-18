@@ -32,8 +32,10 @@
 }
 
 body {
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
+  color: #334155;
+  /* Slate-700 */
+  background-color: #f8fafc;
+  /* Slate-50 - Modern Light Gray */
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
@@ -51,21 +53,25 @@ button {
   cursor: pointer;
 }
 
+/* Modern Navbar - Glassmorphism Base */
 .navbar {
   position: fixed;
   top: 0;
   left: 0;
   width: 6rem;
   height: 100vh;
-  background-color: var(--bg-primary);
-  border-right: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.98);
+  /* Deep Slate with slight transparency */
+  backdrop-filter: blur(8px);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
   transition: all var(--transition-speed) ease;
   z-index: 1000;
   display: flex;
   flex-direction: column;
   overflow-y: hidden;
-  /* no internal scroll */
   overflow-x: hidden;
+  box-shadow: 5px 0 30px rgba(0, 0, 0, 0.3);
+  /* Stronger shadow */
 }
 
 /* Remove scrollbar completely */
@@ -263,39 +269,71 @@ button {
   width: 60%;
 }
 
+/* Modern Badge-Pill Nav Link */
 .nav-link {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: auto;
-  padding: 0.75rem 0;
-  /* çok daha büyük hover alanı (üst-alt) */
-  margin: 0.25rem 0;
-  /* itemler arası daha fazla boşluk */
-  color: var(--text-secondary);
+  padding: 0.9rem 0.2rem;
+  /* Adjusted padding */
+  margin: 0.6rem 0.8rem;
+  /* More spacing */
+  border-radius: 16px;
+  /* Smoother corners */
+  color: #94a3b8;
+  /* Slate-400 */
   text-decoration: none;
-  transition: all var(--transition-speed) ease;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Springy transition */
   position: relative;
-  font-size: 0.65rem;
-  /* biraz daha küçült */
-  font-weight: 500;
+  border: 1px solid transparent;
+  background: transparent;
 }
 
+/* Hover State */
 .nav-link:hover {
-  color: var(--accent-primary);
-  background: var(--bg-hover);
+  color: #f8fafc;
+  background: linear-gradient(145deg, rgba(30, 41, 59, 1), rgba(15, 23, 42, 0.8));
+  /* Depth gradient */
   text-decoration: none;
+  transform: translateY(-4px) scale(1.02);
+  /* Lift effect */
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.4),
+    0 4px 6px -2px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* Top highlight */
 }
 
+/* Icon Animation on Hover */
 .nav-link:hover i {
-  transform: scale(1.2);
-  /* eskiye daha yakın, daha belirgin hover */
+  transform: scale(1.15) rotate(-8deg);
+  /* Action feel */
+  color: #38bdf8;
+  /* Sky Blue Accent */
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+  /* Glow */
 }
 
+/* Active State */
 .nav-link.active {
-  color: var(--accent-primary);
-  background: var(--accent-light);
+  color: #ffffff;
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  /* Indigo Gradient */
+  box-shadow:
+    0 0 25px rgba(79, 70, 229, 0.5),
+    /* Stronger Glow */
+    inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.nav-link.active i {
+  color: #fff;
+  transform: scale(1.1);
 }
 
 .link-text {
@@ -306,9 +344,10 @@ button {
 }
 
 .nav-link i {
-  font-size: 1.05rem;
-  /* ikonları daha da küçült, hover alanı daha da büyüsün */
-  transition: transform var(--transition-speed) ease;
+  font-size: 1.4rem;
+  /* Slightly larger base */
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+  margin-bottom: 3px;
 }
 
 /* .nav-link svg, .nav-link i {
@@ -328,12 +367,13 @@ button {
 } */
 
 path {
-  fill: var(--text-secondary);
+  fill: #94a3b8;
+  /* Default Icon Color in Dark Mode */
   transition: fill var(--transition-speed) ease;
 }
 
 path:hover {
-  fill: var(--accent-primary);
+  fill: #ffffff;
 }
 
 .nav-link svg {
@@ -362,12 +402,14 @@ a:hover {
   font-family: "Fuzzy Bubbles", sans-serif;
   margin-bottom: 0.55rem;
   /* logo altı daha fazla boşluk */
-  padding: 0.75rem 0 0.6rem;
+  padding: 1.25rem 0 1rem;
   /* üst-alt çok daha fazla boşluk */
   text-align: center;
-  color: teal;
+  color: #f8fafc;
+  /* Slate-50 */
   width: 100%;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #1e293b;
+  /* Slate-800 */
 }
 
 .logo-text {
@@ -474,19 +516,20 @@ a:hover {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   border: 1px solid var(--border-color);
   z-index: 9999;
-  animation: slideIn 0.25s ease;
+  animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Smooth elastic expansion */
   overflow: hidden;
 }
 
 @keyframes slideIn {
-  from {
+  0% {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateX(-20px) scale(0.95);
   }
 
-  to {
+  100% {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
   }
 }
 
@@ -701,6 +744,49 @@ a:hover {
   overflow: hidden;
 }
 
+/* Mail menüsü için stil - Accounting ile aynı yapı */
+#emailButton {
+  position: relative;
+}
+
+#emailButton .nav-link {
+  position: relative;
+}
+
+/* Mail menüsü için hover bridge */
+#emailButton::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 10px;
+  height: 100%;
+  background: transparent;
+  z-index: 9998;
+}
+
+/* Mail menüsü hover durumu */
+#emailButton:hover #emailExpanded,
+#emailButton:hover::after,
+#emailExpanded:hover {
+  display: block;
+}
+
+#emailExpanded {
+  display: none;
+  position: fixed !important;
+  left: 6rem;
+  background-color: var(--bg-primary);
+  width: 340px;
+  padding: 0;
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  z-index: 9999;
+  animation: slideIn 0.25s ease;
+  overflow: hidden;
+}
+
 
 /* Below is for countdown */
 /* ------------------------------------------------ */
@@ -757,8 +843,9 @@ a:hover {
 
 
 #nejum_logo_text {
-  color: teal;
+  color: #ffffff;
   font-weight: 700;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
 .errorlist {
@@ -775,8 +862,117 @@ a:hover {
 /* ------------------------------------------------ */
 /* Header Styles */
 /* ------------------------------------------------ */
+/* ------------------------------------------------ */
+/* Header Styles - Global Top Bar */
+/* ------------------------------------------------ */
+.global-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 2rem;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  /* Subtle shadow */
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.top-bar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.welcome-text {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.header-date {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.top-bar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  max-width: 600px;
+}
+
+.search-box-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: #f1f5f9;
+  /* Light Gray Input Background */
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  /* Pill Shape */
+  padding: 0.5rem 1rem;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.search-box-wrapper:focus-within {
+  background-color: #ffffff;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.search-icon {
+  color: #94a3b8;
+  margin-right: 0.75rem;
+}
+
+.search-input {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  font-size: 0.9375rem !important;
+  color: var(--text-primary) !important;
+  width: 100%;
+}
+
+.search-input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.top-bar-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.top-bar-btn:hover {
+  background-color: #f1f5f9;
+  color: var(--text-primary);
+}
+
 header {
   margin-bottom: 2rem;
+  display: none;
+  /* Hide old header if it exists */
 }
 
 header .line {

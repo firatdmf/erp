@@ -1,0 +1,1405 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Notes{% endblock %}
+
+{% block css %}
+{{ block.super }}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+    /* ============================================================
+       DESIGN TOKENS
+       ============================================================ */
+    :root {
+        --n-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        --n-text: #0f172a;
+        --n-text-sec: #475569;
+        --n-text-muted: #94a3b8;
+        --n-surface: #ffffff;
+        --n-surface-2: #f8fafc;
+        --n-border: #e2e8f0;
+        --n-primary: #1e293b;
+        --n-primary-hover: #334155;
+        --n-radius: 12px;
+        --n-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+        --n-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+        /* Priority colors */
+        --n-high: #ef4444;
+        --n-high-bg: rgba(254, 226, 226, 0.6);
+        --n-medium: #f97316;
+        --n-medium-bg: rgba(255, 237, 213, 0.6);
+        --n-low: #22c55e;
+        --n-low-bg: rgba(220, 252, 231, 0.6);
+        /* Category colors */
+        --n-cat-work: #3b82f6;
+        --n-cat-personal: #22c55e;
+        --n-cat-important: #ef4444;
+        --n-cat-ideas: #a855f7;
+        --n-cat-meeting: #f97316;
+    }
+
+    .notes-page {
+        font-family: var(--n-font);
+        background: var(--n-surface-2);
+        min-height: 100vh;
+        color: var(--n-text);
+    }
+
+    /* ============================================================
+       HEADER
+       ============================================================ */
+    .notes-header {
+        padding: 40px 40px 0;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .notes-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 32px;
+    }
+
+    .notes-header h1 {
+        font-size: 34px;
+        font-weight: 800;
+        color: var(--n-text);
+        margin: 0 0 6px;
+        letter-spacing: -0.5px;
+    }
+
+    .notes-header p {
+        font-size: 15px;
+        color: var(--n-text-muted);
+        margin: 0;
+    }
+
+    .btn-new-note {
+        background: var(--n-primary);
+        color: white;
+        padding: 11px 22px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.1s;
+        font-family: var(--n-font);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-new-note:hover {
+        background: var(--n-primary-hover);
+        transform: translateY(-1px);
+    }
+
+    /* ============================================================
+       TABS
+       ============================================================ */
+    .notes-tabs {
+        display: flex;
+        background: var(--n-surface);
+        border-radius: 12px;
+        border: 1px solid var(--n-border);
+        overflow: hidden;
+        box-shadow: var(--n-shadow);
+    }
+
+    .note-tab {
+        flex: 1;
+        padding: 14px 24px;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--n-text-sec);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: none;
+        background: transparent;
+        transition: all 0.2s;
+        font-family: var(--n-font);
+        border-right: 1px solid var(--n-border);
+    }
+
+    .note-tab:last-child {
+        border-right: none;
+    }
+
+    .note-tab:hover {
+        background: var(--n-surface-2);
+    }
+
+    .note-tab.active {
+        background: var(--n-primary);
+        color: white;
+    }
+
+    .note-tab i {
+        font-size: 13px;
+    }
+
+    /* ============================================================
+       SEARCH & FILTER BAR
+       ============================================================ */
+    .notes-toolbar {
+        max-width: 1200px;
+        margin: 28px auto 0;
+        padding: 0 40px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .notes-search-box {
+        flex: 1;
+        position: relative;
+        width: 100%;
+    }
+
+    .notes-search-box i {
+        position: absolute;
+        left: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--n-text-muted);
+        font-size: 16px;
+        pointer-events: none;
+    }
+
+    .notes-search-input {
+        width: 100%;
+        padding: 16px 16px 16px 72px !important;
+        border: 1px solid var(--n-border);
+        border-radius: 12px;
+        font-size: 15px;
+        color: var(--n-text);
+        background: var(--n-surface-2);
+        font-family: var(--n-font);
+        outline: none;
+        box-sizing: border-box;
+        box-shadow: var(--n-shadow);
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .notes-search-input:focus {
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+    }
+
+    .notes-search-input::placeholder {
+        color: var(--n-text-muted);
+    }
+
+    .notes-filter-select {
+        padding: 14px 40px 14px 16px;
+        border: 1px solid var(--n-border);
+        border-radius: 12px;
+        font-size: 14px;
+        color: var(--n-text);
+        background: var(--n-surface-2);
+        font-family: var(--n-font);
+        outline: none;
+        width: 200px;
+        /* Fixed width to prevent taking over */
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M3 5l3 3 3-3'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        background-size: 12px;
+        font-weight: 500;
+        box-shadow: var(--n-shadow);
+        transition: border-color 0.2s;
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    /* ============================================================
+       GRID
+       ============================================================ */
+    .notes-container {
+        max-width: 1200px;
+        margin: 24px auto 40px;
+        padding: 0 40px;
+    }
+
+    .notes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+        gap: 24px;
+    }
+
+    /* ============================================================
+       CREATE FORM (inline)
+       ============================================================ */
+    .create-note-form {
+        background: var(--n-surface);
+        border: 2px solid #3b82f6;
+        border-radius: var(--n-radius);
+        padding: 28px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 24px rgba(59, 130, 246, 0.1);
+        animation: slideDown 0.25s ease;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-12px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .create-form-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--n-border);
+    }
+
+    .create-form-header h3 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--n-text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+    }
+
+    .create-form-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: var(--n-text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: background 0.15s;
+    }
+
+    .create-form-close:hover {
+        background: #f1f5f9;
+        color: var(--n-text);
+    }
+
+    .form-group {
+        margin-bottom: 18px;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--n-text-sec);
+        margin-bottom: 8px;
+    }
+
+    .form-input,
+    .form-textarea {
+        width: 100%;
+        padding: 11px 14px;
+        border: 1px solid var(--n-border);
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--n-text);
+        background: var(--n-surface-2);
+        font-family: var(--n-font);
+        outline: none;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+    }
+
+    .form-textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .form-input:focus,
+    .form-textarea:focus {
+        border-color: #93c5fd;
+        background: white;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .form-select {
+        width: 100%;
+        padding: 11px 14px;
+        border: 1px solid var(--n-border);
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--n-text);
+        background: var(--n-surface-2);
+        font-family: var(--n-font);
+        outline: none;
+        cursor: pointer;
+        box-sizing: border-box;
+    }
+
+    .form-select:focus {
+        border-color: #93c5fd;
+    }
+
+    .file-upload-area {
+        border: 2px dashed var(--n-border);
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--n-text-muted);
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .file-upload-area:hover {
+        border-color: #93c5fd;
+        background: #eff6ff;
+        color: #3b82f6;
+    }
+
+    .file-upload-area i {
+        font-size: 18px;
+        margin-right: 8px;
+    }
+
+    .btn-create-submit {
+        background: var(--n-primary);
+        color: white;
+        padding: 12px 28px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: none;
+        cursor: pointer;
+        font-family: var(--n-font);
+        transition: background 0.2s;
+        float: right;
+    }
+
+    .btn-create-submit:hover {
+        background: var(--n-primary-hover);
+    }
+
+    /* ============================================================
+       NOTE CARD
+       ============================================================ */
+    .note-card {
+        background: var(--n-surface);
+        border-radius: var(--n-radius);
+        border: 1px solid var(--n-border);
+        border-left: 3px solid var(--n-border);
+        overflow: hidden;
+        box-shadow: var(--n-shadow);
+        transition: box-shadow 0.25s, transform 0.2s;
+        display: flex;
+        flex-direction: column;
+        cursor: pointer;
+    }
+
+    .note-card:hover {
+        box-shadow: var(--n-shadow-lg);
+        transform: translateY(-2px);
+    }
+
+    .note-card.priority-high {
+        border-left-color: var(--n-high);
+    }
+
+    .note-card.priority-medium {
+        border-left-color: var(--n-medium);
+    }
+
+    .note-card.priority-low {
+        border-left-color: var(--n-low);
+    }
+
+    .note-card-body {
+        padding: 20px 22px;
+        flex: 1;
+    }
+
+    .note-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .note-card-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--n-text);
+        line-height: 1.35;
+        flex: 1;
+        margin: 0;
+    }
+
+    .note-card-actions-top {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .star-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        color: #cbd5e1;
+        padding: 2px;
+        transition: color 0.15s, transform 0.15s;
+    }
+
+    .star-btn:hover {
+        transform: scale(1.15);
+    }
+
+    .star-btn.active {
+        color: #fbbf24;
+    }
+
+    .category-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        color: white;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+    }
+
+    .cat-work {
+        background: var(--n-cat-work);
+    }
+
+    .cat-personal {
+        background: var(--n-cat-personal);
+    }
+
+    .cat-important {
+        background: var(--n-cat-important);
+    }
+
+    .cat-ideas {
+        background: var(--n-cat-ideas);
+    }
+
+    .cat-meeting {
+        background: var(--n-cat-meeting);
+    }
+
+    .note-card-content {
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.65;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin-bottom: 14px;
+    }
+
+    /* Attachments section in card */
+    .note-card-files {
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 14px;
+    }
+
+    .note-card-files-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--n-text-sec);
+        margin-bottom: 8px;
+    }
+
+    .note-card-file-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: white;
+        border: 1px solid var(--n-border);
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 12px;
+        color: var(--n-text-sec);
+        margin-right: 6px;
+        margin-bottom: 4px;
+    }
+
+    .note-card-file-chip i {
+        color: #3b82f6;
+        font-size: 11px;
+    }
+
+    /* Footer */
+    .note-card-footer {
+        padding: 12px 22px;
+        border-top: 1px solid rgba(0, 0, 0, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .note-card-date {
+        font-size: 12px;
+        color: var(--n-text-muted);
+    }
+
+    .note-card-priority {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .note-card-priority.high {
+        color: var(--n-high);
+    }
+
+    .note-card-priority.medium {
+        color: var(--n-medium);
+    }
+
+    .note-card-priority.low {
+        color: var(--n-low);
+    }
+
+    .note-card-priority i {
+        font-size: 13px;
+    }
+
+    /* Action buttons row */
+    .note-card-btns {
+        display: flex;
+        gap: 8px;
+        padding: 0 22px 18px;
+    }
+
+    .note-card-btns button {
+        flex: 1;
+        padding: 10px 0;
+        border-radius: 8px;
+        border: 1px solid var(--n-border);
+        background: var(--n-surface);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-family: var(--n-font);
+        transition: all 0.15s;
+    }
+
+    .btn-edit {
+        color: var(--n-text-sec);
+    }
+
+    .btn-edit:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+    }
+
+    .btn-delete-card {
+        color: var(--n-high) !important;
+    }
+
+    .btn-delete-card:hover {
+        background: #fef2f2 !important;
+        border-color: #fecaca !important;
+    }
+
+    .btn-save-card {
+        background: var(--n-primary) !important;
+        color: white !important;
+        border-color: var(--n-primary) !important;
+    }
+
+    .btn-save-card:hover {
+        background: var(--n-primary-hover) !important;
+    }
+
+    .btn-cancel-card {
+        color: var(--n-text-sec);
+    }
+
+    .btn-cancel-card:hover {
+        background: #f1f5f9;
+    }
+
+    .btn-restore {
+        color: #22c55e !important;
+    }
+
+    .btn-restore:hover {
+        background: #f0fdf4 !important;
+        border-color: #bbf7d0 !important;
+    }
+
+    /* ============================================================
+       INLINE EDIT FIELDS in card
+       ============================================================ */
+    .edit-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .edit-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--n-text-sec);
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .edit-select {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid var(--n-border);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--n-text);
+        background: white;
+        font-family: var(--n-font);
+        cursor: pointer;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .edit-textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--n-border);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--n-text);
+        background: white;
+        font-family: var(--n-font);
+        resize: vertical;
+        min-height: 80px;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    .edit-file-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .edit-file-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: white;
+        border: 1px solid var(--n-border);
+        border-radius: 6px;
+        padding: 7px 12px;
+        margin-bottom: 6px;
+    }
+
+    .edit-file-item .file-name {
+        font-size: 12px;
+        color: var(--n-text);
+        font-weight: 500;
+    }
+
+    .edit-file-item .file-size {
+        font-size: 11px;
+        color: var(--n-text-muted);
+    }
+
+    .edit-file-remove {
+        background: none;
+        border: none;
+        color: var(--n-text-muted);
+        cursor: pointer;
+        padding: 2px;
+        font-size: 13px;
+        transition: color 0.15s;
+    }
+
+    .edit-file-remove:hover {
+        color: var(--n-high);
+    }
+
+    .edit-upload-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 14px;
+        border: 1px solid var(--n-border);
+        border-radius: 8px;
+        background: white;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--n-text-sec);
+        cursor: pointer;
+        font-family: var(--n-font);
+        transition: all 0.15s;
+    }
+
+    .edit-upload-btn:hover {
+        border-color: #93c5fd;
+        color: #3b82f6;
+    }
+
+    /* ============================================================
+       EMPTY STATE
+       ============================================================ */
+    .notes-empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--n-text-muted);
+    }
+
+    .notes-empty-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+
+    .notes-empty h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--n-text-sec);
+        margin-bottom: 8px;
+    }
+
+    .notes-empty p {
+        font-size: 14px;
+    }
+
+    /* ============================================================
+       DELETE MODAL
+       ============================================================ */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.2s ease;
+    }
+
+    .modal-box {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        animation: slideUp 0.3s ease;
+    }
+
+    .modal-icon {
+        width: 64px;
+        height: 64px;
+        background: #fee2e2;
+        color: #ef4444;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        margin: 0 auto 20px;
+    }
+
+    .modal-box h3 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--n-text);
+        margin-bottom: 8px;
+    }
+
+    .modal-box p {
+        color: var(--n-text-sec);
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 24px;
+    }
+
+    .modal-btns {
+        display: flex;
+        gap: 12px;
+    }
+
+    .modal-btns button {
+        flex: 1;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        font-family: var(--n-font);
+        font-size: 14px;
+        transition: all 0.2s;
+    }
+
+    .modal-cancel {
+        background: #f1f5f9;
+        color: var(--n-text-sec);
+    }
+
+    .modal-cancel:hover {
+        background: #e2e8f0;
+    }
+
+    .modal-confirm-delete {
+        background: #ef4444;
+        color: white;
+    }
+
+    .modal-confirm-delete:hover {
+        background: #dc2626;
+    }
+
+    /* Toast */
+    .notes-toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #059669, #10b981);
+        color: white;
+        padding: 14px 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 8px 32px rgba(5, 150, 105, 0.4);
+        z-index: 99999;
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .notes-toast.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 900px) {
+        .notes-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .notes-header,
+        .notes-toolbar,
+        .notes-container {
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .notes-header h1 {
+            font-size: 26px;
+        }
+
+        .notes-toolbar {
+            flex-direction: column;
+        }
+
+        .notes-filter-select {
+            width: 100%;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .note-card-btns {
+            flex-direction: column;
+        }
+    }
+
+    /* Skeleton Loading */
+    .skeleton-card {
+        background: var(--n-surface);
+        border: 1px solid var(--n-border);
+        border-radius: 12px;
+        padding: 20px;
+        height: 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .skeleton-line {
+        height: 12px;
+        background: #e2e8f0;
+        border-radius: 6px;
+        animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    .skeleton-title {
+        height: 24px;
+        width: 60%;
+        margin-bottom: 8px;
+    }
+
+    .skeleton-text {
+        height: 12px;
+        width: 100%;
+    }
+
+    .skeleton-text-short {
+        height: 12px;
+        width: 80%;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 0.6;
+        }
+
+        50% {
+            opacity: 1;
+        }
+
+        100% {
+            opacity: 0.6;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="notes-page">
+    <!-- Header -->
+    <div class="notes-header">
+        <div class="notes-header-top">
+            <div>
+                <h1>My Notes</h1>
+                <p>Manage all your notes here</p>
+            </div>
+            <button type="button" class="btn-new-note" onclick="toggleCreateForm()">
+                <i class="fas fa-plus"></i> New Note
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="notes-tabs">
+            <button class="note-tab {% if active_tab == 'all' %}active{% endif %}"
+                hx-get="{% url 'notes:index' %}?status=all" hx-target="#notesGrid" hx-push-url="?status=all"
+                onclick="setActiveTab(this, 'all')">
+                <i class="fas fa-clipboard-list"></i> All Notes ({{ all_count }})
+            </button>
+            <button class="note-tab {% if active_tab == 'favorites' %}active{% endif %}"
+                hx-get="{% url 'notes:index' %}?status=favorites" hx-target="#notesGrid" hx-push-url="?status=favorites"
+                onclick="setActiveTab(this, 'favorites')">
+                <i class="far fa-star"></i> Favorites ({{ fav_count }})
+            </button>
+            <button class="note-tab {% if active_tab == 'deleted' %}active{% endif %}"
+                hx-get="{% url 'notes:index' %}?status=deleted" hx-target="#notesGrid" hx-push-url="?status=deleted"
+                onclick="setActiveTab(this, 'deleted')">
+                <i class="far fa-trash-alt"></i> Trash ({{ deleted_count }})
+            </button>
+        </div>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="notes-toolbar">
+        <div class="notes-search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" class="notes-search-input" placeholder="Search notes..." name="search"
+                value="{{ search_query }}" hx-get="{% url 'notes:index' %}?status={{ active_tab }}"
+                hx-trigger="keyup changed delay:400ms" hx-target="#notesGrid" hx-include="[name='category']">
+        </div>
+        <select name="category" class="notes-filter-select" hx-get="{% url 'notes:index' %}?status={{ active_tab }}"
+            hx-trigger="change" hx-target="#notesGrid" hx-include="[name='search']">
+            <option value="all" {% if category_filter == 'all' %}selected{% endif %}>All Notes</option>
+            {% for val, label in categories %}
+            <option value="{{ val }}" {% if category_filter == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Main Content -->
+    <div class="notes-container">
+        <!-- Inline Create Form (hidden by default) -->
+        <div id="createFormContainer" style="display: none;">
+            <form id="createNoteForm" hx-post="{% url 'notes:create' %}" hx-target="#notesGrid" hx-swap="innerHTML"
+                hx-encoding="multipart/form-data"
+                hx-on::after-request="if(event.detail.successful) hideCreateForm(true)">
+                {% csrf_token %}
+                <div class="create-note-form">
+                    <div class="create-form-header">
+                        <h3>✨ Create New Note</h3>
+                        <button type="button" class="create-form-close" onclick="hideCreateForm()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Note Title</label>
+                        <input type="text" name="title" class="form-input" placeholder="Enter title..." required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Note Content</label>
+                        <textarea name="content" class="form-textarea" placeholder="Enter content..."
+                            rows="5"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Category</label>
+                            <select name="category" class="form-select">
+                                {% for val, label in categories %}
+                                <option value="{{ val }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Priority Level</label>
+                            <select name="priority" class="form-select">
+                                <option value="medium">⏱ Medium Priority</option>
+                                <option value="high">🔴 High Priority</option>
+                                <option value="low">🟢 Low Priority</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Add File (Optional)</label>
+                        <div class="file-upload-area" onclick="document.getElementById('createFileInput').click()">
+                            <i class="fas fa-cloud-upload-alt"></i> Choose File
+                        </div>
+                        <input type="file" name="files" id="createFileInput" multiple style="display:none;"
+                            onchange="showSelectedFiles(this)">
+                        <div id="createFileList" style="margin-top: 8px;"></div>
+                    </div>
+
+                    <div style="overflow: hidden; padding-top: 8px;">
+                        <button type="submit" class="btn-create-submit">
+                            <i class="fas fa-check"></i> Create Note
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Grid -->
+        <div id="notesGrid" class="notes-grid">
+            {% include "notes/components/note_grid.html" %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div id="deleteModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+        <div class="modal-icon">
+            <i class="fas fa-trash-alt"></i>
+        </div>
+        <h3>Delete Note?</h3>
+        <p>Are you sure you want to delete this note? You can restore it from the 'Trash' tab.</p>
+        <div class="modal-btns">
+            <button class="modal-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button id="confirmDeleteBtn" class="modal-confirm-delete" hx-post="" hx-target=""
+                hx-swap="outerHTML swap:0.3s" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="notesToast" class="notes-toast">
+    <i class="fas fa-check-circle"></i>
+    <span id="toastMessage"></span>
+</div>
+
+<script>
+    // ---- Speed: disable HTMX settle delays ----
+    document.addEventListener('DOMContentLoaded', function () {
+        htmx.config.defaultSettleDelay = 0;
+        htmx.config.defaultSwapDelay = 0;
+    });
+
+    // ---- Tab switching ----
+    let currentTab = '{{ active_tab }}';
+
+    function setActiveTab(el, tab) {
+        currentTab = tab;
+        document.querySelectorAll('.note-tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+        // Update search hx-get to match tab
+        const search = document.querySelector('.notes-search-input');
+        search.setAttribute('hx-get', "{% url 'notes:index' %}?status=" + tab);
+        htmx.process(search);
+
+        const catFilter = document.querySelector('.notes-filter-select');
+        catFilter.setAttribute('hx-get', "{% url 'notes:index' %}?status=" + tab);
+        htmx.process(catFilter);
+    }
+
+    // ---- Create form ----
+    function toggleCreateForm() {
+        const c = document.getElementById('createFormContainer');
+        c.style.display = c.style.display === 'none' ? 'block' : 'none';
+        if (c.style.display === 'block') {
+            c.querySelector('input[name="title"]').focus();
+        }
+    }
+    function hideCreateForm(showSuccessToast = false) {
+        document.getElementById('createFormContainer').style.display = 'none';
+        document.getElementById('createNoteForm').reset();
+        document.getElementById('createFileList').innerHTML = '';
+        if (showSuccessToast) {
+            showToast('Note created successfully');
+        }
+    }
+
+    function showSelectedFiles(input) {
+        const container = document.getElementById('createFileList');
+        container.innerHTML = '';
+        for (const f of input.files) {
+            const chip = document.createElement('span');
+            chip.className = 'note-card-file-chip';
+            chip.innerHTML = '<i class="fas fa-file"></i> ' + f.name;
+            container.appendChild(chip);
+        }
+    }
+
+    // ---- Delete modal ----
+    function openDeleteModal(noteId) {
+        const modal = document.getElementById('deleteModal');
+        const btn = document.getElementById('confirmDeleteBtn');
+        btn.setAttribute('hx-post', '/notes/note/' + noteId + '/delete/');
+        btn.setAttribute('hx-target', '#note-card-' + noteId);
+        btn.setAttribute('hx-swap', 'outerHTML');
+        htmx.process(btn);
+        modal.style.display = 'flex';
+    }
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+    }
+
+    document.getElementById('deleteModal').addEventListener('click', function (e) {
+        if (e.target === this) closeDeleteModal();
+    });
+    document.body.addEventListener('htmx:afterOnLoad', function (evt) {
+        if (evt.detail.elt.id === 'confirmDeleteBtn') {
+            closeDeleteModal();
+            showToast('Note moved to trash');
+        }
+    });
+
+    // ---- Favorite toggle ----
+    function toggleFavorite(btn, noteId) {
+        btn.classList.toggle('active');
+        fetch('/notes/note/' + noteId + '/toggle-favorite/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(r => r.json()).then(data => {
+            showToast(data.is_favorite ? 'Added to favorites' : 'Removed from favorites');
+        });
+    }
+
+    // ---- Inline edit ----
+    const savedCards = {};
+
+    function startEdit(noteId) {
+        const card = document.getElementById('note-card-' + noteId);
+        // Save original HTML for instant cancel
+        savedCards[noteId] = card.outerHTML;
+        // Immediate visual feedback
+        card.style.opacity = '0.5';
+        card.style.pointerEvents = 'none';
+        // Fetch edit form
+        fetch('/notes/note/' + noteId + '/inline-edit/?active_tab=' + currentTab, {
+            headers: { 'HX-Request': 'true' }
+        }).then(r => r.text()).then(html => {
+            card.outerHTML = html;
+            htmx.process(document.getElementById('note-card-' + noteId));
+        });
+    }
+
+    function cancelEdit(noteId) {
+        // Instant cancel — restore saved HTML, no server call
+        if (savedCards[noteId]) {
+            const card = document.getElementById('note-card-' + noteId);
+            card.outerHTML = savedCards[noteId];
+            delete savedCards[noteId];
+            htmx.process(document.getElementById('note-card-' + noteId));
+        }
+    }
+
+    // ---- Grid loading indicator for tab/filter switches ----
+    const skeletonHTML = `
+        <div class="skeleton-card">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line skeleton-text"></div>
+            <div class="skeleton-line skeleton-text"></div>
+            <div class="skeleton-line skeleton-text-short"></div>
+        </div>
+        <div class="skeleton-card">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line skeleton-text"></div>
+            <div class="skeleton-line skeleton-text"></div>
+            <div class="skeleton-line skeleton-text-short"></div>
+        </div>
+        <div class="skeleton-card">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line skeleton-text"></div>
+            <div class="skeleton-line skeleton-text"></div>
+            <div class="skeleton-line skeleton-text-short"></div>
+        </div>
+    `;
+
+    document.body.addEventListener('htmx:beforeRequest', function (evt) {
+        if (evt.detail.target && evt.detail.target.id === 'notesGrid') {
+            // Inject skeleton immediately for instant feedback
+            evt.detail.target.innerHTML = skeletonHTML;
+            evt.detail.target.style.opacity = '1';
+        }
+    });
+
+    // ---- File handling in edit ----
+    function deleteNoteFile(fileId, el) {
+        fetch('/notes/file/' + fileId + '/delete/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                el.closest('.edit-file-item').remove();
+                showToast('File removed');
+            }
+        });
+    }
+
+    function showEditSelectedFiles(input) {
+        const container = input.closest('.note-card-body').querySelector('.edit-selected-files');
+        container.innerHTML = '';
+        for (const f of input.files) {
+            const div = document.createElement('div');
+            div.className = 'edit-file-item';
+            div.innerHTML = '<i class="fas fa-file" style="color: #3b82f6;"></i>' +
+                '<div style="flex:1; min-width:0;"><span class="file-name">' + f.name + '</span>' +
+                '<br><span style="font-size:11px; color:#94a3b8;">' + (f.size / 1024).toFixed(2) + ' KB</span></div>';
+            container.appendChild(div);
+        }
+    }
+
+    // ---- Restore note ----
+    function restoreNote(noteId) {
+        fetch('/notes/note/' + noteId + '/restore/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(r => {
+            if (r.ok) {
+                document.getElementById('note-card-' + noteId).remove();
+                showToast('Note restored');
+            }
+        });
+    }
+
+    function permanentDelete(noteId) {
+        fetch('/notes/note/' + noteId + '/delete/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(r => {
+            if (r.ok) {
+                document.getElementById('note-card-' + noteId).remove();
+                showToast('Note permanently deleted');
+            }
+        });
+    }
+
+    // ---- Toast ----
+    function showToast(msg) {
+        const t = document.getElementById('notesToast');
+        document.getElementById('toastMessage').textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+</script>
+{% endblock %}

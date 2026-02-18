@@ -1,4 +1,4 @@
-from .models import Contact, Note, Company
+from .models import Contact, Note, Company, Supplier
 from todo.models import Task
 from datetime import date
 
@@ -282,3 +282,11 @@ class NoteForm(ModelForm):
         fields = ["content"]
         # Below is the give the form text area a class so I can adjust the css later manually.
         widgets = {"content": forms.Textarea(attrs={"class": "note_form_text_input"})}
+
+class SupplierForm(ModelForm):
+    class Meta:
+        model = Supplier
+        exclude = ['created_at']
+        widgets = {
+            'address': forms.Textarea(attrs={'rows': 3}),
+        }

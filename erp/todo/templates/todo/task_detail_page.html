@@ -3,1067 +3,401 @@
 
 {% block css %}
 <style>
-  * {
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg-body: #F9FAFB;
+    /* Lighter background */
+    --bg-card: #FFFFFF;
+    --border-color: #E5E7EB;
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --brand-color: #4F46E5;
+    /* Indigo */
+    --brand-hover: #4338CA;
+    --danger-color: #EF4444;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Global Box Sizing */
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
   }
 
-  .task-detail-page {
+  body {
+    background-color: var(--bg-body);
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+  }
+
+  /* Layout */
+  .layout-container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 3rem;
     display: flex;
-    min-height: calc(100vh - 80px);
-    background: #f8f9fa;
+    gap: 4rem;
+    align-items: flex-start;
   }
 
-  /* Left Content Area */
-  .task-content {
+  /* Main Column */
+  .main-column {
     flex: 1;
-    padding: 2.5rem 3rem;
-    background: white;
+    min-width: 0;
   }
 
-  /* Breadcrumb */
-  .breadcrumb-nav {
+  /* Sidebar Column */
+  .sidebar-column {
+    width: 320px;
+    flex-shrink: 0;
+    margin-right: 0;
+  }
+
+  /* Typography */
+  h1.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  .breadcrumbs {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    color: var(--text-secondary);
     font-size: 0.875rem;
-    color: #64748b;
     margin-bottom: 1.5rem;
   }
 
-  .breadcrumb-nav a {
-    color: #64748b;
+  .breadcrumbs a {
+    color: var(--text-secondary);
     text-decoration: none;
   }
 
-  .breadcrumb-nav a:hover {
-    color: #3b82f6;
+  .breadcrumbs .badge {
+    background: #EEF2FF;
+    color: var(--brand-color);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
   }
 
-  .breadcrumb-separator {
-    color: #cbd5e1;
+  .meta-info {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    color: var(--text-secondary);
+    font-size: 0.925rem;
   }
 
-  .task-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 2rem 0;
-    line-height: 1.3;
-  }
-
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    width: fit-content;
-  }
-
-  .status-badge.completed {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .status-badge.ongoing {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-
-  .status-badge.high-priority {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-
-  .assignee-display {
+  .meta-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
-  .assignee-avatar {
+  /* Description */
+  .section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #9CA3AF;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+
+  .description-box {
+    color: #374151;
+    line-height: 1.6;
+    margin-bottom: 3rem;
+    font-size: 1rem;
+  }
+
+  /* Activity Section */
+  .activity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .activity-heading {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  /* Pill Switcher */
+  .pill-switcher {
+    display: flex;
+    background: #F3F4F6;
+    padding: 4px;
+    border-radius: 8px;
+    gap: 4px;
+  }
+
+  .pill-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .pill-btn.active {
+    background: white;
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+  }
+
+  /* Editor */
+  .editor-wrapper {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .avatar-circle {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: #E0E7FF;
+    color: var(--brand-color);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: 0.875rem;
+    flex-shrink: 0;
   }
 
-  .assignee-info {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .assignee-name {
-    font-weight: 600;
-    color: #1e293b;
-    font-size: 0.938rem;
-  }
-
-  .assignee-role {
-    font-size: 0.813rem;
-    color: #64748b;
-  }
-
-  .priority-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    width: fit-content;
-  }
-
-  .priority-badge.low {
-    background: #d1fae5;
-    color: #065f46;
-  }
-
-  .priority-badge.medium {
-    background: #fed7aa;
-    color: #92400e;
-  }
-
-  .priority-badge.high {
-    background: #fecaca;
-    color: #991b1b;
-  }
-
-  .priority-badge.urgent {
-    background: #fca5a5;
-    color: #7f1d1d;
-  }
-
-  /* Description Section */
-  .section-title {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 1.5rem 0;
-  }
-
-  .task-description {
-    color: #475569;
-    line-height: 1.8;
-    white-space: pre-wrap;
-    font-size: 0.938rem;
-    margin-bottom: 2rem;
-  }
-
-  .requirements-section {
-    margin-top: 2rem;
-  }
-
-  .requirement-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    color: #475569;
-    font-size: 0.938rem;
-    line-height: 1.6;
-  }
-
-  .requirement-item::before {
-    content: "•";
-    font-weight: bold;
-    color: #94a3b8;
-  }
-
-  .section-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .section-list li {
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #f1f5f9;
-    color: #475569;
-    font-size: 0.938rem;
-  }
-
-  .section-list li:last-child {
-    border-bottom: none;
-  }
-
-  .section-list li i {
-    color: #94a3b8;
-    width: 20px;
-    margin-right: 0.5rem;
-  }
-
-  /* Right Sidebar - Details */
-  .task-sidebar {
-    width: 320px;
-    background: #fafafa;
-    border-left: 1px solid #e5e7eb;
-    padding: 2rem 1.5rem;
-    overflow-y: auto;
-  }
-
-  .sidebar-title {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 1.25rem 0;
-  }
-
-  .detail-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.875rem 0;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 0.875rem;
-  }
-
-  .detail-item:last-child {
-    border-bottom: none;
-  }
-
-  .detail-label {
-    color: #64748b;
-    font-weight: 500;
-  }
-
-  .detail-value {
-    color: #0f172a;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .detail-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.75rem;
+  .editor-card {
+    flex: 1;
     background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    color: #0f172a;
-    text-decoration: none;
-    font-size: 0.813rem;
-    font-weight: 600;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
     transition: all 0.2s;
   }
 
-  .detail-badge:hover {
-    border-color: #3b82f6;
-    color: #3b82f6;
+  .editor-card:focus-within {
+    border-color: #cbd5e1;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
   }
 
-  .detail-badge i {
-    font-size: 0.75rem;
-    color: #64748b;
-  }
-
-  /* Comments Section */
-  .comments-section {
-    margin-top: 2rem;
-  }
-
-  .comment-form {
-    margin-bottom: 1.5rem;
-  }
-
-  .comment-form textarea {
+  .editor-textarea {
     width: 100%;
-    min-height: 100px;
-    padding: 0.75rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    resize: vertical;
-    font-family: inherit;
-  }
-
-  .comment-form textarea:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-
-  .comment-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-
-  .btn-comment {
-    padding: 0.625rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
     border: none;
+    padding: 1rem 1rem 0.5rem 1rem;
+    min-height: 80px;
+    resize: none;
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .editor-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid #F3F4F6;
+    background: #FAFAFA;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .editor-tools {
+    display: flex;
+    gap: 1rem;
+    color: #9CA3AF;
+    font-size: 1.1rem;
+  }
+
+  .editor-tools i {
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .editor-tools i:hover {
+    color: var(--text-secondary);
   }
 
   .btn-primary {
-    background: #3b82f6;
-    color: white;
-  }
-
-  .btn-primary:hover {
-    background: #2563eb;
-  }
-
-  .btn-secondary {
-    background: #f1f5f9;
-    color: #64748b;
-  }
-
-  .btn-secondary:hover {
-    background: #e2e8f0;
-  }
-
-  /* Comment Send Button with Loading State */
-  .comment-send-btn {
-    padding: 0.5rem 1rem;
-    background: #3b82f6;
+    background: var(--brand-color);
     color: white;
     border: none;
+    padding: 6px 16px;
     border-radius: 6px;
-    font-size: 0.813rem;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 0.875rem;
     cursor: pointer;
     transition: background 0.2s;
   }
 
-  .comment-send-btn:hover {
-    background: #2563eb;
+  .btn-primary:hover {
+    background: var(--brand-hover);
   }
 
-  .comment-send-btn .btn-text {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .comment-send-btn .btn-loading {
-    display: none;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .comment-send-btn.loading {
-    pointer-events: none;
-    opacity: 0.7;
-  }
-
-  .comment-send-btn.loading .btn-text {
-    display: none;
-  }
-
-  .comment-send-btn.loading .btn-loading {
-    display: inline-flex;
-  }
-
-  /* Simple Modern Comments */
-  .comments-list {
+  /* Lists */
+  .comment-list {
     display: flex;
     flex-direction: column;
-    gap: 0;
-  }
-
-  /* Modern Tabs */
-  .modern-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    border-bottom: 2px solid #f1f5f9;
-    padding-bottom: 0;
-  }
-
-  .modern-tab {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: none;
-    border: none;
-    color: #64748b;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    position: relative;
-    transition: color 0.2s;
-  }
-
-  .modern-tab:hover {
-    color: #3b82f6;
-  }
-
-  .modern-tab.active {
-    color: #3b82f6;
-  }
-
-  .modern-tab.active::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: #3b82f6;
-    border-radius: 2px 2px 0 0;
-  }
-
-  .modern-tab i {
-    font-size: 0.875rem;
-  }
-
-  .tab-badge {
-    background: #e0e7ff;
-    color: #3b82f6;
-    padding: 0.125rem 0.5rem;
-    border-radius: 10px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  /* Comment Input */
-  .comment-input-wrapper {
-    margin-bottom: 1.5rem;
-  }
-
-  .comment-input-container {
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-start;
-  }
-
-  .comment-input-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 0.75rem;
-    flex-shrink: 0;
-  }
-
-  .comment-input-box {
-    flex: 1;
-    display: flex;
-    align-items: flex-end;
-    gap: 0.5rem;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 0.5rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .comment-input-box:focus-within {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    background: white;
-  }
-
-  .comment-input-box textarea {
-    flex: 1;
-    border: none;
-    background: transparent;
-    resize: none;
-    font-size: 0.875rem;
-    font-family: inherit;
-    padding: 0.5rem;
-    min-height: 40px;
-    max-height: 120px;
-  }
-
-  .comment-input-box textarea:focus {
-    outline: none;
-  }
-
-  .comment-input-box textarea::placeholder {
-    color: #94a3b8;
-  }
-
-  /* Send Button */
-  .comment-send-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-
-  .comment-send-btn:hover {
-    background: #2563eb;
-    transform: scale(1.05);
-  }
-
-  .comment-send-btn .btn-text,
-  .comment-send-btn .btn-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .comment-send-btn .btn-loading {
-    display: none;
-  }
-
-  .comment-send-btn.loading .btn-text {
-    display: none;
-  }
-
-  .comment-send-btn.loading .btn-loading {
-    display: flex;
-  }
-
-  /* Comments List */
-  .comments-list {
-    display: flex;
-    flex-direction: column;
+    gap: 1.5rem;
   }
 
   .comment-row {
     display: flex;
-    gap: 0.75rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid #f1f5f9;
+    gap: 1rem;
   }
 
-  .comment-row:last-child {
-    border-bottom: none;
+  .comment-content {
+    background: #F3F4F6;
+    padding: 1rem;
+    border-radius: 0 12px 12px 12px;
+    font-size: 0.95rem;
+    color: #374151;
+    line-height: 1.5;
   }
 
-  .comment-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+  .comment-header {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 0.75rem;
-    flex-shrink: 0;
-  }
-
-  .comment-main {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .comment-meta {
-    display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 0.5rem;
     margin-bottom: 0.25rem;
   }
 
-  .comment-author {
+  .user-name {
     font-weight: 600;
-    color: #1e293b;
-    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
   }
 
-  .comment-time {
+  .time-text {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--text-secondary);
   }
 
-  .comment-text {
-    color: #475569;
-    font-size: 0.875rem;
-    line-height: 1.6;
-    white-space: pre-wrap;
-  }
-
-  /* Empty State */
-  .empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-  }
-
-  .empty-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: #f1f5f9;
-    color: #94a3b8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1rem;
-    font-size: 1.5rem;
-  }
-
-  .empty-state p {
-    font-size: 0.938rem;
-    font-weight: 500;
-    color: #475569;
-    margin: 0 0 0.25rem 0;
-  }
-
-  .empty-state span {
-    font-size: 0.813rem;
-    color: #94a3b8;
-  }
-
-  /* Activity Timeline Styles */
-  .activity-timeline-container {
-    max-height: 500px;
-    overflow-y: auto;
-    padding-right: 0.5rem;
-  }
-
-  .activity-timeline-container::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .activity-timeline-container::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 3px;
-  }
-
-  .activity-timeline-container::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
-  }
-
-  .activity-timeline-container::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-  }
-
-  .activity-item {
-    display: flex;
-    gap: 1rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid #f1f5f9;
-    transition: background-color 0.2s ease;
-  }
-
-  .activity-item:last-child {
-    border-bottom: none;
-  }
-
-  .activity-item:hover {
-    background-color: rgba(248, 250, 252, 0.5);
-  }
-
-  .activity-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 0.875rem;
-  }
-
-  .activity-content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .activity-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.375rem;
-  }
-
-  .activity-user {
-    font-weight: 600;
-    color: #0f172a;
-    font-size: 0.875rem;
-  }
-
-  .activity-action {
-    color: #64748b;
-    font-size: 0.875rem;
-  }
-
-  .activity-details {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.375rem;
-    flex-wrap: wrap;
-  }
-
-  .activity-old-value {
-    color: #ef4444;
-    font-size: 0.813rem;
-    padding: 0.25rem 0.5rem;
-    background: #fee2e2;
-    border-radius: 4px;
-    text-decoration: line-through;
-  }
-
-  .activity-arrow {
-    color: #94a3b8;
-    font-size: 0.75rem;
-  }
-
-  .activity-new-value {
-    color: #10b981;
-    font-size: 0.813rem;
-    padding: 0.25rem 0.5rem;
-    background: #dcfce7;
-    border-radius: 4px;
-    font-weight: 500;
-  }
-
-  .activity-time {
-    color: #94a3b8;
-    font-size: 0.75rem;
-  }
-
-  .empty-activity {
-    text-align: center;
-    padding: 4rem 2rem;
-    background: linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%);
-    border: 2px dashed #e2e8f0;
-    border-radius: 20px;
-  }
-
-  .empty-activity i {
-    font-size: 3rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 1rem;
-    display: block;
-  }
-
-  .empty-activity p {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #334155;
-    margin: 0 0 0.5rem 0;
-  }
-
-  .empty-activity span {
-    font-size: 0.875rem;
-    color: #94a3b8;
-  }
-
-  /* Action Buttons */
-  .action-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
+  /* Sidebar Widgets */
+  .sidebar-widget {
     background: white;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 8px;
-    color: #475569;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-
-  .action-btn:hover {
-    background: #f8fafc;
-    border-color: #3b82f6;
-    color: #3b82f6;
-    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1);
-    transform: translateY(-1px);
-  }
-
-  .action-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-
-  .action-btn i {
-    font-size: 0.875rem;
-    transition: transform 0.2s;
-  }
-
-  .action-btn:hover i {
-    transform: scale(1.1);
-  }
-
-  /* Dropdown Modal */
-  .dropdown-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    display: none;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .dropdown-modal.active {
-    display: flex;
-  }
-
-  .dropdown-content {
-    background: white;
-    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     padding: 1.5rem;
-    width: 90%;
-    max-width: 400px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    animation: slideDown 0.2s ease;
-  }
-
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-20px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .dropdown-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 1.5rem;
+    box-shadow: var(--shadow-sm);
   }
 
-  .dropdown-title {
-    font-size: 1.125rem;
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 0.75rem;
     font-weight: 700;
-    color: #0f172a;
-  }
-
-  .close-dropdown {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: none;
-    background: #f1f5f9;
-    color: #64748b;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-  }
-
-  .close-dropdown:hover {
-    background: #e2e8f0;
-    color: #475569;
-  }
-
-  .status-option,
-  .user-option {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.875rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.15s;
+    color: #9CA3AF;
+    text-transform: uppercase;
     margin-bottom: 0.5rem;
   }
 
-  .status-option:hover,
-  .user-option:hover {
-    background: #f8fafc;
+  /* Interactive Dropdown (Status) */
+  .select-box {
+    width: 100%;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
   }
 
-  .status-option.selected,
-  .user-option.selected {
-    background: #dbeafe;
-    border: 2px solid #3b82f6;
+  .select-box:hover {
+    border-color: #cbd5e1;
   }
 
-  .status-icon {
+  /* Static Box (Priority/Date) */
+  .static-box {
+    width: 100%;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    color: var(--text-primary);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.5rem;
+  }
+
+  /* Facepile */
+  .facepile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .facepile-group {
+    display: flex;
+    align-items: center;
+  }
+
+  .facepile-img {
     width: 32px;
     height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.875rem;
-  }
-
-  .user-avatar-option {
-    width: 40px;
-    height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    border: 2px solid white;
+    margin-left: -8px;
+    background: #E5E7EB;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-
-  .option-label {
-    flex: 1;
-  }
-
-  .option-title {
-    font-weight: 600;
-    color: #0f172a;
-    font-size: 0.875rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .option-desc {
     font-size: 0.75rem;
-    color: #64748b;
+    color: #6B7280;
+    font-weight: 600;
   }
 
-  .dropdown-actions {
+  .facepile-img:first-child {
+    margin-left: 0;
+  }
+
+  /* Reporter */
+  .reporter-row {
     display: flex;
+    align-items: center;
     gap: 0.75rem;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid #e5e7eb;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    margin-top: 1rem;
   }
 
-  .btn-save {
-    flex: 1;
-    padding: 0.75rem;
-    background: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-save:hover {
-    background: #2563eb;
-  }
-
-  .btn-cancel {
-    flex: 1;
-    padding: 0.75rem;
-    background: #f1f5f9;
-    color: #64748b;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-cancel:hover {
-    background: #e2e8f0;
-  }
-
-  /* Content Area Tabs */
-  .content-tabs {
-    display: flex;
-    border-bottom: 2px solid #e5e7eb;
-    margin-bottom: 2rem;
-    gap: 0;
-  }
-
-  .content-tab {
-    padding: 1rem 0;
-    margin-right: 2rem;
-    font-size: 0.938rem;
-    font-weight: 600;
-    color: #64748b;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    background: none;
-    border: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    margin-bottom: -2px;
-  }
-
-  .content-tab:hover {
-    color: #3b82f6;
-  }
-
-  .content-tab.active {
-    color: #3b82f6;
-    border-bottom-color: #3b82f6;
-  }
-
-  .content-tab-content {
-    display: none;
-  }
-
-  .content-tab-content.active {
-    display: block;
-  }
-
-  /* Tabs */
-  .sidebar-tabs {
-    display: flex;
-    border-bottom: 2px solid #e5e7eb;
-    margin-bottom: 1.5rem;
-    gap: 0;
-    margin-left: -1.5rem;
-    margin-right: -1.5rem;
-    padding-left: 1.5rem;
-  }
-
-  .sidebar-tab {
-    padding: 0.875rem 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #64748b;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    background: none;
-    border: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    margin-bottom: -2px;
-  }
-
-  .sidebar-tab:hover {
-    color: #3b82f6;
-  }
-
-  .sidebar-tab.active {
-    color: #3b82f6;
-    border-bottom-color: #3b82f6;
-  }
-
+  /* Hide tabs logic */
   .tab-content {
     display: none;
   }
@@ -1072,618 +406,482 @@
     display: block;
   }
 
-  @media (max-width: 1024px) {
-    .task-detail-page {
-      flex-direction: column;
-    }
+  /* Modal Overlay - HIDDEN BY DEFAULT */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    display: none;
+    /* Crucial */
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
 
-    .task-sidebar {
-      width: 100%;
-      border-left: none;
-      border-top: 1px solid #e2e8f0;
-    }
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .dropdown-menu {
+    background: white;
+    padding: 0.5rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .dropdown-item {
+    padding: 0.5rem 1rem;
+    text-align: left;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    color: #374151;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s;
+  }
+
+  .dropdown-item:hover {
+    background: #F3F4F6;
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="task-detail-page">
-  <!-- Left Content Area -->
-  <div class="task-content">
-    <!-- Breadcrumb -->
-    <nav class="breadcrumb-nav">
-      <a href="/">Projects</a>
-      <span class="breadcrumb-separator">/</span>
-      {% if task.company %}
-      <a href="{% url 'crm:company_detail' task.company.id %}">{{ task.company.name }}</a>
-      {% elif task.contact %}
-      <a href="{% url 'crm:contact_detail' task.contact.id %}">{{ task.contact.name }}</a>
-      {% else %}
-      <span>Tasks</span>
-      {% endif %}
-      <span class="breadcrumb-separator">/</span>
-      <span>{{ task.name|truncatewords:5 }}</span>
-    </nav>
+<div class="layout-container">
 
-    <!-- Task Header with Title and Actions -->
-    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 2rem;">
-      <h1 class="task-title" style="margin: 0;">{{ task.name }}</h1>
+  <!-- Main Content -->
+  <div class="main-column">
 
-      <div style="display: flex; gap: 0.75rem;">
-        <button onclick="openTaskEditSidebar('{{ task.id }}')" class="action-btn"
-          style="background: #3b82f6; color: white; border-color: #3b82f6;">
-          <i class="fa fa-edit"></i>
-          Edit Task
-        </button>
-
-        <button onclick="toggleStatusDropdown()" class="action-btn" style="position: relative;">
-          <i class="fa fa-sync-alt"></i>
-          Change Status
-        </button>
-
-        <button onclick="toggleAssignDropdown()" class="action-btn">
-          <i class="fa fa-user-plus"></i>
-          Assign User
-        </button>
-
-        <button onclick="shareTask()" class="action-btn">
-          <i class="fa fa-share-alt"></i>
-          Share
-        </button>
-      </div>
+    <!-- Top Nav -->
+    <div class="breadcrumbs">
+      <a href="/">Dashboard</a> <span>/</span>
+      <a href="{% url 'todo:tasks_list' %}">Tasks</a> <span>/</span>
+      <span class="badge">TASK-{{ task.id }}</span>
     </div>
 
-    <!-- Description Section -->
+    <!-- Title -->
+    <h1 class="page-title">{{ task.title|default:task.name }}</h1>
+
+    <!-- Meta -->
+    <div class="meta-info">
+      <div class="meta-item">
+        <i class="far fa-clock"></i> Due {{ task.due_date|date:"F j, Y" }}
+      </div>
+      <div class="meta-item">
+        <i class="far fa-user"></i> {{ task.member.user.get_full_name }}
+      </div>
+      <!-- Helper Actions -->
+      {% if task.created_by == request.user.member %}
+      <div class="meta-item" style="margin-left: auto;">
+        <a href="#" onclick="openTaskEditSidebar('{{ task.id }}')" style="color:inherit; text-decoration:none;"><i
+            class="fa fa-pen"></i></a>
+        <a href="#" onclick="if(confirm('Delete?')) document.getElementById('delTask').submit()"
+          style="color:var(--danger-color); margin-left:1rem;"><i class="fa fa-trash"></i></a>
+        <form id="delTask" method="POST" action="{% url 'todo:delete_task' task.id %}" style="display:none;">{%
+          csrf_token %}</form>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Description -->
     <div style="margin-bottom: 3rem;">
-      <h2 class="section-title">Description</h2>
-      <div class="task-description">
+      <div class="section-title">Description</div>
+      <div class="description-box">
         {% if task.description %}
-        {{ task.description }}
+        {{ task.description|linebreaksbr }}
         {% else %}
-        <em style="color: #94a3b8;">No description added.</em>
+        <span style="color:#9CA3AF; font-style:italic;">No description provided.</span>
         {% endif %}
       </div>
     </div>
 
-    <!-- Requirements Section (if description has bullet points) -->
-    <div class="requirements-section" style="display: none;">
-      <h2 class="section-title">Requirements:</h2>
-      <div class="requirement-item">Preparation of user flow diagrams and wireframes.</div>
-      <div class="requirement-item">Creation of a style guide including color palette, typography and icon set.</div>
-      <div class="requirement-item">High-fidelity designs for main screens (Login, Dashboard, Profile, Settings).</div>
-      <div class="requirement-item">Creation of components that comply with the design system.</div>
+    <!-- Attachments (Relocated) -->
+    {% if task.attachments.all %}
+    <div style="margin-bottom: 3rem;">
+      <div class="section-title">Attachments</div>
+      <div style="display:flex; flex-wrap:wrap; gap:1rem;">
+        {% for att in task.attachments.all %}
+        <div
+          style="background:white; border:1px solid #E5E7EB; border-radius:8px; padding:0.75rem; width:100%; max-width:300px; display:flex; align-items:center; gap:0.75rem;">
+          <div
+            style="width:40px; height:40px; background:#F3F4F6; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#EF4444; font-size:1.2rem;">
+            <i class="far fa-file-pdf"></i>
+          </div>
+          <div style="flex:1; overflow:hidden;">
+            <div
+              style="font-size:0.9rem; font-weight:500; color:#374151; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+              title="{{ att.file_name }}">
+              {{ att.file_name }}
+            </div>
+            <div style="font-size:0.75rem; color:#9CA3AF;">Attachment</div>
+          </div>
+          <a href="{{ att.get_download_url }}" target="_blank"
+            style="width:32px; height:32px; border-radius:50%; border:1px solid #E5E7EB; display:flex; align-items:center; justify-content:center; color:#6B7280; text-decoration:none; transition:bg 0.2s;"
+            onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background='white'">
+            <i class="fas fa-download" style="font-size:0.8rem;"></i>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
     </div>
+    {% endif %}
 
-    <!-- Comments Section (Full Width) -->
-    <div style="margin-top: 3rem; border-top: 2px solid #e5e7eb; padding-top: 2rem;">
-      <!-- Modern Tabs -->
-      <div class="modern-tabs">
-        <button class="modern-tab active" onclick="switchContentTab('comments')">
-          <i class="fa fa-comments"></i>
-          <span>Comments</span>
-          <span class="tab-badge">{{ comments|length }}</span>
-        </button>
-        <button class="modern-tab" onclick="switchContentTab('files')">
-          <i class="fa fa-paperclip"></i>
-          <span>Files</span>
-        </button>
-        <button class="modern-tab" onclick="switchContentTab('activity')">
-          <i class="fa fa-history"></i>
-          <span>Activity</span>
-        </button>
+    <!-- Activity Section -->
+    <div>
+      <div class="activity-header">
+        <div class="activity-heading">Activity</div>
+        <!-- Pill Toggle -->
+        <div class="pill-switcher">
+          <button class="pill-btn active" onclick="switchTab('comments')">Comments</button>
+          <button class="pill-btn" onclick="switchTab('history')">History</button>
+        </div>
       </div>
 
-      <!-- Comments Tab -->
-      <div id="commentsContentTab" class="content-tab-content active">
-        <!-- Comment Form -->
-        <div class="comment-input-wrapper">
-          <form id="commentForm" hx-post="/todo/tasks/{{ task.id }}/add_comment/" hx-target="#commentsList"
-            hx-swap="afterbegin" hx-on::before-request="document.getElementById('sendBtn').classList.add('loading')"
-            hx-on::after-request="if(event.detail.successful) { this.reset(); document.getElementById('sendBtn').classList.remove('loading'); }">
+      <!-- Tab: Comments -->
+      <div id="view-comments" class="tab-content active">
+        <!-- Input -->
+        <div class="editor-wrapper">
+          <div class="avatar-circle">
+            {{ request.user.first_name.0 }}{{ request.user.last_name.0 }}
+          </div>
+          <form class="editor-card" action="{% url 'todo:add_task_comment' task.id %}" method="POST"
+            onsubmit="handleCommentSubmit(event)">
             {% csrf_token %}
-            <div class="comment-input-container">
-              <div class="comment-input-avatar">
-                {{ request.user.first_name.0 }}{{ request.user.last_name.0 }}
+            <textarea name="content" class="editor-textarea" placeholder="Write a comment..." required></textarea>
+            <div class="editor-footer">
+              <div class="editor-tools">
+                <i class="fa fa-paperclip" style="cursor: pointer;" title="Attach file (Coming soon)"></i>
+                <i class="far fa-smile" style="cursor: pointer;"></i>
+                <i class="fa fa-at" style="cursor: pointer;"></i>
               </div>
-              <div class="comment-input-box">
-                <textarea name="content" id="commentTextarea" placeholder="Add a comment..." required></textarea>
-                <button type="submit" id="sendBtn" class="comment-send-btn">
-                  <span class="btn-text"><i class="fa fa-paper-plane"></i></span>
-                  <span class="btn-loading"><i class="fa fa-spinner fa-spin"></i></span>
-                </button>
-              </div>
+              <button type="submit" class="btn-primary">Send</button>
             </div>
           </form>
         </div>
 
-        <!-- Comments List -->
-        <div id="commentsList" class="comments-list">
+        <!-- Stream -->
+        <div class="comment-list">
           {% for comment in comments %}
           <div class="comment-row">
-            <div class="comment-avatar">
+            <div class="avatar-circle" style="width:32px; height:32px; font-size:0.8rem;">
               {{ comment.author.user.first_name.0 }}{{ comment.author.user.last_name.0 }}
             </div>
-            <div class="comment-main">
-              <div class="comment-meta">
-                <span class="comment-author">{{ comment.author.user.get_full_name }}</span>
-                <span class="comment-time">{{ comment.created_at|timesince }} ago</span>
+            <div>
+              <div class="comment-header">
+                <span class="user-name">{{ comment.author.user.get_full_name }}</span>
+                <span class="time-text">{{ comment.created_at|timesince }} ago</span>
               </div>
-              <div class="comment-text">{{ comment.content }}</div>
+              <div class="comment-content">
+                {{ comment.content }}
+              </div>
+              <div style="margin-top:0.25rem; font-size:0.75rem; color:var(--text-secondary); font-weight:500;">
+                <span style="cursor:pointer; margin-right:0.5rem;" class="hover-underline">Reply</span>
+                <span style="cursor:pointer;" class="hover-underline">Like</span>
+              </div>
             </div>
           </div>
           {% empty %}
-          <div id="noComments" class="empty-state">
-            <div class="empty-icon"><i class="fa fa-comment-o"></i></div>
-            <p>No comments yet</p>
-            <span>Be the first to start the conversation</span>
-          </div>
+          <div style="text-align:center; padding:2rem; color:#9CA3AF;">No comments yet.</div>
           {% endfor %}
         </div>
       </div>
 
-      <!-- Files Tab -->
-      <div id="filesContentTab" class="content-tab-content">
-        <p style="text-align: center; color: #94a3b8; padding: 3rem 0;">
-          File feature coming soon.
-        </p>
-      </div>
-
-      <!-- Activity Tab -->
-      <div id="activityContentTab" class="content-tab-content">
-        <div class="activity-timeline-container">
+      <!-- Tab: History -->
+      <div id="view-history" class="tab-content">
+        <div class="comment-list">
           {% for activity in activities %}
-          <div class="activity-item">
-            <div class="activity-icon"
-              style="background-color: {{ activity.get_color }}20; color: {{ activity.get_color }};"><i
-                class="fa {{ activity.get_icon }}"></i></div>
-            <div class="activity-content">
-              <div class="activity-header">
-                <span class="activity-user">{% if activity.user %}{{ activity.user.user.get_full_name }}{% else%}
-                  System{% endif %}</span>
-                <span class="activity-action">{{ activity.get_activity_type_display }}</span>
+          <div class="comment-row">
+            <div class="avatar-circle"
+              style="width:32px; height:32px; font-size:0.8rem; background:#F3F4F6; color:#6B7280;">
+              <i class="fa fa-history"></i>
+            </div>
+            <div>
+              <div class="comment-header">
+                <span class="user-name">{{ activity.user.user.get_full_name|default:"System" }}</span>
+                <span class="time-text">{{ activity.created_at|timesince }} ago</span>
               </div>
-              {% if activity.old_value or activity.new_value %}
-              <div class="activity-details">
-                {% if activity.old_value and activity.new_value %}
-                <span class="activity-old-value">{{ activity.old_value }}</span>
-                <i class="fa fa-arrow-right activity-arrow"></i>
-                <span class="activity-new-value">{{ activity.new_value }}</span>
-                {% elif activity.new_value %}
-                <span class="activity-new-value">{{ activity.new_value }}</span>
+              <div style="font-size:0.9rem; color:#374151;">
+                {{ activity.get_activity_type_display }}
+                {% if activity.old_value or activity.new_value %}
+                <div
+                  style="margin-top:0.25rem; font-family:monospace; font-size:0.8rem; background:#F9FAFB; padding:0.25rem 0.5rem; border-radius:4px;">
+                  <span style="color:#EF4444; text-decoration:line-through;">{{ activity.old_value|default:"-" }}</span>
+                  <i class="fa fa-arrow-right" style="margin:0 0.25rem; color:#9CA3AF;"></i>
+                  <span style="color:#10B981;">{{ activity.new_value|default:"-" }}</span>
+                </div>
                 {% endif %}
               </div>
-              {% endif %}
-              <div class="activity-time">{{ activity.created_at|timesince }} ago</div>
             </div>
           </div>
           {% empty %}
-          <div class="empty-activity">
-            <i class="fa fa-history"></i>
-            <p>No activity yet</p>
-            <span>Activity history will appear here as changes are made to this task.</span>
-          </div>
+          <div style="text-align:center; padding:2rem; color:#9CA3AF;">No history recorded.</div>
           {% endfor %}
         </div>
       </div>
+
     </div>
   </div>
 
-  <!-- Right Sidebar -->
-  <div class="task-sidebar">
-    <!-- Details Section -->
-    <div style="margin-bottom: 2.5rem;">
-      <h3 class="sidebar-title">Details</h3>
+  <!-- Sidebar Column -->
+  <div class="sidebar-column">
 
-      <div class="detail-item">
-        <span class="detail-label">Status</span>
-        <span class="detail-value">
-          <span id="taskStatusBadge" class="detail-badge"
-            style="{% if task.completed %}background: #dcfce7; color: #166534;{% elif task.on_hold %}background: #fef3c7; color: #d97706;{% else %}background: #dbeafe; color: #1e40af;{% endif %}">
-            {% if task.completed %}Completed{% elif task.on_hold %}On Hold{% else %}In Progress{% endif %}
-          </span>
-        </span>
+    <div class="sidebar-widget">
+      <!-- Status (Clickable) -->
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <div class="select-box" onclick="toggleModal('statusModal')">
+          <div style="display:flex; align-items:center;">
+            {% if task.status == 'done' %}
+            <span class="status-dot" style="background:#10B981;"></span> Done
+            {% elif task.status == 'review' %}
+            <span class="status-dot" style="background:#F59E0B;"></span> Review
+            {% elif task.status == 'in_progress' %}
+            <span class="status-dot" style="background:#3B82F6;"></span> In Progress
+            {% else %}
+            <span class="status-dot" style="background:#9CA3AF;"></span> To Do
+            {% endif %}
+          </div>
+          <i class="fa fa-chevron-down" style="font-size:0.75rem; color:#9CA3AF;"></i>
+        </div>
       </div>
 
-      <div class="detail-item">
-        <span class="detail-label">Assignees</span>
-        <span class="detail-value">
-          <div class="assignee-avatar" style="width: 28px; height: 28px; font-size: 0.7rem;">
-            {{ task.member.user.first_name.0 }}{{ task.member.user.last_name.0 }}
-          </div>
-          <div class="assignee-avatar"
-            style="width: 28px; height: 28px; font-size: 0.7rem; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-            {{ task.created_by.user.first_name.0 }}{{ task.created_by.user.last_name.0 }}
-          </div>
-        </span>
+      <!-- Priority (Static / Non-clickable visually) -->
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <div class="static-box">
+          <i class="fa fa-flag" style="color:#EF4444; margin-right:0.5rem;"></i>
+          {{ task.get_priority_display }}
+        </div>
       </div>
 
-      <div class="detail-item">
-        <span class="detail-label">Created By</span>
-        <span class="detail-value">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <div class="assignee-avatar"
-              style="width: 24px; height: 24px; font-size: 0.65rem; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-              {{ task.created_by.user.first_name.0 }}{{ task.created_by.user.last_name.0 }}
+      <!-- Assignees -->
+      <div class="form-group">
+        <label class="form-label">Assignees</label>
+        <div class="facepile-row">
+          <div class="facepile-group" style="flex-wrap: wrap;">
+            {% if task.assignees.exists %}
+            {% for u in task.assignees.all|slice:":4" %}
+            <div class="facepile-img" title="{{ u.user.get_full_name }}"
+              style="background:#E0E7FF; color:var(--brand-color); border-color:white;">
+              {{ u.user.first_name.0 }}{{ u.user.last_name.0 }}
             </div>
-            <span style="font-size: 0.813rem;">
-              {{ task.created_by.user.first_name }} {{ task.created_by.user.last_name }}
-            </span>
+            {% endfor %}
+            {% if task.assignees.count > 4 %}
+            <div class="facepile-img" title="{{ task.assignees.count|add:'-4' }} more"
+              style="background:#F3F4F6; color:#6B7280; font-size:0.7rem;">
+              +{{ task.assignees.count|add:"-4" }}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="facepile-img" title="{{ task.member.user.get_full_name }}"
+              style="background:#E0E7FF; color:var(--brand-color); border-color:white;">
+              {{ task.member.user.first_name.0 }}{{ task.member.user.last_name.0 }}
+            </div>
+            {% endif %}
+
+            {% if task.created_by == request.user.member %}
+            <div class="facepile-img" onclick="toggleModal('assignModal')"
+              style="cursor:pointer; border:1px dashed #9CA3AF; background:white; margin-left: -5px;">
+              <i class="fa fa-plus"></i>
+            </div>
+            {% endif %}
           </div>
-        </span>
+        </div>
       </div>
 
-      <div class="detail-item">
-        <span class="detail-label">Priority</span>
-        <span class="detail-value">
-          <span class="detail-badge" style="
-            {% if task.priority == 'urgent' %}background: #fee2e2; color: #991b1b; border-color: #fee2e2;
-            {% elif task.priority == 'high' %}background: #fecaca; color: #991b1b; border-color: #fecaca;
-            {% elif task.priority == 'medium' %}background: #fed7aa; color: #92400e; border-color: #fed7aa;
-            {% else %}background: #d1fae5; color: #065f46; border-color: #d1fae5;{% endif %}">
-            <i
-              class="fa {% if task.priority == 'low' %}fa-arrow-down{% elif task.priority == 'medium' %}fa-minus{% else %}fa-arrow-up{% endif %}"></i>
-            {% if task.priority == 'urgent' %}Urgent
-            {% elif task.priority == 'high' %}High
-            {% elif task.priority == 'medium' %}Medium
-            {% else %}Low{% endif %}
-          </span>
-        </span>
+
+
+      <!-- Due Date -->
+      <div class="form-group">
+        <label class="form-label">Due Date</label>
+        <div class="static-box">
+          <i class="far fa-calendar" style="color:#6B7280; margin-right:0.5rem;"></i>
+          {{ task.due_date|date:"F j, Y" }}
+        </div>
       </div>
 
-      <div class="detail-item">
-        <span class="detail-label">Project</span>
-        <span class="detail-value">
-          {% if task.company %}
-          <a href="{% url 'crm:company_detail' task.company.id %}" class="detail-badge">
-            <i class="fa fa-building"></i>
-            {{ task.company.name }}
-          </a>
-          {% elif task.contact %}
-          <a href="{% url 'crm:contact_detail' task.contact.id %}" class="detail-badge">
-            <i class="fa fa-user"></i>
-            {{ task.contact.name }}
-          </a>
-          {% else %}
-          <span class="detail-badge">-</span>
-          {% endif %}
-        </span>
+      <!-- Reporter Divider -->
+      <div class="reporter-row">
+        <div class="avatar-circle" style="background:#1F2937; color:white; width:36px; height:36px; font-size:0.85rem;">
+          {{ task.created_by.user.first_name.0 }}{{ task.created_by.user.last_name.0 }}
+        </div>
+        <div>
+          <div style="font-size:0.9rem; font-weight:600;">{{ task.created_by.user.get_full_name }}</div>
+          <div style="font-size:0.75rem; color:var(--text-secondary);">Reporter</div>
+        </div>
       </div>
 
-      <div class="detail-item">
-        <span class="detail-label">Due Date</span>
-        <span class="detail-value">{{ task.due_date|date:"d.m.Y" }}</span>
-      </div>
     </div>
+
+  </div>
+
+</div>
+
+<!-- Modals -->
+<div id="statusModal" class="modal-overlay" onclick="if(event.target===this) toggleModal('statusModal')">
+  <div class="dropdown-menu">
+    <button class="dropdown-item" onclick="updateStatus('todo')">To Do</button>
+    <button class="dropdown-item" onclick="updateStatus('in_progress')">In Progress</button>
+    <button class="dropdown-item" onclick="updateStatus('review')">Review</button>
+    <button class="dropdown-item" onclick="updateStatus('done')">Done</button>
   </div>
 </div>
 
-<!-- Status Change Modal -->
-<div id="statusModal" class="dropdown-modal" onclick="if(event.target === this) closeStatusDropdown()">
-  <div class="dropdown-content">
-    <div class="dropdown-header">
-      <h3 class="dropdown-title">Change Status</h3>
-      <button class="close-dropdown" onclick="closeStatusDropdown()">
-        <i class="fa fa-times"></i>
-      </button>
-    </div>
-
-    <div class="status-option {% if not task.completed and not task.on_hold %}selected{% endif %}"
-      onclick="selectStatus('in_progress')" data-status="in_progress">
-      <div class="status-icon" style="background: #dbeafe; color: #1e40af;">
-        <i class="fa fa-clock"></i>
-      </div>
-      <div class="option-label">
-        <div class="option-title">In Progress</div>
-        <div class="option-desc">Task is ongoing</div>
-      </div>
-      <i class="fa fa-check"
-        style="color: #3b82f6; {% if task.completed or task.on_hold %}display: none;{% endif %}"></i>
-    </div>
-
-    <div class="status-option {% if task.on_hold %}selected{% endif %}" onclick="selectStatus('on_hold')"
-      data-status="on_hold">
-      <div class="status-icon" style="background: #fef3c7; color: #d97706;">
-        <i class="fa fa-pause-circle"></i>
-      </div>
-      <div class="option-label">
-        <div class="option-title">On Hold</div>
-        <div class="option-desc">Task is paused</div>
-      </div>
-      <i class="fa fa-check" style="color: #3b82f6; {% if not task.on_hold %}display: none;{% endif %}"></i>
-    </div>
-
-    <div class="status-option {% if task.completed %}selected{% endif %}" onclick="selectStatus('completed')"
-      data-status="completed">
-      <div class="status-icon" style="background: #dcfce7; color: #166534;">
-        <i class="fa fa-check-circle"></i>
-      </div>
-      <div class="option-label">
-        <div class="option-title">Completed</div>
-        <div class="option-desc">Task is finished</div>
-      </div>
-      <i class="fa fa-check" style="color: #3b82f6; {% if not task.completed %}display: none;{% endif %}"></i>
-    </div>
-
-    <div class="dropdown-actions">
-      <button class="btn-save" id="statusSaveBtn" onclick="saveStatus()">Save</button>
-      <button class="btn-cancel" onclick="closeStatusDropdown()">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- Assign User Modal -->
-<div id="assignModal" class="dropdown-modal" onclick="if(event.target === this) closeAssignDropdown()">
-  <div class="dropdown-content">
-    <div class="dropdown-header">
-      <h3 class="dropdown-title">Assign User</h3>
-      <button class="close-dropdown" onclick="closeAssignDropdown()">
-        <i class="fa fa-times"></i>
-      </button>
-    </div>
-
-    <div style="margin-bottom: 1rem;">
-      <input type="text" id="userSearch" placeholder="Search users..." onkeyup="filterUsers()"
-        style="width: 100%; padding: 0.75rem; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 0.875rem;">
-    </div>
-
-    <div id="usersList" style="max-height: 300px; overflow-y: auto;">
-      {% for member in all_members %}
-      <div class="user-option {% if task.member.id == member.id %}selected{% endif %}"
-        onclick="selectUser({{ member.id }}, '{{ member.user.first_name }} {{ member.user.last_name }}')"
-        data-user-id="{{ member.id }}" data-user-name="{{ member.user.first_name }} {{ member.user.last_name }}">
-        <div class="user-avatar-option">
-          {{ member.user.first_name.0 }}{{ member.user.last_name.0 }}
-        </div>
-        <div class="option-label">
-          <div class="option-title">{{ member.user.first_name }} {{ member.user.last_name }}</div>
-          <div class="option-desc">{{ member.user.email }}</div>
-        </div>
-        <i class="fa fa-check"
-          style="color: #3b82f6; {% if task.member.id != member.id %}display: none;{% endif %}"></i>
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="dropdown-actions">
-      <button class="btn-save" onclick="saveAssignment()">Assign</button>
-      <button class="btn-cancel" onclick="closeAssignDropdown()">Cancel</button>
-    </div>
+<div id="assignModal" class="modal-overlay" onclick="if(event.target===this) toggleModal('assignModal')">
+  <div class="dropdown-menu" style="width:250px;">
+    {% for member in all_members %}
+    <button class="dropdown-item" onclick="assignUser({{ member.id }})">
+      {{ member.user.get_full_name }}
+    </button>
+    {% endfor %}
   </div>
 </div>
 
 <script>
-  let initialStatus = '{% if task.completed %}completed{% elif task.on_hold %}on_hold{% else %}in_progress{% endif %}';
-  let selectedStatus = initialStatus;
-  let selectedUserId = {{ task.member.id }};
+  function switchTab(tab) {
+    // Buttons
+    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+    // Panes
+    document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
 
-  // Status Modal Functions
-  function toggleStatusDropdown() {
-    document.getElementById('statusModal').classList.add('active');
+    // Activate
+    const btn = Array.from(document.querySelectorAll('.pill-btn')).find(b => b.textContent.toLowerCase().includes(tab));
+    if (btn) btn.classList.add('active');
+
+    document.getElementById('view-' + tab).classList.add('active');
   }
 
-  function closeStatusDropdown() {
-    document.getElementById('statusModal').classList.remove('active');
+  function toggleModal(id) {
+    document.getElementById(id).classList.toggle('active');
   }
 
-  function selectStatus(status) {
-    selectedStatus = status;
-
-    // Update UI
-    document.querySelectorAll('.status-option').forEach(opt => {
-      opt.classList.remove('selected');
-      opt.querySelector('.fa-check').style.display = 'none';
-    });
-
-    const selected = document.querySelector(`.status-option[data-status="${status}"]`);
-    if (selected) {
-      selected.classList.add('selected');
-      selected.querySelector('.fa-check').style.display = 'block';
-    }
-  }
-
-  function saveStatus() {
-    const btn = document.getElementById('statusSaveBtn');
-
-    // Don't do anything if status hasn't changed
-    if (selectedStatus === initialStatus) {
-      closeStatusDropdown();
-      return;
-    }
-
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
-    }
-
+  function updateStatus(status) {
     fetch('/todo/tasks/{{ task.id }}/complete_task', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-CSRFToken': '{{ csrf_token }}',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: `status=${selectedStatus}`
-    })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          // Close modal
-          closeStatusDropdown();
-
-          // Update status badge based on status
-          const statusBadge = document.getElementById('taskStatusBadge');
-          if (statusBadge) {
-            statusBadge.textContent = data.status_display;
-            if (data.status === 'completed') {
-              statusBadge.style.background = '#dcfce7';
-              statusBadge.style.color = '#166534';
-            } else if (data.status === 'on_hold') {
-              statusBadge.style.background = '#fef3c7';
-              statusBadge.style.color = '#d97706';
-            } else {
-              statusBadge.style.background = '#dbeafe';
-              statusBadge.style.color = '#1e40af';
-            }
-          }
-
-          // Add activity to timeline only if status changed
-          addActivityToTimeline(data.status, data.status_display);
-
-          // Update initial status to current
-          initialStatus = data.status;
-
-          // Show success
-          if (btn) {
-            btn.innerHTML = '✓ Saved!';
-            btn.style.background = '#10b981';
-            setTimeout(() => {
-              btn.disabled = false;
-              btn.innerHTML = 'Save';
-              btn.style.background = '';
-            }, 1500);
-          }
-        } else {
-          alert('Status could not be changed.');
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = 'Save';
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred.');
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = 'Save';
-        }
-      });
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
+      body: `status=${status}`
+    }).then(() => location.reload());
+    toggleModal('statusModal');
   }
 
-  function addActivityToTimeline(status, statusDisplay) {
-    const activityContainer = document.querySelector('.activity-timeline-container');
-    if (!activityContainer) return;
-
-    // Remove empty state if exists
-    const emptyState = activityContainer.querySelector('.empty-activity');
-    if (emptyState) emptyState.remove();
-
-    // Get icon and color based on status
-    let icon, color;
-    if (status === 'completed') {
-      icon = 'fa-check-circle';
-      color = '#10b981';
-    } else if (status === 'on_hold') {
-      icon = 'fa-pause-circle';
-      color = '#d97706';
-    } else {
-      icon = 'fa-clock';
-      color = '#3b82f6';
-    }
-
-    const activityHtml = `
-      <div class="activity-item" style="animation: slideIn 0.3s ease;">
-        <div class="activity-icon" style="background-color: ${color}20; color: ${color};">
-          <i class="fa ${icon}"></i>
-        </div>
-        <div class="activity-content">
-          <div class="activity-header">
-            <span class="activity-user">{{ request.user.first_name }} {{ request.user.last_name }}</span>
-            <span class="activity-action">Status Changed</span>
-          </div>
-          <div class="activity-details">
-            <span class="activity-new-value">${statusDisplay}</span>
-          </div>
-          <div class="activity-time">Just now</div>
-        </div>
-      </div>
-    `;
-    activityContainer.insertAdjacentHTML('afterbegin', activityHtml);
-  }
-
-  // Assign User Modal Functions
-  function toggleAssignDropdown() {
-    document.getElementById('assignModal').classList.add('active');
-  }
-
-  function closeAssignDropdown() {
-    document.getElementById('assignModal').classList.remove('active');
-  }
-
-  function selectUser(userId, userName) {
-    selectedUserId = userId;
-
-    // Update UI
-    document.querySelectorAll('.user-option').forEach(opt => {
-      opt.classList.remove('selected');
-      opt.querySelector('.fa-check').style.display = 'none';
-    });
-
-    const selected = document.querySelector(`.user-option[data-user-id="${userId}"]`);
-    selected.classList.add('selected');
-    selected.querySelector('.fa-check').style.display = 'block';
-  }
-
-  function filterUsers() {
-    const search = document.getElementById('userSearch').value.toLowerCase();
-    document.querySelectorAll('.user-option').forEach(opt => {
-      const name = opt.dataset.userName.toLowerCase();
-      opt.style.display = name.includes(search) ? 'flex' : 'none';
-    });
-  }
-
-  function saveAssignment() {
+  function assignUser(mid) {
     fetch('/todo/tasks/{{ task.id }}/update_ajax/', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': '{{ csrf_token }}' },
+      body: `member_id=${mid}`
+    }).then(() => location.reload());
+    toggleModal('assignModal');
+  }
+
+  // --- Comment & Toast Logic (Unified) ---
+  function showToast(message) {
+    const toast = document.getElementById('toast-notification');
+    const msg = document.getElementById('toast-message');
+    msg.textContent = message;
+    toast.style.display = 'flex';
+    toast.style.animation = 'slideUp 0.3s ease-out';
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      toast.style.transition = 'all 0.3s';
+      setTimeout(() => {
+        toast.style.display = 'none';
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      }, 300);
+    }, 3000);
+  }
+
+  function handleCommentSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    const textarea = form.querySelector('textarea');
+
+    // Loading State
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest', // Important for detecting AJAX
         'X-CSRFToken': '{{ csrf_token }}'
-      },
-      body: `member_id=${selectedUserId}`
-    })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
+      }
+    }).then(response => {
+      if (response.ok) {
+        return response.text(); // Assuming backend returns HTML fragment or we handle it manually
+        // Note: If backend returns pure JSON, we might need to parse it. 
+        // But 'add_task_comment' likely redirects or returns HTML fragment in "Team" style.
+        // Let's check 'add_task_comment' view if this fails.
+      }
+      return response.text().then(text => { throw new Error(text) });
+    }).then(htmlOrJson => {
+      // Check if response is JSON (if backend was not updated to return HTML fragment)
+      try {
+        const data = JSON.parse(htmlOrJson);
+        if (data.html) {
+          htmlOrJson = data.html;
+        } else if (data.success) {
+          // Fallback if no HTML provided but success
           location.reload();
-        } else {
-          alert('User could not be assigned.');
+          return;
         }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred.');
-      });
-  }
+      } catch (e) {
+        // Not JSON, assume HTML fragment
+      }
 
-  function shareTask() {
-    alert('Share feature coming soon.');
-  }
+      // Success
+      showToast('Comment sent');
+      textarea.value = '';
 
-  function switchContentTab(tabName) {
-    // Hide all content tabs
-    document.querySelectorAll('.content-tab-content').forEach(tab => {
-      tab.classList.remove('active');
+      // Append new comment
+      const list = document.querySelector('.comment-list');
+      const emptyState = list.querySelector('div[style*="text-align:center"]');
+      if (emptyState) emptyState.remove();
+
+      // Insert after list start (prepend)
+      const temp = document.createElement('div');
+      temp.innerHTML = htmlOrJson;
+
+      // If the response is a full page (redirect), we shouldn't insert it. 
+      // Ideally the view returns a partial. 
+      // For now, if we get a partial, insert it. If it looks like a full page (has <html>), reload.
+      if (htmlOrJson.includes('<html') || htmlOrJson.includes('<!DOCTYPE')) {
+        location.reload();
+      } else {
+        list.insertBefore(temp.firstElementChild, list.firstChild);
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }).catch(error => {
+      console.error('Error:', error);
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+      alert('Failed to send comment');
     });
-
-    // Remove active from all modern tab buttons
-    document.querySelectorAll('.modern-tab').forEach(btn => {
-      btn.classList.remove('active');
-    });
-
-    // Show selected tab
-    if (tabName === 'comments') {
-      document.getElementById('commentsContentTab').classList.add('active');
-      document.querySelectorAll('.modern-tab')[0].classList.add('active');
-    } else if (tabName === 'files') {
-      document.getElementById('filesContentTab').classList.add('active');
-      document.querySelectorAll('.modern-tab')[1].classList.add('active');
-    } else if (tabName === 'activity') {
-      document.getElementById('activityContentTab').classList.add('active');
-      document.querySelectorAll('.modern-tab')[2].classList.add('active');
-    }
   }
-
 </script>
+
+<div id="toast-notification"
+  style="position:fixed; bottom:24px; right:24px; background:#10B981; color:white; padding:12px 24px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); display:none; align-items:center; gap:12px; z-index:9999; font-weight:500; font-size:0.95rem;">
+  <i class="fas fa-check-circle"></i>
+  <span id="toast-message">Action successful</span>
+</div>
 
 {% include 'todo/components/task_edit_modal.html' %}
 {% endblock %}

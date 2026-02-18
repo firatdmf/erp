@@ -13,6 +13,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 import json
+import datetime
+from django.utils import timezone
 
 
 def get_gmail_oauth_flow(request):
@@ -148,6 +150,8 @@ def refresh_credentials(email_account):
     return credentials
 
 
+from google.auth.exceptions import RefreshError
+
 def get_gmail_service(email_account):
     """
     Get authenticated Gmail API service
@@ -165,9 +169,16 @@ def get_gmail_service(email_account):
     
     # Check if token is expired and refresh if needed
     if credentials.expired and credentials.refresh_token:
-        credentials.refresh(Request())
-        email_account.access_token = credentials.token
-        email_account.save(update_fields=['access_token'])
+        try:
+            credentials.refresh(Request())
+            email_account.access_token = credentials.token
+            email_account.save(update_fields=['access_token'])
+        except RefreshError:
+            print("Refresh token expired or revoked.")
+            return None
+        except Exception as e:
+            print(f"Error refreshing token: {e}")
+            return None
     
     # Build and return the service
     service = build('gmail', 'v1', credentials=credentials)
@@ -186,45 +197,79 @@ def get_user_email(service):
         return None
 
 
-def create_message(sender, to, subject, message_text, html_body=None):
+from email.mime.base import MIMEBase
+from email import encoders
+
+def create_message(sender, to, subject, message_text, html_body=None, cc=None, bcc=None, attachments=None):
     """
     Create a message for an email
+    attachments: list of tuples (filename, content, content_type)
     """
-    if html_body:
+    if attachments:
+        message = MIMEMultipart('mixed')
+    elif html_body:
         message = MIMEMultipart('alternative')
-        message['to'] = to
-        message['from'] = sender
-        message['subject'] = subject
-        
-        text_part = MIMEText(message_text, 'plain')
-        html_part = MIMEText(html_body, 'html')
-        
-        message.attach(text_part)
-        message.attach(html_part)
     else:
-        message = MIMEText(message_text)
-        message['to'] = to
-        message['from'] = sender
-        message['subject'] = subject
+        message = MIMEText(message_text, 'plain')
+
+    message['to'] = to
+    message['from'] = sender
+    message['subject'] = subject
+    if cc:
+        message['cc'] = ", ".join(cc) if isinstance(cc, list) else cc
+    if bcc:
+        message['bcc'] = ", ".join(bcc) if isinstance(bcc, list) else bcc
+
+    # Body handling
+    if html_body:
+        if attachments:
+            msg_body = MIMEMultipart('alternative')
+            msg_body.attach(MIMEText(message_text, 'plain'))
+            msg_body.attach(MIMEText(html_body, 'html'))
+            message.attach(msg_body)
+        else:
+             # message is already alternative
+             message.attach(MIMEText(message_text, 'plain'))
+             message.attach(MIMEText(html_body, 'html'))
+    else:
+        # Plain text
+        if attachments:
+             message.attach(MIMEText(message_text, 'plain'))
+        else:
+             # message is MIMEText, content already set in constructor
+             pass 
+
+    # Attachments
+    if attachments:
+        for filename, content, content_type in attachments:
+            if not content_type:
+                content_type = 'application/octet-stream'
+            
+            main_type, sub_type = content_type.split('/', 1) if '/' in content_type else ('application', 'octet-stream')
+            
+            part = MIMEBase(main_type, sub_type)
+            part.set_payload(content)
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename="{filename}"'
+            )
+            message.attach(part)
     
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return {'raw': raw}
 
-
-def send_email(service, sender, to, subject, message_text, html_body=None):
+def send_email(service, sender, to, subject, message_text, html_body=None, cc=None, bcc=None, attachments=None):
     """
     Send an email message
     """
-    try:
-        message = create_message(sender, to, subject, message_text, html_body)
-        sent_message = service.users().messages().send(
-            userId='me', 
-            body=message
-        ).execute()
-        return sent_message
-    except HttpError as error:
-        print(f'An error occurred: {error}')
-        return None
+    message = create_message(sender, to, subject, message_text, html_body, cc, bcc, attachments)
+    sent_message = service.users().messages().send(
+        userId='me', 
+        body=message
+    ).execute()
+    return sent_message
+
 
 
 def list_messages(service, max_results=10, query=''):
@@ -261,10 +306,31 @@ def get_message(service, msg_id):
         return None
 
 
+def get_attachment(service, msg_id, att_id):
+    """
+    Get attachment data
+    """
+    try:
+        attachment = service.users().messages().attachments().get(
+            userId='me',
+            messageId=msg_id,
+            id=att_id
+        ).execute()
+        
+        data = base64.urlsafe_b64decode(attachment['data'])
+        return data
+    except HttpError as error:
+        print(f'An error occurred: {error}')
+        return None
+
+
 def parse_message(message):
     """
     Parse a Gmail message to extract relevant information
     """
+    from email.utils import parseaddr, parsedate_to_datetime, getaddresses
+    from django.utils import timezone
+    
     headers = message.get('payload', {}).get('headers', [])
     
     subject = ''
@@ -284,32 +350,192 @@ def parse_message(message):
             to = value
         elif name == 'date':
             date = value
+            
+    # Parse sender
+    sender_name, sender_email = parseaddr(sender)
     
-    # Get message body
-    body = ''
-    if 'parts' in message.get('payload', {}):
-        parts = message['payload']['parts']
+    # Parse recipients
+    to_list = []
+    if to:
+        to_list = [addr[1] for addr in getaddresses([to])]
+    
+    # Parse date
+    try:
+        received_at = parsedate_to_datetime(date)
+    except:
+        received_at = timezone.now()
+
+    # Get message body (text and html) and attachments
+    body_text = ''
+    body_html = ''
+    attachments = []
+    
+    payload = message.get('payload', {})
+    
+    def get_parts(parts):
+        text = ''
+        html = ''
         for part in parts:
-            if part.get('mimeType') == 'text/plain':
-                data = part.get('body', {}).get('data', '')
-                if data:
-                    body = base64.urlsafe_b64decode(data).decode('utf-8')
-                    break
+             mimeType = part.get('mimeType')
+             filename = part.get('filename', '')
+             body_obj = part.get('body', {})
+             body_data = body_obj.get('data', '')
+             att_id = body_obj.get('attachmentId', '')
+             
+             # Attachment: has a filename and attachmentId
+             if filename and att_id:
+                 attachments.append({
+                     'filename': filename,
+                     'mimeType': mimeType or 'application/octet-stream',
+                     'size': body_obj.get('size', 0),
+                     'attachmentId': att_id,
+                 })
+             elif body_data:
+                 decoded = base64.urlsafe_b64decode(body_data).decode('utf-8', errors='ignore')
+                 if mimeType == 'text/plain':
+                     text += decoded
+                 elif mimeType == 'text/html':
+                     html += decoded
+             
+             if part.get('parts'):
+                 t, h = get_parts(part.get('parts'))
+                 text += t
+                 html += h
+        return text, html
+
+    if 'parts' in payload:
+        body_text, body_html = get_parts(payload['parts'])
     else:
-        data = message.get('payload', {}).get('body', {}).get('data', '')
+        # Single part
+        data = payload.get('body', {}).get('data', '')
         if data:
-            body = base64.urlsafe_b64decode(data).decode('utf-8')
-    
+            decoded = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+            if payload.get('mimeType') == 'text/html':
+                body_html = decoded
+            else:
+                body_text = decoded
+
     return {
         'id': message.get('id'),
-        'thread_id': message.get('threadId'),
+        'threadId': message.get('threadId'),
         'subject': subject,
-        'sender': sender,
-        'to': to,
-        'date': date,
-        'body': body,
+        'sender_name': sender_name,
+        'sender_email': sender_email,
+        'to': to_list,
+        'received_at': received_at,
+        'body_text': body_text,
+        'body_html': body_html,
         'snippet': message.get('snippet', ''),
+        'attachments': attachments,
     }
+
+
+def fetch_inbox_emails(email_account, max_results=20):
+    """
+    Fetch recent emails from inbox and save to DB
+    """
+    from .models import Email, EmailAttachment
+    
+    service = get_gmail_service(email_account)
+    if not service:
+        raise Exception("Gmail connection expired. Please reconnect in Settings.")
+        
+    # Get messages from both INBOX and SENT
+    inbox_messages = list_messages(service, max_results=max_results, query='label:INBOX') or []
+    sent_messages = list_messages(service, max_results=max_results, query='label:SENT') or []
+    
+    # Combine, dedup by ID
+    seen_ids = set()
+    all_messages = []
+    for msg in inbox_messages + sent_messages:
+        if msg['id'] not in seen_ids:
+            seen_ids.add(msg['id'])
+            all_messages.append(msg)
+    
+    if not all_messages:
+        return 0
+    
+    # Filter out messages already in DB to avoid unnecessary API calls
+    all_msg_ids = [m['id'] for m in all_messages]
+    existing_ids = set(
+        Email.objects.filter(gmail_message_id__in=all_msg_ids)
+        .values_list('gmail_message_id', flat=True)
+    )
+    new_messages = [m for m in all_messages if m['id'] not in existing_ids]
+    
+    count = 0
+        
+    for msg in new_messages:
+        try:
+            # Fetch full message
+            message_detail = get_message(service, msg['id'])
+            if not message_detail:
+                continue
+                
+            parsed = parse_message(message_detail)
+            
+            # Use internalDate as fallback if date parsing failed
+            if not parsed.get('received_at') and message_detail.get('internalDate'):
+                try:
+                    timestamp = int(message_detail.get('internalDate')) / 1000
+                    parsed['received_at'] = datetime.datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                except:
+                    parsed['received_at'] = timezone.now()
+            
+            # Determine folder from Gmail labels
+            labels = message_detail.get('labelIds', [])
+            if 'SENT' in labels and 'INBOX' not in labels:
+                folder = 'sent'
+            else:
+                folder = 'inbox'
+            
+            # Safety: truncate fields to fit DB columns
+            subject = (parsed.get('subject') or '')[:500]
+            snippet = (parsed.get('snippet') or '')[:300]
+            from_name = (parsed.get('sender_name') or '')[:200]
+            from_email = (parsed.get('sender_email') or '')[:254]
+            
+            # Create new email
+            email = Email(
+                email_account=email_account,
+                gmail_message_id=parsed['id'],
+                gmail_thread_id=parsed['threadId'],
+                from_email=from_email,
+                from_name=from_name,
+                to_emails=parsed['to'], 
+                subject=subject,
+                body_text=parsed['body_text'],
+                body_html=parsed['body_html'],
+                snippet=snippet,
+                folder=folder,
+                received_at=parsed['received_at'] if folder == 'inbox' else None,
+                sent_at=parsed['received_at'] if folder == 'sent' else None,
+                is_read='UNREAD' not in labels
+            )
+            email.save()
+            
+            # Create attachment records
+            for att in parsed.get('attachments', []):
+                EmailAttachment.objects.create(
+                    email=email,
+                    filename=att['filename'][:255],
+                    file_url='#gmail-attachment',
+                    file_size=att.get('size', 0),
+                    content_type=att.get('mimeType', 'application/octet-stream')[:100],
+                    gmail_attachment_id=att.get('attachmentId', ''),
+                )
+            
+            # Auto-match CRM records
+            email.match_crm_records()
+            email.save()
+            
+            count += 1
+            
+        except Exception as e:
+            print(f"Error syncing email {msg['id']}: {e}")
+            continue
+            
+    return count
 
 
 def check_thread_for_replies(service, thread_id, original_sender_email):
@@ -340,15 +566,16 @@ def check_thread_for_replies(service, thread_id, original_sender_email):
         # Check subsequent messages for replies FROM recipient TO us
         for message in messages[1:]:
             parsed = parse_message(message)
-            sender = parsed['sender'].lower()
-            to = parsed['to'].lower()
+            sender = parsed['sender_email'].lower()
+            to_list = [t.lower() for t in parsed['to']]
             
             # Check if this is a reply TO our email address
-            if original_sender_email.lower() in to:
+            # We check if our email is in the TO list
+            if any(original_sender_email.lower() in t for t in to_list):
                 return {
                     'has_reply': True,
                     'reply_message': parsed,
-                    'replied_at': parsed['date']
+                    'replied_at': parsed['received_at']
                 }
         
         return {'has_reply': False}
@@ -411,11 +638,8 @@ def check_campaigns_for_replies(email_account):
                     # Save received email
                     reply_msg = result['reply_message']
                     
-                    # Extract sender email from "Name <email>" format
-                    sender_email = reply_msg['sender']
-                    email_match = re.search(r'<(.+?)>', sender_email)
-                    if email_match:
-                        sender_email = email_match.group(1)
+                    # Already parsed by parse_message
+                    sender_email = reply_msg['sender_email']
                     
                     ReceivedEmail.objects.get_or_create(
                         gmail_message_id=reply_msg['id'],
@@ -438,11 +662,11 @@ def check_campaigns_for_replies(email_account):
                     
                     print(f"✓ Reply detected for campaign {campaign.id} from {sender_email}")
                     break  # No need to check other emails in this campaign
-        
-        return reply_count
-        
+                    
     except Exception as e:
-        print(f"✗ Error checking for replies: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error checking campaigns for replies: {e}")
         return 0
+        
+    return reply_count
+
+

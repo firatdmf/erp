@@ -1,0 +1,884 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ note.title }} - My Notes{% endblock %}
+
+{% block css %}
+{{ block.super }}
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --n-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        --n-text: #0f172a;
+        --n-text-sec: #475569;
+        --n-text-muted: #94a3b8;
+        --n-surface: #ffffff;
+        --n-surface-2: #f8fafc;
+        --n-border: #e2e8f0;
+        --n-primary: #1e293b;
+        --n-primary-hover: #334155;
+        --n-radius: 12px;
+        --n-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+        --n-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+        --n-high: #ef4444;
+        --n-medium: #f97316;
+        --n-low: #22c55e;
+        --n-cat-work: #3b82f6;
+        --n-cat-personal: #22c55e;
+        --n-cat-important: #ef4444;
+        --n-cat-ideas: #a855f7;
+        --n-cat-meeting: #f97316;
+    }
+
+    body {
+        background-color: var(--n-surface-2);
+    }
+
+    .note-detail-page {
+        font-family: var(--n-font);
+        color: var(--n-text);
+    }
+
+    /* ============ TOP BAR ============ */
+    .note-top-bar {
+        background: var(--n-surface);
+        border-bottom: 1px solid var(--n-border);
+        padding: 0 40px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 64px;
+    }
+
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        color: var(--n-text-muted);
+    }
+
+    .breadcrumb a {
+        color: var(--n-text-muted);
+        text-decoration: none;
+        transition: color 0.2s;
+        font-weight: 500;
+    }
+
+    .breadcrumb a:hover {
+        color: var(--n-text);
+    }
+
+    .breadcrumb i.fa-chevron-right {
+        font-size: 9px;
+        color: #cbd5e1;
+    }
+
+    .breadcrumb__current {
+        color: var(--n-text);
+        font-weight: 600;
+    }
+
+    .top-bar-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .btn-top-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        border: 1px solid var(--n-border);
+        background: var(--n-surface);
+        color: var(--n-text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+    }
+
+    .btn-top-icon:hover {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: var(--n-high);
+    }
+
+    .btn-top-icon.fav-btn {
+        color: #cbd5e1;
+    }
+
+    .btn-top-icon.fav-btn:hover {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #f59e0b;
+    }
+
+    .btn-top-icon.fav-btn.active {
+        color: #fbbf24;
+        background: #fffbeb;
+        border-color: #fde68a;
+    }
+
+    .btn-save-note {
+        background: var(--n-primary);
+        color: white;
+        border: none;
+        padding: 9px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: var(--n-font);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+
+    .btn-save-note:hover {
+        background: var(--n-primary-hover);
+        transform: translateY(-1px);
+    }
+
+    /* ============ LAYOUT ============ */
+    .note-layout {
+        display: flex;
+        max-width: 1400px;
+        margin: 28px auto;
+        padding: 0 40px;
+        gap: 24px;
+        min-height: calc(100vh - 120px);
+    }
+
+    /* ============ EDITOR ============ */
+    .note-editor-card {
+        flex: 1;
+        background: var(--n-surface);
+        border-radius: var(--n-radius);
+        border: 1px solid var(--n-border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: var(--n-shadow);
+    }
+
+    .note-title-wrapper {
+        padding: 28px 32px 20px 32px;
+    }
+
+    .note-title-input {
+        width: 100%;
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--n-text);
+        border: none;
+        outline: none;
+        padding: 0;
+        font-family: var(--n-font);
+        background: transparent;
+        line-height: 1.3;
+    }
+
+    .note-title-input::placeholder {
+        color: #cbd5e1;
+    }
+
+    .quill-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .ql-toolbar.ql-snow {
+        border: none !important;
+        border-top: 1px solid #f1f5f9 !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        padding: 10px 32px !important;
+        background: transparent;
+    }
+
+    .ql-container.ql-snow {
+        border: none !important;
+        font-family: var(--n-font);
+        font-size: 15px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ql-editor {
+        padding: 24px 32px !important;
+        color: #334155;
+        line-height: 1.75;
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .ql-editor:focus {
+        outline: none;
+    }
+
+    .editor-footer {
+        padding: 14px 32px;
+        border-top: 1px solid #f1f5f9;
+        color: var(--n-text-muted);
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: transparent;
+    }
+
+    /* ============ SIDEBAR ============ */
+    .note-sidebar {
+        width: 320px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        flex-shrink: 0;
+    }
+
+    .sidebar-card {
+        background: var(--n-surface);
+        border: 1px solid var(--n-border);
+        border-radius: var(--n-radius);
+        padding: 20px;
+        box-shadow: var(--n-shadow);
+    }
+
+    .sidebar-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--n-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .sidebar-title i {
+        font-size: 12px;
+    }
+
+    .detail-row {
+        margin-bottom: 16px;
+    }
+
+    .detail-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--n-text-sec);
+        margin-bottom: 6px;
+    }
+
+    .sidebar-select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--n-border);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--n-text);
+        outline: none;
+        background: var(--n-surface-2);
+        font-family: var(--n-font);
+        cursor: pointer;
+    }
+
+    .sidebar-select:focus {
+        border-color: #93c5fd;
+        background: white;
+    }
+
+    /* Toggle Switch */
+    .toggle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+    }
+
+    .toggle-label {
+        font-size: 13px;
+        color: var(--n-text-sec);
+        font-weight: 500;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 42px;
+        height: 22px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #cbd5e1;
+        transition: .3s;
+        border-radius: 34px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+    }
+
+    input:checked+.slider {
+        background-color: #3b82f6;
+    }
+
+    input:checked+.slider:before {
+        transform: translateX(20px);
+    }
+
+    /* Priority indicator */
+    .priority-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 6px;
+    }
+
+    .priority-indicator.high {
+        background: #fef2f2;
+        color: var(--n-high);
+    }
+
+    .priority-indicator.medium {
+        background: #fff7ed;
+        color: var(--n-medium);
+    }
+
+    .priority-indicator.low {
+        background: #f0fdf4;
+        color: var(--n-low);
+    }
+
+    /* Category badge */
+    .detail-cat-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        color: white;
+        letter-spacing: 0.3px;
+    }
+
+    .detail-cat-badge.cat-work {
+        background: var(--n-cat-work);
+    }
+
+    .detail-cat-badge.cat-personal {
+        background: var(--n-cat-personal);
+    }
+
+    .detail-cat-badge.cat-important {
+        background: var(--n-cat-important);
+    }
+
+    .detail-cat-badge.cat-ideas {
+        background: var(--n-cat-ideas);
+    }
+
+    .detail-cat-badge.cat-meeting {
+        background: var(--n-cat-meeting);
+    }
+
+    /* Attachments */
+    .attachment-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border: 1px solid var(--n-border);
+        border-radius: 8px;
+        margin-bottom: 8px;
+        background: var(--n-surface-2);
+        transition: all 0.15s;
+    }
+
+    .attachment-item:hover {
+        border-color: #93c5fd;
+    }
+
+    .file-icon-box {
+        width: 36px;
+        height: 36px;
+        background: #eff6ff;
+        color: #3b82f6;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .file-icon-box.pdf {
+        background: #fef2f2;
+        color: #ef4444;
+    }
+
+    .file-icon-box.img {
+        background: #f0fdf4;
+        color: #22c55e;
+    }
+
+    .file-info {
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .file-name-link {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--n-text);
+        text-decoration: none;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .file-name-link:hover {
+        color: #3b82f6;
+    }
+
+    .file-meta {
+        font-size: 11px;
+        color: var(--n-text-muted);
+    }
+
+    .file-remove-btn {
+        background: none;
+        border: none;
+        color: #cbd5e1;
+        cursor: pointer;
+        padding: 4px;
+        font-size: 13px;
+        transition: color 0.15s;
+    }
+
+    .file-remove-btn:hover {
+        color: var(--n-high);
+    }
+
+    .upload-dropzone {
+        border: 2px dashed var(--n-border);
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-top: 12px;
+    }
+
+    .upload-dropzone:hover {
+        border-color: #93c5fd;
+        background: #eff6ff;
+    }
+
+    .upload-dropzone i {
+        font-size: 22px;
+        color: #3b82f6;
+        margin-bottom: 6px;
+    }
+
+    .upload-dropzone .upload-label {
+        font-size: 13px;
+        color: #3b82f6;
+        font-weight: 600;
+    }
+
+    .upload-dropzone .upload-hint {
+        font-size: 11px;
+        color: var(--n-text-muted);
+        margin-top: 2px;
+    }
+
+    /* Meta info */
+    .meta-info {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid var(--n-border);
+    }
+
+    .meta-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+    }
+
+    .meta-label {
+        color: var(--n-text-muted);
+    }
+
+    .meta-value {
+        color: var(--n-text-sec);
+        font-weight: 500;
+    }
+
+    /* Toast */
+    .detail-toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: var(--n-primary);
+        color: white;
+        padding: 14px 24px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.3s ease;
+        z-index: 999;
+        font-family: var(--n-font);
+    }
+
+    .detail-toast.show {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    .detail-toast i {
+        margin-right: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="note-detail-page">
+    <form id="noteForm" method="post" action="{% url 'notes:note_detail' note.id %}">
+        {% csrf_token %}
+
+        <!-- Top Bar -->
+        <div class="note-top-bar">
+            <div class="breadcrumb">
+                <a href="{% url 'notes:index' %}"><i class="fas fa-arrow-left" style="margin-right:4px;"></i> Back</a>
+                <i class="fas fa-chevron-right"></i>
+                <a href="{% url 'notes:index' %}">My Notes</a>
+                <i class="fas fa-chevron-right"></i>
+                <span class="breadcrumb__current">{{ note.title|truncatechars:35 }}</span>
+            </div>
+            <div class="top-bar-actions">
+                <button type="button" class="btn-top-icon fav-btn {% if note.is_favorite %}active{% endif %}"
+                    title="Add to favorites" onclick="toggleDetailFavorite(this)">
+                    <i class="fas fa-star"></i>
+                </button>
+                <button type="button" class="btn-top-icon" title="Delete note"
+                    onclick="if(confirm('Are you sure you want to delete this note?')) deleteNote()">
+                    <i class="far fa-trash-alt"></i>
+                </button>
+                <button type="button" class="btn-save-note" onclick="saveNote()">
+                    <i class="fas fa-check"></i> Save
+                </button>
+            </div>
+        </div>
+
+        <!-- Layout -->
+        <div class="note-layout">
+            <!-- Editor -->
+            <div class="note-editor-card">
+                <div class="note-title-wrapper">
+                    <input type="text" name="title" value="{{ note.title }}" class="note-title-input"
+                        placeholder="Note title...">
+                </div>
+
+                <div class="quill-wrapper">
+                    <textarea name="content" id="hiddenContent" style="display:none;">{{ note.content }}</textarea>
+                    <div id="editor-container"></div>
+                </div>
+
+                <div class="editor-footer">
+                    <span><i class="far fa-clock" style="margin-right:4px;"></i> Last saved: {{   note.updated_at|date:"d.m.Y H:i" }}</span>
+                    <span>{{ note.content|striptags|wordcount }} words</span>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="note-sidebar">
+                <!-- Details -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title"><i class="fas fa-sliders-h"></i> DETAILS</div>
+
+                    <div class="detail-row">
+                        <label class="detail-label">Category</label>
+                        <select name="category" class="sidebar-select">
+                            <option value="work" {% if note.category == 'work' %}selected{% endif %}>Work</option>
+                            <option value="personal" {% if note.category == 'personal' %}selected{% endif %}>Personal
+                            </option>
+                            <option value="important" {% if note.category == 'important' %}selected{% endif %}>Important
+                            </option>
+                            <option value="ideas" {% if note.category == 'ideas' %}selected{% endif %}>Ideas</option>
+                            <option value="meeting" {% if note.category == 'meeting' %}selected{% endif %}>Meeting
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="detail-row">
+                        <label class="detail-label">Priority</label>
+                        <select name="priority" class="sidebar-select">
+                            <option value="high" {% if note.priority == 'high' %}selected{% endif %}>High</option>
+                            <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="low" {% if note.priority == 'low' %}selected{% endif %}>Low</option>
+                        </select>
+                    </div>
+
+                    <div class="toggle-row">
+                        <span class="toggle-label"><i class="far fa-star" style="margin-right:4px; color:#fbbf24;"></i>
+                            Favorite</span>
+                        <label class="switch">
+                            <input type="checkbox" name="is_favorite" {% if note.is_favorite %}checked{% endif %}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="meta-info" style="margin-top:16px;">
+                        <div class="meta-row">
+                            <span class="meta-label">Created</span>
+                            <span class="meta-value">{{ note.created_at|date:"d.m.Y H:i" }}</span>
+                        </div>
+                        <div class="meta-row">
+                            <span class="meta-label">Updated</span>
+                            <span class="meta-value">{{ note.updated_at|date:"d.m.Y H:i" }}</span>
+                        </div>
+                        <div class="meta-row">
+                            <span class="meta-label">Status</span>
+                            <span class="meta-value">
+                                <span class="priority-indicator {{ note.priority }}">
+                                    <i class="fas fa-circle" style="font-size:6px;"></i>
+                                    {% if note.priority == 'high' %}High{% elif note.priority == 'medium' %}Medium{% else %}Low{% endif %}
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attachments -->
+                <div class="sidebar-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <div class="sidebar-title" style="margin-bottom:0;"><i class="fas fa-paperclip"></i> FILES
+                        </div>
+                        <span
+                            style="background:var(--n-surface-2); color:var(--n-text-muted); font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600;">
+                            {{ note.attachments.count }}
+                        </span>
+                    </div>
+
+                    <div id="fileList">
+                        {% for file in note.attachments.all %}
+                        <div class="attachment-item" id="file-{{ file.id }}">
+                            <div
+                                class="file-icon-box {% if 'pdf' in file.file_name %}pdf{% elif 'png' in file.file_name or 'jpg' in file.file_name or 'jpeg' in file.file_name %}img{% endif %}">
+                                {% if 'pdf' in file.file_name %}
+                                <i class="fas fa-file-pdf"></i>
+                                {% elif 'png' in file.file_name or 'jpg' in file.file_name or 'jpeg' in file.file_name
+                                %}
+                                <i class="fas fa-image"></i>
+                                {% else %}
+                                <i class="fas fa-file"></i>
+                                {% endif %}
+                            </div>
+                            <div class="file-info">
+                                <a href="{{ file.drive_link }}" target="_blank" class="file-name-link">{{ file.file_name }}</a>
+                                <span class="file-meta">Google Drive</span>
+                            </div>
+                            <button type="button" class="file-remove-btn"
+                                onclick="deleteDetailFile({{ file.id }}, this)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="upload-dropzone" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <div class="upload-label">Upload file</div>
+                        <div class="upload-hint">PDF, PNG, JPG or SVG</div>
+                        <input type="file" id="fileInput" style="display:none;" onchange="handleFileUpload(this.files)">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="detail-toast" id="detailToast">
+        <i class="fas fa-check-circle"></i>
+        <span id="detailToastMsg"></span>
+    </div>
+</div>
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script>
+    // ---- Quill Editor ----
+    var quill = new Quill('#editor-container', {
+        theme: 'snow',
+        placeholder: 'Start writing...',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['blockquote', 'code-block'],
+                ['link', 'image'],
+                [{ 'color': [] }, { 'background': [] }],
+                ['clean']
+            ]
+        }
+    });
+
+    try {
+        var delta = quill.clipboard.convert(document.getElementById('hiddenContent').value);
+        quill.setContents(delta, 'silent');
+    } catch (e) {
+        quill.setText(document.getElementById('hiddenContent').value);
+    }
+
+    // ---- Save ----
+    function saveNote() {
+        document.getElementById('hiddenContent').value = quill.root.innerHTML;
+        const formData = new FormData(document.getElementById('noteForm'));
+
+        fetch("{% url 'notes:note_detail' note.id %}", {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                showDetailToast('Note saved successfully');
+                const btn = document.querySelector('.btn-save-note');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Saved';
+                setTimeout(() => btn.innerHTML = orig, 2000);
+            }
+        });
+    }
+
+    // ---- Favorite ----
+    function toggleDetailFavorite(btn) {
+        fetch("{% url 'notes:toggle_favorite' note.id %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(r => r.json()).then(data => {
+            btn.classList.toggle('active', data.is_favorite);
+            // Also update the sidebar checkbox
+            const cb = document.querySelector('input[name="is_favorite"]');
+            if (cb) cb.checked = data.is_favorite;
+            showDetailToast(data.is_favorite ? 'Added to favorites' : 'Removed from favorites');
+        });
+    }
+
+    // ---- Delete Note ----
+    function deleteNote() {
+        fetch("{% url 'notes:delete' note.id %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(r => {
+            if (r.ok) window.location.href = "{% url 'notes:index' %}";
+        });
+    }
+
+    // ---- File Upload ----
+    document.getElementById('uploadArea').addEventListener('click', () => {
+        document.getElementById('fileInput').click();
+    });
+
+    function handleFileUpload(files) {
+        if (files.length === 0) return;
+
+        const formData = new FormData();
+        formData.append('file', files[0]);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        const uploadBox = document.getElementById('uploadArea');
+        const originalContent = uploadBox.innerHTML;
+        uploadBox.innerHTML = '<div style="padding:10px;"><i class="fas fa-spinner fa-spin" style="color:#3b82f6;"></i> Uploading...</div>';
+
+        fetch("{% url 'notes:upload_file' note.id %}", {
+            method: 'POST',
+            body: formData
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                showDetailToast('Upload failed');
+                uploadBox.innerHTML = originalContent;
+            }
+        });
+    }
+
+    // ---- Delete File ----
+    function deleteDetailFile(fileId, el) {
+        fetch('/notes/file/' + fileId + '/delete/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                el.closest('.attachment-item').remove();
+                showDetailToast('File removed');
+            }
+        });
+    }
+
+    // ---- Toast ----
+    function showDetailToast(msg) {
+        const t = document.getElementById('detailToast');
+        document.getElementById('detailToastMsg').textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ---- Keyboard shortcut ----
+    document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            saveNote();
+        }
+    });
+</script>
+{% endblock %}

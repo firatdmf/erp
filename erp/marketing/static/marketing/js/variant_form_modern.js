@@ -1481,12 +1481,35 @@ async function openImagePicker(variantIndex) {
     // Global uploadedImages array initialization
     if (!uploadedImages) uploadedImages = [];
 
+    // Helper to normalize URL for comparison (remove query params, protocol variations)
+    const normalizeUrl = (url) => {
+        if (!url) return '';
+        // Remove query params
+        let normalized = url.split('?')[0];
+        // Remove trailing slashes
+        normalized = normalized.replace(/\/$/, '');
+        // Extract just the filename for comparison as a fallback
+        return normalized;
+    };
+
     // Helper to add unique images to uploadedImages
     const addUniqueImage = (newImg) => {
         if (!newImg.url) return;
-        const exists = uploadedImages.some(img => img.url === newImg.url);
-        if (!exists) {
+
+        const normalizedNewUrl = normalizeUrl(newImg.url);
+        const existingIndex = uploadedImages.findIndex(img => normalizeUrl(img.url) === normalizedNewUrl);
+
+        if (existingIndex === -1) {
+            // New unique image - add it
             uploadedImages.push(newImg);
+        } else {
+            // Duplicate found - prefer real filenames over "Main Image X" names
+            const existing = uploadedImages[existingIndex];
+            if (existing.name && existing.name.startsWith('Main Image') &&
+                newImg.name && !newImg.name.startsWith('Main Image')) {
+                // Replace with the better-named version
+                uploadedImages[existingIndex] = { ...existing, ...newImg, name: newImg.name };
+            }
         }
     };
 
@@ -1506,32 +1529,39 @@ async function openImagePicker(variantIndex) {
         }
     });
 
-    // 2. Scrape Main Product Images from DOM (Universal - works for both Edit and Create)
-    const mainImageGrid = document.getElementById('sortable_images');
-    if (mainImageGrid) {
-        const mainImages = mainImageGrid.querySelectorAll('.sortable-image');
-        Array.from(mainImages).forEach((imgDiv, idx) => {
-            const img = imgDiv.querySelector('img');
-            const imgUrl = img ? img.src : '';
+    // 2. Scrape Main Product Images from DOM
+    // NOTE: Only do this for CREATE mode. In EDIT mode, the API call below provides accurate URLs.
+    // DOM scraping causes issues because videos show thumbnail URL in img.src, not the actual video URL.
+    const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
 
-            if (imgUrl) {
-                const fileType = imgDiv.dataset.fileType || (isVideoFile(imgUrl) ? 'video' : 'image');
-                addUniqueImage({
-                    id: imgDiv.dataset.fileId || `main_img_${idx}`, // Use distinct ID prefix
-                    url: imgUrl,
-                    name: `Main Image ${idx + 1}`,
-                    variant: null,
-                    file: null,
-                    temp_file: true,
-                    from_main: true, // Flag to identify origin
-                    file_type: fileType
-                });
-            }
-        });
+    if (!productEditMatch) {
+        // CREATE MODE: Scrape from DOM (no API available)
+        const mainImageGrid = document.getElementById('sortable_images');
+        if (mainImageGrid) {
+            const mainImages = mainImageGrid.querySelectorAll('.sortable-image');
+            Array.from(mainImages).forEach((imgDiv, idx) => {
+                const img = imgDiv.querySelector('img');
+                const imgUrl = img ? img.src : '';
+
+                if (imgUrl) {
+                    const fileType = imgDiv.dataset.fileType || (isVideoFile(imgUrl) ? 'video' : 'image');
+                    addUniqueImage({
+                        id: imgDiv.dataset.fileId || `main_img_${idx}`,
+                        url: imgUrl,
+                        name: `Main Image ${idx + 1}`,
+                        variant: null,
+                        file: null,
+                        temp_file: true,
+                        from_main: true,
+                        file_type: fileType
+                    });
+                }
+            });
+        }
     }
 
-    // Check if product edit or create mode
-    const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
+    // Check if product edit or create mode (already defined above)
+    // const productEditMatch = ...
 
     // 3. In Edit Mode, fetch server-side pool (this catches images uploaded but not yet in DOM or variants)
     if (productEditMatch) {
@@ -1543,6 +1573,7 @@ async function openImagePicker(variantIndex) {
                     addUniqueImage({
                         id: file.id,
                         url: file.url,
+                        optimized_url: file.optimized_url || file.url,
                         name: file.name,
                         variant: file.variant || null,
                         file: null,
@@ -1614,19 +1645,23 @@ function generateImageGrid() {
         // Detect if file is a video
         const isVideo = isVideoFile(img.url) || img.file_type === 'video';
         const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
+        const fileType = isVideo ? 'video' : 'image';
 
         // No variant badges - shared pool
 
         if (isVideo) {
             return `
-                <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="video" onclick="toggleImageSelection(this, event)">
-                    <div style="position: relative;">
-                        <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.background='#1a1a2e'">
-                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                            <i class="fa fa-play" style="color: white; font-size: 12px; margin-left: 2px;"></i>
+                <div class="image_item video_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="video" onclick="toggleImageSelection(this, event)">
+                    <div class="video_thumbnail_container">
+                        <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.display='none'">
+                        <div class="video_play_overlay">
+                            <i class="fa fa-play"></i>
                         </div>
                     </div>
                     <p>${img.name}</p>
+                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${img.optimized_url || img.url}', 'video')" title="Preview Video">
+                        <i class="fa fa-search-plus"></i>
+                    </button>
                     <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
                         <i class="fa fa-trash"></i>
                     </button>
@@ -1635,8 +1670,11 @@ function generateImageGrid() {
         } else {
             return `
                 <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="image" onclick="toggleImageSelection(this, event)">
-                    <img src="${img.url}" alt="${img.name}">
+                    <img src="${thumbnailUrl}" alt="${img.name}">
                     <p>${img.name}</p>
+                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${img.optimized_url || img.url}', 'image')" title="Preview">
+                        <i class="fa fa-search-plus"></i>
+                    </button>
                     <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
                         <i class="fa fa-trash"></i>
                     </button>
@@ -1655,12 +1693,25 @@ function isVideoFile(url) {
     return /\.(mp4|mov|webm|avi|mkv|m4v|wmv)(\?.*)?$/i.test(lowerUrl);
 }
 
-// Generate video thumbnail URL for Cloudinary
+// Generate video thumbnail URL for Cloudinary videos
+// Returns empty string for non-Cloudinary (e.g., Bunny CDN) videos to use the gradient fallback
 function getVideoThumbnailUrlVariant(videoUrl) {
     if (!videoUrl) return '';
-    // Cloudinary transformation for video thumbnail
-    const transformed = videoUrl.replace('/upload/', '/upload/w_150,h_150,c_fill,so_0,f_jpg/');
-    return transformed.replace(/\.(mp4|mov|webm|avi|mkv|m4v)$/i, '.jpg');
+
+    // Check if this is a Cloudinary URL (contains res.cloudinary.com or /upload/)
+    const isCloudinary = videoUrl.includes('res.cloudinary.com') ||
+        (videoUrl.includes('/upload/') && videoUrl.includes('cloudinary'));
+
+    if (isCloudinary) {
+        // Cloudinary transformation for video thumbnail
+        // w_300 = width, h_180 = height, c_fill = crop fill, so_0 = start at 0 seconds, f_jpg = jpg format
+        const transformed = videoUrl.replace('/upload/', '/upload/w_300,h_180,c_fill,so_0,f_jpg/');
+        return transformed.replace(/\.(mp4|mov|webm|avi|mkv|m4v)$/i, '.jpg');
+    }
+
+    // For Bunny CDN or other providers, return empty to use gradient fallback
+    // (They don't support automatic thumbnail generation)
+    return '';
 }
 
 // Toggle image selection with Order Tracking
@@ -1805,8 +1856,7 @@ async function handleImageUpload(event) {
             const formData = new FormData();
             formData.append('file', file);
 
-            let apiUrl, data;
-
+            let data;
             if (isCreateMode) {
                 // Create mode: Use temp upload API
                 formData.append('file_type', 'variant_image');
@@ -1815,93 +1865,105 @@ async function handleImageUpload(event) {
 
                 const response = await fetch('/marketing/api/temp_upload_file/', {
                     method: 'POST',
-                    headers: {
-                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
-                    },
+                    headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
                     body: formData
                 });
-
                 data = await response.json();
-
-                if (data.success) {
-                    // Add to uploadedImages from temp file data
-                    uploadedImages.push({
-                        url: data.file_data.url,
-                        name: data.file_data.name,
-                        file: null,
-                        id: data.file_data.public_id,  // Use public_id for temp files
-                        variant: null,
-                        temp_file: true
-                    });
-                }
             } else {
                 // Edit mode: Use instant upload API
                 formData.append('product_id', productEditMatch);
-                // DO NOT send variant_id - want files unlinked until form submit
-
                 const response = await fetch('/marketing/api/instant_upload_file/', {
                     method: 'POST',
-                    headers: {
-                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
-                    },
+                    headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
                     body: formData
                 });
-
                 data = await response.json();
-
-                if (data.success) {
-                    // Add to uploadedImages with real URL from Cloudinary
-                    uploadedImages.push({
-                        url: data.file.url,
-                        name: file.name,
-                        file: null,
-                        id: data.file.id,
-                        variant: null
-                    });
-                }
             }
 
-            if (data && data.success) {
-                // Remove placeholder
-                if (placeholder) placeholder.remove();
+            if (!data.success) {
+                throw new Error(data.error || 'Upload failed');
+            }
 
-                // Create and add the new image element
-                const newImage = uploadedImages[uploadedImages.length - 1];
-                const newIndex = uploadedImages.length - 1;
+            // Normalize response data from both APIs
+            const fileUrl = isCreateMode ? data.file_data.url : data.file.url;
+            const fileId = isCreateMode ? data.file_data.public_id : data.file.id;
+            const fileType = (data.file && data.file.file_type) ? data.file.file_type : (isVideoFile(fileUrl) ? 'video' : 'image');
 
-                const newElement = document.createElement('div');
-                newElement.className = 'image_item';
-                newElement.setAttribute('data-url', newImage.url);
-                newElement.setAttribute('data-name', newImage.name);
-                newElement.setAttribute('data-index', newIndex);
-                newElement.onclick = function (e) { toggleImageSelection(this, e); };
+            const isCloudinary = fileUrl.includes('/upload/');
+            const optimizedUrl = isCloudinary ? fileUrl.replace('/upload/', '/upload/f_auto,q_auto/') : fileUrl;
 
+            const newImage = {
+                url: fileUrl,
+                optimized_url: optimizedUrl,
+                name: file.name,
+                file: null,
+                id: fileId,
+                variant: null,
+                file_type: fileType,
+                temp_file: isCreateMode
+            };
+
+            uploadedImages.push(newImage);
+            const newIndex = uploadedImages.length - 1;
+            const isVideo = fileType === 'video';
+
+            // Remove placeholder
+            if (placeholder) placeholder.remove();
+
+            // Create and add the new UI element
+            const newElement = document.createElement('div');
+            newElement.className = 'image_item' + (isVideo ? ' video_item' : '');
+            newElement.setAttribute('data-url', newImage.url);
+            newElement.setAttribute('data-name', newImage.name);
+            newElement.setAttribute('data-index', newIndex);
+            newElement.setAttribute('data-file-type', fileType);
+            newElement.onclick = function (e) { toggleImageSelection(this, e); };
+
+            if (isVideo) {
+                const thumbnailUrl = getVideoThumbnailUrlVariant(fileUrl);
                 newElement.innerHTML = `
-                    <img src="${newImage.url}" alt="${newImage.name}">
+                    <div class="video_thumbnail_container">
+                        <img src="${thumbnailUrl}" alt="${newImage.name}" onerror="this.style.display='none'">
+                        <div class="video_play_overlay">
+                            <i class="fa fa-play"></i>
+                        </div>
+                    </div>
                     <p>${newImage.name}</p>
+                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'video')" title="Preview Video">
+                        <i class="fa fa-search-plus"></i>
+                    </button>
                     <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
                         <i class="fa fa-trash"></i>
                     </button>
                 `;
-
-                if (grid) grid.appendChild(newElement);
-
-                showToast(`✅ ${file.name} uploaded to shared pool!`, 'success');
-
-                // Note: Newly uploaded image is not selected by default, so we don't need to update badges yet
             } else {
-                throw new Error(data.error || 'Upload failed');
+                newElement.innerHTML = `
+                    <img src="${newImage.optimized_url || newImage.url}" alt="${newImage.name}">
+                    <p>${newImage.name}</p>
+                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'image')" title="Preview">
+                        <i class="fa fa-search-plus"></i>
+                    </button>
+                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                `;
             }
+
+            if (grid) grid.appendChild(newElement);
+            showToast(`✅ ${file.name} uploaded successfully!`, 'success');
+
         } catch (error) {
             console.error('Upload error:', error);
             if (placeholder) placeholder.remove();
             showToast(`❌ Upload failed: ${error.message}`, 'error');
         }
-    }
 
-    // Clear the input so the same file can be uploaded again if needed
+    } // End of for loop
+
+    // Clear the input so the same files can be uploaded again
     event.target.value = '';
-}
+} // End of handleImageUpload function
+
 
 // Get variant ID from table row
 function getVariantId(variantIndex) {
@@ -2036,6 +2098,9 @@ async function removeUploadedImage(index, event) {
         // Remove from uploadedImages array
         uploadedImages.splice(index, 1);
 
+        // Remove from selectionOrder and renumber badges
+        selectionOrder = selectionOrder.filter(url => url !== image.url);
+
         // Also remove from variantImages selections if it was selected
         if (variantImages[currentVariantIndex]) {
             variantImages[currentVariantIndex].images = variantImages[currentVariantIndex].images.filter(
@@ -2070,6 +2135,9 @@ async function removeUploadedImage(index, event) {
                 grid.innerHTML = '<div class="no_images_message"><i class="fa fa-image"></i><p>No images uploaded yet. Use the "Add File" button above to add images.</p></div>';
             }
         }
+
+        // Update selection badges to renumber remaining selected items
+        updateSelectionBadges();
     }
 }
 

@@ -1,23 +1,23 @@
 {% extends 'base.html' %}
 {% block content %}
-  {% load static %}
-  {% comment %} {% load custom_tags %} {% endcomment %}
-  {% comment %} {% load custom_filters %} {% endcomment %}
-  {% load todo_filters %}
-  {% load todo_tags %}
-  {% block css %}
-    <link rel="stylesheet" href="{% static 'todo/index.css' %}" />
-  {% endblock %}
-  <script src="{% static 'todo/index.js' %}"></script>
-  <div class="todo_index_page">
-    <p>
-      <a href="{% url 'todo:task_report' %}">See Task Report</a>
-    </p>
-    <h1>Create Task</h1>
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit" onclick="">Create Task</button>
-    </form>
-  </div>
+{% load static %}
+{% comment %} {% load custom_tags %} {% endcomment %}
+{% comment %} {% load custom_filters %} {% endcomment %}
+{% load todo_filters %}
+{% load todo_tags %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'todo/index.css' %}" />
+{% endblock %}
+<script src="{% static 'todo/index.js' %}"></script>
+<div class="todo_index_page">
+  <p>
+    <a href="{% url 'todo:task_report' %}">See Task Report</a>
+  </p>
+  <h1>Create Task</h1>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" onclick="">Create Task</button>
+  </form>
+</div>
 {% endblock %}

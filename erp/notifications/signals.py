@@ -243,16 +243,16 @@ def connect_signals():
     
     # Connect Order signal
     post_save.connect(create_order_notification_handler, sender=Order)
-    print("📡 Connected Order notification signal")
+    print("Connected Order notification signal")
     
     # Connect Task signal  
     post_save.connect(create_task_notification_handler, sender=Task)
-    print("📡 Connected Task notification signal")
+    print("Connected Task notification signal")
     
     # Connect TaskActivity signal (for status changes, priority changes, etc.)
     post_save.connect(create_task_activity_notification_handler, sender=TaskActivity)
-    print("📡 Connected TaskActivity notification signal")
+    print("Connected TaskActivity notification signal")
     
     # Connect TaskComment signal
     post_save.connect(create_task_comment_notification_handler, sender=TaskComment)
-    print("📡 Connected TaskComment notification signal")
+    print("Connected TaskComment notification signal")

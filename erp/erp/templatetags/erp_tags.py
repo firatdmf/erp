@@ -42,7 +42,7 @@ def dashboard_component(csrf_token,path,member):
     if member:
         task_counts = Task.objects.filter(completed=False).aggregate(
             pending=Count('id'),
-            my_tasks=Count('id', filter=Q(member=member)),
+            my_tasks=Count('id', filter=Q(member=member) | Q(assignees=member), distinct=True),
             assigned=Count('id', filter=Q(created_by=member) & ~Q(member=member))
         )
         pending_tasks_count = task_counts['my_tasks']
@@ -53,8 +53,8 @@ def dashboard_component(csrf_token,path,member):
         user = member.user if hasattr(member, 'user') else None
         if user:
             team_tasks_count = TeamTask.objects.filter(
-                assigned_to=user
-            ).exclude(status='done').count()
+                assignees=user
+            ).exclude(status='done').distinct().count()
             my_tasks_count += team_tasks_count
             pending_tasks_count += team_tasks_count
     else:
@@ -65,7 +65,7 @@ def dashboard_component(csrf_token,path,member):
     # ⚡ Calendar data: Efficient grouping by date
     base_calendar_query = Task.objects.filter(completed=False)
     if member:
-        base_calendar_query = base_calendar_query.filter(member=member)
+        base_calendar_query = base_calendar_query.filter(Q(member=member) | Q(assignees=member)).distinct()
 
     tasks_by_date_query = base_calendar_query.annotate(
         date=TruncDate('due_date')
@@ -82,7 +82,7 @@ def dashboard_component(csrf_token,path,member):
     # Add TeamTask to calendar data
     if member and hasattr(member, 'user'):
         team_tasks_by_date = TeamTask.objects.filter(
-            assigned_to=member.user
+            assignees=member.user
         ).exclude(status='done').annotate(
             date=TruncDate('due_date')
         ).values('date').annotate(
@@ -90,6 +90,26 @@ def dashboard_component(csrf_token,path,member):
         ).order_by('date')
         
         for item in team_tasks_by_date:
+            if item['date']:
+                date_str = item['date'].strftime('%Y-%m-%d')
+                if date_str in tasks_by_date:
+                    tasks_by_date[date_str] += item['count']
+                else:
+                    tasks_by_date[date_str] = item['count']
+
+    # Add Team Meetings to calendar data
+    from team.models import TeamMeeting
+    if member and hasattr(member, 'user'):
+        meetings_by_date = TeamMeeting.objects.filter(
+            team__members=member.user, # User must be a member of the team
+            status__in=['scheduled', 'ongoing']
+        ).annotate(
+            date=TruncDate('scheduled_at')
+        ).values('date').annotate(
+            count=Count('id')
+        ).order_by('date')
+
+        for item in meetings_by_date:
             if item['date']:
                 date_str = item['date'].strftime('%Y-%m-%d')
                 if date_str in tasks_by_date:

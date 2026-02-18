@@ -1,0 +1,918 @@
+<div class="modal-backdrop" onclick="closeComposeModal()"></div>
+<div class="compose-modal">
+    <div class="compose-header">
+        <h3>New Message</h3>
+        <button class="close-btn" onclick="closeComposeModal()"><i class="fas fa-times"></i></button>
+    </div>
+
+    <form id="composeForm">
+        {% csrf_token %}
+        <input type="hidden" name="company_id" id="hiddenCompanyId" value="{{ company_id|default:'' }}">
+        <input type="hidden" name="contact_id" id="hiddenContactId" value="{{ contact_id|default:'' }}">
+
+        <!-- To field with autocomplete -->
+        <div class="compose-field recipient-field">
+            <label class="field-label">To</label>
+            <div class="recipient-container" id="toContainer">
+                <div class="recipient-chips" id="toChips">
+                    {% if recipient_email %}
+                    <span class="recipient-chip" data-email="{{ recipient_email }}">
+                        <span class="chip-text">{{ recipient_name|default:recipient_email }}</span>
+                        <i class="fas fa-times chip-remove" onclick="removeChip(this)"></i>
+                    </span>
+                    {% endif %}
+                </div>
+                <input type="text" class="recipient-input" id="toInput"
+                    placeholder="{% if not recipient_email %}Search contacts / companies or type email...{% endif %}"
+                    autocomplete="off">
+                <div class="recipient-dropdown" id="toDropdown"></div>
+            </div>
+        </div>
+
+        <div class="compose-field" style="display: none;" id="ccField">
+            <label class="field-label">Cc</label>
+            <div class="recipient-container" id="ccContainer">
+                <div class="recipient-chips" id="ccChips"></div>
+                <input type="text" class="recipient-input" id="ccInput"
+                    placeholder="Search contacts / companies or type email..." autocomplete="off">
+                <div class="recipient-dropdown" id="ccDropdown"></div>
+            </div>
+        </div>
+
+        <div class="compose-field" style="display: none;" id="bccField">
+            <label class="field-label">Bcc</label>
+            <div class="recipient-container" id="bccContainer">
+                <div class="recipient-chips" id="bccChips"></div>
+                <input type="text" class="recipient-input" id="bccInput"
+                    placeholder="Search contacts / companies or type email..." autocomplete="off">
+                <div class="recipient-dropdown" id="bccDropdown"></div>
+            </div>
+        </div>
+
+        <div class="compose-actions-secondary">
+            <span onclick="toggleField('ccField')">Cc</span>
+            <span onclick="toggleField('bccField')">Bcc</span>
+        </div>
+
+        <div class="compose-field">
+            <input type="text" name="subject" class="compose-input" placeholder="Subject" value="{{ subject }}"
+                required>
+        </div>
+
+        <div class="compose-body">
+            <textarea name="body" class="compose-textarea" placeholder="Write your message here..."></textarea>
+        </div>
+
+        <div class="file-preview-area" id="filePreviewArea"></div>
+
+        <div class="compose-footer">
+            <div class="compose-tools">
+                <label for="fileInput" class="tool-btn" title="Attach File">
+                    <i class="fas fa-paperclip"></i>
+                </label>
+                <input type="file" id="fileInput" name="attachments" multiple style="display: none;"
+                    onchange="handleFileSelect(event)">
+
+                <button type="button" class="tool-btn" title="Insert Template">
+                    <i class="fas fa-file-alt"></i>
+                </button>
+            </div>
+
+            <!-- Changed to type="button" and added onclick to prevent default form submission -->
+            <button type="button" class="send-btn" id="sendBtn" onclick="sendEmail(event)">
+                <span class="send-btn-content">
+                    <i class="fas fa-paper-plane"></i> Send
+                </span>
+                <span class="send-btn-loading" style="display:none;">
+                    <i class="fas fa-spinner fa-spin"></i> Sending...
+                </span>
+            </button>
+        </div>
+
+        <!-- Error toast -->
+        <div class="compose-error-toast" id="composeErrorToast" style="display:none;">
+            <i class="fas fa-exclamation-circle"></i>
+            <span id="composeErrorText"></span>
+        </div>
+    </form>
+</div>
+
+<style>
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.3);
+        z-index: 9998;
+    }
+
+    .compose-modal {
+        position: fixed;
+        bottom: 0;
+        right: 80px;
+        width: 580px;
+        max-width: 90vw;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+        border-radius: 12px 12px 0 0;
+        background: white;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        height: 560px;
+        max-height: 85vh;
+        animation: modalSlideUp 0.2s ease-out;
+    }
+
+    @keyframes modalSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .compose-header {
+        padding: 12px 20px;
+        background: #1e293b;
+        color: white;
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .compose-header h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+        font-size: 16px;
+        padding: 4px;
+        transition: color 0.12s;
+    }
+
+    .close-btn:hover {
+        color: white;
+    }
+
+    #composeForm {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .compose-field {
+        padding: 8px 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .field-label {
+        font-size: 13px;
+        color: #94a3b8;
+        font-weight: 500;
+        min-width: 28px;
+        margin-right: 4px;
+    }
+
+    .compose-input {
+        width: 100%;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        padding: 4px 0;
+    }
+
+    /* --- Recipient autocomplete styles --- */
+    .recipient-field {
+        position: relative;
+    }
+
+    .recipient-container {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        position: relative;
+    }
+
+    .recipient-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .recipient-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+        border: 1px solid #c7d2fe;
+        padding: 3px 8px 3px 10px;
+        border-radius: 16px;
+        font-size: 12px;
+        color: #4338ca;
+        font-weight: 500;
+        animation: chipIn 0.15s ease-out;
+        max-width: 200px;
+    }
+
+    .recipient-chip.company-chip {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border-color: #fbbf24;
+        color: #92400e;
+    }
+
+    @keyframes chipIn {
+        from {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .chip-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .chip-remove {
+        cursor: pointer;
+        font-size: 10px;
+        opacity: 0.6;
+        padding: 2px;
+        transition: opacity 0.15s;
+    }
+
+    .chip-remove:hover {
+        opacity: 1;
+    }
+
+    .recipient-input {
+        flex: 1;
+        min-width: 160px;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        padding: 4px 0;
+        background: transparent;
+    }
+
+    .recipient-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        z-index: 10001;
+        max-height: 220px;
+        overflow-y: auto;
+        margin-top: 4px;
+    }
+
+    .recipient-dropdown.show {
+        display: block;
+    }
+
+    .dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        transition: background 0.12s;
+    }
+
+    .dropdown-item:hover,
+    .dropdown-item.active {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    .dropdown-item-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    .dropdown-item-icon.contact {
+        background: #eef2ff;
+        color: #6366f1;
+    }
+
+    .dropdown-item-icon.company {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .dropdown-item-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .dropdown-item-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .dropdown-item-detail {
+        font-size: 11px;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .dropdown-item-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+    }
+
+    .dropdown-item-badge.contact {
+        background: #eef2ff;
+        color: #6366f1;
+    }
+
+    .dropdown-item-badge.company {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .dropdown-empty {
+        padding: 16px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    .dropdown-hint {
+        padding: 8px 14px;
+        font-size: 11px;
+        color: #94a3b8;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    /* --- End autocomplete styles --- */
+
+    .compose-actions-secondary {
+        padding: 4px 16px;
+        font-size: 12px;
+        color: #64748b;
+        display: flex;
+        gap: 12px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .compose-actions-secondary span {
+        cursor: pointer;
+    }
+
+    .compose-actions-secondary span:hover {
+        text-decoration: underline;
+    }
+
+    .compose-body {
+        flex: 1;
+        padding: 16px;
+        overflow-y: auto;
+    }
+
+    .compose-textarea {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        resize: none;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .compose-footer {
+        padding: 12px 16px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8fafc;
+    }
+
+    .compose-tools {
+        display: flex;
+        gap: 8px;
+    }
+
+    .tool-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #64748b;
+        transition: all 0.15s;
+    }
+
+    .tool-btn:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+
+    .send-btn {
+        padding: 10px 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.25s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .send-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+        transition: left 0.5s;
+    }
+
+    .send-btn:hover::before {
+        left: 100%;
+    }
+
+    .send-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+    }
+
+    .send-btn:disabled {
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .send-btn.sending {
+        background: linear-gradient(135deg, #818cf8 0%, #8b5cf6 100%);
+        animation: sendPulse 1.5s ease-in-out infinite;
+        pointer-events: none;
+    }
+
+    @keyframes sendPulse {
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.5);
+        }
+
+        50% {
+            box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+        }
+    }
+
+    /* Error toast */
+    .compose-error-toast {
+        padding: 10px 16px;
+        background: linear-gradient(135deg, #fef2f2, #fee2e2);
+        border-left: 3px solid #ef4444;
+        color: #b91c1c;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: slideUpToast 0.3s ease;
+    }
+
+    @keyframes slideUpToast {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .file-preview-area {
+        padding: 0 16px 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .file-preview-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #eef2ff;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        color: #667eea;
+    }
+
+    .remove-file {
+        cursor: pointer;
+        font-size: 14px;
+    }
+</style>
+
+<script>
+    // ============================================================
+    // Recipient Autocomplete
+    // ============================================================
+    let searchTimeout = null;
+    let activeDropdownIndex = -1;
+
+    function initRecipientInput(inputId, dropdownId, chipsId) {
+        const input = document.getElementById(inputId);
+        const dropdown = document.getElementById(dropdownId);
+
+        if (!input || !dropdown) return;
+
+        input.addEventListener('input', function () {
+            const query = this.value.trim();
+            clearTimeout(searchTimeout);
+            activeDropdownIndex = -1;
+
+            if (query.length < 2) {
+                dropdown.classList.remove('show');
+                dropdown.innerHTML = '';
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                fetchRecipients(query, dropdown, chipsId);
+            }, 250);
+        });
+
+        // Keyboard navigation
+        input.addEventListener('keydown', function (e) {
+            const items = dropdown.querySelectorAll('.dropdown-item');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeDropdownIndex = Math.min(activeDropdownIndex + 1, items.length - 1);
+                updateActiveItem(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeDropdownIndex = Math.max(activeDropdownIndex - 1, -1);
+                updateActiveItem(items);
+            } else if (e.key === 'Enter' && activeDropdownIndex >= 0 && items.length > 0) {
+                e.preventDefault();
+                items[activeDropdownIndex].click();
+            } else if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
+                // Add raw email if valid
+                const val = this.value.replace(',', '').trim();
+                if (val && val.includes('@')) {
+                    e.preventDefault();
+                    addChip(chipsId, val, val, 'email');
+                    this.value = '';
+                    dropdown.classList.remove('show');
+                }
+            } else if (e.key === 'Backspace' && !this.value) {
+                // Remove last chip
+                const chips = document.getElementById(chipsId);
+                const lastChip = chips.querySelector('.recipient-chip:last-child');
+                if (lastChip) lastChip.remove();
+            }
+        });
+
+        // Close dropdown on outside click
+        document.addEventListener('click', function (e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+    }
+
+    function updateActiveItem(items) {
+        items.forEach((item, i) => {
+            item.classList.toggle('active', i === activeDropdownIndex);
+        });
+        if (activeDropdownIndex >= 0 && items[activeDropdownIndex]) {
+            items[activeDropdownIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function fetchRecipients(query, dropdown, chipsId) {
+        fetch(`/email/api/recipients/?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(results => {
+                dropdown.innerHTML = '';
+
+                if (results.length === 0) {
+                    dropdown.innerHTML = `
+                        <div class="dropdown-empty">
+                            <i class="fas fa-search" style="margin-bottom:4px"></i><br>
+                            No contacts or companies found
+                        </div>
+                        <div class="dropdown-hint">
+                            <i class="fas fa-info-circle"></i> Type a full email and press Enter to add manually
+                        </div>
+                    `;
+                    dropdown.classList.add('show');
+                    return;
+                }
+
+                results.forEach(r => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item';
+                    const icon = r.type === 'contact' ? 'fa-user' : 'fa-building';
+                    const detail = r.type === 'contact' && r.company
+                        ? `${r.email} · ${r.company}`
+                        : r.email;
+
+                    item.innerHTML = `
+                        <div class="dropdown-item-icon ${r.type}">
+                            <i class="fas ${icon}"></i>
+                        </div>
+                        <div class="dropdown-item-info">
+                            <div class="dropdown-item-name">${escapeHtml(r.name)}</div>
+                            <div class="dropdown-item-detail">${escapeHtml(detail)}</div>
+                        </div>
+                        <span class="dropdown-item-badge ${r.type}">${r.type === 'contact' ? 'Contact' : 'Company'}</span>
+                    `;
+
+                    item.addEventListener('click', () => {
+                        const email = r.email || '';
+                        addChip(chipsId, email, r.name, r.type, r.id);
+                        const input = dropdown.previousElementSibling;
+                        input.value = '';
+                        dropdown.classList.remove('show');
+                        input.focus();
+                    });
+
+                    dropdown.appendChild(item);
+                });
+
+                dropdown.classList.add('show');
+            })
+            .catch(err => {
+                console.error('Recipient search error:', err);
+            });
+    }
+
+    function addChip(chipsId, email, name, type, id) {
+        const chips = document.getElementById(chipsId);
+
+        // Don't add duplicate
+        const existing = chips.querySelectorAll('.recipient-chip');
+        for (const chip of existing) {
+            if (chip.dataset.email === email) return;
+        }
+
+        const chip = document.createElement('span');
+        chip.className = 'recipient-chip' + (type === 'company' ? ' company-chip' : '');
+        chip.dataset.email = email;
+        chip.dataset.type = type || 'email';
+        if (id) chip.dataset.id = id;
+
+        chip.innerHTML = `
+            <span class="chip-text">${escapeHtml(name || email)}</span>
+            <i class="fas fa-times chip-remove" onclick="removeChip(this)"></i>
+        `;
+        chips.appendChild(chip);
+
+        // Auto-fill hidden CRM fields from To chips
+        if (chipsId === 'toChips' && id) {
+            if (type === 'company') {
+                const hidden = document.getElementById('hiddenCompanyId');
+                if (hidden) hidden.value = id;
+            } else if (type === 'contact') {
+                const hidden = document.getElementById('hiddenContactId');
+                if (hidden) hidden.value = id;
+            }
+        }
+
+        // Update input placeholder
+        updatePlaceholder(chipsId);
+    }
+
+    function removeChip(el) {
+        const chip = el.closest('.recipient-chip');
+        const chipsId = chip.parentElement.id;
+        chip.remove();
+        updatePlaceholder(chipsId);
+    }
+
+    function updatePlaceholder(chipsId) {
+        const chips = document.getElementById(chipsId);
+        const input = chips.nextElementSibling;
+        if (chips.children.length > 0) {
+            input.placeholder = '';
+        } else {
+            input.placeholder = 'Search contacts / companies or type email...';
+        }
+    }
+
+    function getChipEmails(chipsId) {
+        const chips = document.getElementById(chipsId);
+        return Array.from(chips.querySelectorAll('.recipient-chip')).map(c => c.dataset.email).filter(Boolean);
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ============================================================
+    // Compose actions
+    // ============================================================
+
+    function closeComposeModal() {
+        document.getElementById('composeModalContainer').innerHTML = '';
+    }
+
+    function toggleField(id) {
+        const el = document.getElementById(id);
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function handleFileSelect(event) {
+        const files = event.target.files;
+        const preview = document.getElementById('filePreviewArea');
+        preview.innerHTML = '';
+
+        Array.from(files).forEach(file => {
+            const item = document.createElement('div');
+            item.className = 'file-preview-item';
+            item.innerHTML = `
+                <i class="fas fa-file"></i>
+                <span>${escapeHtml(file.name)}</span>
+                <i class="fas fa-times remove-file"></i>
+            `;
+            preview.appendChild(item);
+        });
+    }
+
+    function showComposeError(message) {
+        const toast = document.getElementById('composeErrorToast');
+        const text = document.getElementById('composeErrorText');
+        if (toast && text) {
+            text.textContent = message;
+            toast.style.display = 'flex';
+            setTimeout(() => { toast.style.display = 'none'; }, 5000);
+        }
+    }
+
+    function sendEmail(event) {
+        // Prevent default just in case
+        if (event) event.preventDefault();
+
+        console.log('[SEND] sendEmail called');
+
+        // Auto-add text in To field as chip if valid email
+        const toInput = document.getElementById('toInput');
+        if (toInput && toInput.value.trim()) {
+            const val = toInput.value.trim();
+            if (val.includes('@')) {
+                addChip('toChips', val, val, 'email');
+                toInput.value = '';
+            }
+        }
+
+        const form = document.getElementById('composeForm');
+        const formData = new FormData(form);
+        const btn = document.getElementById('sendBtn');
+        const btnContent = btn.querySelector('.send-btn-content');
+        const btnLoading = btn.querySelector('.send-btn-loading');
+
+        // Hide previous error
+        const errorToast = document.getElementById('composeErrorToast');
+        if (errorToast) errorToast.style.display = 'none';
+
+        // Collect recipients from chips
+        const toEmails = getChipEmails('toChips');
+        console.log('[SEND] To emails:', toEmails);
+
+        if (toEmails.length === 0) {
+            showComposeError('Please add at least one recipient.');
+            return;
+        }
+
+        // Add recipients to formData
+        toEmails.forEach(e => formData.append('to[]', e));
+        getChipEmails('ccChips').forEach(e => formData.append('cc[]', e));
+        getChipEmails('bccChips').forEach(e => formData.append('bcc[]', e));
+
+        // --- Show loading state ---
+        btn.disabled = true;
+        btn.classList.add('sending');
+        if (btnContent) btnContent.style.display = 'none';
+        if (btnLoading) btnLoading.style.display = 'inline-flex';
+        console.log('[SEND] Sending request to /email/send/');
+
+        function resetBtn() {
+            btn.disabled = false;
+            btn.classList.remove('sending');
+            if (btnContent) btnContent.style.display = 'inline-flex';
+            if (btnLoading) btnLoading.style.display = 'none';
+        }
+
+        fetch('/email/send/', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+            .then(res => {
+                console.log('[SEND] Response status:', res.status);
+                return res.json().then(data => ({ ok: res.ok, data }));
+            })
+            .then(({ ok, data }) => {
+                console.log('[SEND] Response data:', data);
+                if (ok && data.success) {
+                    // Close modal immediately
+                    closeComposeModal();
+
+                    // Show global green success toast
+                    if (window.showGlobalToast) {
+                        window.showGlobalToast('Mail başarıyla gönderildi!');
+                    }
+
+                    // Update Sent count in sidebar immediately
+                    const sentLink = document.querySelector('a[hx-get*="/sent/"]');
+                    if (sentLink) {
+                        let badge = sentLink.querySelector('.folder-count');
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'folder-count';
+                            badge.textContent = '0';
+                            sentLink.appendChild(badge);
+                        }
+                        const currentCount = parseInt(badge.textContent || '0');
+                        badge.textContent = currentCount + 1;
+                    }
+
+                    // Refresh inbox via HTMX
+                    const activeLink = document.querySelector('.folder-link.active');
+                    if (activeLink && typeof htmx !== 'undefined') {
+                        // Use standard HTMX triggers
+                        htmx.trigger(activeLink, 'click');
+                    }
+                } else {
+                    resetBtn();
+                    showComposeError(data.error || 'Mail gönderilemedi.');
+                }
+            })
+            .catch(err => {
+                console.error('[SEND] Error:', err);
+                resetBtn();
+                showComposeError(err.message || 'Bağlantı hatası. Tekrar deneyin.');
+            });
+    }
+
+    // Initialize all recipient inputs
+    initRecipientInput('toInput', 'toDropdown', 'toChips');
+    initRecipientInput('ccInput', 'ccDropdown', 'ccChips');
+    initRecipientInput('bccInput', 'bccDropdown', 'bccChips');
+</script>

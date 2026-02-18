@@ -160,3 +160,21 @@ class CartItem(models.Model):
             return f"{self.client.username} - Custom Curtain ({self.product_sku}) x {self.quantity}"
         variant_info = f" ({self.variant_sku})" if self.variant_sku else ""
         return f"{self.client.username} - {self.product_sku}{variant_info} x {self.quantity}"
+
+
+class GoogleChatCredentials(models.Model):
+    """Store Google OAuth credentials for Chat integration"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='google_chat_credentials')
+    token = models.TextField()  # JSON stored token
+    refresh_token = models.TextField(blank=True, null=True)
+    token_uri = models.TextField()
+    client_id = models.TextField()
+    client_secret = models.TextField()
+    scopes = models.TextField()
+    email = models.EmailField(blank=True, null=True)
+    avatar_url = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Google Chat Credentials for {self.user.username}"

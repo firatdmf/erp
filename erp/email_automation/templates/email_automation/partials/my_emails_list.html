@@ -1,0 +1,158 @@
+<!-- List Header -->
+<div class="em-list-header">
+    <label><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"> Select all</label>
+</div>
+
+{% for email in emails %}
+<a href="{% url 'email_automation:email_detail' email.id %}"
+    class="em-email-item {% if not email.is_read %}unread{% endif %}" data-email-id="{{ email.id }}">
+
+    <input type="checkbox" class="em-item-checkbox" onclick="event.stopPropagation()">
+
+    <div class="em-avatar em-avatar-{% cycle '0' '1' '2' '3' '4' '5' '6' '7' %}">
+        {% if current_folder == 'sent' %}
+        {{ email.to_emails.0|make_list|first|upper|default:"?" }}
+        {% else %}
+        {{ email.from_name|default:email.from_email|make_list|first|upper|default:"?" }}
+        {% endif %}
+    </div>
+
+    <div class="em-content">
+        <div class="em-sender-row">
+            <span class="em-sender-name">
+                {% if current_folder == 'sent' %}
+                {{ email.to_emails.0 }}
+                {% else %}
+                {{ email.from_name|default:email.from_email }}
+                {% endif %}
+            </span>
+
+            {% for company in email.companies.all %}
+            <span class="em-crm-badge company">
+                <i class="fas fa-building"></i> {{ company.name }}
+            </span>
+            {% empty %}
+            {% if email.company %}
+            <span class="em-crm-badge company">
+                <i class="fas fa-building"></i> {{ email.company.name }}
+            </span>
+            {% endif %}
+            {% endfor %}
+
+            {% for contact in email.contacts.all %}
+            <span class="em-crm-badge contact">
+                <i class="fas fa-user"></i> {{ contact.name }}
+            </span>
+            {% empty %}
+            {% if email.contact %}
+            <span class="em-crm-badge contact">
+                <i class="fas fa-user"></i> {{ email.contact.name }}
+            </span>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="em-subject-row">
+            {% if not email.is_read %}<span class="em-unread-dot"></span>{% endif %}
+            <span class="em-subject">{{ email.subject|default:"(No Subject)" }}</span>
+        </div>
+
+        <div class="em-snippet">{{ email.get_preview }}</div>
+    </div>
+
+    <div class="em-meta">
+        <span class="em-date">
+            {% if email.sent_at %}
+            {{ email.sent_at|date:"H:i" }}
+            {% elif email.received_at %}
+            {{ email.received_at|date:"H:i" }}
+            {% else %}
+            {{ email.created_at|date:"d M" }}
+            {% endif %}
+        </span>
+        {% if email.attachments.count %}
+        <span class="em-attachment-icon"
+            title="{{ email.attachments.count }} attachment{{ email.attachments.count|pluralize }}">
+            <i class="fas fa-paperclip"></i>
+        </span>
+        {% endif %}
+    </div>
+</a>
+{% empty %}
+<div class="em-empty-state">
+    <div class="em-empty-icon"><i class="fas fa-inbox"></i></div>
+    <h3>No emails here</h3>
+    <p>This folder is empty. Emails will appear here once received.</p>
+</div>
+{% endfor %}
+
+<!-- Bottom Pagination -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="em-bottom-pagination">
+    <span class="em-pag-info">
+        Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} emails
+    </span>
+    <div class="em-pag-controls">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if current_folder %}&folder={{ current_folder }}{% endif %}"
+            class="em-pag-btn" title="Previous"
+            hx-get="?page={{ page_obj.previous_page_number }}{% if current_folder %}&folder={{ current_folder }}{% endif %}"
+            hx-target="#emailListContainer" hx-push-url="true">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        {% else %}
+        <span class="em-pag-btn disabled"><i class="fas fa-chevron-left"></i></span>
+        {% endif %}
+
+        {% for p in page_obj.paginator.page_range %}
+        {% if p == page_obj.number %}
+        <span class="em-pag-num active">{{ p }}</span>
+        {% elif p == 1 or p == page_obj.paginator.num_pages or p >= page_obj.number|add:"-2" and p <=
+            page_obj.number|add:"2" %} <a
+            href="?page={{ p }}{% if current_folder %}&folder={{ current_folder }}{% endif %}" class="em-pag-num"
+            hx-get="?page={{ p }}{% if current_folder %}&folder={{ current_folder }}{% endif %}"
+            hx-target="#emailListContainer" hx-push-url="true">{{ p }}</a>
+            {% elif p == page_obj.number|add:"-3" or p == page_obj.number|add:"3" %}
+            <span class="em-pag-num" style="cursor: default;">…</span>
+            {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if current_folder %}&folder={{ current_folder }}{% endif %}"
+                class="em-pag-btn" title="Next"
+                hx-get="?page={{ page_obj.next_page_number }}{% if current_folder %}&folder={{ current_folder }}{% endif %}"
+                hx-target="#emailListContainer" hx-push-url="true">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% else %}
+            <span class="em-pag-btn disabled"><i class="fas fa-chevron-right"></i></span>
+            {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- OOB Swap for Folder Tabs -->
+{% if is_htmx %}
+<div class="em-folder-tabs" id="folderTabs" hx-swap-oob="true">
+    <a href="{% url 'email_automation:my_emails' %}" class="em-tab {% if current_folder == 'inbox' %}active{% endif %}"
+        hx-get="{% url 'email_automation:my_emails' %}" hx-target="#emailListContainer" hx-push-url="true">
+        Inbox
+        {% if folder_counts.unread %}<span class="em-tab-count">{{ folder_counts.unread }}</span>{% endif %}
+    </a>
+    <a href="{% url 'email_automation:my_emails_sent' %}"
+        class="em-tab {% if current_folder == 'sent' %}active{% endif %}"
+        hx-get="{% url 'email_automation:my_emails_sent' %}" hx-target="#emailListContainer" hx-push-url="true">
+        Sent
+    </a>
+    <a href="{% url 'email_automation:my_emails_archive' %}"
+        class="em-tab {% if current_folder == 'archive' %}active{% endif %}"
+        hx-get="{% url 'email_automation:my_emails_archive' %}" hx-target="#emailListContainer" hx-push-url="true">
+        Archive
+    </a>
+    <a href="{% url 'email_automation:my_emails_trash' %}"
+        class="em-tab {% if current_folder == 'trash' %}active{% endif %}"
+        hx-get="{% url 'email_automation:my_emails_trash' %}" hx-target="#emailListContainer" hx-push-url="true">
+        Trash
+    </a>
+</div>
+{% endif %}

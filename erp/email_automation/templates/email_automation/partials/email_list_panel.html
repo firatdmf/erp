@@ -1,0 +1,125 @@
+<!-- Email List Header -->
+<div class="email-list-header">
+    <div class="email-list-title-row">
+        <i class="{{ folder_icon }}"></i>
+        <span>{{ page_title }}</span>
+    </div>
+
+    <div class="email-search">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Search emails, contacts..." id="emailSearch" autocomplete="off">
+    </div>
+</div>
+
+<!-- Filter Bar – Spacious with Labels -->
+<div class="email-filter-bar" id="emailFilterBar">
+    <div class="filter-group">
+        <label for="filterCompany">Company</label>
+        <input type="text" class="filter-input" id="filterCompany" placeholder="Filter by company..."
+            value="{{ filter_company|default:'' }}" autocomplete="off">
+    </div>
+    <div class="filter-group">
+        <label for="filterContact">Contact</label>
+        <input type="text" class="filter-input" id="filterContact" placeholder="Filter by contact..."
+            value="{{ filter_contact|default:'' }}" autocomplete="off">
+    </div>
+    <div class="filter-group">
+        <label for="filterEmail">Email</label>
+        <input type="text" class="filter-input" id="filterEmail" placeholder="Filter by email..."
+            value="{{ filter_email|default:'' }}" autocomplete="off">
+    </div>
+    <button class="filter-clear-btn" onclick="clearFilters()" title="Clear all filters">
+        Clear
+    </button>
+</div>
+
+<!-- Email List -->
+<div class="email-list" id="emailList">
+    {% if emails %}
+    {% for email in emails %}
+    <a href="javascript:void(0)"
+        class="email-item {% if not email.is_read %}unread{% endif %} {% if selected_email.id == email.id %}active{% endif %}"
+        hx-get="{% url 'email_automation:email_detail' email.id %}" hx-target="#emailDetailContent" hx-swap="innerHTML">
+
+        <!-- Avatar -->
+        <div class="email-avatar"
+            style="background: {{ email.avatar_color|default:'linear-gradient(135deg, #dbeafe, #93c5fd)' }};">
+            {% if current_folder == 'sent' %}
+            {{ email.to_emails.0|make_list|first|upper|default:"?" }}
+            {% else %}
+            {{ email.from_name|default:email.from_email|make_list|first|upper|default:"?" }}
+            {% endif %}
+        </div>
+
+        <!-- Content -->
+        <div class="email-content-col">
+            <div class="email-header-row">
+                <span class="email-sender">
+                    {% if current_folder == 'sent' %}
+                    {{ email.to_emails.0 }}
+                    {% else %}
+                    {{ email.from_name|default:email.from_email }}
+                    {% endif %}
+                </span>
+
+                <!-- Inline badges -->
+                {% for company in email.companies.all %}
+                <span class="email-badge company">
+                    <i class="fas fa-building"></i> {{ company.name }}
+                </span>
+                {% empty %}
+                {% if email.company %}
+                <span class="email-badge company">
+                    <i class="fas fa-building"></i> {{ email.company.name }}
+                </span>
+                {% endif %}
+                {% endfor %}
+
+                {% for contact in email.contacts.all %}
+                <span class="email-badge contact">
+                    <i class="fas fa-user"></i> {{ contact.name }}
+                </span>
+                {% empty %}
+                {% if email.contact %}
+                <span class="email-badge contact">
+                    <i class="fas fa-user"></i> {{ email.contact.name }}
+                </span>
+                {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="email-subject">
+                {% if not email.is_read %}<span class="unread-dot"></span>{% endif %}
+                {{ email.subject|default:"(No Subject)" }}
+            </div>
+            <div class="email-snippet">{{ email.get_preview }}</div>
+        </div>
+
+        <!-- Date & Attachment -->
+        <div class="email-meta-right">
+            <span class="email-date">
+                {% if email.sent_at %}
+                {{ email.sent_at|date:"H:i" }}
+                {% elif email.received_at %}
+                {{ email.received_at|date:"H:i" }}
+                {% else %}
+                {{ email.created_at|date:"d M" }}
+                {% endif %}
+            </span>
+            {% if email.attachments.count %}
+            <span class="email-has-attachment"
+                title="{{ email.attachments.count }} attachment{{ email.attachments.count|pluralize }}">
+                <i class="fas fa-paperclip"></i>
+            </span>
+            {% endif %}
+        </div>
+    </a>
+    {% endfor %}
+    {% else %}
+    <div class="email-empty-state" style="padding:60px 30px; text-align:center;">
+        <i class="fas fa-inbox" style="font-size:40px; margin-bottom:16px; color:#d1d5db;"></i>
+        <h3 style="margin:0 0 6px; color:#6b7280; font-size:15px; font-weight:600;">Folder is empty</h3>
+        <p style="margin:0; color:#9ca3af; font-size:13px;">No emails in this folder yet.</p>
+    </div>
+    {% endif %}
+</div>

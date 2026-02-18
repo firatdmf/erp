@@ -268,6 +268,52 @@
     background: #f1f5f9;
   }
 
+  /* Action Dropdown */
+  .action-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid var(--mm-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 150px;
+    z-index: 100;
+    overflow: hidden;
+  }
+
+  .action-dropdown.show {
+    display: block;
+  }
+
+  .action-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--mm-text-main);
+    cursor: pointer;
+    transition: background 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .action-dropdown-item:hover {
+    background: #f8fafc;
+  }
+
+  .action-dropdown-item.danger {
+    color: #dc2626;
+  }
+
+  .action-dropdown-item.danger:hover {
+    background: #fef2f2;
+  }
+
   /* Pagination */
   .table-footer {
     display: flex;
@@ -415,7 +461,16 @@
           <td class="date-cell">{{ member.joined_at|date:"M d, Y" }}</td>
           <td>
             <div class="action-menu">
-              <button class="action-btn"><i class="fas fa-ellipsis-h"></i></button>
+              <button class="action-btn" onclick="toggleActionMenu(event, {{ member.id }})"><i
+                  class="fas fa-ellipsis-h"></i></button>
+              {% if is_creator and member.user != team.creator %}
+              <div class="action-dropdown" id="actionMenu{{ member.id }}">
+                <button class="action-dropdown-item danger"
+                  onclick="removeMember({{ member.id }}, '{{ member.user.get_full_name|escapejs }}')">
+                  <i class="fas fa-user-minus"></i> Remove Member
+                </button>
+              </div>
+              {% endif %}
             </div>
           </td>
         </tr>
@@ -624,5 +679,54 @@
   document.getElementById('inviteModal').addEventListener('click', function (e) {
     if (e.target === this) closeInviteModal();
   });
+
+  // Action Menu Toggle
+  function toggleActionMenu(event, memberId) {
+    event.stopPropagation();
+    // Close all other dropdowns
+    document.querySelectorAll('.action-dropdown.show').forEach(d => {
+      if (d.id !== 'actionMenu' + memberId) d.classList.remove('show');
+    });
+    const menu = document.getElementById('actionMenu' + memberId);
+    if (menu) menu.classList.toggle('show');
+  }
+
+  // Close action menus when clicking outside
+  document.addEventListener('click', function () {
+    document.querySelectorAll('.action-dropdown.show').forEach(d => d.classList.remove('show'));
+  });
+
+  // Remove Member
+  function removeMember(memberId, memberName) {
+    if (!confirm(`Are you sure you want to remove "${memberName}" from the team?`)) {
+      return;
+    }
+
+    fetch('/team/member/' + memberId + '/remove/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrfToken
+      }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          // Remove row from table
+          const row = document.querySelector(`tr[data-member-id="${memberId}"]`);
+          if (row) row.remove();
+          // Update count
+          const footer = document.querySelector('.table-footer span');
+          const currentCount = document.querySelectorAll('#membersTable tr[data-member-id]').length;
+          if (footer) footer.textContent = `Showing ${currentCount} of ${currentCount} members`;
+        } else {
+          alert(data.error || 'Failed to remove member');
+        }
+      })
+      .catch(err => {
+        console.error('Error:', err);
+        alert('An error occurred while removing member');
+      });
+  }
 </script>
 {% endblock %}

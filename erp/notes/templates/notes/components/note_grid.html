@@ -1,0 +1,21 @@
+{% load humanize %}
+
+{% for note in notes %}
+{% include "notes/components/note_card.html" with note=note editing=False %}
+{% empty %}
+<div class="notes-empty" style="grid-column: 1 / -1;">
+    {% if active_tab == 'deleted' %}
+    <div class="notes-empty-icon">🗑️</div>
+    <h3>Trash is empty</h3>
+    <p>Deleted notes will appear here</p>
+    {% elif active_tab == 'favorites' %}
+    <div class="notes-empty-icon">⭐</div>
+    <h3>No favorites yet</h3>
+    <p>Add notes to favorites for quick access</p>
+    {% else %}
+    <div class="notes-empty-icon">📝</div>
+    <h3>No notes found</h3>
+    <p>Get started by creating a new note</p>
+    {% endif %}
+</div>
+{% endfor %}

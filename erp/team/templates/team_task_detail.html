@@ -1,0 +1,940 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --bg-body: #F9FAFB;
+        --bg-card: #FFFFFF;
+        --border-color: #E5E7EB;
+        --text-primary: #111827;
+        --text-secondary: #6B7280;
+        --brand-color: #4F46E5;
+        --brand-hover: #4338CA;
+        --danger-color: #EF4444;
+        --radius-md: 12px;
+        --radius-sm: 8px;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    body {
+        background-color: var(--bg-body);
+        font-family: 'Inter', sans-serif;
+        color: var(--text-primary);
+        box-sizing: border-box;
+        /* Global box-sizing */
+    }
+
+    *,
+    *::before,
+    *::after {
+        box-sizing: inherit;
+    }
+
+    /* Layout */
+    .layout-container {
+        max-width: 1400px;
+        margin: 2rem auto;
+        padding: 0 3rem;
+        display: flex;
+        gap: 4rem;
+        align-items: flex-start;
+    }
+
+    /* Main Column */
+    .main-column {
+        flex: 1;
+        min-width: 0;
+    }
+
+    /* Sidebar Column */
+    .sidebar-column {
+        width: 320px;
+        /* Reduced slightly to safe width */
+        flex-shrink: 0;
+        margin-right: 0;
+    }
+
+    /* Typography */
+    h1.page-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+    }
+
+    .breadcrumbs {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .breadcrumbs a {
+        color: var(--text-secondary);
+        text-decoration: none;
+    }
+
+    .breadcrumbs .badge {
+        background: #EEF2FF;
+        color: var(--brand-color);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .meta-info {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+        color: var(--text-secondary);
+        font-size: 0.925rem;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Description */
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #9CA3AF;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.75rem;
+    }
+
+    .description-box {
+        color: #374151;
+        line-height: 1.6;
+        margin-bottom: 3rem;
+        font-size: 1rem;
+    }
+
+    /* Activity Section */
+    .activity-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .activity-heading {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    /* Pill Switcher */
+    .pill-switcher {
+        display: flex;
+        background: #F3F4F6;
+        padding: 4px;
+        border-radius: 8px;
+        gap: 4px;
+    }
+
+    .pill-btn {
+        border: none;
+        background: transparent;
+        padding: 6px 16px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .pill-btn.active {
+        background: white;
+        color: var(--text-primary);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        font-weight: 600;
+    }
+
+    /* Sidebar Widgets */
+    .sidebar-widget {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #9CA3AF;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Interactive Dropdown (Status) */
+    .select-box {
+        width: 100%;
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        /* Increased padding */
+        font-size: 0.9rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .select-box:hover {
+        border-color: #cbd5e1;
+    }
+
+    /* Static Box (Priority/Date) */
+    .static-box {
+        width: 100%;
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        /* Increased padding */
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        color: var(--text-primary);
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+
+    /* Reporter */
+    .reporter-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+        margin-top: 1rem;
+    }
+
+    .avatar-circle {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.2);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .dropdown-menu {
+        background: white;
+        padding: 0.5rem;
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        min-width: 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .dropdown-item {
+        padding: 0.5rem 1rem;
+        text-align: left;
+        background: none;
+        border: none;
+        font-size: 0.875rem;
+        color: #374151;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background 0.1s;
+    }
+
+    .dropdown-item:hover {
+        background: #F3F4F6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="layout-container">
+
+    <!-- Main Content -->
+    <div class="main-column">
+
+        <!-- Top Nav -->
+        <div class="breadcrumbs">
+            <a href="{% url 'team:team_list' %}">Teams</a> <span>/</span>
+            <a href="{% url 'team:team_tasks' %}?team_id={{ task.team.id }}">{{ task.team.name }}</a> <span>/</span>
+            <span class="badge">TEAM-TASK-{{ task.id }}</span>
+        </div>
+
+        <!-- Title -->
+        <h1 class="page-title">{{ task.title }}</h1>
+
+        <!-- Meta -->
+        <div class="meta-info">
+            <div class="meta-item">
+                <i class="far fa-clock"></i> Due {{ task.due_date|date:"F j, Y" }}
+            </div>
+            <div class="meta-item">
+                <i class="far fa-user"></i> {{ task.assigned_to.get_full_name }}
+            </div>
+            <!-- Helper Actions: Removed as per request -->
+
+        </div>
+
+        <!-- Description -->
+        <div style="margin-bottom: 3rem;">
+            <div class="section-title">Description</div>
+            <div class="description-box">
+                {% if task.description %}
+                {{ task.description|linebreaksbr }}
+                {% else %}
+                <span style="color:#9CA3AF; font-style:italic;">No description provided.</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Attachments (Relocated) -->
+        {% if task.attachments.all %}
+        <div style="margin-bottom: 3rem;">
+            <div class="section-title">Attachments</div>
+            <div style="display:flex; flex-wrap:wrap; gap:1rem;">
+                {% for att in task.attachments.all %}
+                <div
+                    style="background:white; border:1px solid #E5E7EB; border-radius:8px; padding:0.75rem; width:100%; max-width:300px; display:flex; align-items:center; gap:0.75rem;">
+                    <div
+                        style="width:40px; height:40px; background:#F3F4F6; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#EF4444; font-size:1.2rem;">
+                        <i class="far fa-file-pdf"></i>
+                    </div>
+                    <div style="flex:1; overflow:hidden;">
+                        <div style="font-size:0.9rem; font-weight:500; color:#374151; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                            title="{{ att.file_name }}">
+                            {{ att.file_name }}
+                        </div>
+                        <div style="font-size:0.75rem; color:#9CA3AF;">Attachment</div>
+                    </div>
+                    <a href="{{ att.get_download_url }}" target="_blank"
+                        style="width:32px; height:32px; border-radius:50%; border:1px solid #E5E7EB; display:flex; align-items:center; justify-content:center; color:#6B7280; text-decoration:none; transition:bg 0.2s;"
+                        onmouseover="this.style.background='#F3F4F6'" onmouseout="this.style.background='white'">
+                        <i class="fas fa-download" style="font-size:0.8rem;"></i>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Activity Section -->
+        <div>
+            <!-- Activity Header with Tabs -->
+            <div class="activity-header">
+                <div class="activity-heading">Activity</div>
+                <!-- Pill Toggle -->
+                <div class="pill-switcher">
+                    <button class="pill-btn active" onclick="switchTab('comments')">Comments</button>
+                    <button class="pill-btn" onclick="switchTab('history')">History</button>
+                </div>
+            </div>
+
+            <!-- Tab: Comments -->
+            <div id="view-comments" class="tab-content active">
+                <!-- Comment Input -->
+                <div class="editor-wrapper" style="margin-bottom:2rem;">
+                    <form method="POST" action="{% url 'team:add_task_comment' task.id %}"
+                        onsubmit="handleCommentSubmit(event)">
+                        {% csrf_token %}
+                        <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; box-shadow:0 1px 2px 0 rgba(0,0,0,0.05); overflow:hidden; transition:all 0.2s;"
+                            onclick="this.style.borderColor='#4F46E5'; this.style.boxShadow='0 0 0 3px rgba(79, 70, 229, 0.1)';"
+                            onblur="this.style.borderColor='#E5E7EB'; this.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)';">
+
+                            <textarea name="content"
+                                style="width:100%; border:none; padding:1rem; min-height:100px; resize:vertical; outline:none; font-family:inherit; font-size:0.95rem; line-height:1.5; background:transparent;"
+                                placeholder="Write a comment..."
+                                onfocus="this.parentElement.style.borderColor='#4F46E5'; this.parentElement.style.boxShadow='0 0 0 3px rgba(79, 70, 229, 0.1)';"
+                                onblur="this.parentElement.style.borderColor='#E5E7EB'; this.parentElement.style.boxShadow='0 1px 2px 0 rgba(0,0,0,0.05)';"></textarea>
+
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 1rem; background:#FAFAFA;">
+                                <!-- Tools -->
+                                <div style="display:flex; gap:0.5rem;">
+                                    <button type="button" class="tool-btn"
+                                        style="color:#6B7280; background:none; border:none; cursor:pointer; padding:6px; border-radius:4px; transition:bg 0.2s;"
+                                        onmouseover="this.style.background='#EEF2FF'; this.style.color='#4F46E5'"
+                                        onmouseout="this.style.background='none'; this.style.color='#6B7280'">
+                                        <i class="far fa-smile" style="font-size:1.1rem;"></i>
+                                    </button>
+                                    <button type="button" class="tool-btn"
+                                        style="color:#6B7280; background:none; border:none; cursor:pointer; padding:6px; border-radius:4px; transition:bg 0.2s;"
+                                        onmouseover="this.style.background='#EEF2FF'; this.style.color='#4F46E5'"
+                                        onmouseout="this.style.background='none'; this.style.color='#6B7280'">
+                                        <i class="fas fa-paperclip" style="font-size:1.1rem;"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Send -->
+                                <button type="submit" class="btn-primary"
+                                    style="background:var(--brand-color); color:white; border:none; padding:8px 20px; border-radius:8px; font-weight:600; cursor:pointer; transition:background 0.2s;"
+                                    onmouseover="this.style.background=var(--brand-hover)"
+                                    onmouseout="this.style.background=var(--brand-color)">
+                                    Send
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Comment Stream -->
+                <div class="comment-list" style="display:flex; flex-direction:column; gap:1.5rem;">
+                    {% for comment in comments %}
+                    {% include 'team/components/single_comment.html' %}
+                    {% empty %}
+                    <div
+                        style="text-align:center; color:#9CA3AF; padding:2rem; background:#F9FAFB; border-radius:12px; border:1px dashed #E5E7EB;">
+                        <i class="far fa-comment-dots" style="font-size:2rem; margin-bottom:1rem; opacity:0.5;"></i>
+                        <p>No comments yet. Be the first to share your thoughts!</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Tab: History -->
+            <div id="view-history" class="tab-content" style="display:none;">
+                <div class="history-list" style="display:flex; flex-direction:column; gap:1.5rem;">
+                    {% for event in history %}
+                    <div class="history-item" style="display:flex; gap:1rem; align-items:flex-start;">
+                        <!-- Icon Box -->
+                        <div
+                            style="width:36px; height:36px; background:#F3F4F6; color:#6B7280; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                            {% if event.event_type == 'status_change' %}
+                            <i class="fas fa-sync-alt" style="font-size:0.9rem;"></i>
+                            {% elif event.event_type == 'comment_added' %}
+                            <i class="far fa-comment-alt" style="font-size:0.9rem;"></i>
+                            {% else %}
+                            <i class="fas fa-info" style="font-size:0.9rem;"></i>
+                            {% endif %}
+                        </div>
+
+                        <!-- Content -->
+                        <div>
+                            <div style="font-size:0.95rem; color:#374151; line-height:1.4;">
+                                <span style="font-weight:600; color:#111827;">{{ event.user.get_full_name }}</span>
+                                {% if event.event_type == 'status_change' %}
+                                changed status to <span style="font-weight:600; color:#4F46E5;">{{
+                                    event.new_value}}</span>
+                                {% elif event.event_type == 'comment_added' %}
+                                <span style="color:#6B7280;">added a comment</span>
+                                {% else %}
+                                updated the task
+                                {% endif %}
+                            </div>
+                            <div style="font-size:0.75rem; color:#9CA3AF; margin-top:0.25rem;">
+                                {{ event.created_at|timesince }} ago
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div
+                        style="text-align:center; padding:2rem; color:#9CA3AF; background:#F9FAFB; border-radius:12px; border:1px dashed #E5E7EB;">
+                        <i class="fas fa-history"
+                            style="font-size:1.5rem; margin-bottom:0.5rem; display:block; opacity:0.5;"></i>
+                        No history available yet.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar Column -->
+    <div class="sidebar-column">
+
+        <div class="sidebar-widget">
+            <!-- Status (Clickable) -->
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <div class="select-box" onclick="toggleModal('statusModal')">
+                    <div style="display:flex; align-items:center;">
+                        <span id="current-status-dot" class="status-dot"
+                            style="background:var(--tm-{{ task.column.color|default:'blue' }});"></span>
+                        <span id="current-status-text">{{ task.column.title|default:"No Status" }}</span>
+                    </div>
+                    <i class="fa fa-chevron-down" style="font-size:0.75rem; color:#9CA3AF;"></i>
+                </div>
+            </div>
+
+            <!-- Priority -->
+            <div class="form-group">
+                <label class="form-label">Priority</label>
+                <div class="static-box">
+                    <i class="fa fa-flag"
+                        style="color: {% if task.priority == 'urgent' or task.priority == 'high' %}#EF4444{% else %}#6B7280{% endif %}; margin-right:0.5rem;"></i>
+                    {{ task.get_priority_display }}
+                </div>
+            </div>
+
+            <!-- Assignees -->
+            <div class="form-group">
+                <label class="form-label">Assignees</label>
+                <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap;">
+                    {% if task.assignees.all %}
+                    {% for u in task.assignees.all|slice:":4" %}
+                    <div class="avatar-circle" title="{{ u.get_full_name }}"
+                        style="background:#E0E7FF; color:var(--brand-color); width:32px; height:32px; font-size:0.8rem; display:flex; align-items:center; justify-content:center; border-radius:50%;">
+                        {{ u.first_name|first|upper }}{{ u.last_name|first|upper }}
+                    </div>
+                    {% endfor %}
+
+                    {% if task.assignees.count > 4 %}
+                    <div class="avatar-circle" title="{{ task.assignees.count|add:'-4' }} more"
+                        style="background:#F3F4F6; color:#6B7280; width:32px; height:32px; font-size:0.75rem; display:flex; align-items:center; justify-content:center; border-radius:50%;">
+                        +{{ task.assignees.count|add:"-4" }}
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <span style="color:#9CA3AF; font-style:italic; font-size:0.9rem;">No assignees</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Due Date -->
+            <div class="form-group">
+                <label class="form-label">Due Date</label>
+                <div class="static-box">
+                    <i class="far fa-calendar" style="color:#6B7280; margin-right:0.5rem;"></i>
+                    {{ task.due_date|date:"F j, Y" }}
+                </div>
+            </div>
+
+            <!-- Reporter Divider -->
+            <div class="reporter-row">
+                <div class="avatar-circle" style="background:#1F2937; color:white;">
+                    {{ task.assigned_by.first_name.0 }}{{ task.assigned_by.last_name.0 }}
+                </div>
+                <div>
+                    <div style="font-size:0.9rem; font-weight:600;">{{ task.assigned_by.get_full_name }}</div>
+                    <div style="font-size:0.75rem; color:var(--text-secondary);">Assigner</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Actions -->
+        <!-- Actions -->
+        <div style="display:flex; gap:0.5rem; margin-top:auto;">
+            {% load todo_filters %}
+            {% with can_manage=task|can_manage_team_task:request.user %}
+            {% if can_manage %}
+            <button onclick="editTeamTask('{{ task.id }}')"
+                style="flex:1; padding:0.6rem; background:white; border:1px solid #e2e8f0; border-radius:8px; font-weight:600; color:#1e293b; display:flex; align-items:center; justify-content:center; gap:0.5rem; cursor:pointer; transition:all 0.2s;">
+                <i class="fas fa-pen" style="color:#64748b;"></i> Edit
+            </button>
+            <button onclick="deleteTeamTask('{{ task.id }}')"
+                style="padding:0.6rem 0.8rem; background:#fee2e2; border:1px solid #fecaca; border-radius:8px; color:#dc2626; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
+                <i class="fas fa-trash"></i>
+            </button>
+            {% else %}
+            <button disabled
+                style="flex:1; padding:0.6rem; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; font-weight:600; color:#94a3b8; display:flex; align-items:center; justify-content:center; gap:0.5rem; cursor:not-allowed;">
+                <i class="fas fa-lock" style="color:#94a3b8;"></i> Examples Locked
+            </button>
+            {% endif %}
+            {% endwith %}
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Status Modal -->
+<div id="statusModal" class="modal-overlay" onclick="if(event.target===this) toggleModal('statusModal')">
+    <div class="dropdown-menu">
+        {% for section in task.team.columns.all %}
+        <button class="dropdown-item"
+            onclick="updateTaskColumn('{{ section.id }}', '{{ section.title|escapejs }}', '{{ section.color }}')">
+            <span class="status-dot" style="background:var(--tm-{{ section.color|default:'blue' }});"></span>
+            {{section.title }}
+        </button>
+        {% endfor %}
+    </div>
+</div>
+
+</script>
+<div id="toast-notification"
+    style="position:fixed; bottom:24px; right:24px; background:#10B981; color:white; padding:12px 24px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); display:none; align-items:center; gap:12px; z-index:9999; font-weight:500; font-size:0.95rem;">
+    <i class="fas fa-check-circle"></i>
+    <span id="toast-message">Action successful</span>
+</div>
+
+<script>
+    // Shim to fix ReferenceError if legacy or wrong button is clicked
+    function toggleEditUserSearch() {
+        const el = document.getElementById('userSearchContainer') || document.getElementById('editUserSearchContainer');
+        if (el) {
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            if (el.style.display === 'block') {
+                const input = el.querySelector('input');
+                if (input) input.focus();
+            }
+        } else {
+            console.warn('User search container not found');
+        }
+    }
+
+    // Search users for the edit sidebar
+    function searchUsersForEdit(query) {
+        const results = document.getElementById('editUserSearchResults');
+        if (!results) return;
+
+        if (!query || query.length < 2) {
+            results.style.display = 'none';
+            return;
+        }
+
+        fetch(`/team/search-users/?q=${encodeURIComponent(query)}`)
+            .then(r => r.json())
+            .then(data => {
+                results.innerHTML = '';
+                const users = data.users || [];
+
+                // Filter out already-added users to prevent duplicates
+                const input = document.getElementById('edit_assigned_users');
+                const currentIds = input && input.value ? input.value.split(',').filter(x => x).map(x => x.trim()) : [];
+                const filteredUsers = users.filter(u => !currentIds.includes(String(u.id)));
+
+                if (filteredUsers.length === 0 && users.length > 0) {
+                    results.innerHTML = '<div style="padding:0.75rem; color:#64748b;">All matching users already added</div>';
+                } else if (filteredUsers.length === 0) {
+                    results.innerHTML = '<div style="padding:0.75rem; color:#64748b;">No users found</div>';
+                } else {
+                    filteredUsers.forEach(u => {
+                        const name = u.name || 'Unknown User';
+                        const initials = u.initials || name.charAt(0).toUpperCase();
+                        const div = document.createElement('div');
+                        div.style.cssText = 'padding:0.75rem; cursor:pointer; display:flex; align-items:center; gap:0.75rem; border-bottom:1px solid #f1f5f9;';
+                        div.innerHTML = `
+                            <div style="width:32px; height:32px; background:#e2e8f0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.85rem;">${initials}</div>
+                            <div>
+                                <div style="font-weight:500;">${name}</div>
+                                <div style="font-size:0.85rem; color:#64748b;">${u.email || ''}</div>
+                            </div>
+                        `;
+                        div.onmouseover = () => div.style.background = '#f8fafc';
+                        div.onmouseout = () => div.style.background = 'transparent';
+                        div.onclick = () => selectUserForEdit(u);
+                        results.appendChild(div);
+                    });
+                }
+                results.style.display = 'block';
+            })
+            .catch(err => console.error('Search error:', err));
+    }
+
+    // Select a user from search results
+    function selectUserForEdit(user) {
+        const container = document.getElementById('editSelectedUsersList');
+        const input = document.getElementById('edit_assigned_users');
+        const results = document.getElementById('editUserSearchResults');
+        const searchContainer = document.getElementById('editUserSearchContainer');
+
+        if (!container || !input) return;
+
+        const currentIds = input.value ? input.value.split(',').filter(x => x) : [];
+        if (currentIds.includes(String(user.id))) {
+            if (results) results.style.display = 'none';
+            if (searchContainer) searchContainer.style.display = 'none';
+            return;
+        }
+
+        const fullName = user.name || 'Unknown User';
+        const chip = document.createElement('div');
+        chip.className = 'user-chip';
+        chip.dataset.userId = user.id;
+        chip.style.cssText = 'background:#e2e8f0; padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.85rem; display:flex; align-items:center; gap:0.4rem;';
+        chip.innerHTML = `<span>${fullName}</span><button type="button" style="background:none;border:none;cursor:pointer;color:#94a3b8;" onclick="removeEditUser(${user.id})"><i class="fas fa-times"></i></button>`;
+        container.appendChild(chip);
+
+        currentIds.push(String(user.id));
+        input.value = currentIds.join(',');
+
+        if (results) results.style.display = 'none';
+        if (searchContainer) {
+            searchContainer.style.display = 'none';
+            const searchInput = searchContainer.querySelector('input');
+            if (searchInput) searchInput.value = '';
+        }
+    }
+
+    // Remove a user chip
+    function removeEditUser(userId) {
+        const container = document.getElementById('editSelectedUsersList');
+        const input = document.getElementById('edit_assigned_users');
+
+        if (!container || !input) return;
+
+        const chip = container.querySelector(`[data-id="${userId}"], [data-user-id="${userId}"]`);
+        if (chip) chip.remove();
+
+        const currentIds = input.value ? input.value.split(',').filter(x => x && x !== String(userId)) : [];
+        input.value = currentIds.join(',');
+    }
+
+    function showToast(message) {
+        const toast = document.getElementById('toast-notification');
+        const msg = document.getElementById('toast-message');
+        msg.textContent = message;
+        toast.style.display = 'flex';
+        toast.style.animation = 'slideUp 0.3s ease-out';
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            toast.style.transition = 'all 0.3s';
+            setTimeout(() => {
+                toast.style.display = 'none';
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+            }, 300);
+        }, 3000);
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(p => p.style.display = 'none');
+
+        const btn = Array.from(document.querySelectorAll('.pill-btn')).find(b => b.textContent.toLowerCase().includes(tab));
+        if (btn) btn.classList.add('active');
+
+        const content = document.getElementById('view-' + tab);
+        if (content) content.style.display = 'block';
+    }
+
+    function toggleModal(id) {
+        document.getElementById(id).classList.toggle('active');
+    }
+
+    function updateTaskColumn(columnId, title, color) {
+        // Optimistic UI update
+        const dot = document.getElementById('current-status-dot');
+        const text = document.getElementById('current-status-text');
+
+        if (dot) dot.style.background = `var(--tm-${color})`;
+        if (text) text.textContent = title;
+
+        toggleModal('statusModal');
+
+        fetch(`/team/task/{{ task.id }}/status/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: `column_id=${columnId}`
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                showToast('Status updated successfully');
+            } else {
+                alert('Failed to update status');
+                location.reload(); // Revert on failure
+            }
+        });
+    }
+
+    function handleCommentSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+        const textarea = form.querySelector('textarea');
+
+        // Loading State
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'HX-Request': 'true', // Request HTML fragment
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        }).then(response => {
+            if (response.ok) {
+                return response.text();
+            }
+            throw new Error('Network response was not ok');
+        }).then(html => {
+            // Success
+            showToast('Comment sent');
+            textarea.value = '';
+
+            // Append new comment
+            const list = document.querySelector('.comment-list');
+            const emptyState = list.querySelector('div[style*="text-align:center"]');
+            if (emptyState) emptyState.remove();
+
+            // Insert after list start (prepend)
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            list.insertBefore(temp.firstElementChild, list.firstChild);
+
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }).catch(error => {
+            console.error('Error:', error);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            alert('Failed to send comment');
+        });
+    }
+
+    function deleteTeamTask(taskId) {
+        if (!confirm('Are you sure you want to delete this task?')) return;
+        fetch(`/team/task/${taskId}/delete/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                // Redirect to team tasks if available
+                const teamId = '{{ task.team.id }}';
+                window.location.href = `{% url 'team:team_tasks' %}?team_id=${teamId}`;
+            } else {
+                alert(data.error || 'Error deleting task');
+            }
+        });
+    }
+
+    function editTeamTask(taskId) {
+        const overlay = document.getElementById('taskSidebarOverlay');
+        const sidebarContent = overlay.querySelector('.sidebar-content');
+        const title = overlay.querySelector('.sidebar-title h2');
+
+        if (!overlay || !sidebarContent) return;
+
+        // Show Loading
+        sidebarContent.innerHTML = '<div style="padding:2rem; text-align:center;"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+        title.textContent = 'Edit Task';
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        // Fetch Form
+        fetch(`/team/task/${taskId}/edit-form/`)
+            .then(r => r.text())
+            .then(html => {
+                sidebarContent.innerHTML = html;
+
+                // Re-initialize any scripts if needed, though most inline scripts execute
+                // Note: If the form scripts rely on being in the DOM, they should work fine.
+            })
+            .catch(err => {
+                sidebarContent.innerHTML = '<div style="padding:2rem; color:red;">Failed to load task details.</div>';
+                console.error(err);
+            });
+    }
+
+    function handleTeamTaskEditFormSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const btn = form.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update task'));
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('An error occurred');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+    }
+
+    function closeTaskEditSidebar() {
+        const overlay = document.getElementById('taskSidebarOverlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+</script>
+
+<style>
+    @keyframes slideUp {
+        from {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+</style>
+{% endblock %}

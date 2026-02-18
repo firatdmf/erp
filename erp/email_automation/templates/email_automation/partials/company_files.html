@@ -1,0 +1,90 @@
+<div class="files-list-container">
+    {% if attachments %}
+    <div class="files-grid">
+        {% for file in attachments %}
+        <a href="{{ file.file_url }}" target="_blank" class="file-card">
+            <div class="file-icon">
+                <i class="fas {{ file.get_file_icon }} fa-2x"></i>
+            </div>
+            <div class="file-info">
+                <span class="file-name" title="{{ file.filename }}">{{ file.filename }}</span>
+                <span class="file-meta">{{ file.uploaded_at|date:"d M Y" }} • {{ file.get_size_display }}</span>
+                <span class="file-source">Via: {{ file.email.subject|truncatechars:20 }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="far fa-folder-open"></i>
+        <p>Henüz paylaşılan dosya bulunmuyor.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .files-list-container {
+        padding: 16px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+
+    .files-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .file-card {
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        text-decoration: none;
+        transition: all 0.2s;
+        background: #f8fafc;
+    }
+
+    .file-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border-color: #cbd5e1;
+    }
+
+    .file-icon {
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        margin-bottom: 12px;
+    }
+
+    .file-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .file-name {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .file-meta {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .file-source {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 4px;
+    }
+</style>

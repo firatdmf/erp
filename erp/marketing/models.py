@@ -544,13 +544,21 @@ class ProductFile(models.Model):
     def optimized_url(self):
         """
         Returns the Cloudinary URL with automatic format and quality.
-        Example: https://res.cloudinary.com/.../upload/f_auto,q_auto/.../file.png
+        Works for both images and videos.
+        Example image: .../upload/f_auto,q_auto/.../file.png
+        Example video: .../upload/f_auto,q_auto/.../file.mp4
         """
         if not self.file_url:
             return None
 
+        # Check if it's a Cloudinary URL
+        if "/upload/" not in self.file_url:
+            return self.file_url
+
         parts = urlparse(self.file_url)
         # Insert transformations right after /upload/
+        # f_auto: automatic format selection (WebP/AVIF for images, WebM/MP4 for videos)
+        # q_auto: automatic quality compression
         optimized_path = parts.path.replace("/upload/", "/upload/f_auto,q_auto/")
         return urlunparse(parts._replace(path=optimized_path))
     
@@ -603,25 +611,24 @@ class ProductFile(models.Model):
         start = time.perf_counter()
         print(f"🗑️ ProductFile.delete(pk={self.pk}) called")
         """
-        Extracts public_id from a Cloudinary URL and deletes it.
-        SKIP Cloudinary deletion if skip_cloudinary=True (for async cleanup).
+        Deletes the file from CDN (Bunny or Cloudinary) and then from DB.
+        SKIP CDN deletion if skip_cdn=True (for async cleanup).
         """
-        skip_cloudinary = kwargs.pop('skip_cloudinary', False)
+        skip_cdn = kwargs.pop('skip_cdn', kwargs.pop('skip_cloudinary', False))
         
-        if self.file_url and not skip_cloudinary:
-            match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", self.file_url)
-            if match:
-                public_id = match.group(1)  # e.g. "media/product_images/sku123/file1"
-                try:
-                    c_start = time.perf_counter()
-                    cloudinary_destroy(public_id)
-                    print(f"   ✅ Cloudinary destroy({public_id}) took {(time.perf_counter()-c_start):.3f}s")
-                except Exception as e:
-                    print(f"   ❌ Failed to delete Cloudinary resource {public_id}: {e}")
-            else:
-                print("   ⚠️ Could not extract public_id from URL")
-        elif skip_cloudinary:
-            print(f"   ⚡ Skipped Cloudinary deletion for pk={self.pk} (will be cleaned up async)")
+        if self.file_url and not skip_cdn:
+            try:
+                c_start = time.perf_counter()
+                # Use smart_delete which handles both Bunny and Cloudinary
+                success = smart_delete(self.file_url)
+                if success:
+                    print(f"   ✅ CDN delete({self.file_url}) took {(time.perf_counter()-c_start):.3f}s")
+                else:
+                    print(f"   ⚠️ CDN delete({self.file_url}) failed or file not found")
+            except Exception as e:
+                print(f"   ❌ Failed to delete CDN resource {self.file_url}: {e}")
+        elif skip_cdn:
+            print(f"   ⚡ Skipped CDN deletion for pk={self.pk} (will be cleaned up async)")
 
         # finally delete the DB record
         db_start = time.perf_counter()
@@ -819,6 +826,10 @@ class BlogPost(models.Model):
     # Images (Cloudinary URLs)
     cover_image = models.URLField(blank=True, verbose_name="Kapak Resmi (Liste)")
     hero_image = models.URLField(blank=True, verbose_name="Hero Resmi (Detay)")
+    
+    # Custom Code Injection
+    header_content = models.TextField(blank=True, verbose_name="Extra Header Content (CSS/Meta)", help_text="e.g. &lt;style&gt;...&lt;/style&gt; or &lt;link&gt;")
+    footer_content = models.TextField(blank=True, verbose_name="Extra Footer Content (JS)", help_text="e.g. &lt;script&gt;...&lt;/script&gt;")
     
     # Meta
     author = models.CharField(max_length=200, default='Karven Home Collection')

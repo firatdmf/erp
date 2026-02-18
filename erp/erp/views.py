@@ -29,8 +29,22 @@ class reports(View):
     def get(self, request):
         return render(request, self.template_name)
 
-class user_settings(TemplateView):
+
+from authentication.models import GoogleChatCredentials
+
+class user_settings(View):
     template_name = "user_settings.html"
+
+    def get(self, request):
+        google_creds = None
+        if request.user.is_authenticated:
+            google_creds = GoogleChatCredentials.objects.filter(user=request.user).first()
+            
+        return render(request, self.template_name, {
+            "google_creds": google_creds,
+            "is_google_connected": google_creds is not None,
+            "user": request.user
+        })
 
 
 class task_report(View):
@@ -106,26 +120,45 @@ class Dashboard(View):
                 
                 # Apply tab filter - only show myTasks for calendar
                 if task_tab == 'myTasks':
-                    tasks = list(base_query.filter(member=current_member).select_related('contact', 'company', 'member', 'created_by').order_by('-due_date'))
+                    # Include tasks where user is the member OR is in assignees
+                    from django.db.models import Q
+                    tasks = list(base_query.filter(
+                        Q(member=current_member) | Q(assignees=current_member)
+                    ).distinct().select_related('contact', 'company', 'member', 'created_by').order_by('-due_date'))
                     print(f"My Tasks count: {len(tasks)}")
                     
-                    # Also get TeamTasks assigned to user
+                    # Also get TeamTasks where user is in assignees (ManyToMany)
                     if date_obj == today:
                         team_tasks_query = TeamTask.objects.filter(
-                            assigned_to=current_user,
+                            assignees=current_user,
                             due_date__lte=today
                         ).exclude(status='done')
                     else:
                         team_tasks_query = TeamTask.objects.filter(
-                            assigned_to=current_user,
+                            assignees=current_user,
                             due_date=date_obj
                         ).exclude(status='done')
                     
-                    team_tasks = list(team_tasks_query.select_related('team', 'assigned_to', 'assigned_by').order_by('-due_date'))
+                    team_tasks = list(team_tasks_query.distinct().select_related('team', 'assigned_to', 'assigned_by').prefetch_related('assignees').order_by('-due_date'))
                     print(f"Team Tasks count: {len(team_tasks)}")
+
+                    # Fetch Team Meetings
+                    # Fetch Team Meetings
+                    from team.models import TeamMeeting
+                    from django.db.models import Q
+                    
+                    meetings_query = TeamMeeting.objects.filter(
+                        Q(team__members=current_user) | 
+                        Q(participants=current_user) |
+                        Q(organizer=current_user),
+                        scheduled_at__date=date_obj
+                    ).select_related('organizer', 'team').prefetch_related('participants').order_by('scheduled_at').distinct()
+                    meetings = list(meetings_query)
+                    print(f"Meetings count: {len(meetings)}")
                 else:  # assignedTasks
                     tasks = list(base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by').order_by('-due_date'))
                     team_tasks = []
+                    meetings = []
                     print(f"Assigned Tasks count: {len(tasks)}")
                     for t in tasks:
                         print(f"  - Task ID {t.id}: {t.name} -> {t.member}")
@@ -135,11 +168,13 @@ class Dashboard(View):
                 html = render_to_string('todo/components/tasks.html', {
                     'tasks': tasks,
                     'team_tasks': team_tasks if task_tab == 'myTasks' else [],
+                    'meetings': meetings,
                     'sort_type': 'dictsortreversed',
                     'page_type': 'dashboard_calendar',
                     'csrf_token': request.META.get('CSRF_COOKIE'),
                     'path': request.path,
                     'member': request.user.member if hasattr(request.user, 'member') else None,
+                    'request': request,
                 })
                 
                 return HttpResponse(html)
@@ -207,10 +242,18 @@ class GlobalSearch(View):
 
         limit = 50 if search_type != 'all' else 5
 
-        # 1. Contacts
+        # 1. Contacts (email and phone are ArrayFields, so we need special handling)
         if search_type in ['all', 'contacts']:
-            contacts = Contact.objects.filter(
-                Q(name__icontains=query)
+            # For ArrayFields, cast to text and use ILIKE for partial matching
+            from django.db.models.functions import Cast
+            from django.db.models import TextField
+            contacts = Contact.objects.annotate(
+                email_text=Cast('email', TextField()),
+                phone_text=Cast('phone', TextField())
+            ).filter(
+                Q(name__icontains=query) |
+                Q(email_text__icontains=query) |
+                Q(phone_text__icontains=query)
             )[:limit]
             for c in contacts:
                 try:
@@ -225,9 +268,18 @@ class GlobalSearch(View):
                     'icon': 'fa-user'
                 })
 
-        # 2. Companies
-        if search_type in ['all', 'contacts']:  # Group contacts/companies under 'contacts' tab or all
-            companies = Company.objects.filter(name__icontains=query)[:limit]
+        # 2. Companies (email and phone are also ArrayFields)
+        if search_type in ['all', 'contacts']:
+            from django.db.models.functions import Cast
+            from django.db.models import TextField
+            companies = Company.objects.annotate(
+                email_text=Cast('email', TextField()),
+                phone_text=Cast('phone', TextField())
+            ).filter(
+                Q(name__icontains=query) |
+                Q(email_text__icontains=query) |
+                Q(phone_text__icontains=query)
+            )[:limit]
             for c in companies:
                 try:
                     url = reverse('crm:company_detail', args=[c.id])

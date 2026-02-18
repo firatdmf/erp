@@ -1,0 +1,46 @@
+{% load crispy_forms_tags %}
+
+<div class="sidebar-header">
+    <button class="sidebar-close" onclick="closePurchaseOrderSidebar()">
+        <i class="fas fa-times"></i> Close
+    </button>
+    <div class="sidebar-title">
+        <i class="fas fa-file-invoice-dollar text-primary"></i>
+        <h2>Create Purchase Order</h2>
+    </div>
+</div>
+
+<div class="sidebar-content">
+    <form id="addPurchaseOrderForm" method="post" onsubmit="submitPurchaseOrderForm(event)">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <h4 class="text-sm font-semibold text-gray-600 mb-2">Order Details</h4>
+            {{ form|crispy }}
+        </div>
+
+        <div class="form-group mt-4">
+            <div class="flex justify-between items-center mb-2">
+                <h4 class="text-sm font-semibold text-gray-600">Items</h4>
+            </div>
+
+            {{ items.management_form }}
+            <div id="items-formset">
+                {% for item_form in items %}
+                <div class="item-form p-3 bg-gray-50 rounded mb-3 border border-gray-200">
+                    {{ item_form|crispy }}
+                </div>
+                {% endfor %}
+            </div>
+            <small class="text-muted">Save and edit to add more items if needed.</small>
+        </div>
+
+        <div class="sidebar-footer">
+            <button type="submit" class="btn btn-primary" id="btnSaveOrder">
+                <span class="btn-text">Create Order</span>
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="closePurchaseOrderSidebar()">Cancel</button>
+        </div>
+    </form>
+</div>

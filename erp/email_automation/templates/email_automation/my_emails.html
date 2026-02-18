@@ -1,0 +1,1113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - Nejum ERP{% endblock %}
+
+{% block css %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --em-primary: #3b82f6;
+        --em-primary-light: #60a5fa;
+        --em-primary-dark: #2563eb;
+        --em-primary-bg: rgba(59, 130, 246, 0.06);
+        --em-border: #e5e7eb;
+        --em-surface: #ffffff;
+        --em-surface-2: #f8fafc;
+        --em-text: #0f172a;
+        --em-text-sec: #64748b;
+        --em-text-muted: #94a3b8;
+        --em-hover: #f1f5f9;
+        --em-radius: 12px;
+        --em-radius-sm: 8px;
+        --em-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+        --em-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .em-container {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============================================================
+       PAGE HEADER
+       ============================================================ */
+    .em-page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 0 0;
+    }
+
+    .em-page-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--em-text);
+        letter-spacing: -0.3px;
+    }
+
+    .em-page-title i {
+        color: var(--em-primary);
+        font-size: 20px;
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--em-primary-bg);
+        border-radius: 10px;
+    }
+
+    .em-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    /* Search */
+    .em-search-bar {
+        position: relative;
+        width: 280px;
+    }
+
+    .em-search-bar input {
+        width: 100%;
+        padding: 9px 14px 9px 38px;
+        border: 1px solid var(--em-border);
+        border-radius: 10px;
+        font-size: 13px;
+        background: var(--em-surface);
+        color: var(--em-text);
+        box-sizing: border-box;
+        transition: all 0.15s;
+        font-family: inherit;
+    }
+
+    .em-search-bar input::placeholder {
+        color: var(--em-text-muted);
+    }
+
+    .em-search-bar input:focus {
+        outline: none;
+        border-color: var(--em-primary);
+        box-shadow: 0 0 0 3px var(--em-primary-bg);
+    }
+
+    .em-search-bar i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--em-text-muted);
+        font-size: 13px;
+    }
+
+    /* Buttons */
+    .em-compose-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 20px;
+        background: var(--em-primary);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+        transition: all 0.15s;
+        font-family: inherit;
+        white-space: nowrap;
+    }
+
+    .em-compose-btn:hover {
+        background: var(--em-primary-dark);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+        color: white;
+    }
+
+    .em-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid var(--em-border);
+        background: var(--em-surface);
+        color: var(--em-text-sec);
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.12s;
+    }
+
+    .em-icon-btn:hover {
+        background: var(--em-hover);
+        color: var(--em-text);
+    }
+
+    .em-icon-btn i.fa-spin {
+        animation: fa-spin 0.8s infinite linear;
+    }
+
+    /* ============================================================
+       TOOLBAR (tabs + pagination in one row)
+       ============================================================ */
+    .em-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 16px;
+        padding-bottom: 0;
+    }
+
+    .em-folder-tabs {
+        display: flex;
+        align-items: center;
+        gap: 0;
+    }
+
+    .em-tab {
+        padding: 11px 20px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--em-text-sec);
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+        transition: color 0.12s, border-color 0.12s;
+        font-family: inherit;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .em-tab:hover {
+        color: var(--em-text);
+    }
+
+    .em-tab.active {
+        color: var(--em-primary);
+        font-weight: 600;
+        border-bottom-color: var(--em-primary);
+    }
+
+    .em-tab-count {
+        font-size: 10px;
+        font-weight: 700;
+        background: var(--em-primary-bg);
+        padding: 1px 7px;
+        border-radius: 10px;
+        color: var(--em-primary);
+    }
+
+    .em-tab.active .em-tab-count {
+        background: rgba(59, 130, 246, 0.15);
+    }
+
+    /* Pagination bar (Gmail-style) */
+    .em-pagination {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--em-text-sec);
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .em-pagination-info {
+        margin-right: 6px;
+    }
+
+    .em-pagination .em-pag-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid var(--em-border);
+        background: var(--em-surface);
+        color: var(--em-text-sec);
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.12s;
+        text-decoration: none;
+    }
+
+    .em-pagination .em-pag-btn:hover:not(.disabled) {
+        background: var(--em-hover);
+        color: var(--em-text);
+    }
+
+    .em-pagination .em-pag-btn.disabled {
+        opacity: 0.35;
+        cursor: default;
+        pointer-events: none;
+    }
+
+    /* ============================================================
+       EMAIL LIST
+       ============================================================ */
+    .em-list-container {
+        background: var(--em-surface);
+        border: 1px solid var(--em-border);
+        border-radius: var(--em-radius);
+        overflow: hidden;
+        margin-top: 0;
+        box-shadow: var(--em-shadow);
+    }
+
+    .em-list-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 24px;
+        background: var(--em-surface-2);
+        border-bottom: 1px solid var(--em-border);
+        font-size: 12px;
+        color: var(--em-text-muted);
+        font-weight: 500;
+    }
+
+    .em-list-header label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .em-list-header input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--em-primary);
+        cursor: pointer;
+    }
+
+    .em-email-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 16px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        background: var(--em-surface);
+        transition: background 0.08s;
+        font-family: inherit;
+        position: relative;
+    }
+
+    .em-email-item:last-child {
+        border-bottom: none;
+    }
+
+    .em-email-item:hover {
+        background: #f8fafc;
+    }
+
+    .em-email-item.unread {
+        background: #fafaff;
+    }
+
+    .em-email-item.unread .em-sender-name {
+        font-weight: 700;
+        color: var(--em-text);
+    }
+
+    .em-email-item.unread .em-subject {
+        font-weight: 700;
+        color: var(--em-text);
+    }
+
+    .em-email-item.search-hidden {
+        display: none;
+    }
+
+    /* Checkbox */
+    .em-item-checkbox {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--em-primary);
+        cursor: pointer;
+        margin-top: 4px;
+        flex-shrink: 0;
+    }
+
+    /* Avatar */
+    .em-avatar {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        flex-shrink: 0;
+        text-transform: uppercase;
+        margin-top: 1px;
+    }
+
+    /* Avatar color system */
+    .em-avatar-0 {
+        background: linear-gradient(135deg, #dbeafe, #93c5fd);
+        color: #1e40af;
+    }
+
+    .em-avatar-1 {
+        background: linear-gradient(135deg, #d1fae5, #6ee7b7);
+        color: #065f46;
+    }
+
+    .em-avatar-2 {
+        background: linear-gradient(135deg, #fce7f3, #f9a8d4);
+        color: #9d174d;
+    }
+
+    .em-avatar-3 {
+        background: linear-gradient(135deg, #fef3c7, #fcd34d);
+        color: #92400e;
+    }
+
+    .em-avatar-4 {
+        background: linear-gradient(135deg, #ede9fe, #c4b5fd);
+        color: #5b21b6;
+    }
+
+    .em-avatar-5 {
+        background: linear-gradient(135deg, #ffedd5, #fdba74);
+        color: #9a3412;
+    }
+
+    .em-avatar-6 {
+        background: linear-gradient(135deg, #e0e7ff, #a5b4fc);
+        color: #3730a3;
+    }
+
+    .em-avatar-7 {
+        background: linear-gradient(135deg, #ccfbf1, #5eead4);
+        color: #134e4a;
+    }
+
+    /* Content */
+    .em-content {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .em-sender-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 3px;
+    }
+
+    .em-sender-name {
+        font-size: 14px;
+        color: var(--em-text);
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .em-crm-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 600;
+        white-space: nowrap;
+        flex-shrink: 0;
+        letter-spacing: 0.1px;
+    }
+
+    .em-crm-badge.company {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .em-crm-badge.contact {
+        background: #ecfdf5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+    }
+
+    .em-crm-badge i {
+        font-size: 8px;
+    }
+
+    .em-subject-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 2px;
+    }
+
+    .em-subject {
+        font-size: 13px;
+        color: #374151;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+    }
+
+    .em-unread-dot {
+        width: 7px;
+        height: 7px;
+        min-width: 7px;
+        border-radius: 50%;
+        background: var(--em-primary);
+        flex-shrink: 0;
+    }
+
+    .em-snippet {
+        font-size: 12px;
+        color: var(--em-text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.5;
+    }
+
+    /* Date/meta */
+    .em-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        flex-shrink: 0;
+        min-width: 65px;
+        padding-top: 1px;
+    }
+
+    .em-date {
+        font-size: 12px;
+        color: var(--em-text-muted);
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .em-email-item.unread .em-date {
+        color: var(--em-primary);
+        font-weight: 600;
+    }
+
+    .em-attachment-icon {
+        color: var(--em-text-muted);
+        font-size: 12px;
+    }
+
+    /* Star */
+    .em-star {
+        color: #d1d5db;
+        cursor: pointer;
+        font-size: 13px;
+        transition: color 0.1s;
+        flex-shrink: 0;
+        margin-top: 3px;
+    }
+
+    .em-star:hover {
+        color: #fbbf24;
+    }
+
+    .em-star.starred {
+        color: #f59e0b;
+    }
+
+    /* ============================================================
+       BOTTOM PAGINATION
+       ============================================================ */
+    .em-bottom-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 24px;
+        background: var(--em-surface-2);
+        border-top: 1px solid var(--em-border);
+        font-size: 12px;
+        color: var(--em-text-sec);
+    }
+
+    .em-bottom-pagination .em-pag-info {
+        font-weight: 500;
+    }
+
+    .em-bottom-pagination .em-pag-controls {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .em-bottom-pagination .em-pag-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid var(--em-border);
+        background: var(--em-surface);
+        color: var(--em-text-sec);
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.12s;
+        text-decoration: none;
+    }
+
+    .em-bottom-pagination .em-pag-btn:hover:not(.disabled) {
+        background: var(--em-hover);
+        color: var(--em-text);
+    }
+
+    .em-bottom-pagination .em-pag-btn.disabled {
+        opacity: 0.35;
+        cursor: default;
+        pointer-events: none;
+    }
+
+    .em-bottom-pagination .em-pag-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        color: var(--em-text-sec);
+        transition: all 0.12s;
+    }
+
+    .em-bottom-pagination .em-pag-num:hover {
+        background: var(--em-hover);
+    }
+
+    .em-bottom-pagination .em-pag-num.active {
+        background: var(--em-primary);
+        color: white;
+    }
+
+    /* ============================================================
+       EMPTY STATE
+       ============================================================ */
+    .em-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 80px 40px;
+        text-align: center;
+    }
+
+    .em-empty-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #eff6ff, #dbeafe);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .em-empty-icon i {
+        font-size: 32px;
+        color: var(--em-primary-light);
+    }
+
+    .em-empty-state h3 {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--em-text);
+        margin: 0 0 6px;
+    }
+
+    .em-empty-state p {
+        font-size: 13px;
+        color: var(--em-text-sec);
+        margin: 0;
+        max-width: 320px;
+    }
+
+    .em-connect-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 28px;
+        background: var(--em-primary);
+        color: white;
+        border-radius: var(--em-radius);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        margin-top: 24px;
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+        transition: all 0.15s;
+    }
+
+    .em-connect-btn:hover {
+        background: var(--em-primary-dark);
+        color: white;
+    }
+
+    /* Toast */
+    .email-success-toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #059669, #10b981);
+        color: white;
+        padding: 14px 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 8px 32px rgba(5, 150, 105, 0.4);
+        z-index: 99999;
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .email-success-toast.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    /* ============================================================
+       BULK ACTION BAR
+       ============================================================ */
+    .em-bulk-bar {
+        position: fixed;
+        bottom: -80px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 24px;
+        background: #1e293b;
+        border-radius: 14px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+        z-index: 9990;
+        transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    .em-bulk-bar.visible {
+        bottom: 30px;
+    }
+
+    .em-bulk-count {
+        font-size: 13px;
+        font-weight: 600;
+        color: white;
+        padding-right: 12px;
+        border-right: 1px solid rgba(255, 255, 255, 0.15);
+        white-space: nowrap;
+    }
+
+    .em-bulk-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.12s;
+        font-family: inherit;
+    }
+
+    .em-bulk-btn.archive {
+        background: rgba(255, 255, 255, 0.12);
+        color: white;
+    }
+
+    .em-bulk-btn.archive:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .em-bulk-btn.trash {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+    }
+
+    .em-bulk-btn.trash:hover {
+        background: rgba(239, 68, 68, 0.35);
+        color: white;
+    }
+
+    .em-bulk-btn.inbox-btn {
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+    }
+
+    .em-bulk-btn.inbox-btn:hover {
+        background: rgba(59, 130, 246, 0.35);
+        color: white;
+    }
+
+    .em-bulk-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        cursor: pointer;
+        font-size: 12px;
+        margin-left: 4px;
+        transition: all 0.1s;
+    }
+
+    .em-bulk-close:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .em-page-header {
+            flex-direction: column;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .em-header-actions {
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .em-search-bar {
+            width: 100%;
+        }
+
+        .em-toolbar {
+            flex-direction: column;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .em-email-item {
+            padding: 14px 16px;
+            gap: 10px;
+        }
+
+        .em-avatar {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            font-size: 13px;
+        }
+
+        .em-item-checkbox {
+            display: none;
+        }
+
+        .em-list-header {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="em-container">
+
+    <!-- Page Header -->
+    <div class="em-page-header">
+        <div class="em-page-title">
+            <i class="fas fa-inbox"></i>
+            <span>{{ page_title }}</span>
+        </div>
+        <div class="em-header-actions">
+            <div class="em-search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search emails, contacts..." id="emailSearch" autocomplete="off">
+            </div>
+            <button class="em-icon-btn" id="syncBtn" onclick="syncEmails(this)" title="Sync emails">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+            <a href="#" class="em-compose-btn" onclick="openComposeModal(event)">
+                <i class="fas fa-pen"></i> Compose
+            </a>
+        </div>
+    </div>
+
+    {% if is_connected %}
+    <!-- Toolbar: Tabs + Pagination -->
+    <div class="em-toolbar">
+        <div class="em-folder-tabs" id="folderTabs">
+            <a href="{% url 'email_automation:my_emails' %}"
+                class="em-tab {% if current_folder == 'inbox' %}active{% endif %}"
+                hx-get="{% url 'email_automation:my_emails' %}" hx-target="#emailListContainer" hx-push-url="true">
+                Inbox
+                {% if folder_counts.unread %}<span class="em-tab-count">{{ folder_counts.unread }}</span>{% endif %}
+            </a>
+            <a href="{% url 'email_automation:my_emails_sent' %}"
+                class="em-tab {% if current_folder == 'sent' %}active{% endif %}"
+                hx-get="{% url 'email_automation:my_emails_sent' %}" hx-target="#emailListContainer" hx-push-url="true">
+                Sent
+            </a>
+            <a href="{% url 'email_automation:my_emails_archive' %}"
+                class="em-tab {% if current_folder == 'archive' %}active{% endif %}"
+                hx-get="{% url 'email_automation:my_emails_archive' %}" hx-target="#emailListContainer"
+                hx-push-url="true">
+                Archive
+            </a>
+            <a href="{% url 'email_automation:my_emails_trash' %}"
+                class="em-tab {% if current_folder == 'trash' %}active{% endif %}"
+                hx-get="{% url 'email_automation:my_emails_trash' %}" hx-target="#emailListContainer"
+                hx-push-url="true">
+                Trash
+            </a>
+        </div>
+
+        {% if page_obj.paginator.count > 0 %}
+        <div class="em-pagination">
+            <span class="em-pagination-info">
+                {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+            </span>
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}" class="em-pag-btn" title="Previous">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            {% else %}
+            <span class="em-pag-btn disabled"><i class="fas fa-chevron-left"></i></span>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}" class="em-pag-btn" title="Next">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% else %}
+            <span class="em-pag-btn disabled"><i class="fas fa-chevron-right"></i></span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Email List -->
+    <div class="em-list-container" id="emailListContainer">
+        {% include 'email_automation/partials/my_emails_list.html' %}
+    </div>
+
+    {% else %}
+    <!-- Not Connected -->
+    <div class="em-empty-state" style="margin-top: 60px;">
+        <div class="em-empty-icon"><i class="fas fa-envelope-open-text"></i></div>
+        <h3>Connect Your Google Account</h3>
+        <p>To view and send emails, connect your Google account.</p>
+        <a href="{% url 'authentication:google_login' %}" class="em-connect-btn">
+            <i class="fab fa-google"></i> Connect with Google
+        </a>
+    </div>
+    {% endif %}
+
+</div><!-- /em-container -->
+
+<!-- Compose Modal Container -->
+<div id="composeModalContainer"></div>
+
+<!-- Bulk Action Bar -->
+<div class="em-bulk-bar" id="bulkBar">
+    <span class="em-bulk-count" id="bulkCount">0 selected</span>
+    {% if current_folder != 'archive' %}
+    <button class="em-bulk-btn archive" onclick="bulkMove('archive')">
+        <i class="fas fa-archive"></i> Archive
+    </button>
+    {% endif %}
+    {% if current_folder != 'trash' %}
+    <button class="em-bulk-btn trash" onclick="bulkMove('trash')">
+        <i class="fas fa-trash"></i> Trash
+    </button>
+    {% endif %}
+    {% if current_folder == 'archive' or current_folder == 'trash' %}
+    <button class="em-bulk-btn inbox-btn" onclick="bulkMove('inbox')">
+        <i class="fas fa-inbox"></i> Move to Inbox
+    </button>
+    {% endif %}
+    <button class="em-bulk-close" onclick="clearSelection()" title="Clear"><i class="fas fa-times"></i></button>
+</div>
+
+<script>
+    // Search
+    const searchInput = document.getElementById('emailSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            const q = this.value.toLowerCase().trim();
+            document.querySelectorAll('.em-email-item').forEach(item => {
+                if (!q) { item.classList.remove('search-hidden'); return; }
+                item.classList.toggle('search-hidden', !item.textContent.toLowerCase().includes(q));
+            });
+        });
+    }
+
+    // Select all
+    function toggleSelectAll(el) {
+        document.querySelectorAll('.em-item-checkbox').forEach(cb => cb.checked = el.checked);
+        updateBulkBar();
+    }
+
+    // Checkbox change listener
+    document.addEventListener('change', function (e) {
+        if (e.target.classList.contains('em-item-checkbox')) updateBulkBar();
+    });
+
+    // Bulk bar visibility
+    function updateBulkBar() {
+        const checked = document.querySelectorAll('.em-item-checkbox:checked');
+        const bar = document.getElementById('bulkBar');
+        const count = document.getElementById('bulkCount');
+        if (checked.length > 0) {
+            bar.classList.add('visible');
+            count.textContent = checked.length + ' selected';
+        } else {
+            bar.classList.remove('visible');
+        }
+    }
+
+    // Clear selection
+    function clearSelection() {
+        document.querySelectorAll('.em-item-checkbox:checked').forEach(cb => cb.checked = false);
+        document.getElementById('selectAll').checked = false;
+        updateBulkBar();
+    }
+
+    // Bulk move
+    function bulkMove(folder) {
+        const checked = document.querySelectorAll('.em-item-checkbox:checked');
+        const ids = Array.from(checked).map(cb => {
+            return cb.closest('.em-email-item').dataset.emailId;
+        }).filter(id => id);
+
+        if (!ids.length) return;
+
+        fetch('{% url "email_automation:bulk_move_emails" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email_ids: ids, folder: folder })
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    window.showGlobalToast(d.message);
+                    setTimeout(() => location.reload(), 600);
+                } else {
+                    window.showGlobalToast(d.error || 'Failed');
+                }
+            })
+            .catch(() => window.showGlobalToast('Error moving emails'));
+    }
+
+    // Sync
+    function syncEmails(btn) {
+        const icon = btn.querySelector('i');
+        icon.classList.add('fa-spin');
+        btn.disabled = true;
+
+        fetch('{% url "email_automation:sync_emails" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+            .then(r => r.json())
+            .then(d => {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+                if (d.success) {
+                    location.reload();
+                } else {
+                    window.showGlobalToast(d.error || 'Sync failed');
+                }
+            })
+            .catch(err => {
+                icon.classList.remove('fa-spin');
+                btn.disabled = false;
+                window.showGlobalToast('Connection error');
+            });
+    }
+
+    // Compose Modal
+    function openComposeModal(event, recipientEmail, subject) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        let url = '{% url "email_automation:compose_email" %}';
+        if (recipientEmail) url += '?to=' + encodeURIComponent(recipientEmail);
+        if (subject) url += (url.includes('?') ? '&' : '?') + 'subject=' + encodeURIComponent(subject);
+
+        fetch(url, { headers: { 'HX-Request': 'true' } })
+            .then(r => r.text())
+            .then(html => {
+                const c = document.getElementById('composeModalContainer');
+                c.innerHTML = html;
+                c.querySelectorAll('script').forEach(old => {
+                    const s = document.createElement('script');
+                    Array.from(old.attributes).forEach(a => s.setAttribute(a.name, a.value));
+                    s.textContent = old.textContent;
+                    old.parentNode.replaceChild(s, old);
+                });
+            });
+    }
+
+    window.closeComposeModal = function () {
+        document.getElementById('composeModalContainer').innerHTML = '';
+    };
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            const c = document.getElementById('composeModalContainer');
+            if (c && c.innerHTML.trim()) window.closeComposeModal();
+        }
+    });
+
+    // Auto-sync on load - REMOVED to prevent infinite loop
+    /*
+    document.addEventListener('DOMContentLoaded', function () {
+        if ('{{ is_connected }}' === 'True') {
+            const btn = document.getElementById('syncBtn');
+            if (btn) syncEmails(btn);
+        }
+    });
+    */
+
+    // Toast
+    window.showGlobalToast = function (msg) {
+        const t = document.createElement('div');
+        t.className = 'email-success-toast';
+        t.innerHTML = `<i class="fas fa-check-circle"></i><span>${msg}</span>`;
+        document.body.appendChild(t);
+        requestAnimationFrame(() => t.classList.add('show'));
+        setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 4000);
+    };
+</script>
+{% endblock %}

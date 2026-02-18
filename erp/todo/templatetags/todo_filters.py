@@ -87,3 +87,32 @@ def days_since(value, arg=None):
         return "today"
     else:
         return False
+
+@register.filter
+def can_edit(task, member):
+    """
+    Check if member can edit the task.
+    Users can only edit tasks they created.
+    If created_by is None (legacy tasks), assume editable.
+    """
+    if task.created_by:
+        return task.created_by == member
+    return True
+
+@register.filter
+def can_manage_team_task(task, user):
+    """
+    Check if user can manage (create/edit/delete) the team task.
+    Allowed if user is admin or manager in the task's team.
+    """
+    if not user.is_authenticated:
+        return False
+        
+    try:
+        from team.models import TeamMember
+        member = TeamMember.objects.filter(team=task.team, user=user).first()
+        if member and member.role in ['admin', 'manager']:
+            return True
+    except Exception:
+        pass
+    return False

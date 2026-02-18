@@ -12,21 +12,45 @@
     --tm-text-muted: #64748b;
     --tm-border: #e2e8f0;
     --tm-card-bg: #ffffff;
+
+    /* Kanban Colors */
+    --tm-blue: #3b82f6;
+    --tm-green: #10b981;
+    --tm-orange: #f59e0b;
+    --tm-purple: #8b5cf6;
+    --tm-red: #ef4444;
+    --tm-teal: #14b8a6;
+    --tm-gray: #64748b;
+    --tm-pink: #ec4899;
   }
 
   body {
     background: var(--tm-bg);
-    overflow: hidden;
+    /* overflow: hidden; Removed to allow page scrolling */
   }
 
   .kanban-container {
-    height: calc(100vh - 70px);
+    min-height: calc(100vh - 70px);
     display: flex;
     flex-direction: column;
     padding: 1.5rem 2rem;
   }
 
-  /* Breadcrumb */
+  /* ... (Previous CSS remains same until .column-tasks) ... */
+
+  .column-tasks {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 100px;
+    padding-bottom: 2rem;
+    /* Add spacing at the bottom */
+  }
+
+  /* ... (Rest of CSS) ... */
+
+  /* ... (Inside HTML structure) ... */
   .breadcrumb {
     display: flex;
     gap: 0.5rem;
@@ -63,6 +87,43 @@
     display: flex;
     gap: 1rem;
     align-items: center;
+  }
+
+  /* Team Switcher */
+  .team-switcher-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .team-switcher-select {
+    appearance: none;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 0.5rem 2.25rem 0.5rem 1rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .team-switcher-select:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .switcher-icon {
+    position: absolute;
+    right: 0.85rem;
+    pointer-events: none;
+    font-size: 0.75rem;
+    color: #94a3b8;
   }
 
   .member-preview {
@@ -156,6 +217,7 @@
     margin-bottom: 0.75rem;
   }
 
+
   .column-title {
     display: flex;
     align-items: center;
@@ -163,6 +225,118 @@
     font-weight: 600;
     font-size: 0.9rem;
     color: var(--tm-text-main);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: background 0.2s;
+    flex: 1;
+    cursor: grab;
+    /* For dragging */
+  }
+
+  .column-title:active {
+    cursor: grabbing;
+  }
+
+  .column-menu-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid var(--tm-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    display: none;
+    min-width: 150px;
+    overflow: hidden;
+  }
+
+  .column-menu-dropdown.show {
+    display: block;
+  }
+
+  .menu-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--tm-text-main);
+    transition: background 0.2s;
+  }
+
+  .menu-item:hover {
+    background: #f8fafc;
+  }
+
+  .menu-item.danger {
+    color: #ef4444;
+  }
+
+  .menu-item.danger:hover {
+    background: #fef2f2;
+  }
+
+  .column-title:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .column-title-edit {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  .title-input {
+    flex: 1;
+    padding: 0.25rem 0.5rem;
+    border: 2px solid var(--tm-primary);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    outline: none;
+    width: 100%;
+  }
+
+  .btn-icon-check {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #10b981;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .btn-icon-check:hover {
+    background: #f0fdf4;
+    border-color: #10b981;
+  }
+
+  .btn-icon-cancel {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #ef4444;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .btn-icon-cancel:hover {
+    background: #fef2f2;
+    border-color: #ef4444;
   }
 
   .column-dot {
@@ -306,6 +480,295 @@
   .task-done-icon {
     color: #10b981;
     font-size: 1rem;
+  }
+
+  /* Task Card Menu */
+  .task-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+  }
+
+  .task-menu-btn {
+    background: none;
+    border: none;
+    color: var(--tm-text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .task-card:hover .task-menu-btn {
+    opacity: 1;
+  }
+
+  .task-menu-btn:hover {
+    background: #f1f5f9;
+    color: var(--tm-text-main);
+  }
+
+  .task-menu-dropdown {
+    position: absolute;
+    right: 0.5rem;
+    top: 2rem;
+    background: white;
+    border: 1px solid var(--tm-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    display: none;
+    min-width: 140px;
+  }
+
+  .task-menu-dropdown.show {
+    display: block;
+  }
+
+  .task-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.85rem;
+    color: var(--tm-text-main);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .task-menu-item:hover {
+    background: #f1f5f9;
+  }
+
+  .task-menu-item.danger {
+    color: #dc2626;
+  }
+
+  .task-menu-item:first-child {
+    border-radius: 8px 8px 0 0;
+  }
+
+  .task-menu-item:last-child {
+    border-radius: 0 0 8px 8px;
+  }
+
+  .task-card {
+    position: relative;
+  }
+
+  /* Modern Task Detail Modal */
+  .detail-modal .modal-content {
+    max-width: 960px;
+    width: 95%;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 85vh;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+  }
+
+  .modal-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .modal-main {
+    flex: 1;
+    padding: 3rem;
+    overflow-y: auto;
+    background: white;
+  }
+
+  .modal-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    color: var(--tm-text-muted);
+  }
+
+  .task-id-badge {
+    background: #f1f5f9;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .modal-task-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin-bottom: 2rem;
+    letter-spacing: -0.02em;
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .description-content {
+    font-size: 1rem;
+    color: #475569;
+    line-height: 1.7;
+    margin-bottom: 3rem;
+  }
+
+  .modal-sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: #f8fafc;
+    border-left: 1px solid #e2e8f0;
+    padding: 2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .sidebar-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .sidebar-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .status-select-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #1e293b;
+    transition: all 0.2s;
+  }
+
+  .user-stack {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .user-avatar-lg {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: #475569;
+    font-size: 0.85rem;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #e2e8f0;
+  }
+
+  .priority-select {
+    display: inline-flex;
+    padding: 0.35rem 0.85rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+    border-radius: 4px;
+    transition: color 0.2s;
+  }
+
+  .modal-close-btn:hover {
+    color: #ef4444;
+    background: #fef2f2;
+  }
+
+  .comments-section {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 2rem;
+    margin-top: auto;
+  }
+
+  .comment-input-area {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .comment-textarea {
+    width: 100%;
+    border: none;
+    background: transparent;
+    resize: none;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    outline: none;
+    min-height: 60px;
+  }
+
+  .comment-actions {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .btn-edit {
+    flex: 1;
+    padding: 0.65rem 1rem;
+    background: var(--tm-primary);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn-delete {
+    padding: 0.65rem 1rem;
+    background: #fee2e2;
+    border: none;
+    border-radius: 8px;
+    color: #dc2626;
+    font-weight: 600;
+    cursor: pointer;
   }
 
   /* Add Task Button */
@@ -463,7 +926,17 @@
 
   <!-- Header -->
   <div class="kanban-header">
-    <h1>{{ team.name }} Tasks</h1>
+    <div style="display: flex; align-items: center; gap: 1.25rem;">
+      <h1>{{ team.name }} Tasks</h1>
+      <div class="team-switcher-wrapper">
+        <select onchange="window.location.href='?team_id='+this.value" class="team-switcher-select">
+          {% for ut in user_teams %}
+          <option value="{{ ut.id }}" {% if ut.id == team.id %}selected{% endif %}>{{ ut.name }}</option>
+          {% endfor %}
+        </select>
+        <i class="fas fa-chevron-down switcher-icon"></i>
+      </div>
+    </div>
     <div class="header-right">
       <div class="member-preview">
         {% for member in members|slice:":4" %}
@@ -481,192 +954,296 @@
         <button class="view-btn active"><i class="fas fa-th-large"></i> Board</button>
         <button class="view-btn"><i class="fas fa-list"></i> List</button>
       </div>
-      <button onclick="openTaskModal()" class="btn-create-task">
+      {% if user_role == 'member' %}
+      <button class="btn-create-task" style="opacity: 0.5; cursor: not-allowed; background: #94a3b8;"
+        title="Only Admins and Managers can create tasks">
+        <i class="fas fa-lock"></i> Create Task
+      </button>
+      {% else %}
+      <button onclick="openTaskSidebar('{{ team.id }}', '{{ team.name|escapejs }}')" class="btn-create-task">
         <i class="fas fa-plus"></i> Create Task
       </button>
+      {% endif %}
     </div>
   </div>
 
   <!-- Kanban Board -->
   <div class="kanban-board">
-    <!-- To Do Column -->
-    <div class="kanban-column" data-status="todo">
+    {% for column in columns %}
+    <div class="kanban-column" data-column-id="{{ column.id }}" data-status="{{ column.title|lower }}"
+      ondragover="allowDropColumn(event)" ondrop="dropColumn(event)">
       <div class="column-header">
-        <div class="column-title">
-          <span class="column-dot dot-todo"></span>
-          To Do
-          <span class="column-count">{{ pending_tasks.count }}</span>
+        <!-- View Mode -->
+        <div class="column-title" id="title-view-{{ column.id }}" onclick="enableInlineEdit('{{ column.id }}')"
+          title="Click to edit" draggable="true" ondragstart="dragColumn(event)">
+          <span class="column-dot" style="background-color: var(--tm-{{ column.color|default:'blue' }});"></span>
+          <span class="title-text">{{ column.title }}</span>
+          <span class="column-count">{{ column.task_list|length }}</span>
         </div>
-        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
+
+        <div class="column-menu-wrapper" style="position: relative;">
+          <span class="column-menu" onclick="toggleColumnMenu(event, '{{ column.id }}')">
+            <i class="fas fa-ellipsis-h"></i>
+          </span>
+          <div class="column-menu-dropdown" id="columnMenu{{ column.id }}">
+            <div class="menu-item" onclick="moveSection('{{ column.id }}', 'left')">
+              <i class="fas fa-arrow-left"></i> Move Left
+            </div>
+            <div class="menu-item" onclick="moveSection('{{ column.id }}', 'right')">
+              <i class="fas fa-arrow-right"></i> Move Right
+            </div>
+            <div class="menu-item danger" onclick="deleteSection('{{ column.id }}')">
+              <i class="fas fa-trash"></i> Delete
+            </div>
+          </div>
+        </div>
+
+        <!-- Edit Mode -->
+        <div class="column-title-edit" id="title-edit-{{ column.id }}">
+          <input type="text" id="input-title-{{ column.id }}" value="{{ column.title }}" class="title-input"
+            onkeydown="handleTitleKeydown(event, '{{ column.id }}')" onclick="event.stopPropagation()">
+          <button onclick="saveInlineTitle('{{ column.id }}')" class="btn-icon-check"><i
+              class="fas fa-check"></i></button>
+          <button onclick="cancelInlineEdit('{{ column.id }}')" class="btn-icon-cancel"><i
+              class="fas fa-times"></i></button>
+        </div>
       </div>
       <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
-        {% for task in pending_tasks %}
-        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
-          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+        {% for task in column.task_list %}
+        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}"
+          data-title="{{ task.title|escapejs }}" data-description="{{ task.description|escapejs|default:'' }}"
+          data-priority="{{ task.priority }}" data-priority-display="{{ task.get_priority_display }}"
+          data-due-date="{{ task.due_date|date:'Y-m-d'|default:'' }}"
+          data-due-date-display="{{ task.due_date|date:'M d, Y'|default:'No date' }}"
+          data-assignees='[{% for u in task.assignees.all %}{"name": "{{ u.get_full_name|escapejs }}", "initials": "{{ u.first_name|first|upper }}{{ u.last_name|first|upper }}"}{% if not forloop.last %}, {% endif %}{% endfor %}]'
+          data-creator-id="{{ task.assigned_by.id }}"
+          data-assignee-ids="[{% for u in task.assignees.all %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}]"
+          data-column-id="{{ column.id }}">
+          <div class="task-card-header">
+            <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
+            <button class="task-menu-btn" onclick="toggleTaskMenu(event, {{ task.id }})">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <div class="task-menu-dropdown" id="taskMenu{{ task.id }}">
+              <div class="task-menu-item" onclick="window.location.href='{% url 'team:task_detail' task.id %}'"><i
+                  class="fas fa-eye"></i> View
+                Details</div>
+              {% if user_role != 'member' %}
+              <div class="task-menu-item" onclick="editTask({{ task.id }})"><i class="fas fa-edit"></i> Edit</div>
+              <div class="task-menu-item danger" onclick="deleteTask({{ task.id }})"><i class="fas fa-trash"></i> Delete
+              </div>
+              {% endif %}
+            </div>
+          </div>
           <div class="task-title">{{ task.title }}</div>
           <div class="task-footer">
             <div class="due-date {% if task.is_overdue %}overdue{% endif %}">
               <i class="fas fa-calendar"></i>
               {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
             </div>
-            <div class="task-avatar" style="background: #dbeafe; color: #2563eb;">
-              {{ task.assigned_to.first_name|first|upper }}{{ task.assigned_to.last_name|first|upper }}
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="add-task-btn" onclick="openTaskModal('todo')">
-        <i class="fas fa-plus"></i> Add Task
-      </div>
-    </div>
-
-    <!-- In Progress Column -->
-    <div class="kanban-column" data-status="in_progress">
-      <div class="column-header">
-        <div class="column-title">
-          <span class="column-dot dot-progress"></span>
-          In Progress
-          <span class="column-count">{{ in_progress_tasks.count }}</span>
-        </div>
-        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
-      </div>
-      <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
-        {% for task in in_progress_tasks %}
-        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
-          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
-          <div class="task-title">{{ task.title }}</div>
-          <div class="task-footer">
-            <div class="due-date {% if task.is_overdue %}overdue{% endif %}">
-              <i class="fas fa-clock"></i>
-              {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
-            </div>
-            <div class="task-avatar" style="background: #d1fae5; color: #059669;">
-              {{ task.assigned_to.first_name|first|upper }}{{ task.assigned_to.last_name|first|upper }}
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="add-task-btn" onclick="openTaskModal('in_progress')">
-        <i class="fas fa-plus"></i> Add Task
-      </div>
-    </div>
-
-    <!-- Review Column -->
-    <div class="kanban-column" data-status="review">
-      <div class="column-header">
-        <div class="column-title">
-          <span class="column-dot dot-review"></span>
-          Review
-          <span class="column-count">{{ review_tasks.count }}</span>
-        </div>
-        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
-      </div>
-      <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
-        {% for task in review_tasks %}
-        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
-          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
-          <div class="task-title">{{ task.title }}</div>
-          <div class="task-footer">
-            <div class="due-date">
-              <i class="fas fa-calendar"></i>
-              {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
-            </div>
-            <div class="task-avatar" style="background: #ede9fe; color: #7c3aed;">
-              {{ task.assigned_to.first_name|first|upper }}{{ task.assigned_to.last_name|first|upper }}
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="add-task-btn" onclick="openTaskModal('review')">
-        <i class="fas fa-plus"></i> Add Task
-      </div>
-    </div>
-
-    <!-- Done Column -->
-    <div class="kanban-column" data-status="done">
-      <div class="column-header">
-        <div class="column-title">
-          <span class="column-dot dot-done"></span>
-          Done
-          <span class="column-count">{{ completed_tasks.count }}</span>
-        </div>
-        <span class="column-menu"><i class="fas fa-ellipsis-h"></i></span>
-      </div>
-      <div class="column-tasks" ondrop="drop(event)" ondragover="allowDrop(event)">
-        {% for task in completed_tasks %}
-        <div class="task-card" draggable="true" ondragstart="drag(event)" data-id="{{ task.id }}">
-          <span class="priority-badge priority-{{ task.priority }}">{{ task.get_priority_display }}</span>
-          <div class="task-title">{{ task.title }}</div>
-          <div class="task-footer">
-            <div class="due-date">
-              <i class="fas fa-calendar"></i>
-              {% if task.due_date %}{{ task.due_date|date:"M d" }}{% else %}No date{% endif %}
-            </div>
+            {% if task.status == 'done' or column.title|lower == 'done' %}
             <i class="fas fa-check-circle task-done-icon"></i>
+            {% else %}
+            <div class="user-stack" style="justify-content: flex-end;">
+              {% for u in task.assignees.all|slice:":3" %}
+              <div class="task-avatar"
+                style="background: #e2e8f0; color: #475569; margin-left: -8px; border: 2px solid white;"
+                title="{{ u.get_full_name }}">
+                {{ u.first_name|first|upper }}{{ u.last_name|first|upper }}
+              </div>
+              {% endfor %}
+              {% if task.assignees.count > 3 %}
+              <div class="task-avatar"
+                style="background: #f1f5f9; color: #64748b; margin-left: -8px; border: 2px solid white; font-size: 0.7rem;">
+                +{{ task.assignees.count|add:"-3" }}
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
           </div>
         </div>
         {% endfor %}
       </div>
     </div>
+    {% endfor %}
 
     <!-- Add Section -->
     <div class="add-section">
-      <div class="add-section-btn">
+      <div class="add-section-btn" onclick="openSectionModal()">
         <i class="fas fa-plus"></i> Add Section
       </div>
     </div>
   </div>
 </div>
 
-<!-- Create Task Modal -->
-<div id="taskModal" class="modal-overlay">
+
+<!-- Create Section Modal -->
+<div id="createSectionModal" class="modal-overlay">
   <div class="modal-content">
-    <h2>Create New Task</h2>
-    <form id="taskForm">
-      <input type="hidden" name="status" id="taskStatus" value="todo">
+    <h2>Add New Section</h2>
+    <form id="createSectionForm" onsubmit="createSection(event)">
       <div class="form-group">
-        <label>Task Title *</label>
-        <input type="text" name="title" class="form-control" placeholder="What needs to be done?" required>
+        <label>Section Title</label>
+        <input type="text" name="title" class="form-control" placeholder="e.g. Backlog" required>
       </div>
       <div class="form-group">
-        <label>Description</label>
-        <textarea name="description" class="form-control" rows="3" placeholder="Add more details..."></textarea>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Assign To</label>
-          <select name="assigned_to" class="form-control">
-            {% for member in members %}
-            <option value="{{ member.user.id }}">{{ member.user.get_full_name }}</option>
-            {% endfor %}
-          </select>
+        <label>Color Tag</label>
+        <div class="color-options-grid" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="blue" checked> <span class="dot-swatch"
+              style="background:var(--tm-blue);width:16px;height:16px;border-radius:50%"></span> Blue
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="green"> <span class="dot-swatch"
+              style="background:var(--tm-green);width:16px;height:16px;border-radius:50%"></span> Green
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="orange"> <span class="dot-swatch"
+              style="background:var(--tm-orange);width:16px;height:16px;border-radius:50%"></span> Orange
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="purple"> <span class="dot-swatch"
+              style="background:var(--tm-purple);width:16px;height:16px;border-radius:50%"></span> Purple
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="red"> <span class="dot-swatch"
+              style="background:var(--tm-red);width:16px;height:16px;border-radius:50%"></span> Red
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="teal"> <span class="dot-swatch"
+              style="background:var(--tm-teal);width:16px;height:16px;border-radius:50%"></span> Teal
+          </label>
         </div>
-        <div class="form-group">
-          <label>Priority</label>
-          <select name="priority" class="form-control">
-            <option value="low">Low</option>
-            <option value="medium" selected>Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Due Date</label>
-        <input type="date" name="due_date" class="form-control">
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
-        <button type="submit" class="btn-submit">Create Task</button>
+        <button type="button" class="btn-cancel" onclick="closeSectionModal()">Cancel</button>
+        <button type="submit" class="btn-submit">Create Section</button>
       </div>
     </form>
   </div>
 </div>
 
+<!-- Edit Section Modal -->
+<div id="editSectionModal" class="modal-overlay">
+  <div class="modal-content">
+    <h2>Edit Section</h2>
+    <form id="editSectionForm" onsubmit="editSection(event)">
+      <input type="hidden" name="section_id" id="editSectionId">
+      <div class="form-group">
+        <label>Section Title</label>
+        <input type="text" name="title" id="editSectionTitle" class="form-control" required>
+      </div>
+      <div class="form-group">
+        <label>Color Tag</label>
+        <div class="color-options-grid" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="blue" id="editColor_blue"> <span class="dot-swatch"
+              style="background:var(--tm-blue);width:16px;height:16px;border-radius:50%"></span> Blue
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="green" id="editColor_green"> <span class="dot-swatch"
+              style="background:var(--tm-green);width:16px;height:16px;border-radius:50%"></span> Green
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="orange" id="editColor_orange"> <span class="dot-swatch"
+              style="background:var(--tm-orange);width:16px;height:16px;border-radius:50%"></span> Orange
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="purple" id="editColor_purple"> <span class="dot-swatch"
+              style="background:var(--tm-purple);width:16px;height:16px;border-radius:50%"></span> Purple
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="red" id="editColor_red"> <span class="dot-swatch"
+              style="background:var(--tm-red);width:16px;height:16px;border-radius:50%"></span> Red
+          </label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="radio" name="color" value="teal" id="editColor_teal"> <span class="dot-swatch"
+              style="background:var(--tm-teal);width:16px;height:16px;border-radius:50%"></span> Teal
+          </label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeEditSectionModal()">Cancel</button>
+        <button type="submit" class="btn-submit">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Task Detail Modal -->
+<div id="taskDetailModal" class="modal-overlay detail-modal">
+  <div class="modal-content">
+    <div class="modal-layout">
+      <!-- Main Content -->
+      <div class="modal-main">
+        <div class="modal-top-bar">
+          <span class="task-id-badge" id="detailIdDisplay">#TASK</span>
+          <button class="modal-close-btn" onclick="closeDetailModal()">&times;</button>
+        </div>
+
+        <h1 class="modal-task-title" id="detailTitle">Task Title</h1>
+
+        <div class="section-title"><i class="fas fa-align-left"></i> Description</div>
+        <div class="description-content" id="detailDescription">
+          No description provided.
+        </div>
+
+        <!-- Activity -->
+        <div class="comments-section">
+          <div class="section-title"><i class="fas fa-comments"></i> Activity</div>
+          <div class="comment-input-area">
+            <textarea class="comment-textarea" placeholder="Write a comment... (Coming Soon)"></textarea>
+            <div class="comment-actions">
+              <button class="btn-create-task" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;"
+                disabled>Comment</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="modal-sidebar">
+        <div class="sidebar-group">
+          <div class="sidebar-label">Status</div>
+          <div id="detailStatusBadge" class="status-select-btn">
+            <span>To Do</span>
+            <i class="fas fa-chevron-down" style="font-size: 0.7rem;"></i>
+          </div>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="sidebar-label">Assignees</div>
+          <div class="user-stack" id="detailAssignees">
+            <div class="user-avatar-lg">--</div>
+          </div>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="sidebar-label">Priority</div>
+          <div id="detailPriority" class="priority-select priority-medium">Medium</div>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="sidebar-label">Due Date</div>
+          <div class="sidebar-value" id="detailDueDate">
+            <i class="fas fa-calendar"></i> <span>Jan 01, 2024</span>
+          </div>
+        </div>
+
+        <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+          <button class="btn-edit" id="detailEditBtn" style="width: 100%; justify-content: center;">
+            <i class="fas fa-pen"></i> Edit Task
+          </button>
+          <button class="btn-delete" id="detailDeleteBtn" style="width: 100%; justify-content: center;">
+            <i class="fas fa-trash"></i> Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-  // Modal
   function openTaskModal(status = 'todo') {
     document.getElementById('taskStatus').value = status;
     document.getElementById('taskModal').style.display = 'flex';
@@ -683,49 +1260,113 @@
   }
 
   // Drag and Drop
+  let draggedCard = null;
+  let sourceColumn = null;
+
   function allowDrop(ev) {
     ev.preventDefault();
     ev.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
   }
 
   function drag(ev) {
-    ev.dataTransfer.setData("taskId", ev.target.dataset.id);
-    ev.target.classList.add('dragging');
+    const card = ev.target;
+
+    // Permission Check
+    const creatorId = parseInt(card.dataset.creatorId);
+    const assigneeIds = JSON.parse(card.dataset.assigneeIds || '[]');
+    const currentUserId = Number("{{ request.user.id }}");
+    const userRole = '{{ user_role }}';
+
+    const isAuthorized =
+      ['admin', 'manager', 'owner'].includes(userRole) ||
+      creatorId === currentUserId ||
+      assigneeIds.includes(currentUserId);
+
+    if (!isAuthorized) {
+      ev.preventDefault();
+      // Optional: Custom toast or alert
+      // alert('You can only move your own tasks.');
+      return;
+    }
+
+    draggedCard = card;
+    // Identifiy source column for count update logic
+    sourceColumn = draggedCard.closest('.kanban-column');
+
+    ev.dataTransfer.setData("taskId", card.dataset.id);
+    card.classList.add('dragging');
   }
 
   function drop(ev) {
     ev.preventDefault();
-    ev.currentTarget.style.background = '';
+    const columnTasksContainer = ev.currentTarget;
+    columnTasksContainer.style.background = '';
+
     const taskId = ev.dataTransfer.getData("taskId");
+    if (!taskId) return; // Ignore if not a task (e.g. column drag)
+
     const card = document.querySelector(`.task-card[data-id="${taskId}"]`);
-    const newStatus = ev.currentTarget.closest('.kanban-column').dataset.status;
+    const targetColumn = columnTasksContainer.closest('.kanban-column');
 
-    if (card) {
+    if (card && targetColumn) {
       card.classList.remove('dragging');
-      ev.currentTarget.appendChild(card);
+      columnTasksContainer.appendChild(card);
 
-      // Update server
+      // Update Counters
+      updateColumnCounts(sourceColumn, targetColumn);
+
+      // Server Update
+      const columnId = targetColumn.dataset.columnId;
       fetch(`/team/task/${taskId}/status/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'X-CSRFToken': '{{ csrf_token }}'
         },
-        body: `status=${newStatus}`
-      });
+        body: `column_id=${columnId}`
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (!data.success) {
+            alert('Failed to update status: ' + data.error);
+            location.reload(); // Revert on logic error
+          }
+        })
+        .catch(err => {
+          console.error('Error:', err);
+          alert('Failed to save status update.');
+          location.reload(); // Revert on network error
+        });
     }
+    draggedCard = null;
+    sourceColumn = null;
   }
 
-  // Create Task
-  document.getElementById('taskForm').onsubmit = function (e) {
-    e.preventDefault();
-    const formData = new FormData(this);
+  // Section Modal Functions
+  function openSectionModal() {
+    document.getElementById('createSectionModal').style.display = 'flex';
+  }
 
-    fetch('{% url "team:team_tasks" %}', {
+  function closeSectionModal() {
+    document.getElementById('createSectionModal').style.display = 'none';
+    document.getElementById('createSectionForm').reset();
+  }
+
+  function createSection(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    formData.append('team_id', '{{ team.id }}'); // Inject team ID
+
+    fetch('{% url "team:create_section" %}', {
       method: 'POST',
       headers: {
-        'X-CSRFToken': '{{ csrf_token }}',
-        'X-Requested-With': 'XMLHttpRequest'
+        'X-CSRFToken': '{{ csrf_token }}'
       },
       body: formData
     })
@@ -734,9 +1375,337 @@
         if (data.success) {
           window.location.reload();
         } else {
-          alert(data.error || 'Error creating task');
+          alert(data.error || 'Error creating section');
         }
       });
-  };
+  }
+
+  // Inline Edit Functions
+  function enableInlineEdit(colId) {
+    document.getElementById(`title-view-${colId}`).style.display = 'none';
+    document.getElementById(`title-edit-${colId}`).style.display = 'flex';
+    const input = document.getElementById(`input-title-${colId}`);
+    input.focus();
+    input.select();
+  }
+
+  function cancelInlineEdit(colId) {
+    document.getElementById(`title-edit-${colId}`).style.display = 'none';
+    document.getElementById(`title-view-${colId}`).style.display = 'flex';
+  }
+
+  function handleTitleKeydown(event, colId) {
+    if (event.key === 'Enter') {
+      saveInlineTitle(colId);
+    } else if (event.key === 'Escape') {
+      cancelInlineEdit(colId);
+    }
+  }
+
+  function saveInlineTitle(colId) {
+    const newTitle = document.getElementById(`input-title-${colId}`).value;
+    if (!newTitle.trim()) return;
+
+    // Optimistic Update
+    const oldTitle = document.getElementById(`title-view-${colId}`).querySelector('.title-text').textContent;
+    document.getElementById(`title-view-${colId}`).querySelector('.title-text').textContent = newTitle;
+    cancelInlineEdit(colId); // Close edit mode immediately
+
+    const formData = new FormData();
+    formData.append('title', newTitle);
+
+    fetch(`/team/section/${colId}/edit/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: formData
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) {
+          // Revert on error
+          document.getElementById(`title-view-${colId}`).querySelector('.title-text').textContent = oldTitle;
+          alert(data.error || 'Error updating title');
+        }
+      })
+      .catch(err => {
+        // Revert on network error
+        document.getElementById(`title-view-${colId}`).querySelector('.title-text').textContent = oldTitle;
+        console.error(err);
+        alert('Network error. Failed to save title.');
+      });
+  }
+
+  // Modal Functions
+  function updateColumnCounts(srcCol, tgtCol) {
+    if (!srcCol || !tgtCol) return;
+
+    const srcCountSpan = srcCol.querySelector('.column-count');
+    const tgtCountSpan = tgtCol.querySelector('.column-count');
+
+    // Update src count
+    if (srcCountSpan) {
+      const srcTasks = srcCol.querySelector('.column-tasks').children.length;
+      srcCountSpan.innerText = srcTasks;
+    }
+
+    // Update tgt count
+    if (tgtCountSpan) {
+      const tgtTasks = tgtCol.querySelector('.column-tasks').children.length;
+      tgtCountSpan.innerText = tgtTasks;
+    }
+  }
+
+
+  function toggleColumnMenu(event, columnId) {
+    event.stopPropagation();
+    document.querySelectorAll('.column-menu-dropdown').forEach(d => {
+      if (d.id !== 'columnMenu' + columnId) d.classList.remove('show');
+    });
+    document.getElementById('columnMenu' + columnId).classList.toggle('show');
+  }
+
+  // Close menus when clicking outside
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.column-menu') && !e.target.closest('.column-menu-dropdown')) {
+      document.querySelectorAll('.column-menu-dropdown.show').forEach(menu => {
+        menu.classList.remove('show');
+      });
+    }
+  });
+
+  // Task Menu Functions
+  let currentTaskId = null;
+
+  function toggleTaskMenu(event, taskId) {
+    event.stopPropagation();
+    event.preventDefault();
+
+    // Close all other menus
+    document.querySelectorAll('.task-menu-dropdown.show').forEach(menu => {
+      menu.classList.remove('show');
+    });
+
+    const menu = document.getElementById('taskMenu' + taskId);
+    menu.classList.toggle('show');
+  }
+
+  // Close menus when clicking outside
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.task-menu-btn') && !e.target.closest('.task-menu-dropdown')) {
+      document.querySelectorAll('.task-menu-dropdown.show').forEach(menu => {
+        menu.classList.remove('show');
+      });
+    }
+  });
+
+  function closeDetailModal() {
+    document.getElementById('taskDetailModal').style.display = 'none';
+  }
+
+  function viewTaskDetails(taskId) {
+    const card = document.querySelector(`.task-card[data-id="${taskId}"]`);
+    if (!card) return;
+
+    currentTaskId = taskId;
+
+    // Populate Fields
+    document.getElementById('detailTitle').textContent = card.dataset.title || 'Untitled Task';
+    document.getElementById('detailDescription').textContent = card.dataset.description || 'No description provided.';
+    document.getElementById('detailIdDisplay').textContent = `#${taskId}`;
+
+    // Status
+    const statusMap = { 'todo': 'To Do', 'in_progress': 'In Progress', 'review': 'Review', 'done': 'Done' };
+    const statusText = statusMap[card.dataset.status] || 'Unknown';
+    const statusBadge = document.getElementById('detailStatusBadge');
+    if (statusBadge) statusBadge.innerHTML = `<span>${statusText}</span><i class="fas fa-chevron-down" style="font-size: 0.7rem;"></i>`;
+
+    // Priority
+    const priority = card.dataset.priority || 'medium';
+    const priorityDisplay = card.dataset.priorityDisplay || 'Medium';
+    const pEl = document.getElementById('detailPriority');
+    if (pEl) {
+      pEl.textContent = priorityDisplay;
+      pEl.className = `priority-select priority-${priority}`;
+    }
+
+    // Due Date
+    document.getElementById('detailDueDate').innerHTML = `<i class="fas fa-calendar"></i> <span>${card.dataset.dueDateDisplay || 'No date'}</span>`;
+
+    // Assignees
+    const assigneeContainer = document.getElementById('detailAssignees');
+    if (assigneeContainer) {
+      let assignees = [];
+      try {
+        assignees = JSON.parse(card.dataset.assignees || '[]');
+      } catch (e) {
+        // Fallback for legacy or error
+        console.error('Error parsing assignees', e);
+        const name = card.dataset.assignee || 'Unknown';
+        if (name !== 'Unknown') {
+          assignees = [{ name: name, initials: card.dataset.assigneeInitials }];
+        }
+      }
+
+      if (assignees.length === 0) {
+        assigneeContainer.innerHTML = '<span style="color: #94a3b8; font-style: italic;">No assignees</span>';
+      } else {
+        let html = '<div class="user-stack">';
+        // Show up to 4
+        const displayCount = 4;
+        const show = assignees.slice(0, displayCount);
+        const remaining = assignees.length - displayCount;
+
+        show.forEach(u => {
+          html += `
+            <div class="user-avatar-lg" title="${u.name}" style="background: #e2e8f0; color: #475569; width: 32px; height: 32px; font-size: 0.8rem; border: 2px solid white; margin-left: -8px;">
+                ${u.initials}
+            </div>`;
+        });
+
+        if (remaining > 0) {
+          html += `
+            <div class="user-avatar-lg" title="${remaining} more" style="background: #f1f5f9; color: #64748b; width: 32px; height: 32px; font-size: 0.75rem; border: 2px solid white; margin-left: -8px;">
+                +${remaining}
+            </div>`;
+        }
+        html += '</div>';
+
+        // Add names text if only 1 (optional, but requested layout seemed to be just avatars or list)
+        // User asked for: "4 tane göster geri kalanı yanına + 11 yaz" -> This implies just the stack.
+        // But the previous layout had name next to it. Let's keep it clean with just the stack for multiple, 
+        // or a list if single? 
+        // "task detailde assignees kısmında" -> The screenshot showed a stack.
+        // Let's wrap it in a flex container if needed.
+        assigneeContainer.innerHTML = html;
+      }
+    }
+
+    // Actions
+    document.getElementById('detailEditBtn').onclick = () => editTask(taskId);
+    document.getElementById('detailDeleteBtn').onclick = () => deleteTask(taskId);
+
+    document.getElementById('taskDetailModal').style.display = 'flex';
+
+    // Close the dropdown menu
+    document.querySelectorAll('.task-menu-dropdown.show').forEach(menu => {
+      menu.classList.remove('show');
+    });
+  }
+
+  function closeDetailModal() {
+    document.getElementById('taskDetailModal').style.display = 'none';
+    currentTaskId = null;
+  }
+
+  function editTask(taskId) {
+    // For now, just show an alert. You can implement a full edit modal later.
+    alert('Edit functionality coming soon for task #' + taskId);
+    closeDetailModal();
+  }
+
+  function deleteTask(taskId) {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+
+    fetch(`/team/task/${taskId}/delete/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}'
+      }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          alert(data.error || 'Error deleting task');
+        }
+      });
+  }
+
+  // --- Column Reordering Logic ---
+
+  function dragColumn(ev) {
+    ev.stopPropagation(); // Prevent bubbling to task drag
+    ev.dataTransfer.setData("columnId", ev.target.closest('.kanban-column').dataset.columnId);
+    ev.dataTransfer.effectAllowed = "move";
+  }
+
+  function allowDropColumn(ev) {
+    // Only allow if dragging a column
+    // Note: dataTransfer types might not always be available in dragover/enter for security, 
+    // but usually we can assume intent if we coordinate with dragStart
+    ev.preventDefault();
+  }
+
+  function dropColumn(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    const draggedColId = ev.dataTransfer.getData("columnId");
+    if (!draggedColId || !ev.dataTransfer.types.includes("columnid")) return; // Ensure it's a column drag
+
+    const targetColumn = ev.currentTarget.closest('.kanban-column');
+    if (!targetColumn || targetColumn.dataset.columnId === draggedColId) return;
+
+    const board = document.querySelector('.kanban-board');
+    const allColumns = Array.from(board.querySelectorAll('.kanban-column'));
+    const draggedCol = board.querySelector(`.kanban-column[data-column-id="${draggedColId}"]`);
+
+    // Determine insertion
+    // Simple logic: Insert before target
+    const targetIndex = allColumns.indexOf(targetColumn);
+    const draggedIndex = allColumns.indexOf(draggedCol);
+
+    if (draggedIndex < targetIndex) {
+      targetColumn.after(draggedCol);
+    } else {
+      targetColumn.before(draggedCol);
+    }
+
+    saveColumnOrder();
+  }
+
+  function moveSection(colId, direction) {
+    const col = document.querySelector(`.kanban-column[data-column-id="${colId}"]`);
+    if (!col) return;
+
+    if (direction === 'left') {
+      const prev = col.previousElementSibling;
+      if (prev) {
+        prev.before(col);
+        saveColumnOrder();
+      }
+    } else if (direction === 'right') {
+      const next = col.nextElementSibling;
+      if (next) {
+        next.after(col);
+        saveColumnOrder();
+      }
+    }
+  }
+
+  function saveColumnOrder() {
+    const cols = document.querySelectorAll('.kanban-column');
+    const ids = Array.from(cols).map(c => c.dataset.columnId);
+
+    fetch('{% url "team:reorder_section" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ column_ids: ids })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) {
+          console.error('Failed to save order', data);
+          alert('Failed to save order');
+        }
+      });
+  }
+
 </script>
 {% endblock %}

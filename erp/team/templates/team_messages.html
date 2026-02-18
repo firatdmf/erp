@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Messages - {{ team.name }} | Nejum ERP{% endblock %}
+<title>Messages - {{ active_room.display_name|default:team.name }} | Nejum ERP</title>
 
 {% block css %}
 <style>
@@ -498,18 +498,72 @@
     font-size: 14px;
   }
 
+  /* Modern Composer Styles */
+  .message-composer {
+    padding: 24px;
+    background: white;
+    border-top: 1px solid var(--chat-border);
+  }
+
+  .composer-box {
+    background: white;
+    border: 1px solid var(--chat-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    /* Soft shadow */
+    transition: box-shadow 0.2s, border-color 0.2s;
+    overflow: hidden;
+    /* For rounded corners */
+  }
+
+  .composer-box:focus-within {
+    border-color: var(--chat-primary);
+    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.15);
+    /* Primary glow */
+  }
+
+  .composer-toolbar {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f3f4;
+    background: #f8f9fa;
+  }
+
+  .toolbar-btn {
+    width: 28px;
+    /* Slightly smaller touch target */
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--chat-text-muted);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
   .toolbar-btn:hover {
-    background: var(--chat-hover);
+    background: #e8ebed;
+    color: var(--chat-text-main);
   }
 
   .composer-input {
     width: 100%;
     border: none;
-    padding: 12px 16px;
-    font-size: 14px;
+    padding: 16px;
+    /* More breathing room */
+    font-size: 15px;
+    /* Slightly larger text */
+    line-height: 1.5;
     resize: none;
-    min-height: 48px;
-    max-height: 120px;
+    min-height: 56px;
+    max-height: 150px;
+    font-family: inherit;
+    color: var(--chat-text-main);
   }
 
   .composer-input:focus {
@@ -517,7 +571,7 @@
   }
 
   .composer-input::placeholder {
-    color: var(--chat-text-muted);
+    color: #9aa0a6;
   }
 
   .composer-footer {
@@ -525,16 +579,19 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: white;
+    /* distinct from input */
   }
 
   .composer-actions {
     display: flex;
-    gap: 4px;
+    gap: 8px;
+    /* Better spacing between icons */
   }
 
   .action-btn {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border: none;
     background: transparent;
     color: var(--chat-text-muted);
@@ -543,36 +600,51 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 18px;
+    /* Larger icons */
+    transition: background 0.2s, color 0.2s;
   }
 
   .action-btn:hover {
-    background: var(--chat-hover);
+    background: #f1f3f4;
+    color: var(--chat-primary);
   }
 
   .send-btn {
     background: var(--chat-primary);
     color: white;
     border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 13px;
+    padding: 8px 20px;
+    /* Wider button */
+    border-radius: 20px;
+    /* Pill shape */
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 2px 4px rgba(26, 115, 232, 0.3);
   }
 
   .send-btn:hover {
     background: #1557b0;
+    box-shadow: 0 4px 8px rgba(26, 115, 232, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .send-btn:active {
+    transform: translateY(0);
   }
 
   .send-hint {
     font-size: 11px;
-    color: var(--chat-text-muted);
+    color: #9aa0a6;
     text-align: center;
     margin-top: 8px;
+    font-weight: 500;
+    opacity: 0.8;
   }
 
   /* Empty State */
@@ -768,15 +840,33 @@
 
       <div class="section-header" style="margin-top: 16px;">
         <i class="fas fa-chevron-down"></i>
+        Google Chat
+      </div>
+
+      {% if is_google_connected %}
+      <div style="padding: 8px 12px; font-size: 13px; color: var(--chat-text-muted);">
+        <i class="fas fa-check-circle" style="color: #34a853; margin-right: 6px;"></i> Connected
+        <!-- Dynamic spaces listing will go here later -->
+      </div>
+      {% else %}
+      <div class="channel-item" onclick="window.location.href='{% url 'authentication:google_login' %}'"
+        style="color: #DB4437;">
+        <span class="channel-icon"><i class="fab fa-google"></i></span>
+        <span class="channel-name">Connect Google</span>
+      </div>
+      {% endif %}
+
+      <div class="section-header" style="margin-top: 16px;">
+        <i class="fas fa-chevron-down"></i>
         Direct Messages
       </div>
 
       {% for room in direct_messages %}
       <div class="channel-item {% if room.id == active_room.id %}active{% endif %}" onclick="selectRoom({{ room.id }})">
         <div class="dm-avatar" style="background: #e8f0fe; color: #1a73e8;">
-          {{ room.other_user.first_name|first|upper }}{{ room.other_user.last_name|first|upper }}
+          {{ room.display_name|slice:":2"|upper }}
         </div>
-        <span class="channel-name">{{ room.other_user.get_full_name }}</span>
+        <span class="channel-name">{{ room.display_name }}</span>
         {% if room.unread > 0 %}
         <span class="unread-badge">{{ room.unread }}</span>
         {% endif %}
@@ -813,7 +903,7 @@
       <div class="chat-title-area">
         <span class="chat-title-icon">#</span>
         <div class="chat-title">
-          <h2>{{ active_room.name }} <i class="fas fa-star" style="color: #fbbc04; font-size: 12px;"></i></h2>
+          <h2>{{ active_room.display_name }} <i class="fas fa-star" style="color: #fbbc04; font-size: 12px;"></i></h2>
           <p>{{ active_room.description|default:"Team channel" }} • {{ active_room.members.count }} Members</p>
         </div>
       </div>
@@ -829,6 +919,8 @@
           <div class="avatar member-count">+{{ active_room.members.count|add:"-3" }}</div>
           {% endif %}
         </div>
+        <button class="header-btn" onclick="startVideoCall()" title="Start Video Call"><i
+            class="fas fa-video"></i></button>
         <button class="header-btn"><i class="fas fa-bell"></i></button>
         <button class="header-btn"><i class="fas fa-info-circle"></i></button>
       </div>
@@ -847,7 +939,25 @@
             <span class="msg-sender">{{ msg.sender.get_full_name }}</span>
             <span class="msg-time">{{ msg.created_at|time:"g:i A" }}</span>
           </div>
-          <div class="msg-bubble">{{ msg.content }}</div>
+          <div class="msg-bubble">
+            {% if "Join Meeting" in msg.content and "href" in msg.content %}
+            {{ msg.content|safe }}
+            {% else %}
+            {{ msg.content }}
+            {% endif %}
+          </div>
+          {% if msg.attachments.all %}
+          {% for f in msg.attachments.all %}
+          <div class="file-attachment">
+            <div class="file-icon"><i class="fas fa-file"></i></div>
+            <div class="file-info">
+              <div class="file-name">{{ f.file_name }}</div>
+              <div class="file-size">{{ f.file_size|filesizeformat }}</div>
+            </div>
+            <a href="{{ f.file.url }}" download class="file-download"><i class="fas fa-download"></i></a>
+          </div>
+          {% endfor %}
+          {% endif %}
         </div>
       </div>
       {% empty %}
@@ -855,6 +965,10 @@
       {% endfor %}
     </div>
 
+    <div id="typingIndicator"
+      style="display:none; padding: 4px 24px; font-size: 12px; color: #5f6368; font-style: italic;">
+      Someone is typing...
+    </div>
     <div class="message-composer">
       <div class="composer-box">
         <div class="composer-toolbar">
@@ -863,7 +977,7 @@
           <button class="toolbar-btn"><i class="fas fa-strikethrough"></i></button>
           <button class="toolbar-btn"><i class="fas fa-list-ul"></i></button>
         </div>
-        <textarea class="composer-input" id="messageInput" placeholder="Message #{{ active_room.name }}..."
+        <textarea class="composer-input" id="messageInput" placeholder="Message #{{ active_room.display_name }}..."
           rows="1"></textarea>
         <div class="composer-footer">
           <div class="composer-actions">
@@ -911,10 +1025,81 @@
 </div>
 
 <script>
+  // Global State
+  let currentRoomId = {{ active_room.id|default:0 }};
+let lastMessageId = {{ messages.last.id|default:0 }};
+  let pollInterval = null;
+  let typingTimeout = null;
+  let selectedFiles = [];
   const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
+  // AJAX Room Switching
   function selectRoom(roomId) {
-    window.location.href = `?team_id={{ team.id }}&room_id=${roomId}`;
+    if (roomId === currentRoomId) return;
+
+    // Optimistic UI - update sidebar immediately
+    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+    const newItem = document.querySelector(`.channel-item[onclick="selectRoom(${roomId})"]`);
+    if (newItem) newItem.classList.add('active');
+
+    // Show specific loaded state in main area if needed, or just keep old content until new arrives
+    document.getElementById('messagesContainer').style.opacity = '0.5';
+
+    fetch(`?team_id={{ team.id }}&room_id=${roomId}&ajax=1`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          // Update Global State
+          currentRoomId = data.room_id;
+          lastMessageId = 0; // Reset for new room (will be updated by polling or just assume loaded)
+          // Actually, the partial implementation sets loop attributes but we don't parse last ID from HTML easily. 
+          // Ideally the API should return last_message_id. 
+          // For now, let's just reset and rely on the fact that we just loaded everything.
+
+          // Update Header
+          const titleH2 = document.querySelector('.chat-title h2');
+          if (titleH2) titleH2.innerHTML = `${data.room_name} <i class="fas fa-star" style="color: #fbbc04; font-size: 12px;"></i>`;
+
+          const titleP = document.querySelector('.chat-title p');
+          if (titleP) titleP.innerText = `${data.description} • ${data.member_count} Members`;
+
+          // Update Member Stack (optional, logic needed to rebuild avatars)
+          if (data.member_avatars) {
+            const stack = document.querySelector('.member-stack');
+            if (stack) {
+              let html = '';
+              data.member_avatars.forEach(m => {
+                html += `<div class="avatar" style="background: ${m.color_bg}; color: ${m.color_text};">${m.initials}</div>`;
+              });
+              if (data.member_count > 3) {
+                html += `<div class="avatar member-count">+${data.member_count - 3}</div>`;
+              }
+              stack.innerHTML = html;
+            }
+          }
+
+          // Update Messages
+          const container = document.getElementById('messagesContainer');
+          container.innerHTML = data.messages_html;
+          container.style.opacity = '1';
+          container.scrollTop = container.scrollHeight;
+
+          // Update URL
+          const newUrl = `?team_id={{ team.id }}&room_id=${roomId}`;
+          window.history.pushState({ path: newUrl }, '', newUrl);
+
+          // Restart Polling (clears previous interval)
+          startPolling();
+
+        } else {
+          alert('Failed to load room');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Error loading room');
+        document.getElementById('messagesContainer').style.opacity = '1';
+      });
   }
 
   function changeTeam(teamId) {
@@ -935,62 +1120,289 @@
     }
   }
 
-  function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const content = input.value.trim();
-    if (!content) return;
+  // Poll for new messages every 3 seconds
+  function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(pollMessages, 3000);
+  }
 
-    fetch('{% url "team:send_chat_message" %}', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-CSRFToken': csrfToken
-      },
-      body: `room_id={{ active_room.id|default:0 }}&content=${encodeURIComponent(content)}`
-    })
+  // Start polling if room is active
+  if (currentRoomId) {
+    startPolling();
+  }
+
+  function pollMessages() {
+    if (!currentRoomId) return;
+
+    fetch(`{% url "team:get_chat_updates" %}?room_id=${currentRoomId}&last_message_id=${lastMessageId}`)
       .then(r => r.json())
       .then(data => {
-        if (data.success) {
-          input.value = '';
-          // Add message to UI immediately
+        // Update messages
+        if (data.messages.length > 0) {
           const container = document.getElementById('messagesContainer');
-          const msgHtml = `
-          <div class="message own">
-            <div class="msg-avatar" style="background: #e8f0fe; color: #1a73e8;">
-              {{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}
-            </div>
-            <div class="msg-content">
-              <div class="msg-header">
-                <span class="msg-sender">Me</span>
-                <span class="msg-time">Just now</span>
-              </div>
-              <div class="msg-bubble">${content}</div>
-            </div>
-          </div>
-        `;
-          container.insertAdjacentHTML('beforeend', msgHtml);
-          container.scrollTop = container.scrollHeight;
+          data.messages.forEach(msg => {
+            if (document.getElementById(`msg-${msg.id}`)) return; // Skip if exists
+
+            lastMessageId = Math.max(lastMessageId, msg.id);
+
+            // Notify if not own message
+            if (!msg.is_own) {
+              showNotification(`New message from ${msg.sender_name}`, msg.content);
+            }
+
+            const attachmentsHtml = msg.attachments.map(f => `
+                              <div class="file-attachment">
+                                  <div class="file-icon"><i class="fas fa-file"></i></div>
+                                  <div class="file-info">
+                                      <div class="file-name">${f.name}</div>
+                                      <div class="file-size">${formatBytes(f.size)}</div>
+                                  </div>
+                                  <a href="${f.url}" download class="file-download"><i class="fas fa-download"></i></a>
+                              </div>
+                          `).join('');
+
+            const msgHtml = `
+                          <div class="message ${msg.is_own ? 'own' : ''}" id="msg-${msg.id}">
+                              <div class="msg-avatar" style="background: #e8f0fe; color: #1a73e8;">
+                                  ${msg.sender_initials}
+                              </div>
+                              <div class="msg-content">
+                                  <div class="msg-header">
+                                      <span class="msg-sender">${msg.is_own ? 'Me' : msg.sender_name}</span>
+                                      <span class="msg-time">${msg.created_at}</span>
+                                  </div>
+                                  <div class="msg-bubble">${msg.content}</div>
+                                  ${attachmentsHtml}
+                              </div>
+                          </div>`;
+
+            container.insertAdjacentHTML('beforeend', msgHtml);
+            container.scrollTop = container.scrollHeight;
+          });
+        }
+
+        // Update typing indicator
+        const indicator = document.getElementById('typingIndicator');
+        if (data.typing && data.typing.length > 0) {
+          indicator.style.display = 'block';
+          indicator.innerText = `${data.typing.join(', ')} is typing...`;
         } else {
-          alert(data.error || 'Failed to send message');
+          indicator.style.display = 'none';
+        }
+
+        // Update unread badges
+        if (data.unread_counts) {
+          updateUnreadCounts(data.unread_counts);
         }
       });
   }
 
-  // Enter to send
-  document.getElementById('messageInput')?.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  // Auto-resize textarea
+  // Handle typing status
   document.getElementById('messageInput')?.addEventListener('input', function () {
+    if (typingTimeout) clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      const fd = new FormData();
+      fd.append('room_id', currentRoomId);
+
+      fetch('{% url "team:update_typing_status" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: fd
+      });
+    }, 500);
+
+    // Auto resize
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, 120) + 'px';
   });
 
-  // Scroll to bottom on load
+  // File Upload Handling
+  document.getElementById('fileUpload')?.addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('room_id', currentRoomId);
+
+    // Show uploading indicator (simple alert for now or better UI)
+    const btn = document.querySelector('.fa-plus-circle').parentNode;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    fetch('{% url "team:upload_chat_file" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      body: formData
+    })
+      .then(r => r.json())
+      .then(data => {
+        btn.innerHTML = '<i class="fas fa-plus-circle"></i>';
+        if (data.success) {
+          selectedFiles.push(data.file_id);
+          // Add preview to composer
+          const composerBox = document.querySelector('.composer-box');
+          const preview = document.createElement('div');
+          preview.style.padding = '8px';
+          preview.style.fontSize = '12px';
+          preview.innerHTML = `<i class="fas fa-paperclip"></i> ${data.file_name} (Ready to send)`;
+          composerBox.insertBefore(preview, document.querySelector('.composer-footer'));
+        } else {
+          alert('Upload failed: ' + data.error);
+        }
+      });
+  });
+
+  // Current User Info
+  const currentUser = {
+    id: {{ request.user.id }},
+  initials: "{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}" || "{{ request.user.username|slice:':2'|upper }}",
+    name: "{{ request.user.get_full_name|default:request.user.username }}"
+  };
+
+  function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const content = input.value.trim();
+    if (!content && selectedFiles.length === 0) return;
+
+    // Optimistic UI Data
+    const tempId = 'temp-' + Date.now();
+    const tempMsg = {
+      id: tempId,
+      is_own: true,
+      sender_initials: currentUser.initials,
+      sender_name: 'Me', // Or currentUser.name
+      created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      content: content,
+      attachments: selectedFiles.map(id => ({ name: 'File', url: '#', size: 0 })) // Simplified for optimistic
+      // Note: File preview handling for optimistic is tricky without file objects,
+      // but we clear selectedFiles immediately, so we might want to just show "Sending attachment..."
+      // For now, let's focus on text.
+    };
+
+    // Clear Input Immediately
+    input.value = '';
+
+    // Remove file previews from composer
+    const previews = document.querySelectorAll('.composer-box > div[style*="padding: 8px"]');
+    previews.forEach(el => el.remove());
+
+    // Render Optimistic Message
+    if (content) { // Only render text optimistic for now, files wait for upload response anyway (which we have)
+      // Wait, files are ALREADY uploaded and in selectedFiles list (ID strings).
+      // We can't easily show file name unless we stored it.
+      // But fast text is the priority.
+
+      const msgHtml = `
+              <div class="message own" id="msg-${tempId}" style="opacity: 0.7;">
+                  <div class="msg-avatar" style="background: #e8f0fe; color: #1a73e8;">
+                      ${tempMsg.sender_initials}
+                  </div>
+                  <div class="msg-content">
+                      <div class="msg-header">
+                          <span class="msg-sender">Me</span>
+                          <span class="msg-time">${tempMsg.created_at}</span>
+                      </div>
+                      <div class="msg-bubble">${tempMsg.content.replace(/\n/g, '<br>')}</div>
+                  </div>
+              </div>`;
+
+      const container = document.getElementById('messagesContainer');
+      container.insertAdjacentHTML('beforeend', msgHtml);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    const filesToSend = [...selectedFiles]; // Copy
+    selectedFiles = []; // Clear global
+
+    fetch('{% url "team:send_chat_message" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        room_id: {{ active_room.id |default:0 }},
+      content: content,
+      attachments: filesToSend
+      })
+    })
+      .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        // Update the optimistic message
+        const optimisticRow = document.getElementById(`msg-${tempId}`);
+        if (optimisticRow) {
+          optimisticRow.id = `msg-${data.message.id}`;
+          optimisticRow.style.opacity = '1';
+          // optional: update content/attachments if server formatted it differently
+          lastMessageId = Math.max(lastMessageId, data.message.id);
+        } else {
+          // Fallback if not found (unexpected)
+        }
+      } else {
+        alert('Failed to send: ' + data.error);
+        const optimisticRow = document.getElementById(`msg-${tempId}`);
+        if (optimisticRow) optimisticRow.remove(); // Revert
+        input.value = content; // Restore text
+      }
+    });
+  }
+
+  function formatBytes(bytes, decimals = 2) {
+    if (!+bytes) return '0 Bytes';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  }
+
+  function showNotification(title, body) {
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          new Notification(title, { body });
+        }
+      });
+    }
+  }
+
+  function updateUnreadCounts(counts) {
+    // Reset all badges first (optional, or just update existing)
+    document.querySelectorAll('.unread-badge').forEach(el => el.style.display = 'none');
+
+    for (const [roomId, count] of Object.entries(counts)) {
+      // Find sidebar item for this room
+      const item = document.querySelector(`.channel-item[onclick="selectRoom(${roomId})"]`);
+      if (item) {
+        let badge = item.querySelector('.unread-badge');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'unread-badge';
+          item.appendChild(badge);
+        }
+        badge.textContent = count;
+        badge.style.display = 'flex';
+      }
+    }
+
+    // Clear badge for active room (since we are viewing it)
+    // Clear badge for active room
+    if (currentRoomId) {
+      const activeItem = document.querySelector(`.channel-item[onclick="selectRoom(${currentRoomId})"]`);
+      if (activeItem) {
+        const badge = activeItem.querySelector('.unread-badge');
+        if (badge) badge.style.display = 'none';
+      }
+    }
+  }
+
+  // Request notification permission on load
+  if ("Notification" in window) {
+    Notification.requestPermission();
+  }
+
+  // Scroll to bottom
   const container = document.getElementById('messagesContainer');
   if (container) {
     container.scrollTop = container.scrollHeight;
@@ -1005,10 +1417,14 @@
       method: 'POST',
       headers: { 'X-CSRFToken': csrfToken },
       body: formData
+
     })
       .then(r => r.json())
       .then(data => {
         if (data.success) {
+          if (data.warning) {
+            alert(data.warning);
+          }
           window.location.href = `?team_id={{ team.id }}&room_id=${data.room_id}`;
         } else {
           alert(data.error || 'Error creating channel');
@@ -1037,10 +1453,65 @@
       .then(r => r.json())
       .then(data => {
         if (data.success) {
-          window.location.href = `?team_id={{ team.id }}&room_id=${data.room_id}`;
+          if (data.warning) {
+            alert(data.warning);
+          }
+          // Use AJAX switch instead of reload
+          selectRoom(data.room_id);
         } else {
           alert(data.error || 'Error starting conversation');
         }
+      });
+  }
+
+  function startVideoCall() {
+    if (!currentRoomId) {
+      alert("Please select a valid conversation first.");
+      return;
+    }
+
+    // Optimistion (optional: change icon to spinner)
+    const btn = document.querySelector('.fa-video').parentNode;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    fetch('{% url "team:create_instant_meeting" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        room_id: currentRoomId
+      })
+    })
+      .then(r => r.json())
+      .then(data => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+
+        if (data.success) {
+          // Open Meet in new tab
+          window.open(data.meet_link, '_blank');
+
+          // Warning about sync
+          if (data.google_sync_status === 'not_connected') {
+            alert("Meeting created!\n\nNote: Link NOT sent to Google Chat because this channel is not connected to a Google Chat Space.");
+          } else if (data.google_sync_status === 'failed') {
+            console.warn("Google Chat sync failed");
+          }
+
+          // Message will be polled automatically
+        } else {
+          alert(data.error || 'Failed to start video call');
+        }
+      })
+      .catch(err => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        alert(' video call');
+        console.error(err);
       });
   }
 </script>

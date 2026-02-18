@@ -35,6 +35,10 @@ SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=False, cast=bool)
 
+# Google OAuth Settings
+GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
+GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="") # Fixed case sensitivity
+
 ALLOWED_HOSTS = [
     ".vercel.app",
     "erp.demfirat.com",
@@ -102,6 +106,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
     "corsheaders",  # CORS support for Next.js frontend
     "erp",
     "todo",
@@ -113,10 +118,16 @@ INSTALLED_APPS = [
     "email_automation",  # Email automation system
     "notifications",  # Notification system
     "team",  # Team management system
+    "notes", # My Notes system
+    "procurement", # Procurement system
     "django_htmx",
+    "crispy_forms",
+    "crispy_bootstrap5",
     # below is to host images
     "cloudinary",
     "cloudinary_storage",
+    # below is for google auth
+
     # below is for google auth
     # "django.contrib.sites",
     # "allauth",  # this allows us to do other authentications beside the standard one (like google)
@@ -124,6 +135,9 @@ INSTALLED_APPS = [
     # "allauth.socialaccount",
     # "allauth.socialaccount.providers.google",
 ]
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 # SOCIALACCOUNT_PROVIDERS = {
 #     "google": {
@@ -214,7 +228,7 @@ DATABASES = {
         "HOST": config("DB_HOST"),  # an empty string means localhost
         "PORT": config("DB_PORT"),
         # Connection pooling for better performance
-        "CONN_MAX_AGE": 600,  # Keep connections alive for 10 minutes
+        "CONN_MAX_AGE": 0,  # Disable persistent connections in development to avoid stale cursor issues
         "OPTIONS": {
             # PostgreSQL specific optimizations
             "connect_timeout": 10,

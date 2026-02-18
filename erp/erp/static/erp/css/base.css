@@ -63,7 +63,7 @@ button {
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  overflow-y: hidden;
+  overflow-y: auto;
   /* no internal scroll */
   overflow-x: hidden;
 }
@@ -269,9 +269,9 @@ button {
   align-items: center;
   justify-content: center;
   height: auto;
-  padding: 0.75rem 0;
+  padding: 0.4rem 0;
   /* çok daha büyük hover alanı (üst-alt) */
-  margin: 0.25rem 0;
+  margin: 0.1rem 0;
   /* itemler arası daha fazla boşluk */
   color: var(--text-secondary);
   text-decoration: none;
@@ -360,9 +360,9 @@ a:hover {
 .logo {
   font-weight: 700;
   font-family: "Fuzzy Bubbles", sans-serif;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.25rem;
   /* logo altı daha fazla boşluk */
-  padding: 0.75rem 0 0.6rem;
+  padding: 0.5rem 0 0.4rem;
   /* üst-alt çok daha fazla boşluk */
   text-align: center;
   color: teal;
@@ -745,6 +745,49 @@ a:hover {
   overflow: hidden;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+/* Procurement menüsü için stil - Operating ile aynı yapı */
+#procurementButton {
+  position: relative;
+}
+
+#procurementButton .nav-link {
+  position: relative;
+}
+
+/* Procurement menüsü için hover bridge */
+#procurementButton::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 10px;
+  height: 100%;
+  background: transparent;
+  z-index: 9998;
+}
+
+/* Procurement menüsü hover durumu */
+#procurementButton:hover #procurementExpanded,
+#procurementButton:hover::after,
+#procurementExpanded:hover {
+  display: block;
+}
+
+#procurementExpanded {
+  display: none;
+  position: fixed;
+  left: 6rem;
+  background-color: var(--bg-primary);
+  width: 340px;
+  padding: 0;
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  z-index: 9999;
+  animation: slideIn 0.25s ease;
+  overflow: hidden;
 }
 
 /* Below is for countdown */

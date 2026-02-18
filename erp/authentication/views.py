@@ -163,3 +163,158 @@ def change_password_settings(request):
                 </div>
             """)
     return HttpResponse(status=405)
+
+
+# ------------------- Google OAuth Views -------------------
+
+import os
+import google_auth_oauthlib.flow
+from django.views import View
+from django.conf import settings
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.http import HttpResponse
+from .models import GoogleChatCredentials
+
+# Scopes for Google Chat
+GOOGLE_CHAT_SCOPES = [
+    'https://www.googleapis.com/auth/chat.spaces',
+    'https://www.googleapis.com/auth/chat.spaces.readonly',
+    'https://www.googleapis.com/auth/chat.messages.readonly',
+    'https://www.googleapis.com/auth/chat.messages',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/drive.file',
+    # Gmail Scopes
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.send',
+    # Calendar Scopes
+    'https://www.googleapis.com/auth/calendar.events',
+]
+
+# Allow HTTP for development
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+# Allow Google to add extra scopes (like openid) without failing
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
+class GoogleAuthView(View):
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return redirect('authentication:signin')
+
+        # Use keys from settings
+        # Ensure GOOGLE_OAUTH_CLIENT_ID and SECRET are in settings.py
+        client_config = {
+            "web": {
+                "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
+                "client_secret": settings.GOOGLE_OAUTH_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "redirect_uris": [request.build_absolute_uri(reverse('authentication:google_callback'))]
+            }
+        }
+        
+        flow = google_auth_oauthlib.flow.Flow.from_client_config(
+            client_config,
+            scopes=GOOGLE_CHAT_SCOPES
+        )
+
+        flow.redirect_uri = request.build_absolute_uri(reverse('authentication:google_callback'))
+        
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent' # Force consent to ensure we get refresh token and can see account picker
+        )
+
+        request.session['google_oauth_state'] = state
+        
+        return redirect(authorization_url)
+
+
+class GoogleCallbackView(View):
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return redirect('authentication:signin')
+
+        state = request.session.get('google_oauth_state')
+        
+        if not state:
+             return HttpResponse("State not found in session.", status=400)
+
+        client_config = {
+            "web": {
+                "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
+                "client_secret": settings.GOOGLE_OAUTH_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "redirect_uris": [request.build_absolute_uri(reverse('authentication:google_callback'))]
+            }
+        }
+
+        flow = google_auth_oauthlib.flow.Flow.from_client_config(
+            client_config,
+            scopes=GOOGLE_CHAT_SCOPES,
+            state=state
+        )
+        flow.redirect_uri = request.build_absolute_uri(reverse('authentication:google_callback'))
+        
+        print(f"DEBUG: Redirect URI used: {flow.redirect_uri}")
+
+        authorization_response = request.get_full_path()
+        
+        try:
+            flow.fetch_token(authorization_response=authorization_response)
+        except Exception as e:
+            # Common error: InvalidGrantError usually means code expired or reused
+            error_msg = str(e)
+            if "invalid_grant" in error_msg:
+                friendly_msg = "The authorization code expired or was already used. Please try connecting again."
+            elif "mismatch" in error_msg:
+                friendly_msg = "Redirect URI mismatch. Please check Google Cloud Console settings."
+            else:
+                friendly_msg = f"Authentication failed: {error_msg}"
+
+            return HttpResponse(f"""
+                <div style="font-family: sans-serif; padding: 20px; text-align: center;">
+                    <h1>Connection Failed</h1>
+                    <p>{friendly_msg}</p>
+                    <p style="color: #666; font-size: 12px;">Technical Detail: {error_msg}</p>
+                    <a href="{reverse('user_settings')}" style="padding: 10px 20px; background: #1a73e8; color: white; text-decoration: none; border-radius: 4px;">Return to Settings</a>
+                </div>
+            """, status=400)
+
+        credentials = flow.credentials
+        
+        # Fetch user info
+        from googleapiclient.discovery import build
+        user_info_service = build('oauth2', 'v2', credentials=credentials)
+        user_info = user_info_service.userinfo().get().execute()
+        
+        email = user_info.get('email')
+        picture = user_info.get('picture')
+        
+        GoogleChatCredentials.objects.update_or_create(
+            user=request.user,
+            defaults={
+                'token': credentials.token,
+                'refresh_token': credentials.refresh_token,
+                'token_uri': credentials.token_uri,
+                'client_id': credentials.client_id,
+                'client_secret': credentials.client_secret,
+                'scopes': ' '.join(credentials.scopes) if credentials.scopes else '',
+                'email': email,
+                'avatar_url': picture
+            }
+        )
+
+        return redirect('user_settings')
+
+
+class GoogleDisconnectView(View):
+    def get(self, request):
+        if request.user.is_authenticated:
+            GoogleChatCredentials.objects.filter(user=request.user).delete()
+        return redirect('user_settings')

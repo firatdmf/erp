@@ -1,0 +1,233 @@
+<div class="email-list-container">
+    {% if emails %}
+    {% for email in emails %}
+    <div class="company-email-item" onclick="viewEmailDetail({{ email.id }})">
+        <div class="email-icon">
+            {% if email.folder == 'sent' %}
+            <div class="direction-badge sent">
+                <i class="fas fa-arrow-up"></i>
+            </div>
+            {% else %}
+            <div class="direction-badge received">
+                <i class="fas fa-arrow-down"></i>
+            </div>
+            {% endif %}
+        </div>
+        <div class="email-content">
+            <div class="email-top-row">
+                <span class="email-subject">{{ email.subject|default:"(No Subject)" }}</span>
+                <span class="email-date">
+                    {% if email.sent_at %}
+                    {{ email.sent_at|date:"d M Y H:i" }}
+                    {% elif email.received_at %}
+                    {{ email.received_at|date:"d M Y H:i" }}
+                    {% else %}
+                    {{ email.created_at|date:"d M Y H:i" }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="email-bottom-row">
+                <span class="email-meta">
+                    {% if email.folder == 'sent' %}
+                    <span class="direction-label sent-label">Sent</span>
+                    To: {{ email.to_emails|join:", " }}
+                    {% else %}
+                    <span class="direction-label received-label">Received</span>
+                    From: {{ email.from_name|default:email.from_email }}
+                    {% endif %}
+                </span>
+                <div class="email-indicators">
+                    {% if email.attachments.exists %}
+                    <span class="attach-badge"
+                        title="{{ email.attachments.count }} attachment{{ email.attachments.count|pluralize }}">
+                        <i class="fas fa-paperclip"></i> {{ email.attachments.count }}
+                    </span>
+                    {% endif %}
+                    {% if not email.is_read and email.folder != 'sent' %}
+                    <span class="unread-dot" title="Unread"></span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="email-snippet">{{ email.get_preview }}</div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <i class="far fa-envelope"></i>
+        <p>No emails found.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .email-list-container {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: white;
+        max-height: 500px;
+        overflow-y: auto;
+    }
+
+    .company-email-item {
+        display: flex;
+        gap: 12px;
+        padding: 16px;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .company-email-item:hover {
+        background: #f8fafc;
+    }
+
+    .company-email-item:last-child {
+        border-bottom: none;
+    }
+
+    .email-icon {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .direction-badge {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+    }
+
+    .direction-badge.sent {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .direction-badge.received {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .email-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .email-top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        gap: 8px;
+    }
+
+    .email-subject {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .email-date {
+        font-size: 12px;
+        color: #94a3b8;
+        flex-shrink: 0;
+    }
+
+    .email-bottom-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .email-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .direction-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        flex-shrink: 0;
+    }
+
+    .sent-label {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .received-label {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .email-indicators {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .attach-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 11px;
+        color: #94a3b8;
+        background: #f8fafc;
+        padding: 1px 6px;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .attach-badge i {
+        font-size: 10px;
+    }
+
+    .unread-dot {
+        width: 8px;
+        height: 8px;
+        background: #667eea;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .email-snippet {
+        font-size: 13px;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #94a3b8;
+    }
+
+    .empty-state i {
+        font-size: 32px;
+        margin-bottom: 8px;
+    }
+</style>

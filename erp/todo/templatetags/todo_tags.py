@@ -30,11 +30,11 @@ def tasks_component(sort_type, csrf_token, page_type, contact, company, path, me
     
     if page_type == "dashboard":
         if contact:
-            tasks = base_query.filter(contact=contact, completed=False)
+            tasks = base_query.filter(contact=contact, completed=False, due_date__lte=today)
         elif company:
-            tasks = base_query.filter(company=company, completed=False)
+            tasks = base_query.filter(company=company, completed=False, due_date__lte=today)
         else:
-            tasks = base_query.filter(completed=False)
+            tasks = base_query.filter(completed=False, due_date__lte=today)
     else:
         if contact:
             tasks = base_query.filter(contact=contact)

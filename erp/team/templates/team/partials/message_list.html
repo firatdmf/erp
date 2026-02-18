@@ -1,0 +1,34 @@
+{% for msg in messages %}
+<div class="message {% if msg.sender == request.user %}own{% endif %}" id="msg-{{ msg.id }}">
+    <div class="msg-avatar" style="background: #e8f0fe; color: #1a73e8;">
+        {{ msg.sender.first_name|first|upper }}{{ msg.sender.last_name|first|upper }}
+    </div>
+    <div class="msg-content">
+        <div class="msg-header">
+            <span class="msg-sender">{{ msg.sender.get_full_name }}</span>
+            <span class="msg-time">{{ msg.created_at|time:"g:i A" }}</span>
+        </div>
+        <div class="msg-bubble">
+            {% if "Join Meeting" in msg.content and "href" in msg.content %}
+            {{ msg.content|safe }}
+            {% else %}
+            {{ msg.content|linebreaksbr }}
+            {% endif %}
+        </div>
+        {% if msg.attachments.all %}
+        {% for f in msg.attachments.all %}
+        <div class="file-attachment">
+            <div class="file-icon"><i class="fas fa-file"></i></div>
+            <div class="file-info">
+                <div class="file-name">{{ f.file_name }}</div>
+                <div class="file-size">{{ f.file_size|filesizeformat }}</div>
+            </div>
+            <a href="{{ f.file.url }}" download class="file-download"><i class="fas fa-download"></i></a>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% empty %}
+<div class="system-message"><i>No messages yet. Start the conversation!</i></div>
+{% endfor %}

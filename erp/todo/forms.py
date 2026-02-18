@@ -12,6 +12,9 @@ class HiddenInputWithStyle(forms.HiddenInput):
         attrs.update({'style': 'display:none;'})
         super().__init__(attrs=attrs, **kwargs)
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
@@ -28,6 +31,12 @@ class TaskForm(forms.ModelForm):
             'company': forms.HiddenInput(),  # Specify 'contact_company_id' as a hidden input here
             'member': forms.Select(attrs={'class': 'form-input'}),
         }
+    
+    task_files = forms.Field(
+        widget=MultipleFileInput(attrs={'multiple': True, 'class': 'form-input'}),
+        required=False,
+        label="Attachments"
+    )
 
     # Below is to hide contact and company fields if the form has been used with parameter hide_fields=True
     def __init__(self, *args, **kwargs):
@@ -57,7 +66,9 @@ class TaskForm(forms.ModelForm):
             self.fields.pop('contact', None)
             self.fields.pop('company', None)
         else:
-            # Optionally, you can set the fields as hidden fields
-            self.fields['contact'].widget = forms.HiddenInput()
             self.fields['company'].widget = forms.HiddenInput()
+        
+        # Force required=False for task_files and debug
+        self.fields['task_files'].required = False
+        print(f"DEBUG: TaskForm instantiated. task_files required={self.fields['task_files'].required}")
     # -----------------------------------------------------------------------

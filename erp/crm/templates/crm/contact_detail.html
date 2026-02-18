@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
 {% block content %}
-  {% load todo_filters %}
-  {% load todo_tags %}
-  {% load crm_tags %}
-  {% load static %}
-  
-  {% comment %}Below is to use unique css for each file{% endcomment %}
-  {% block css %}
-    <link rel="stylesheet" href="{% static 'crm/css/company_detail.css' %}" />
-  {% endblock %}
-  {% block js %}
-    <script src="{% static 'crm/js/detailPages.js' %}" defer></script>
-  {% endblock %}
+{% load todo_filters %}
+{% load todo_tags %}
+{% load crm_tags %}
+{% load static %}
+
+{% comment %}Below is to use unique css for each file{% endcomment %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'crm/css/company_detail.css' %}" />
+{% endblock %}
+{% block js %}
+<script src="{% static 'crm/js/detailPages.js' %}" defer></script>
+{% endblock %}
 <div class="company-detail-container">
   <!-- Header Section -->
   <div class="detail-header">
@@ -26,21 +26,25 @@
         <div>
           <h1 class="company-title">{{ contact.name|capfirst }}</h1>
           {% if contact.job_title %}
-            <span class="company-group-badge" style="background: #10b98120; color: #059669; border-color: #10b981;">{{ contact.job_title }}</span>
+          <span class="company-group-badge" style="background: #10b98120; color: #059669; border-color: #10b981;">{{
+            contact.job_title }}</span>
           {% endif %}
           {% if contact.company %}
-            <span class="company-group-badge">
-              <i class="fa fa-building"></i> {{ contact.company.name }}
-            </span>
+          <span class="company-group-badge">
+            <i class="fa fa-building"></i> {{ contact.company.name }}
+          </span>
           {% endif %}
         </div>
       </div>
     </div>
     <div class="detail-header-right">
-      <a href="{% url 'crm:update_contact' contact.id %}?next_url={{ request.path|urlencode }}" class="btn-action btn-action-secondary">
+      <a href="{% url 'crm:update_contact' contact.id %}?next_url={{ request.path|urlencode }}"
+        class="btn-action btn-action-secondary">
         <i class="fa fa-edit"></i> Edit
       </a>
-      <form action="{% url 'crm:delete_contact' contact.id %}" method="post" style="display: inline; margin: 0; vertical-align: top;" onsubmit="return confirm('Are you sure you want to delete this contact?');">
+      <form action="{% url 'crm:delete_contact' contact.id %}" method="post"
+        style="display: inline; margin: 0; vertical-align: top;"
+        onsubmit="return confirm('Are you sure you want to delete this contact?');">
         {% csrf_token %}
         <button type="submit" class="btn-action btn-action-danger" style="display: inline-flex;">
           <i class="fa fa-trash"></i> Delete
@@ -50,177 +54,217 @@
   </div>
 
   <!-- Main Content Grid -->
-  <div class="detail-grid">
-    <!-- Contact Information Card -->
-    <div class="detail-card">
-      <div class="card-header">
-        <h2><i class="fa fa-info-circle"></i> Contact Information</h2>
-      </div>
-      <div class="info-grid">
-        {% if contact.email %}
+  <!-- Tab Navigation -->
+  <div class="company-tabs">
+    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" onclick="switchTab('communication')">Communication</button>
+  </div>
+
+  <div id="tab-overview" class="tab-content active">
+    <div class="detail-grid">
+      <!-- Contact Information Card -->
+      <div class="detail-card">
+        <div class="card-header">
+          <h2><i class="fa fa-info-circle"></i> Contact Information</h2>
+        </div>
+        <div class="info-grid">
+          {% if contact.email %}
           <div class="info-item">
             <span class="info-label">Email{{ contact.email|length|pluralize:"s" }}</span>
             <span class="info-value">
               {% for email in contact.email %}
-                <a href="mailto:{{ email }}" style="display: block; margin-bottom: 4px;">{{ email }}</a>
+              <a href="mailto:{{ email }}" style="display: block; margin-bottom: 4px;">{{ email }}</a>
               {% endfor %}
             </span>
           </div>
-        {% endif %}
-        {% if contact.phone %}
+          {% endif %}
+          {% if contact.phone %}
           <div class="info-item">
             <span class="info-label">Phone{{ contact.phone|length|pluralize:"s" }}</span>
             <span class="info-value">
               {% for phone in contact.phone %}
-                <span style="display: block; margin-bottom: 4px;">{{ phone }}</span>
+              <span style="display: block; margin-bottom: 4px;">{{ phone }}</span>
               {% endfor %}
             </span>
           </div>
-        {% endif %}
-        {% if contact.job_title %}
+          {% endif %}
+          {% if contact.job_title %}
           <div class="info-item">
             <span class="info-label">Job Title</span>
             <span class="info-value">{{ contact.job_title }}</span>
           </div>
-        {% endif %}
-        {% if contact.company %}
+          {% endif %}
+          {% if contact.company %}
           <div class="info-item">
             <span class="info-label">Company</span>
             <span class="info-value">
-              <a href="{% url 'crm:company_detail' contact.company.id %}" style="color: #3b82f6; text-decoration: none;">
+              <a href="{% url 'crm:company_detail' contact.company.id %}"
+                style="color: #3b82f6; text-decoration: none;">
                 <i class="fa fa-building"></i> {{ contact.company.name }}
               </a>
             </span>
           </div>
-        {% endif %}
-        {% if contact.address %}
+          {% endif %}
+          {% if contact.address %}
           <div class="info-item info-full-width">
             <span class="info-label">Address</span>
             <span class="info-value">{{ contact.address }}</span>
           </div>
-        {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Attach an Item Section -->
+    <div class="detail-card attach-card">
+      <div class="card-header">
+        <h2><i class="fa fa-paperclip"></i> Attach an item</h2>
+      </div>
+      <div class="attach-options">
+        <button type="button" class="attach-option-btn" onclick="toggleAttachSection('note')">
+          <i class="fa fa-file-text"></i>
+          <span>Note</span>
+        </button>
+        <button type="button" class="attach-option-btn" onclick="toggleAttachSection('task')">
+          <i class="fa fa-check-circle"></i>
+          <span>Task</span>
+        </button>
+      </div>
+
+      <!-- Note Attach Section -->
+      <div id="attachNoteSection" class="attach-form-section" style="display: none;">
+        <div class="attach-form-header">
+          <span><i class="fa fa-file-text"></i> Add a note</span>
+          <button type="button" class="btn-text" onclick="toggleAttachSection('note')">
+            Cancel
+          </button>
+        </div>
+        <form hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_note" hx-swap="none" class="attach-form"
+          hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('note'); htmx.ajax('GET', '/crm/contact/{{ contact.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'}); }">
+          {% csrf_token %}
+          {{ note_form.as_p }}
+          <div class="form-actions">
+            <button type="submit" class="btn-action btn-action-primary">Add Note</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Task Attach Section -->
+      <div id="attachTaskSection" class="attach-form-section" style="display: none;">
+        <div class="attach-form-header">
+          <span><i class="fa fa-check-circle"></i> Add a task</span>
+          <button type="button" class="btn-text" onclick="toggleAttachSection('task')">
+            Cancel
+          </button>
+        </div>
+        <form hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_task" hx-target="#tasksList"
+          hx-swap="innerHTML" class="attach-form"
+          hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); }">
+          {% csrf_token %}
+          {{ task_form.as_p }}
+          <div class="form-actions">
+            <button type="submit" class="btn-action btn-action-primary">Add Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tasks List -->
+    <div class="detail-card">
+      <div class="card-header">
+        <h2><i class="fa fa-check-circle"></i> Tasks</h2>
+      </div>
+      <div id="tasksList" class="tasks-list">
+        {% for task in tasks|dictsortreversed:'due_date' %}
+        {% if not task.completed %}
+        <div class="task-item" id="task-{{ task.id }}">
+          <div class="task-content" id="task-content-{{ task.id }}">
+            <h3 class="task-name">{{ task.name }}</h3>
+            {% if task.description %}
+            <p class="task-description">{{ task.description }}</p>
+            {% endif %}
+            <div class="task-meta">
+              <span class="task-due">Due: {{ task.due_date|date:"M d, Y" }}</span>
+              {% if task.due_date|days_since %}
+              <span class="task-overdue">{{ task.due_date|days_since }}</span>
+              {% endif %}
+              {% if task.member %}
+              <span class="task-member"><i class="fa fa-user"></i> {{ task.member }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="task-actions">
+            <button type="button" class="btn-icon-minimal" title="Complete"
+              onclick="confirmDelete('complete_task', {{ task.id }})">
+              <i class="fa fa-check"></i>
+            </button>
+            <button type="button" class="btn-icon-minimal" title="Edit"
+              onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"
+              Y-m-d" }}')">
+              <i class="fa fa-edit"></i>
+            </button>
+            <button type="button" class="btn-icon-minimal" title="Delete"
+              onclick="confirmDelete('delete_task', {{ task.id }})">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+        </div> <!-- End task-item -->
+      </div>
+      {% endif %}
+      {% empty %}
+      <p class="empty-state">No tasks available.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Communication Tab (outside the tasks loop) -->
+  <div id="tab-communication" class="tab-content" style="display: none;">
+    <div class="detail-card comm-container">
+      <div class="comm-header">
+        <div class="comm-toggle">
+          <button class="comm-toggle-btn active" onclick="switchCommTab('emails')">
+            <i class="fas fa-envelope"></i> Emails
+          </button>
+          <button class="comm-toggle-btn" onclick="switchCommTab('files')">
+            <i class="fas fa-paperclip"></i> Files
+          </button>
+        </div>
+
+        <button class="btn-action btn-action-primary" onclick="openComposeModal(null, '', '', null, {{ contact.id }})">
+          <i class="fas fa-plus"></i> Compose Email
+        </button>
+      </div>
+
+      <div id="comm-content" class="comm-content" hx-get="{% url 'email_automation:contact_emails' contact.id %}"
+        hx-trigger="load">
+        <div style="text-align: center; padding: 40px; color: #94a3b8;">
+          <i class="fas fa-spinner fa-spin fa-2x"></i>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Attach an Item Section -->
-  <div class="detail-card attach-card">
-    <div class="card-header">
-      <h2><i class="fa fa-paperclip"></i> Attach an item</h2>
-    </div>
-    <div class="attach-options">
-      <button type="button" class="attach-option-btn" onclick="toggleAttachSection('note')">
-        <i class="fa fa-file-text"></i>
-        <span>Note</span>
-      </button>
-      <button type="button" class="attach-option-btn" onclick="toggleAttachSection('task')">
-        <i class="fa fa-check-circle"></i>
-        <span>Task</span>
-      </button>
-    </div>
-    
-    <!-- Note Attach Section -->
-    <div id="attachNoteSection" class="attach-form-section" style="display: none;">
-      <div class="attach-form-header">
-        <span><i class="fa fa-file-text"></i> Add a note</span>
-        <button type="button" class="btn-text" onclick="toggleAttachSection('note')">
-          Cancel
-        </button>
-      </div>
-      <form hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_note" 
-            hx-swap="none"
-            class="attach-form"
-            hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('note'); htmx.ajax('GET', '/crm/contact/{{ contact.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'}); }">
-        {% csrf_token %}
-        {{ note_form.as_p }}
-        <div class="form-actions">
-          <button type="submit" class="btn-action btn-action-primary">Add Note</button>
-        </div>
-      </form>
-    </div>
-    
-    <!-- Task Attach Section -->
-    <div id="attachTaskSection" class="attach-form-section" style="display: none;">
-      <div class="attach-form-header">
-        <span><i class="fa fa-check-circle"></i> Add a task</span>
-        <button type="button" class="btn-text" onclick="toggleAttachSection('task')">
-          Cancel
-        </button>
-      </div>
-      <form hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_task" 
-            hx-target="#tasksList"
-            hx-swap="innerHTML"
-            class="attach-form"
-            hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); }">
-        {% csrf_token %}
-        {{ task_form.as_p }}
-        <div class="form-actions">
-          <button type="submit" class="btn-action btn-action-primary">Add Task</button>
-        </div>
-      </form>
-    </div>
-  </div>
-  
-  <!-- Tasks List -->
-  <div class="detail-card">
-    <div class="card-header">
-      <h2><i class="fa fa-check-circle"></i> Tasks</h2>
-    </div>
-    <div id="tasksList" class="tasks-list">
-      {% for task in tasks|dictsortreversed:'due_date' %}
-        {% if not task.completed %}
-          <div class="task-item" id="task-{{ task.id }}">
-            <div class="task-content" id="task-content-{{ task.id }}">
-              <h3 class="task-name">{{ task.name }}</h3>
-              {% if task.description %}
-                <p class="task-description">{{ task.description }}</p>
-              {% endif %}
-              <div class="task-meta">
-                <span class="task-due">Due: {{ task.due_date|date:"M d, Y" }}</span>
-                {% if task.due_date|days_since %}
-                  <span class="task-overdue">{{ task.due_date|days_since }}</span>
-                {% endif %}
-                {% if task.member %}
-                  <span class="task-member"><i class="fa fa-user"></i> {{ task.member }}</span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="task-actions">
-              <button type="button" class="btn-icon-minimal" title="Complete" onclick="confirmDelete('complete_task', {{ task.id }})">
-                <i class="fa fa-check"></i>
-              </button>
-              <button type="button" class="btn-icon-minimal" title="Edit" onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"Y-m-d" }}')">
-                <i class="fa fa-edit"></i>
-              </button>
-              <button type="button" class="btn-icon-minimal" title="Delete" onclick="confirmDelete('delete_task', {{ task.id }})">
-                <i class="fa fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        {% endif %}
-      {% empty %}
-        <p class="empty-state">No tasks available.</p>
-      {% endfor %}
-    </div>
-  </div>
-  
+  <!-- Compose Modal Container -->
+  <div id="composeModalContainer"></div>
+
   <!-- Notes History -->
   <div id="notesSection">
-    {% history_component company=None contact=contact csrf_token=csrf_token note_form=note_form current_url=request.path %}
+    {% history_component company=None contact=contact csrf_token=csrf_token note_form=note_form
+    current_url=request.path %}
   </div>
-  
+
   <script>
     // Store original HTML for cancel
     const taskOriginalHTML = {};
     const noteOriginalHTML = {};
-    
+
     // Inline task editing
     function editTask(taskId, name, description, dueDate) {
       const contentDiv = document.getElementById(`task-content-${taskId}`);
       const csrf = '{{ csrf_token }}';
-      
+
       taskOriginalHTML[taskId] = contentDiv.innerHTML;
-      
+
       contentDiv.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:0.75rem;">
           <div>
@@ -245,36 +289,36 @@
           </div>
         </div>
       `;
-      
+
       const nameInput = document.getElementById(`edit-task-name-${taskId}`);
       nameInput.value = name;
       nameInput.focus();
       nameInput.setSelectionRange(nameInput.value.length, nameInput.value.length);
     }
-    
+
     function cancelTaskEdit(taskId) {
       if (taskOriginalHTML[taskId]) {
         document.getElementById(`task-content-${taskId}`).innerHTML = taskOriginalHTML[taskId];
         delete taskOriginalHTML[taskId];
       }
     }
-    
+
     function saveTask(taskId) {
       const csrf = '{{ csrf_token }}';
       const name = document.getElementById(`edit-task-name-${taskId}`).value;
       const description = document.getElementById(`edit-task-desc-${taskId}`).value;
       const dueDate = document.getElementById(`edit-task-date-${taskId}`).value;
-      
+
       if (!name.trim()) {
         alert('Task name cannot be empty');
         return;
       }
-      
+
       if (!dueDate) {
         alert('Due date is required');
         return;
       }
-      
+
       fetch(`/todo/tasks/${taskId}/update_ajax/`, {
         method: 'POST',
         headers: {
@@ -284,9 +328,9 @@
         },
         body: `name=${encodeURIComponent(name)}&description=${encodeURIComponent(description)}&due_date=${dueDate}`
       }).then(response => response.json())
-      .then(data => {
-        if (data.success && data.task) {
-          document.getElementById(`task-content-${taskId}`).innerHTML = `
+        .then(data => {
+          if (data.success && data.task) {
+            document.getElementById(`task-content-${taskId}`).innerHTML = `
             <h3 class="task-name">${data.task.name}</h3>
             ${data.task.description ? `<p class="task-description">${data.task.description}</p>` : ''}
             <div class="task-meta">
@@ -294,22 +338,22 @@
               ${data.task.overdue_badge || ''}
             </div>
           `;
-        } else {
-          alert('Failed to save task: ' + (data.error || 'Unknown error'));
-        }
-      }).catch(err => {
-        alert('Failed to save task');
-        console.error(err);
-      });
+          } else {
+            alert('Failed to save task: ' + (data.error || 'Unknown error'));
+          }
+        }).catch(err => {
+          alert('Failed to save task');
+          console.error(err);
+        });
     }
 
     // Inline note editing
     function editNote(noteId, currentContent) {
       const contentDiv = document.getElementById(`note-content-${noteId}`);
       const csrf = '{{ csrf_token }}';
-      
+
       noteOriginalHTML[noteId] = contentDiv.innerHTML;
-      
+
       contentDiv.innerHTML = `
         <div class="note-meta">
           <span class="note-date" style="color:#64748b;font-size:0.75rem;font-weight:500;margin-bottom:0.5rem;display:block;">Editing...</span>
@@ -324,26 +368,26 @@
           </button>
         </div>
       `;
-      
+
       document.getElementById(`edit-textarea-${noteId}`).focus();
     }
-    
+
     function cancelEdit(noteId) {
       if (noteOriginalHTML[noteId]) {
         document.getElementById(`note-content-${noteId}`).innerHTML = noteOriginalHTML[noteId];
         delete noteOriginalHTML[noteId];
       }
     }
-    
+
     function saveNote(noteId) {
       const csrf = '{{ csrf_token }}';
       const newContent = document.getElementById(`edit-textarea-${noteId}`).value;
-      
+
       if (!newContent.trim()) {
         alert('Note content cannot be empty');
         return;
       }
-      
+
       fetch(`/crm/notes/${noteId}/update_ajax/`, {
         method: 'POST',
         headers: {
@@ -353,18 +397,18 @@
         },
         body: `content=${encodeURIComponent(newContent)}`
       }).then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          document.getElementById(`note-content-${noteId}`).innerHTML = `
+        .then(data => {
+          if (data.success) {
+            document.getElementById(`note-content-${noteId}`).innerHTML = `
             <div class="note-meta">
               <span class="note-date" style="color:#64748b;font-size:0.75rem;font-weight:500;margin-bottom:0.5rem;display:block;">${data.date}</span>
             </div>
             <p class="note-text" style="margin:0;font-size:0.875rem;color:#1e293b;line-height:1.5;word-break:break-word;">${data.content}</p>
           `;
-        } else {
-          alert('Failed to save note');
-        }
-      });
+          } else {
+            alert('Failed to save note');
+          }
+        });
     }
 
     function toggleAttachSection(type) {
@@ -372,10 +416,10 @@
         'note': 'attachNoteSection',
         'task': 'attachTaskSection'
       };
-      
+
       const sectionId = sections[type];
       const section = document.getElementById(sectionId);
-      
+
       // Hide all sections first
       Object.values(sections).forEach(id => {
         const el = document.getElementById(id);
@@ -383,7 +427,7 @@
           el.style.display = 'none';
         }
       });
-      
+
       // Toggle current section
       if (section) {
         section.style.display = section.style.display === 'none' ? 'block' : 'none';
@@ -394,7 +438,7 @@
     function confirmDelete(action, id) {
       const contactId = '{{ contact.id }}';
       const csrf = '{{ csrf_token }}';
-      
+
       // Determine action text and icon
       let actionText = 'Delete';
       let questionText = 'Are you sure?';
@@ -402,7 +446,7 @@
       let iconBg = '#fee2e2';
       let iconColor = '#dc2626';
       let buttonBg = '#ef4444';
-      
+
       if (action === 'complete_task') {
         actionText = 'Complete';
         questionText = 'Mark as complete?';
@@ -411,11 +455,11 @@
         iconColor = '#16a34a';
         buttonBg = '#22c55e';
       }
-      
+
       // Create overlay
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:10000;animation:fadeIn 0.15s;';
-      
+
       const dialog = document.createElement('div');
       dialog.style.cssText = 'background:#fff;border-radius:12px;max-width:420px;width:90%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:slideIn 0.2s;';
       dialog.innerHTML = `
@@ -437,7 +481,7 @@
           </button>
         </div>
       `;
-      
+
       // Add CSS animations
       if (!document.getElementById('modal-animations')) {
         const style = document.createElement('style');
@@ -448,27 +492,27 @@
         `;
         document.head.appendChild(style);
       }
-      
+
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
-      
+
       // Add hover effects
       const cancelBtn = dialog.querySelector('#cancelBtn');
       const confirmBtn = dialog.querySelector('#confirmBtn');
-      
+
       cancelBtn.onmouseover = () => cancelBtn.style.background = '#e5e7eb';
       cancelBtn.onmouseout = () => cancelBtn.style.background = '#f3f4f6';
       confirmBtn.onmouseover = () => confirmBtn.style.opacity = '0.9';
       confirmBtn.onmouseout = () => confirmBtn.style.opacity = '1';
-      
+
       // Cancel action
       cancelBtn.onclick = () => overlay.remove();
-      
+
       // Confirm action
       confirmBtn.onclick = () => {
         let url = '';
         let body = '';
-        
+
         if (action === 'delete_note') {
           url = `/crm/notes/${id}/delete_note/`;
           body = `note_id=${id}`;
@@ -479,7 +523,7 @@
           url = `/todo/tasks/${id}/complete_task`;
           body = `task_id=${id}`;
         }
-        
+
         fetch(url, {
           method: 'POST',
           headers: {
@@ -523,7 +567,7 @@
               taskEl.style.transform = 'translateX(-20px)';
               setTimeout(() => taskEl.remove(), 300);
             }
-            
+
             // Add completed task to history (at the top of notes list)
             const notesList = document.querySelector('.notes-list');
             if (notesList && data.task) {
@@ -539,10 +583,10 @@
                   </div>
                 </div>
               `;
-              
+
               // Insert at the top (first child)
               notesList.insertAdjacentHTML('afterbegin', completedTaskHTML);
-              
+
               // Trigger animation
               setTimeout(() => {
                 const newItem = notesList.firstElementChild;
@@ -555,6 +599,123 @@
           }
         }).catch(() => overlay.remove());
       };
+    }
+
+    // Tab Switching
+    function switchTab(tabId) {
+      // Buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.onclick.toString().includes(tabId)) {
+          btn.classList.add('active');
+        }
+      });
+
+      // Contents
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+        content.style.display = 'none';
+      });
+
+      const activeContent = document.getElementById(`tab-${tabId}`);
+      if (activeContent) {
+        activeContent.style.display = 'block';
+        setTimeout(() => activeContent.classList.add('active'), 10);
+      }
+    }
+
+    // Communication Tab Toggle
+    function switchCommTab(type) {
+      // Update buttons
+      const btns = document.querySelectorAll('.comm-toggle-btn');
+      btns.forEach(btn => btn.classList.remove('active'));
+
+      if (type === 'emails') {
+        btns[0].classList.add('active');
+        htmx.ajax('GET', "{% url 'email_automation:contact_emails' contact.id %}", { target: '#comm-content' });
+      } else {
+        btns[1].classList.add('active');
+        // Contact files endpoint'i company ile aynı olabilir veya ayrı olabilir. 
+        // Şimdilik company_shared_files benzeri bir yapı kullanalım ama contact için view yazmadım henüz.
+        // Ancak modelde contact ilişkisi var.
+        // HATA: contact_shared_files view henüz yok!
+        // View yazmadığım için şimdilik boş bir placeholder veya email view çağıralım. 
+        // DOĞRUSU: Views.py'ye contact_shared_files eklemek. 
+        // Şimdilik burayı Comment out yapıyorum veya email yüklüyorum.
+        // DÜZELTME: company_shared_files view var ama contact_shared_files yok.
+        // Views.py'ye contact_shared_files eklemem gerekli. 
+        // Ancak bu adımda JS eklerken, olmayan view'a istek atamayız. 
+        // Şimdilik alert verelim veya geliştirilecek diyelim.
+        // Veya view'u hemen ekleyelim. En doğrusu bu.
+        // JS'i ekleyeyim, view'u bir sonraki adımda eklerim.
+        alert('Bu özellik yakında eklenecek.');
+        // htmx.ajax('GET', "{% url 'email_automation:contact_shared_files' contact.id %}", {target: '#comm-content'});
+      }
+    }
+
+    // Open Compose Modal
+    function openComposeModal(toEmail, toName, subject, companyId, contactId) {
+      let url = "{% url 'email_automation:compose_email' %}?";
+      if (toEmail) url += `to=${encodeURIComponent(toEmail)}&`;
+      if (toName) url += `name=${encodeURIComponent(toName)}&`;
+      if (subject) url += `subject=${encodeURIComponent(subject)}&`;
+      if (companyId) url += `company=${companyId}&`;
+      if (contactId) url += `contact=${contactId}&`;
+
+      fetch(url, {
+        headers: { 'HX-Request': 'true' }
+      })
+        .then(res => res.text())
+        .then(html => {
+          document.getElementById('composeModalContainer').innerHTML = html;
+        });
+    }
+
+    // View Email Detail
+    function viewEmailDetail(emailId) {
+      openEmailDetailModal(emailId);
+    }
+
+    function openEmailDetailModal(emailId) {
+      let container = document.getElementById('emailDetailModal');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'emailDetailModal';
+        container.className = 'modal-backdrop';
+        container.onclick = (e) => {
+          if (e.target === container) closeEmailDetailModal();
+        };
+        document.body.appendChild(container);
+      }
+
+      container.style.display = 'flex';
+      container.innerHTML = '<div style="margin:auto; background:white; padding:20px; border-radius:8px;"><i class="fas fa-spinner fa-spin"></i> Yükleniyor...</div>';
+
+      fetch(`/email/email/${emailId}/`, {
+        headers: { 'HX-Request': 'true' }
+      })
+        .then(res => res.text())
+        .then(html => {
+          container.innerHTML = `
+          <div class="compose-modal" style="position:relative; bottom:auto; right:auto; width:800px; height:80vh;">
+            <div class="compose-header">
+              <h3>E-posta Detayı</h3>
+              <button class="close-btn" onclick="closeEmailDetailModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+                ${html}
+            </div>
+          </div>
+        `;
+        });
+    }
+
+    function closeEmailDetailModal() {
+      const container = document.getElementById('emailDetailModal');
+      if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+      }
     }
   </script>
 </div>

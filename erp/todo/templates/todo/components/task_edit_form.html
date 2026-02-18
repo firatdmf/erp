@@ -1,5 +1,6 @@
 <!-- Task Edit Form Content -->
-<form id="taskEditForm" method="post" action="{% url 'todo:update_task_ajax' task.id %}" onsubmit="handleTaskEditFormSubmit(event); return false;">
+<form id="taskEditForm" method="post" action="{% url 'todo:update_task_ajax' task.id %}"
+  onsubmit="handleTaskEditFormSubmit(event); return false;">
   {% csrf_token %}
 
   <!-- Task Info -->
@@ -7,7 +8,8 @@
   <div class="form-group">
     <label><i class="fa fa-building"></i> Company</label>
     <div style="padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; font-size: 0.875rem;">
-      <a href="{% url 'crm:company_detail' task.company.pk %}" style="color: var(--text-primary); text-decoration: none;">
+      <a href="{% url 'crm:company_detail' task.company.pk %}"
+        style="color: var(--text-primary); text-decoration: none;">
         <strong>{{ task.company }}</strong>
       </a>
     </div>
@@ -16,7 +18,8 @@
   <div class="form-group">
     <label><i class="fa fa-user"></i> Contact</label>
     <div style="padding: 0.5rem 0.75rem; background: var(--bg-secondary); border-radius: 6px; font-size: 0.875rem;">
-      <a href="{% url 'crm:contact_detail' task.contact.pk %}" style="color: var(--text-primary); text-decoration: none;">
+      <a href="{% url 'crm:contact_detail' task.contact.pk %}"
+        style="color: var(--text-primary); text-decoration: none;">
         <strong>{{ task.contact }}</strong>
       </a>
     </div>
@@ -52,14 +55,225 @@
     {{ form.description }}
   </div>
 
+  <!-- Assignees Management -->
+  <div class="form-group" style="position: relative;">
+    <label>Assignees</label>
+    <div id="editSelectedUsersList" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+      {% for u in task.assignees.all %}
+      <div class="user-chip" data-id="{{ u.id }}">
+        <div class="avatar-circle" style="width:20px; height:20px; font-size:0.6rem;">
+          {{ u.user.first_name.0 }}{{ u.user.last_name.0 }}
+        </div>
+        <span>{{ u.user.get_full_name }}</span>
+        <span class="remove-user" onclick="removeEditUser('{{ u.id }}')">&times;</span>
+      </div>
+      {% endfor %}
+      <!-- Fallback if empty but has legacy member -->
+      {% if not task.assignees.exists and task.member %}
+      <div class="user-chip" data-id="{{ task.member.id }}">
+        <div class="avatar-circle" style="width:20px; height:20px; font-size:0.6rem;">
+          {{ task.member.user.first_name.0 }}{{ task.member.user.last_name.0 }}
+        </div>
+        <span>{{ task.member.user.get_full_name }}</span>
+        <span class="remove-user" onclick="removeEditUser('{{ task.member.id }}')">&times;</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Hidden input to store comma-separated IDs -->
+    <input type="hidden" name="assigned_users" id="edit_assigned_users"
+      value="{% for u in task.assignees.all %}{{ u.user.id }}{% if not forloop.last %},{% endif %}{% empty %}{% if task.member %}{{ task.member.user.id }}{% endif %}{% endfor %}">
+
+    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleEditUserSearch()"
+      style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
+      <i class="fas fa-plus"></i> Add User
+    </button>
+
+    <!-- Search Dropdown -->
+    <div id="editUserSearchContainer" style="display: none; margin-top: 0.5rem; position: relative;">
+      <input type="text" class="form-input" placeholder="Search users..." onkeyup="searchUsersForEdit(this.value)"
+        autocomplete="off">
+      <div id="editUserSearchResults" class="search-results"
+        style="display:none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 9999;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Attachments Management -->
+  <div class="form-group">
+    <label>Attachments</label>
+
+    <!-- Existing List -->
+    {% if task.attachments.all %}
+    <div class="attachment-list" style="margin-bottom: 0.5rem; display:flex; flex-direction:column; gap:0.5rem;">
+      {% for att in task.attachments.all %}
+      <div class="attachment-item" id="att-{{ att.id }}"
+        style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:0.5rem; border-radius:6px; font-size:0.85rem;">
+        <a href="{{ att.get_download_url }}" target="_blank"
+          style="text-decoration:none; color:#334155; display:flex; align-items:center; gap:0.5rem;">
+          <i class="fas fa-file"></i> {{ att.file_name }}
+        </a>
+        <button type="button" onclick="deleteAttachment('{{ att.id }}')"
+          style="background:none; border:none; color:#ef4444; cursor:pointer;" title="Remove">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Upload New -->
+    <input type="file" name="task_files" class="form-input" multiple>
+    <small style="color: #64748b; font-size: 0.8rem;">New files will be uploaded to Google Drive</small>
+  </div>
+
+  <script>
+    // --- Assignee Logic ---
+    function toggleEditUserSearch() {
+      const c = document.getElementById('editUserSearchContainer');
+      c.style.display = c.style.display === 'none' ? 'block' : 'none';
+      if (c.style.display === 'block') c.querySelector('input').focus();
+    }
+
+    let editSearchTimeout;
+    function searchUsersForEdit(query) {
+      clearTimeout(editSearchTimeout);
+      if (!query) {
+        document.getElementById('editUserSearchResults').style.display = 'none';
+        return;
+      }
+
+      editSearchTimeout = setTimeout(() => {
+        fetch(`/team/search-users/?q=${encodeURIComponent(query)}`)
+          .then(r => r.json())
+          .then(data => {
+            const res = document.getElementById('editUserSearchResults');
+            res.innerHTML = '';
+            if (data.results && data.results.length > 0) {
+              data.results.forEach(u => {
+                const div = document.createElement('div');
+                div.className = 'user-search-item';
+                div.innerHTML = `
+                            <div class="avatar-circle">${u.initials}</div>
+                            <span>${u.name}</span>
+                        `;
+                div.onclick = () => addEditUser(u.id, u.name, u.initials);
+                res.appendChild(div);
+              });
+              res.style.display = 'block';
+            } else {
+              res.style.display = 'none';
+            }
+          });
+      }, 300);
+    }
+
+    function addEditUser(id, name, initials) {
+      // Check duplicates
+      const container = document.getElementById('editSelectedUsersList');
+      if (container.querySelector(`[data-id="${id}"]`)) return; // already added
+
+      // Add chip
+      const chip = document.createElement('div');
+      chip.className = 'user-chip';
+      chip.setAttribute('data-id', id);
+      chip.innerHTML = `
+            <div class="avatar-circle" style="width:20px; height:20px; font-size:0.6rem;">${initials}</div>
+            <span>${name}</span>
+            <span class="remove-user" onclick="removeEditUser('${id}')">&times;</span>
+        `;
+      container.appendChild(chip);
+
+      // Update hidden input
+      updateEditHiddenInput();
+
+      // Hide search
+      document.getElementById('editUserSearchContainer').style.display = 'none';
+      document.getElementById('editUserSearchResults').style.display = 'none';
+      document.querySelector('#editUserSearchContainer input').value = '';
+    }
+
+    function removeEditUser(id) {
+      const chip = document.querySelector(`.user-chip[data-id="${id}"]`);
+      if (chip) chip.remove();
+      updateEditHiddenInput();
+    }
+
+    function updateEditHiddenInput() {
+      const chips = document.querySelectorAll('.user-chip');
+      const ids = Array.from(chips).map(c => c.getAttribute('data-id'));
+      document.getElementById('edit_assigned_users').value = ids.join(',');
+    }
+
+    // --- Attachment Logic ---
+    function deleteAttachment(attId) {
+      if (!confirm('Delete this attachment?')) return;
+
+      // We'll call a dedicated endpoint
+      fetch(`/todo/tasks/attachments/${attId}/delete/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            document.getElementById(`att-${attId}`).remove();
+          } else {
+            alert('Error deleting attachment');
+          }
+        });
+    }
+
+    function handleTaskEditFormSubmit(e) {
+      e.preventDefault();
+      const form = e.target;
+      const btn = form.querySelector('button[type="submit"]');
+      const originalText = btn.innerHTML;
+
+      // Loading State
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+
+      const formData = new FormData(form);
+
+      fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            // If on detail page, reload
+            location.reload();
+          } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert('An error occurred.');
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        });
+    }
+  </script>
+
   <!-- Hidden fields -->
   {{ form.contact }}
   {{ form.company }}
-  {{ form.member }}
 
   <!-- Form Errors -->
   {% if form.errors %}
-  <div style="margin: 1rem 0; padding: 0.75rem; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 0.875rem;">
+  <div
+    style="margin: 1rem 0; padding: 0.75rem; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 0.875rem;">
     <strong><i class="fa fa-exclamation-circle"></i> Please correct the errors below:</strong>
     <ul style="margin: 0.5rem 0 0 1.25rem; padding: 0;">
       {% for field, errors in form.errors.items %}

@@ -1168,6 +1168,85 @@ input[type=file]::-webkit-file-upload-button {
   transform: scale(1.1);
 }
 
+/* Preview button for image picker */
+.preview_image_btn {
+  position: absolute;
+  top: 12px;
+  right: 45px;
+  background: rgba(102, 126, 234, 0.9);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.image_item:hover .preview_image_btn {
+  opacity: 1;
+}
+
+.preview_image_btn:hover {
+  background: #5568d3;
+  transform: scale(1.1);
+}
+
+/* Video Card Styles */
+.video_item .video_thumbnail_container {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video_item .video_thumbnail_container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video_item .video_play_overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+}
+
+.video_item:hover .video_play_overlay {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.video_item .video_play_overlay i {
+  color: #667eea;
+  font-size: 18px;
+  margin-left: 3px;
+}
+
+/* Always show preview button on video items */
+.video_item .preview_image_btn {
+  opacity: 1;
+  background: rgba(102, 126, 234, 0.95);
+}
+
 .image_modal_footer {
   display: flex;
   justify-content: flex-end;

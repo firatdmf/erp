@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
+{% endblock %}
+
+{% block content %}
+<div class="product-list-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-left">
+            <h1>Purchase Orders</h1>
+            <span class="product-count">{{ paginator.count|default:orders.count }} order{{ paginator.count|default:orders.count|pluralize }}</span>
+        </div>
+        <div class="header-right">
+            <a href="#" onclick="openPurchaseOrderSidebar(); return false;" class="btn btn-primary">
+                <i class="fa fa-plus"></i>
+                New Order
+            </a>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="search-box-modern">
+            <i class="fa fa-search search-icon"></i>
+            <input type="text" id="instantSearch" placeholder="Search orders by supplier or status..."
+                class="search-input-modern" autocomplete="off" value="{{ search_query }}">
+            <button type="button" class="search-clear" id="searchClear"
+                style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div class="table-container">
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th>Supplier</th>
+                    <th style="width: 150px;">Status</th>
+                    <th style="width: 150px;">Amount</th>
+                    <th style="width: 150px;">Date</th>
+                    <th style="width: 100px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+                {% for order in orders %}
+                <tr class="product-row" onclick="window.location='{% url 'procurement:order_detail' order.pk %}'"
+                    style="cursor: pointer;">
+                    <td>
+                        <span class="text-muted">PO-{{ order.pk }}</span>
+                    </td>
+                    <td>
+                        <div class="product-info">
+                            <div class="product-title">{{
+                                order.supplier.company_name|default:order.supplier.contact_name }}</div>
+                            {% if order.supplier.company_name and order.supplier.contact_name %}
+                            <div class="product-description">{{ order.supplier.contact_name }}</div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if order.status == 'confirmed' %}
+                        <span class="badge" style="background-color: #dcfce7; color: #16a34a;">Confirmed</span>
+                        {% elif order.status == 'received' %}
+                        <span class="badge" style="background-color: #f0fdf4; color: #15803d;">Received</span>
+                        {% elif order.status == 'cancelled' %}
+                        <span class="badge" style="background-color: #f1f5f9; color: #64748b;">Cancelled</span>
+                        {% elif order.status == 'sent' %}
+                        <span class="badge" style="background-color: #e0f2fe; color: #0284c7;">Sent</span>
+                        {% else %}
+                        <span class="badge" style="background-color: #fff7ed; color: #c2410c;">Draft</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="font-medium">{{ order.currency }} {{ order.total_amount }}</span>
+                    </td>
+                    <td>
+                        <span class="text-muted" style="font-size: 0.875rem;">{{ order.created_at|date:"M d, Y"
+                            }}</span>
+                    </td>
+                    <td>
+                        <div class="action-buttons" onclick="event.stopPropagation();">
+                            <a href="{% url 'procurement:order_detail' order.pk %}" class="btn-icon" title="View">
+                                <i class="fa fa-eye"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="empty-state">
+                        <div class="empty-state-content">
+                            <i class="fas fa-shopping-cart"
+                                style="font-size: 48px; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p>No purchase orders found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} orders
+        </div>
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn"
+                title="First"><i class="fa fa-angles-left"></i></a>
+            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
+            {% else %}
+            <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
+            <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <span class="pagination-btn active">{{ num }}</span>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+                href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">
+                {{ num
+                }}</a>
+                {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}"
+                    class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
+                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}"
+                    class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
+                {% else %}
+                <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
+                <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
+                {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem 0;
+        margin-top: 1rem;
+    }
+
+    .pagination-info {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .pagination {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .pagination-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        height: 36px;
+        padding: 0 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .pagination-btn:hover:not(.disabled):not(.active) {
+        background: var(--bg-hover);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .pagination-btn.active {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: white;
+        font-weight: 600;
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+</style>
+
+<script>
+    // Backend search functionality
+    const searchInput = document.getElementById('instantSearch');
+    const searchClear = document.getElementById('searchClear');
+
+    if (searchInput) {
+        // Navigate to search URL with debounce
+        let searchTimeout;
+        searchInput.addEventListener('input', function (e) {
+            const query = e.target.value.trim();
+            searchClear.style.display = query ? 'flex' : 'none';
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                if (query) {
+                    window.location.href = '{% url "procurement:order_list" %}?search=' + encodeURIComponent(query);
+                } else {
+                    window.location.href = '{% url "procurement:order_list" %}';
+                }
+            }, 500); // 500ms debounce
+        });
+    }
+
+    function clearSearch() {
+        searchInput.value = '';
+        searchClear.style.display = 'none';
+        window.location.href = '{% url "procurement:order_list" %}';
+    }
+</script>
+{% endblock %}

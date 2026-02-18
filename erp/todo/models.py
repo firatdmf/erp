@@ -10,6 +10,24 @@ from datetime import datetime, date
 from authentication.models import Member
 
 
+
+class TaskAttachment(models.Model):
+    """Files attached to personal tasks (stored in Google Drive)"""
+    task = models.ForeignKey('Task', on_delete=models.CASCADE, related_name='attachments')
+    file_name = models.CharField(max_length=255)
+    drive_file_id = models.CharField(max_length=255)
+    drive_link = models.URLField(max_length=500)
+    uploaded_by = models.ForeignKey(Member, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file_name
+
+    def get_download_url(self):
+        """Returns direct download link"""
+        return f"https://drive.google.com/uc?export=download&id={self.drive_file_id}"
+
+
 class Task(models.Model):
     # blank=True: This parameter specifies whether the field is allowed to be blank in forms
     # null=True: This parameter specifies whether the field is allowed to have a null value in the database. If null=True, the field will be nullable in the database, meaning it can have a value of NULL. It applies to the database schema. Setting null=True means that the field can be empty in the database, but it may still be required in forms unless blank=True is also set.
@@ -24,10 +42,18 @@ class Task(models.Model):
         ('urgent', 'Urgent'),
     ]
 
+    STATUS_CHOICES = [
+        ('todo', 'To Do'),
+        ('in_progress', 'In Progress'),
+        ('review', 'Review'),
+        ('done', 'Done'),
+    ]
+
     name = models.CharField(max_length=200)
     due_date = models.DateField(db_index=True)
     description = models.TextField(blank=True, null=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium', db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='todo', db_index=True)
     completed = models.BooleanField(default=False, db_index=True)
     on_hold = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,6 +66,7 @@ class Task(models.Model):
         Company, on_delete=models.CASCADE, blank=True, null=True
     )
     member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True, related_name='assigned_tasks')
+    assignees = models.ManyToManyField(Member, related_name='tasks', blank=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, blank=True, null=True, related_name='created_tasks')
 
     def __str__(self):

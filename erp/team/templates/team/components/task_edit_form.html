@@ -1,0 +1,253 @@
+<form id="teamTaskEditForm" method="post" action="{% url 'team:edit_task' task.id %}"
+    onsubmit="handleTeamTaskEditFormSubmit(event)" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <div class="form-group">
+        <label for="id_name">Task name</label>
+        <input type="text" name="name" id="id_name" class="form-input" value="{{ task.title }}" {% if not can_edit %}disabled{% else %}required{% endif %}>
+    </div>
+
+    <div class="form-group">
+        <label for="id_due_date">Due date</label>
+        <input type="date" name="due_date" id="id_due_date" class="form-input" value="{{ task.due_date|date:'Y-m-d' }}"
+            {% if not can_edit %}disabled{% endif %}>
+    </div>
+
+    <div class="form-group">
+        <label for="id_priority">Priority</label>
+        <select name="priority" id="id_priority" class="form-input" {% if not can_edit %}disabled{% endif %}>
+            <option value="low" {% if task.priority == 'low' %}selected{% endif %}>Low</option>
+            <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>Medium</option>
+            <option value="high" {% if task.priority == 'high' %}selected{% endif %}>High</option>
+            <option value="urgent" {% if task.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="id_description">Description</label>
+        <textarea name="description" id="id_description" class="form-textarea" rows="3" {% if not can_edit %}disabled{%
+            else %}placeholder="Enter a description..." {% endif %}>{{ task.description }}</textarea>
+    </div>
+
+    <!-- Assign To Section -->
+    <div class="form-group">
+        <label>Assign To</label>
+
+        <!-- Assign to Team Toggle -->
+        <div style="margin-bottom: 0.5rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer;">
+                <input type="checkbox" name="assign_to_team" id="edit_assign_to_team"
+                    onchange="toggleEditAssignToTeam()">
+                <span>Assign to entire team</span>
+            </label>
+        </div>
+
+        <!-- Selected Users -->
+        <div id="editSelectedUsersList" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+            {% for member in task.assignees.all %}
+            <div class="user-chip" data-user-id="{{ member.id }}"
+                style="background: #e2e8f0; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; color: #334155;">
+                <div class="avatar-circle"
+                    style="width: 20px; height: 20px; background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem;">
+                    {{ member.first_name|first|upper }}
+                </div>
+                {{ member.get_full_name }}
+                {% if can_edit %}
+                <button type="button" style="background:none;border:none;cursor:pointer;color:#94a3b8;"
+                    onclick="removeEditUser({{ member.id }})"><i class="fas fa-times"></i></button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Hidden Input -->
+        <input type="hidden" name="assigned_users" id="edit_assigned_users"
+            value="{% for u in task.assignees.all %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+
+        {% if can_edit %}
+        <!-- Add User Search -->
+        <div id="editUserSearchContainer" style="position: relative;">
+            <input type="text" class="form-input" placeholder="Search to add user..."
+                oninput="searchUsersForEdit(this.value)" style="font-size: 0.9rem;">
+            <div id="editUserSearchResults" class="dropdown-results"
+                style="display:none; position:absolute; top: 100%; margin-top: 0.25rem; background:white; border:1px solid #e2e8f0; border-radius:8px; width:100%; max-height:200px; overflow-y:auto; z-index:1000; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);">
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Current Attachments -->
+    {% if task.attachments.all %}
+    <div style="margin-top: 1.5rem; margin-bottom: 1rem;">
+        <div style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem;">Current Attachments:
+        </div>
+        <div id="edit-attachments-container">
+            {% for att in task.attachments.all %}
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.9rem;">
+                <a href="{{ att.get_download_url }}" target="_blank"
+                    style="color:#2563eb; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:200px;">
+                    <i class="fas fa-paperclip"></i> {{ att.file_name }}
+                </a>
+                {% if can_edit %}
+                <button type="button" onclick="deleteTeamTaskAttachment('{{ att.id }}', this)"
+                    style="color:#ef4444; background:none; border:none; cursor:pointer;" title="Remove">
+                    <i class="fas fa-times"></i>
+                </button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if can_edit %}
+    <!-- New Attachments -->
+    <div class="form-group" style="margin-top: 1rem;">
+        <label for="id_task_files">Attachments (Google Drive)</label>
+        <input type="file" name="task_files" id="id_task_files" class="form-input" multiple>
+        <small style="color: #64748b; font-size: 0.8rem;">Selected files will be uploaded to Google Drive</small>
+    </div>
+    {% endif %}
+
+    <div class="sidebar-footer">
+        {% if can_edit %}
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="button" class="btn btn-secondary" onclick="closeTaskEditSidebar()">Cancel</button>
+        {% else %}
+        <button type="button" class="btn btn-secondary" onclick="closeTaskEditSidebar()"
+            style="width: 100%;">Close</button>
+        {% endif %}
+    </div>
+</form>
+
+<script>
+    function deleteTeamTaskAttachment(attId, btn) {
+        if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+        fetch(`/team/task/attachment/${attId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    btn.closest('div').remove();
+                } else {
+                    alert('Failed to delete attachment: ' + (data.error || 'Unknown error'));
+                }
+            });
+    }
+
+    // Toggle Assign to Team
+    function toggleEditAssignToTeam() {
+        const isChecked = document.getElementById('edit_assign_to_team').checked;
+        const searchContainer = document.getElementById('editUserSearchContainer');
+        const userList = document.getElementById('editSelectedUsersList');
+
+        if (isChecked) {
+            if (searchContainer) searchContainer.style.display = 'none';
+            if (userList) userList.style.opacity = '0.5';
+            // Disable interactions
+            userList.querySelectorAll('button').forEach(b => b.disabled = true);
+        } else {
+            if (searchContainer) searchContainer.style.display = 'block';
+            if (userList) userList.style.opacity = '1';
+            userList.querySelectorAll('button').forEach(b => b.disabled = false);
+        }
+    }
+
+    // Search Users
+    function searchUsersForEdit(query) {
+        const results = document.getElementById('editUserSearchResults');
+        if (!results) return;
+
+        if (!query || query.length < 2) {
+            results.style.display = 'none';
+            return;
+        }
+
+        const teamId = '{{ team.id }}';
+
+        fetch(`/team/search-users/?q=${encodeURIComponent(query)}&team_id=${teamId}`)
+            .then(r => r.json())
+            .then(data => {
+                results.innerHTML = '';
+                const users = data.users || [];
+
+                // Filter already selected
+                const input = document.getElementById('edit_assigned_users');
+                const currentIds = input.value ? input.value.split(',') : [];
+
+                const filtered = users.filter(u => !currentIds.includes(String(u.id)));
+
+                if (filtered.length === 0) {
+                    results.style.display = 'none';
+                    return;
+                }
+
+                filtered.forEach(u => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'padding: 0.5rem; cursor: pointer; hover:background: #f1f5f9; display: flex; align-items: center; gap: 0.5rem;';
+                    div.innerHTML = `
+                        <div style="width:24px;height:24px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;">
+                            ${u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>${u.name}</div>
+                    `;
+                    div.onclick = () => selectUserForEdit(u);
+                    div.onmouseover = () => div.style.background = '#f1f5f9';
+                    div.onmouseout = () => div.style.background = 'white';
+                    results.appendChild(div);
+                });
+                results.style.display = 'block';
+            });
+    }
+
+    function selectUserForEdit(user) {
+        const container = document.getElementById('editSelectedUsersList');
+        const input = document.getElementById('edit_assigned_users');
+
+        // Add visual chip
+        const chip = document.createElement('div');
+        chip.className = 'user-chip';
+        chip.dataset.userId = user.id;
+        chip.style.cssText = 'background: #e2e8f0; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; color: #334155;';
+        chip.innerHTML = `
+            <div class="avatar-circle" style="width: 20px; height: 20px; background: #3b82f6; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem;">
+                ${user.name.charAt(0).toUpperCase()}
+            </div>
+            ${user.name}
+            <button type="button" style="background:none;border:none;cursor:pointer;color:#94a3b8;" onclick="removeEditUser(${user.id})"><i class="fas fa-times"></i></button>
+        `;
+        container.appendChild(chip);
+
+        // Update hidden input
+        const currentIds = input.value ? input.value.split(',') : [];
+        currentIds.push(user.id);
+        input.value = currentIds.join(',');
+
+        // Keep search active but filter out added user
+        const searchInput = document.querySelector('#editUserSearchContainer input');
+        if (searchInput) {
+            searchInput.focus();
+            searchUsersForEdit(searchInput.value);
+        }
+    }
+
+    function removeEditUser(userId) {
+        const input = document.getElementById('edit_assigned_users');
+        if (!input) return;
+
+        let currentIds = input.value ? input.value.split(',') : [];
+        currentIds = currentIds.filter(id => id != userId);
+        input.value = currentIds.join(',');
+
+        // Remove visual
+        const chip = document.querySelectorhip[data-user-id="${userId}"]`);
+        if (chip) chip.remove();
+    }
+</script>

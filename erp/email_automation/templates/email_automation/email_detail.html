@@ -1,0 +1,1221 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ email.subject|default:"Email" }} - Nejum ERP{% endblock %}
+
+{% block css %}
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --ed-primary: #3b82f6;
+        --ed-primary-light: #60a5fa;
+        --ed-primary-dark: #2563eb;
+        --ed-primary-bg: rgba(59, 130, 246, 0.06);
+        --ed-border: #e5e7eb;
+        --ed-surface: #ffffff;
+        --ed-surface-2: #f8fafc;
+        --ed-text: #0f172a;
+        --ed-text-sec: #64748b;
+        --ed-text-muted: #94a3b8;
+        --ed-hover: #f1f5f9;
+        --ed-radius: 12px;
+        --ed-radius-sm: 8px;
+        --ed-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+        --ed-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .ed-container {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============================================================
+       TOP BAR
+       ============================================================ */
+    .ed-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 0 0;
+        margin-bottom: 20px;
+    }
+
+    .ed-back-section {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .ed-back-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid var(--ed-border);
+        background: var(--ed-surface);
+        color: var(--ed-text-sec);
+        text-decoration: none;
+        transition: all 0.12s;
+        flex-shrink: 0;
+    }
+
+    .ed-back-btn:hover {
+        background: var(--ed-hover);
+        color: var(--ed-text);
+        border-color: #d1d5db;
+    }
+
+    .ed-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--ed-text-sec);
+        font-weight: 500;
+    }
+
+    .ed-breadcrumb .bc-icon {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ed-primary-bg);
+        border-radius: 8px;
+        color: var(--ed-primary);
+        font-size: 12px;
+    }
+
+    .ed-breadcrumb .bc-sep {
+        color: var(--ed-text-muted);
+        font-size: 11px;
+    }
+
+    .ed-breadcrumb .bc-subject {
+        color: var(--ed-text-muted);
+        max-width: 320px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ed-topbar-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .ed-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 10px;
+        border: 1px solid var(--ed-border);
+        background: var(--ed-surface);
+        color: var(--ed-text-sec);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.12s;
+        font-family: inherit;
+        text-decoration: none;
+    }
+
+    .ed-action-btn:hover {
+        background: var(--ed-hover);
+        color: var(--ed-text);
+        border-color: #d1d5db;
+    }
+
+    .ed-action-btn i {
+        font-size: 13px;
+    }
+
+    .ed-action-btn.primary {
+        background: var(--ed-primary);
+        color: white;
+        border-color: var(--ed-primary);
+        box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+    }
+
+    .ed-action-btn.primary:hover {
+        background: var(--ed-primary-dark);
+    }
+
+    .ed-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid var(--ed-border);
+        background: var(--ed-surface);
+        color: var(--ed-text-sec);
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.12s;
+    }
+
+    .ed-icon-btn:hover {
+        background: var(--ed-hover);
+        color: var(--ed-text);
+    }
+
+    .ed-action-danger:hover {
+        background: #fef2f2;
+        color: #ef4444;
+        border-color: #fecaca;
+    }
+
+    /* ============================================================
+       2-COLUMN LAYOUT
+       ============================================================ */
+    .ed-layout {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+    }
+
+    .ed-main {
+        flex: 1;
+        min-width: 0;
+        background: var(--ed-surface);
+        border: 1px solid var(--ed-border);
+        border-radius: var(--ed-radius);
+        overflow: hidden;
+        box-shadow: var(--ed-shadow);
+    }
+
+    /* ============================================================
+       EMAIL HEADER
+       ============================================================ */
+    .ed-header {
+        padding: 28px 32px 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .ed-avatar {
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #dbeafe, #93c5fd);
+        color: #1e40af;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 19px;
+        flex-shrink: 0;
+        text-transform: uppercase;
+    }
+
+    .ed-header-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .ed-from-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 4px;
+    }
+
+    .ed-from-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--ed-text);
+    }
+
+    .ed-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 10px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 600;
+        white-space: nowrap;
+        letter-spacing: 0.1px;
+    }
+
+    .ed-badge.company {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .ed-badge.contact {
+        background: #ecfdf5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+    }
+
+    .ed-badge i {
+        font-size: 8px;
+    }
+
+    .ed-sub-info {
+        font-size: 12px;
+        color: var(--ed-text-muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .ed-header-right {
+        flex-shrink: 0;
+        text-align: right;
+    }
+
+    .ed-date {
+        font-size: 12px;
+        color: var(--ed-text-muted);
+        white-space: nowrap;
+        font-weight: 500;
+    }
+
+    .ed-folder-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 6px;
+        background: var(--ed-hover);
+        color: var(--ed-text-muted);
+    }
+
+    .ed-folder-label i {
+        font-size: 9px;
+    }
+
+    /* ============================================================
+       SUBJECT
+       ============================================================ */
+    .ed-subject-section {
+        padding: 0 32px 24px;
+        border-bottom: 1px solid var(--ed-border);
+    }
+
+    .ed-subject {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--ed-text);
+        margin: 0;
+        line-height: 1.35;
+        letter-spacing: -0.3px;
+    }
+
+    /* ============================================================
+       BODY
+       ============================================================ */
+    .ed-body {
+        padding: 28px 32px;
+        font-size: 14px;
+        line-height: 1.75;
+        color: #374151;
+    }
+
+    .ed-body img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+    }
+
+    .ed-body a {
+        color: var(--ed-primary);
+    }
+
+    .ed-body ul,
+    .ed-body ol {
+        padding-left: 24px;
+    }
+
+    .ed-body blockquote {
+        border-left: 3px solid var(--ed-border);
+        padding-left: 16px;
+        margin-left: 0;
+        color: var(--ed-text-sec);
+    }
+
+    /* ============================================================
+       ATTACHMENTS
+       ============================================================ */
+    .ed-attachments {
+        padding: 0 32px 28px;
+        border-top: 1px solid var(--ed-border);
+        margin-top: 4px;
+        padding-top: 20px;
+    }
+
+    .ed-attachments-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ed-text-muted);
+        margin-bottom: 14px;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+    }
+
+    .ed-attachments-title i {
+        font-size: 13px;
+    }
+
+    .ed-attachment-grid {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .ed-attachment-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border: 1px solid var(--ed-border);
+        border-radius: var(--ed-radius-sm);
+        background: var(--ed-surface);
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        min-width: 190px;
+        max-width: 260px;
+        transition: border-color 0.12s, box-shadow 0.12s;
+    }
+
+    .ed-attachment-card:hover {
+        border-color: var(--ed-primary-light);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+    }
+
+    .ed-att-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .ed-att-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .ed-att-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ed-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ed-att-size {
+        font-size: 11px;
+        color: var(--ed-text-muted);
+        margin-top: 2px;
+    }
+
+    /* ============================================================
+       INLINE REPLY
+       ============================================================ */
+    .ed-reply-section {
+        border-top: 1px solid var(--ed-border);
+        padding: 24px 32px 28px;
+        background: var(--ed-surface);
+    }
+
+    .ed-reply-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: var(--ed-text-sec);
+    }
+
+    .ed-reply-to {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .ed-reply-to label {
+        font-weight: 500;
+        color: var(--ed-text-muted);
+        font-size: 12px;
+    }
+
+    .ed-reply-to-value {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: var(--ed-hover);
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ed-text);
+    }
+
+    .ed-reply-to-value .remove-to {
+        cursor: pointer;
+        color: var(--ed-text-muted);
+        font-size: 10px;
+        margin-left: 2px;
+    }
+
+    .ed-reply-to-value .remove-to:hover {
+        color: #ef4444;
+    }
+
+    .ed-reply-toggle-cc {
+        font-size: 12px;
+        color: var(--ed-primary);
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+    }
+
+    .ed-reply-toggle-cc:hover {
+        text-decoration: underline;
+    }
+
+    .ed-reply-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 6px 0 10px;
+        border-bottom: 1px solid var(--ed-border);
+        margin-bottom: 8px;
+    }
+
+    .ed-reply-toolbar button {
+        background: none;
+        border: none;
+        color: var(--ed-text-muted);
+        cursor: pointer;
+        padding: 5px 8px;
+        border-radius: 6px;
+        font-size: 13px;
+        transition: all 0.1s;
+    }
+
+    .ed-reply-toolbar button:hover {
+        background: var(--ed-hover);
+        color: var(--ed-text);
+    }
+
+    .ed-reply-toolbar .tb-sep {
+        width: 1px;
+        height: 16px;
+        background: var(--ed-border);
+        margin: 0 4px;
+    }
+
+    .ed-reply-textarea {
+        width: 100%;
+        min-height: 90px;
+        padding: 12px;
+        border: none;
+        background: transparent;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--ed-text);
+        resize: vertical;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+
+    .ed-reply-textarea::placeholder {
+        color: var(--ed-text-muted);
+    }
+
+    .ed-reply-textarea:focus {
+        outline: none;
+    }
+
+    .ed-reply-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+
+    .ed-reply-footer-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .ed-reply-footer-left button {
+        background: none;
+        border: none;
+        color: var(--ed-text-muted);
+        cursor: pointer;
+        font-size: 15px;
+        padding: 6px;
+        border-radius: 6px;
+        transition: all 0.1s;
+    }
+
+    .ed-reply-footer-left button:hover {
+        color: var(--ed-text);
+        background: var(--ed-hover);
+    }
+
+    .ed-reply-send-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 22px;
+        background: var(--ed-primary);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s;
+        box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
+    }
+
+    .ed-reply-send-btn:hover {
+        background: var(--ed-primary-dark);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+    }
+
+    .ed-reply-send-btn i {
+        font-size: 11px;
+    }
+
+    /* ============================================================
+       CRM SIDEBAR
+       ============================================================ */
+    .ed-crm-sidebar {
+        width: 280px;
+        min-width: 280px;
+        max-width: 280px;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .crm-sidebar-section {
+        background: var(--ed-surface);
+        border: 1px solid var(--ed-border);
+        border-radius: var(--ed-radius);
+        padding: 20px;
+        margin-bottom: 16px;
+        overflow: hidden;
+        box-sizing: border-box;
+        box-shadow: var(--ed-shadow);
+    }
+
+    .crm-section-title {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: var(--ed-text-muted);
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .crm-section-title i {
+        color: var(--ed-primary);
+        font-size: 12px;
+    }
+
+    .crm-card {
+        margin-bottom: 16px;
+        overflow: hidden;
+    }
+
+    .crm-card:last-child {
+        margin-bottom: 0;
+    }
+
+    .crm-card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+
+    .crm-card-icon {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        border-radius: var(--ed-radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .crm-card-icon.company {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .crm-card-icon.contact {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .crm-card-info {
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .crm-card-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ed-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .crm-card-type {
+        font-size: 11px;
+        color: var(--ed-text-muted);
+        margin-top: 2px;
+    }
+
+    .crm-card-detail {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+        font-size: 11px;
+        color: var(--ed-text-sec);
+        overflow: hidden;
+    }
+
+    .crm-card-detail i {
+        width: 14px;
+        min-width: 14px;
+        text-align: center;
+        color: var(--ed-text-muted);
+        font-size: 10px;
+    }
+
+    .crm-card-detail span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .crm-profile-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        padding: 8px 14px;
+        margin-top: 10px;
+        border: 1px solid var(--ed-primary);
+        border-radius: var(--ed-radius-sm);
+        background: var(--ed-surface);
+        color: var(--ed-primary);
+        font-size: 11px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.12s;
+        box-sizing: border-box;
+    }
+
+    .crm-profile-btn:hover {
+        background: var(--ed-primary-bg);
+    }
+
+    .crm-profile-btn i {
+        font-size: 9px;
+    }
+
+    /* ============================================================
+       TOAST
+       ============================================================ */
+    .email-success-toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #059669, #10b981);
+        color: white;
+        padding: 14px 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 8px 32px rgba(5, 150, 105, 0.4);
+        z-index: 99999;
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .email-success-toast.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 1100px) {
+        .ed-crm-sidebar {
+            display: none;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .ed-header {
+            padding: 20px;
+            gap: 12px;
+        }
+
+        .ed-avatar {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            font-size: 16px;
+        }
+
+        .ed-subject-section {
+            padding: 0 20px 20px;
+        }
+
+        .ed-subject {
+            font-size: 18px;
+        }
+
+        .ed-body {
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        .ed-attachments {
+            padding: 0 20px 20px;
+        }
+
+        .ed-reply-section {
+            padding: 20px;
+        }
+
+        .ed-topbar {
+            flex-direction: column;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .ed-topbar-actions {
+            flex-wrap: wrap;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ed-container">
+
+    <!-- Top Bar -->
+    <div class="ed-topbar">
+        <div class="ed-back-section">
+            <a href="{% url 'email_automation:my_emails' %}" class="ed-back-btn" title="Back to Inbox">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div class="ed-breadcrumb">
+                <span class="bc-icon"><i class="fas fa-envelope"></i></span>
+                {{ email.folder|title }}
+                <span class="bc-sep"><i class="fas fa-chevron-right"></i></span>
+                <span class="bc-subject">{{ email.subject|default:"(No Subject)"|truncatewords:8 }}</span>
+            </div>
+        </div>
+        <div class="ed-topbar-actions">
+            <button class="ed-action-btn primary"
+                onclick="openComposeModal(null, '{{ email.from_email }}', 'Re: {{ email.subject|escapejs }}')">
+                <i class="fas fa-reply"></i> Reply
+            </button>
+            <button class="ed-action-btn" onclick="openComposeModal(null, '', 'Fwd: {{ email.subject|escapejs }}')">
+                <i class="fas fa-share"></i> Forward
+            </button>
+            {% if email.folder == 'inbox' %}
+            <button class="ed-icon-btn" title="Archive" onclick="moveEmail({{ email.id }}, 'archive')">
+                <i class="fas fa-archive"></i>
+            </button>
+            {% endif %}
+            {% if email.folder != 'trash' %}
+            <button class="ed-icon-btn ed-action-danger" title="Delete" onclick="moveEmail({{ email.id }}, 'trash')">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 2-Column Layout -->
+    <div class="ed-layout">
+        <!-- Main Content -->
+        <div class="ed-main">
+            <!-- Header -->
+            <div class="ed-header">
+                <div class="ed-avatar">
+                    {{ email.from_name|default:email.from_email|make_list|first|upper }}
+                </div>
+                <div class="ed-header-info">
+                    <div class="ed-from-row">
+                        <span class="ed-from-name">{{ email.from_name|default:email.from_email }}</span>
+
+                        {% for company in email.companies.all %}
+                        <span class="ed-badge company">
+                            <i class="fas fa-building"></i> {{ company.name }}
+                        </span>
+                        {% empty %}
+                        {% if email.company %}
+                        <span class="ed-badge company">
+                            <i class="fas fa-building"></i> {{ email.company.name }}
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% for contact in email.contacts.all %}
+                        <span class="ed-badge contact">
+                            <i class="fas fa-user"></i> {{ contact.name }}
+                        </span>
+                        {% empty %}
+                        {% if email.contact %}
+                        <span class="ed-badge contact">
+                            <i class="fas fa-user"></i> {{ email.contact.name }}
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="ed-sub-info">
+                        {{ email.from_email }} · to {{ email.to_emails|join:", " }}
+                    </div>
+                </div>
+                <div class="ed-header-right">
+                    <div class="ed-date">
+                        {% if email.sent_at %}
+                        {{ email.sent_at|date:"M d, Y · H:i" }}
+                        {% elif email.received_at %}
+                        {{ email.received_at|date:"M d, Y · H:i" }}
+                        {% else %}
+                        {{ email.created_at|date:"M d, Y · H:i" }}
+                        {% endif %}
+                    </div>
+                    <div class="ed-folder-label">
+                        <i class="fas fa-folder"></i> {{ email.folder|title }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subject -->
+            <div class="ed-subject-section">
+                <h1 class="ed-subject">{{ email.subject|default:"(No Subject)" }}</h1>
+            </div>
+
+            <!-- Body -->
+            <div class="ed-body">
+                {% autoescape off %}
+                {{ email.body_html|default:email.body_text|linebreaks }}
+                {% endautoescape %}
+            </div>
+
+            <!-- Attachments -->
+            {% if attachments %}
+            <div class="ed-attachments">
+                <div class="ed-attachments-title">
+                    <i class="fas fa-paperclip"></i>
+                    <span>ATTACHMENTS ({{ attachments.count }})</span>
+                </div>
+                <div class="ed-attachment-grid">
+                    {% for attachment in attachments %}
+                    <a href="{% url 'email_automation:download_attachment' attachment.id %}" target="_blank"
+                        class="ed-attachment-card" title="Download {{ attachment.filename }}">
+                        <div class="ed-att-icon">
+                            {% if 'pdf' in attachment.filename|lower %}
+                            <i class="fas fa-file-pdf" style="color: #ef4444;"></i>
+                            {% elif 'xls' in attachment.filename|lower %}
+                            <i class="fas fa-file-excel" style="color: #059669;"></i>
+                            {% elif 'doc' in attachment.filename|lower %}
+                            <i class="fas fa-file-word" style="color: #2563eb;"></i>
+                            {% elif 'png' in attachment.filename|lower or 'jpg' in attachment.filename|lower or 'jpeg'
+                            in attachment.filename|lower %}
+                            <i class="fas fa-file-image" style="color: #f59e0b;"></i>
+                            {% else %}
+                            <i class="fas fa-file" style="color: #94a3b8;"></i>
+                            {% endif %}
+                        </div>
+                        <div class="ed-att-info">
+                            <div class="ed-att-name">{{ attachment.filename }}</div>
+                            {% if attachment.file_size %}
+                            <div class="ed-att-size">{{ attachment.file_size|filesizeformat }}</div>
+                            {% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Inline Reply -->
+            <div class="ed-reply-section">
+                <div class="ed-reply-header">
+                    <div class="ed-reply-to">
+                        <label>To:</label>
+                        <span class="ed-reply-to-value">
+                            {{ email.from_name|default:email.from_email }}
+                            <span class="remove-to" title="Remove">×</span>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0)" class="ed-reply-toggle-cc">Cc/Bcc</a>
+                </div>
+
+                <div class="ed-reply-toolbar">
+                    <button type="button" title="Bold"><i class="fas fa-bold"></i></button>
+                    <button type="button" title="Italic"><i class="fas fa-italic"></i></button>
+                    <button type="button" title="Underline"><i class="fas fa-underline"></i></button>
+                    <div class="tb-sep"></div>
+                    <button type="button" title="Bulleted list"><i class="fas fa-list-ul"></i></button>
+                    <button type="button" title="Numbered list"><i class="fas fa-list-ol"></i></button>
+                    <div class="tb-sep"></div>
+                    <button type="button" title="Link"><i class="fas fa-link"></i></button>
+                </div>
+
+                <textarea class="ed-reply-textarea" id="replyBody" placeholder="Type your reply here..."></textarea>
+
+                <div class="ed-reply-footer">
+                    <div class="ed-reply-footer-left">
+                        <button type="button" title="Attach file"><i class="fas fa-paperclip"></i></button>
+                    </div>
+                    <button type="button" class="ed-reply-send-btn" onclick="sendReply()">
+                        Send <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CRM Sidebar -->
+        {% with companies=email.companies.all contacts=email.contacts.all %}
+        {% if companies or contacts or email.company or email.contact %}
+        <div class="ed-crm-sidebar">
+            <div class="crm-sidebar-section">
+                <div class="crm-section-title">
+                    <i class="fas fa-link"></i> Related CRM
+                </div>
+
+                {% for company in companies %}
+                <div class="crm-card">
+                    <div class="crm-card-header">
+                        <div class="crm-card-icon company"><i class="fas fa-building"></i></div>
+                        <div class="crm-card-info">
+                            <div class="crm-card-name">{{ company.name }}</div>
+                            <div class="crm-card-type">{{ company.company_type|default:"Company" }}</div>
+                        </div>
+                    </div>
+                    {% if company.address %}
+                    <div class="crm-card-detail"><i class="fas fa-map-marker-alt"></i> <span>{{ company.address
+                            }}</span></div>
+                    {% endif %}
+                    {% if company.phone %}
+                    <div class="crm-card-detail"><i class="fas fa-phone"></i> <span>{{ company.phone }}</span></div>
+                    {% endif %}
+                    <a href="{% url 'crm:company_detail' company.id %}" class="crm-profile-btn">
+                        View Profile <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+                {% empty %}
+                {% if email.company %}
+                <div class="crm-card">
+                    <div class="crm-card-header">
+                        <div class="crm-card-icon company"><i class="fas fa-building"></i></div>
+                        <div class="crm-card-info">
+                            <div class="crm-card-name">{{ email.company.name }}</div>
+                            <div class="crm-card-type">{{ email.company.company_type|default:"Company" }}</div>
+                        </div>
+                    </div>
+                    <a href="{% url 'crm:company_detail' email.company.id %}" class="crm-profile-btn">
+                        View Profile <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+                {% endif %}
+                {% endfor %}
+
+                {% for contact in contacts %}
+                <div class="crm-card">
+                    <div class="crm-card-header">
+                        <div class="crm-card-icon contact"><i class="fas fa-user"></i></div>
+                        <div class="crm-card-info">
+                            <div class="crm-card-name">{{ contact.name }}</div>
+                            <div class="crm-card-type">Contact</div>
+                        </div>
+                    </div>
+                    {% if contact.email %}
+                    <div class="crm-card-detail"><i class="fas fa-envelope"></i> <span>{{ contact.email }}</span></div>
+                    {% endif %}
+                    {% if contact.phone %}
+                    <div class="crm-card-detail"><i class="fas fa-phone"></i> <span>{{ contact.phone }}</span></div>
+                    {% endif %}
+                    <a href="{% url 'crm:contact_detail' contact.id %}" class="crm-profile-btn">
+                        View Profile <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+                {% empty %}
+                {% if email.contact %}
+                <div class="crm-card">
+                    <div class="crm-card-header">
+                        <div class="crm-card-icon contact"><i class="fas fa-user"></i></div>
+                        <div class="crm-card-info">
+                            <div class="crm-card-name">{{ email.contact.name }}</div>
+                            <div class="crm-card-type">Contact</div>
+                        </div>
+                    </div>
+                    <a href="{% url 'crm:contact_detail' email.contact.id %}" class="crm-profile-btn">
+                        View Profile <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+    </div>
+
+</div><!-- /ed-container -->
+
+<!-- Compose Modal Container -->
+<div id="composeModalContainer"></div>
+
+<script>
+    // Compose Modal
+    function openComposeModal(event, recipientEmail, subject) {
+        let url = '{% url "email_automation:compose_email" %}';
+        if (recipientEmail) url += '?to=' + encodeURIComponent(recipientEmail);
+        if (subject) url += (url.includes('?') ? '&' : '?') + 'subject=' + encodeURIComponent(subject);
+
+        fetch(url, { headers: { 'HX-Request': 'true' } })
+            .then(r => r.text())
+            .then(html => {
+                const c = document.getElementById('composeModalContainer');
+                c.innerHTML = html;
+                c.querySelectorAll('script').forEach(old => {
+                    const s = document.createElement('script');
+                    Array.from(old.attributes).forEach(a => s.setAttribute(a.name, a.value));
+                    s.textContent = old.textContent;
+                    old.parentNode.replaceChild(s, old);
+                });
+            });
+    }
+
+    window.closeComposeModal = function () {
+        document.getElementById('composeModalContainer').innerHTML = '';
+    };
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            const c = document.getElementById('composeModalContainer');
+            if (c && c.innerHTML.trim()) window.closeComposeModal();
+        }
+    });
+
+    // Move email (archive / trash)
+    function moveEmail(emailId, folder) {
+        fetch(`/email/email/${emailId}/move/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'folder=' + folder
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    showToast(d.message || 'Done');
+                    setTimeout(() => window.location.href = '{% url "email_automation:my_emails" %}', 800);
+                }
+            });
+    }
+
+    // Toast
+    function showToast(msg) {
+        const t = document.createElement('div');
+        t.className = 'email-success-toast';
+        t.innerHTML = `<i class="fas fa-check-circle"></i><span>${msg}</span>`;
+        document.body.appendChild(t);
+        requestAnimationFrame(() => t.classList.add('show'));
+        setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 3000);
+    }
+
+    window.showGlobalToast = showToast;
+
+    // Send inline reply
+    function sendReply() {
+        const body = document.getElementById('replyBody').value.trim();
+        if (!body) { showToast('Please type a reply first'); return; }
+
+        const btn = document.querySelector('.ed-reply-send-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
+        const formData = new FormData();
+        formData.append('to', '{{ email.from_email|escapejs }}');
+        formData.append('subject', 'Re: {{ email.subject|escapejs }}');
+        formData.append('body', body);
+
+        fetch('{% url "email_automation:send_email" %}', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            body: formData
+        })
+            .then(r => r.json())
+            .then(d => {
+                btn.disabled = false;
+                btn.innerHTML = 'Send <i class="fas fa-paper-plane"></i>';
+                if (d.success) {
+                    showToast('Reply sent successfully!');
+                    document.getElementById('replyBody').value = '';
+                } else {
+                    showToast(d.error || 'Failed to send reply');
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.innerHTML = 'Send <i class="fas fa-paper-plane"></i>';
+                showToast('Error sending reply');
+            });
+    }
+</script>
+{% endblock %}

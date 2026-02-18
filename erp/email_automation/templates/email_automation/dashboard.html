@@ -3,365 +3,452 @@
 
 {% block css %}
 <style>
-.email-dashboard {
-  max-width: 1200px;
-}
+  :root {
+    /* Professional Neutral Palette */
+    --ea-primary: #334155;
+    /* Slate 700 - Professional & Neutral */
+    --ea-primary-hover: #1e293b;
+    /* Slate 800 */
+    --ea-accent: #2563eb;
+    /* Royal Blue - Conservative accent */
 
-.email-dashboard-header {
-  margin-bottom: 2rem;
-}
+    --ea-bg: #f8fafc;
+    --ea-card-bg: #ffffff;
+    --ea-text-main: #0f172a;
+    --ea-text-light: #64748b;
+    --ea-border: #e2e8f0;
 
-.email-dashboard-header h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.5rem;
-}
+    --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  }
 
-.email-dashboard-header p {
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-}
+  .email-dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--ea-text-main);
+  }
 
-.connection-status-card {
-  background: var(--bg-primary);
-  border-radius: var(--border-radius);
-  padding: 2rem;
-  box-shadow: var(--shadow-md);
-  margin-bottom: 2rem;
-  border: 1px solid var(--border-color);
-}
+  /* Header - Authentic "Pro" Look (Compact) */
+  .email-dashboard-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--ea-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 
-.connection-status-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
+  .email-dashboard-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ea-text-main);
+    letter-spacing: -0.025em;
+  }
 
-.connection-status-icon {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-}
+  .email-dashboard-header p {
+    color: var(--ea-text-light);
+    font-size: 1rem;
+    margin: 0;
+    line-height: 1.5;
+  }
 
-.connection-status-icon.connected {
-  background: #d1fae5;
-  color: #065f46;
-}
+  /* Status Card */
+  .connection-status-card {
+    background: white;
+    border-radius: 0.75rem;
+    /* Slightly smaller radius */
+    padding: 1.5rem;
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 2.5rem;
+    border: 1px solid var(--ea-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
 
-.connection-status-icon.disconnected {
-  background: #fee2e2;
-  color: #991b1b;
-}
+  .connection-info-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex: 1;
+    min-width: 300px;
+  }
 
-.connection-status-info h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 0.25rem;
-}
+  .connection-icon-large {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    background: #f1f5f9;
+    color: #64748b;
+    flex-shrink: 0;
+  }
 
-.connection-status-info p {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0;
-}
+  .connection-icon-large.connected {
+    background: #ecfdf5;
+    color: #059669;
+  }
 
-.connection-status-actions {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
+  .connection-icon-large.disconnected {
+    background: #fef2f2;
+    color: #dc2626;
+  }
 
-.btn {
-  padding: 0.625rem 1.25rem;
-  border-radius: var(--border-radius-sm);
-  font-size: 0.875rem;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  transition: all var(--transition-speed) ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+  .status-details h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--ea-text-main);
+    margin: 0 0 0.25rem;
+  }
 
-.btn-primary {
-  background: var(--accent-primary);
-  color: white;
-}
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--ea-text-light);
+    font-weight: 500;
+  }
 
-.btn-primary:hover {
-  background: var(--accent-hover);
-  color: white;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
 
-.btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
+  /* Buttons */
+  .btn-modern {
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border: 1px solid transparent;
+  }
 
-.btn-secondary:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
+  .btn-primary-modern {
+    background: var(--ea-primary);
+    color: white;
+  }
 
-.btn-danger {
-  background: #dc2626;
-  color: white;
-}
+  .btn-primary-modern:hover {
+    background: var(--ea-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    color: white;
+  }
 
-.btn-danger:hover {
-  background: #b91c1c;
-  color: white;
-}
+  .btn-danger-modern {
+    background: white;
+    color: #dc2626;
+    border-color: #fee2e2;
+  }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
+  .btn-danger-modern:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
 
-.stat-card {
-  background: var(--bg-primary);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
-  transition: all var(--transition-speed) ease;
-}
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+  }
 
-.stat-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
+  .stat-card-modern {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid var(--ea-border);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+  }
 
-.stat-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
+  .stat-card-modern:hover {
+    border-color: #cbd5e1;
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+  }
 
-.stat-card-title {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+  .stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
 
-.stat-card-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.125rem;
-  background: var(--accent-light);
-  color: var(--accent-primary);
-}
+  .stat-icon {
+    font-size: 1.15rem;
+    color: var(--ea-text-light);
+    background: #f8fafc;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
-.stat-card-value {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 0.25rem;
-}
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--ea-text-main);
+    line-height: 1.1;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.03em;
+  }
 
-.stat-card-label {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
+  .stat-label {
+    color: var(--ea-text-light);
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
 
-.quick-actions {
-  background: var(--bg-primary);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-color);
-}
+  /* Quick Actions */
+  .quick-actions-section h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--ea-text-main);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
 
-.quick-actions h2 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 1rem;
-}
+  .actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
 
-.quick-actions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
+  .action-card {
+    background: white;
+    padding: 1.25rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--ea-border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
 
-.quick-action-link {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem;
-  border-radius: var(--border-radius-sm);
-  background: var(--bg-secondary);
-  transition: all var(--transition-speed) ease;
-  text-decoration: none;
-  color: var(--text-primary);
-}
+  .action-card:hover {
+    border-color: var(--ea-accent);
+    box-shadow: var(--shadow-soft);
+    transform: translateY(-2px);
+  }
 
-.quick-action-link:hover {
-  background: var(--bg-hover);
-  color: var(--accent-primary);
-  transform: translateX(4px);
-}
+  .action-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: var(--ea-text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+  }
 
-.quick-action-link i {
-  font-size: 1.125rem;
-  color: var(--text-secondary);
-}
+  .action-card:hover .action-icon-box {
+    background: #eff6ff;
+    color: var(--ea-accent);
+  }
 
-.quick-action-link:hover i {
-  color: var(--accent-primary);
-}
+  .action-content h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ea-text-main);
+  }
 
-.alert {
-  padding: 1rem 1.25rem;
-  border-radius: var(--border-radius-sm);
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
+  .action-content p {
+    margin: 0;
+    color: var(--ea-text-light);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
-.alert-info {
-  background: #dbeafe;
-  border: 1px solid #93c5fd;
-  color: #1e3a8a;
-}
-
-.alert i {
-  font-size: 1.25rem;
-}
+  /* Alert styling */
+  .alert-clean {
+    background: #ffffff;
+    border: 1px solid var(--ea-border);
+    border-left: 4px solid var(--ea-primary);
+    padding: 1rem 1.25rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    color: var(--ea-text-main);
+    align-items: flex-start;
+    box-shadow: var(--shadow-soft);
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="email-dashboard">
+
+  <!-- Header (Compact & Clean) -->
   <div class="email-dashboard-header">
     <h1>Email Automation</h1>
-    <p>Manage your automated email campaigns for prospect companies</p>
+    <p>Manage your automated outreach campaigns and track results.</p>
   </div>
 
   {% if not email_account %}
-  <div class="alert alert-info">
-    <i class="fa fa-info-circle"></i>
-    <span>Connect your Gmail account to start sending automated follow-up emails to your prospect companies.</span>
+  <div class="alert-clean">
+    <i class="fa-solid fa-circle-info" style="color: var(--ea-primary); margin-top: 0.2rem;"></i>
+    <div>
+      <strong style="display: block; margin-bottom: 0.25rem;">Connect Gmail Account</strong>
+      To start sending automated emails, please connect your Gmail account below.
+    </div>
   </div>
   {% endif %}
 
+  <!-- Connection Status -->
   <div class="connection-status-card">
-    <div class="connection-status-header">
-      <div class="connection-status-icon {% if email_account %}connected{% else %}disconnected{% endif %}">
-        <i class="fa {% if email_account %}fa-check-circle{% else %}fa-times-circle{% endif %}"></i>
+    <div class="connection-info-wrapper">
+      <div class="connection-icon-large {% if email_account %}connected{% else %}disconnected{% endif %}">
+        <i class="fa-solid {% if email_account %}fa-check{% else %}fa-circle-exclamation{% endif %}"></i>
       </div>
-      <div class="connection-status-info">
+      <div class="status-details">
         {% if email_account %}
         <h2>Gmail Connected</h2>
-        <p>{{ email_account.email_address }}</p>
+        <div class="status-badge">
+          <span class="status-dot" style="background: #10b981;"></span>
+          {{ email_account.email_address }}
+        </div>
         {% else %}
         <h2>Gmail Not Connected</h2>
-        <p>Connect your Gmail account to enable email automation</p>
+        <div class="status-badge">
+          <span class="status-dot" style="background: #94a3b8;"></span>
+          System Offline
+        </div>
         {% endif %}
       </div>
     </div>
-    <div class="connection-status-actions">
+
+    <div class="connection-actions">
       {% if email_account %}
-      <a href="{% url 'email_automation:disconnect_gmail' %}" class="btn btn-danger" onclick="return confirm('Are you sure you want to disconnect your Gmail account?')">
-        <i class="fa fa-unlink"></i>
-        Disconnect Gmail
+      <a href="{% url 'email_automation:disconnect_gmail' %}" class="btn-modern btn-danger-modern"
+        onclick="return confirm('Are you sure you want to disconnect your Gmail account?')">
+        Disconnect
       </a>
       {% else %}
-      <a href="{% url 'email_automation:connect_gmail' %}" class="btn btn-primary">
-        <i class="fa fa-link"></i>
-        Connect Gmail Account
-      </a>
-      <a href="https://console.cloud.google.com/" target="_blank" class="btn btn-secondary">
-        <i class="fa fa-external-link"></i>
-        Google Cloud Console
+      <a href="{% url 'email_automation:connect_gmail' %}" class="btn-modern btn-primary-modern">
+        <i class="fa-brands fa-google"></i>
+        Connect Account
       </a>
       {% endif %}
     </div>
   </div>
 
+  <!-- Stats Grid -->
   <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-card-header">
-        <span class="stat-card-title">Active Campaigns</span>
-        <div class="stat-card-icon">
-          <i class="fa fa-rocket"></i>
-        </div>
+    <div class="stat-card-modern">
+      <div class="stat-header">
+        <span class="stat-label">Active Campaigns</span>
+        <div class="stat-icon"><i class="fa-solid fa-rocket"></i></div>
       </div>
-      <div class="stat-card-value">{{ active_campaigns }}</div>
-      <div class="stat-card-label">Currently running</div>
+      <div class="stat-value">{{ active_campaigns }}</div>
     </div>
 
-    <div class="stat-card">
-      <div class="stat-card-header">
-        <span class="stat-card-title">Emails Sent</span>
-        <div class="stat-card-icon">
-          <i class="fa fa-paper-plane"></i>
-        </div>
+    <div class="stat-card-modern">
+      <div class="stat-header">
+        <span class="stat-label">Emails Sent Today</span>
+        <div class="stat-icon"><i class="fa-solid fa-paper-plane"></i></div>
       </div>
-      <div class="stat-card-value">{{ total_sent }}</div>
-      <div class="stat-card-label">Total sent today</div>
+      <div class="stat-value">{{ total_sent }}</div>
     </div>
 
-    <a href="{% url 'email_automation:inbox' %}" class="stat-card" style="text-decoration: none; color: inherit; cursor: pointer;">
-      <div class="stat-card-header">
-        <span class="stat-card-title">Replies</span>
-        <div class="stat-card-icon" style="background: #fef3c7; color: #92400e;">
-          <i class="fa fa-reply"></i>
-        </div>
+    <a href="{% url 'email_automation:inbox' %}" class="stat-card-modern">
+      <div class="stat-header">
+        <span class="stat-label">Replies Received</span>
+        <div class="stat-icon" style="color: #ea580c; background: #fff7ed;"><i class="fa-solid fa-reply"></i></div>
       </div>
-      <div class="stat-card-value">{{ total_replies }}</div>
-      <div class="stat-card-label">Received today (Click to view)</div>
+      <div class="stat-value">{{ total_replies }}</div>
     </a>
 
-    <div class="stat-card">
-      <div class="stat-card-header">
-        <span class="stat-card-title">Qualified</span>
-        <div class="stat-card-icon" style="background: #d1fae5; color: #065f46;">
-          <i class="fa fa-check-circle"></i>
+    <div class="stat-card-modern">
+      <div class="stat-header">
+        <span class="stat-label">Qualified Leads</span>
+        <div class="stat-icon" style="color: #059669; background: #ecfdf5;"><i class="fa-solid fa-circle-check"></i>
         </div>
       </div>
-      <div class="stat-card-value">{{ qualified_companies }}</div>
-      <div class="stat-card-label">Total companies qualified</div>
+      <div class="stat-value">{{ qualified_companies }}</div>
     </div>
   </div>
 
-  <div class="quick-actions">
-    <h2>Quick Actions</h2>
-    <div class="quick-actions-list">
-      <a href="{% url 'email_automation:template_list' %}" class="quick-action-link">
-        <i class="fa fa-file-text"></i>
-        <span>Manage Email Templates</span>
+  <!-- Quick Actions -->
+  <div class="quick-actions-section">
+    <h2><i class="fa-solid fa-bolt" style="color: #f59e0b; font-size: 1rem;"></i> Quick Actions</h2>
+    <div class="actions-grid">
+      <a href="{% url 'email_automation:template_list' %}" class="action-card">
+        <div class="action-icon-box">
+          <i class="fa-solid fa-file-lines"></i>
+        </div>
+        <div class="action-content">
+          <h3>Manage Templates</h3>
+          <p>Create and edit email templates.</p>
+        </div>
       </a>
-      <a href="{% url 'email_automation:campaign_list' %}" class="quick-action-link">
-        <i class="fa fa-list"></i>
-        <span>View All Campaigns</span>
+
+      <a href="{% url 'email_automation:campaign_list' %}" class="action-card">
+        <div class="action-icon-box">
+          <i class="fa-solid fa-list-check"></i>
+        </div>
+        <div class="action-content">
+          <h3>View Campaigns</h3>
+          <p>Monitor active campaigns.</p>
+        </div>
       </a>
-      <a href="{% url 'email_automation:inbox' %}" class="quick-action-link">
-        <i class="fa fa-inbox"></i>
-        <span>Check Inbox & Replies</span>
+
+      <a href="{% url 'email_automation:inbox' %}" class="action-card">
+        <div class="action-icon-box">
+          <i class="fa-solid fa-inbox"></i>
+        </div>
+        <div class="action-content">
+          <h3>Check Inbox</h3>
+          <p>View prospect replies.</p>
+        </div>
+      </a>
+
+      <a href="{% url 'email_automation:my_emails' %}" class="action-card">
+        <div class="action-icon-box">
+          <i class="fa-solid fa-envelope"></i>
+        </div>
+        <div class="action-content">
+          <h3>My Emails</h3>
+          <p>Access work emails.</p>
+        </div>
       </a>
     </div>
   </div>

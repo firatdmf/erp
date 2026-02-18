@@ -50,4 +50,9 @@ urlpatterns = [
     path('api/get_product_reviews/<str:product_sku>/', api_views.get_product_reviews, name='get_product_reviews'),
     path('api/get_user_reviews/<int:user_id>/', api_views.get_user_reviews, name='get_user_reviews'),
     path('api/delete_review/<int:user_id>/<int:review_id>/', api_views.delete_review, name='delete_review'),
+    
+    # Google OAuth
+    path('google-oauth/login/', views.GoogleAuthView.as_view(), name='google_login'),
+    path('google-oauth/callback/', views.GoogleCallbackView.as_view(), name='google_callback'),
+    path('google-oauth/disconnect/', views.GoogleDisconnectView.as_view(), name='google_disconnect'),
 ]

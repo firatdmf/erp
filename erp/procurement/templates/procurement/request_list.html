@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
+{% endblock %}
+
+{% block content %}
+<div class="product-list-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-left">
+            <h1>Purchase Requests</h1>
+            <span class="product-count">{{ paginator.count|default:requests.count }} request{{ paginator.count|default:requests.count|pluralize }}</span>
+        </div>
+        <div class="header-right">
+            <a href="#" onclick="openPurchaseRequestSidebar(); return false;" class="btn btn-primary">
+                <i class="fa fa-plus"></i>
+                New Request
+            </a>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="search-box-modern">
+            <i class="fa fa-search search-icon"></i>
+            <input type="text" id="instantSearch" placeholder="Search requests by requester, department, or reason..."
+                class="search-input-modern" autocomplete="off" value="{{ search_query }}">
+            <button type="button" class="search-clear" id="searchClear"
+                style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Requests Table -->
+    <div class="table-container">
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">ID</th>
+                    <th>Requester</th>
+                    <th style="width: 200px;">Department</th>
+                    <th style="width: 150px;">Priority</th>
+                    <th style="width: 150px;">Status</th>
+                    <th style="width: 150px;">Date</th>
+                    <th style="width: 100px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="requestsTableBody">
+                {% for request in requests %}
+                <tr class="product-row" onclick="window.location='{% url 'procurement:request_detail' request.pk %}'"
+                    style="cursor: pointer;">
+                    <td>
+                        <span class="text-muted">#{{ request.pk }}</span>
+                    </td>
+                    <td>
+                        <div class="product-info">
+                            <div class="product-title">{{
+                                request.requester.get_full_name|default:request.requester.username }}</div>
+                            {% if request.reason %}
+                            <div class="product-description">{{ request.reason|truncatechars:50 }}</div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if request.department %}
+                        <span class="badge badge-category">{{ request.department }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if request.priority == 'critical' %}
+                        <span class="badge" style="background-color: #fee2e2; color: #dc2626;">Critical</span>
+                        {% elif request.priority == 'high' %}
+                        <span class="badge" style="background-color: #ffedd5; color: #ea580c;">High</span>
+                        {% elif request.priority == 'medium' %}
+                        <span class="badge" style="background-color: #e0f2fe; color: #0284c7;">Medium</span>
+                        {% else %}
+                        <span class="badge" style="background-color: #f1f5f9; color: #64748b;">Low</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if request.status == 'approved' %}
+                        <span class="badge" style="background-color: #dcfce7; color: #16a34a;">Approved</span>
+                        {% elif request.status == 'rejected' %}
+                        <span class="badge" style="background-color: #fee2e2; color: #dc2626;">Rejected</span>
+                        {% elif request.status == 'ordered' %}
+                        <span class="badge" style="background-color: #e0e7ff; color: #4f46e5;">Ordered</span>
+                        {% elif request.status == 'completed' %}
+                        <span class="badge" style="background-color: #f0fdf4; color: #15803d;">Completed</span>
+                        {% elif request.status == 'cancelled' %}
+                        <span class="badge" style="background-color: #f1f5f9; color: #64748b;">Cancelled</span>
+                        {% else %}
+                        <span class="badge" style="background-color: #fff7ed; color: #c2410c;">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="text-muted" style="font-size: 0.875rem;">{{ request.created_at|date:"M d, Y"
+                            }}</span>
+                    </td>
+                    <td>
+                        <div class="action-buttons" onclick="event.stopPropagation();">
+                            <a href="{% url 'procurement:request_detail' request.pk %}" class="btn-icon" title="View">
+                                <i class="fa fa-eye"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <div class="empty-state-content">
+                            <i class="fas fa-file-invoice"
+                                style="font-size: 48px; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p>No purchase requests found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} requests
+        </div>
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn"
+                title="First"><i class="fa fa-angles-left"></i></a>
+            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
+            {% else %}
+            <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
+            <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <span class="pagination-btn active">{{ num }}</span>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+                href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">
+                {{ num
+                }}</a>
+                {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}"
+                    class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
+                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}"
+                    class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
+                {% else %}
+                <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
+                <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
+                {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem 0;
+        margin-top: 1rem;
+    }
+
+    .pagination-info {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .pagination {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .pagination-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        height: 36px;
+        padding: 0 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .pagination-btn:hover:not(.disabled):not(.active) {
+        background: var(--bg-hover);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .pagination-btn.active {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: white;
+        font-weight: 600;
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+</style>
+
+<script>
+    // Backend search functionality
+    const searchInput = document.getElementById('instantSearch');
+    const searchClear = document.getElementById('searchClear');
+
+    if (searchInput) {
+        // Navigate to search URL with debounce
+        let searchTimeout;
+        searchInput.addEventListener('input', function (e) {
+            const query = e.target.value.trim();
+            searchClear.style.display = query ? 'flex' : 'none';
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                if (query) {
+                    window.location.href = '{% url "procurement:request_list" %}?search=' + encodeURIComponent(query);
+                } else {
+                    window.location.href = '{% url "procurement:request_list" %}';
+                }
+            }, 500); // 500ms debounce
+        });
+    }
+
+    function clearSearch() {
+        searchInput.value = '';
+        searchClear.style.display = 'none';
+        window.location.href = '{% url "procurement:request_list" %}';
+    }
+</script>
+{% endblock %}

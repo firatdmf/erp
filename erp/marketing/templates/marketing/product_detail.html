@@ -19,10 +19,10 @@
       <div class="product-meta">
         <span class="product-sku"><i class="fa fa-barcode"></i> {{ product.sku }}</span>
         {% if product.category %}
-          <span class="badge badge-category">{{ product.category.name|title }}</span>
+        <span class="badge badge-category">{{ product.category.name|title }}</span>
         {% endif %}
         {% if product.featured %}
-          <span class="badge badge-featured"><i class="fa fa-star"></i> Featured</span>
+        <span class="badge badge-featured"><i class="fa fa-star"></i> Featured</span>
         {% endif %}
       </div>
     </div>
@@ -39,23 +39,24 @@
     <div class="product-images">
       <div class="main-image">
         {% if product.primary_image %}
-          <img src="{{ product.primary_image.file_url }}" alt="{{ product.title }}" id="mainImage">
+        <img src="{{ product.primary_image.file_url }}" alt="{{ product.title }}" id="mainImage">
         {% elif product.files.all.0 %}
-          <img src="{{ product.files.all.0.file_url }}" alt="{{ product.title }}" id="mainImage">
+        <img src="{{ product.files.all.0.file_url }}" alt="{{ product.title }}" id="mainImage">
         {% else %}
-          <div class="image-placeholder">
-            <i class="fa fa-image"></i>
-            <p>No image available</p>
-          </div>
+        <div class="image-placeholder">
+          <i class="fa fa-image"></i>
+          <p>No image available</p>
+        </div>
         {% endif %}
       </div>
-      
+
       {% if product_files %}
       <div class="image-thumbnails">
         {% for file in product_files %}
-          <div class="thumbnail {% if forloop.first %}active{% endif %}" onclick="changeImage('{{ file.file_url }}', this)">
-            <img src="{{ file.file_url }}" alt="Thumbnail {{ forloop.counter }}">
-          </div>
+        <div class="thumbnail {% if forloop.first %}active{% endif %}"
+          onclick="changeImage('{{ file.file_url }}', this)">
+          <img src="{{ file.file_url }}" alt="Thumbnail {{ forloop.counter }}">
+        </div>
         {% endfor %}
       </div>
       {% endif %}
@@ -67,9 +68,9 @@
       <div class="info-section">
         <h2>Description</h2>
         {% if product.description %}
-          <div class="description-text">{{ product.description|safe }}</div>
+        <div class="description-text">{{ product.description|safe }}</div>
         {% else %}
-          <p class="text-muted">No description available</p>
+        <p class="text-muted">No description available</p>
         {% endif %}
       </div>
 
@@ -94,7 +95,8 @@
           </div>
           <div class="info-item">
             <span class="label">Quantity</span>
-            <span class="value">{{ product.quantity|default:"0" }} {{ product.unit_of_measurement|default:"units" }}</span>
+            <span class="value">{{ product.quantity|default:"0" }} {{ product.unit_of_measurement|default:"units"
+              }}</span>
           </div>
           {% endif %}
           {% if product.weight %}
@@ -124,7 +126,7 @@
         <h2>Tags</h2>
         <div class="tags-container">
           {% for tag in product.tags %}
-            <span class="tag">{{ tag }}</span>
+          <span class="tag">{{ tag }}</span>
           {% endfor %}
         </div>
       </div>
@@ -136,7 +138,7 @@
         <h2>Collections</h2>
         <div class="collections-container">
           {% for collection in product_collections %}
-            <span class="collection-badge">{{ collection.title }}</span>
+          <span class="collection-badge">{{ collection.title }}</span>
           {% endfor %}
         </div>
       </div>
@@ -178,22 +180,23 @@
           <tr>
             <td>
               {% with variant.files.all.0 as first_file %}
-                {% if first_file %}
-                  <img src="{{ first_file.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
-                {% else %}
-                  <div class="variant-image-placeholder">
-                    <i class="fa fa-image"></i>
-                  </div>
-                {% endif %}
+              {% if first_file %}
+              <img src="{{ first_file.file_url }}" alt="{{ variant.variant_sku }}" class="variant-thumbnail">
+              {% else %}
+              <div class="variant-image-placeholder">
+                <i class="fa fa-image"></i>
+              </div>
+              {% endif %}
               {% endwith %}
             </td>
             <td><span class="variant-sku">{{ variant.variant_sku }}</span></td>
             <td>
               <div class="attributes">
                 {% for attribute_value in variant.product_variant_attribute_values.all %}
-                  <span class="attribute">
-                    <strong>{{ attribute_value.product_variant_attribute.name|title }}:</strong> {{ attribute_value.product_variant_attribute_value|title }}
-                  </span>
+                <span class="attribute">
+                  <strong>{{ attribute_value.product_variant_attribute.name|title }}:</strong> {{
+                  attribute_value.product_variant_attribute_value|title }}
+                </span>
                 {% endfor %}
               </div>
             </td>
@@ -202,9 +205,9 @@
             <td>{{ variant.variant_barcode|default:"-" }}</td>
             <td>
               {% if variant.variant_featured %}
-                <span class="badge badge-featured">Featured</span>
+              <span class="badge badge-featured">Featured</span>
               {% else %}
-                <span class="badge badge-regular">Regular</span>
+              <span class="badge badge-regular">Regular</span>
               {% endif %}
             </td>
           </tr>
@@ -217,23 +220,23 @@
 </div>
 
 <script>
-function changeImage(url, thumbnail) {
-  document.getElementById('mainImage').src = url;
-  document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
-  thumbnail.classList.add('active');
-}
+  function changeImage(url, thumbnail) {
+    document.getElementById('mainImage').src = url;
+    document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
+    thumbnail.classList.add('active');
+  }
 
-// Async Cloudinary cleanup - runs after page load
-(function() {
-  // Check if there are files to cleanup from session
-  {% if request.session.cloudinary_cleanup_urls %}
-  const urlsToDelete = {{ request.session.cloudinary_cleanup_urls|safe }};
-  
+  // Async CDN cleanup - runs after page load
+  (function () {
+    // Check if there are files to cleanup from session
+    {% if request.session.cdn_cleanup_urls %}
+    const urlsToDelete = {{ request.session.cdn_cleanup_urls| safe
+  }};
+  console.log('🗑️ Async cleaning up files:', urlsToDelete);
+
   if (urlsToDelete && urlsToDelete.length > 0) {
-    console.log(`🗑️ Cleaning up ${urlsToDelete.length} Cloudinary files in background...`);
-    
     // Send async delete request
-    fetch('{% url "marketing:async_delete_cloudinary_files" %}', {
+    fetch('{% url "marketing:async_delete_cdn_files" %}', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -243,22 +246,22 @@ function changeImage(url, thumbnail) {
         file_urls: urlsToDelete
       })
     })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        console.log(`✅ Successfully deleted ${data.deleted} Cloudinary files`);
-        if (data.errors && data.errors.length > 0) {
-          console.warn('⚠️ Some files failed to delete:', data.errors);
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          console.log(`✅ Successfully deleted ${data.deleted} CDN files`);
+          if (data.errors && data.errors.length > 0) {
+            console.warn('⚠️ Some files failed to delete:', data.errors);
+          }
+        } else {
+          console.error('❌ CDN cleanup failed:', data.error);
         }
-      } else {
-        console.error('❌ Cloudinary cleanup failed:', data.error);
-      }
-    })
-    .catch(error => {
-      console.error('❌ Network error during Cloudinary cleanup:', error);
-    });
+      })
+      .catch(error => {
+        console.error('❌ Network error during CDN cleanup:', error);
+      });
   }
   {% endif %}
-})();
+  }) ();
 </script>
 {% endblock %}

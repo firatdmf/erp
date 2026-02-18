@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
+{% endblock %}
+
+{% block content %}
+<div class="product-list-container">
+    <!-- Header Section -->
+    <div class="page-header">
+        <div class="header-left">
+            <h1>Suppliers</h1>
+            <span class="product-count">{{ paginator.count|default:suppliers.count }} supplier{{ paginator.count|default:suppliers.count|pluralize }}</span>
+        </div>
+        <div class="header-right">
+            <a href="#" onclick="openAddSupplierSidebar(); return false;" class="btn btn-primary">
+                <i class="fa fa-plus"></i>
+                Add Supplier
+            </a>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="search-section">
+        <div class="search-box-modern">
+            <i class="fa fa-search search-icon"></i>
+            <input type="text" id="instantSearch" placeholder="Search suppliers by name, email, phone, or country..."
+                class="search-input-modern" autocomplete="off" value="{{ search_query }}">
+            <button type="button" class="search-clear" id="searchClear"
+                style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Suppliers Table -->
+    <div class="table-container">
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">Icon</th>
+                    <th>Company / Contact</th>
+                    <th style="width: 200px;">Email</th>
+                    <th style="width: 150px;">Phone</th>
+                    <th style="width: 150px;">Location</th>
+                    <th style="width: 120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="suppliersTableBody">
+                {% for supplier in suppliers %}
+                <tr class="product-row" id="supplier-row-{{ supplier.id }}"
+                    onclick="window.location='{% url 'crm:supplier_update' supplier.id %}'" style="cursor: pointer;">
+                    <td>
+                        <div class="product-image-placeholder" style="background: #eff6ff; color: #3b82f6;">
+                            <i class="fas fa-truck"></i>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="product-info">
+                            <div class="product-title">{{ supplier.company_name|default:supplier.contact_name }}</div>
+                            {% if supplier.company_name and supplier.contact_name %}
+                            <div class="product-description">{{ supplier.contact_name }}</div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if supplier.email %}
+                        <span class="text-muted" style="font-size: 0.875rem;">{{ supplier.email }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if supplier.phone %}
+                        <span class="text-muted" style="font-size: 0.875rem;">{{ supplier.phone }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if supplier.country or supplier.address %}
+                        <span class="text-muted" style="font-size: 0.875rem;">
+                            {{ supplier.country|default:"" }}
+                            {% if supplier.country and supplier.address %}, {% endif %}
+                            <small>{{ supplier.address|truncatechars:20 }}</small>
+                        </span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="action-buttons" onclick="event.stopPropagation();">
+                            <a href="{% url 'crm:supplier_update' supplier.id %}" class="btn-icon" title="Edit">
+                                <i class="fa fa-edit"></i>
+                            </a>
+                            <a href="{% url 'crm:supplier_delete' supplier.id %}" class="btn-icon btn-delete"
+                                title="Delete">
+                                <i class="fa fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="empty-state">
+                        <div class="empty-state-content">
+                            <i class="fas fa-truck" style="font-size: 48px; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p>No suppliers found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="pagination-container">
+        <div class="pagination-info">
+            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} suppliers
+        </div>
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn"
+                title="First"><i class="fa fa-angles-left"></i></a>
+            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
+            {% else %}
+            <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
+            <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <span class="pagination-btn active">{{ num }}</span>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
+                href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">
+                {{ num
+                }}</a>
+                {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}"
+                    class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
+                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}"
+                    class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
+                {% else %}
+                <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
+                <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
+                {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem 0;
+        margin-top: 1rem;
+    }
+
+    .pagination-info {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .pagination {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .pagination-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        height: 36px;
+        padding: 0 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--bg-primary);
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+
+    .pagination-btn:hover:not(.disabled):not(.active) {
+        background: var(--bg-hover);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .pagination-btn.active {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: white;
+        font-weight: 600;
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .btn-delete {
+        color: #dc2626 !important;
+        transition: all 0.2s;
+    }
+
+    .btn-delete:hover {
+        background: #fef2f2 !important;
+        transform: scale(1.1);
+    }
+</style>
+
+<script>
+    // Backend search functionality
+    const searchInput = document.getElementById('instantSearch');
+    const searchClear = document.getElementById('searchClear');
+
+    if (searchInput) {
+        // Navigate to search URL with debounce
+        let searchTimeout;
+        searchInput.addEventListener('input', function (e) {
+            const query = e.target.value.trim();
+            searchClear.style.display = query ? 'flex' : 'none';
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                if (query) {
+                    window.location.href = '{% url "crm:supplier_list" %}?search=' + encodeURIComponent(query);
+                } else {
+                    window.location.href = '{% url "crm:supplier_list" %}';
+                }
+            }, 500); // 500ms debounce
+        });
+    }
+
+    function clearSearch() {
+        searchInput.value = '';
+        searchClear.style.display = 'none';
+        window.location.href = '{% url "crm:supplier_list" %}';
+    }
+</script>
+{% endblock %}

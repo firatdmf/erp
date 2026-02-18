@@ -15,6 +15,7 @@ class Notification(models.Model):
         ('task_updated', 'Task Updated'),
         ('task_comment', 'Task Comment'),
         ('team_invitation', 'Team Invitation'),
+        ('meeting_invite', 'Meeting Invite'),
     ]
     
     # Who receives this notification

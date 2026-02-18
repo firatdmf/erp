@@ -9,10 +9,15 @@
   <title>{% block title %}ERP{% endblock %}</title>
 
   <!-- CSS Files -->
-  <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=4.4" />
+  <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=5.1" />
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=9" />
+  
+
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 
   <!-- HTMX -->
   <script src="{% static 'erp/htmx.min.js' %}" defer></script>
@@ -245,7 +250,8 @@
       .nav-item #addExpanded,
       #marketingExpanded,
       #operatingExpanded,
-      #accountingExpanded {
+      #accountingExpanded,
+      #emailExpanded {
         position: fixed !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
@@ -262,7 +268,8 @@
       #addButton::after,
       #marketingButton::after,
       #operatingButton::after,
-      #accountingButton::after {
+      #accountingButton::after,
+      #emailButton::after {
         display: none !important;
       }
 
@@ -337,7 +344,58 @@
         /* Prevent zoom on iOS */
       }
     }
+
+    /* CRITICAL SIDEBAR FIXES FOR MAIL MENU */
+    #emailButton {
+      position: relative !important;
+    }
+
+    #emailExpanded {
+      display: none !important;
+      position: fixed !important;
+      left: 6rem !important;
+      background-color: #ffffff !important;
+      width: 340px !important;
+      z-index: 99999 !important;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 12px !important;
+      overflow: hidden !important;
+    }
+
+    #emailButton:hover #emailExpanded,
+    #emailExpanded:hover {
+      display: block !important;
+    }
+
+    /* Hover bridge */
+    #emailButton::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 100%;
+      width: 20px;
+      height: 100%;
+      background: transparent;
+      z-index: 99998;
+    }
+
+    #emailButton:hover::after {
+      display: block !important;
+    }
   </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var emailBtn = document.getElementById('emailButton');
+      var emailPanel = document.getElementById('emailExpanded');
+      if (emailBtn && emailPanel) {
+        emailBtn.addEventListener('mouseenter', function () {
+          var rect = emailBtn.getBoundingClientRect();
+          emailPanel.style.top = rect.top + 'px';
+        });
+      }
+    });
+  </script>
 </head>
 
 <body>
@@ -487,6 +545,12 @@
                 <a href="{% url 'marketing:blog_create' %}">
                   <i class="fas fa-newspaper" aria-hidden="true"></i>
                   <span>Blog</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" onclick="openAddSupplierSidebar(); return false;">
+                  <i class="fas fa-truck" aria-hidden="true"></i>
+                  <span>Supplier</span>
                 </a>
               </li>
             </ul>
@@ -738,16 +802,90 @@
           </div>
         </div>
       </li>
+      <li class="nav-item" id="procurementButton">
+        <a href="#procurement" class="nav-link">
+          <i class="fas fa-shopping-basket fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Procurement</span>
+        </a>
+        <div id="procurementExpanded"
+          style="top: 375px !important; max-height: 90vh !important; overflow-y: auto !important;">
+          <div class="add-menu-header">
+            <i class="fas fa-shopping-basket" aria-hidden="true"></i>
+            <h2>Procurement</h2>
+          </div>
+          <div class="add-menu-section">
+            <h3>Purchasing</h3>
+            <ul>
+              <li>
+                <a href="{% url 'procurement:request_list' %}">
+                  <i class="fas fa-file-alt" aria-hidden="true"></i>
+                  <span>Purchase Requests</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'procurement:order_list' %}">
+                  <i class="fas fa-file-invoice-dollar" aria-hidden="true"></i>
+                  <span>Purchase Orders</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="add-menu-section">
+            <h3>Suppliers</h3>
+            <ul>
+              <li>
+                <a href="{% url 'crm:supplier_list' %}">
+                  <i class="fas fa-truck" aria-hidden="true"></i>
+                  <span>Supplier List</span>
+                </a>
+              </li>
+              <li>
+                <a href="#" onclick="openAddSupplierSidebar(); return false;">
+                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                  <span>Add Supplier</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </li>
       <li class="nav-item">
         <a href="{% url 'operating:order_analytics' %}" class="nav-link">
           <i class="fas fa-chart-line fa-2x" aria-hidden="true"></i>
           <span class="link-text">Analytics</span>
         </a>
       </li>
-      <li class="nav-item">
-        <a href="{% url 'email_automation:dashboard' %}" class="nav-link">
+      <li class="nav-item" id="emailButton">
+        <a href="#email" class="nav-link">
           <i class="fas fa-envelope fa-2x" aria-hidden="true"></i>
           <span class="link-text">Mail</span>
+        </a>
+        <div id="emailExpanded">
+          <div class="add-menu-section" style="padding: 1.5rem;">
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.1rem;">
+              <li>
+                <a href="{% url 'email_automation:dashboard' %}"
+                  style="display: flex; align-items: center; gap: 0.875rem; padding: 0.35rem 1rem; border-radius: var(--border-radius-sm); transition: all 0.2s ease; font-size: 0.9375rem; color: var(--text-primary); font-weight: 500;">
+                  <i class="fas fa-tachometer-alt"
+                    style="width: 20px; text-align: center; color: var(--text-secondary);"></i>
+                  <span>Automatic Mail System</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'email_automation:my_emails' %}"
+                  style="display: flex; align-items: center; gap: 0.875rem; padding: 0.35rem 1rem; border-radius: var(--border-radius-sm); transition: all 0.2s ease; font-size: 0.9375rem; color: var(--text-primary); font-weight: 500;">
+                  <i class="fas fa-inbox" style="width: 20px; text-align: center; color: var(--text-secondary);"></i>
+                  <span>My Emails</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'notes:index' %}" class="nav-link">
+          <i class="fas fa-sticky-note fa-2x" aria-hidden="true"></i>
+          <span class="link-text">Notes</span>
         </a>
       </li>
       <li class="nav-item">
@@ -780,7 +918,8 @@
         </div>
       </div>
       <div class="sidebar-content">
-        <form id="taskForm" method="post" action="{% url 'todo:create_task' %}">
+        <form id="taskForm" method="post" enctype="multipart/form-data" action="{% url 'todo:create_task' %}"
+          data-action-personal="{% url 'todo:create_task' %}" data-action-team="{% url 'team:create_task' %}">
           {% csrf_token %}
           <div class="form-group">
             <label for="id_name">Task name</label>
@@ -809,14 +948,104 @@
           </div>
 
           <div class="form-group">
-            <label for="id_task_member">Assign to</label>
-            <select name="member" id="id_task_member" class="form-input">
-              {% for member in all_members %}
-              <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
-              </option>
-              {% endfor %}
-            </select>
+            <label>Assign To</label>
+
+            <!-- Hidden inputs for logic -->
+            <input type="hidden" name="team_id" id="id_task_team_id">
+            <input type="hidden" name="assigned_users" id="id_assigned_users">
+            <!-- Critical: 'member' field for Personal TaskForm -->
+            <input type="hidden" name="member" id="id_member">
+
+            <!-- Global Team Selector -->
+            <div id="globalTeamSelectContainer" style="display:none; margin-bottom: 0.5rem;">
+              <label class="form-label"
+                style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem; display:block;">Select Team
+                (Optional)</label>
+              <select id="globalTeamSelect" class="form-input" style="width: 100%;"
+                onchange="handleGlobalTeamSelect(this.value)">
+                <option value="">-- Personal Task --</option>
+              </select>
+            </div>
+
+            <!-- Team Assignment Toggle -->
+            <div id="assignTeamOption" style="display:none; margin-bottom: 0.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" name="assign_to_team" id="id_assign_to_team" onchange="toggleTeamAssignment()">
+                <span>Assign to entire team <strong id="teamNameLabel"></strong></span>
+              </label>
+            </div>
+
+            <!-- User Selection Area -->
+            <div id="userAssignmentContainer">
+              <!-- Selected Users Chips -->
+              <div id="selectedUsersList" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+              </div>
+
+              <!-- Add User Control -->
+              <div style="position: relative;">
+                <button type="button" id="addUserBtn" onclick="toggleUserSearch()" class="btn btn-sm btn-secondary"
+                  style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
+                  <i class="fas fa-plus"></i> Add User
+                </button>
+
+                <div id="userSearchContainer" style="display: none; margin-top: 0.5rem;">
+                  <input type="text" id="userSearchInput" class="form-input" placeholder="Search by name or email..."
+                    onkeyup="searchUsersDebounced(this.value)" autocomplete="off">
+                  <div id="userSearchResults" class="search-results"
+                    style="display:none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 50;">
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <style>
+            .user-chip {
+              background: #e2e8f0;
+              padding: 0.2rem 0.6rem;
+              border-radius: 1rem;
+              font-size: 0.85rem;
+              display: flex;
+              align-items: center;
+              gap: 0.4rem;
+              color: #334155;
+            }
+
+            .user-chip .remove-user {
+              cursor: pointer;
+              color: #64748b;
+              font-size: 0.8rem;
+            }
+
+            .user-chip .remove-user:hover {
+              color: #ef4444;
+            }
+
+            .user-search-item {
+              padding: 0.5rem 0.75rem;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+              border-bottom: 1px solid #f1f5f9;
+            }
+
+            .user-search-item:hover {
+              background: #f8fafc;
+            }
+
+            .user-search-item .avatar-circle {
+              width: 24px;
+              height: 24px;
+              background: #3b82f6;
+              color: white;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 0.7rem;
+            }
+          </style>
 
           <!-- Attach an item section -->
           <div class="attach-section">
@@ -868,6 +1097,12 @@
               <div id="taskContactResults" class="search-results"></div>
             </div>
             <input type="hidden" name="contact" id="id_contact" value="">
+          </div>
+
+          <div class="form-group" style="margin-top: 1rem;">
+            <label for="id_task_files">Attachments (Google Drive)</label>
+            <input type="file" name="task_files" id="id_task_files" class="form-input" multiple>
+            <small style="color: #64748b; font-size: 0.8rem;">Selected files will be uploaded to Google Drive</small>
           </div>
 
           <div class="sidebar-footer">
@@ -1195,6 +1430,33 @@
     </div>
   </div>
 
+  <!-- Add Supplier Sidebar Modal -->
+  <div id="addSupplierSidebarOverlay" class="sidebar-overlay" onclick="closeAddSupplierSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div id="addSupplierSidebarContent" style="display: contents;">
+        <!-- Content loaded via HTMX -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Purchase Request Sidebar Modal -->
+  <div id="purchaseRequestSidebarOverlay" class="sidebar-overlay" onclick="closePurchaseRequestSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div id="purchaseRequestSidebarContent" style="display: contents;">
+        <!-- Content loaded via HTMX -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Purchase Order Sidebar Modal -->
+  <div id="purchaseOrderSidebarOverlay" class="sidebar-overlay" onclick="closePurchaseOrderSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div id="purchaseOrderSidebarContent" style="display: contents;">
+        <!-- Content loaded via HTMX -->
+      </div>
+    </div>
+  </div>
+
   <!-- Contact Sidebar Modal (Nested from Company) -->
   <div id="contactSidebarOverlay" class="sidebar-overlay sidebar-nested" onclick="closeContactSidebar()">
     <div class="sidebar-modal" onclick="event.stopPropagation()">
@@ -1250,6 +1512,122 @@
   </div>
 
   <script>
+    // Purchase Request Sidebar Functions
+    function openPurchaseRequestSidebar() {
+      const overlay = document.getElementById('purchaseRequestSidebarOverlay');
+      const content = document.getElementById('purchaseRequestSidebarContent');
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+      htmx.ajax('GET', '{% url "procurement:request_create_partial" %}', { target: '#purchaseRequestSidebarContent', swap: 'innerHTML' });
+    }
+
+    function closePurchaseRequestSidebar() {
+      document.getElementById('purchaseRequestSidebarOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function submitPurchaseRequestForm(event) {
+      event.preventDefault();
+      const form = document.getElementById('addPurchaseRequestForm');
+      const submitBtn = document.getElementById('btnSaveRequest');
+      const btnText = submitBtn.querySelector('.btn-text');
+      const btnSpinner = submitBtn.querySelector('.spinner-border');
+
+      if (btnText) btnText.style.display = 'none';
+      if (btnSpinner) btnSpinner.classList.remove('d-none');
+      submitBtn.disabled = true;
+
+      const formData = new FormData(form);
+
+      fetch('{% url "procurement:request_create_partial" %}', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const toast = document.getElementById('toastNotification');
+            toast.querySelector('.toast-message-global').textContent = data.message || 'Request created successfully!';
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+            closePurchaseRequestSidebar();
+            if (data.redirect_url) window.location.reload();
+          } else {
+            alert('Error: ' + JSON.stringify(data.errors));
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.classList.add('d-none');
+            submitBtn.disabled = false;
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred.');
+          if (btnText) btnText.style.display = 'inline';
+          if (btnSpinner) btnSpinner.classList.add('d-none');
+          submitBtn.disabled = false;
+        });
+    }
+
+    // Purchase Order Sidebar Functions
+    function openPurchaseOrderSidebar() {
+      const overlay = document.getElementById('purchaseOrderSidebarOverlay');
+      const content = document.getElementById('purchaseOrderSidebarContent');
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+      htmx.ajax('GET', '{% url "procurement:order_create_partial" %}', { target: '#purchaseOrderSidebarContent', swap: 'innerHTML' });
+    }
+
+    function closePurchaseOrderSidebar() {
+      document.getElementById('purchaseOrderSidebarOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function submitPurchaseOrderForm(event) {
+      event.preventDefault();
+      const form = document.getElementById('addPurchaseOrderForm');
+      const submitBtn = document.getElementById('btnSaveOrder');
+      const btnText = submitBtn.querySelector('.btn-text');
+      const btnSpinner = submitBtn.querySelector('.spinner-border');
+
+      if (btnText) btnText.style.display = 'none';
+      if (btnSpinner) btnSpinner.classList.remove('d-none');
+      submitBtn.disabled = true;
+
+      const formData = new FormData(form);
+
+      fetch('{% url "procurement:order_create_partial" %}', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const toast = document.getElementById('toastNotification');
+            toast.querySelector('.toast-message-global').textContent = data.message || 'Order created successfully!';
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+            closePurchaseOrderSidebar();
+            if (data.redirect_url) window.location.reload();
+          } else {
+            alert('Error: ' + JSON.stringify(data.errors));
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.classList.add('d-none');
+            submitBtn.disabled = false;
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('An error occurred.');
+          if (btnText) btnText.style.display = 'inline';
+          if (btnSpinner) btnSpinner.classList.add('d-none');
+          submitBtn.disabled = false;
+        });
+    }
+
     // Configure HTMX tCSRF token in all requests
     document.body.addEventListener('htmx:configRequest', (event) => {
       event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
@@ -1456,17 +1834,106 @@
       }
     });
 
-    function openTaskSidebar() {
+    // Global state for selected users
+    let selectedUsers = [];
+    let userSearchTimeout = null;
+
+    function openTaskSidebar(teamId = null, teamName = null) {
       document.getElementById('taskSidebarOverlay').classList.add('active');
       document.body.style.overflow = 'hidden';
+
+      const assignTeamOption = document.getElementById('assignTeamOption');
+      const teamIdInput = document.getElementById('id_task_team_id');
+      const teamNameLabel = document.getElementById('teamNameLabel');
+      const globalSelectContainer = document.getElementById('globalTeamSelectContainer');
+      const globalSelect = document.getElementById('globalTeamSelect');
+      const form = document.getElementById('taskForm');
+
+      if (teamId) {
+        // Team Context (Fixed)
+        if (form) form.action = form.dataset.actionTeam;
+        teamIdInput.value = teamId;
+        teamNameLabel.textContent = teamName ? `(${teamName})` : '';
+        assignTeamOption.style.display = 'block';
+        if (globalSelectContainer) globalSelectContainer.style.display = 'none';
+      } else {
+        // Global Context (Selectable)
+        if (form) form.action = form.dataset.actionPersonal;
+        teamIdInput.value = '';
+        teamNameLabel.textContent = '';
+        assignTeamOption.style.display = 'none';
+
+        // Fetch teams
+        fetchManageableTeams();
+        if (globalSelect) globalSelect.value = "";
+      }
+
+      // Reset selection state
+      selectedUsers = [];
+      updateSelectedUsersUI();
+      toggleTeamAssignment();
+
       // Set today's date again
       const today = new Date().toISOString().split('T')[0];
-      document.getElementById('id_due_date').value = today;
+      const dueDateField = document.getElementById('id_due_date');
+      if (dueDateField) dueDateField.value = today;
+
       // Initialize form tracking
       setTimeout(() => {
         initializeFormTracking('taskForm');
         document.getElementById('id_name').focus();
       }, 300);
+    }
+
+    // --- Team Selection Helpers ---
+    function handleGlobalTeamSelect(teamId) {
+      const select = document.getElementById('globalTeamSelect');
+      const teamName = teamId ? select.options[select.selectedIndex].text : '';
+      const form = document.getElementById('taskForm');
+
+      document.getElementById('id_task_team_id').value = teamId;
+
+      const assignTeamOption = document.getElementById('assignTeamOption');
+      const teamNameLabel = document.getElementById('teamNameLabel');
+      const assignCheckbox = document.getElementById('id_assign_to_team');
+
+      if (teamId) {
+        if (form) form.action = form.dataset.actionTeam;
+        teamNameLabel.textContent = `(${teamName})`;
+        assignTeamOption.style.display = 'block';
+      } else {
+        if (form) form.action = form.dataset.actionPersonal;
+        assignTeamOption.style.display = 'none';
+        teamNameLabel.textContent = '';
+      }
+      assignCheckbox.checked = false;
+      toggleTeamAssignment();
+    }
+
+    function fetchManageableTeams() {
+      const select = document.getElementById('globalTeamSelect');
+      // Only fetch if empty or has only default (length 1)
+      if (select.options.length > 1) {
+        document.getElementById('globalTeamSelectContainer').style.display = 'block';
+        return;
+      }
+
+      fetch('{% url "team:get_manageable_teams" %}')
+        .then(r => r.json())
+        .then(data => {
+          select.innerHTML = '<option value="">-- Personal Task --</option>';
+          if (data.teams && data.teams.length > 0) {
+            data.teams.forEach(team => {
+              const opt = document.createElement('option');
+              opt.value = team.id;
+              opt.textContent = team.name;
+              select.appendChild(opt);
+            });
+            document.getElementById('globalTeamSelectContainer').style.display = 'block';
+          } else {
+            document.getElementById('globalTeamSelectContainer').style.display = 'none';
+          }
+        });
     }
 
     // Original close function (without checks)
@@ -1475,6 +1942,17 @@
       document.body.style.overflow = '';
       // Reset form
       document.getElementById('taskForm').reset();
+
+      // Reset Team UI
+      document.getElementById('id_task_team_id').value = '';
+      document.getElementById('assignTeamOption').style.display = 'none';
+      document.getElementById('id_assign_to_team').checked = false;
+      document.getElementById('id_assigned_users').value = '';
+      document.getElementById('globalTeamSelect').value = '';
+
+      selectedUsers = [];
+      updateSelectedUsersUI();
+
       // Hide all attachment sections
       document.getElementById('taskCompanySection').style.display = 'none';
       document.getElementById('taskContactSection').style.display = 'none';
@@ -1498,6 +1976,207 @@
         _closeTaskSidebarOriginal();
       }
     };
+
+    // --- User Assignment Functions ---
+
+    function toggleTeamAssignment() {
+      const isTeam = document.getElementById('id_assign_to_team').checked;
+      const userContainer = document.getElementById('userAssignmentContainer');
+      userContainer.style.display = isTeam ? 'none' : 'block';
+    }
+
+    function toggleUserSearch() {
+      const container = document.getElementById('userSearchContainer');
+      const input = document.getElementById('userSearchInput');
+
+      if (container.style.display === 'none') {
+        container.style.display = 'block';
+        input.focus();
+      } else {
+        container.style.display = 'none';
+      }
+    }
+
+    function searchUsersDebounced(query) {
+      clearTimeout(userSearchTimeout);
+      userSearchTimeout = setTimeout(() => {
+        if (query.length < 1) {
+          document.getElementById('userSearchResults').style.display = 'none';
+          return;
+        }
+
+        // Build URL with team_id if available (for team-scoped search)
+        const teamId = document.getElementById('id_task_team_id').value;
+        let searchUrl = `{% url 'team:search_users' %}?q=${encodeURIComponent(query)}`;
+        if (teamId) {
+          searchUrl += `&team_id=${teamId}`;
+        }
+
+        // Call API
+        fetch(searchUrl)
+          .then(r => r.json())
+          .then(data => {
+            const results = document.getElementById('userSearchResults');
+            results.innerHTML = '';
+
+            if (data.users && data.users.length > 0) {
+              data.users.forEach(user => {
+                // Don't show already selected users
+                if (selectedUsers.some(u => u.id === user.id)) return;
+
+                const div = document.createElement('div');
+                div.className = 'user-search-item';
+                div.innerHTML = `
+                                <div class="avatar-circle">${user.initials}</div>
+                                <div>
+                                    <div style="font-size: 0.9rem; font-weight: 500;">${user.name}</div>
+                                    <div style="font-size: 0.75rem; color: #64748b;">${user.email}</div>
+                                </div>
+                            `;
+                div.onclick = () => addUser(user.id, user.name, user.initials);
+                results.appendChild(div);
+              });
+              results.style.display = 'block';
+            } else {
+              results.style.display = 'none';
+            }
+          });
+      }, 300);
+    }
+
+    function addUser(id, name, initials) {
+      const teamId = document.getElementById('id_task_team_id').value;
+
+      // Uncheck "Assign to Team" if it was checked (e.g. if user search was open)
+      const assignTeamCheckbox = document.getElementById('id_assign_to_team');
+      if (assignTeamCheckbox && assignTeamCheckbox.checked) {
+        assignTeamCheckbox.checked = false;
+        toggleTeamAssignment();
+      }
+
+      // Personal Task: Limit to 1 user - REMOVED to allow switching to Team Task
+      // if (!teamId) {
+      //   if (selectedUsers.length >= 1) {
+      //     alert("Personal tasks can only be assigned to one person.");
+      //     return;
+      //   }
+      // }
+
+      if (!selectedUsers.some(u => u.id === id)) {
+        selectedUsers.push({ id, name, initials });
+        updateSelectedUsersUI();
+
+        // Update TaskForm 'member' field for Personal Tasks
+        const memberSelect = document.getElementById('id_member'); // This is the standard django form field
+        if (memberSelect) {
+          memberSelect.value = id;
+          // Also update any other hidden inputs if necessary, but TaskForm uses 'member'
+        }
+      }
+      // Clear search
+      document.getElementById('userSearchInput').value = '';
+      document.getElementById('userSearchResults').style.display = 'none';
+      document.getElementById('userSearchContainer').style.display = 'none';
+    }
+
+    function removeUser(id) {
+      selectedUsers = selectedUsers.filter(u => u.id !== id);
+      updateSelectedUsersUI();
+
+      // Clear member field if empty
+      if (selectedUsers.length === 0) {
+        const memberSelect = document.getElementById('id_member');
+        if (memberSelect) memberSelect.value = '';
+      }
+    }
+
+    function updateSelectedUsersUI() {
+      const container = document.getElementById('selectedUsersList');
+      container.innerHTML = '';
+
+      selectedUsers.forEach(user => {
+        const chip = document.createElement('div');
+        chip.className = 'user-chip';
+        chip.innerHTML = `
+                <span>${user.name}</span>
+                <i class="fas fa-times remove-user" onclick="removeUser(${user.id})"></i>
+            `;
+        container.appendChild(chip);
+      });
+
+      // Update hidden input used by Team Tasks
+      const ids = selectedUsers.map(u => u.id).join(',');
+      document.getElementById('id_assigned_users').value = ids;
+    }
+
+    // Intercept Form Submission for Team Tasks
+    document.addEventListener('DOMContentLoaded', function () {
+      const taskForm = document.getElementById('taskForm');
+      if (taskForm) {
+        taskForm.onsubmit = function (e) {
+          const teamId = document.getElementById('id_task_team_id').value;
+          if (teamId) {
+            e.preventDefault(); // Stop default generic todo submit
+
+            const formData = new FormData(taskForm);
+
+            // Add selected users manually if needed, though hidden input is there
+            if (selectedUsers.length > 0) {
+              // Safety: If users are selected, we definitely don't want 'Assign to Team'
+              const assignTeamCheckbox = document.getElementById('id_assign_to_team');
+              if (assignTeamCheckbox) assignTeamCheckbox.checked = false;
+            }
+
+            const ids = selectedUsers.map(u => u.id).join(',');
+            // Add selected users to formData if not already handled by hidden input
+            // formData.append('assigned_users', ids); // This is handled by the hidden input 'id_assigned_users'
+
+            const submitBtn = taskForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating...';
+
+            fetch(taskForm.action, { // Use dynamic action set by openTaskSidebar
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+              }
+            })
+              .then(r => r.json())
+              .then(data => {
+                if (data.success) {
+                  closeTaskSidebar();
+                  // If we are on team page, reload
+                  if (window.location.href.includes('team/tasks')) {
+                    window.location.reload();
+                  } else {
+                    // Show success toast
+                    const toast = document.getElementById('toastNotification');
+                    if (toast) {
+                      toast.querySelector('.toast-message-global').textContent = 'Task created successfully';
+                      toast.classList.add('show');
+                      setTimeout(() => toast.classList.remove('show'), 3000);
+                    }
+                  }
+                } else {
+                  alert(data.error || 'Error creating task');
+                }
+              })
+              .catch(err => {
+                alert('Network error occurred');
+                console.error(err);
+              })
+              .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+              });
+          }
+        };
+      }
+    });
+
 
     // Company Modal Functions
     function openCompanySidebar() {
@@ -2468,7 +3147,7 @@
       if (selectedRadio) {
         const badge = document.getElementById(`primary_badge_${selectedRadio.value}`);
         if (badge) {
-          badge.style.display = 'inline-block';
+          badgstyle.display = 'inline-block';
         }
       }
     }
@@ -2707,6 +3386,23 @@
         </div>
       </div>
       <div class="sidebar-content" id="addDividendSidebarContent">
+        <!-- HTMX loading target -->
+      </div>
+    </div>
+  </div>
+
+  <div id="addSupplierSidebarOverlay" class="sidebar-overlay" onclick="closeAddSupplierSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeAddSupplierSidebar()">
+          <i class="fas fa-times"></i> Close
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-truck text-primary"></i>
+          <h2>Add Supplier</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="addSupplierSidebarContent">
         <!-- HTMX loading target -->
       </div>
     </div>
@@ -3730,8 +4426,7 @@
               if (data.redirect_url) window.location.reload();
             } else {
               alert('Error: ' + JSON.stringify(data.errors));
-              if (btnText) btnText.style.display = 'inline';
-              if (btnSpinner) btnSpinner.style.display = 'none';
+              if (btnText) btnText.style.display = 'inline'; if (btnSpinner) btnSpinner.style.display = 'none';
               submitBtn.disabled = false;
             }
           })
@@ -3740,6 +4435,67 @@
             alert('An error occurred.');
             if (btnText) btnText.style.display = 'inline';
             if (btnSpinner) btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          });
+      }
+
+      // Add Supplier Sidebar Functions
+      function openAddSupplierSidebar() {
+        const overlay = document.getElementById('addSupplierSidebarOverlay');
+        const content = document.getElementById('addSupplierSidebarContent');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+        htmx.ajax('GET', '{% url "crm:create_supplier_partial" %}', { target: '#addSupplierSidebarContent', swap: 'innerHTML' });
+      }
+
+      function closeAddSupplierSidebar() {
+        document.getElementById('addSupplierSidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function submitAddSupplierForm(event) {
+        event.preventDefault();
+        const form = document.getElementById('addSupplierForm');
+        const submitBtn = document.getElementById('btnSaveSupplier');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnSpinner = submitBtn.querySelector('.spinner-border');
+
+        if (btnText) btnText.style.display = 'none';
+        if (btnSpinner) btnSpinner.classList.remove('d-none');
+        submitBtn.disabled = true;
+
+        const formData = new FormData(form);
+        fetch('{% url "crm:create_supplier_partial" %}', {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              const toast = document.getElementById('toastNotification');
+              toast.querySelector('.toast-message-global').textContent = data.message || 'Supplier added successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+              closeAddSupplierSidebar();
+              if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+              } else {
+                window.location.reload();
+              }
+            } else {
+              alert('Error: ' + JSON.stringify(data.errors));
+              if (btnText) btnText.style.display = 'inline';
+              if (btnSpinner) btnSpinner.classList.add('d-none');
+              submitBtn.disabled = false;
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred.');
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.classList.add('d-none');
             submitBtn.disabled = false;
           });
       }

@@ -530,6 +530,26 @@
             </div>
         </div>
 
+        <!-- Advanced Options (Code Injection) -->
+        <div class="form-section">
+            <h2><i class="fas fa-code"></i> Advanced Options (Code Injection)</h2>
+            <div class="form-group">
+                <label for="id_header_content">Extra Header Content (CSS/Styles/Meta)</label>
+                {{ form.header_content }}
+                <p class="help-text" style="font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem;">
+                    Use this for <code>&lt;style&gt;</code>, <code>&lt;link&gt;</code>, or <code>&lt;meta&gt;</code>
+                    tags.
+                </p>
+            </div>
+            <div class="form-group">
+                <label for="id_footer_content">Extra Footer Content (Scripts)</label>
+                {{ form.footer_content }}
+                <p class="help-text" style="font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem;">
+                    Use this for <code>&lt;script&gt;</code> tags. These will be executed on the frontend.
+                </p>
+            </div>
+        </div>
+
         <!-- Submit -->
         <div class="form-section" style="display: flex; justify-content: flex-end;">
             <a href="{% url 'marketing:blog_list' %}" class="btn-cancel">

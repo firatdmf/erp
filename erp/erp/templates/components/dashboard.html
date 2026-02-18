@@ -1,10 +1,10 @@
 {% load static %}
 {% load todo_tags %}
 {% block css %}
-  <link rel="stylesheet" href="{% static 'erp/css/components/dashboard.css' %}" />
+<link rel="stylesheet" href="{% static 'erp/css/components/dashboard.css' %}" />
 {% endblock %}
 {% block js %}
-  <script src="{% static 'erp/js/dashboard.js' %}"></script>
+<script src="{% static 'erp/js/dashboard.js' %}"></script>
 {% endblock %}
 <div class="dashboardComponent">
   <!-- Quick Stats Bar -->
@@ -43,7 +43,7 @@
           </button>
         </div>
       </div>
-      
+
       <div class="calendar-container">
         <div class="calendar-weekdays">
           <div class="weekday">Sun</div>
@@ -64,11 +64,8 @@
     <div class="tasks-section">
       <div class="section-header">
         <h3><i class="fa fa-check-square"></i> <span id="selectedDateText">Today's Tasks</span></h3>
-        <a href="{% url 'task_report' %}" class="btn-link" target="_blank">
-          View All <i class="fa fa-arrow-right"></i>
-        </a>
       </div>
-      
+
       <!-- Task Tabs -->
       <div class="task-tabs">
         <button class="task-tab active" onclick="switchDashboardTab('myTasks')">
@@ -80,166 +77,164 @@
           Assigned Tasks
         </button>
       </div>
-      
-      <div class="tasks-container" id="tasksContainer">
-        {% tasks_component csrf_token=csrf_token page_type='dashboard' contact=None company=None sort_type='dictsortreversed' path=path member=member%}
-      </div>
+
+   
     </div>
   </div>
 </div>
 
 <script>
-// Make these global for task component access
-window.currentDate = new Date();
-window.selectedDate = new Date();
-window.tasksData = {{ tasks_calendar_data|safe }};
+  // Make these global for task component access
+  window.currentDate = new Date();
+  window.selectedDate = new Date();
+  window.tasksData = {{ tasks_calendar_data | safe }};
 
-// Local references
-let currentDate = window.currentDate;
-let selectedDate = window.selectedDate;
-const tasksData = window.tasksData;
+  // Local references
+  let currentDate = window.currentDate;
+  let selectedDate = window.selectedDate;
+  const tasksData = window.tasksData;
 
-function renderCalendar() {
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  
-  // Update month display
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'];
-  document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
-  
-  // Get first day of month and total days
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
-  const calendarDays = document.getElementById('calendarDays');
-  calendarDays.innerHTML = '';
-  
-  // Add empty cells for days before month starts
-  for (let i = 0; i < firstDay; i++) {
-    const emptyDay = document.createElement('div');
-    emptyDay.className = 'calendar-day empty';
-    calendarDays.appendChild(emptyDay);
+  function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    // Update month display
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
+
+    // Get first day of month and total days
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const calendarDays = document.getElementById('calendarDays');
+    calendarDays.innerHTML = '';
+
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+      const emptyDay = document.createElement('div');
+      emptyDay.className = 'calendar-day empty';
+      calendarDays.appendChild(emptyDay);
+    }
+
+    // Add days of month
+    const today = new Date();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayElement = document.createElement('div');
+      dayElement.className = 'calendar-day';
+
+      const dateObj = new Date(year, month, day);
+      // Use local date string instead of UTC to avoid timezone issues
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+      // Check if today
+      if (dateObj.toDateString() === today.toDateString()) {
+        dayElement.classList.add('today');
+      }
+
+      // Check if selected
+      if (dateObj.toDateString() === selectedDate.toDateString()) {
+        dayElement.classList.add('selected');
+      }
+
+      // Check if has tasks
+      if (tasksData[dateStr]) {
+        dayElement.classList.add('has-tasks');
+        const badge = document.createElement('span');
+        badge.className = 'task-badge';
+        badge.textContent = tasksData[dateStr];
+        dayElement.appendChild(badge);
+
+        const dayNumber = document.createElement('span');
+        dayNumber.textContent = day;
+        dayElement.insertBefore(dayNumber, badge);
+      } else {
+        dayElement.textContent = day;
+      }
+
+      dayElement.onclick = () => selectDate(dateObj);
+
+      calendarDays.appendChild(dayElement);
+    }
   }
-  
-  // Add days of month
-  const today = new Date();
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dayElement = document.createElement('div');
-    dayElement.className = 'calendar-day';
-    
-    const dateObj = new Date(year, month, day);
-    // Use local date string instead of UTC to avoid timezone issues
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    
-    // Check if today
-    if (dateObj.toDateString() === today.toDateString()) {
-      dayElement.classList.add('today');
-    }
-    
-    // Check if selected
-    if (dateObj.toDateString() === selectedDate.toDateString()) {
-      dayElement.classList.add('selected');
-    }
-    
-    // Check if has tasks
-    if (tasksData[dateStr]) {
-      dayElement.classList.add('has-tasks');
-      const badge = document.createElement('span');
-      badge.className = 'task-badge';
-      badge.textContent = tasksData[dateStr];
-      dayElement.appendChild(badge);
-      
-      const dayNumber = document.createElement('span');
-      dayNumber.textContent = day;
-      dayElement.insertBefore(dayNumber, badge);
+
+  function selectDate(date) {
+    selectedDate = date;
+    window.selectedDate = date; // Update global reference
+    renderCalendar();
+
+    // Update tasks header
+    const today = new Date();
+    const selectedDateText = document.getElementById('selectedDateText');
+
+    if (date.toDateString() === today.toDateString()) {
+      selectedDateText.textContent = "Today's Tasks";
     } else {
-      dayElement.textContent = day;
+      const options = { month: 'short', day: 'numeric', year: 'numeric' };
+      selectedDateText.textContent = `Tasks for ${date.toLocaleDateString('en-US', options)}`;
     }
-    
-    dayElement.onclick = () => selectDate(dateObj);
-    
-    calendarDays.appendChild(dayElement);
+
+    // Fetch tasks for selected date
+    loadTasksForDate(date);
   }
-}
 
-function selectDate(date) {
-  selectedDate = date;
-  window.selectedDate = date; // Update global reference
-  renderCalendar();
-  
-  // Update tasks header
-  const today = new Date();
-  const selectedDateText = document.getElementById('selectedDateText');
-  
-  if (date.toDateString() === today.toDateString()) {
-    selectedDateText.textContent = "Today's Tasks";
-  } else {
-    const options = { month: 'short', day: 'numeric', year: 'numeric' };
-    selectedDateText.textContent = `Tasks for ${date.toLocaleDateString('en-US', options)}`;
+  function loadTasksForDate(date) {
+    // Use local date string instead of UTC to avoid timezone issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    const tasksContainer = document.getElementById('tasksContainer');
+
+    // Show loading state
+    tasksContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading tasks...</div>';
+
+    fetch(`/dashboard/?date=${dateStr}&tab=${currentTaskTab}`, {
+      method: 'GET',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(response => response.text())
+      .then(html => {
+        tasksContainer.innerHTML = html;
+      })
+      .catch(error => {
+        console.error('Error loading tasks:', error);
+        tasksContainer.innerHTML = '<div class="tasks_component"><ul><li style="color: red;">Error loading tasks.</li></ul></div>';
+      });
   }
-  
-  // Fetch tasks for selected date
-  loadTasksForDate(date);
-}
 
-function loadTasksForDate(date) {
-  // Use local date string instead of UTC to avoid timezone issues
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
-  const tasksContainer = document.getElementById('tasksContainer');
-  
-  // Show loading state
-  tasksContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fa fa-spinner fa-spin"></i> Loading tasks...</div>';
-  
-  fetch(`/dashboard/?date=${dateStr}&tab=${currentTaskTab}`, {
-    method: 'GET',
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest'
-    }
-  })
-  .then(response => response.text())
-  .then(html => {
-    tasksContainer.innerHTML = html;
-  })
-  .catch(error => {
-    console.error('Error loading tasks:', error);
-    tasksContainer.innerHTML = '<div class="tasks_component"><ul><li style="color: red;">Error loading tasks.</li></ul></div>';
+  function previousMonth() {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+  }
+
+  function nextMonth() {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+  }
+
+  // Tab switching for My Tasks / Assigned Tasks
+  let currentTaskTab = 'myTasks';
+
+  function switchDashboardTab(tabName) {
+    currentTaskTab = tabName;
+
+    // Update tab buttons
+    document.querySelectorAll('.task-tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    event.target.closest('.task-tab').classList.add('active');
+
+    // Reload tasks with tab filter
+    loadTasksForDate(selectedDate);
+  }
+
+  // Initialize calendar on page load
+  document.addEventListener('DOMContentLoaded', function () {
+    renderCalendar();
+    // Load today's tasks with default tab
+    loadTasksForDate(new Date());
   });
-}
-
-function previousMonth() {
-  currentDate.setMonth(currentDate.getMonth() - 1);
-  renderCalendar();
-}
-
-function nextMonth() {
-  currentDate.setMonth(currentDate.getMonth() + 1);
-  renderCalendar();
-}
-
-// Tab switching for My Tasks / Assigned Tasks
-let currentTaskTab = 'myTasks';
-
-function switchDashboardTab(tabName) {
-  currentTaskTab = tabName;
-  
-  // Update tab buttons
-  document.querySelectorAll('.task-tab').forEach(tab => {
-    tab.classList.remove('active');
-  });
-  event.target.closest('.task-tab').classList.add('active');
-  
-  // Reload tasks with tab filter
-  loadTasksForDate(selectedDate);
-}
-
-// Initialize calendar on page load
-document.addEventListener('DOMContentLoaded', function() {
-  renderCalendar();
-  // Load today's tasks with default tab
-  loadTasksForDate(new Date());
-});
 </script>

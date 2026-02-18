@@ -203,3 +203,205 @@ class ReceivedEmail(models.Model):
         ordering = ['-received_at']
         verbose_name = "Received Email"
         verbose_name_plural = "Received Emails"
+
+
+# ============================================================
+# MY EMAILS - User's personal email management
+# ============================================================
+from django.contrib.postgres.fields import ArrayField
+
+
+class Email(models.Model):
+    """
+    Kullanıcının gönderdiği/aldığı tüm e-postalar.
+    Gmail ile senkronize edilir ve CRM entegrasyonu sağlar.
+    """
+    FOLDER_CHOICES = [
+        ('inbox', 'Gelen Kutusu'),
+        ('sent', 'Gönderilen'),
+        ('archive', 'Arşiv'),
+        ('trash', 'Silinenler'),
+        ('drafts', 'Taslaklar'),
+    ]
+    
+    email_account = models.ForeignKey(
+        EmailAccount, 
+        on_delete=models.CASCADE, 
+        related_name='emails'
+    )
+    
+    # Gmail tracking
+    gmail_message_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    gmail_thread_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    
+    # Sender/Recipients
+    from_email = models.EmailField()
+    from_name = models.CharField(max_length=200, blank=True)
+    to_emails = ArrayField(models.EmailField(), default=list)
+    cc_emails = ArrayField(models.EmailField(), default=list, blank=True)
+    bcc_emails = ArrayField(models.EmailField(), default=list, blank=True)
+    
+    # Content
+    subject = models.CharField(max_length=500)
+    body_text = models.TextField(blank=True)
+    body_html = models.TextField(blank=True)
+    snippet = models.CharField(max_length=300, blank=True)  # Preview text
+    
+    # Folder & Status
+    folder = models.CharField(max_length=20, choices=FOLDER_CHOICES, default='inbox', db_index=True)
+    is_read = models.BooleanField(default=False)
+    is_starred = models.BooleanField(default=False)
+    is_important = models.BooleanField(default=False)
+    
+    # CRM Connections - Auto-matched based on email address
+    company = models.ForeignKey(
+        'crm.Company', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='user_emails'
+    )
+    companies = models.ManyToManyField(
+        'crm.Company',
+        blank=True,
+        related_name='user_emails_multi'
+    )
+    
+    contact = models.ForeignKey(
+        'crm.Contact', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='user_emails'
+    )
+    contacts = models.ManyToManyField(
+        'crm.Contact',
+        blank=True,
+        related_name='user_emails_multi'
+    )
+    
+    # Timestamps
+    sent_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-received_at', '-sent_at', '-created_at']
+        verbose_name = "Email"
+        verbose_name_plural = "Emails"
+        indexes = [
+            models.Index(fields=['email_account', 'folder']),
+            models.Index(fields=['company']),
+            models.Index(fields=['contact']),
+            models.Index(fields=['-sent_at']),
+            models.Index(fields=['-received_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.subject[:50]} - {self.from_email}"
+    
+    def get_preview(self, max_length=150):
+        """Get a preview of the email body"""
+        text = self.body_text or self.snippet
+        if len(text) > max_length:
+            return text[:max_length] + "..."
+        return text
+    
+    def match_crm_records(self):
+        """Auto-match email to Company/Contact based on email addresses"""
+        from crm.models import Company, Contact
+        
+        # Determine which email to match (from_email for inbox, to_emails for sent)
+        emails_to_check = []
+        if self.folder == 'inbox':
+            emails_to_check = [self.from_email]
+        elif self.folder == 'sent':
+            emails_to_check = self.to_emails or []
+        
+        # Clear existing M2M (we'll re-add matches)
+        # Note: We need to save first if object is new, but here it's likely existing.
+        # If new, M2M operations might fail if PK is not set. Assuming PK is set.
+        
+        for email_addr in emails_to_check:
+            if not email_addr:
+                continue
+            
+            # Match Contacts (find ALL)
+            matching_contacts = Contact.objects.filter(email__contains=[email_addr])
+            for contact in matching_contacts:
+                self.contacts.add(contact)
+                # If contact belongs to a company, link that company too
+                if contact.company:
+                    self.companies.add(contact.company)
+                
+                # Legacy: Set first match as primary
+                if not self.contact:
+                    self.contact = contact
+                if not self.company and contact.company:
+                    self.company = contact.company
+            
+            # Match Companies directly (find ALL)
+            matching_companies = Company.objects.filter(email__contains=[email_addr])
+            for company in matching_companies:
+                self.companies.add(company)
+                
+                # Legacy: Set first match as primary
+                if not self.company:
+                    self.company = company
+
+
+class EmailAttachment(models.Model):
+    """
+    E-posta ekleri - Cloudinary'de saklanır.
+    """
+    email = models.ForeignKey(
+        Email, 
+        on_delete=models.CASCADE, 
+        related_name='attachments'
+    )
+    
+    filename = models.CharField(max_length=255)
+    file_url = models.URLField(max_length=500)  # Cloudinary URL
+    file_size = models.PositiveIntegerField(default=0)  # bytes
+    content_type = models.CharField(max_length=100, blank=True)
+    
+    # Gmail attachment ID (for sync)
+    gmail_attachment_id = models.TextField(blank=True, null=True)
+    
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['uploaded_at']
+        verbose_name = "Email Attachment"
+        verbose_name_plural = "Email Attachments"
+    
+    def __str__(self):
+        return f"{self.filename} ({self.get_size_display()})"
+    
+    def get_size_display(self):
+        """Human-readable file size"""
+        if self.file_size < 1024:
+            return f"{self.file_size} B"
+        elif self.file_size < 1024 * 1024:
+            return f"{self.file_size / 1024:.1f} KB"
+        else:
+            return f"{self.file_size / (1024 * 1024):.1f} MB"
+    
+    def get_file_icon(self):
+        """Return appropriate icon class based on content type"""
+        content_type = self.content_type.lower()
+        if 'pdf' in content_type:
+            return 'fa-file-pdf'
+        elif 'word' in content_type or 'document' in content_type:
+            return 'fa-file-word'
+        elif 'excel' in content_type or 'spreadsheet' in content_type:
+            return 'fa-file-excel'
+        elif 'image' in content_type:
+            return 'fa-file-image'
+        elif 'video' in content_type:
+            return 'fa-file-video'
+        elif 'zip' in content_type or 'rar' in content_type:
+            return 'fa-file-archive'
+        else:
+            return 'fa-file'

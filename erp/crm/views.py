@@ -3,9 +3,9 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
-from .models import Contact, Company, Note, CompanyFollowUp
+from .models import Contact, Company, Note, CompanyFollowUp, Supplier
 from todo.models import Task
-from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm
+from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm, SupplierForm
 from todo.forms import TaskForm
 from itertools import chain
 from operator import attrgetter
@@ -1240,3 +1240,69 @@ def toggle_email_campaign(request, pk):
         """
     
     return HttpResponse(html)
+
+class SupplierList(generic.ListView):
+    model = Supplier
+    template_name = "crm/supplier_list.html"
+    context_object_name = "suppliers"
+    ordering = ['company_name']
+    paginate_by = 25
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search_query = self.request.GET.get('search', '').strip()
+        
+        if search_query:
+            queryset = queryset.filter(
+                Q(company_name__icontains=search_query) |
+                Q(contact_name__icontains=search_query) |
+                Q(email__icontains=search_query) |
+                Q(phone__icontains=search_query) |
+                Q(country__icontains=search_query)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['search_query'] = self.request.GET.get('search', '')
+        return context
+
+class SupplierCreate(generic.CreateView):
+    model = Supplier
+    form_class = SupplierForm
+    template_name = "crm/supplier_form.html"
+    success_url = reverse_lazy('crm:supplier_list')
+
+class SupplierUpdate(generic.UpdateView):
+    model = Supplier
+    form_class = SupplierForm
+    template_name = "crm/supplier_form.html"
+    success_url = reverse_lazy('crm:supplier_list')
+
+class SupplierDelete(generic.DeleteView):
+    model = Supplier
+    template_name = "crm/supplier_confirm_delete.html"
+    success_url = reverse_lazy('crm:supplier_list')
+
+def create_supplier_partial(request):
+    if request.method == 'POST':
+        form = SupplierForm(request.POST, request.FILES)
+        if form.is_valid():
+            supplier = form.save()
+            return JsonResponse({
+                'success': True,
+                'message': f'Supplier "{supplier.company_name}" added successfully.',
+                'redirect_url': reverse('crm:supplier_list') # Or we can reload the current page
+            })
+        else:
+             return JsonResponse({
+                'success': False,
+                'errors': form.errors.as_json()
+            })
+    else:
+        form = SupplierForm()
+    
+    return render(request, 'crm/supplier_form_partial.html', {'form': form})
+
+
+

@@ -18,6 +18,7 @@ urlpatterns = [
     path('tasks/<int:task_id>/update_ajax/', views.update_task_ajax, name='update_task_ajax'),
     path('tasks/<int:task_id>/detail/', views.task_detail_page, name='task_detail'),
     path('tasks/<int:task_id>/detail_ajax/', views.task_detail_ajax, name='task_detail_ajax'),
+    path('tasks/attachments/<int:att_id>/delete/', views.delete_task_attachment, name='delete_task_attachment'),
     path('tasks/<int:task_id>/add_comment/', views.add_task_comment, name='add_task_comment'),
     path('task_report/',views.TaskReport.as_view(),name="task_report")
 ]

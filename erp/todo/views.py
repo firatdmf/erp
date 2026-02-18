@@ -78,11 +78,32 @@ class index(View):
         # Your code for handling POST requests
         # This part should process the submitted form data and save it
 
-        form = TaskForm(request.POST)  # Bind the form with the POST data
+        # Bind the form with the POST data and FILES
+        form = TaskForm(request.POST, request.FILES)
 
         if form.is_valid():
             # Form is valid, save the task
-            form.save()
+            task = form.save()
+            
+            # Handle Attachments
+            if request.FILES.getlist('attachments'):
+                from erp.google_drive import upload_file_to_drive
+                from .models import TaskAttachment
+                
+                for file_item in request.FILES.getlist('attachments'):
+                    upload_result = upload_file_to_drive(request.user, file_item, folder_name="ERP Personal Tasks")
+                    
+                    if upload_result.get('success'):
+                        TaskAttachment.objects.create(
+                            task=task,
+                            file_name=upload_result.get('name'),
+                            drive_file_id=upload_result.get('file_id'),
+                            drive_link=upload_result.get('drive_link'),
+                            uploaded_by=request.user.member
+                        )
+                    else:
+                        print(f"Failed to upload attachment {file_item.name}: {upload_result.get('error')}")
+
             # You can also add a success message if needed
             # messages.success(request, 'Task created successfully.')
 
@@ -110,6 +131,18 @@ class CreateTask(generic.edit.CreateView):
     template_name = "todo/create_task.html"
     # Redirect will be handled in form_valid to go to task detail page
 
+    def post(self, request, *args, **kwargs):
+        # Handle empty member field (common when creating personal tasks via sidebar)
+        if 'member' in request.POST and not request.POST['member']:
+            # Create a mutable copy of POST data
+            post_data = request.POST.copy()
+            # Set default member to current user
+            if hasattr(request.user, 'member'):
+                post_data['member'] = request.user.member.id
+            request.POST = post_data
+            
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
         print("your member iss")
         print("your member is", self.request.user.member)
@@ -121,7 +154,53 @@ class CreateTask(generic.edit.CreateView):
         if not form.instance.member:
             form.instance.member = self.request.user.member
         response = super().form_valid(form)
+        print("Task created:", self.object)
+        
+        # Handle multiple assignees
+        assigned_ids_str = self.request.POST.get('assigned_users')
+        if assigned_ids_str:
+            try:
+                from authentication.models import Member
+                ids = [int(id_str) for id_str in assigned_ids_str.split(',') if id_str.strip()]
+                if ids:
+                    members = Member.objects.filter(id__in=ids)
+                    self.object.assignees.set(members)
+                    print(f"Assigned members: {members}")
+            except Exception as e:
+                print(f"Error setting assignees: {e}")
+
+        files = self.request.FILES.getlist('task_files')
+        
+        if files:
+            try:
+                from erp.google_drive import upload_file_to_drive
+                from .models import TaskAttachment
+                
+                for file_item in files:
+                    print(f"Uploading {file_item.name}...")
+                    upload_result = upload_file_to_drive(self.request.user, file_item, folder_name="ERP Personal Tasks")
+                    print(f"Upload result: {upload_result}")
+                    
+                    if upload_result.get('success'):
+                        TaskAttachment.objects.create(
+                            task=self.object,
+                            file_name=upload_result.get('name'),
+                            drive_file_id=upload_result.get('file_id'),
+                            drive_link=upload_result.get('drive_link'),
+                            uploaded_by=self.request.user.member
+                        )
+                    else:
+                        print(f"Failed to upload attachment {file_item.name}: {upload_result.get('error')}")
+            except Exception as e:
+                print(f"EXCEPTION in attachment handling: {e}")
+                # Don't crash, just log
+                    
         return response
+
+    def form_invalid(self, form):
+        print("Form Invalid!")
+        print(form.errors)
+        return super().form_invalid(form)
     
     def get_success_url(self):
         # Redirect to task detail page after creation
@@ -414,32 +493,46 @@ def search_contacts_and_companies(request):
 
 # @method_decorator(login_required, name="dispatch")
 def complete_task(request, task_id):
-    """Update task status - supports in_progress, on_hold, completed"""
+    """Update task status - supports todo, in_progress, review, done"""
     task = get_object_or_404(Task, pk=task_id)
     
-    # Get status from POST data or default to completed
-    status = request.POST.get('status', 'completed')
-    old_status = 'completed' if task.completed else ('on_hold' if task.on_hold else 'in_progress')
+    # Get status from POST data
+    status = request.POST.get('status')
+    if not status:
+        # Fallback for old calls or toggles
+        status = 'done' if not task.completed else 'todo'
+        
+    old_status = task.status
     
     # Update task based on status
-    if status == 'completed':
+    task.status = status
+    
+    # Sync legacy fields
+    if status == 'done':
         task.completed = True
         task.on_hold = False
-        task.completed_at = timezone.now()
-        new_status_display = 'Completed'
+        if not task.completed_at:
+            task.completed_at = timezone.now()
+        new_status_display = 'Done'
         activity_type = 'completed'
-    elif status == 'on_hold':
+    elif status == 'review':
         task.completed = False
-        task.on_hold = True
+        task.on_hold = False # Review is active state
         task.completed_at = None
-        new_status_display = 'On Hold'
+        new_status_display = 'Review'
         activity_type = 'status_changed'
-    else:  # in_progress
+    elif status == 'in_progress':
         task.completed = False
         task.on_hold = False
         task.completed_at = None
         new_status_display = 'In Progress'
-        activity_type = 'reopened' if old_status == 'completed' else 'status_changed'
+        activity_type = 'reopened' if old_status == 'done' else 'status_changed'
+    else:  # todo
+        task.completed = False
+        task.on_hold = False
+        task.completed_at = None
+        new_status_display = 'To Do'
+        activity_type = 'status_changed'
     
     task.save()
     
@@ -447,12 +540,10 @@ def complete_task(request, task_id):
     from .models import TaskActivity
     current_user = request.user.member if hasattr(request.user, 'member') else None
     
-    old_status_display = 'Completed' if old_status == 'completed' else ('On Hold' if old_status == 'on_hold' else 'In Progress')
-    
     if old_status != status:
         TaskActivity.objects.create(
             task=task, user=current_user, activity_type=activity_type,
-            old_value=old_status_display,
+            old_value=old_status.replace('_', ' ').title(),
             new_value=new_status_display
         )
     
@@ -480,6 +571,14 @@ def complete_task(request, task_id):
 def delete_task(request, task_id):
     if request.method == "POST":
         task = get_object_or_404(Task, pk=task_id)
+        
+        # Permission Check: Only creator can delete
+        current_member = request.user.member if hasattr(request.user, 'member') else None
+        if task.created_by != current_member:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'error': 'Permission denied. Only the creator can delete this task.'}, status=403)
+            return HttpResponse("Permission denied", status=403)
+
         task.delete()
         
         # Check if it's an AJAX request (HTMX)
@@ -519,6 +618,15 @@ def update_task_ajax(request, task_id):
             from authentication.models import Member
             try:
                 member = Member.objects.get(id=member_id)
+                
+                # Sync legacy member to assignees if needed
+                if not task.assignees.exists() and task.member:
+                    task.assignees.add(task.member)
+                
+                # Add new member to assignees
+                task.assignees.add(member)
+                
+                # Update legacy field as primary/latest
                 task.member = member
                 task.save()
                 return JsonResponse({'success': True})
@@ -590,6 +698,67 @@ def update_task_ajax(request, task_id):
                     new_value=due_date.strftime('%Y-%m-%d')
                 )
             
+            # Handle Assignees List (from Edit Sidebar)
+            assigned_users_str = request.POST.get('assigned_users')
+            if assigned_users_str is not None:
+                from authentication.models import Member
+                try:
+                    # Store old assignees before updating
+                    old_assignees = set(task.assignees.all())
+                    
+                    ids = [int(x) for x in assigned_users_str.split(',') if x.strip()]
+                    if ids:
+                        members = Member.objects.filter(user__id__in=ids)
+                        task.assignees.set(members)
+                        # Sync legacy member if needed (e.g. if currently empty or just to keep it valid)
+                        # If task.member is not in new list, maybe we should switch it?
+                        # For now, if task.member is null, set it.
+                        if not task.member and members.exists():
+                            task.member = members.first()
+                        
+                        # Detect newly added assignees and send notifications
+                        new_assignees = set(members)
+                        added_assignees = new_assignees - old_assignees
+                        
+                        if added_assignees:
+                            from notifications.models import Notification
+                            for member in added_assignees:
+                                # Don't notify the user making the change
+                                if current_user and member.id != current_user.id:
+                                    Notification.create_notification(
+                                        recipient=member,
+                                        notification_type='task_assigned',
+                                        title=f'Task Assigned: {task.name}',
+                                        message=f'You have been assigned to "{task.name}" by {request.user.get_full_name() or request.user.username}',
+                                        link=f'/todo/tasks/{task.id}/detail/',
+                                        icon='fa-tasks',
+                                        content_object=task
+                                    )
+                    else:
+                        task.assignees.clear()
+                except Exception as e:
+                    print(f"Error updating assignees: {e}")
+
+            # Handle File Uploads
+            files = request.FILES.getlist('task_files')
+            if files:
+                try:
+                    from erp.google_drive import upload_file_to_drive
+                    from .models import TaskAttachment
+                    
+                    for file_item in files:
+                        upload_result = upload_file_to_drive(request.user, file_item, folder_name="ERP Personal Tasks")
+                        if upload_result.get('success'):
+                            TaskAttachment.objects.create(
+                                task=task,
+                                file_name=upload_result.get('name'),
+                                drive_file_id=upload_result.get('file_id'),
+                                drive_link=upload_result.get('drive_link'),
+                                uploaded_by=request.user.member if hasattr(request.user, 'member') else None
+                            )
+                except Exception as e:
+                    print(f"Error uploading files: {e}")
+
             # Calculate overdue display (use same classes as tasks.html)
             from datetime import date as dt_date
             delta = (due_date - dt_date.today()).days
@@ -620,6 +789,15 @@ def update_task_ajax(request, task_id):
     
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
+@login_required
+def delete_task_attachment(request, att_id):
+    if request.method == "POST":
+        from .models import TaskAttachment
+        att = get_object_or_404(TaskAttachment, pk=att_id)
+        att.delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False, 'error': 'Invalid method'})
+
 
 # Task detail full page view
 @login_required
@@ -634,7 +812,8 @@ def task_detail_page(request, task_id):
         'contact', 'company'
     ).prefetch_related(
         'comments', 'comments__author', 'comments__author__user',
-        'activities', 'activities__user', 'activities__user__user'
+        'activities', 'activities__user', 'activities__user__user',
+        'attachments', 'assignees'
     ).get(pk=task_id)
     
     comments = task.comments.all().order_by('-created_at')

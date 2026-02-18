@@ -70,6 +70,33 @@ class TeamRole(models.Model):
         return f"{self.team.name} - {self.name}"
 
 
+class TeamBoardColumn(models.Model):
+    """Dynamic columns for Kanban board"""
+    COLOR_CHOICES = [
+        ('blue', 'Blue'),
+        ('green', 'Green'),
+        ('orange', 'Orange'),
+        ('purple', 'Purple'),
+        ('red', 'Red'),
+        ('gray', 'Gray'),
+        ('pink', 'Pink'),
+        ('teal', 'Teal'),
+    ]
+    
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='columns')
+    title = models.CharField(max_length=50)
+    color = models.CharField(max_length=20, choices=COLOR_CHOICES, default='blue')
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['order']
+        unique_together = ('team', 'title')
+    
+    def __str__(self):
+        return f"{self.team.name} - {self.title}"
+
+
 class TeamTask(models.Model):
     """Task assignment model for team members"""
     STATUS_CHOICES = [
@@ -87,10 +114,12 @@ class TeamTask(models.Model):
     ]
     
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='tasks')
+    column = models.ForeignKey(TeamBoardColumn, on_delete=models.SET_NULL, null=True, blank=True, related_name='tasks')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='assigned_team_tasks')
-    assigned_to = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_team_tasks')
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='received_team_tasks_legacy')
+    assignees = models.ManyToManyField(User, related_name='team_tasks', blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='todo')
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
     due_date = models.DateTimeField()
@@ -103,6 +132,37 @@ class TeamTask(models.Model):
     
     def __str__(self):
         return f"{self.title} - {self.assigned_to.get_full_name()}"
+
+
+class TeamTaskAttachment(models.Model):
+    """Files attached to team tasks (stored in Google Drive)"""
+    task = models.ForeignKey(TeamTask, on_delete=models.CASCADE, related_name='attachments')
+    file_name = models.CharField(max_length=255)
+    drive_file_id = models.CharField(max_length=255)
+    drive_link = models.URLField(max_length=500)
+    uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file_name
+
+    def get_download_url(self):
+        """Returns direct download link"""
+        return f"https://drive.google.com/uc?export=download&id={self.drive_file_id}"
+
+
+class TeamTaskComment(models.Model):
+    """Comments on team tasks"""
+    task = models.ForeignKey(TeamTask, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='team_task_comments')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"Comment by {self.author.get_full_name()} on {self.task.title}"
 
 
 class TeamMessage(models.Model):
@@ -124,7 +184,7 @@ class TeamMessage(models.Model):
 
 class TeamMeeting(models.Model):
     """Meeting scheduling for team members"""
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='meetings')
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='meetings', null=True, blank=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     organizer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='organized_team_meetings')
@@ -248,6 +308,7 @@ class ChatRoom(models.Model):
     members = models.ManyToManyField(User, related_name='chat_rooms', blank=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_chat_rooms')
     is_default = models.BooleanField(default=False, help_text="Default room for new team members")
+    google_space_id = models.CharField(max_length=255, blank=True, null=True, help_text="Google Chat Space ID if connected")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -294,7 +355,7 @@ class ChatFile(models.Model):
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='files')
     message = models.ForeignKey(ChatMessage, on_delete=models.CASCADE, null=True, blank=True, related_name='attachments')
     uploader = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploaded_chat_files')
-    file_url = models.URLField(max_length=500)
+    file = models.FileField(upload_to='chat_uploads/%Y/%m/%d/', null=True, blank=True)
     file_name = models.CharField(max_length=255)
     file_type = models.CharField(max_length=20, choices=FILE_TYPES, default='other')
     file_size = models.PositiveIntegerField(default=0, help_text="File size in bytes")
@@ -306,6 +367,15 @@ class ChatFile(models.Model):
     def __str__(self):
         return self.file_name
 
+class ChatTypingStatus(models.Model):
+    """Transient model to track who is typing in which room"""
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='typing_statuses')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='typing_statuses')
+    last_typed = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('room', 'user')
+
 
 class ChatReadMarker(models.Model):
     """Track when user last read a chat room"""
@@ -316,6 +386,24 @@ class ChatReadMarker(models.Model):
     class Meta:
         unique_together = ('room', 'user')
     
-    def __str__(self):
-        return f"{self.user.get_full_name()} - {self.room.name}"
+class TeamTaskHistory(models.Model):
+    """History log for TeamTask"""
+    EVENT_TYPES = [
+        ('status_change', 'Status Change'),
+        ('comment_added', 'Comment Added'),
+        ('priority_change', 'Priority Change'),
+        ('created', 'Task Created'),
+    ]
 
+    task = models.ForeignKey(TeamTask, on_delete=models.CASCADE, related_name='history')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_history')
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
+    old_value = models.TextField(null=True, blank=True)
+    new_value = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.first_name} - {self.event_type}"

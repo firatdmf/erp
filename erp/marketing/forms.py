@@ -47,17 +47,18 @@ class ProductForm(forms.ModelForm):
         # Fix cursor issues by ensuring querysets are properly evaluated
         # Force fresh queryset for supplier to avoid stale cursor references
         if 'supplier' in self.fields:
-            self.fields['supplier'].queryset = Supplier.objects.all()
+            # Evaluate into a list only if absolutely necessary, otherwise ensure fresh queryset
+            self.fields['supplier'].queryset = Supplier.objects.all().order_by('company_name', 'contact_name')
         
         # If the instance has variants, set the has_variants field to True
         if self.instance and self.instance.pk:
-            # Use count() instead of exists() to avoid cursor issues
+            # Use count() instead of exists() for better compatibility with some cursor types
             if is_update and self.instance.variants.count() > 0:
                 self.fields["has_variants"].initial = True
-            # Force evaluation of queryset to prevent cursor issues
+            # Force fresh queryset for primary_image filtered to this product
             self.fields["primary_image"].queryset = ProductFile.objects.filter(
                 product=self.instance
-            ).all()
+            ).order_by('sequence', 'pk')
         else:
             # For new products, show empty queryset
             self.fields["primary_image"].queryset = ProductFile.objects.none()
@@ -104,6 +105,7 @@ class BlogPostForm(forms.ModelForm):
             'excerpt_tr', 'excerpt_en', 'excerpt_ru', 'excerpt_pl',
             'content_tr', 'content_en', 'content_ru', 'content_pl',
             'category_tr', 'category_en', 'category_ru', 'category_pl',
+            'header_content', 'footer_content',
             # cover_image and hero_image handled manually in template via hidden inputs
         ]
         widgets = {
@@ -126,6 +128,8 @@ class BlogPostForm(forms.ModelForm):
             'category_en': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Category'}),
             'category_ru': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Категория'}),
             'category_pl': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategoria'}),
+            'header_content': forms.Textarea(attrs={'class': 'form-textarea code-editor', 'rows': 5, 'placeholder': '<style>...</style>'}),
+            'footer_content': forms.Textarea(attrs={'class': 'form-textarea code-editor', 'rows': 5, 'placeholder': '<script>...</script>'}),
         }
 
 

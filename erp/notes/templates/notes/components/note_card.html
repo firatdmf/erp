@@ -1,0 +1,170 @@
+{% load humanize %}
+{# Single note card - used for both display and edit modes #}
+{# Context: note, editing (bool), active_tab #}
+
+{% if editing %}
+{# ======== EDIT MODE ======== #}
+<div id="note-card-{{ note.id }}" class="note-card priority-{{ note.priority }}">
+    <form hx-post="{% url 'notes:note_detail' note.id %}" hx-target="#note-card-{{ note.id }}" hx-swap="outerHTML"
+        hx-encoding="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="active_tab" value="{{ active_tab }}">
+        <div class="note-card-body">
+            <div class="note-card-top">
+                <input type="text" name="title" value="{{ note.title }}" class="form-input"
+                    style="font-size:16px; font-weight:700; padding:8px 12px;">
+                <div class="note-card-actions-top">
+                    <button type="button" class="star-btn {% if note.is_favorite %}active{% endif %}"
+                        onclick="toggleFavorite(this, {{ note.id }})">
+                        <i class="fas fa-star"></i>
+                    </button>
+                    <span class="category-badge cat-{{ note.category }}">
+                        {{ note.get_category_display }}
+                    </span>
+                </div>
+            </div>
+
+            <textarea name="content" class="edit-textarea" rows="6">{{ note.content|striptags }}</textarea>
+
+            <div class="edit-row">
+                <div>
+                    <label class="edit-label">Category</label>
+                    <select name="category" class="edit-select">
+                        <option value="work" {% if note.category == 'work' %}selected{% endif %}>Work</option>
+                        <option value="personal" {% if note.category == 'personal' %}selected{% endif %}>Personal</option>
+                        <option value="important" {% if note.category == 'important' %}selected{% endif %}>Important
+                        </option>
+                        <option value="ideas" {% if note.category == 'ideas' %}selected{% endif %}>Ideas</option>
+                        <option value="meeting" {% if note.category == 'meeting' %}selected{% endif %}>Meeting</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="edit-label">Priority</label>
+                    <select name="priority" class="edit-select">
+                        <option value="high" {% if note.priority == 'high' %}selected{% endif %}>High Priority</option>
+                        <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>Medium Priority
+                        </option>
+                        <option value="low" {% if note.priority == 'low' %}selected{% endif %}>Low Priority</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- File Management -->
+            <div class="edit-file-row">
+                <label class="edit-label" style="margin-bottom:0;">Add File</label>
+                <button type="button" class="edit-upload-btn"
+                    onclick="this.closest('form').querySelector('.edit-file-hidden').click()">
+                    <i class="fas fa-cloud-upload-alt"></i> Choose File
+                </button>
+                <input type="file" name="files" class="edit-file-hidden" multiple style="display:none;"
+                    onchange="showEditSelectedFiles(this)">
+            </div>
+
+            <div class="edit-selected-files"></div>
+
+            {% for file in note.attachments.all %}
+            <div class="edit-file-item" id="file-{{ file.id }}">
+                <i class="fas fa-file" style="color: #3b82f6;"></i>
+                <div style="flex:1; min-width:0;">
+                    <span class="file-name">{{ file.file_name }}</span>
+                </div>
+                <button type="button" class="edit-file-remove" onclick="deleteNoteFile({{ file.id }}, this)">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            {% endfor %}
+
+            <input type="hidden" name="is_favorite" value="{{ note.is_favorite|yesno:'True,False' }}">
+        </div>
+
+        <div class="note-card-footer">
+            <span class="note-card-date">
+                {{ note.updated_at|date:"d E Y H:i" }}
+            </span>
+            <div class="note-card-priority {{ note.priority }}">
+                <i class="fas fa-exclamation-circle"></i>
+                {% if note.priority == 'high' %}High{% elif note.priority == 'medium' %}Medium{% else %}Low{% endif %}
+            </div>
+        </div>
+
+        <div class="note-card-btns">
+            <button type="submit" class="btn-save-card">
+                <i class="fas fa-check"></i> Save
+            </button>
+            <button type="button" class="btn-cancel-card" onclick="cancelEdit({{ note.id }})">
+                <i class="fas fa-times"></i> Cancel
+            </button>
+        </div>
+    </form>
+</div>
+
+{% else %}
+{# ======== VIEW MODE ======== #}
+<div id="note-card-{{ note.id }}" class="note-card priority-{{ note.priority }}">
+    <div class="note-card-body" onclick="window.location.href='{% url 'notes:note_detail' note.id %}'"
+        style="cursor:pointer;">
+        <div class="note-card-top">
+            <h3 class="note-card-title">{{ note.title }}</h3>
+            <div class="note-card-actions-top">
+                {% if not note.is_deleted %}
+                <button type="button" class="star-btn {% if note.is_favorite %}active{% endif %}"
+                    onclick="toggleFavorite(this, {{ note.id }})">
+                    <i class="fas fa-star"></i>
+                </button>
+                {% endif %}
+                <span class="category-badge cat-{{ note.category }}">
+                    {{ note.get_category_display }}
+                </span>
+            </div>
+        </div>
+
+        <div class="note-card-content">
+            {{ note.content|striptags|truncatewords:30 }}
+        </div>
+
+        {% if note.attachments.exists %}
+        <div class="note-card-files">
+            <div class="note-card-files-header">
+                <i class="fas fa-paperclip"></i>
+                {{ note.attachments.count }} Files
+            </div>
+            <div>
+                {% for file in note.attachments.all %}
+                <span class="note-card-file-chip">
+                    <i class="fas fa-file"></i> {{ file.file_name|truncatechars:25 }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="note-card-footer">
+        <span class="note-card-date">
+            {{ note.updated_at|date:"d E Y H:i" }}
+        </span>
+        <div class="note-card-priority {{ note.priority }}">
+            <i class="fas fa-exclamation-circle"></i>
+            {% if note.priority == 'high' %}High{% elif note.priority == 'medium' %}Medium{% else %}Low{% endif %}
+        </div>
+    </div>
+
+    <div class="note-card-btns">
+        {% if note.is_deleted %}
+        <button type="button" class="btn-restore" onclick="restoreNote({{ note.id }})">
+            <i class="fas fa-undo"></i> Restore
+        </button>
+        <button type="button" class="btn-delete-card" onclick="permanentDelete({{ note.id }})">
+            <i class="fas fa-trash-alt"></i> Delete Forever
+        </button>
+        {% else %}
+        <button type="button" class="btn-edit" onclick="startEdit({{ note.id }})">
+            <i class="fas fa-pen"></i> Edit
+        </button>
+        <button type="button" class="btn-delete-card" onclick="openDeleteModal({{ note.id }})">
+            <i class="fas fa-trash-alt"></i> Delete
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

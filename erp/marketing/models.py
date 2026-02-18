@@ -163,7 +163,7 @@ class Product(models.Model):
     ]
     WEIGHT_UNIT_TYPE_CHOICES = [("lb", "lb"), ("oz", "oz"), ("kg", "kg"), ("g", "g")]
 
-    title = models.CharField(max_length=255, null=False, blank=False)
+    title = models.CharField(max_length=255, null=False, blank=False, db_index=True)
 
     # This can be implement and used as html later.
     description = models.TextField(null=True, blank=True)

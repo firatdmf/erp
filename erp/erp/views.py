@@ -85,78 +85,96 @@ class test_page2(TemplateView):
 class Dashboard(View):
     template_name = "dashboard.html"
 
-    def get(self, request,*args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        from django.http import HttpResponse
+        from django.template.loader import render_to_string
+        from datetime import datetime, timedelta, time
+        from django.utils import timezone
+        from team.models import TeamTask, TeamMeeting
+        from team.models import TeamMember
+        from django.db.models import Q, Subquery, OuterRef, Value
+        from django.utils.timezone import make_aware
+
         # Check if this is an AJAX request for tasks by date
         selected_date = request.GET.get('date')
         task_tab = request.GET.get('tab', 'myTasks')  # Default to myTasks
         
         if selected_date:
-            from django.http import HttpResponse
-            from django.template.loader import render_to_string
-            from datetime import datetime
-            from django.utils import timezone
-            from team.models import TeamTask
-            
             try:
+                # Convert string to date object
                 date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
                 today = timezone.localdate()
                 
+                # Calculate start and end of the selected day for index-friendly range query
+                # This allow DB to use specific datetime index instead of casting column to date
+                day_start = make_aware(datetime.combine(date_obj, time.min))
+                day_end = make_aware(datetime.combine(date_obj, time.max))
+
                 # Get current user's member
                 current_member = request.user.member if hasattr(request.user, 'member') else None
                 current_user = request.user
+                
                 print(f"\n=== Dashboard AJAX Debug ===")
                 print(f"Date: {date_obj}, Tab: {task_tab}")
-                print(f"Current member: {current_member} (ID: {current_member.id if current_member else None})")
                 
                 # Base query - date filtering
                 if date_obj == today:
                     # If selected date is today, show all tasks up to and including today
+                    # For index usage: due_date <= today
                     base_query = Task.objects.filter(completed=False, due_date__lte=today)
                 else:
-                    # For other dates, show only tasks for that specific date
+                    # For other dates, show range of that day
+                    # Note: Task.due_date is distinct from TeamTask.due_date (date vs datetime)
+                    # Task.due_date is DateField, so exact match is fine and indexed
                     base_query = Task.objects.filter(completed=False, due_date=date_obj)
-                
-                print(f"Base query count: {base_query.count()}")
                 
                 # Apply tab filter - only show myTasks for calendar
                 if task_tab == 'myTasks':
                     # Include tasks where user is the member OR is in assignees
-                    from django.db.models import Q
                     tasks = list(base_query.filter(
                         Q(member=current_member) | Q(assignees=current_member)
-                    ).distinct().select_related('contact', 'company', 'member', 'created_by').order_by('-due_date'))
+                    ).distinct().select_related('contact', 'company', 'member', 'member__user', 'created_by', 'created_by__user').order_by('-due_date'))
                     print(f"My Tasks count: {len(tasks)}")
                     
-                    # Also get TeamTasks where user is in assignees (ManyToMany)
+                    # Subquery to get current user's role in the task's team
+                    user_role_subquery = TeamMember.objects.filter(
+                        team=OuterRef('team'),
+                        user=current_user
+                    ).values('role')[:1]
+
+                    # TeamTask filtering using Range for DatetimeField
                     if date_obj == today:
+                         # For today, we want everything up to end of today
                         team_tasks_query = TeamTask.objects.filter(
                             assignees=current_user,
-                            due_date__lte=today
+                            due_date__lte=day_end # Use range/lte on datetime index
                         ).exclude(status='done')
                     else:
+                        # For specific day: Use RANGE to hit the index
                         team_tasks_query = TeamTask.objects.filter(
                             assignees=current_user,
-                            due_date=date_obj
+                            due_date__range=(day_start, day_end)
                         ).exclude(status='done')
                     
-                    team_tasks = list(team_tasks_query.distinct().select_related('team', 'assigned_to', 'assigned_by').prefetch_related('assignees').order_by('-due_date'))
+                    # Annotate with user role for permission check without N+1
+                    team_tasks = list(team_tasks_query.annotate(
+                        current_user_role=user_role_subquery
+                    ).distinct().select_related('team', 'assigned_to', 'assigned_by').prefetch_related('assignees').order_by('-due_date'))
                     print(f"Team Tasks count: {len(team_tasks)}")
 
-                    # Fetch Team Meetings
-                    # Fetch Team Meetings
-                    from team.models import TeamMeeting
-                    from django.db.models import Q
-                    
+                    # Fetch Team Meetings using Range for DatetimeField (Index Optimized)
                     meetings_query = TeamMeeting.objects.filter(
                         Q(team__members=current_user) | 
                         Q(participants=current_user) |
                         Q(organizer=current_user),
-                        scheduled_at__date=date_obj
+                        scheduled_at__range=(day_start, day_end)
                     ).select_related('organizer', 'team').prefetch_related('participants').order_by('scheduled_at').distinct()
+                    
                     meetings = list(meetings_query)
                     print(f"Meetings count: {len(meetings)}")
+
                 else:  # assignedTasks
-                    tasks = list(base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by').order_by('-due_date'))
+                    tasks = list(base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by', 'created_by__user').order_by('-due_date'))
                     team_tasks = []
                     meetings = []
                     print(f"Assigned Tasks count: {len(tasks)}")

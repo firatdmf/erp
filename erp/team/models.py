@@ -189,7 +189,7 @@ class TeamMeeting(models.Model):
     description = models.TextField(blank=True)
     organizer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='organized_team_meetings')
     participants = models.ManyToManyField(User, related_name='team_meetings')
-    scheduled_at = models.DateTimeField()
+    scheduled_at = models.DateTimeField(db_index=True)
     duration_minutes = models.IntegerField(default=60)
     meeting_link = models.URLField(blank=True, help_text="Zoom/Google Meet link")
     location = models.CharField(max_length=255, blank=True, help_text="Physical location if applicable")

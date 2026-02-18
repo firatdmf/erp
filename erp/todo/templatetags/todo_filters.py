@@ -108,6 +108,10 @@ def can_manage_team_task(task, user):
     if not user.is_authenticated:
         return False
         
+    # Optimized: Check annotation first to avoid N+1 queries
+    if hasattr(task, 'current_user_role'):
+        return task.current_user_role in ['admin', 'manager']
+
     try:
         from team.models import TeamMember
         member = TeamMember.objects.filter(team=task.team, user=user).first()

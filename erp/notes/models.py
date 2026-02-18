@@ -23,35 +23,30 @@ class Note(models.Model):
     
     title = models.CharField(max_length=255)
     content = models.TextField(blank=True, null=True)
-    
+    snippet = models.CharField(max_length=500, blank=True, null=True, help_text="Text-only preview of content")
+
     # Meta fields
-    is_favorite = models.BooleanField(default=False)
-    is_deleted = models.BooleanField(default=False) # Soft delete / Recycle bin
+    is_favorite = models.BooleanField(default=False, db_index=True)
+    is_deleted = models.BooleanField(default=False, db_index=True) # Soft delete / Recycle bin
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='work')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='work', db_index=True)
     
     # Timestamp fields
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    # Optional: Tags (if we want to use ArrayField for simple tagging like the design suggests "Labels")
-    # For SQLite compatibility during dev, we might want to use JSONField or just a ManyToMany. 
-    # But project uses Postgres in prod. Let's use simple JSONField or M2M if ArrayField is risky for local SQLite.
-    # The 'todo' app has M2M tags or just text? 
-    # Let's check 'todo' models again... ah, user environment says 'postgres' in settings but 'sqlite' in local?
-    # settings.py: DATABASES['default']['ENGINE'] = config("DB_ENGINE")
-    # Let's simpler approach: Separate Tag model or just JSONField if Django > 3.0 (it is 4.2).
-    # Going with a simple separate model for Tags is safest and most flexible.
-    # But design just shows "Labels" like "High Priority", "Medium Priority". Wait, those are priorities.
-    # The design also shows "Tags" like "#planning", "#Q3".
-    
-    # Let's use a simple JSONField for tags to avoid extra tables for now, 
-    # or just a CharField for "comma separated" if we want to be super simple. 
-    # JSONField is best for modern Django.
-    # tags = models.JSONField(default=list, blank=True) 
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
     
     class Meta:
         ordering = ['-updated_at']
+
+    def save(self, *args, **kwargs):
+        # Auto-generate snippet from content
+        if self.content:
+            from django.utils.html import strip_tags
+            text = strip_tags(self.content)
+            self.snippet = text[:490] + "..." if len(text) > 490 else text
+        else:
+            self.snippet = ""
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title

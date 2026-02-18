@@ -249,7 +249,7 @@ class Email(models.Model):
     
     # Folder & Status
     folder = models.CharField(max_length=20, choices=FOLDER_CHOICES, default='inbox', db_index=True)
-    is_read = models.BooleanField(default=False)
+    is_read = models.BooleanField(default=False, db_index=True)
     is_starred = models.BooleanField(default=False)
     is_important = models.BooleanField(default=False)
     

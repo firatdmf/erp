@@ -228,7 +228,7 @@ DATABASES = {
         "HOST": config("DB_HOST"),  # an empty string means localhost
         "PORT": config("DB_PORT"),
         # Connection pooling for better performance
-        "CONN_MAX_AGE": 0,  # Disable persistent connections in development to avoid stale cursor issues
+        "CONN_MAX_AGE": 60,  # 60 seconds persistence (Safe for cloud)
         "OPTIONS": {
             # PostgreSQL specific optimizations
             "connect_timeout": 10,

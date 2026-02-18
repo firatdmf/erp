@@ -23,10 +23,22 @@ class NoteListView(View):
         # Base query: current user's notes
         all_user_notes = Note.objects.filter(user=request.user.member)
 
-        # Counts for tabs
-        all_count = all_user_notes.filter(is_deleted=False).count()
-        fav_count = all_user_notes.filter(is_favorite=True, is_deleted=False).count()
-        deleted_count = all_user_notes.filter(is_deleted=True).count()
+        # Optimized: Get all counts in one query
+        from django.db.models import Count, Q
+        try:
+            stats = all_user_notes.aggregate(
+                all_count=Count('id', filter=Q(is_deleted=False)),
+                fav_count=Count('id', filter=Q(is_favorite=True, is_deleted=False)),
+                deleted_count=Count('id', filter=Q(is_deleted=True))
+            )
+            
+            all_count = stats['all_count']
+            fav_count = stats['fav_count']
+            deleted_count = stats['deleted_count']
+        except Exception:
+             all_count = 0
+             fav_count = 0
+             deleted_count = 0
 
         # Status filtering
         if status == 'favorites':
@@ -47,8 +59,10 @@ class NoteListView(View):
                 Q(content__icontains=search_query)
             )
 
-        notes = notes.prefetch_related('attachments')
-
+        # Use defer to skip loading potentially huge content (base64 images etc)
+        # We use the 'snippet' field for preview instead
+        notes = notes.order_by('-updated_at').defer('content')
+        
         context = {
             'notes': notes,
             'active_tab': status,

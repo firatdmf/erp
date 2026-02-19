@@ -2212,6 +2212,7 @@ def get_products(request):
             "id": p.id,
             "title": p.title,
             "sku": p.sku,
+            "description": p.description,
             "price": p.price,
             "primary_image": p.primary_image.file_url if p.primary_image else None,
             "product_attributes": [

@@ -194,8 +194,7 @@
               <div class="attributes">
                 {% for attribute_value in variant.product_variant_attribute_values.all %}
                 <span class="attribute">
-                  <strong>{{ attribute_value.product_variant_attribute.name|title }}:</strong> {{
-                  attribute_value.product_variant_attribute_value|title }}
+                  <strong>{{ attribute_value.product_variant_attribute.name|title }}:</strong> {{attribute_value.product_variant_attribute_value|title }}
                 </span>
                 {% endfor %}
               </div>

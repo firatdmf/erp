@@ -194,6 +194,13 @@ class CreateTask(generic.edit.CreateView):
             except Exception as e:
                 print(f"EXCEPTION in attachment handling: {e}")
                 # Don't crash, just log
+                
+        # Push to Google Tasks
+        try:
+            from .google_tasks import push_task_to_google
+            push_task_to_google(self.request.user, self.object)
+        except Exception as e:
+            print(f"Error pushing new task to Google Tasks: {e}")
                     
         return response
 
@@ -419,6 +426,12 @@ class EditTaskView(generic.edit.UpdateView):
         else:
             self.success_url = '/todo/'
             print("no next_url")
+        try:
+            from .google_tasks import update_task_in_google
+            update_task_in_google(self.request.user, form.instance)
+        except Exception as e:
+            print(f"Error updating task in Google Tasks: {e}")
+            
         return super().form_valid(form)
 
 
@@ -563,6 +576,14 @@ def complete_task(request, task_id):
             }
         })
     
+    
+    # Sync status to Google Tasks
+    try:
+        from .google_tasks import update_task_in_google
+        update_task_in_google(request.user, task)
+    except Exception as e:
+        print(f"Error updating task completion in Google Tasks: {e}")
+    
     # below line brings back the user to the current page
     return redirect(request.META.get("HTTP_REFERER"))
 
@@ -595,7 +616,14 @@ def delete_task(request, task_id):
 
 # Get task edit form (AJAX endpoint)
 def get_task_edit_form(request, task_id):
-    task = get_object_or_404(Task, pk=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related(
+            'contact', 'company', 'member', 'member__user'
+        ).prefetch_related(
+            'assignees', 'assignees__user', 'attachments'
+        ), 
+        pk=task_id
+    )
     form = TaskForm(instance=task)
     
     # Render the form template
@@ -805,16 +833,18 @@ def task_detail_page(request, task_id):
     from authentication.models import Member
     from .models import TaskActivity
     
-    task = get_object_or_404(Task, pk=task_id)
-    task = Task.objects.select_related(
-        'member', 'member__user',
-        'created_by', 'created_by__user',
-        'contact', 'company'
-    ).prefetch_related(
-        'comments', 'comments__author', 'comments__author__user',
-        'activities', 'activities__user', 'activities__user__user',
-        'attachments', 'assignees'
-    ).get(pk=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related(
+            'member', 'member__user',
+            'created_by', 'created_by__user',
+            'contact', 'company'
+        ).prefetch_related(
+            'comments', 'comments__author', 'comments__author__user',
+            'activities', 'activities__user', 'activities__user__user',
+            'attachments', 'assignees'
+        ),
+        pk=task_id
+    )
     
     comments = task.comments.all().order_by('-created_at')
     activities = task.activities.all().order_by('-created_at')[:50]  # Last 50 activities
@@ -834,14 +864,16 @@ def task_detail_page(request, task_id):
 @login_required
 def task_detail_ajax(request, task_id):
     from datetime import date as dt_date
-    task = get_object_or_404(Task, pk=task_id)
     
     # Get task with related data
-    task = Task.objects.select_related(
-        'member', 'member__user',
-        'created_by', 'created_by__user',
-        'contact', 'company'
-    ).prefetch_related('comments', 'comments__author', 'comments__author__user').get(pk=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related(
+            'member', 'member__user',
+            'created_by', 'created_by__user',
+            'contact', 'company'
+        ).prefetch_related('comments', 'comments__author', 'comments__author__user'),
+        pk=task_id
+    )
     
     # Check permissions
     can_edit = request.user.member == task.created_by or request.user.member == task.member

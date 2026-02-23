@@ -190,6 +190,8 @@ GOOGLE_CHAT_SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     # Calendar Scopes
     'https://www.googleapis.com/auth/calendar.events',
+    # Tasks Scopes
+    'https://www.googleapis.com/auth/tasks',
 ]
 
 # Allow HTTP for development

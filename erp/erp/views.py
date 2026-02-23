@@ -199,6 +199,14 @@ class Dashboard(View):
             except ValueError:
                 return HttpResponse('<div class="tasks_component"><ul><li style="color: red;">Invalid date format</li></ul></div>')
         
+        # Sync Google Tasks on full page load
+        if request.user.is_authenticated:
+            try:
+                from todo.google_tasks import sync_from_google
+                sync_from_google(request.user)
+            except Exception as e:
+                print(f"Error syncing from Google Tasks on dashboard load: {e}")
+                
         return render(request, self.template_name, {"title": "Dashboard"})
     
 

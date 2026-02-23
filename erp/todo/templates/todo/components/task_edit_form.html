@@ -45,7 +45,7 @@
       <option value="low" {% if task.priority == 'low' %}selected{% endif %}>Low</option>
       <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>Medium</option>
       <option value="high" {% if task.priority == 'high' %}selected{% endif %}>High</option>
-      <option value="urgent" {% if task.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+      <option value="urgent" {% if task.priority ==  'urgent' %}selected{% endif %}>Urgent</option>
     </select>
   </div>
 
@@ -122,9 +122,10 @@
     </div>
     {% endif %}
 
-    <!-- Upload New -->
+    <!-- Upload New (Temporarily Disabled by User Request)
     <input type="file" name="task_files" class="form-input" multiple>
     <small style="color: #64748b; font-size: 0.8rem;">New files will be uploaded to Google Drive</small>
+    -->
   </div>
 
   <script>

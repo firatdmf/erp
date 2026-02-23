@@ -159,6 +159,13 @@ def team_tasks(request):
                             content_object=task
                         )
 
+            # Sync to Google Tasks
+            try:
+                from todo.google_tasks import push_team_task_to_google
+                push_team_task_to_google(request.user, task)
+            except Exception as e:
+                print(f"Error pushing team task to Google Tasks: {e}")
+
             from .models import TeamTaskAttachment
             for att_data in attachments_data:
                 TeamTaskAttachment.objects.create(
@@ -303,6 +310,13 @@ def update_task_status(request, task_id):
             old_value='(Drag & Drop)',
             new_value=column.title
         )
+
+        # Sync to Google Tasks
+        try:
+            from todo.google_tasks import update_task_in_google
+            update_task_in_google(request.user, task, is_team=True)
+        except Exception as e:
+            print(f"Error updating team task in Google Tasks: {e}")
 
         return JsonResponse({'success': True, 'message': f'Task moved to {column.title}'})
 
@@ -503,6 +517,13 @@ def create_task(request):
         # Add all targets to ManyToMany field
         task.assignees.set(target_users)
 
+        # Sync to Google Tasks
+        try:
+            from todo.google_tasks import push_team_task_to_google
+            push_team_task_to_google(request.user, task)
+        except Exception as e:
+            print(f"Error pushing team task to Google Tasks: {e}")
+
         from .models import TeamTaskAttachment
         for att_data in attachments_data:
             TeamTaskAttachment.objects.create(
@@ -526,7 +547,14 @@ def create_task(request):
 @login_required
 def task_detail(request, task_id):
     """Detail view for a specific task"""
-    task = get_object_or_404(TeamTask, id=task_id)
+    task = get_object_or_404(
+        TeamTask.objects.select_related(
+            'team', 'column', 'assigned_to', 'assigned_by'
+        ).prefetch_related(
+            'assignees', 'team__columns'
+        ), 
+        id=task_id
+    )
     # Check permissions (basic: user must be in the team)
     if not task.team.members.filter(id=request.user.id).exists():
          # Or handle via TeamMember check
@@ -743,6 +771,13 @@ def edit_task(request, task_id):
         new_value="Task details updated"
     )
     
+    # Sync to Google Tasks
+    try:
+        from todo.google_tasks import update_task_in_google
+        update_task_in_google(request.user, task, is_team=True)
+    except Exception as e:
+        print(f"Error updating team task in Google Tasks: {e}")
+    
     return JsonResponse({'success': True, 'message': 'Task updated successfully'})
 
 @login_required
@@ -759,6 +794,45 @@ def team_messages(request):
     else:
         team = get_user_team(request.user)
     
+    # -------------------------------------------------------------------------
+    # AJAX FAST-PATH FOR ROOM SWITCHING
+    # Return messages HTML instantly without fetching the rest of the sidebar
+    # -------------------------------------------------------------------------
+    if request.GET.get('ajax') == '1':
+        if not room_id:
+            return JsonResponse({'success': False, 'error': 'Room ID missing'})
+            
+        active_room = get_object_or_404(ChatRoom, id=room_id, team=team)
+        if active_room.room_type == 'direct':
+             other_member = active_room.members.exclude(id=request.user.id).first()
+             active_room.display_name = other_member.get_full_name() if other_member else active_room.name
+        else:
+             active_room.display_name = active_room.name
+             
+        messages = active_room.messages.select_related('sender').prefetch_related('attachments').order_by('created_at')
+        
+        from django.template.loader import render_to_string
+        html = render_to_string('team/partials/message_list.html', {'messages': messages, 'request': request})
+        
+        member_avatars = []
+        for m in active_room.members.all()[:3]:
+            member_avatars.append({
+                'initials': (m.first_name[:1] + m.last_name[:1]).upper() if m.first_name and m.last_name else m.username[:2].upper(),
+                'color_bg': '#dbeafe', 
+                'color_text': '#1a73e8'
+            })
+            
+        return JsonResponse({
+            'success': True,
+            'room_id': active_room.id,
+            'room_name': active_room.display_name,
+            'description': active_room.description or "Team channel",
+            'member_count': active_room.members.count(),
+            'messages_html': html,
+            'member_avatars': member_avatars
+        })
+    # -------------------------------------------------------------------------
+
     # Get chat rooms for this team (only team's channels visible)
     channels = ChatRoom.objects.filter(team=team, room_type='channel').prefetch_related('members')
     direct_messages = ChatRoom.objects.filter(team=team, room_type='direct', members=request.user).prefetch_related('members')
@@ -776,28 +850,23 @@ def team_messages(request):
         else:
             dm.display_name = dm.name
 
-    # Get active room
+    # Get active room for full page load
     active_room = None
     messages = []
     if room_id:
         active_room = get_object_or_404(ChatRoom, id=room_id, team=team)
-        # Set display name for active room if it's a DM
         if active_room.room_type == 'direct':
              other_member = active_room.members.exclude(id=request.user.id).first()
-             if other_member:
-                 active_room.display_name = other_member.get_full_name()
-             else:
-                 active_room.display_name = active_room.name
+             active_room.display_name = other_member.get_full_name() if other_member else active_room.name
         else:
             active_room.display_name = active_room.name
-            
         messages = active_room.messages.select_related('sender').prefetch_related('attachments').order_by('created_at')
     elif channels.exists():
         active_room = channels.first()
         active_room.display_name = active_room.name
         messages = active_room.messages.select_related('sender').prefetch_related('attachments').order_by('created_at')
     
-    # Get team members for DM list (exclude current user and existing DMs)
+    # Get team members for DM list
     existing_dm_partner_ids = []
     for dm in direct_messages:
         for member in dm.members.all():
@@ -809,32 +878,6 @@ def team_messages(request):
     # Check Google Chat connection
     from authentication.models import GoogleChatCredentials
     is_google_connected = GoogleChatCredentials.objects.filter(user=request.user).exists()
-    
-    if active_room:
-        messages = ChatMessage.objects.filter(room=active_room).order_by('created_at')
-
-    # AJAX for room switching
-    if request.GET.get('ajax') == '1':
-        from django.template.loader import render_to_string
-        html = render_to_string('team/partials/message_list.html', {'messages': messages, 'request': request})
-        
-        member_avatars = []
-        for m in active_room.members.all()[:3]:
-            member_avatars.append({
-                'initials': (m.first_name[:1] + m.last_name[:1]).upper() if m.first_name and m.last_name else m.username[:2].upper(),
-                'color_bg': '#dbeafe', # simplified for now, or cycle logic in JS? 
-                'color_text': '#1a73e8'
-            })
-            
-        return JsonResponse({
-            'success': True,
-            'room_id': active_room.id,
-            'room_name': active_room.display_name,
-            'description': active_room.description or "Team channel",
-            'member_count': active_room.members.count(),
-            'messages_html': html,
-            'member_avatars': member_avatars
-        })
 
     context = {
         'team': team,
@@ -2076,7 +2119,10 @@ def send_google_message(request):
 @login_required
 def get_team_task_edit_form(request, task_id):
     """Get the team task edit form partial for sidebar"""
-    task = get_object_or_404(TeamTask, id=task_id)
+    task = get_object_or_404(
+        TeamTask.objects.select_related('team', 'assigned_by').prefetch_related('assignees', 'attachments'),
+        id=task_id
+    )
     
     # Check permissions and get role
     try:

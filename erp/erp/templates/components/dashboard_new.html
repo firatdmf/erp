@@ -236,19 +236,10 @@
   <!-- TAB 2: My Tasks -->
   <div id="myTasksTabContent" class="main-tab-content">
     <div id="myTasksList">
-      <div class="skeleton-loader-container" style="padding: 1rem;">
-        <div class="skeleton-card">
-          <div class="skeleton-text" style="width: 40%;"></div>
-          <div class="skeleton-text" style="width: 80%;"></div>
-        </div>
-        <div class="skeleton-card">
-          <div class="skeleton-text" style="width: 40%;"></div>
-          <div class="skeleton-text" style="width: 80%;"></div>
-        </div>
-        <div class="skeleton-card">
-          <div class="skeleton-text" style="width: 40%;"></div>
-          <div class="skeleton-text" style="width: 80%;"></div>
-        </div>
+      <div
+        style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem; color: #64748b; text-align: center;">
+        <i class="fas fa-spinner fa-spin" style="font-size: 2.5rem; color: #3b82f6; margin-bottom: 1rem;"></i>
+        <p style="font-size: 0.95rem; font-weight: 500; margin: 0;">Loading tasks...</p>
       </div>
     </div>
   </div>
@@ -256,19 +247,10 @@
   <!-- TAB 3: Assigned Tasks -->
   <div id="assignedTasksTabContent" class="main-tab-content">
     <div id="assignedTasksList">
-      <div class="skeleton-loader-container" style="padding: 1rem;">
-        <div class="skeleton-card">
-          <div class="skeleton-text" style="width: 40%;"></div>
-          <div class="skeleton-text" style="width: 80%;"></div>
-        </div>
-        <div class="skeleton-card">
-          <div class="skeleton-text" style="width: 40%;"></div>
-          <div class="skeleton-text" style="width: 80%;"></div>
-        </div>
-        <div class="skeleton-card">
-          <div class="skeleton-text" style="width: 40%;"></div>
-          <div class="skeleton-text" style="width: 80%;"></div>
-        </div>
+      <div
+        style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem; color: #64748b; text-align: center;">
+        <i class="fas fa-spinner fa-spin" style="font-size: 2.5rem; color: #3b82f6; margin-bottom: 1rem;"></i>
+        <p style="font-size: 0.95rem; font-weight: 500; margin: 0;">Loading tasks...</p>
       </div>
     </div>
   </div>
@@ -589,10 +571,9 @@
 
   // Skeleton Loader Template
   const SKELETON_LOADER_HTML = `
-    <div class="skeleton-loader-container" style="padding: 1rem;">
-      <div class="skeleton-card"><div class="skeleton-text" style="width: 40%;"></div><div class="skeleton-text" style="width: 80%;"></div></div>
-      <div class="skeleton-card"><div class="skeleton-text" style="width: 40%;"></div><div class="skeleton-text" style="width: 80%;"></div></div>
-      <div class="skeleton-card"><div class="skeleton-text" style="width: 40%;"></div><div class="skeleton-text" style="width: 80%;"></div></div>
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem; color: #64748b; text-align: center;">
+      <i class="fas fa-spinner fa-spin" style="font-size: 2.5rem; color: #3b82f6; margin-bottom: 1rem;"></i>
+      <p style="font-size: 0.95rem; font-weight: 500; margin: 0;">Loading tasks...</p>
     </div>
   `;
 

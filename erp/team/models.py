@@ -126,6 +126,7 @@ class TeamTask(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    google_task_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID of the task in Google Tasks")
     
     class Meta:
         ordering = ['-created_at']

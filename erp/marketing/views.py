@@ -2206,6 +2206,10 @@ def get_products(request):
             if av.product_variant_attribute_id not in attributes_map:
                 attributes_map[av.product_variant_attribute_id] = av.product_variant_attribute
 
+    # Fetch exchange rates once (in-memory cached, refreshed every hour)
+    from marketing.utils.currency_service import get_rates, convert_price as _convert_price
+    rates = get_rates()
+
     # Build products data from already fetched list
     products_data = [
         {
@@ -2214,6 +2218,7 @@ def get_products(request):
             "sku": p.sku,
             "description": p.description,
             "price": p.price,
+            "prices": _convert_price(p.price, rates),
             "primary_image": p.primary_image.file_url if p.primary_image else None,
             "product_attributes": [
                 {"name": attr.name, "value": attr.value, "sequence": attr.sequence}
@@ -2230,6 +2235,7 @@ def get_products(request):
             "product_id": v.product_id,
             "variant_sku": v.variant_sku,
             "variant_price": v.variant_price,
+            "variant_prices": _convert_price(v.variant_price, rates),
             "variant_quantity": v.variant_quantity,
             "product_variant_attribute_values": [
                 av.id for av in v.product_variant_attribute_values.all()
@@ -2338,6 +2344,10 @@ def get_product(request):
 
     product_category = product.category.name if product.category else None
 
+    # Fetch exchange rates once (in-memory cached, refreshed every hour)
+    from marketing.utils.currency_service import get_rates, convert_price as _convert_price
+    rates = get_rates()
+
     # Product fields for Product_API
     product_fields = {
         "id": product.id,
@@ -2352,14 +2362,13 @@ def get_product(request):
         "unit_of_measurement": product.unit_of_measurement,
         "quantity": product.quantity,
         "price": product.price,
+        "prices": _convert_price(product.price, rates),
         "featured": product.featured,
         "selling_while_out_of_stock": product.selling_while_out_of_stock,
         "weight": product.weight,
         "unit_of_weight": product.unit_of_weight,
         "category_id": product.category_id,
         "supplier_id": product.supplier_id,
-        # "has_variants": product.has_variants,  # REMOVE THIS LINE
-        # "has_variants": product.variants.exists(),  # ADD THIS LINE
         "datasheet_url": product.datasheet_url,
         "minimum_inventory_level": getattr(product, "minimum_inventory_level", None),
         "primary_image": (
@@ -2408,6 +2417,7 @@ def get_product(request):
                 "variant_barcode": variant.variant_barcode,
                 "variant_quantity": variant.variant_quantity,
                 "variant_price": variant.variant_price,
+                "variant_prices": _convert_price(variant.variant_price, rates),
                 "variant_cost": getattr(variant, "variant_cost", None),
                 "variant_featured": variant.variant_featured,
                 "product_id": variant.product_id,

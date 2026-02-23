@@ -13,7 +13,7 @@
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=9" />
-  
+
 
   <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"
@@ -1099,11 +1099,13 @@
             <input type="hidden" name="contact" id="id_contact" value="">
           </div>
 
+          <!-- Attachments (Temporarily Disabled by User Request)
           <div class="form-group" style="margin-top: 1rem;">
             <label for="id_task_files">Attachments (Google Drive)</label>
             <input type="file" name="task_files" id="id_task_files" class="form-input" multiple>
             <small style="color: #64748b; font-size: 0.8rem;">Selected files will be uploaded to Google Drive</small>
           </div>
+          -->
 
           <div class="sidebar-footer">
             <button type="submit" class="btn btn-primary">Create task</button>

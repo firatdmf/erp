@@ -1027,7 +1027,7 @@
 <script>
   // Global State
   let currentRoomId = {{ active_room.id|default:0 }};
-let lastMessageId = {{ messages.last.id|default:0 }};
+  let lastMessageId = {{ messages.last.id|default:0 }};
   let pollInterval = null;
   let typingTimeout = null;
   let selectedFiles = [];
@@ -1321,31 +1321,31 @@ let lastMessageId = {{ messages.last.id|default:0 }};
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        room_id: {{ active_room.id |default:0 }},
-      content: content,
-      attachments: filesToSend
+        room_id: currentRoomId,
+        content: content,
+        attachments: filesToSend
       })
     })
       .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        // Update the optimistic message
-        const optimisticRow = document.getElementById(`msg-${tempId}`);
-        if (optimisticRow) {
-          optimisticRow.id = `msg-${data.message.id}`;
-          optimisticRow.style.opacity = '1';
-          // optional: update content/attachments if server formatted it differently
-          lastMessageId = Math.max(lastMessageId, data.message.id);
+      .then(data => {
+        if (data.success) {
+          // Update the optimistic message
+          const optimisticRow = document.getElementById(`msg-${tempId}`);
+          if (optimisticRow) {
+            optimisticRow.id = `msg-${data.message.id}`;
+            optimisticRow.style.opacity = '1';
+            // optional: update content/attachments if server formatted it differently
+            lastMessageId = Math.max(lastMessageId, data.message.id);
+          } else {
+            // Fallback if not found (unexpected)
+          }
         } else {
-          // Fallback if not found (unexpected)
+          alert('Failed to send: ' + data.error);
+          const optimisticRow = document.getElementById(`msg-${tempId}`);
+          if (optimisticRow) optimisticRow.remove(); // Revert
+          input.value = content; // Restore text
         }
-      } else {
-        alert('Failed to send: ' + data.error);
-        const optimisticRow = document.getElementById(`msg-${tempId}`);
-        if (optimisticRow) optimisticRow.remove(); // Revert
-        input.value = content; // Restore text
-      }
-    });
+      });
   }
 
   function formatBytes(bytes, decimals = 2) {

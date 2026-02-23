@@ -58,6 +58,7 @@ class Task(models.Model):
     on_hold = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    google_task_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID of the task in Google Tasks")
     # make it either a company or contact
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True

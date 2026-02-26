@@ -1998,6 +1998,20 @@ async function confirmImageSelection() {
         }
     });
 
+    // Check for images that were unselected (removed from this variant)
+    if (variantImages[currentVariantIndex] && variantImages[currentVariantIndex].images) {
+        const oldImages = variantImages[currentVariantIndex].images;
+        const newImageIds = images.map(i => i.id).filter(id => id);
+        
+        oldImages.forEach(oldImg => {
+            if (oldImg.id && !newImageIds.includes(oldImg.id)) {
+                // This image was unselected, notify backend to remove link
+                unlinkedVariantFiles.add(oldImg.id);
+                console.log(`Unlinked image ${oldImg.id} from variant ${currentVariantIndex}`);
+            }
+        });
+    }
+
     // Store selected images
     variantImages[currentVariantIndex] = {
         images: images,

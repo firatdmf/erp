@@ -568,9 +568,15 @@ class BaseProductView(ModelFormMixin):
         
         print(f"  ✓ Pre-fetched all data: {len(attr_cache)} attrs, {len(attr_value_cache)} values: {time.time() - prefetch_start:.3f}s")
         
-        # Fetch variants WITH files in ONE query (combines 385 and 399)
+        # Read deleted_files from ROOT of parsed JSON
+        deleted_files = variants_json.get("deleted_files", []) if isinstance(variants_json, dict) else []
+        
         variant_create_start = time.time()
+        
+        # Determine total unique SKUs to form existing variants list
         variant_skus = [v.get("variant_sku") for v in variants_data if v.get("variant_sku")]
+        
+        # Fetch existing variants to minimize DB queries
         existing_variants = ProductVariant.objects.filter(
             product=self.object, variant_sku__in=variant_skus
         ).prefetch_related('files')
@@ -729,26 +735,54 @@ class BaseProductView(ModelFormMixin):
                         pass
         
         # Fetch ALL files by ID (including those already linked to other variants)
-        # This allows sharing images across variants (shared pool)
+        # This creates the shared pool.
         all_files_dict = {}
         if all_image_ids:
             all_files = ProductFile.objects.filter(
                 pk__in=all_image_ids,
                 product=self.object
-                # NO product_variant__isnull filter - allow linking ANY file
             )
             all_files_dict = {f.pk: f for f in all_files}
-            print(f"  ✓ Fetched {len(all_files_dict)} files from shared pool (for linking)")
+            print(f"  ✓ Fetched {len(all_files_dict)} files from shared pool (for linking/cloning)")
         
+        # First pass: Handle explicit deletions (unlinking)
+        # We do this FIRST so if an image is unlinked from A, but assigned to B in the same request,
+        # it is freed up before we try to link/clone it.
+        all_images_to_update = []
+        if deleted_files:
+            for file_id in deleted_files:
+                try:
+                    file_id = int(file_id)
+                    f_to_unlink = ProductFile.objects.filter(pk=file_id, product=self.object).first()
+                    if f_to_unlink:
+                        # If it's linked to a variant, unlink it
+                        if f_to_unlink.product_variant_id is not None:
+                            # We check if it is part of a "clone group" (same URL, different IDs)
+                            # If there are other files with same URL, we just delete this clone
+                            duplicates_count = ProductFile.objects.filter(product=self.object, file_url=f_to_unlink.file_url).count()
+                            if duplicates_count > 1:
+                                print(f"🗑️ Deleting clone file {f_to_unlink.pk} for deselection")
+                                f_to_unlink.delete()
+                            else:
+                                # It's the only one left, just unlink it back to shared pool
+                                print(f"🔓 Unlinking file {f_to_unlink.pk} back to shared pool")
+                                f_to_unlink.product_variant = None
+                                f_to_unlink.sequence = 0
+                                f_to_unlink.is_primary = False
+                                all_images_to_update.append(f_to_unlink)
+                except (ValueError, TypeError):
+                    pass
+
         variant_loop_start = time.time()
         index = 0
         total_variant_time = 0
         total_attr_time = 0
         total_image_time = 0
         
-        # Collect all images to update across all variants
-        all_images_to_update = []  # Updates for existing files
+        # Collect all images to create across all variants
+        files_to_clone = []
         
+        # Second pass: Handle linking and cloning
         for variant_data in variants_data:
             variant_sku = variant_data.get("variant_sku")
             if not variant_sku:
@@ -764,8 +798,6 @@ class BaseProductView(ModelFormMixin):
             
             print(f"\n🖼️  Processing images for variant {variant_sku}:")
             print(f"   Found {len(variant_image_info)} images in JSON")
-            for img_info in variant_image_info:
-                print(f"   - Image ID: {img_info.get('id')}, Sequence: {img_info.get('sequence')}")
             
             if variant_image_info:
                 for img_info in variant_image_info:
@@ -781,38 +813,65 @@ class BaseProductView(ModelFormMixin):
                         # Get source file from shared pool
                         source_file = all_files_dict.get(img_id)
                         if source_file:
-                            # Check if this file already belongs to this variant
+                            # 1. Image is already linked to THIS variant -> Just update sequence
                             if source_file.product_variant_id == variant.id:
-                                # Just update sequence/primary
                                 source_file.sequence = img_sequence
                                 source_file.is_primary = (img_sequence == 0)
                                 if source_file not in all_images_to_update:
                                     all_images_to_update.append(source_file)
                                 print(f"✅ Updated existing file {img_id} for variant {variant_sku} (seq={img_sequence})")
-                            else:
-                                # File belongs to another variant or is unlinked
-                                # FIXED: Instead of creating a copy, just update the file's variant link
-                                # This prevents duplicate records
+                            
+                            # 2. Image is FREE (not linked to any variant) -> Link it
+                            elif source_file.product_variant_id is None:
                                 source_file.product_variant = variant
                                 source_file.sequence = img_sequence
                                 source_file.is_primary = (img_sequence == 0)
                                 if source_file not in all_images_to_update:
                                     all_images_to_update.append(source_file)
-                                print(f"🔗 Linked file {img_id} to variant {variant_sku} (seq={img_sequence})")
+                                print(f"🔗 Linked FREE file {img_id} to variant {variant_sku}")
+
+                            # 3. Image is linked to ANOTHER variant -> CLONE it (Virtual Sharing)
+                            else:
+                                # Check if we already cloned this URL for THIS variant in this request
+                                # (e.g., if JSON payload has same file twice, or we already have a clone)
+                                existing_clone = ProductFile.objects.filter(
+                                    product=self.object, 
+                                    file_url=source_file.file_url,
+                                    product_variant=variant
+                                ).first()
+
+                                if existing_clone:
+                                    existing_clone.sequence = img_sequence
+                                    existing_clone.is_primary = (img_sequence == 0)
+                                    if existing_clone not in all_images_to_update:
+                                        all_images_to_update.append(existing_clone)
+                                    print(f"✅ Updated existing clone {existing_clone.pk} for variant {variant_sku}")
+                                else:
+                                    # Create a new clone row in memory
+                                    cloned_file = ProductFile(
+                                        product=self.object,
+                                        product_variant=variant,
+                                        file_url=source_file.file_url,
+                                        file_path=source_file.file_path,
+                                        file_type=source_file.file_type,
+                                        sequence=img_sequence,
+                                        is_primary=(img_sequence == 0)
+                                    )
+                                    files_to_clone.append(cloned_file)
+                                    print(f"👯 Cloning file {img_id} (URL: {source_file.file_url[-15:]}) for variant {variant_sku}")
                         else:
                             print(f"❌ WARNING: Image {img_id} not found in shared pool")
             
             image_time = time.time() - image_start
             total_image_time += image_time
-            
-            # NOTE: Images are already uploaded to product via instant_upload_file API
-            # and linked here via unlinked_files_dict above. No need for file upload here.
             index += 1
         
-        # No longer creating copies - just updating existing files
-        # Remove bulk_create for images since we're only updating now
-        
-        # Bulk update existing files (including product_variant link for newly assigned files)
+        # Save clones
+        if files_to_clone:
+            ProductFile.objects.bulk_create(files_to_clone)
+            print(f"  ✓ Created {len(files_to_clone)} cloned images for Virtual Sharing.")
+
+        # Bulk update existing files
         if all_images_to_update:
             ProductFile.objects.bulk_update(all_images_to_update, ['product_variant', 'sequence', 'is_primary'])
         
@@ -1465,10 +1524,23 @@ def instant_delete_file(request):
         # Store product reference before deleting
         product = product_file.product
         was_variant_file = product_file.product_variant is not None
+        file_url_to_delete = product_file.file_url
         
         # Delete (will also delete from Cloudinary via model's delete method)
         product_file.delete()
+
+        # If this file was cloned for multiple variants (Virtual Sharing),
+        # we must delete all clones that share this same URL to prevent broken links
+        if product and file_url_to_delete:
+            clones = ProductFile.objects.filter(product=product, file_url=file_url_to_delete)
+            clones_count = clones.count()
+            if clones_count > 0:
+                print(f"🧹 Cleaning up {clones_count} cloned database records for deleted URL: {file_url_to_delete[-15:]}")
+                # Use .delete() on queryset to quickly remove the duplicate DB rows
+                # Note: The physical file on CDN is already gone from the first delete()
+                clones.delete()
         
+
         # AUTO-UPDATE PRIMARY IMAGE after deletion
         if product:
             first_variant = product.variants.order_by('id').first()

@@ -706,8 +706,8 @@
     {% if is_paginated %}
     <div class="pagination-container">
       <div style="font-size: 13px; color: #64748b;">
-        Showing <span style="font-weight: 600; color: #0f172a;">{{ page_obj.start_index }}-{{
-          page_obj.end_index}}</span> of {{ paginator.count }} products
+        Showing <span style="font-weight: 600; color: #0f172a;">{{ page_obj.start_index }}-{{page_obj.end_index}}</span>
+        of {{ paginator.count }} products
       </div>
       <div style="display: flex; gap: 6px;">
         {% if page_obj.has_previous %}

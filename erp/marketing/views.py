@@ -2461,6 +2461,7 @@ def get_product(request):
         {
             "id": pf.id,
             "file": pf.file_url,
+            "file_type": pf.file_type,
             "product_id": pf.product_id,
             "product_variant_id": pf.product_variant_id,
             "sequence": pf.sequence,

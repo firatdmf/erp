@@ -28,10 +28,14 @@ from django.conf import settings as django_settings
 # Bunny CDN support
 from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
 
+# AVIF Image Optimizer
+from .utils.image_optimizer import optimize_image_to_avif
+
 
 def smart_upload(file, folder, resource_type="image"):
     """
     Smart upload function that uses Bunny CDN when enabled, otherwise Cloudinary.
+    Automatically converts images (JPEG/PNG) to AVIF before uploading.
     
     Args:
         file: File object to upload
@@ -42,6 +46,23 @@ def smart_upload(file, folder, resource_type="image"):
     """
     use_bunny = getattr(django_settings, 'USE_BUNNY_CDN', False)
     print(f"[DEBUG] smart_upload called - USE_BUNNY_CDN={use_bunny}, resource_type={resource_type}")
+    
+    # ── AVIF Conversion (images only) ────────────────────────────────────
+    # Skip conversion for videos, or files that are already AVIF
+    if resource_type == 'image':
+        original_name = getattr(file, 'name', '') or ''
+        if not original_name.lower().endswith('.avif'):
+            optimized = optimize_image_to_avif(file)
+            if optimized is not None:
+                print(f"[image_optimizer] Converted '{original_name}' → '{optimized.name}'")
+                file = optimized  # Replace with optimized AVIF file
+            else:
+                # Fallback: reset file position in case it was partially read
+                try:
+                    file.seek(0)
+                except Exception:
+                    pass
+    # ─────────────────────────────────────────────────────────────────────
     
     if use_bunny:
         # Use Bunny CDN
@@ -62,6 +83,7 @@ def smart_upload(file, folder, resource_type="image"):
         
         result = cloudinary_upload(file, **upload_options)
         return result.get('secure_url')
+
 
 
 def get_file_type_from_name(filename):

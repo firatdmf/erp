@@ -83,6 +83,7 @@ packaging==23.2
 pandas
 passlib==1.7.4
 Pillow>=10.4.0
+pillow-avif-plugin>=1.4.1
 proglog==0.1.12
 proto-plus==1.27.1
 protobuf==4.23.4

@@ -101,10 +101,14 @@ class BlogPostForm(forms.ModelForm):
         model = BlogPost
         fields = [
             'slug', 'author', 'published_at', 'is_published',
-            'title_tr', 'title_en', 'title_ru', 'title_pl',
-            'excerpt_tr', 'excerpt_en', 'excerpt_ru', 'excerpt_pl',
-            'content_tr', 'content_en', 'content_ru', 'content_pl',
-            'category_tr', 'category_en', 'category_ru', 'category_pl',
+            # English (primary)
+            'title_en', 'excerpt_en', 'content_en', 'category_en',
+            # Turkish
+            'title_tr', 'excerpt_tr', 'content_tr', 'category_tr',
+            # Russian
+            'title_ru', 'excerpt_ru', 'content_ru', 'category_ru',
+            # Polish
+            'title_pl', 'excerpt_pl', 'content_pl', 'category_pl',
             'header_content', 'footer_content',
             # cover_image and hero_image handled manually in template via hidden inputs
         ]
@@ -112,25 +116,31 @@ class BlogPostForm(forms.ModelForm):
             'slug': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'url-friendly-slug'}),
             'author': forms.TextInput(attrs={'class': 'form-input'}),
             'published_at': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
-            'title_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Türkçe Başlık'}),
+            # English
             'title_en': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'English Title'}),
-            'title_ru': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Русский заголовок'}),
-            'title_pl': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Polski tytuł'}),
-            'excerpt_tr': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
-            'excerpt_en': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
-            'excerpt_ru': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
-            'excerpt_pl': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
-            'content_tr': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
-            'content_en': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
-            'content_ru': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
-            'content_pl': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
-            'category_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategori'}),
+            'excerpt_en': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3, 'placeholder': 'Short description in English'}),
+            'content_en': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15, 'placeholder': 'Full content in English (Markdown supported)'}),
             'category_en': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Category'}),
+            # Turkish
+            'title_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Türkçe Başlık'}),
+            'excerpt_tr': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'content_tr': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
+            'category_tr': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategori'}),
+            # Russian
+            'title_ru': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Русский заголовок'}),
+            'excerpt_ru': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'content_ru': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
             'category_ru': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Категория'}),
+            # Polish
+            'title_pl': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Polski tytuł'}),
+            'excerpt_pl': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'content_pl': forms.Textarea(attrs={'class': 'form-textarea markdown-editor', 'rows': 15}),
             'category_pl': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Kategoria'}),
+            # Code blocks
             'header_content': forms.Textarea(attrs={'class': 'form-textarea code-editor', 'rows': 5, 'placeholder': '<style>...</style>'}),
             'footer_content': forms.Textarea(attrs={'class': 'form-textarea code-editor', 'rows': 5, 'placeholder': '<script>...</script>'}),
         }
+
 
 
 class BlogFileForm(forms.ModelForm):

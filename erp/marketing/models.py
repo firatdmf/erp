@@ -800,26 +800,26 @@ class BlogPost(models.Model):
     slug = models.SlugField(max_length=200, unique=True, help_text="URL-friendly identifier")
     
     # Multilingual Title
-    title_tr = models.CharField(max_length=300, verbose_name="Başlık (TR)")
-    title_en = models.CharField(max_length=300, blank=True, verbose_name="Title (EN)")
+    title_en = models.CharField(max_length=300, verbose_name="Title (EN)")
+    title_tr = models.CharField(max_length=300, blank=True, verbose_name="Başlık (TR)")
     title_ru = models.CharField(max_length=300, blank=True, verbose_name="Заголовок (RU)")
     title_pl = models.CharField(max_length=300, blank=True, verbose_name="Tytuł (PL)")
     
     # Multilingual Excerpt (short description for list view)
-    excerpt_tr = models.TextField(verbose_name="Özet (TR)")
-    excerpt_en = models.TextField(blank=True, verbose_name="Excerpt (EN)")
+    excerpt_en = models.TextField(verbose_name="Excerpt (EN)")
+    excerpt_tr = models.TextField(blank=True, verbose_name="Özet (TR)")
     excerpt_ru = models.TextField(blank=True, verbose_name="Краткое описание (RU)")
     excerpt_pl = models.TextField(blank=True, verbose_name="Streszczenie (PL)")
     
     # Multilingual Content (Markdown format)
-    content_tr = models.TextField(verbose_name="İçerik (TR)")
-    content_en = models.TextField(blank=True, verbose_name="Content (EN)")
+    content_en = models.TextField(verbose_name="Content (EN)")
+    content_tr = models.TextField(blank=True, verbose_name="İçerik (TR)")
     content_ru = models.TextField(blank=True, verbose_name="Содержание (RU)")
     content_pl = models.TextField(blank=True, verbose_name="Treść (PL)")
     
     # Multilingual Category
-    category_tr = models.CharField(max_length=100, verbose_name="Kategori (TR)")
-    category_en = models.CharField(max_length=100, blank=True, verbose_name="Category (EN)")
+    category_en = models.CharField(max_length=100, verbose_name="Category (EN)")
+    category_tr = models.CharField(max_length=100, blank=True, verbose_name="Kategori (TR)")
     category_ru = models.CharField(max_length=100, blank=True, verbose_name="Категория (RU)")
     category_pl = models.CharField(max_length=100, blank=True, verbose_name="Kategoria (PL)")
     
@@ -841,11 +841,11 @@ class BlogPost(models.Model):
     
     class Meta:
         ordering = ['-published_at']
-        verbose_name = "Blog Yazısı"
-        verbose_name_plural = "Blog Yazıları"
+        verbose_name = "Blog Post"
+        verbose_name_plural = "Blog Posts"
     
     def __str__(self):
-        return self.title_tr
+        return self.title_en or self.title_tr or self.slug
     
     def delete(self, *args, **kwargs):
         """Delete cover and hero images from Cloudinary when deleting the post"""

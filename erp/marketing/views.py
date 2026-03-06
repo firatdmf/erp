@@ -2254,18 +2254,7 @@ def get_products(request):
         # Filter products where ANY variant has the specified attribute value
         # We use iexact for case-insensitive matching
         if value and value.strip():
-            # print(f"🔍 Filtering by {key}={value}")
             from django.db.models import Q
-            
-            # Debug: Check if any product has this attribute
-            has_attr = Product.objects.filter(attributes__name__iexact=key, attributes__value__iexact=value).exists()
-            # print(f"   - ProductAttribute match exists? {has_attr}")
-            
-            has_variant_attr = Product.objects.filter(
-                variants__product_variant_attribute_values__product_variant_attribute__name__iexact=key,
-                variants__product_variant_attribute_values__product_variant_attribute_value__iexact=value
-            ).exists()
-            # print(f"   - VariantAttribute match exists? {has_variant_attr}")
 
             products = products.filter(
                 Q(variants__product_variant_attribute_values__product_variant_attribute__name__iexact=key,
@@ -2275,36 +2264,83 @@ def get_products(request):
             ).distinct()
             # print(f"   - Products count after filter: {products.count()}")
 
-    # Optimize: prefetch all related data in a single query chain
-    products = products.select_related("primary_image", "category").prefetch_related(
-        'variants',
-        'variants__product_variant_attribute_values',
-        'variants__product_variant_attribute_values__product_variant_attribute',
-        'attributes'  # Prefetch product attributes for discount_rate
-    )
-
-    # Convert to list to execute query once
+    # Step 1: Get product IDs + basic fields with a single ORM query (1 round-trip)
+    products = products.select_related("primary_image", "category")
     products_list = list(products)
-    
-    # Collect variants from prefetched data
-    product_variants = []
-    for product in products_list:
-        product_variants.extend(product.variants.all())
-    
-    # Collect attribute values from prefetched data
-    product_variant_attribute_values_set = set()
-    attributes_map = {}
-    for variant in product_variants:
-        for av in variant.product_variant_attribute_values.all():
-            product_variant_attribute_values_set.add(av)
-            if av.product_variant_attribute_id not in attributes_map:
-                attributes_map[av.product_variant_attribute_id] = av.product_variant_attribute
+    product_ids = [p.id for p in products_list]
+
+    if not product_ids:
+        response = JsonResponse({
+            "products": [],
+            "product_variants": [],
+            "product_variant_attributes": [],
+            "product_variant_attribute_values": [],
+            "product_category": category.name if product_category else None,
+            "product_category_description": category.description if product_category and category.description else None,
+        })
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+
+    # Step 2: Fetch ALL related data in ONE round-trip using CTEs
+    from django.db import connection as db_conn
+    with db_conn.cursor() as cursor:
+        cursor.execute("""
+            WITH pids AS (SELECT unnest(%(pids)s::bigint[]) AS id),
+            variants AS (
+                SELECT json_agg(sub) as data FROM (
+                    SELECT id, product_id, variant_sku, variant_price, variant_quantity
+                    FROM marketing_productvariant
+                    WHERE product_id IN (SELECT id FROM pids)
+                ) sub
+            ),
+            m2m AS (
+                SELECT json_agg(sub) as data FROM (
+                    SELECT
+                        pvav.productvariant_id,
+                        avl.id as attr_value_id,
+                        avl.product_variant_attribute_value,
+                        avl.product_variant_attribute_id,
+                        attr.id as attr_id,
+                        attr.name as attr_name
+                    FROM marketing_productvariant_product_variant_attribute_values pvav
+                    JOIN marketing_productvariantattributevalue avl ON avl.id = pvav.productvariantattributevalue_id
+                    JOIN marketing_productvariantattribute attr ON attr.id = avl.product_variant_attribute_id
+                    WHERE pvav.productvariant_id IN (
+                        SELECT id FROM marketing_productvariant WHERE product_id IN (SELECT id FROM pids)
+                    )
+                ) sub
+            ),
+            prod_attrs AS (
+                SELECT json_agg(sub ORDER BY sub.sequence) as data FROM (
+                    SELECT id, product_id, name, value, sequence
+                    FROM marketing_productattribute
+                    WHERE product_id IN (SELECT id FROM pids)
+                ) sub
+            )
+            SELECT
+                (SELECT data FROM variants),
+                (SELECT data FROM m2m),
+                (SELECT data FROM prod_attrs)
+        """, {"pids": product_ids})
+        combined = cursor.fetchone()
+
+    variant_rows = combined[0] or []
+    m2m_rows = combined[1] or []
+    prod_attr_rows = combined[2] or []
 
     # Fetch exchange rates once (in-memory cached, refreshed every hour)
     from marketing.utils.currency_service import get_rates, convert_price as _convert_price
     rates = get_rates()
 
-    # Build products data from already fetched list
+    # Build product attributes map: product_id -> [attrs]
+    prod_attrs_map = {}
+    for a in prod_attr_rows:
+        pid = a["product_id"]
+        if pid not in prod_attrs_map:
+            prod_attrs_map[pid] = []
+        prod_attrs_map[pid].append({"name": a["name"], "value": a["value"], "sequence": a["sequence"]})
+
+    # Build products data
     products_data = [
         {
             "id": p.id,
@@ -2314,48 +2350,43 @@ def get_products(request):
             "price": p.price,
             "prices": _convert_price(p.price, rates),
             "primary_image": p.primary_image.file_url if p.primary_image else None,
-            "product_attributes": [
-                {"name": attr.name, "value": attr.value, "sequence": attr.sequence}
-                for attr in p.attributes.all()
-            ],
+            "product_attributes": prod_attrs_map.get(p.id, []),
         }
         for p in products_list
     ]
 
-    # Build variant data from collected variants (already prefetched)
+    # Build variant -> attribute value IDs map
+    variant_av_map = {}
+    attribute_values_dict = {}
+    attributes_dict = {}
+    for m in m2m_rows:
+        v_id = m["productvariant_id"]
+        av_id = m["attr_value_id"]
+        if v_id not in variant_av_map:
+            variant_av_map[v_id] = []
+        variant_av_map[v_id].append(av_id)
+        attribute_values_dict[av_id] = {
+            "id": av_id,
+            "product_variant_attribute_id": m["product_variant_attribute_id"],
+            "product_variant_attribute_value": m["product_variant_attribute_value"],
+        }
+        attributes_dict[m["attr_id"]] = {"id": m["attr_id"], "name": m["attr_name"]}
+
     product_variants_data = [
         {
-            "id": v.id,
-            "product_id": v.product_id,
-            "variant_sku": v.variant_sku,
-            "variant_price": v.variant_price,
-            "variant_prices": _convert_price(v.variant_price, rates),
-            "variant_quantity": v.variant_quantity,
-            "product_variant_attribute_values": [
-                av.id for av in v.product_variant_attribute_values.all()
-            ],
+            "id": v["id"],
+            "product_id": v["product_id"],
+            "variant_sku": v["variant_sku"],
+            "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
+            "variant_prices": _convert_price(v["variant_price"], rates),
+            "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
+            "product_variant_attribute_values": variant_av_map.get(v["id"], []),
         }
-        for v in product_variants
+        for v in variant_rows
     ]
 
-    # Build attributes data from collected map
-    product_variant_attributes_data = [
-        {
-            "id": a.id,
-            "name": a.name,
-        }
-        for a in attributes_map.values()
-    ]
-
-    # Build attribute values from collected set
-    product_variant_attribute_values_data = [
-        {
-            "id": av.id,
-            "product_variant_attribute_id": av.product_variant_attribute_id,
-            "product_variant_attribute_value": av.product_variant_attribute_value,
-        }
-        for av in product_variant_attribute_values_set
-    ]
+    product_variant_attributes_data = list(attributes_dict.values())
+    product_variant_attribute_values_data = list(attribute_values_dict.values())
 
     end = time.time()
     print(f"Time taken to get products: {end - start} seconds")
@@ -2367,7 +2398,7 @@ def get_products(request):
             "product_variant_attributes": product_variant_attributes_data,
             "product_variant_attribute_values": product_variant_attribute_values_data,
             "product_category": category.name if product_category else None,
-            "product_category_description": category.description if category.description else None,
+            "product_category_description": category.description if product_category and category.description else None,
         }
     )
     response["Access-Control-Allow-Origin"] = "*"
@@ -2418,175 +2449,209 @@ def get_products(request):
 # ------------------------------------------------------------------------------------------------
 def get_product(request):
     product_sku = request.GET.get("product_sku", None)
-    try:
-        # Optimize: prefetch all related data in one query
-        product = Product.objects.select_related(
-            'category',
-            'primary_image',
-            'supplier'
-        ).prefetch_related(
-            models.Prefetch('files', queryset=ProductFile.objects.order_by('sequence', 'pk')),
-            'attributes',  # Product-level attributes
-            'variants',
-            models.Prefetch('variants__files', queryset=ProductFile.objects.order_by('sequence', 'pk')),
-            'variants__attributes',  # Variant-level attributes
-            'variants__product_variant_attribute_values',
-            'variants__product_variant_attribute_values__product_variant_attribute'
-        ).get(sku=product_sku, featured=True)
-    except Product.DoesNotExist:
+
+    import time as _time
+    _t0 = _time.time()
+
+    from django.db import connection
+
+    # ─── SINGLE RAW SQL: fetch everything in 2 queries instead of 8 ───
+    # Query 1: Product + category + primary_image (JOIN)
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                p.id, p.created_at, p.title, p.description, p.sku, p.barcode,
+                p.tags, p.type, p.unit_of_measurement, p.quantity, p.price,
+                p.featured, p.selling_while_out_of_stock, p.weight, p.unit_of_weight,
+                p.category_id, p.supplier_id, p.datasheet_url, p.minimum_inventory_level,
+                pi.file_url as primary_image_url,
+                pc.name as category_name
+            FROM marketing_product p
+            LEFT JOIN marketing_productfile pi ON pi.id = p.primary_image_id
+            LEFT JOIN marketing_productcategory pc ON pc.id = p.category_id
+            WHERE p.sku = %s AND p.featured = true
+        """, [product_sku])
+        row = cursor.fetchone()
+
+    if not row:
         return JsonResponse({"error": "Product not found"}, status=404)
 
-    product_category = product.category.name if product.category else None
+    # Unpack product row
+    (p_id, p_created_at, p_title, p_description, p_sku, p_barcode,
+     p_tags, p_type, p_uom, p_quantity, p_price,
+     p_featured, p_selling_oos, p_weight, p_uow,
+     p_category_id, p_supplier_id, p_datasheet_url, p_min_inv,
+     p_primary_image_url, p_category_name) = row
 
-    # Fetch exchange rates once (in-memory cached, refreshed every hour)
+    _t1 = _time.time()
+
+    # Query 2: ALL related data in ONE round-trip using json_agg CTEs
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            WITH variant_ids AS (
+                SELECT id FROM marketing_productvariant WHERE product_id = %(pid)s
+            ),
+            files AS (
+                SELECT json_agg(sub ORDER BY sub.sequence, sub.id) as data FROM (
+                    SELECT id, file_url, file_type, product_id, product_variant_id, sequence, is_primary
+                    FROM marketing_productfile
+                    WHERE product_id = %(pid)s OR product_variant_id IN (SELECT id FROM variant_ids)
+                ) sub
+            ),
+            variants AS (
+                SELECT json_agg(sub) as data FROM (
+                    SELECT id, variant_sku, variant_barcode, variant_quantity, variant_price,
+                           variant_cost, variant_featured, product_id
+                    FROM marketing_productvariant
+                    WHERE product_id = %(pid)s
+                ) sub
+            ),
+            m2m AS (
+                SELECT json_agg(sub) as data FROM (
+                    SELECT
+                        pvav.productvariant_id,
+                        avl.id as attr_value_id,
+                        avl.product_variant_attribute_value,
+                        avl.product_variant_attribute_id,
+                        attr.id as attr_id,
+                        attr.name as attr_name
+                    FROM marketing_productvariant_product_variant_attribute_values pvav
+                    JOIN marketing_productvariantattributevalue avl ON avl.id = pvav.productvariantattributevalue_id
+                    JOIN marketing_productvariantattribute attr ON attr.id = avl.product_variant_attribute_id
+                    WHERE pvav.productvariant_id IN (SELECT id FROM variant_ids)
+                ) sub
+            ),
+            prod_attrs AS (
+                SELECT json_agg(sub ORDER BY sub.sequence) as data FROM (
+                    SELECT id, name, value, sequence
+                    FROM marketing_productattribute
+                    WHERE product_id = %(pid)s
+                ) sub
+            ),
+            var_attrs AS (
+                SELECT json_agg(sub ORDER BY sub.sequence) as data FROM (
+                    SELECT id, product_variant_id, name, value, sequence
+                    FROM marketing_productattribute
+                    WHERE product_variant_id IN (SELECT id FROM variant_ids)
+                ) sub
+            )
+            SELECT
+                (SELECT data FROM files),
+                (SELECT data FROM variants),
+                (SELECT data FROM m2m),
+                (SELECT data FROM prod_attrs),
+                (SELECT data FROM var_attrs)
+        """, {"pid": p_id})
+        combined = cursor.fetchone()
+
+    import json as _json
+    file_rows_json = combined[0] or []
+    variant_rows_json = combined[1] or []
+    m2m_rows_json = combined[2] or []
+    prod_attr_rows_json = combined[3] or []
+    var_attr_rows_json = combined[4] or []
+
+    _t2 = _time.time()
+
+    # ─── Build response dicts ───
     from marketing.utils.currency_service import get_rates, convert_price as _convert_price
     rates = get_rates()
 
-    # Product fields for Product_API
+    product_category = p_category_name
+
     product_fields = {
-        "id": product.id,
-        "pk": product.pk,
-        "created_at": product.created_at,
-        "title": product.title,
-        "description": product.description,
-        "sku": product.sku,
-        "barcode": product.barcode,
-        "tags": product.tags,
-        "type": product.type,
-        "unit_of_measurement": product.unit_of_measurement,
-        "quantity": product.quantity,
-        "price": product.price,
-        "prices": _convert_price(product.price, rates),
-        "featured": product.featured,
-        "selling_while_out_of_stock": product.selling_while_out_of_stock,
-        "weight": product.weight,
-        "unit_of_weight": product.unit_of_weight,
-        "category_id": product.category_id,
-        "supplier_id": product.supplier_id,
-        "datasheet_url": product.datasheet_url,
-        "minimum_inventory_level": getattr(product, "minimum_inventory_level", None),
-        "primary_image": (
-            product.primary_image.file_url
-            if getattr(product, "primary_image", None)
-            else None
-        ),
+        "id": p_id,
+        "pk": p_id,
+        "created_at": p_created_at.isoformat() if p_created_at else None,
+        "title": p_title,
+        "description": p_description,
+        "sku": p_sku,
+        "barcode": p_barcode,
+        "tags": p_tags,
+        "type": p_type,
+        "unit_of_measurement": p_uom,
+        "quantity": float(p_quantity) if p_quantity is not None else None,
+        "price": float(p_price) if p_price is not None else None,
+        "prices": _convert_price(p_price, rates),
+        "featured": p_featured,
+        "selling_while_out_of_stock": p_selling_oos,
+        "weight": float(p_weight) if p_weight is not None else None,
+        "unit_of_weight": p_uow,
+        "category_id": p_category_id,
+        "supplier_id": p_supplier_id,
+        "datasheet_url": p_datasheet_url,
+        "minimum_inventory_level": float(p_min_inv) if p_min_inv is not None else None,
+        "primary_image": p_primary_image_url,
     }
 
-    # product_api = {
-    #     "model": "Product",
-    #     "pk": product.pk,
-    #     "fields": product_fields,
-    # }
-
-    # All product files (main and variant) - already ordered by sequence in prefetch
+    # Files (already JSON dicts from Postgres)
     product_files = [
         {
-            "id": pf.id,
-            "file": pf.file_url,
-            "file_type": pf.file_type,
-            "product_id": pf.product_id,
-            "product_variant_id": pf.product_variant_id,
-            "sequence": pf.sequence,
-            "is_primary": pf.is_primary,
+            "id": f["id"], "file": f["file_url"], "file_type": f["file_type"],
+            "product_id": f["product_id"], "product_variant_id": f["product_variant_id"],
+            "sequence": f["sequence"], "is_primary": f["is_primary"],
         }
-        for pf in product.files.all()
+        for f in file_rows_json
     ]
 
-    # Variants (already prefetched)
-    variants = product.variants.all()
-    variants_data = []
-    for variant in variants:
-        # Find primary image for variant (first by sequence) - already ordered in prefetch
-        variant_files = list(variant.files.all())
-        variant_primary_file = variant_files[0] if variant_files else None
-        
-        # Get attribute value pks (already prefetched)
-        product_variant_attribute_values_pk_list = [
-            av.pk for av in variant.product_variant_attribute_values.all()
-        ]
-        
-        variants_data.append(
-            {
-                "id": variant.id,
-                "variant_sku": variant.variant_sku,
-                "variant_barcode": variant.variant_barcode,
-                "variant_quantity": variant.variant_quantity,
-                "variant_price": variant.variant_price,
-                "variant_prices": _convert_price(variant.variant_price, rates),
-                "variant_cost": getattr(variant, "variant_cost", None),
-                "variant_featured": variant.variant_featured,
-                "product_id": variant.product_id,
-                "primary_image": (
-                    variant_primary_file.file_url if variant_primary_file else None
-                ),
-                "product_variant_attribute_values": product_variant_attribute_values_pk_list,
-            }
-        )
+    # Build variant -> first file map for primary_image
+    variant_primary_map = {}
+    for f in file_rows_json:
+        vid = f["product_variant_id"]
+        if vid and vid not in variant_primary_map:
+            variant_primary_map[vid] = f["file_url"]
 
-    # Attribute values - collect from already prefetched data
-    attribute_values_set = set()
-    attributes_map = {}
-    
-    for variant in variants:
-        for av in variant.product_variant_attribute_values.all():
-            attribute_values_set.add(av)
-            # Also collect unique attributes
-            if av.product_variant_attribute_id not in attributes_map:
-                attributes_map[av.product_variant_attribute_id] = av.product_variant_attribute
-    
-    attribute_values_data = [
+    # Build variant -> attribute value IDs map
+    variant_av_map = {}
+    attribute_values_dict = {}
+    attributes_dict = {}
+
+    for m in m2m_rows_json:
+        v_id = m["productvariant_id"]
+        av_id = m["attr_value_id"]
+        if v_id not in variant_av_map:
+            variant_av_map[v_id] = []
+        variant_av_map[v_id].append(av_id)
+        attribute_values_dict[av_id] = {
+            "id": av_id,
+            "product_variant_attribute_value": m["product_variant_attribute_value"],
+            "product_variant_attribute_id": m["product_variant_attribute_id"],
+        }
+        attributes_dict[m["attr_id"]] = {"id": m["attr_id"], "name": m["attr_name"]}
+
+    # Variants
+    variants_data = [
         {
-            "id": av.id,
-            "product_variant_attribute_value": av.product_variant_attribute_value,
-            "product_variant_attribute_id": av.product_variant_attribute_id,
+            "id": v["id"],
+            "variant_sku": v["variant_sku"],
+            "variant_barcode": v["variant_barcode"],
+            "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
+            "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
+            "variant_prices": _convert_price(v["variant_price"], rates),
+            "variant_cost": float(v["variant_cost"]) if v["variant_cost"] is not None else None,
+            "variant_featured": v["variant_featured"],
+            "product_id": v["product_id"],
+            "primary_image": variant_primary_map.get(v["id"]),
+            "product_variant_attribute_values": variant_av_map.get(v["id"], []),
         }
-        for av in attribute_values_set
+        for v in variant_rows_json
     ]
 
-    # Attributes - from already collected map
-    attributes_data = [
-        {
-            "id": attr.id,
-            "name": attr.name,
-        }
-        for attr in attributes_map.values()
-    ]
-    
-    # Product-level attributes (ProductAttribute model)
+    attributes_data = list(attributes_dict.values())
+    attribute_values_data = list(attribute_values_dict.values())
+
     product_attributes_data = [
-        {
-            "id": attr.id,
-            "name": attr.name,
-            "value": attr.value,
-            "sequence": attr.sequence,
-        }
-        for attr in product.attributes.all()
+        {"id": a["id"], "name": a["name"], "value": a["value"], "sequence": a["sequence"]}
+        for a in prod_attr_rows_json
     ]
-    
-    # Variant-level attributes (ProductAttribute model for variants)
-    variant_attributes_data = []
-    for variant in variants:
-        for attr in variant.attributes.all():
-            variant_attributes_data.append({
-                "id": attr.id,
-                "variant_id": variant.id,
-                "name": attr.name,
-                "value": attr.value,
-                "sequence": attr.sequence,
-            })
-    
-    # print("here comes the response")
-    # print(product_files)
-    # print(
-    #     {
-    #         "product_category": product_category,
-    #         "product": product_fields,
-    #         "product_variants": variants_data,
-    #         "product_files": product_files,
-    #         "product_variant_attributes": attributes_data,
-    #         "product_variant_attribute_values": attribute_values_data,
-    #     }
-    # )
+
+    variant_attributes_data = [
+        {"id": a["id"], "variant_id": a["product_variant_id"], "name": a["name"], "value": a["value"], "sequence": a["sequence"]}
+        for a in var_attr_rows_json
+    ]
+
+    _t3 = _time.time()
+    print(f"[PERF] get_product RAW SQL: Q1={_t1-_t0:.3f}s Q2={_t2-_t1:.3f}s serialize={_t3-_t2:.3f}s TOTAL={_t3-_t0:.3f}s")
 
     return JsonResponse(
         {
@@ -2596,8 +2661,8 @@ def get_product(request):
             "product_files": product_files,
             "product_variant_attributes": attributes_data,
             "product_variant_attribute_values": attribute_values_data,
-            "product_attributes": product_attributes_data,  # Product-level attributes
-            "variant_attributes": variant_attributes_data,  # Variant-level attributes
+            "product_attributes": product_attributes_data,
+            "variant_attributes": variant_attributes_data,
         }
     )
 

@@ -139,7 +139,9 @@ def delete_from_bunny(path_or_url):
         "AccessKey": config['api_key'],
     }
     
+    print(f"[BUNNY DELETE] URL: {url}")
     response = requests.delete(url, headers=headers)
+    print(f"[BUNNY DELETE] Status: {response.status_code}, Response: {response.text[:200] if response.text else 'empty'}")
     return response.status_code in [200, 404]  # 404 means already deleted
 
 

@@ -109,11 +109,13 @@ def smart_delete(url):
     """
     if not url:
         return False
-    
+
     bunny_cdn_url = getattr(django_settings, 'BUNNY_CDN_URL', '')
-    
+    print(f"[smart_delete] url={url}, bunny_cdn_url={bunny_cdn_url}, starts_with_bunny={url.startswith(bunny_cdn_url) if bunny_cdn_url else False}")
+
     if bunny_cdn_url and url.startswith(bunny_cdn_url):
         # Delete from Bunny CDN
+        print(f"[smart_delete] → Routing to Bunny delete")
         return delete_from_bunny(url)
     elif 'cloudinary.com' in url:
         # Delete from Cloudinary

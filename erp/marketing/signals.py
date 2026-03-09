@@ -30,23 +30,21 @@ def set_primary_image_on_first_upload(sender, instance, created, **kwargs):
             product.save(update_fields=["primary_image"])
 
 
-# ------ below is when we do bulk deletion, we still delete the cloudinary image
+# ------ below is when we do bulk deletion, we still delete the CDN file (Bunny or Cloudinary)
 from django.db.models.signals import pre_delete
-from cloudinary.uploader import destroy as cloudinary_destroy
-import re
 
 
 @receiver(pre_delete, sender=ProductFile)
-def delete_cloudinary_file(sender, instance, **kwargs):
+def delete_cdn_file(sender, instance, **kwargs):
     product = instance.product
     if product and product.primary_image_id == instance.pk:
         product.primary_image = None
         product.save(update_fields=["primary_image"])
     if instance.file_url:
-        match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", instance.file_url)
-        if match:
-            public_id = match.group(1)
-            try:
-                cloudinary_destroy(public_id)
-            except Exception as e:
-                print(f"Failed to delete Cloudinary resource {public_id}: {e}")
+        try:
+            from .views import smart_delete
+            print(f"[SIGNAL] delete_cdn_file triggered for: {instance.file_url}")
+            result = smart_delete(instance.file_url)
+            print(f"[SIGNAL] smart_delete result: {result}")
+        except Exception as e:
+            print(f"[SIGNAL] Failed to delete CDN file {instance.file_url}: {e}")

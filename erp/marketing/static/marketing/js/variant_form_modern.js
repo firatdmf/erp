@@ -925,9 +925,13 @@ function renderVariantTable(combinations, selectedGrouping = null) {
             </td>`;
 
         // Option Values (Non-editable text)
-        displayOptions.forEach(optionName => {
+        displayOptions.forEach((optionName, optIdx) => {
             const value = combo[optionName] || '';
-            rowHTML += `<td><span style="font-weight: 500;">${value}</span></td>`;
+            if (optIdx === 0) {
+                rowHTML += `<td><span style="font-weight: 500;">${value}</span><br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> Edit</span></td>`;
+            } else {
+                rowHTML += `<td><span style="font-weight: 500;">${value}</span></td>`;
+            }
         });
 
         // Price Input
@@ -1597,30 +1601,36 @@ async function openImagePicker(variantIndex) {
     modal.id = 'image_picker_modal';
     modal.className = 'image_modal';
 
+    const selectedCount = selectionOrder.length;
     modal.innerHTML = `
-        <div class="image_modal_content">
-            <div class="image_modal_header">
-                <h3>Select Images</h3>
-                <button type="button" class="modal_close" onclick="closeImagePicker()">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-            <div class="image_modal_body">
-                <div class="image_upload_area">
-                    <button type="button" class="btn_upload" onclick="document.getElementById('image_file_input').click()">
-                        <i class="fa fa-plus"></i> Add File
-                    </button>
-                    <input type="file" id="image_file_input" accept="image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/avi" multiple style="display: none;" onchange="handleImageUpload(event)">
-                    <p>Drag and drop images or videos here</p>
-                    <small style="color: #6b7280;">Supports: JPG, PNG, GIF, WebP, MP4, MOV, WebM</small>
+        <div class="imp_content">
+            <div class="imp_header">
+                <div class="imp_header_left">
+                    <h3>Media</h3>
+                    <span class="imp_count" id="imp_total_count">${uploadedImages.length} files</span>
                 </div>
+                <button type="button" class="imp_close" onclick="closeImagePicker()">&times;</button>
+            </div>
+            <div class="imp_toolbar">
+                <div class="imp_dropzone" id="image_upload_dropzone">
+                    <input type="file" id="image_file_input" accept="image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/avi" multiple style="display:none;" onchange="handleImageUpload(event)">
+                    <button type="button" class="imp_upload_btn" onclick="document.getElementById('image_file_input').click()">
+                        <i class="fa fa-plus"></i> Upload
+                    </button>
+                    <span class="imp_drop_hint">or drop files here</span>
+                </div>
+            </div>
+            <div class="imp_body image_modal_body">
                 <div class="image_grid" id="image_grid">
                     ${generateImageGrid()}
                 </div>
             </div>
-            <div class="image_modal_footer">
-                <button type="button" class="btn_cancel" onclick="closeImagePicker()">Cancel</button>
-                <button type="button" class="btn_confirm" onclick="confirmImageSelection()">Done</button>
+            <div class="imp_footer">
+                <span class="imp_selection_info" id="imp_selection_info">${selectedCount > 0 ? selectedCount + ' selected' : 'Click images to select'}</span>
+                <div class="imp_footer_actions">
+                    <button type="button" class="imp_btn_cancel" onclick="closeImagePicker()">Cancel</button>
+                    <button type="button" class="imp_btn_done" onclick="confirmImageSelection()">Done</button>
+                </div>
             </div>
         </div>
     `;
@@ -1638,49 +1648,37 @@ let uploadedImages = [];
 // Generate image grid from uploaded images
 function generateImageGrid() {
     if (uploadedImages.length === 0) {
-        return '<div class="no_images_message"><i class="fa fa-image"></i><p>No files uploaded yet. Use the \"Add File\" button above to add images or videos.</p></div>';
+        return '<div class="no_images_message"><i class="fa fa-cloud-upload-alt"></i><p>No files yet.<br>Upload images or videos to get started.</p></div>';
     }
 
     return uploadedImages.map((img, idx) => {
-        // Detect if file is a video
         const isVideo = isVideoFile(img.url) || img.file_type === 'video';
         const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
-        const fileType = isVideo ? 'video' : 'image';
 
-        // No variant badges - shared pool
+        const thumbHTML = isVideo
+            ? `<div class="imp_thumb_video">
+                   <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.display='none'">
+                   <div class="imp_play"><i class="fa fa-play"></i></div>
+               </div>`
+            : `<img class="imp_thumb" src="${thumbnailUrl}" alt="${img.name}">`;
 
-        if (isVideo) {
-            return `
-                <div class="image_item video_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="video" onclick="toggleImageSelection(this, event)">
-                    <div class="video_thumbnail_container">
-                        <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.display='none'">
-                        <div class="video_play_overlay">
-                            <i class="fa fa-play"></i>
-                        </div>
+        return `
+            <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="${isVideo ? 'video' : 'image'}" onclick="toggleImageSelection(this, event)">
+                <div class="imp_card_media">
+                    ${thumbHTML}
+                    <div class="imp_card_check"><i class="fa fa-check"></i></div>
+                    <div class="imp_card_actions">
+                        <button type="button" class="imp_act_btn" onclick="event.stopPropagation(); window.openMediaPreview('${img.optimized_url || img.url}', '${isVideo ? 'video' : 'image'}', ${img.id || 'null'})" title="Preview">
+                            <i class="fa fa-expand"></i>
+                        </button>
+                        <button type="button" class="imp_act_btn imp_act_delete" onclick="removeUploadedImage(${idx}, event)" title="Delete">
+                            <i class="fa fa-trash-alt"></i>
+                        </button>
                     </div>
-                    <p>${img.name}</p>
-                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${img.optimized_url || img.url}', 'video')" title="Preview Video">
-                        <i class="fa fa-search-plus"></i>
-                    </button>
-                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
-                        <i class="fa fa-trash"></i>
-                    </button>
                 </div>
-            `;
-        } else {
-            return `
-                <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="image" onclick="toggleImageSelection(this, event)">
-                    <img src="${thumbnailUrl}" alt="${img.name}">
-                    <p>${img.name}</p>
-                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${img.optimized_url || img.url}', 'image')" title="Preview">
-                        <i class="fa fa-search-plus"></i>
-                    </button>
-                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
-                        <i class="fa fa-trash"></i>
-                    </button>
-                </div>
-            `;
-        }
+                <div class="imp_card_name">${img.name}</div>
+            </div>
+        `;
     }).join('');
 }
 
@@ -1744,62 +1742,45 @@ function toggleImageSelection(element, event) {
 
 // Update badges on all images to reflect their order in selectionOrder
 function updateSelectionBadges() {
-    // Remove all existing badges
     document.querySelectorAll('.selection_badge').forEach(el => el.remove());
 
-    // Check each image item
     const allItems = document.querySelectorAll('.image_item');
     allItems.forEach(item => {
         const url = item.getAttribute('data-url');
         const orderIndex = selectionOrder.indexOf(url);
 
         if (orderIndex !== -1) {
-            // It's selected
-            if (!item.classList.contains('selected')) {
-                item.classList.add('selected');
-            }
+            item.classList.add('selected');
+            if (orderIndex === 0) item.classList.add('primary');
+            else item.classList.remove('primary');
 
-            // Add badge
+            // Number badge
             const badge = document.createElement('div');
             badge.className = 'selection_badge';
             badge.textContent = orderIndex + 1;
-
-            // Styling for the badge
             const isPrimary = orderIndex === 0;
-            const bgColor = isPrimary ? '#10b981' : '#667eea'; // Green for primary (1), Blue for others
-
             badge.style.cssText = `
-                position: absolute; 
-                top: 8px; 
-                left: 8px; 
-                background: ${bgColor}; 
-                color: white; 
-                width: 24px; 
-                height: 24px; 
-                border-radius: 50%; 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; 
-                font-weight: 600; 
-                font-size: 12px; 
-                z-index: 10; 
-                border: 2px solid white; 
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                pointer-events: none;
+                position:absolute; top:8px; left:8px;
+                background:${isPrimary ? '#10b981' : '#667eea'};
+                color:white; width:22px; height:22px; border-radius:50%;
+                display:flex; align-items:center; justify-content:center;
+                font-weight:700; font-size:11px; z-index:12;
+                border:2px solid white;
+                box-shadow:0 2px 6px rgba(0,0,0,0.25);
+                pointer-events:none;
             `;
-
-            item.appendChild(badge);
-
-            // Add visual border
-            item.style.borderColor = bgColor;
-            item.style.backgroundColor = isPrimary ? '#f0fdf4' : '#f0f4ff';
+            item.querySelector('.imp_card_media').appendChild(badge);
         } else {
-            // Not selected
-            item.classList.remove('selected');
-            item.style.borderColor = '#e5e7eb';
-            item.style.backgroundColor = 'white';
+            item.classList.remove('selected', 'primary');
         }
     });
+
+    // Update footer info
+    const info = document.getElementById('imp_selection_info');
+    if (info) {
+        const count = selectionOrder.length;
+        info.textContent = count > 0 ? count + ' selected' : 'Click images to select';
+    }
 }
 
 // Handle image upload - INSTANT upload to Cloudinary
@@ -1929,7 +1910,7 @@ async function handleImageUpload(event) {
                         </div>
                     </div>
                     <p>${newImage.name}</p>
-                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'video')" title="Preview Video">
+                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'video', ${newImage.id || 'null'})" title="Preview Video">
                         <i class="fa fa-search-plus"></i>
                     </button>
                     <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
@@ -1940,7 +1921,7 @@ async function handleImageUpload(event) {
                 newElement.innerHTML = `
                     <img src="${newImage.optimized_url || newImage.url}" alt="${newImage.name}">
                     <p>${newImage.name}</p>
-                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'image')" title="Preview">
+                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'image', ${newImage.id || 'null'})" title="Preview">
                         <i class="fa fa-search-plus"></i>
                     </button>
                     <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">

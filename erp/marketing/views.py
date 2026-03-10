@@ -2495,7 +2495,7 @@ def get_product(request):
             ),
             files AS (
                 SELECT json_agg(sub ORDER BY sub.sequence, sub.id) as data FROM (
-                    SELECT id, file_url, file_type, product_id, product_variant_id, sequence, is_primary
+                    SELECT id, file_url, file_type, product_id, product_variant_id, sequence, is_primary, alt_text
                     FROM marketing_productfile
                     WHERE product_id = %(pid)s OR product_variant_id IN (SELECT id FROM variant_ids)
                 ) sub
@@ -2503,7 +2503,7 @@ def get_product(request):
             variants AS (
                 SELECT json_agg(sub) as data FROM (
                     SELECT id, variant_sku, variant_barcode, variant_quantity, variant_price,
-                           variant_cost, variant_featured, product_id
+                           variant_cost, variant_featured, variant_alt_text, product_id
                     FROM marketing_productvariant
                     WHERE product_id = %(pid)s
                 ) sub
@@ -2592,6 +2592,7 @@ def get_product(request):
             "id": f["id"], "file": f["file_url"], "file_type": f["file_type"],
             "product_id": f["product_id"], "product_variant_id": f["product_variant_id"],
             "sequence": f["sequence"], "is_primary": f["is_primary"],
+            "alt_text": f.get("alt_text", ""),
         }
         for f in file_rows_json
     ]
@@ -2632,6 +2633,7 @@ def get_product(request):
             "variant_prices": _convert_price(v["variant_price"], rates),
             "variant_cost": float(v["variant_cost"]) if v["variant_cost"] is not None else None,
             "variant_featured": v["variant_featured"],
+            "variant_alt_text": v.get("variant_alt_text", ""),
             "product_id": v["product_id"],
             "primary_image": variant_primary_map.get(v["id"]),
             "product_variant_attribute_values": variant_av_map.get(v["id"], []),
@@ -3065,3 +3067,44 @@ def newsletter_subscribe(request):
     except Exception as e:
         print(f"[NEWSLETTER] Subscription error: {e}")
         return JsonResponse({'success': False, 'error': 'Bir hata oluştu, lütfen tekrar deneyin'}, status=500)
+
+
+@login_required
+def file_info_api(request, file_id):
+    try:
+        pf = ProductFile.objects.select_related('product', 'product_variant').get(pk=file_id)
+    except ProductFile.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'File not found'}, status=404)
+
+    if request.method == 'GET':
+        # Extract filename from URL
+        filename = ''
+        if pf.file_url:
+            filename = pf.file_url.rstrip('/').split('/')[-1].split('?')[0]
+
+        # File details
+        details = {
+            'format': filename.rsplit('.', 1)[-1].upper() if '.' in filename else 'Unknown',
+            'uploaded': pf.created_at.strftime('%b %d, %Y') if pf.created_at else '',
+        }
+
+        # Usage info
+        usage = []
+        if pf.product:
+            usage.append(f'Product: {pf.product.title}')
+        if pf.product_variant:
+            usage.append(f'Variant #{pf.product_variant.id}')
+
+        return JsonResponse({
+            'success': True,
+            'alt_text': pf.alt_text or '',
+            'filename': filename,
+            'details': details,
+            'usage': usage,
+        })
+
+    elif request.method == 'POST':
+        data = json.loads(request.body)
+        pf.alt_text = (data.get('alt_text') or '')[:255]
+        pf.save(update_fields=['alt_text'])
+        return JsonResponse({'success': True})

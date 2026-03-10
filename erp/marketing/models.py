@@ -538,6 +538,8 @@ class ProductFile(models.Model):
         ('video', 'Video'),
     ]
     file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='image')
+    alt_text = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
 
 
     @property
@@ -888,7 +890,7 @@ class BlogFile(models.Model):
     )
     
     # Alt text for accessibility
-    alt_text = models.CharField(max_length=255, blank=True)
+    alt_text = models.CharField(max_length=255, blank=True, null=True)
     
     sequence = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

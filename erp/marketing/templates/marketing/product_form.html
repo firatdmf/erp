@@ -189,7 +189,7 @@
             {% for file in product.files.all %}
             {% if not file.product_variant %}
             <div class="media-item sortable-image" data-file-id="{{ file.pk }}" data-file-type="{{ file.file_type }}">
-              <div class="media-preview" onclick="openMediaPreview('{{ file.optimized_url }}', '{{ file.file_type }}')">
+              <div class="media-preview" onclick="openMediaPreview('{{ file.optimized_url }}', '{{ file.file_type }}', {{ file.pk }})">
                 {% if file.is_video %}
                 <img src="{{ file.video_thumbnail_url|default:file.file_url }}" />
                 <div class="play-icon"><i class="fa fa-play"></i></div>
@@ -1268,178 +1268,367 @@
   </div>
 </div>
 
-<!-- Media Preview Modal (Lightbox) -->
+<!-- Media Preview Modal (Lightbox) with Info Panel -->
 <div id="media_preview_modal" class="media-lightbox-modal" style="display: none;">
   <div class="lightbox-overlay" onclick="closeMediaPreview()"></div>
-  <div class="lightbox-content">
-    <button type="button" class="lightbox-close" onclick="closeMediaPreview()">
-      <i class="fa fa-times"></i>
-    </button>
-    <div id="lightbox_container">
-      <!-- Image or Video will be inserted here -->
+  <div class="lightbox-layout">
+    <button type="button" class="lightbox-close" onclick="closeMediaPreview()">&times;</button>
+    <!-- Left: Image/Video -->
+    <div class="lightbox-media-area">
+      <div id="lightbox_container"></div>
+    </div>
+    <!-- Right: Info Panel -->
+    <div class="lightbox-info-panel" id="lightbox_info_panel">
+      <div class="info-panel-section">
+        <h4 class="info-panel-title"><i class="fa fa-info-circle"></i> Information</h4>
+      </div>
+      <div class="info-panel-section">
+        <label class="info-label">File name</label>
+        <input type="text" id="lightbox_filename" class="info-input" readonly>
+      </div>
+      <div class="info-panel-section">
+        <label class="info-label">Alt text</label>
+        <input type="text" id="lightbox_alt_text" class="info-input" maxlength="255" placeholder="Describe this image for SEO">
+        <button type="button" id="lightbox_save_alt" class="info-save-btn" onclick="saveLightboxAltText()">
+          <i class="fa fa-check"></i> Save
+        </button>
+      </div>
+      <div class="info-panel-section">
+        <h4 class="info-panel-subtitle">Details</h4>
+        <div id="lightbox_details" class="info-details"></div>
+      </div>
+      <div class="info-panel-section">
+        <h4 class="info-panel-subtitle">Used in</h4>
+        <div id="lightbox_usage" class="info-usage"></div>
+      </div>
     </div>
   </div>
 </div>
 
 <style>
-  /* Media Preview Modal Styles */
   .media-lightbox-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     z-index: 99999;
     animation: fadeIn 0.2s ease-out;
   }
-
   .lightbox-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.9);
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(8px);
   }
-
-  .lightbox-content {
+  .lightbox-layout {
     position: relative;
     z-index: 1;
     display: flex;
+    height: 100%;
+    width: 100%;
+  }
+  .lightbox-media-area {
+    flex: 1;
+    display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
     padding: 40px;
+    min-width: 0;
   }
-
-  .lightbox-close {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    font-size: 24px;
-    cursor: pointer;
-    transition: all 0.2s;
-    z-index: 10;
-  }
-
-  .lightbox-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
-  }
-
   #lightbox_container img {
-    max-width: 90vw;
+    max-width: 100%;
     max-height: 85vh;
     object-fit: contain;
     border-radius: 8px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   }
-
   #lightbox_container video {
-    max-width: 90vw;
+    max-width: 100%;
     max-height: 85vh;
     border-radius: 8px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   }
-
-  /* Preview icon overlay for images */
-  .media-preview {
-    cursor: pointer;
-    position: relative;
-  }
-
-  .media-preview .preview-icon {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.6);
+  .lightbox-close {
+    position: fixed;
+    top: 16px; right: 16px;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
     color: white;
-    width: 40px;
-    height: 40px;
+    width: 44px; height: 44px;
     border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 10;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
+    line-height: 1;
+    padding: 0;
+  }
+  .lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
   }
 
-  .media-preview:hover .preview-icon {
-    opacity: 1;
+  /* Info Panel */
+  .lightbox-info-panel {
+    width: 320px;
+    min-width: 320px;
+    background: #1a1a2e;
+    border-left: 1px solid rgba(255,255,255,0.08);
+    padding: 24px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    color: #e0e0e0;
+  }
+  .info-panel-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .info-panel-title i {
+    color: #667eea;
+    font-size: 14px;
+  }
+  .info-panel-subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #aaa;
+    margin: 0 0 6px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .info-panel-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .info-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #bbb;
+  }
+  .info-input {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    color: #fff;
+    padding: 8px 10px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .info-input:focus {
+    border-color: #667eea;
+  }
+  .info-input[readonly] {
+    color: #999;
+    cursor: default;
+  }
+  .info-save-btn {
+    align-self: flex-start;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: none;
+  }
+  .info-save-btn:hover {
+    background: #5a6fd6;
+  }
+  .info-save-btn.visible {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .info-save-btn.saved {
+    background: #22c55e;
+  }
+  .info-details {
+    font-size: 13px;
+    color: #aaa;
+    line-height: 1.7;
+  }
+  .info-usage {
+    font-size: 13px;
+    color: #aaa;
   }
 
+  /* Preview icon overlay for images */
+  .media-preview { cursor: pointer; position: relative; }
+  .media-preview .preview-icon {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.6); color: white;
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .media-preview:hover .preview-icon { opacity: 1; }
   .media-preview:hover .play-icon {
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0,0,0,0.8);
     transform: translate(-50%, -50%) scale(1.1);
+  }
+
+  @media (max-width: 768px) {
+    .lightbox-layout { flex-direction: column; }
+    .lightbox-media-area { padding: 20px; flex: none; height: 55vh; }
+    .lightbox-info-panel { width: 100%; min-width: unset; border-left: none; border-top: 1px solid rgba(255,255,255,0.08); }
+    .lightbox-close { top: 8px; right: 8px; width: 36px; height: 36px; font-size: 16px; }
   }
 </style>
 
 <script>
-  // Media Preview (Lightbox) Functions
-  function openMediaPreview(url, fileType) {
+  let currentLightboxFileId = null;
+  let currentLightboxAltTextOriginal = '';
+
+  function openMediaPreview(url, fileType, fileId, fileName) {
     const modal = document.getElementById('media_preview_modal');
     const container = document.getElementById('lightbox_container');
-
     if (!modal || !container) return;
 
-    // Clear previous content
+    currentLightboxFileId = fileId || null;
     container.innerHTML = '';
 
     if (fileType === 'video') {
-      // Create video element
       const video = document.createElement('video');
       video.src = url;
       video.controls = true;
       video.autoplay = true;
-      video.preload = 'metadata'; // Only load metadata initially for faster perceived performance
-      video.playsInline = true;   // Important for iOS and better mobile behavior
-      video.style.cssText = 'max-width: 90vw; max-height: 85vh; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);';
+      video.preload = 'metadata';
+      video.playsInline = true;
       container.appendChild(video);
     } else {
-      // Create image element
       const img = document.createElement('img');
       img.src = url;
       img.alt = 'Preview';
+      // Load natural dimensions once loaded
+      img.onload = function() {
+        const detailsEl = document.getElementById('lightbox_details');
+        if (detailsEl) {
+          const ext = (url.split('?')[0].split('.').pop() || '').toUpperCase();
+          detailsEl.innerHTML = `${ext} &bull; ${img.naturalWidth} &times; ${img.naturalHeight}`;
+        }
+      };
       container.appendChild(img);
+    }
+
+    // Populate info panel
+    const filenameEl = document.getElementById('lightbox_filename');
+    const altTextEl = document.getElementById('lightbox_alt_text');
+    const saveBtn = document.getElementById('lightbox_save_alt');
+    const detailsEl = document.getElementById('lightbox_details');
+    const usageEl = document.getElementById('lightbox_usage');
+
+    if (filenameEl) filenameEl.value = fileName || extractFilename(url);
+    if (altTextEl) { altTextEl.value = ''; currentLightboxAltTextOriginal = ''; }
+    if (saveBtn) { saveBtn.classList.remove('visible', 'saved'); saveBtn.innerHTML = '<i class="fa fa-check"></i> Save'; }
+    if (detailsEl) detailsEl.innerHTML = fileType === 'video' ? 'Video' : 'Loading...';
+    if (usageEl) usageEl.innerHTML = '';
+
+    // Fetch file info from backend if we have a fileId
+    if (fileId) {
+      fetch(`/marketing/api/file-info/${fileId}/`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            if (altTextEl) {
+              altTextEl.value = data.alt_text || '';
+              currentLightboxAltTextOriginal = data.alt_text || '';
+            }
+            if (detailsEl && data.details) detailsEl.innerHTML = data.details;
+            if (usageEl && data.usage) usageEl.innerHTML = data.usage;
+            if (filenameEl && data.filename) filenameEl.value = data.filename;
+          }
+        })
+        .catch(() => {});
     }
 
     modal.style.display = 'block';
     document.body.style.overflow = 'hidden';
-
-    // Close on ESC key
     document.addEventListener('keydown', handleEscKey);
+
+    // Show save button when alt text changes
+    if (altTextEl) {
+      altTextEl.oninput = function() {
+        if (saveBtn) {
+          saveBtn.classList.toggle('visible', this.value !== currentLightboxAltTextOriginal);
+          saveBtn.classList.remove('saved');
+          saveBtn.innerHTML = '<i class="fa fa-check"></i> Save';
+        }
+      };
+    }
+  }
+
+  function saveLightboxAltText() {
+    if (!currentLightboxFileId) return;
+    const altTextEl = document.getElementById('lightbox_alt_text');
+    const saveBtn = document.getElementById('lightbox_save_alt');
+    if (!altTextEl) return;
+
+    const newAltText = altTextEl.value;
+    saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+
+    fetch(`/marketing/api/file-info/${currentLightboxFileId}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+      },
+      body: JSON.stringify({ alt_text: newAltText })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        currentLightboxAltTextOriginal = newAltText;
+        saveBtn.classList.add('saved');
+        saveBtn.innerHTML = '<i class="fa fa-check"></i> Saved';
+        setTimeout(() => saveBtn.classList.remove('visible'), 1500);
+      } else {
+        saveBtn.innerHTML = '<i class="fa fa-times"></i> Error';
+      }
+    })
+    .catch(() => {
+      saveBtn.innerHTML = '<i class="fa fa-times"></i> Error';
+    });
+  }
+
+  function extractFilename(url) {
+    if (!url) return '';
+    try {
+      const path = new URL(url).pathname;
+      return path.split('/').pop() || '';
+    } catch {
+      return url.split('/').pop()?.split('?')[0] || '';
+    }
   }
 
   function closeMediaPreview() {
     const modal = document.getElementById('media_preview_modal');
     if (modal) {
       modal.style.display = 'none';
-      // Stop video if playing
       const video = modal.querySelector('video');
-      if (video) {
-        video.pause();
-        video.currentTime = 0;
-      }
+      if (video) { video.pause(); video.currentTime = 0; }
     }
     document.body.style.overflow = '';
     document.removeEventListener('keydown', handleEscKey);
+    currentLightboxFileId = null;
   }
 
   function handleEscKey(e) {
-    if (e.key === 'Escape') {
-      closeMediaPreview();
-    }
+    if (e.key === 'Escape') closeMediaPreview();
   }
 
-  // Expose to global scope for variant picker use
   window.openMediaPreview = openMediaPreview;
   window.closeMediaPreview = closeMediaPreview;
 </script>

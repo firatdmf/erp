@@ -2503,7 +2503,7 @@ def get_product(request):
             variants AS (
                 SELECT json_agg(sub) as data FROM (
                     SELECT id, variant_sku, variant_barcode, variant_quantity, variant_price,
-                           variant_cost, variant_featured, variant_alt_text, product_id
+                           variant_cost, variant_featured, product_id
                     FROM marketing_productvariant
                     WHERE product_id = %(pid)s
                 ) sub
@@ -2633,7 +2633,6 @@ def get_product(request):
             "variant_prices": _convert_price(v["variant_price"], rates),
             "variant_cost": float(v["variant_cost"]) if v["variant_cost"] is not None else None,
             "variant_featured": v["variant_featured"],
-            "variant_alt_text": v.get("variant_alt_text", ""),
             "product_id": v["product_id"],
             "primary_image": variant_primary_map.get(v["id"]),
             "product_variant_attribute_values": variant_av_map.get(v["id"], []),

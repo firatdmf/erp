@@ -21,17 +21,26 @@
     </button>
   </div>
 
-  <!-- Grouping Selector -->
-  <div class="variant_grouping" id="variant_grouping" style="display: none;">
-    <label>Grouping By</label>
-    <select id="grouping_select" onchange="filterVariantTableByGroup()">
-      <option value="">All variants</option>
-    </select>
+  <!-- Hidden select for compat -->
+  <select id="grouping_select" style="display:none;" onchange="filterVariantTableByGroup()"></select>
+
+  <!-- Shopify-style grouping popover -->
+  <div class="grp" id="grp_container" style="display: none;">
+    <span class="grp_label">Grouping by</span>
+    <div class="grp_trigger_wrap">
+      <button type="button" class="grp_trigger" id="grp_trigger" onclick="toggleGroupingPopover()">
+        <span id="grp_selected_text">—</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="grp_popover" id="grp_popover">
+        <div class="grp_options" id="grp_options"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Scrollable Table Wrapper for Mobile -->
   <div id="variant_table_wrapper"
-    style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 20px;">
+    style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;">
     <table id="variant_table" style="width: 100%; min-width: 500px; border-collapse: collapse;"></table>
   </div>
 

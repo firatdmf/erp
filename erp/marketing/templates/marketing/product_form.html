@@ -115,17 +115,6 @@
   {% endif %}
 
   <div class="form-header">
-    <h1>
-      <i class="fa fa-tag"></i>
-      {% if not is_update %}
-      Create New Product
-      {% else %}
-      Edit Product
-      {% endif %}
-    </h1>
-  </div>
-
-  <div class="form-header">
     <div class="header-left">
       <a href="{% url 'marketing:product_list' %}" class="back-button">
         <i class="fa fa-arrow-left"></i>

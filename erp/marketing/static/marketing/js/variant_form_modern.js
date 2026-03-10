@@ -654,7 +654,6 @@ function updateVariantTable() {
     console.log('Generated', allCombinations.length, 'combinations');
 
     const table = document.getElementById('variant_table');
-    const grouping = document.getElementById('variant_grouping');
 
     if (!table) {
         console.error('variant_table not found!');
@@ -664,7 +663,8 @@ function updateVariantTable() {
     if (allCombinations.length === 0) {
         console.log('No combinations, hiding table');
         table.style.display = 'none';
-        if (grouping) grouping.style.display = 'none';
+        const _grp = document.getElementById('grp_container');
+        if (_grp) _grp.style.display = 'none';
         toggleProductImagesSection();
         return;
     }
@@ -811,16 +811,18 @@ function updateVariantTable() {
     console.log('Showing table with', allCombinations.length, 'combinations');
     table.style.display = 'table';
     table.style.visibility = 'visible';
-    if (grouping) {
-        grouping.style.display = 'flex';
-        grouping.style.visibility = 'visible';
-    }
 
     // Auto-select first option in grouping dropdown
     const select = document.getElementById('grouping_select');
     if (select && select.options.length > 0) {
         select.selectedIndex = 0;
         filterVariantTableByGroup();
+    }
+
+    // Show grouping popover
+    const grpC = document.getElementById('grp_container');
+    if (grpC && select && select.options.length > 0) {
+        grpC.style.display = 'inline-flex';
     }
 
     // Toggle product images section based on variants
@@ -1481,6 +1483,7 @@ async function openImagePicker(variantIndex) {
     // Initialize selectionOrder from existing images for this variant
     // This preserves the established order
     selectionOrder = variantImages[variantIndex].images.map(img => img.url).filter(url => url);
+    selectionSet = new Set(selectionOrder);
 
     // Global uploadedImages array initialization
     if (!uploadedImages) uploadedImages = [];
@@ -1655,12 +1658,13 @@ function generateImageGrid() {
         const isVideo = isVideoFile(img.url) || img.file_type === 'video';
         const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
 
+        const lazyAttr = idx > 9 ? 'loading="lazy"' : '';
         const thumbHTML = isVideo
             ? `<div class="imp_thumb_video">
-                   <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.display='none'">
+                   <img src="${thumbnailUrl}" alt="${img.name}" ${lazyAttr} onerror="this.style.display='none'">
                    <div class="imp_play"><i class="fa fa-play"></i></div>
                </div>`
-            : `<img class="imp_thumb" src="${thumbnailUrl}" alt="${img.name}">`;
+            : `<img class="imp_thumb" src="${thumbnailUrl}" alt="${img.name}" ${lazyAttr}>`;
 
         return `
             <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="${isVideo ? 'video' : 'image'}" onclick="toggleImageSelection(this, event)">
@@ -1714,64 +1718,74 @@ function getVideoThumbnailUrlVariant(videoUrl) {
 
 // Toggle image selection with Order Tracking
 function toggleImageSelection(element, event) {
-    // Don't toggle if clicking on remove button or other controls
-    if (event.target.closest('.remove_image_btn')) {
+    // Don't toggle if clicking on action buttons
+    if (event.target.closest('.imp_act_btn, .imp_card_actions, .remove_image_btn')) {
         return;
     }
 
     const url = element.getAttribute('data-url');
-    const isCurrentlySelected = element.classList.contains('selected');
+    if (!url) return;
 
-    if (isCurrentlySelected) {
-        // Deselect
-        element.classList.remove('selected');
-        // Remove from selectionOrder
-        selectionOrder = selectionOrder.filter(u => u !== url);
+    if (selectionSet.has(url)) {
+        // Deselect - use splice for O(1)-ish removal
+        const idx = selectionOrder.indexOf(url);
+        if (idx !== -1) selectionOrder.splice(idx, 1);
+        selectionSet.delete(url);
     } else {
         // Select
-        element.classList.add('selected');
-        // Add to selectionOrder if not present
-        if (url && !selectionOrder.includes(url)) {
-            selectionOrder.push(url);
-        }
+        selectionOrder.push(url);
+        selectionSet.add(url);
     }
 
     // Update visual numbering
     updateSelectionBadges();
 }
 
+// Fast lookup Set for selectionOrder (kept in sync)
+let selectionSet = new Set();
+
 // Update badges on all images to reflect their order in selectionOrder
 function updateSelectionBadges() {
-    document.querySelectorAll('.selection_badge').forEach(el => el.remove());
+    // Sync Set with array
+    selectionSet = new Set(selectionOrder);
 
     const allItems = document.querySelectorAll('.image_item');
     allItems.forEach(item => {
         const url = item.getAttribute('data-url');
-        const orderIndex = selectionOrder.indexOf(url);
+        const existingBadge = item.querySelector('.selection_badge');
 
-        if (orderIndex !== -1) {
+        if (selectionSet.has(url)) {
+            const orderIndex = selectionOrder.indexOf(url);
             item.classList.add('selected');
             if (orderIndex === 0) item.classList.add('primary');
             else item.classList.remove('primary');
 
-            // Number badge
-            const badge = document.createElement('div');
-            badge.className = 'selection_badge';
-            badge.textContent = orderIndex + 1;
             const isPrimary = orderIndex === 0;
-            badge.style.cssText = `
-                position:absolute; top:8px; left:8px;
-                background:${isPrimary ? '#10b981' : '#667eea'};
-                color:white; width:22px; height:22px; border-radius:50%;
-                display:flex; align-items:center; justify-content:center;
-                font-weight:700; font-size:11px; z-index:12;
-                border:2px solid white;
-                box-shadow:0 2px 6px rgba(0,0,0,0.25);
-                pointer-events:none;
-            `;
-            item.querySelector('.imp_card_media').appendChild(badge);
+            if (existingBadge) {
+                // Update existing badge instead of removing/recreating
+                existingBadge.textContent = orderIndex + 1;
+                existingBadge.style.background = isPrimary ? '#10b981' : '#667eea';
+            } else {
+                // Create badge only if it doesn't exist
+                const badge = document.createElement('div');
+                badge.className = 'selection_badge';
+                badge.textContent = orderIndex + 1;
+                badge.style.cssText = `
+                    position:absolute; top:8px; left:8px;
+                    background:${isPrimary ? '#10b981' : '#667eea'};
+                    color:white; width:22px; height:22px; border-radius:50%;
+                    display:flex; align-items:center; justify-content:center;
+                    font-weight:700; font-size:11px; z-index:12;
+                    border:2px solid white;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+                    pointer-events:none;
+                `;
+                const media = item.querySelector('.imp_card_media');
+                if (media) media.appendChild(badge);
+            }
         } else {
             item.classList.remove('selected', 'primary');
+            if (existingBadge) existingBadge.remove();
         }
     });
 
@@ -1831,7 +1845,7 @@ async function handleImageUpload(event) {
             </div>
             <p>Uploading...</p>
         `;
-        if (grid) grid.appendChild(placeholder);
+        if (grid) grid.prepend(placeholder);
 
         try {
             const formData = new FormData();
@@ -1884,8 +1898,9 @@ async function handleImageUpload(event) {
                 temp_file: isCreateMode
             };
 
-            uploadedImages.push(newImage);
-            const newIndex = uploadedImages.length - 1;
+            // Insert at beginning so new uploads appear at top
+            uploadedImages.unshift(newImage);
+            const newIndex = 0;
             const isVideo = fileType === 'video';
 
             // Remove placeholder
@@ -1903,35 +1918,53 @@ async function handleImageUpload(event) {
             if (isVideo) {
                 const thumbnailUrl = getVideoThumbnailUrlVariant(fileUrl);
                 newElement.innerHTML = `
-                    <div class="video_thumbnail_container">
-                        <img src="${thumbnailUrl}" alt="${newImage.name}" onerror="this.style.display='none'">
-                        <div class="video_play_overlay">
-                            <i class="fa fa-play"></i>
+                    <div class="imp_card_media">
+                        <div class="imp_thumb_video">
+                            <img src="${thumbnailUrl}" alt="${newImage.name}" onerror="this.style.display='none'">
+                            <div class="imp_play"><i class="fa fa-play"></i></div>
+                        </div>
+                        <div class="imp_card_check"><i class="fa fa-check"></i></div>
+                        <div class="imp_card_actions">
+                            <button type="button" class="imp_act_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'video', ${newImage.id || 'null'})" title="Preview">
+                                <i class="fa fa-expand"></i>
+                            </button>
+                            <button type="button" class="imp_act_btn imp_act_delete" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
+                                <i class="fa fa-trash-alt"></i>
+                            </button>
                         </div>
                     </div>
-                    <p>${newImage.name}</p>
-                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'video', ${newImage.id || 'null'})" title="Preview Video">
-                        <i class="fa fa-search-plus"></i>
-                    </button>
-                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
-                        <i class="fa fa-trash"></i>
-                    </button>
+                    <div class="imp_card_name">${newImage.name}</div>
                 `;
             } else {
                 newElement.innerHTML = `
-                    <img src="${newImage.optimized_url || newImage.url}" alt="${newImage.name}">
-                    <p>${newImage.name}</p>
-                    <button type="button" class="preview_image_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'image', ${newImage.id || 'null'})" title="Preview">
-                        <i class="fa fa-search-plus"></i>
-                    </button>
-                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
-                        <i class="fa fa-trash"></i>
-                    </button>
+                    <div class="imp_card_media">
+                        <img class="imp_thumb" src="${newImage.optimized_url || newImage.url}" alt="${newImage.name}">
+                        <div class="imp_card_check"><i class="fa fa-check"></i></div>
+                        <div class="imp_card_actions">
+                            <button type="button" class="imp_act_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'image', ${newImage.id || 'null'})" title="Preview">
+                                <i class="fa fa-expand"></i>
+                            </button>
+                            <button type="button" class="imp_act_btn imp_act_delete" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
+                                <i class="fa fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="imp_card_name">${newImage.name}</div>
                 `;
             }
 
-            if (grid) grid.appendChild(newElement);
+            if (grid) grid.prepend(newElement);
+
+            // Re-index all grid items since we inserted at position 0
+            grid.querySelectorAll('.image_item').forEach((item, i) => {
+                item.setAttribute('data-index', i);
+            });
+
             showToast(`✅ ${file.name} uploaded successfully!`, 'success');
+
+            // Update file count in header
+            const countEl = document.getElementById('imp_total_count');
+            if (countEl) countEl.textContent = `${uploadedImages.length} files`;
 
         } catch (error) {
             console.error('Upload error:', error);
@@ -2095,6 +2128,7 @@ async function removeUploadedImage(index, event) {
 
         // Remove from selectionOrder and renumber badges
         selectionOrder = selectionOrder.filter(url => url !== image.url);
+        selectionSet.delete(image.url);
 
         // Also remove from variantImages selections if it was selected
         if (variantImages[currentVariantIndex]) {
@@ -2395,39 +2429,96 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Update grouping dropdown options
+// Update grouping dropdown options + popover
 function updateGroupingOptions() {
     const select = document.getElementById('grouping_select');
+    const grpContainer = document.getElementById('grp_container');
+    const grpOptions = document.getElementById('grp_options');
+    const grpSelectedText = document.getElementById('grp_selected_text');
     if (!select) return;
 
-    // Get unique option names (filter out duplicates)
     const optionNames = Object.values(variantData)
         .filter(d => d.name)
         .map(d => d.name);
 
-    // Remove duplicate names (case-insensitive)
     const uniqueNames = [...new Set(optionNames.map(n => n.toLowerCase()))];
 
-    // If no options, hide table and grouping
     if (uniqueNames.length === 0) {
         const table = document.getElementById('variant_table');
-        const grouping = document.getElementById('variant_grouping');
         if (table) table.style.display = 'none';
-        if (grouping) grouping.style.display = 'none';
+        if (grpContainer) grpContainer.style.display = 'none';
         select.innerHTML = '';
         return;
     }
 
+    // Update hidden select
     let optionsHTML = '';
     uniqueNames.forEach(name => {
         optionsHTML += `<option value="${name}">${name}</option>`;
     });
-
     select.innerHTML = optionsHTML;
+    if (select.options.length > 0) select.selectedIndex = 0;
 
-    // Auto-select first option after updating
-    if (select.options.length > 0) {
-        select.selectedIndex = 0;
+    // Build popover options
+    if (grpOptions) {
+        let html = '';
+        uniqueNames.forEach((name, idx) => {
+            html += `<div class="grp_option${idx === 0 ? ' active' : ''}" data-value="${name}" onclick="selectGroupingOption(this)">
+                <span>${name}</span>
+                <span class="grp_option_check"><i class="fa fa-check"></i></span>
+            </div>`;
+        });
+        grpOptions.innerHTML = html;
+    }
+    if (grpSelectedText) grpSelectedText.textContent = uniqueNames[0];
+    if (grpContainer) grpContainer.style.display = 'inline-flex';
+}
+
+// Toggle popover open/close
+function toggleGroupingPopover() {
+    const popover = document.getElementById('grp_popover');
+    if (!popover) return;
+    popover.classList.toggle('open');
+
+    // Close on outside click
+    if (popover.classList.contains('open')) {
+        setTimeout(() => {
+            document.addEventListener('click', closeGroupingPopoverOutside);
+        }, 0);
+    }
+}
+
+function closeGroupingPopoverOutside(e) {
+    const wrap = document.querySelector('.grp_trigger_wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        const popover = document.getElementById('grp_popover');
+        if (popover) popover.classList.remove('open');
+        document.removeEventListener('click', closeGroupingPopoverOutside);
+    }
+}
+
+// Select an option from popover
+function selectGroupingOption(el) {
+    const value = el.dataset.value;
+
+    // Update active state
+    document.querySelectorAll('.grp_option').forEach(o => o.classList.remove('active'));
+    el.classList.add('active');
+
+    // Update trigger text
+    const grpSelectedText = document.getElementById('grp_selected_text');
+    if (grpSelectedText) grpSelectedText.textContent = value;
+
+    // Close popover
+    const popover = document.getElementById('grp_popover');
+    if (popover) popover.classList.remove('open');
+    document.removeEventListener('click', closeGroupingPopoverOutside);
+
+    // Sync hidden select & filter
+    const select = document.getElementById('grouping_select');
+    if (select) {
+        select.value = value;
+        filterVariantTableByGroup();
     }
 }
 
@@ -2514,8 +2605,8 @@ async function deleteVariantRow(index, event) {
             // If no variants left, hide table and grouping
             if (remainingRows === 0) {
                 table.style.display = 'none';
-                const grouping = document.getElementById('variant_grouping');
-                if (grouping) grouping.style.display = 'none';
+                const _grp2 = document.getElementById('grp_container');
+                if (_grp2) _grp2.style.display = 'none';
                 console.log('No variants left - hiding table');
             }
         }

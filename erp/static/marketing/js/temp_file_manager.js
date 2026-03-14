@@ -28,7 +28,7 @@ function getCookie(name) {
     return cookieValue;
 }
 
-const csrftoken = getCookie('csrftoken');
+const tempCsrfToken = getCookie('csrftoken');
 
 // Toast notification
 function showToast(message, type = 'success') {
@@ -48,7 +48,7 @@ function showToast(message, type = 'success') {
         animation: slideIn 0.3s ease-out;
     `;
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
         toast.style.animation = 'slideOut 0.3s ease-out';
         setTimeout(() => toast.remove(), 300);
@@ -56,8 +56,8 @@ function showToast(message, type = 'success') {
 }
 
 // Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
+const tempStyle = document.createElement('style');
+tempStyle.textContent = `
     @keyframes slideIn {
         from { transform: translateX(400px); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
@@ -124,7 +124,7 @@ style.textContent = `
         transform: scale(1.1);
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(tempStyle);
 
 /**
  * Upload file to temporary storage
@@ -144,35 +144,35 @@ async function tempUploadFile(file, fileType, variantTempId, container) {
         </div>
     `;
     container.appendChild(progressDiv);
-    
+
     // Prepare form data
     const formData = new FormData();
     formData.append('file', file);
     formData.append('file_type', fileType);
     formData.append('sequence', fileType === 'main_image' ? tempFiles.main_images.length : (tempFiles.variant_images[variantTempId]?.length || 0));
-    
+
     if (variantTempId) {
         formData.append('variant_temp_id', variantTempId);
     }
-    
+
     try {
         // Update progress to 60%
         progressDiv.querySelector('.temp-upload-progress-fill').style.width = '60%';
-        
+
         const response = await fetch('/marketing/api/temp_upload_file/', {
             method: 'POST',
             headers: {
-                'X-CSRFToken': csrftoken,
+                'X-CSRFToken': tempCsrfToken,
             },
             body: formData
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             // Update progress to 100%
             progressDiv.querySelector('.temp-upload-progress-fill').style.width = '100%';
-            
+
             // Store file data
             const fileData = result.file_data;
             if (fileType === 'main_image') {
@@ -183,13 +183,13 @@ async function tempUploadFile(file, fileType, variantTempId, container) {
                 }
                 tempFiles.variant_images[variantTempId].push(fileData);
             }
-            
+
             hasUnsavedFiles = true;
-            
+
             // Replace progress with preview
             setTimeout(() => {
                 progressDiv.remove();
-                
+
                 const preview = document.createElement('div');
                 preview.className = 'temp-file-preview';
                 preview.dataset.publicId = fileData.public_id;
@@ -200,13 +200,13 @@ async function tempUploadFile(file, fileType, variantTempId, container) {
                     </button>
                 `;
                 container.appendChild(preview);
-                
+
                 showToast('✅ File uploaded!');
             }, 500);
         } else {
             throw new Error(result.error || 'Upload failed');
         }
-        
+
     } catch (error) {
         console.error('Upload error:', error);
         progressDiv.remove();
@@ -223,7 +223,7 @@ async function tempUploadFile(file, fileType, variantTempId, container) {
  */
 async function tempDeleteFile(publicId, fileType, variantTempId, btn) {
     const preview = btn.closest('.temp-file-preview');
-    
+
     // Remove from local tracking
     if (fileType === 'main_image') {
         tempFiles.main_images = tempFiles.main_images.filter(f => f.public_id !== publicId);
@@ -232,15 +232,15 @@ async function tempDeleteFile(publicId, fileType, variantTempId, btn) {
             tempFiles.variant_images[variantTempId] = tempFiles.variant_images[variantTempId].filter(f => f.public_id !== publicId);
         }
     }
-    
+
     // Update hasUnsavedFiles flag
-    hasUnsavedFiles = (tempFiles.main_images.length > 0) || 
-                      (Object.values(tempFiles.variant_images).some(arr => arr.length > 0));
-    
+    hasUnsavedFiles = (tempFiles.main_images.length > 0) ||
+        (Object.values(tempFiles.variant_images).some(arr => arr.length > 0));
+
     // Remove preview
     preview.remove();
     showToast('🗑️ File deleted!');
-    
+
     // Note: No need to call cleanup API here since session-based deletion
     // happens automatically on page unload
 }
@@ -253,15 +253,15 @@ async function cleanupTempFiles() {
     if (!hasUnsavedFiles) {
         return;
     }
-    
+
     try {
         // Use sendBeacon for reliable cleanup during page unload
         const formData = new FormData();
-        formData.append('csrfmiddlewaretoken', csrftoken);
-        
+        formData.append('csrfmiddlewaretoken', tempCsrfToken);
+
         // sendBeacon doesn't support custom headers, so use FormData
         navigator.sendBeacon('/marketing/api/cleanup_temp_files/', formData);
-        
+
         console.log('🧹 Cleanup triggered for temp files');
     } catch (error) {
         console.error('Cleanup error:', error);
@@ -275,7 +275,7 @@ function beforeUnloadWarning(e) {
     if (hasUnsavedFiles) {
         // Trigger cleanup
         cleanupTempFiles();
-        
+
         // Show browser warning
         const message = 'You have uploaded files but haven\'t saved the product yet. Files will be deleted if you leave.';
         e.preventDefault();

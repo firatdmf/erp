@@ -1275,3 +1275,81 @@ input[type=file]::-webkit-file-upload-button {
     font-size: 12px !important;
   }
 }
+
+/* ─── Bulk Select Checkbox (top-right of each image) ─── */
+.imp_bulk_check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  opacity: 0;
+  transition: all 0.2s;
+  color: transparent;
+  font-size: 11px;
+}
+.image_item:hover .imp_bulk_check {
+  opacity: 1;
+}
+.imp_bulk_check.checked {
+  opacity: 1;
+  background: #667eea;
+  border-color: #667eea;
+  color: #fff;
+  transform: scale(1.1);
+}
+.imp_bulk_check:hover {
+  border-color: #667eea;
+  background: rgba(102,126,234,0.3);
+}
+
+/* ─── Bulk Delete Bar ─── */
+.imp_bulk_bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin: 0 24px;
+  animation: utRowFadeIn 0.2s ease;
+}
+.imp_bulk_bar span {
+  font-size: 13px;
+  color: #374151;
+}
+.imp_bulk_delete_btn {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+}
+.imp_bulk_delete_btn:hover { background: #b91c1c; }
+.imp_bulk_cancel_btn {
+  background: none;
+  border: 1px solid #d1d5db;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.imp_bulk_cancel_btn:hover { background: #f3f4f6; }

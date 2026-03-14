@@ -359,6 +359,165 @@ const modalCSS = `
   color: #667eea;
 }
 
+/* ─── Floating Upload Tracker (Google Drive style) ─── */
+.upload-tracker {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 360px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 2147483647;
+  overflow: hidden;
+  animation: trackerSlideUp 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.upload-tracker.closing {
+  animation: trackerSlideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.upload-tracker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #1a1a2e;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+}
+.upload-tracker-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.upload-tracker-header .ut-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.upload-tracker-header .ut-actions button {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.upload-tracker-header .ut-actions button:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.1);
+}
+.upload-tracker-body {
+  max-height: 280px;
+  overflow-y: auto;
+  transition: max-height 0.3s ease;
+}
+.upload-tracker-body.collapsed {
+  max-height: 0;
+}
+.upload-tracker-body::-webkit-scrollbar {
+  width: 4px;
+}
+.upload-tracker-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.ut-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  animation: utRowFadeIn 0.3s ease;
+}
+.ut-file-row:last-child { border-bottom: none; }
+.ut-file-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #f1f5f9;
+}
+.ut-file-info {
+  flex: 1;
+  min-width: 0;
+}
+.ut-file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ut-file-size {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+.ut-file-status {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ut-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid #e2e8f0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: utSpin 0.7s linear infinite;
+}
+.ut-check {
+  color: #22c55e;
+  font-size: 18px;
+  animation: utPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.ut-error {
+  color: #ef4444;
+  font-size: 18px;
+}
+.ut-overall-progress {
+  height: 3px;
+  background: #e2e8f0;
+}
+.ut-overall-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  transition: width 0.4s ease;
+  border-radius: 0 3px 3px 0;
+}
+
+@keyframes trackerSlideUp {
+  from { transform: translateY(100px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes trackerSlideDown {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(100px); opacity: 0; }
+}
+@keyframes utRowFadeIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes utSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes utPop {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -366,11 +525,11 @@ const modalCSS = `
 }
 
 @keyframes slideUp {
-  from { 
+  from {
     opacity: 0;
     transform: translateY(40px);
   }
-  to { 
+  to {
     opacity: 1;
     transform: translateY(0);
   }
@@ -444,16 +603,16 @@ const modalCSS = `
 </style>
 `;
 
+// Inject CSS immediately on load (needed for upload tracker even before modal opens)
+if (!document.getElementById('fmModalStyles')) {
+  const _style = document.createElement('div');
+  _style.id = 'fmModalStyles';
+  _style.innerHTML = modalCSS;
+  document.head.appendChild(_style);
+}
+
 // Initialize modal
 function initFileManager() {
-  // Add CSS
-  if (!document.getElementById('fmModalStyles')) {
-    const style = document.createElement('div');
-    style.id = 'fmModalStyles';
-    style.innerHTML = modalCSS;
-    document.head.appendChild(style);
-  }
-
   // Add HTML
   if (!document.getElementById('fileManagerModal')) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
@@ -852,6 +1011,124 @@ function handleFileDrop(files) {
   uploadFiles(Array.from(files));
 }
 
+// ─── Floating Upload Tracker (Google Drive style) ───
+let uploadTracker = null;
+let trackerCollapsed = false;
+
+function createUploadTracker(totalFiles) {
+  // Remove existing tracker
+  if (uploadTracker) uploadTracker.remove();
+
+  const tracker = document.createElement('div');
+  tracker.className = 'upload-tracker';
+  tracker.id = 'uploadTracker';
+  tracker.innerHTML = `
+    <div class="upload-tracker-header" onclick="toggleTrackerCollapse()">
+      <h4>
+        <span id="utTitle">Uploading <span id="utDoneCount">0</span> of ${totalFiles} items</span>
+      </h4>
+      <div class="ut-actions">
+        <button onclick="event.stopPropagation(); toggleTrackerCollapse()" id="utCollapseBtn" title="Minimize">
+          <i class="fa fa-chevron-down"></i>
+        </button>
+        <button onclick="event.stopPropagation(); closeUploadTracker()" id="utCloseBtn" title="Close" style="display:none;">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+    </div>
+    <div class="ut-overall-progress"><div class="ut-overall-bar" id="utOverallBar" style="width:0%"></div></div>
+    <div class="upload-tracker-body" id="utBody"></div>
+  `;
+  document.body.appendChild(tracker);
+  uploadTracker = tracker;
+  trackerCollapsed = false;
+  return tracker;
+}
+
+function addTrackerRow(file) {
+  const body = document.getElementById('utBody');
+  if (!body) return null;
+
+  const row = document.createElement('div');
+  row.className = 'ut-file-row';
+  row.id = `ut-row-${file.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+  const sizeStr = file.size > 1048576
+    ? (file.size / 1048576).toFixed(1) + ' MB'
+    : (file.size / 1024).toFixed(0) + ' KB';
+
+  // Create a thumbnail from the file
+  const thumbUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+  const thumbHTML = thumbUrl
+    ? `<img class="ut-file-thumb" src="${thumbUrl}" alt="">`
+    : `<div class="ut-file-thumb" style="display:flex;align-items:center;justify-content:center;background:#1a1a2e;color:#667eea;font-size:14px;"><i class="fa fa-film"></i></div>`;
+
+  row.innerHTML = `
+    ${thumbHTML}
+    <div class="ut-file-info">
+      <div class="ut-file-name">${file.name}</div>
+      <div class="ut-file-size">${sizeStr}</div>
+    </div>
+    <div class="ut-file-status"><div class="ut-spinner"></div></div>
+  `;
+  body.appendChild(row);
+
+  // Auto-scroll to bottom
+  body.scrollTop = body.scrollHeight;
+  return row;
+}
+
+function updateTrackerRow(row, success) {
+  if (!row) return;
+  const status = row.querySelector('.ut-file-status');
+  if (success) {
+    status.innerHTML = '<i class="fa fa-check-circle ut-check"></i>';
+  } else {
+    status.innerHTML = '<i class="fa fa-times-circle ut-error"></i>';
+  }
+}
+
+function updateTrackerProgress(done, total) {
+  const bar = document.getElementById('utOverallBar');
+  const countEl = document.getElementById('utDoneCount');
+  const title = document.getElementById('utTitle');
+  if (bar) bar.style.width = `${(done / total) * 100}%`;
+  if (countEl) countEl.textContent = done;
+
+  if (done >= total) {
+    if (title) title.innerHTML = `<i class="fa fa-check-circle" style="color:#22c55e"></i> ${total} file uploaded`;
+    const closeBtn = document.getElementById('utCloseBtn');
+    if (closeBtn) closeBtn.style.display = '';
+    // Auto-close after 4 seconds
+    setTimeout(() => closeUploadTracker(), 4000);
+  }
+}
+
+function toggleTrackerCollapse() {
+  const body = document.getElementById('utBody');
+  const btn = document.getElementById('utCollapseBtn');
+  if (!body) return;
+  trackerCollapsed = !trackerCollapsed;
+  body.classList.toggle('collapsed', trackerCollapsed);
+  if (btn) btn.innerHTML = trackerCollapsed ? '<i class="fa fa-chevron-up"></i>' : '<i class="fa fa-chevron-down"></i>';
+}
+
+function closeUploadTracker() {
+  const tracker = document.getElementById('uploadTracker');
+  if (tracker) {
+    tracker.classList.add('closing');
+    setTimeout(() => { tracker.remove(); uploadTracker = null; }, 300);
+  }
+}
+
+// Expose tracker functions globally for variant_form_modern.js
+window.createUploadTracker = createUploadTracker;
+window.addTrackerRow = addTrackerRow;
+window.updateTrackerRow = updateTrackerRow;
+window.updateTrackerProgress = updateTrackerProgress;
+window.closeUploadTracker = closeUploadTracker;
+window.toggleTrackerCollapse = toggleTrackerCollapse;
+
 // Upload files with progress
 async function uploadFiles(files) {
   const modal = document.getElementById('fileManagerModal');
@@ -862,48 +1139,56 @@ async function uploadFiles(files) {
   // Get existing file names from grid
   const existingFileNames = new Set();
   grid.querySelectorAll('.fm-file-item .fm-file-img').forEach(img => {
-    // Extract filename from URL
     const url = img.src || '';
     const fileName = url.split('/').pop().split('?')[0];
     if (fileName) existingFileNames.add(fileName);
   });
 
-  for (const file of files) {
-    // Check for duplicate - skip if file with same name already exists
+  // Filter out duplicates first
+  const filesToUpload = files.filter(file => {
     if (existingFileNames.has(file.name)) {
-      console.log(`File ${file.name} already exists, skipping upload.`);
       showToast(`⚠️ "${file.name}" already exists`, 'warning');
-      continue;
+      return false;
     }
+    return true;
+  });
 
-    // Create placeholder with progress
+  if (filesToUpload.length === 0) return;
+
+  // Create floating tracker
+  createUploadTracker(filesToUpload.length);
+  let doneCount = 0;
+
+  for (const file of filesToUpload) {
+    // Add row to tracker
+    const trackerRow = addTrackerRow(file);
+
+    // Create placeholder in modal grid
     const placeholder = createUploadPlaceholder(file);
-    // Add to END of grid, not beginning
     grid.appendChild(placeholder);
 
     // Upload
     const uploadedFile = await uploadSingleFile(file, productId, placeholder, variantId);
 
-    if (uploadedFile) {
-      console.log('Uploaded file object:', uploadedFile);
+    doneCount++;
 
-      // Add to existing names to prevent duplicates in same batch
+    if (uploadedFile) {
       existingFileNames.add(file.name);
 
-      // Replace placeholder with actual file
       const fileItem = createFileItem(uploadedFile);
-      console.log('Created file item, dataset.fileId:', fileItem.dataset.fileId);
       placeholder.replaceWith(fileItem);
 
-      // Update count
       const count = document.getElementById('fmFileCount');
       count.textContent = parseInt(count.textContent) + 1;
-
-      // Update done button
       updateDoneButton();
+
+      updateTrackerRow(trackerRow, true);
     } else {
       placeholder.remove();
+      updateTrackerRow(trackerRow, false);
     }
+
+    updateTrackerProgress(doneCount, filesToUpload.length);
   }
 }
 

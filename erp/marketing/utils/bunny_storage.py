@@ -15,6 +15,7 @@ def get_bunny_config():
     """Get Bunny CDN configuration from settings"""
     return {
         'api_key': getattr(settings, 'BUNNY_STORAGE_API_KEY', ''),
+        'account_api_key': getattr(settings, 'BUNNY_ACCOUNT_API_KEY', ''),
         'storage_zone': getattr(settings, 'BUNNY_STORAGE_ZONE', ''),
         'region': getattr(settings, 'BUNNY_STORAGE_REGION', ''),
         'cdn_url': getattr(settings, 'BUNNY_CDN_URL', ''),
@@ -65,10 +66,12 @@ def upload_to_bunny(file, path, content_type=None):
         content = file
     
     response = requests.put(url, data=content, headers=headers)
-    
+
     if response.status_code in [200, 201]:
         # Return CDN URL
         cdn_url = f"{config['cdn_url']}/{path}"
+        # Purge CDN cache so edge nodes serve the new version (not stale cache)
+        purge_bunny_cache(cdn_url)
         return cdn_url
     else:
         raise Exception(f"Bunny upload failed ({response.status_code}): {response.text}")
@@ -103,7 +106,10 @@ def upload_to_bunny_from_url(source_url, path):
     upload_response = requests.put(url, data=response.content, headers=headers)
     
     if upload_response.status_code in [200, 201]:
-        return f"{config['cdn_url']}/{path}"
+        cdn_url = f"{config['cdn_url']}/{path}"
+        # Purge CDN cache so edge nodes serve the new version (not stale cache)
+        purge_bunny_cache(cdn_url)
+        return cdn_url
     else:
         raise Exception(f"Bunny upload failed: {upload_response.text}")
 
@@ -139,10 +145,60 @@ def delete_from_bunny(path_or_url):
         "AccessKey": config['api_key'],
     }
     
-    print(f"[BUNNY DELETE] URL: {url}")
+    import json
+
+    print(f"[BUNNY DELETE] Storage URL: {url}")
+    print(f"[BUNNY DELETE] Path: {path}")
     response = requests.delete(url, headers=headers)
-    print(f"[BUNNY DELETE] Status: {response.status_code}, Response: {response.text[:200] if response.text else 'empty'}")
-    return response.status_code in [200, 404]  # 404 means already deleted
+    try:
+        delete_json = response.json()
+    except Exception:
+        delete_json = response.text[:200] if response.text else 'empty'
+    print(f"[BUNNY DELETE] Status: {response.status_code}")
+    print(f"[BUNNY DELETE] Response JSON: {json.dumps(delete_json, indent=2, ensure_ascii=False)}")
+    storage_deleted = response.status_code in [200, 404]
+
+    # Purge CDN cache so the file stops being served from edge
+    if storage_deleted:
+        cdn_file_url = path_or_url if path_or_url.startswith('http') else f"{config['cdn_url']}/{path}"
+        print(f"[BUNNY PURGE] Purging cache for: {cdn_file_url}")
+        purge_bunny_cache(cdn_file_url)
+    else:
+        print(f"[BUNNY DELETE] Storage delete failed, skipping cache purge")
+
+    return storage_deleted
+
+
+def purge_bunny_cache(cdn_file_url):
+    """Purge a specific file from Bunny CDN edge cache using Storage API key"""
+    import json
+    import urllib.parse
+
+    config = get_bunny_config()
+    api_key = config.get('account_api_key', '')
+    if not api_key:
+        print(f"[BUNNY PURGE] No BUNNY_ACCOUNT_API_KEY set in .env, skipping cache purge")
+        return False
+
+    encoded_url = urllib.parse.quote(cdn_file_url, safe='')
+    purge_url = f"https://api.bunny.net/purge?url={encoded_url}"
+
+    headers = {
+        "AccessKey": api_key,
+    }
+
+    try:
+        response = requests.post(purge_url, headers=headers)
+        try:
+            purge_json = response.json()
+        except Exception:
+            purge_json = response.text[:200] if response.text else 'empty'
+        print(f"[BUNNY PURGE] Status: {response.status_code}")
+        print(f"[BUNNY PURGE] Response JSON: {json.dumps(purge_json, indent=2, ensure_ascii=False)}")
+        return response.status_code == 200
+    except Exception as e:
+        print(f"[BUNNY PURGE] Error: {e}")
+        return False
 
 
 def extract_public_id_from_cloudinary(url):

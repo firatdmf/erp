@@ -2,24 +2,8 @@
 let optionCounter = 0;
 let variantData = {};
 let variantImages = {}; // Store images for each variant: { variantIndex: { images: [], primaryIndex: 0 } }
+let currentEditingVariantIndex = null;
 let productAttributes = []; // Product-level attributes to show in variant table
-
-// Utility to get cookie by name (standard Django implementation)
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            // Does this cookie string begin with the name we want?
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -670,7 +654,6 @@ function updateVariantTable() {
     console.log('Generated', allCombinations.length, 'combinations');
 
     const table = document.getElementById('variant_table');
-    const grouping = document.getElementById('variant_grouping');
 
     if (!table) {
         console.error('variant_table not found!');
@@ -680,7 +663,8 @@ function updateVariantTable() {
     if (allCombinations.length === 0) {
         console.log('No combinations, hiding table');
         table.style.display = 'none';
-        if (grouping) grouping.style.display = 'none';
+        const _grp = document.getElementById('grp_container');
+        if (_grp) _grp.style.display = 'none';
         toggleProductImagesSection();
         return;
     }
@@ -827,10 +811,6 @@ function updateVariantTable() {
     console.log('Showing table with', allCombinations.length, 'combinations');
     table.style.display = 'table';
     table.style.visibility = 'visible';
-    if (grouping) {
-        grouping.style.display = 'flex';
-        grouping.style.visibility = 'visible';
-    }
 
     // Auto-select first option in grouping dropdown
     const select = document.getElementById('grouping_select');
@@ -839,12 +819,19 @@ function updateVariantTable() {
         filterVariantTableByGroup();
     }
 
+    // Show grouping popover
+    const grpC = document.getElementById('grp_container');
+    if (grpC && select && select.options.length > 0) {
+        grpC.style.display = 'inline-flex';
+    }
+
     // Toggle product images section based on variants
     toggleProductImagesSection();
 
     console.log('Table should be visible now');
 }
 
+// Render variant table with given combinations
 // Render variant table with given combinations
 function renderVariantTable(combinations, selectedGrouping = null) {
     const table = document.getElementById('variant_table');
@@ -855,12 +842,138 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         .filter(d => d.name)
         .map(d => d.name);
 
-    // Build table HTML
-    let tableHTML = '<thead><tr><th>ACTIONS</th>';
+    // Build table HTML - Cost, SKU, Barcode columns are removed from view
+    let tableHTML = '<thead><tr><th style="width: 50px;"></th><th style="width: 60px;">PHOTO</th>';
     displayOptions.forEach(name => {
         tableHTML += `<th>${name.toUpperCase()}</th>`;
     });
-    tableHTML += '<th>PRICE</th><th>COST</th><th>STOCK</th><th>PHOTO</th><th>SKU</th><th>BARCODE</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
+    tableHTML += '<th>PRICE</th><th>STOCK</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
+
+    // Helper to generate row HTML (avoids duplication between grouped/ungrouped)
+    const generateRowHTML = (combo, originalIndex, displayOptions, groupId = '') => {
+        // Skip deleted variants
+        if (deletedVariantIndices.has(originalIndex)) return '';
+
+        // Create key for looking up existing data
+        const attrKey = Object.entries(combo)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, val]) => `${key}:${val}`)
+            .join('|');
+
+        const existingData = existingVariantData[attrKey] || {};
+        const variantId = existingData.variant_id || '';
+        const variantProductAttrs = existingData.product_attributes || [];
+
+        // Load images if not already loaded
+        if (existingData.images && existingData.images.length > 0 && !variantImages[originalIndex]) {
+            variantImages[originalIndex] = {
+                images: existingData.images,
+                primaryIndex: 0
+            };
+        }
+
+        // Prepare image content
+        const variantImg = variantImages[originalIndex];
+        const hasImages = variantImg && variantImg.images && variantImg.images.length > 0;
+        const primaryImg = hasImages ? variantImg.images[0] : null;
+
+        const imgContent = primaryImg
+            ? `<img src="${primaryImg.url}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e7eb;">`
+            : `<div style="width: 40px; height: 40px; border: 1px dashed #d1d5db; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #6b7280; background: #f9fafb;"><i class="fa fa-image"></i></div>`;
+
+        const countBadge = (hasImages && variantImg.images.length > 1)
+            ? `<span style="position: absolute; top: -5px; right: -5px; background: #667eea; color: white; font-size: 9px; padding: 1px 4px; border-radius: 8px; font-weight: 600;">${variantImg.images.length}</span>`
+            : '';
+
+        // Retrieve current values (DOM > existingData > default)
+        const priceInput = document.querySelector(`input[name="variant_price_${originalIndex + 1}"]`);
+        const quantityInput = document.querySelector(`input[name="variant_quantity_${originalIndex + 1}"]`);
+        const featuredInput = document.querySelector(`input[name="variant_featured_${originalIndex + 1}"]`);
+        // Hidden inputs
+        const costInput = document.querySelector(`input[name="variant_cost_${originalIndex + 1}"]`);
+        const skuInput = document.querySelector(`input[name="variant_sku_${originalIndex + 1}"]`);
+        const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
+        const activeInput = document.querySelector(`input[name="variant_active_${originalIndex + 1}"]`);
+
+        const price = priceInput?.value || existingData.price || '';
+        const quantity = quantityInput?.value || existingData.quantity || '';
+        const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
+        const cost = costInput?.value || existingData.cost || '';
+        const sku = skuInput?.value || existingData.sku || existingData.item_code || ''; // fallback to item_code if sku missing
+        const barcode = barcodeInput?.value || existingData.barcode || '';
+        const active = activeInput ? (activeInput.value === 'true') : (existingData.is_active !== false);
+
+        // Row HTML
+        // Add onclick to open modal, but stop propagation for interactive elements
+        let rowHTML = `<tr class="variant_row ${groupId}" data-variant-index="${originalIndex}" data-variant-id="${variantId}" style="cursor: pointer;" onclick="openVariantDetailModal(${originalIndex})">`;
+
+        // Delete button
+        rowHTML += `<td style="padding-left: 14px; vertical-align: middle;">
+            <button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${originalIndex}, event); event.stopPropagation();" title="Delete variant" style="background: white; border: 1px solid #d1d5db; color: #6b7280; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444'; this.style.background='#fef2f2';" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#6b7280'; this.style.background='white';">
+                <i class="fa fa-trash" style="font-size: 14px;"></i>
+            </button>
+        </td>`;
+
+        // Photo Column
+        rowHTML += `
+            <td style="text-align: center; vertical-align: middle;">
+                <div onclick="openImagePicker(${originalIndex}); event.stopPropagation();" style="cursor: pointer; display: inline-block; position: relative;" title="Manage Images">
+                    ${imgContent}
+                    ${countBadge}
+                    <div style="position: absolute; bottom: -5px; right: -5px; background: white; border: 1px solid #e5e7eb; border-radius: 50%; width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; font-size: 8px;">
+                        <i class="fa fa-plus" style="color: #667eea;"></i>
+                    </div>
+                </div>
+            </td>`;
+
+        // Option Values (Non-editable text)
+        displayOptions.forEach((optionName, optIdx) => {
+            const value = combo[optionName] || '';
+            if (optIdx === 0) {
+                rowHTML += `<td><span style="font-weight: 500;">${value}</span><br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> Edit</span></td>`;
+            } else {
+                rowHTML += `<td><span style="font-weight: 500;">${value}</span></td>`;
+            }
+        });
+
+        // Price Input
+        rowHTML += `<td>
+            <input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" onclick="event.stopPropagation()" oninput="updateGroupPriceRange('${groupId}')">
+        </td>`;
+
+        // Stock Input
+        rowHTML += `<td>
+            <input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;" onclick="event.stopPropagation()">
+        </td>`;
+
+        // Featured Checkbox - using toggle switch
+        rowHTML += `<td style="text-align: center;">
+            <label class="custom-checkbox" style="margin: 0; justify-content: center; gap: 0;" onclick="event.stopPropagation()">
+                <input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}>
+                <span class="checkmark"></span>
+            </label>
+        </td>`;
+
+        // Attributes Button
+        rowHTML += `<td style="text-align: center;">
+            <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${originalIndex}, ''); event.stopPropagation();" 
+                    style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;"
+                    onmouseover="this.style.borderColor='#667eea'; this.style.color='#667eea';"
+                    onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#374151';">
+                <i class="fa fa-tags"></i>
+                <span class="attr-count" id="attr_count_${originalIndex}">${variantProductAttrs.length}</span>
+            </button>
+        </td>`;
+
+        // HIDDEN INPUTS for Modal Fields
+        rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
+        rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}">`;
+        rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
+        rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
+
+        rowHTML += `</tr>`;
+        return rowHTML;
+    };
 
     // If grouping is selected, create hierarchical structure
     if (selectedGrouping) {
@@ -902,13 +1015,15 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             // Group header row (collapsible)
             const groupId = `group_${groupValue.replace(/\s+/g, '_')}`;
-            const variantCount = variants.filter(v => !deletedVariantIndices.has(v.originalIndex)).length;
-            const extraColsCount = 6; // barcode, sku, photo, stock, featured, attributes
+            const extraColsCount = 3; // stock, featured, attributes
+            // Colspan logic: 1 (Action) + 1 (Photo) + Options + 1 (Price) + 3 (Extra)
+
             tableHTML += `
-                <tr class="group_header_row" style="background: #f3f4f6; font-weight: 600; cursor: pointer;" onclick="toggleGroupCollapse('${groupId}')">
+                <tr class="group_header_row" style="font-weight: 600; cursor: pointer;" onclick="toggleGroupCollapse('${groupId}')">
                     <td>
                         <i class="fa fa-chevron-down group_toggle_icon" id="icon_${groupId}" style="transition: transform 0.2s;"></i>
                     </td>
+                    <td></td>
                     <td colspan="${displayOptions.length}">
                         <div style="display: flex; flex-direction: column;">
                             <span style="font-weight: 600; color: #111827;">${groupValue}</span>
@@ -922,158 +1037,13 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
             // Render all variants in this group
             variants.forEach(({ combo, originalIndex }) => {
-                // Skip deleted variants
-                if (deletedVariantIndices.has(originalIndex)) return;
-
-                // Create key for looking up existing data - MUST BE FIRST
-                const attrKey = Object.entries(combo)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([key, val]) => `${key}:${val}`)
-                    .join('|');
-
-                const existingData = existingVariantData[attrKey] || {};
-                const variantId = existingData.variant_id || '';
-
-                // Get existing product attributes for this variant
-                const variantProductAttrs = existingData.product_attributes || [];
-
-                tableHTML += `<tr class="variant_row ${groupId}" data-variant-index="${originalIndex}" data-variant-id="${variantId}" style="background: white;">`;
-                tableHTML += `<td style="padding-left: 30px;"><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${originalIndex}, event)" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
-
-                // Show all option values
-                displayOptions.forEach(optionName => {
-                    const value = combo[optionName] || '';
-                    tableHTML += `<td>${value}</td>`;
-                });
-
-                // Try to read current form values first (preserves user input during re-render)
-                const priceInput = document.querySelector(`input[name="variant_price_${originalIndex + 1}"]`);
-                const costInput = document.querySelector(`input[name="variant_cost_${originalIndex + 1}"]`);
-                const quantityInput = document.querySelector(`input[name="variant_quantity_${originalIndex + 1}"]`);
-                const skuInput = document.querySelector(`input[name="variant_sku_${originalIndex + 1}"]`);
-                const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
-                const featuredInput = document.querySelector(`input[name="variant_featured_${originalIndex + 1}"]`);
-
-                const price = priceInput?.value || existingData.price || '';
-                const cost = costInput?.value || existingData.cost || '';
-                const quantity = quantityInput?.value || existingData.quantity || '';
-                const sku = skuInput?.value || existingData.sku || '';
-                const barcode = barcodeInput?.value || existingData.barcode || '';
-                const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
-
-                // Load existing images for this variant
-                if (existingData.images && existingData.images.length > 0 && !variantImages[originalIndex]) {
-                    variantImages[originalIndex] = {
-                        images: existingData.images,
-                        primaryIndex: 0
-                    };
-                }
-
-                const variantImagesHtml = renderVariantImages(originalIndex);
-
-                tableHTML += `
-                <td><input type="number" name="variant_price_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;" oninput="updateGroupPriceRange('${groupId}')"></td>
-                <td><input type="number" name="variant_cost_${originalIndex + 1}" step="0.01" placeholder="0.00" value="${cost}" style="min-width: 100px;"></td>
-                <td><input type="number" name="variant_quantity_${originalIndex + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
-                <td>
-                    <button type="button" class="photo_picker_btn" onclick="openImagePicker(${originalIndex})" title="Select images">
-                        <i class="fa fa-camera"></i>
-                    </button>
-                    <div class="variant_images_preview" id="variant_images_${originalIndex}">
-                        ${variantImagesHtml}
-                    </div>
-                </td>
-                <td><input type="text" name="variant_sku_${originalIndex + 1}" value="${sku}" style="min-width: 120px;${variantId ? ' background: #f3f4f6; color: #6b7280;' : ''}" ${variantId ? 'readonly title="SKU cannot be changed for existing variants"' : ''}></td>
-                <td><input type="text" name="variant_barcode_${originalIndex + 1}" value="${barcode}" style="min-width: 120px;"></td>
-                <td style="text-align: center;"><input type="checkbox" name="variant_featured_${originalIndex + 1}" ${featured ? 'checked' : ''}></td>
-                <td style="text-align: center;">
-                    <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${originalIndex}, '${sku}')" 
-                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);"
-                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.3)'"
-                            onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.2)'">
-                        <i class="fa fa-tags"></i>
-                        <span class="attr-count" id="attr_count_${originalIndex}">${variantProductAttrs.length}</span>
-                    </button>
-                </td>
-            </tr>`;
+                tableHTML += generateRowHTML(combo, originalIndex, displayOptions, groupId);
             });
         });
     } else {
         // No grouping - show all variants flat
         allCombinations.forEach((combo, index) => {
-            // Skip deleted variants
-            if (deletedVariantIndices.has(index)) return;
-
-            // Create key for looking up existing data - MUST BE FIRST
-            const attrKey = Object.entries(combo)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([key, val]) => `${key}:${val}`)
-                .join('|');
-
-            const existingData = existingVariantData[attrKey] || {};
-            const variantId = existingData.variant_id || '';
-
-            // Get existing product attributes for this variant
-            const variantProductAttrs = existingData.product_attributes || [];
-
-            tableHTML += `<tr data-variant-index="${index}" data-variant-id="${variantId}"><td><button type="button" class="btn_delete_variant" onclick="deleteVariantRow(${index}, event)" title="Delete variant"><i class="fa fa-trash"></i></button></td>`;
-
-            // Show all option values
-            displayOptions.forEach(optionName => {
-                const value = combo[optionName] || '';
-                tableHTML += `<td>${value}</td>`;
-            });
-
-            // Try to read current form values first (preserves user input during re-render)
-            const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
-            const costInput = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
-            const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
-            const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
-            const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
-            const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
-
-            const price = priceInput?.value || existingData.price || '';
-            const cost = costInput?.value || existingData.cost || '';
-            const quantity = quantityInput?.value || existingData.quantity || '';
-            const sku = skuInput?.value || existingData.sku || '';
-            const barcode = barcodeInput?.value || existingData.barcode || '';
-            const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
-
-            // Load existing images for this variant
-            if (existingData.images && existingData.images.length > 0 && !variantImages[index]) {
-                variantImages[index] = {
-                    images: existingData.images,
-                    primaryIndex: 0
-                };
-            }
-
-            const variantImagesHtml = renderVariantImages(index);
-
-            tableHTML += `
-                <td><input type="number" name="variant_price_${index + 1}" step="0.01" placeholder="0.00" value="${price}" style="min-width: 100px;"></td>
-                <td><input type="number" name="variant_cost_${index + 1}" step="0.01" placeholder="0.00" value="${cost}" style="min-width: 100px;"></td>
-                <td><input type="number" name="variant_quantity_${index + 1}" step="0.01" placeholder="0" value="${quantity}" style="min-width: 60px;"></td>
-                <td>
-                    <button type="button" class="photo_picker_btn" onclick="openImagePicker(${index})" title="Select images">
-                        <i class="fa fa-camera"></i>
-                    </button>
-                    <div class="variant_images_preview" id="variant_images_${index}">
-                        ${variantImagesHtml}
-                    </div>
-                </td>
-                <td><input type="text" name="variant_sku_${index + 1}" value="${sku}" style="min-width: 120px;${variantId ? ' background: #f3f4f6; color: #6b7280;' : ''}" ${variantId ? 'readonly title="SKU cannot be changed for existing variants"' : ''}></td>
-                <td><input type="text" name="variant_barcode_${index + 1}" value="${barcode}" style="min-width: 120px;"></td>
-                <td style="text-align: center;"><input type="checkbox" name="variant_featured_${index + 1}" ${featured ? 'checked' : ''}></td>
-                <td style="text-align: center;">
-                    <button type="button" class="attributes_btn" onclick="openVariantAttributesModal(${index}, '${sku}')" 
-                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);"
-                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(102, 126, 234, 0.3)'"
-                            onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 4px rgba(102, 126, 234, 0.2)'">
-                        <i class="fa fa-tags"></i>
-                        <span class="attr-count" id="attr_count_${index}">${variantProductAttrs.length}</span>
-                    </button>
-                </td>
-            </tr>`;
+            tableHTML += generateRowHTML(combo, index, displayOptions, '');
         });
     }
 
@@ -1438,16 +1408,6 @@ function updatePrimaryBadgeAfterSort(variantIndex) {
     container.querySelectorAll('.variant-sortable-image').forEach(img => {
         img.style.borderColor = '#e5e7eb';
     });
-
-    // Add badge to first
-    const first = container.querySelector('.variant-sortable-image');
-    if (first) {
-        first.style.borderColor = '#667eea';
-        const badge = document.createElement('div');
-        badge.textContent = 'PRIMARY';
-        badge.style.cssText = 'position: absolute; top: -6px; left: 4px; background: #667eea; color: white; padding: 1px 4px; border-radius: 8px; font-size: 8px; font-weight: 600;';
-        first.insertBefore(badge, first.firstChild);
-    }
 }
 
 // Remove image from variant - INSTANT delete with confirmation
@@ -1468,10 +1428,6 @@ async function removeVariantImage(variantIndex, imageIndex) {
     if (!confirmed) return;
 
     // If image has DB ID, delete from Cloudinary via API
-    // If image has DB ID, we originally deleted it here. 
-    // BUT for a shared pool system, we likely just want to UNLINK it from this variant, not delete the file entirely.
-    // The user can delete the file from the main library if they really want to.
-    /*
     if (img.id) {
         try {
             const response = await fetch('/marketing/api/instant_delete_file/', {
@@ -1488,23 +1444,30 @@ async function removeVariantImage(variantIndex, imageIndex) {
                 throw new Error(data.error || 'Silme işlemi başarısız');
             }
 
+            // Remove this image from ALL variants that share the same URL
+            const deletedUrl = data.deleted_url || img.url;
+            removeImageFromAllVariants(deletedUrl, variantIndex);
+
+            // Also remove from main product gallery if exists
+            removeImageFromMainGallery(deletedUrl);
+
             showToast('🗑️ Resim silindi!', 'success');
+            return; // Already handled UI update in removeImageFromAllVariants
         } catch (error) {
             console.error('Delete error:', error);
             showToast(`❌ Silme hatası: ${error.message}`, 'error');
             return; // Don't remove from UI if delete failed
         }
     }
-    */
 
-    // Remove from frontend array
+    // Remove from frontend array (for images not yet saved to DB)
     variantImages[variantIndex].images.splice(imageIndex, 1);
 
     // Adjust primary index if needed
     if (variantImages[variantIndex].images.length === 0) {
         variantImages[variantIndex].primaryIndex = 0;
     } else if (imageIndex === variantImages[variantIndex].primaryIndex) {
-        variantImages[variantIndex].primaryIndex = 0; // Set first as primary
+        variantImages[variantIndex].primaryIndex = 0;
     } else if (imageIndex < variantImages[variantIndex].primaryIndex) {
         variantImages[variantIndex].primaryIndex--;
     }
@@ -1515,198 +1478,222 @@ async function removeVariantImage(variantIndex, imageIndex) {
 
 // Open image picker modal
 let currentVariantIndex = null;
+let selectionOrder = []; // Track selection order [url1, url2, ...]
 
 async function openImagePicker(variantIndex) {
     currentVariantIndex = variantIndex;
 
-    // Determine if we are selecting for Main Product
-    const isMainProduct = (variantIndex === 'param_main');
-
-    // Initialize variant images if not exists (Only for variants)
-    if (!isMainProduct && !variantImages[variantIndex]) {
+    // Initialize variant images if not exists
+    if (!variantImages[variantIndex]) {
         variantImages[variantIndex] = { images: [], primaryIndex: 0 };
     }
 
-    // CLEAR uploadedImages and reload from scratch to prevent duplicates
-    uploadedImages = [];
+    // Initialize selectionOrder from existing images for this variant
+    // This preserves the established order
+    selectionOrder = variantImages[variantIndex].images.map(img => img.url).filter(url => url);
+    selectionSet = new Set(selectionOrder);
 
-    // Check if product edit or create mode
+    // Global uploadedImages array initialization
+    if (!uploadedImages) uploadedImages = [];
+
+    // Helper to normalize URL for comparison (remove query params, protocol variations)
+    const normalizeUrl = (url) => {
+        if (!url) return '';
+        // Remove query params
+        let normalized = url.split('?')[0];
+        // Remove trailing slashes
+        normalized = normalized.replace(/\/$/, '');
+        // Extract just the filename for comparison as a fallback
+        return normalized;
+    };
+
+    // Helper to add unique images to uploadedImages
+    const addUniqueImage = (newImg) => {
+        if (!newImg.url) return;
+
+        const normalizedNewUrl = normalizeUrl(newImg.url);
+        const existingIndex = uploadedImages.findIndex(img => normalizeUrl(img.url) === normalizedNewUrl);
+
+        if (existingIndex === -1) {
+            // New unique image - add it
+            uploadedImages.push(newImg);
+        } else {
+            // Duplicate found - prefer real filenames over "Main Image X" names
+            const existing = uploadedImages[existingIndex];
+            if (existing.name && existing.name.startsWith('Main Image') &&
+                newImg.name && !newImg.name.startsWith('Main Image')) {
+                // Replace with the better-named version
+                uploadedImages[existingIndex] = { ...existing, ...newImg, name: newImg.name };
+            }
+        }
+    };
+
+    // 1. Merge images from CURRENT variant (and all other variants)
+    Object.values(variantImages).forEach(vData => {
+        if (vData.images) {
+            vData.images.forEach(img => {
+                addUniqueImage({
+                    id: img.id,
+                    url: img.url,
+                    name: img.name,
+                    variant: null,
+                    file: img.file,
+                    file_type: img.file_type || 'image'
+                });
+            });
+        }
+    });
+
+    // 2. Scrape Main Product Images from DOM
+    // NOTE: Only do this for CREATE mode. In EDIT mode, the API call below provides accurate URLs.
+    // DOM scraping causes issues because videos show thumbnail URL in img.src, not the actual video URL.
     const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
-    const isCreateMode = window.location.pathname.includes('/product_create/');
 
+    if (!productEditMatch) {
+        // CREATE MODE: Scrape from DOM (no API available)
+        const mainImageGrid = document.getElementById('sortable_images');
+        if (mainImageGrid) {
+            const mainImages = mainImageGrid.querySelectorAll('.sortable-image');
+            Array.from(mainImages).forEach((imgDiv, idx) => {
+                const img = imgDiv.querySelector('img');
+                const imgUrl = img ? img.src : '';
+
+                if (imgUrl) {
+                    const fileType = imgDiv.dataset.fileType || (isVideoFile(imgUrl) ? 'video' : 'image');
+                    addUniqueImage({
+                        id: imgDiv.dataset.fileId || `main_img_${idx}`,
+                        url: imgUrl,
+                        name: `Main Image ${idx + 1}`,
+                        variant: null,
+                        file: null,
+                        temp_file: true,
+                        from_main: true,
+                        file_type: fileType
+                    });
+                }
+            });
+        }
+    }
+
+    // Check if product edit or create mode (already defined above)
+    // const productEditMatch = ...
+
+    // 3. In Edit Mode, fetch server-side pool (this catches images uploaded but not yet in DOM or variants)
     if (productEditMatch) {
-        // Edit mode: Load from API
         try {
             const response = await fetch(`/marketing/api/get_product_files/?product_id=${productEditMatch}`);
             const data = await response.json();
             if (data.success && data.files) {
-                // Replace uploadedImages with fresh data from API
-                uploadedImages = data.files.map(file => ({
-                    id: file.id,
-                    url: file.url,
-                    name: file.name,
-                    variant: file.variant || null,  // Include variant info from API
-                    file: null,  // No file object needed (already uploaded)
-                    file_type: file.file_type || 'image'  // 'image' or 'video'
-                }));
-                console.log(`Loaded ${uploadedImages.length} files from shared pool`);
+                data.files.forEach(file => {
+                    addUniqueImage({
+                        id: file.id,
+                        url: file.url,
+                        optimized_url: file.optimized_url || file.url,
+                        name: file.name,
+                        variant: file.variant || null,
+                        file: null,
+                        file_type: file.file_type || 'image'
+                    });
+                });
+                console.log(`Synced with server pool. Total images: ${uploadedImages.length}`);
             }
         } catch (error) {
             console.error('Error loading product files:', error);
         }
-    } else if (isCreateMode) {
-        // Create mode: Load from main product images grid (temp files)
-        const mainImageGrid = document.getElementById('sortable_images');
-        if (mainImageGrid) {
-            const mainImages = mainImageGrid.querySelectorAll('.sortable-image');
-            uploadedImages = Array.from(mainImages).map((imgDiv, idx) => {
-                const imgWrapper = imgDiv.querySelector('.image-wrapper img') || imgDiv.querySelector('img');
-                const fileType = imgDiv.dataset.fileType || (isVideoFile(imgWrapper?.src) ? 'video' : 'image');
-
-                if (imgWrapper) {
-                    return {
-                        id: imgDiv.dataset.fileId || `temp_${idx}`,
-                        url: imgWrapper.src,
-                        name: `File ${idx + 1}`,
-                        variant: null,
-                        file: null,
-                        temp_file: true,  // Mark as temporary
-                        file_type: fileType
-                    };
-                }
-                return null;
-            }).filter(Boolean); // Remove nulls
-            console.log(`Loaded ${uploadedImages.length} temp files from main grid`);
-        }
     }
 
-    // FIX: Merge images from existing variants into the pool
-    // This ensures that if we uploaded an image for Variant A (but it's not on Main Grid),
-    // it still shows up in the picker when we open it for Variant B or re-open for A.
-    if (variantImages) {
-        Object.values(variantImages).forEach(vData => {
-            if (vData.images) {
-                vData.images.forEach(img => {
-                    const exists = uploadedImages.some(u => u.url === img.url);
-                    if (!exists && img.url) {
-                        uploadedImages.push({
-                            id: img.id || `temp_var_${Date.now()}_${Math.random()}`,
-                            url: img.url,
-                            name: img.name || 'Variant Image',
-                            variant: null,
-                            file: img.file,
-                            temp_file: !img.id,
-                            file_type: img.file_type || (isVideoFile(img.url) ? 'video' : 'image')
-                        });
-                    }
-                });
-            }
-        });
-    }
+    // Sort uploadedImages? Maybe put selected ones first? 
+    // For now, preservation of order or simple append is fine.
+    // Maybe Main images first?
+    // uploadedImages.sort((a, b) => (a.from_main === b.from_main) ? 0 : a.from_main ? -1 : 1);
 
     // Create modal
     const modal = document.createElement('div');
     modal.id = 'image_picker_modal';
     modal.className = 'image_modal';
 
-    // Get currently selected images
-    let selectedImageUrls = [];
-    let primaryIndex = 0;
-
-    if (isMainProduct) {
-        // For Main Product: Get currently displayed images in the main grid
-        const mainGrid = document.getElementById('sortable_images');
-        if (mainGrid) {
-            selectedImageUrls = Array.from(mainGrid.querySelectorAll('.sortable-image')).map(div => {
-                const img = div.querySelector('img');
-                return img ? img.src : null;
-            }).filter(Boolean);
-        }
-    } else {
-        // For Variant: Get from variantImages memory
-        selectedImageUrls = variantImages[variantIndex].images.map(img => img.url).filter(url => url);
-        primaryIndex = variantImages[variantIndex].primaryIndex;
-    }
-
+    const selectedCount = selectionOrder.length;
     modal.innerHTML = `
-        <div class="image_modal_content">
-            <div class="image_modal_header">
-                <h3>Select Images</h3>
-                <button type="button" class="modal_close" onclick="closeImagePicker()">
-                    <i class="fa fa-times"></i>
-                </button>
+        <div class="imp_content">
+            <div class="imp_header">
+                <div class="imp_header_left">
+                    <h3>Media</h3>
+                    <span class="imp_count" id="imp_total_count">${uploadedImages.length} files</span>
+                </div>
+                <button type="button" class="imp_close" onclick="closeImagePicker()">&times;</button>
             </div>
-            <div class="image_modal_body">
-                <div class="image_upload_area">
-                    <button type="button" class="btn_upload" onclick="document.getElementById('image_file_input').click()">
-                        <i class="fa fa-plus"></i> Add File
+            <div class="imp_toolbar">
+                <div class="imp_dropzone" id="image_upload_dropzone">
+                    <input type="file" id="image_file_input" accept="image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/avi" multiple style="display:none;" onchange="handleImageUpload(event)">
+                    <button type="button" class="imp_upload_btn" onclick="document.getElementById('image_file_input').click()">
+                        <i class="fa fa-plus"></i> Upload
                     </button>
-                    <input type="file" id="image_file_input" accept="image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/avi" multiple style="display: none;" onchange="handleImageUpload(event)">
-                    <p>Drag and drop images or videos here</p>
-                    <small style="color: #6b7280;">Supports: JPG, PNG, GIF, WebP, MP4, MOV, WebM</small>
-                </div>
-                <div class="image_grid" id="image_grid">
-                    ${generateImageGrid(selectedImageUrls, primaryIndex)}
+                    <span class="imp_drop_hint">or drop files here</span>
                 </div>
             </div>
-            <div class="image_modal_footer">
-                <button type="button" class="btn_cancel" onclick="closeImagePicker()">Cancel</button>
-                <button type="button" class="btn_confirm" onclick="confirmImageSelection()">Done</button>
+            <div class="imp_body image_modal_body">
+                <div class="image_grid" id="image_grid">
+                    ${generateImageGrid()}
+                </div>
+            </div>
+            <div class="imp_footer">
+                <span class="imp_selection_info" id="imp_selection_info">${selectedCount > 0 ? selectedCount + ' selected' : 'Click images to select'}</span>
+                <div class="imp_footer_actions">
+                    <button type="button" class="imp_btn_cancel" onclick="closeImagePicker()">Cancel</button>
+                    <button type="button" class="imp_btn_done" onclick="confirmImageSelection()">Done</button>
+                </div>
             </div>
         </div>
     `;
 
     document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('show'), 10);
+    setTimeout(() => {
+        modal.classList.add('show');
+        updateSelectionBadges(); // Apply numbers after rendering
+    }, 10);
 }
 
 // Store uploaded images globally
 let uploadedImages = [];
 
 // Generate image grid from uploaded images
-function generateImageGrid(selectedImageUrls, primaryIndex) {
+function generateImageGrid() {
     if (uploadedImages.length === 0) {
-        return '<div class="no_images_message"><i class="fa fa-image"></i><p>No files uploaded yet. Use the \"Add File\" button above to add images or videos.</p></div>';
+        return '<div class="no_images_message"><i class="fa fa-cloud-upload-alt"></i><p>No files yet.<br>Upload images or videos to get started.</p></div>';
     }
 
     return uploadedImages.map((img, idx) => {
-        // Check if this image is selected by URL (for cross-variant matching)
-        const isSelected = img.url && selectedImageUrls.includes(img.url);
-        const selectedIndex = isSelected ? selectedImageUrls.indexOf(img.url) : -1;
-        const isPrimary = isSelected && selectedIndex === primaryIndex;
-
-        // Detect if file is a video
         const isVideo = isVideoFile(img.url) || img.file_type === 'video';
         const thumbnailUrl = isVideo ? getVideoThumbnailUrlVariant(img.url) : img.url;
 
-        // No variant badges - shared pool
+        const lazyAttr = idx > 9 ? 'loading="lazy"' : '';
+        const thumbHTML = isVideo
+            ? `<div class="imp_thumb_video">
+                   <img src="${thumbnailUrl}" alt="${img.name}" ${lazyAttr} onerror="this.style.display='none'">
+                   <div class="imp_play"><i class="fa fa-play"></i></div>
+               </div>`
+            : `<img class="imp_thumb" src="${thumbnailUrl}" alt="${img.name}" ${lazyAttr}>`;
 
-        if (isVideo) {
-            return `
-                <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="video" onclick="toggleImageSelection(this, event)">
-                    <div style="position: relative;">
-                        <img src="${thumbnailUrl}" alt="${img.name}" onerror="this.style.background='#1a1a2e'">
-                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; background: rgba(0,0,0,0.7); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                            <i class="fa fa-play" style="color: white; font-size: 12px; margin-left: 2px;"></i>
-                        </div>
+        return `
+            <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="${isVideo ? 'video' : 'image'}" onclick="toggleImageSelection(this, event)">
+                <div class="imp_card_media">
+                    ${thumbHTML}
+                    <div class="imp_bulk_check" onclick="toggleBulkCheck(this, event)" title="Select for bulk delete">
+                        <i class="fa fa-check"></i>
                     </div>
-                    <p>${img.name}</p>
-                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
-                        <i class="fa fa-trash"></i>
-                    </button>
+                    <div class="imp_card_check"><i class="fa fa-check"></i></div>
+                    <div class="imp_card_actions">
+                        <button type="button" class="imp_act_btn" onclick="event.stopPropagation(); window.openMediaPreview('${img.optimized_url || img.url}', '${isVideo ? 'video' : 'image'}', ${img.id || 'null'})" title="Preview">
+                            <i class="fa fa-expand"></i>
+                        </button>
+                        <button type="button" class="imp_act_btn imp_act_delete" onclick="removeUploadedImage(${idx}, event)" title="Delete">
+                            <i class="fa fa-trash-alt"></i>
+                        </button>
+                    </div>
                 </div>
-            `;
-        } else {
-            return `
-                <div class="image_item ${isSelected ? 'selected' : ''}" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="image" onclick="toggleImageSelection(this, event)">
-                    <img src="${img.url}" alt="${img.name}">
-                    <p>${img.name}</p>
-                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${idx}, event)" title="Delete">
-                        <i class="fa fa-trash"></i>
-                    </button>
-                </div>
-            `;
-        }
+                <div class="imp_card_name">${img.name}</div>
+            </div>
+        `;
     }).join('');
 }
 
@@ -1719,76 +1706,226 @@ function isVideoFile(url) {
     return /\.(mp4|mov|webm|avi|mkv|m4v|wmv)(\?.*)?$/i.test(lowerUrl);
 }
 
-// Generate video thumbnail URL for Cloudinary
+// Generate video thumbnail URL for Cloudinary videos
+// Returns empty string for non-Cloudinary (e.g., Bunny CDN) videos to use the gradient fallback
 function getVideoThumbnailUrlVariant(videoUrl) {
     if (!videoUrl) return '';
-    // Cloudinary transformation for video thumbnail
-    const transformed = videoUrl.replace('/upload/', '/upload/w_150,h_150,c_fill,so_0,f_jpg/');
-    return transformed.replace(/\.(mp4|mov|webm|avi|mkv|m4v)$/i, '.jpg');
-}
 
+    // Check if this is a Cloudinary URL (contains res.cloudinary.com or /upload/)
+    const isCloudinary = videoUrl.includes('res.cloudinary.com') ||
+        (videoUrl.includes('/upload/') && videoUrl.includes('cloudinary'));
 
-// Set primary image (only one can be primary)
-function setPrimaryImage(imageIndex, event) {
-    event.stopPropagation(); // Don't trigger toggleImageSelection
-
-    const clickedItem = document.querySelector(`.image_item[data-index="${imageIndex}"]`);
-    if (!clickedItem || !clickedItem.classList.contains('selected')) {
-        return; // Only selected images can be primary
+    if (isCloudinary) {
+        // Cloudinary transformation for video thumbnail
+        // w_300 = width, h_180 = height, c_fill = crop fill, so_0 = start at 0 seconds, f_jpg = jpg format
+        const transformed = videoUrl.replace('/upload/', '/upload/w_300,h_180,c_fill,so_0,f_jpg/');
+        return transformed.replace(/\.(mp4|mov|webm|avi|mkv|m4v)$/i, '.jpg');
     }
 
-    // Remove primary from all checkboxes
-    document.querySelectorAll('.image_checkbox input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-    });
-
-    // Set this one as primary
-    const thisCheckbox = clickedItem.querySelector('input[type="checkbox"]');
-    if (thisCheckbox) {
-        thisCheckbox.checked = true;
-    }
+    // For Bunny CDN or other providers, return empty to use gradient fallback
+    // (They don't support automatic thumbnail generation)
+    return '';
 }
 
-// Toggle image selection
+// Toggle image selection with Order Tracking
 function toggleImageSelection(element, event) {
-    // Don't toggle if clicking on checkbox or remove button
-    if (event.target.closest('.image_checkbox') || event.target.closest('.remove_image_btn')) {
+    // Don't toggle if clicking on action buttons
+    if (event.target.closest('.imp_act_btn, .imp_card_actions, .remove_image_btn')) {
         return;
     }
 
-    const isCurrentlySelected = element.classList.contains('selected');
-    const checkboxContainer = element.querySelector('.image_checkbox');
-    const checkbox = element.querySelector('input[type="checkbox"]');
+    const url = element.getAttribute('data-url');
+    if (!url) return;
 
-    if (isCurrentlySelected) {
-        // Deselect
-        const wasPrimary = checkbox && checkbox.checked;
-        element.classList.remove('selected');
-        if (checkboxContainer) checkboxContainer.style.display = 'none';
-        if (checkbox) checkbox.checked = false;
-
-        // If this was primary, make first selected image primary
-        if (wasPrimary) {
-            const remainingSelected = document.querySelectorAll('.image_item.selected');
-            if (remainingSelected.length > 0) {
-                const firstCheckbox = remainingSelected[0].querySelector('input[type="checkbox"]');
-                if (firstCheckbox) firstCheckbox.checked = true;
-            }
-        }
+    if (selectionSet.has(url)) {
+        // Deselect - use splice for O(1)-ish removal
+        const idx = selectionOrder.indexOf(url);
+        if (idx !== -1) selectionOrder.splice(idx, 1);
+        selectionSet.delete(url);
     } else {
         // Select
-        element.classList.add('selected');
-        if (checkboxContainer) checkboxContainer.style.display = 'block';
+        selectionOrder.push(url);
+        selectionSet.add(url);
+    }
 
-        // If this is the first selected image, make it primary
-        const allSelected = document.querySelectorAll('.image_item.selected');
-        if (allSelected.length === 1) {
-            if (checkbox) checkbox.checked = true;
+    // Update visual numbering
+    updateSelectionBadges();
+}
+
+// Fast lookup Set for selectionOrder (kept in sync)
+let selectionSet = new Set();
+
+// Update badges on all images to reflect their order in selectionOrder
+function updateSelectionBadges() {
+    // Sync Set with array
+    selectionSet = new Set(selectionOrder);
+
+    const allItems = document.querySelectorAll('.image_item');
+    allItems.forEach(item => {
+        const url = item.getAttribute('data-url');
+        const existingBadge = item.querySelector('.selection_badge');
+
+        if (selectionSet.has(url)) {
+            const orderIndex = selectionOrder.indexOf(url);
+            item.classList.add('selected');
+            if (orderIndex === 0) item.classList.add('primary');
+            else item.classList.remove('primary');
+
+            const isPrimary = orderIndex === 0;
+            if (existingBadge) {
+                // Update existing badge instead of removing/recreating
+                existingBadge.textContent = orderIndex + 1;
+                existingBadge.style.background = isPrimary ? '#10b981' : '#667eea';
+            } else {
+                // Create badge only if it doesn't exist
+                const badge = document.createElement('div');
+                badge.className = 'selection_badge';
+                badge.textContent = orderIndex + 1;
+                badge.style.cssText = `
+                    position:absolute; top:8px; left:8px;
+                    background:${isPrimary ? '#10b981' : '#667eea'};
+                    color:white; width:22px; height:22px; border-radius:50%;
+                    display:flex; align-items:center; justify-content:center;
+                    font-weight:700; font-size:11px; z-index:12;
+                    border:2px solid white;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+                    pointer-events:none;
+                `;
+                const media = item.querySelector('.imp_card_media');
+                if (media) media.appendChild(badge);
+            }
+        } else {
+            item.classList.remove('selected', 'primary');
+            if (existingBadge) existingBadge.remove();
         }
+    });
+
+    // Update footer info
+    const info = document.getElementById('imp_selection_info');
+    if (info) {
+        const count = selectionOrder.length;
+        info.textContent = count > 0 ? count + ' selected' : 'Click images to select';
     }
 }
 
-// Handle image upload - INSTANT upload to Cloudinary
+// ─── Ensure upload tracker is available (fallback if file_manager_modal.js not loaded yet) ───
+(function ensureTrackerFunctions() {
+    if (typeof window.createUploadTracker === 'function') return; // already defined
+
+    let _uploadTracker = null;
+    let _trackerCollapsed = false;
+
+    window.createUploadTracker = function(totalFiles) {
+        if (_uploadTracker) _uploadTracker.remove();
+        const t = document.createElement('div');
+        t.className = 'upload-tracker';
+        t.id = 'uploadTracker';
+        t.innerHTML = `
+            <div class="upload-tracker-header" onclick="window.toggleTrackerCollapse()">
+                <h4><span id="utTitle">Uploading <span id="utDoneCount">0</span> of ${totalFiles} items</span></h4>
+                <div class="ut-actions">
+                    <button onclick="event.stopPropagation(); window.toggleTrackerCollapse()" id="utCollapseBtn" title="Minimize"><i class="fa fa-chevron-down"></i></button>
+                    <button onclick="event.stopPropagation(); window.closeUploadTracker()" id="utCloseBtn" title="Close" style="display:none;"><i class="fa fa-times"></i></button>
+                </div>
+            </div>
+            <div class="ut-overall-progress"><div class="ut-overall-bar" id="utOverallBar" style="width:0%"></div></div>
+            <div class="upload-tracker-body" id="utBody"></div>`;
+        document.body.appendChild(t);
+        _uploadTracker = t;
+        _trackerCollapsed = false;
+
+        // Inject CSS if not present
+        if (!document.getElementById('ut-tracker-css')) {
+            const s = document.createElement('style');
+            s.id = 'ut-tracker-css';
+            s.textContent = `
+                .upload-tracker{position:fixed;bottom:24px;right:24px;width:360px;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.08);z-index:2147483647;overflow:hidden;animation:trackerSlideUp .35s cubic-bezier(.4,0,.2,1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+                .upload-tracker.closing{animation:trackerSlideDown .3s cubic-bezier(.4,0,.2,1) forwards}
+                .upload-tracker-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#1a1a2e;color:#fff;cursor:pointer;user-select:none}
+                .upload-tracker-header h4{margin:0;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+                .upload-tracker-header .ut-actions{display:flex;gap:8px;align-items:center}
+                .upload-tracker-header .ut-actions button{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;transition:all .15s}
+                .upload-tracker-header .ut-actions button:hover{color:#fff;background:rgba(255,255,255,.1)}
+                .upload-tracker-body{max-height:280px;overflow-y:auto;transition:max-height .3s ease}
+                .upload-tracker-body.collapsed{max-height:0}
+                .upload-tracker-body::-webkit-scrollbar{width:4px}
+                .upload-tracker-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+                .ut-file-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f1f5f9;animation:utRowFadeIn .3s ease}
+                .ut-file-row:last-child{border-bottom:none}
+                .ut-file-thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#f1f5f9}
+                .ut-file-info{flex:1;min-width:0}
+                .ut-file-name{font-size:13px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .ut-file-size{font-size:11px;color:#94a3b8;margin-top:2px}
+                .ut-file-status{flex-shrink:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+                .ut-spinner{width:20px;height:20px;border:2.5px solid #e2e8f0;border-top-color:#667eea;border-radius:50%;animation:utSpin .7s linear infinite}
+                .ut-check{color:#22c55e;font-size:18px;animation:utPop .3s cubic-bezier(.175,.885,.32,1.275)}
+                .ut-error{color:#ef4444;font-size:18px}
+                .ut-overall-progress{height:3px;background:#e2e8f0}
+                .ut-overall-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width .4s ease;border-radius:0 3px 3px 0}
+                @keyframes trackerSlideUp{from{transform:translateY(100px);opacity:0}to{transform:translateY(0);opacity:1}}
+                @keyframes trackerSlideDown{from{transform:translateY(0);opacity:1}to{transform:translateY(100px);opacity:0}}
+                @keyframes utRowFadeIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+                @keyframes utSpin{to{transform:rotate(360deg)}}
+                @keyframes utPop{0%{transform:scale(0)}100%{transform:scale(1)}}`;
+            document.head.appendChild(s);
+        }
+    };
+
+    window.addTrackerRow = function(file) {
+        const body = document.getElementById('utBody');
+        if (!body) return null;
+        const row = document.createElement('div');
+        row.className = 'ut-file-row';
+        const sizeStr = file.size > 1048576 ? (file.size/1048576).toFixed(1)+' MB' : (file.size/1024).toFixed(0)+' KB';
+        const thumbUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+        const thumbHTML = thumbUrl
+            ? `<img class="ut-file-thumb" src="${thumbUrl}" alt="">`
+            : `<div class="ut-file-thumb" style="display:flex;align-items:center;justify-content:center;background:#1a1a2e;color:#667eea;font-size:14px;"><i class="fa fa-film"></i></div>`;
+        row.innerHTML = `${thumbHTML}<div class="ut-file-info"><div class="ut-file-name">${file.name}</div><div class="ut-file-size">${sizeStr}</div></div><div class="ut-file-status"><div class="ut-spinner"></div></div>`;
+        body.appendChild(row);
+        body.scrollTop = body.scrollHeight;
+        return row;
+    };
+
+    window.updateTrackerRow = function(row, success) {
+        if (!row) return;
+        const s = row.querySelector('.ut-file-status');
+        s.innerHTML = success ? '<i class="fa fa-check-circle ut-check"></i>' : '<i class="fa fa-times-circle ut-error"></i>';
+    };
+
+    window.updateTrackerProgress = function(done, total) {
+        const bar = document.getElementById('utOverallBar');
+        const countEl = document.getElementById('utDoneCount');
+        const title = document.getElementById('utTitle');
+        if (bar) bar.style.width = `${(done/total)*100}%`;
+        if (countEl) countEl.textContent = done;
+        if (done >= total) {
+            if (title) title.innerHTML = `<i class="fa fa-check-circle" style="color:#22c55e"></i> ${total} file uploaded`;
+            const closeBtn = document.getElementById('utCloseBtn');
+            if (closeBtn) closeBtn.style.display = '';
+            setTimeout(() => window.closeUploadTracker(), 4000);
+        }
+    };
+
+    window.toggleTrackerCollapse = function() {
+        const body = document.getElementById('utBody');
+        const btn = document.getElementById('utCollapseBtn');
+        if (!body) return;
+        _trackerCollapsed = !_trackerCollapsed;
+        body.classList.toggle('collapsed', _trackerCollapsed);
+        if (btn) btn.innerHTML = _trackerCollapsed ? '<i class="fa fa-chevron-up"></i>' : '<i class="fa fa-chevron-down"></i>';
+    };
+
+    window.closeUploadTracker = function() {
+        const tracker = document.getElementById('uploadTracker');
+        if (tracker) {
+            tracker.classList.add('closing');
+            setTimeout(() => { tracker.remove(); _uploadTracker = null; }, 300);
+        }
+    };
+})();
+
+// Handle image upload - INSTANT upload with floating tracker
 async function handleImageUpload(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -1806,35 +1943,41 @@ async function handleImageUpload(event) {
     const variantId = productEditMatch ? getVariantId(currentVariantIndex) : null;
     console.log('Uploading to variant index:', currentVariantIndex, 'variant ID:', variantId);
 
-    // Process each file
+    // Filter valid files first
+    const validFiles = [];
     for (const file of files) {
-        // Check if it's an image or video
         const isImage = file.type.startsWith('image/');
         const isVideo = file.type.startsWith('video/');
 
         if (!isImage && !isVideo) {
-            console.warn(`${file.name} is not a supported file type.`);
             showToast(`⚠️ "${file.name}" is not a supported file type`, 'warning');
             continue;
         }
-
-        // Check for duplicate - skip if file with same name already exists
         const existingFile = uploadedImages.find(img => img.name === file.name);
         if (existingFile) {
-            console.log(`File ${file.name} already exists, skipping upload.`);
             showToast(`⚠️ "${file.name}" already exists`, 'warning');
             continue;
         }
+        validFiles.push(file);
+    }
 
-        // Store current DOM selections (by URL) BEFORE upload
-        const selectedUrls = new Set();
-        document.querySelectorAll('.image_item.selected').forEach(item => {
-            const url = item.getAttribute('data-url');
-            if (url) selectedUrls.add(url);
-        });
-        console.log('Stored selections before upload:', Array.from(selectedUrls));
+    if (validFiles.length === 0) { event.target.value = ''; return; }
 
-        // Show progress placeholder
+    // Create floating upload tracker
+    if (typeof window.createUploadTracker === 'function') {
+        window.createUploadTracker(validFiles.length);
+    }
+    let doneCount = 0;
+
+    // Process each file
+    for (const file of validFiles) {
+        // Add row to floating tracker
+        let trackerRow = null;
+        if (typeof window.addTrackerRow === 'function') {
+            trackerRow = window.addTrackerRow(file);
+        }
+
+        // Show progress placeholder in grid
         const grid = document.getElementById('image_grid');
         const placeholder = document.createElement('div');
         placeholder.className = 'image_item uploading';
@@ -1844,117 +1987,86 @@ async function handleImageUpload(event) {
             </div>
             <p>Uploading...</p>
         `;
-        if (grid) grid.appendChild(placeholder);
+        if (grid) grid.prepend(placeholder);
 
         try {
             const formData = new FormData();
             formData.append('file', file);
 
-            let apiUrl, data;
-
+            let data;
             if (isCreateMode) {
-                // Create mode: Use temp upload API
                 formData.append('file_type', 'variant_image');
                 formData.append('variant_temp_id', `variant_${currentVariantIndex}`);
                 formData.append('sequence', uploadedImages.length);
 
                 const response = await fetch('/marketing/api/temp_upload_file/', {
                     method: 'POST',
-                    headers: {
-                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
-                    },
+                    headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
                     body: formData
                 });
-
                 data = await response.json();
-
-                if (data.success) {
-                    // Add to uploadedImages from temp file data
-                    uploadedImages.push({
-                        url: data.file_data.url,
-                        name: data.file_data.name,
-                        file: null,
-                        id: data.file_data.public_id,  // Use public_id for temp files
-                        variant: null,
-                        temp_file: true
-                    });
-                }
             } else {
-                // Edit mode: Use instant upload API
                 formData.append('product_id', productEditMatch);
-                // DO NOT send variant_id - want files unlinked until form submit
-
                 const response = await fetch('/marketing/api/instant_upload_file/', {
                     method: 'POST',
-                    headers: {
-                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
-                    },
+                    headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
                     body: formData
                 });
-
                 data = await response.json();
-
-                if (data.success) {
-                    // Add to uploadedImages with real URL from Cloudinary
-                    uploadedImages.push({
-                        url: data.file.url,
-                        name: file.name,
-                        file: null,
-                        id: data.file.id,
-                        variant: null
-                    });
-                }
             }
 
-            if (data && data.success) {
-                // Remove placeholder
-                if (placeholder) placeholder.remove();
-
-                // Create and add the new image element instead of re-rendering entire grid
-                const newImage = uploadedImages[uploadedImages.length - 1];
-                const newIndex = uploadedImages.length - 1;
-
-                const newElement = document.createElement('div');
-                newElement.className = 'image_item';
-                newElement.setAttribute('data-url', newImage.url);
-                newElement.setAttribute('data-name', newImage.name);
-                newElement.setAttribute('data-index', newIndex);
-                newElement.onclick = function (e) { toggleImageSelection(this, e); };
-
-                newElement.innerHTML = `
-                    <img src="${newImage.url}" alt="${newImage.name}">
-                    <p>${newImage.name}</p>
-                    <button type="button" class="remove_image_btn" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
-                        <i class="fa fa-trash"></i>
-                    </button>
-                `;
-
-                if (grid) grid.appendChild(newElement);
-
-                // Reapply selections to all existing elements
-                if (grid) {
-                    grid.querySelectorAll('.image_item').forEach(item => {
-                        const itemUrl = item.getAttribute('data-url');
-                        if (selectedUrls.has(itemUrl)) {
-                            item.classList.add('selected');
-                        }
-                    });
-                }
-
-                showToast(`✅ ${file.name} uploaded to shared pool!`, 'success');
-            } else {
+            if (!data.success) {
                 throw new Error(data.error || 'Upload failed');
             }
+
+            // Normalize response data from both APIs
+            const fileUrl = isCreateMode ? data.file_data.url : data.file.url;
+            const fileId = isCreateMode ? data.file_data.public_id : data.file.id;
+            const fileType = (data.file && data.file.file_type) ? data.file.file_type : (isVideoFile(fileUrl) ? 'video' : 'image');
+
+            const isCloudinary = fileUrl.includes('/upload/');
+            const optimizedUrl = isCloudinary ? fileUrl.replace('/upload/', '/upload/f_auto,q_auto/') : fileUrl;
+
+            const newImage = {
+                url: fileUrl,
+                optimized_url: optimizedUrl,
+                name: file.name,
+                file: null,
+                id: fileId,
+                variant: null,
+                file_type: fileType,
+                temp_file: isCreateMode
+            };
+
+            // Insert at beginning so new uploads appear at top
+            uploadedImages.unshift(newImage);
+
+            // Remove placeholder and refresh grid
+            if (placeholder) placeholder.remove();
+            refreshImageGrid();
+
+            // Also add to main Media gallery instantly
+            addImageToMainGallery(newImage);
+
+            // Update tracker row - success
+            if (typeof window.updateTrackerRow === 'function') window.updateTrackerRow(trackerRow, true);
+
         } catch (error) {
             console.error('Upload error:', error);
             if (placeholder) placeholder.remove();
             showToast(`❌ Upload failed: ${error.message}`, 'error');
+            if (typeof window.updateTrackerRow === 'function') window.updateTrackerRow(trackerRow, false);
         }
-    }
 
-    // Clear the input so the same file can be uploaded again if needed
+        doneCount++;
+        if (typeof window.updateTrackerProgress === 'function') window.updateTrackerProgress(doneCount, validFiles.length);
+
+    } // End of for loop
+
+    // Clear the input so the same files can be uploaded again
     event.target.value = '';
-}
+} // End of handleImageUpload function
+
 
 // Get variant ID from table row
 function getVariantId(variantIndex) {
@@ -1964,242 +2076,261 @@ function getVariantId(variantIndex) {
     return (variantId && variantId.trim()) ? variantId : null;
 }
 
-// Confirm image selection
+// Confirm image selection using the Selection Order
 async function confirmImageSelection() {
-    const selectedItems = document.querySelectorAll('.image_item.selected');
-
-    if (selectedItems.length === 0) {
-        alert('Please select at least one image.');
-        return;
+    if (selectionOrder.length === 0) {
+        // Allow clearing selection? User said "First selected is primary", implying selection.
+        // But if they unchecked everything, they might want to clear images.
+        // Let's allow it if they really want, or just return.
+        // If they click Done with nothing selected, it clears the variant images.
     }
 
     const images = [];
 
-    selectedItems.forEach((item) => {
-        const imageUrl = item.getAttribute('data-url');
-        const imageName = item.getAttribute('data-name');
-
-        // Find the actual file object from uploadedImages
-        const uploadedImg = uploadedImages.find(img => img.url === imageUrl);
-
-        images.push({
-            url: imageUrl,
-            name: imageName,
-            file: uploadedImg ? uploadedImg.file : null,
-            id: uploadedImg ? uploadedImg.id : null,
-            file_type: uploadedImg ? uploadedImg.file_type : 'image'
-        });
+    // Construct images array in the order of selectionOrder
+    selectionOrder.forEach(url => {
+        const uploadedImg = uploadedImages.find(img => img.url === url);
+        if (uploadedImg) {
+            images.push({
+                url: url,
+                name: uploadedImg.name,
+                file: uploadedImg.file,
+                id: uploadedImg.id,
+                file_type: uploadedImg.file_type // Ensure file_type is carried over
+            });
+        }
     });
 
-    // Handle Main Product Image Selection
-    if (currentVariantIndex === null || currentVariantIndex === 'param_main') {
-        console.log('Selected images for MAIN PRODUCT:', images);
-
-        // Update the main product preview grid
-        updateMainProductImagePreview(images);
-
-        showToast(`✅ ${images.length} image(s) selected for Product`, 'success');
-        closeImagePicker();
-        return;
+    // Check for images that were unselected (removed from this variant)
+    if (variantImages[currentVariantIndex] && variantImages[currentVariantIndex].images) {
+        const oldImages = variantImages[currentVariantIndex].images;
+        const newImageIds = images.map(i => i.id).filter(id => id);
+        
+        oldImages.forEach(oldImg => {
+            if (oldImg.id && !newImageIds.includes(oldImg.id)) {
+                // This image was unselected, notify backend to remove link
+                unlinkedVariantFiles.add(oldImg.id);
+                console.log(`Unlinked image ${oldImg.id} from variant ${currentVariantIndex}`);
+            }
+        });
     }
 
-    // Handle Variant Image Selection
-    // Store selected images - first image is always primary
+    // Store selected images
     variantImages[currentVariantIndex] = {
         images: images,
-        primaryIndex: 0  // First image is always primary
+        primaryIndex: 0  // First image in the ordered list is always primary
     };
 
-    console.log(`Variant ${currentVariantIndex} images:`, variantImages[currentVariantIndex]);
+    console.log(`Variant ${currentVariantIndex} images updated (count: ${images.length})`);
 
-    // Note: Images are NOT linked to variant here
-    // They will be linked when form is submitted
-    showToast(`✅ ${images.length} image(s) selected for variant`, 'success');
+    showToast(`✅ ${images.length} image(s) updated for variant`, 'success');
 
-    // Update preview in table
-    updateVariantImagePreview(currentVariantIndex);
+    // Also update the simple icon in the table (we changed the render function to use a single icon)
+    // We need to re-render that cell ideally, or just the whole table row content?
+    // updateVariantTable() might be too heavy.
+    // Ideally updateVariantImagePreview should handle the DOM update for the icon column now.
+    // But updateVariantImagePreview implementation in our previous step was assuming the OLD layout (inside a div id="variant_images_X").
+    // We moved the image to a new column.
+
+    // Let's trigger a table update to be safe and clean, or update the specific cell manually.
+    // For now, let's call updateVariantTable() if it's cheap enough, or better:
+    // Update the innerHTML of the cell wrapper.
+    updateVariantIconInTable(currentVariantIndex);
 
     closeImagePicker();
 }
 
-// Update Main Product Image Preview Grid
-function updateMainProductImagePreview(images) {
-    // Try to find the container
-    let container = document.getElementById('sortable_images');
-    if (!container) {
-        // Fallback or create if missing (should be there in form)
-        console.error('Main image container #sortable_images not found');
-        return;
+// Helper to update the specific icon cell in table without re-rendering whole table
+function updateVariantIconInTable(variantIndex) {
+    // We need to find the cell for this variant
+    // In grouped view, finding by index is tricky if we don't have direct reference.
+    // But we have data-variant-index on the TR.
+    const row = document.querySelector(`tr[data-variant-index="${variantIndex}"]`);
+    if (!row) return; // Might be hidden or filtered?
+
+    // Re-render the table to be 100% sure we get the correct state including grouping/badges etc.
+    const select = document.getElementById('grouping_select');
+    const selectedGrouping = select ? select.value : null;
+
+    if (typeof renderVariantTable === 'function') {
+        renderVariantTable(allCombinations, selectedGrouping);
     }
+}
 
-    // Clear existing images but KEEP the "Add" button
-    const addBtn = container.querySelector('.media-upload-area') || container.querySelector('#openFileManagerBtn') || container.querySelector('#openFileManagerBtnCreate');
+// Animate-out and remove a single DOM element
+function animateRemoveItem(el) {
+    el.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+    el.style.transform = 'scale(0.7)';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 250);
+}
 
-    // Store add button HTML to restore it
-    const addBtnHTML = addBtn ? addBtn.outerHTML : '';
+// Fire-and-forget backend delete (no await, no blocking)
+function deleteImageInBackground(image) {
+    if (!image || !image.id) return;
+    fetch('/marketing/api/instant_delete_file/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
+        },
+        body: JSON.stringify({ file_id: image.id })
+    }).catch(err => console.error('Background delete error:', err));
+}
 
-    // Clear container
-    container.innerHTML = '';
-
-    // Render images
-    images.forEach((img, idx) => {
-        const div = document.createElement('div');
-        div.className = 'sortable-image';
-        div.setAttribute('data-file-id', img.id || '');
-        div.setAttribute('data-file-type', img.file_type || 'image');
-
-        let content = '';
-        if (img.file_type === 'video' || isVideoFile(img.url)) {
-            const thumbUrl = getVideoThumbnailUrlVariant(img.url);
-            content = `
-                <div class="image-wrapper">
-                    <img src="${thumbUrl}" alt="${img.name}" onerror="this.src='/static/erp/img/placeholder.png'">
-                    <div class="video-overlay"><i class="fa fa-play"></i></div>
-                </div>
-             `;
-        } else {
-            content = `
-                <img src="${img.url}" alt="${img.name}" onerror="this.src='/static/erp/img/placeholder.png'">
-             `;
+// Remove image from all in-memory state
+function removeImageFromState(image) {
+    uploadedImages = uploadedImages.filter(img => img.url !== image.url);
+    selectionOrder = selectionOrder.filter(url => url !== image.url);
+    selectionSet.delete(image.url);
+    Object.values(variantImages).forEach(vi => {
+        if (vi && vi.images) {
+            vi.images = vi.images.filter(img => img.url !== image.url);
         }
-
-        div.innerHTML = `
-            ${content}
-            <div class="sortable-image-actions">
-                <button type="button" class="action-btn delete-btn" onclick="this.closest('.sortable-image').remove()">
-                    <i class="fa fa-trash"></i>
-                </button>
-            </div>
-            ${idx === 0 ? '<div class="primary-badge">Primary</div>' : ''}
-        `;
-        container.appendChild(div);
     });
+}
 
-    // Restore Add Button
-    if (addBtnHTML) {
-        // Create a wrapper or temp div to parse string to DOM if needed, or just append HTML
-        // But better to re-append the original element if we removed it, 
-        // OR re-create it using the HTML string.
-        const btnContainer = document.createElement('div');
-        btnContainer.innerHTML = addBtnHTML;
-        const newBtn = btnContainer.firstElementChild;
-
-        // WIRE UP CLICK EVENT again because innerHTML wiped listeners
-        // Check ID to determine which handler
-        if (newBtn.id === 'openFileManagerBtn' || newBtn.id === 'openFileManagerBtnCreate') {
-            newBtn.onclick = function () { openImagePicker('param_main'); };
-        }
-
-        container.appendChild(newBtn);
-    }
-
-    // Re-initialize sortable if needed
-    if (typeof initSortable === 'function') {
-        initSortable();
+// Update file count in header
+function updateFileCount() {
+    const countEl = document.getElementById('imp_total_count');
+    if (countEl) countEl.textContent = `${uploadedImages.length} files`;
+    const grid = document.getElementById('image_grid');
+    if (grid && uploadedImages.length === 0) {
+        grid.innerHTML = '<div class="no_images_message"><i class="fa fa-cloud-upload-alt"></i><p>No files yet.<br>Upload images or videos to get started.</p></div>';
     }
 }
 
-// Update variant image preview in table
-function updateVariantImagePreview(variantIndex) {
-    const previewContainer = document.getElementById(`variant_images_${variantIndex}`);
-    if (!previewContainer) return;
-
-    previewContainer.innerHTML = renderVariantImages(variantIndex);
-}
-
-// Remove uploaded image - INSTANT delete
+// Remove single image - instant UI, background backend
 async function removeUploadedImage(index, event) {
-    event.stopPropagation(); // Prevent toggling selection
+    event.stopPropagation();
 
-    const image = uploadedImages[index];
+    const clickedItem = event.target.closest('.image_item');
+    const imageUrl = clickedItem ? clickedItem.getAttribute('data-url') : null;
+    const image = imageUrl ? uploadedImages.find(img => img.url === imageUrl) : uploadedImages[index];
     if (!image) return;
 
-    // Get the element to remove
-    const elementToRemove = document.querySelector(`.image_item[data-index="${index}"]`);
-    if (!elementToRemove) return;
+    const confirmed = await window.showConfirmDialog('Delete Image?', 'This action cannot be undone.', 'Delete', 'Cancel');
+    if (!confirmed) return;
 
-    // Use modern confirmation
+    // 1. Animate out immediately
+    if (clickedItem) animateRemoveItem(clickedItem);
+
+    // 2. Remove from state
+    removeImageFromState(image);
+    updateFileCount();
+    updateSelectionBadges();
+
+    // 3. Remove from main product gallery + variant table previews
+    removeFromMainGalleryAndVariants(image.url);
+
+    // 4. Backend in background
+    deleteImageInBackground(image);
+
+    showToast('🗑️ Image deleted!', 'success');
+}
+
+// Bulk delete - instant UI, background backend
+async function bulkDeleteSelectedImages() {
+    const checkedItems = document.querySelectorAll('.image_item .imp_bulk_check.checked');
+    if (checkedItems.length === 0) return;
+
+    const items = [];
+    checkedItems.forEach(chk => {
+        const el = chk.closest('.image_item');
+        if (el) items.push({ el, url: el.getAttribute('data-url') });
+    });
+
     const confirmed = await window.showConfirmDialog(
-        'Delete Image?',
-        'This action cannot be undone.',
-        'Delete',
-        'Cancel'
+        `Delete ${items.length} images?`, 'This action cannot be undone.', 'Delete All', 'Cancel'
     );
+    if (!confirmed) return;
 
-    if (confirmed) {
-        // Store selections AFTER dialog closes (captures current state)
-        const selectedUrls = new Set();
-        document.querySelectorAll('.image_item.selected').forEach(item => {
-            const url = item.getAttribute('data-url');
-            if (url && url !== image.url) {
-                selectedUrls.add(url);
-            }
-        });
-        console.log('Stored selections before delete:', Array.from(selectedUrls));
+    // 1. Staggered animate out
+    items.forEach((item, i) => {
+        setTimeout(() => animateRemoveItem(item.el), i * 60);
+    });
 
-        // If image has DB ID, delete from backend
-        if (image.id) {
-            try {
-                const response = await fetch('/marketing/api/instant_delete_file/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
-                    },
-                    body: JSON.stringify({ file_id: image.id })
-                });
-
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Delete failed');
-                }
-
-                showToast('🗑️ Image deleted!', 'success');
-            } catch (error) {
-                console.error('Delete error:', error);
-                showToast(`❌ Delete failed: ${error.message}`, 'error');
-                return;
-            }
+    // 2. Remove from state + fire backend deletes + remove from main gallery
+    items.forEach(item => {
+        const image = uploadedImages.find(img => img.url === item.url);
+        if (image) {
+            removeImageFromState(image);
+            deleteImageInBackground(image);
+            removeFromMainGalleryAndVariants(image.url);
         }
+    });
 
-        // Remove from uploadedImages array
-        uploadedImages.splice(index, 1);
+    setTimeout(() => {
+        updateFileCount();
+        updateSelectionBadges();
+        hideBulkDeleteBar();
+    }, items.length * 60 + 300);
 
-        // Also remove from variantImages selections if it was selected
-        if (variantImages[currentVariantIndex]) {
-            variantImages[currentVariantIndex].images = variantImages[currentVariantIndex].images.filter(
-                img => img.id !== image.id
-            );
-        }
+    showToast(`🗑️ ${items.length} image(s) deleted!`, 'success');
+}
 
-        // Remove element from DOM
-        elementToRemove.remove();
+// Re-render the entire image grid (used after upload)
+function refreshImageGrid() {
+    const grid = document.getElementById('image_grid');
+    if (!grid) return;
 
-        // Update data-index attributes for remaining elements
-        const grid = document.getElementById('image_grid');
-        if (grid) {
-            grid.querySelectorAll('.image_item').forEach((item, newIndex) => {
-                item.setAttribute('data-index', newIndex);
-                // Update onclick handler for remove button
-                const removeBtn = item.querySelector('.remove_image_btn');
-                if (removeBtn) {
-                    removeBtn.setAttribute('onclick', `removeUploadedImage(${newIndex}, event)`);
-                }
-
-                // Reapply selection if this item was selected
-                const itemUrl = item.getAttribute('data-url');
-                if (selectedUrls.has(itemUrl)) {
-                    item.classList.add('selected');
-                    console.log('Reapplied selection to:', itemUrl);
-                }
-            });
-
-            // Show empty message if no images left
-            if (uploadedImages.length === 0) {
-                grid.innerHTML = '<div class="no_images_message"><i class="fa fa-image"></i><p>No images uploaded yet. Use the "Add File" button above to add images.</p></div>';
-            }
-        }
+    if (uploadedImages.length === 0) {
+        grid.innerHTML = '<div class="no_images_message"><i class="fa fa-cloud-upload-alt"></i><p>No files yet.<br>Upload images or videos to get started.</p></div>';
+    } else {
+        grid.innerHTML = generateImageGrid();
     }
+
+    selectionOrder.forEach(url => {
+        const item = grid.querySelector(`.image_item[data-url="${CSS.escape(url)}"]`);
+        if (item) item.classList.add('selected');
+    });
+    updateSelectionBadges();
+    updateFileCount();
+    updateBulkDeleteCount();
+}
+
+// Toggle bulk-select checkbox
+function toggleBulkCheck(el, event) {
+    event.stopPropagation();
+    el.classList.toggle('checked');
+    updateBulkDeleteCount();
+}
+
+// Show/hide bulk delete bar
+function updateBulkDeleteCount() {
+    const checked = document.querySelectorAll('.image_item .imp_bulk_check.checked').length;
+    let bar = document.getElementById('bulkDeleteBar');
+    if (checked > 0) {
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'bulkDeleteBar';
+            bar.className = 'imp_bulk_bar';
+            const toolbar = document.querySelector('.imp_toolbar');
+            if (toolbar) toolbar.after(bar);
+        }
+        bar.innerHTML = `
+            <span><strong>${checked}</strong> selected</span>
+            <button type="button" class="imp_bulk_delete_btn" onclick="bulkDeleteSelectedImages()">
+                <i class="fa fa-trash-alt"></i> Delete Selected
+            </button>
+            <button type="button" class="imp_bulk_cancel_btn" onclick="clearBulkSelection()">
+                Cancel
+            </button>
+        `;
+        bar.style.display = 'flex';
+    } else {
+        hideBulkDeleteBar();
+    }
+}
+
+function hideBulkDeleteBar() {
+    const bar = document.getElementById('bulkDeleteBar');
+    if (bar) bar.style.display = 'none';
+}
+
+function clearBulkSelection() {
+    document.querySelectorAll('.imp_bulk_check.checked').forEach(el => el.classList.remove('checked'));
+    hideBulkDeleteBar();
 }
 
 // Close image picker modal
@@ -2314,12 +2445,6 @@ function prepareVariantsForSubmission() {
 
 // Handle form submission
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Variant form script loaded");
-
-    // Attach getCookie to window if not already present
-    if (!window.getCookie) {
-        window.getCookie = getCookie;
-    }
     const productForm = document.getElementById('product_form');
     if (productForm) {
         productForm.addEventListener('submit', function (e) {
@@ -2467,39 +2592,96 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Update grouping dropdown options
+// Update grouping dropdown options + popover
 function updateGroupingOptions() {
     const select = document.getElementById('grouping_select');
+    const grpContainer = document.getElementById('grp_container');
+    const grpOptions = document.getElementById('grp_options');
+    const grpSelectedText = document.getElementById('grp_selected_text');
     if (!select) return;
 
-    // Get unique option names (filter out duplicates)
     const optionNames = Object.values(variantData)
         .filter(d => d.name)
         .map(d => d.name);
 
-    // Remove duplicate names (case-insensitive)
     const uniqueNames = [...new Set(optionNames.map(n => n.toLowerCase()))];
 
-    // If no options, hide table and grouping
     if (uniqueNames.length === 0) {
         const table = document.getElementById('variant_table');
-        const grouping = document.getElementById('variant_grouping');
         if (table) table.style.display = 'none';
-        if (grouping) grouping.style.display = 'none';
+        if (grpContainer) grpContainer.style.display = 'none';
         select.innerHTML = '';
         return;
     }
 
+    // Update hidden select
     let optionsHTML = '';
     uniqueNames.forEach(name => {
         optionsHTML += `<option value="${name}">${name}</option>`;
     });
-
     select.innerHTML = optionsHTML;
+    if (select.options.length > 0) select.selectedIndex = 0;
 
-    // Auto-select first option after updating
-    if (select.options.length > 0) {
-        select.selectedIndex = 0;
+    // Build popover options
+    if (grpOptions) {
+        let html = '';
+        uniqueNames.forEach((name, idx) => {
+            html += `<div class="grp_option${idx === 0 ? ' active' : ''}" data-value="${name}" onclick="selectGroupingOption(this)">
+                <span>${name}</span>
+                <span class="grp_option_check"><i class="fa fa-check"></i></span>
+            </div>`;
+        });
+        grpOptions.innerHTML = html;
+    }
+    if (grpSelectedText) grpSelectedText.textContent = uniqueNames[0];
+    if (grpContainer) grpContainer.style.display = 'inline-flex';
+}
+
+// Toggle popover open/close
+function toggleGroupingPopover() {
+    const popover = document.getElementById('grp_popover');
+    if (!popover) return;
+    popover.classList.toggle('open');
+
+    // Close on outside click
+    if (popover.classList.contains('open')) {
+        setTimeout(() => {
+            document.addEventListener('click', closeGroupingPopoverOutside);
+        }, 0);
+    }
+}
+
+function closeGroupingPopoverOutside(e) {
+    const wrap = document.querySelector('.grp_trigger_wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        const popover = document.getElementById('grp_popover');
+        if (popover) popover.classList.remove('open');
+        document.removeEventListener('click', closeGroupingPopoverOutside);
+    }
+}
+
+// Select an option from popover
+function selectGroupingOption(el) {
+    const value = el.dataset.value;
+
+    // Update active state
+    document.querySelectorAll('.grp_option').forEach(o => o.classList.remove('active'));
+    el.classList.add('active');
+
+    // Update trigger text
+    const grpSelectedText = document.getElementById('grp_selected_text');
+    if (grpSelectedText) grpSelectedText.textContent = value;
+
+    // Close popover
+    const popover = document.getElementById('grp_popover');
+    if (popover) popover.classList.remove('open');
+    document.removeEventListener('click', closeGroupingPopoverOutside);
+
+    // Sync hidden select & filter
+    const select = document.getElementById('grouping_select');
+    if (select) {
+        select.value = value;
+        filterVariantTableByGroup();
     }
 }
 
@@ -2586,8 +2768,8 @@ async function deleteVariantRow(index, event) {
             // If no variants left, hide table and grouping
             if (remainingRows === 0) {
                 table.style.display = 'none';
-                const grouping = document.getElementById('variant_grouping');
-                if (grouping) grouping.style.display = 'none';
+                const _grp2 = document.getElementById('grp_container');
+                if (_grp2) _grp2.style.display = 'none';
                 console.log('No variants left - hiding table');
             }
         }
@@ -2983,3 +3165,215 @@ function checkDuplicateSku(input) {
 }
 
 
+
+// Variant Detail Modal Functions
+
+function openVariantDetailModal(variantIndex) {
+    currentEditingVariantIndex = variantIndex;
+    const modal = document.getElementById('variant_detail_modal');
+    if (!modal) return;
+
+    // Get current values from hidden inputs
+    // We can rely on the hidden inputs we just generated in renderVariantTable
+    // Note: renderVariantTable MUST have been called at least once.
+
+    // Select inputs using variant index (1-based for name attributes)
+    const idx = variantIndex + 1;
+    const price = document.querySelector(`input[name="variant_price_${idx}"]`)?.value || '';
+    const cost = document.querySelector(`input[name="variant_cost_${idx}"]`)?.value || '';
+    const sku = document.querySelector(`input[name="variant_sku_${idx}"]`)?.value || '';
+    const barcode = document.querySelector(`input[name="variant_barcode_${idx}"]`)?.value || '';
+    const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
+    const isActive = activeInput ? (activeInput.value === 'true') : true;
+
+    // Populate modal inputs
+    const priceEl = document.getElementById('modal_variant_price');
+    const costEl = document.getElementById('modal_variant_cost');
+    const skuEl = document.getElementById('modal_variant_sku');
+    const barcodeEl = document.getElementById('modal_variant_barcode');
+    const activeEl = document.getElementById('modal_variant_active');
+
+    if (priceEl) priceEl.value = price;
+    if (costEl) costEl.value = cost;
+    if (skuEl) skuEl.value = sku;
+    if (barcodeEl) barcodeEl.value = barcode;
+    if (activeEl) activeEl.checked = isActive;
+
+    const titleEl = document.getElementById('variant_modal_title');
+    if (titleEl) titleEl.textContent = `Edit Variant #${idx}`;
+
+    modal.style.display = 'flex';
+}
+
+function closeVariantDetailModal() {
+    const modal = document.getElementById('variant_detail_modal');
+    if (modal) {
+        modal.style.display = 'none';
+        // Remove hash to clean URL if needed
+        // window.location.hash = '';
+    }
+    currentEditingVariantIndex = null;
+}
+
+function saveVariantDetailModal() {
+    if (currentEditingVariantIndex === null) return;
+
+    const idx = currentEditingVariantIndex + 1;
+
+    // Get values from modal
+    const price = document.getElementById('modal_variant_price').value;
+    const cost = document.getElementById('modal_variant_cost').value;
+    const sku = document.getElementById('modal_variant_sku').value;
+    const barcode = document.getElementById('modal_variant_barcode').value;
+    const isActive = document.getElementById('modal_variant_active').checked;
+
+    // Update DOM inputs (hidden and visible)
+    const priceInput = document.querySelector(`input[name="variant_price_${idx}"]`);
+    const costInput = document.querySelector(`input[name="variant_cost_${idx}"]`);
+    const skuInput = document.querySelector(`input[name="variant_sku_${idx}"]`);
+    const barcodeInput = document.querySelector(`input[name="variant_barcode_${idx}"]`);
+    const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
+
+    if (priceInput) priceInput.value = price;
+    if (costInput) costInput.value = cost;
+    if (skuInput) skuInput.value = sku;
+    if (barcodeInput) barcodeInput.value = barcode;
+    if (activeInput) activeInput.value = isActive;
+
+    // Trigger price range update if explicit group row exists
+    const row = document.querySelector(`tr[data-variant-index="${currentEditingVariantIndex}"]`);
+    if (row && row.classList.length > 1) {
+        row.classList.forEach(cls => {
+            if (cls.startsWith('group_')) {
+                // Check if updateGroupPriceRange exists before calling
+                if (typeof updateGroupPriceRange === 'function') {
+                    updateGroupPriceRange(cls);
+                }
+            }
+        });
+    }
+
+    closeVariantDetailModal();
+}
+
+// Remove a deleted image URL from ALL variant image arrays and update their UI
+function removeImageFromAllVariants(deletedUrl) {
+    if (!deletedUrl) return;
+
+    Object.keys(variantImages).forEach(vIdx => {
+        const vi = variantImages[vIdx];
+        if (!vi || !vi.images) return;
+
+        const before = vi.images.length;
+        vi.images = vi.images.filter(img => img.url !== deletedUrl);
+
+        if (vi.images.length !== before) {
+            // Reset primary index
+            if (vi.images.length === 0) {
+                vi.primaryIndex = 0;
+            } else if (vi.primaryIndex >= vi.images.length) {
+                vi.primaryIndex = 0;
+            }
+            updateVariantImagePreview(parseInt(vIdx));
+        }
+    });
+}
+
+// Remove a deleted image from main gallery + all variant table previews
+function removeFromMainGalleryAndVariants(deletedUrl) {
+    if (!deletedUrl) return;
+    removeImageFromMainGallery(deletedUrl);
+    if (typeof removeImageFromAllVariants === 'function') {
+        removeImageFromAllVariants(deletedUrl);
+    }
+}
+
+// Add a newly uploaded image to the main Media gallery instantly
+function addImageToMainGallery(image) {
+    if (!image || !image.url) return;
+
+    const gallery = document.getElementById('sortable_images');
+    if (!gallery) return;
+
+    // Don't add duplicates
+    const normalizedUrl = image.url.split('?')[0];
+    const exists = Array.from(gallery.querySelectorAll('.media-item img, .sortable-image img'))
+        .some(img => img.src.split('?')[0] === normalizedUrl);
+    if (exists) return;
+
+    const isVideo = image.file_type === 'video';
+    const displayUrl = image.optimized_url || image.url;
+    const fileId = image.id || '';
+
+    const div = document.createElement('div');
+    div.className = 'media-item sortable-image';
+    div.dataset.fileId = fileId;
+    div.dataset.fileType = image.file_type || 'image';
+    div.style.cssText = 'opacity:0; transform:scale(0.8); transition: opacity 0.3s ease, transform 0.3s ease;';
+
+    div.innerHTML = `
+        <div class="media-preview" onclick="openMediaPreview('${displayUrl}', '${image.file_type || 'image'}', ${fileId || 'null'})">
+            ${isVideo
+                ? `<img src="${displayUrl}" /><div class="play-icon"><i class="fa fa-play"></i></div>`
+                : `<img src="${displayUrl}" /><div class="preview-icon"><i class="fa fa-search-plus"></i></div>`
+            }
+        </div>
+        <div class="media-actions">
+            <button type="button" class="icon-btn delete-btn instant-delete-btn" data-file-id="${fileId}">
+                <i class="fa fa-trash"></i>
+            </button>
+            <div class="drag-handle"><i class="fa fa-grip-vertical"></i></div>
+        </div>
+    `;
+
+    // Insert before the "Add Media" placeholder
+    const placeholder = gallery.querySelector('.media-upload-placeholder');
+    if (placeholder) {
+        gallery.insertBefore(div, placeholder);
+    } else {
+        gallery.appendChild(div);
+    }
+
+    // Animate in
+    requestAnimationFrame(() => {
+        div.style.opacity = '1';
+        div.style.transform = 'scale(1)';
+    });
+
+    // Attach delete handler
+    const deleteBtn = div.querySelector('.instant-delete-btn');
+    if (deleteBtn && typeof instantDeleteFile === 'function') {
+        deleteBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            instantDeleteFile(fileId, div);
+        });
+    }
+}
+
+// Remove a deleted image URL from the main product gallery (non-variant images)
+function removeImageFromMainGallery(deletedUrl) {
+    if (!deletedUrl) return;
+
+    const gallery = document.getElementById('sortable_images');
+    if (!gallery) return;
+
+    // Normalize for comparison (src may have origin prepended)
+    const normalizedUrl = deletedUrl.split('?')[0];
+
+    gallery.querySelectorAll('.media-item, .sortable-image').forEach(item => {
+        const img = item.querySelector('img');
+        if (!img) return;
+        const imgSrc = img.src.split('?')[0];
+        if (imgSrc === normalizedUrl || imgSrc.endsWith(normalizedUrl) || normalizedUrl.endsWith(imgSrc.replace(location.origin, ''))) {
+            item.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+            item.style.transform = 'scale(0.7)';
+            item.style.opacity = '0';
+            setTimeout(() => {
+                item.remove();
+                if (typeof updatePrimaryBadge === 'function') updatePrimaryBadge();
+                if (typeof updateImageOrder === 'function') updateImageOrder();
+            }, 250);
+        }
+    });
+}

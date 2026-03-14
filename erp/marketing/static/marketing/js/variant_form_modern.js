@@ -1444,7 +1444,15 @@ async function removeVariantImage(variantIndex, imageIndex) {
                 throw new Error(data.error || 'Silme işlemi başarısız');
             }
 
+            // Remove this image from ALL variants that share the same URL
+            const deletedUrl = data.deleted_url || img.url;
+            removeImageFromAllVariants(deletedUrl, variantIndex);
+
+            // Also remove from main product gallery if exists
+            removeImageFromMainGallery(deletedUrl);
+
             showToast('🗑️ Resim silindi!', 'success');
+            return; // Already handled UI update in removeImageFromAllVariants
         } catch (error) {
             console.error('Delete error:', error);
             showToast(`❌ Silme hatası: ${error.message}`, 'error');
@@ -1452,14 +1460,14 @@ async function removeVariantImage(variantIndex, imageIndex) {
         }
     }
 
-    // Remove from frontend array
+    // Remove from frontend array (for images not yet saved to DB)
     variantImages[variantIndex].images.splice(imageIndex, 1);
 
     // Adjust primary index if needed
     if (variantImages[variantIndex].images.length === 0) {
         variantImages[variantIndex].primaryIndex = 0;
     } else if (imageIndex === variantImages[variantIndex].primaryIndex) {
-        variantImages[variantIndex].primaryIndex = 0; // Set first as primary
+        variantImages[variantIndex].primaryIndex = 0;
     } else if (imageIndex < variantImages[variantIndex].primaryIndex) {
         variantImages[variantIndex].primaryIndex--;
     }
@@ -1670,6 +1678,9 @@ function generateImageGrid() {
             <div class="image_item" data-url="${img.url}" data-name="${img.name}" data-index="${idx}" data-file-type="${isVideo ? 'video' : 'image'}" onclick="toggleImageSelection(this, event)">
                 <div class="imp_card_media">
                     ${thumbHTML}
+                    <div class="imp_bulk_check" onclick="toggleBulkCheck(this, event)" title="Select for bulk delete">
+                        <i class="fa fa-check"></i>
+                    </div>
                     <div class="imp_card_check"><i class="fa fa-check"></i></div>
                     <div class="imp_card_actions">
                         <button type="button" class="imp_act_btn" onclick="event.stopPropagation(); window.openMediaPreview('${img.optimized_url || img.url}', '${isVideo ? 'video' : 'image'}', ${img.id || 'null'})" title="Preview">
@@ -1797,7 +1808,124 @@ function updateSelectionBadges() {
     }
 }
 
-// Handle image upload - INSTANT upload to Cloudinary
+// ─── Ensure upload tracker is available (fallback if file_manager_modal.js not loaded yet) ───
+(function ensureTrackerFunctions() {
+    if (typeof window.createUploadTracker === 'function') return; // already defined
+
+    let _uploadTracker = null;
+    let _trackerCollapsed = false;
+
+    window.createUploadTracker = function(totalFiles) {
+        if (_uploadTracker) _uploadTracker.remove();
+        const t = document.createElement('div');
+        t.className = 'upload-tracker';
+        t.id = 'uploadTracker';
+        t.innerHTML = `
+            <div class="upload-tracker-header" onclick="window.toggleTrackerCollapse()">
+                <h4><span id="utTitle">Uploading <span id="utDoneCount">0</span> of ${totalFiles} items</span></h4>
+                <div class="ut-actions">
+                    <button onclick="event.stopPropagation(); window.toggleTrackerCollapse()" id="utCollapseBtn" title="Minimize"><i class="fa fa-chevron-down"></i></button>
+                    <button onclick="event.stopPropagation(); window.closeUploadTracker()" id="utCloseBtn" title="Close" style="display:none;"><i class="fa fa-times"></i></button>
+                </div>
+            </div>
+            <div class="ut-overall-progress"><div class="ut-overall-bar" id="utOverallBar" style="width:0%"></div></div>
+            <div class="upload-tracker-body" id="utBody"></div>`;
+        document.body.appendChild(t);
+        _uploadTracker = t;
+        _trackerCollapsed = false;
+
+        // Inject CSS if not present
+        if (!document.getElementById('ut-tracker-css')) {
+            const s = document.createElement('style');
+            s.id = 'ut-tracker-css';
+            s.textContent = `
+                .upload-tracker{position:fixed;bottom:24px;right:24px;width:360px;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18),0 2px 8px rgba(0,0,0,.08);z-index:2147483647;overflow:hidden;animation:trackerSlideUp .35s cubic-bezier(.4,0,.2,1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+                .upload-tracker.closing{animation:trackerSlideDown .3s cubic-bezier(.4,0,.2,1) forwards}
+                .upload-tracker-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#1a1a2e;color:#fff;cursor:pointer;user-select:none}
+                .upload-tracker-header h4{margin:0;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+                .upload-tracker-header .ut-actions{display:flex;gap:8px;align-items:center}
+                .upload-tracker-header .ut-actions button{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;transition:all .15s}
+                .upload-tracker-header .ut-actions button:hover{color:#fff;background:rgba(255,255,255,.1)}
+                .upload-tracker-body{max-height:280px;overflow-y:auto;transition:max-height .3s ease}
+                .upload-tracker-body.collapsed{max-height:0}
+                .upload-tracker-body::-webkit-scrollbar{width:4px}
+                .upload-tracker-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+                .ut-file-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #f1f5f9;animation:utRowFadeIn .3s ease}
+                .ut-file-row:last-child{border-bottom:none}
+                .ut-file-thumb{width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#f1f5f9}
+                .ut-file-info{flex:1;min-width:0}
+                .ut-file-name{font-size:13px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .ut-file-size{font-size:11px;color:#94a3b8;margin-top:2px}
+                .ut-file-status{flex-shrink:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+                .ut-spinner{width:20px;height:20px;border:2.5px solid #e2e8f0;border-top-color:#667eea;border-radius:50%;animation:utSpin .7s linear infinite}
+                .ut-check{color:#22c55e;font-size:18px;animation:utPop .3s cubic-bezier(.175,.885,.32,1.275)}
+                .ut-error{color:#ef4444;font-size:18px}
+                .ut-overall-progress{height:3px;background:#e2e8f0}
+                .ut-overall-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width .4s ease;border-radius:0 3px 3px 0}
+                @keyframes trackerSlideUp{from{transform:translateY(100px);opacity:0}to{transform:translateY(0);opacity:1}}
+                @keyframes trackerSlideDown{from{transform:translateY(0);opacity:1}to{transform:translateY(100px);opacity:0}}
+                @keyframes utRowFadeIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+                @keyframes utSpin{to{transform:rotate(360deg)}}
+                @keyframes utPop{0%{transform:scale(0)}100%{transform:scale(1)}}`;
+            document.head.appendChild(s);
+        }
+    };
+
+    window.addTrackerRow = function(file) {
+        const body = document.getElementById('utBody');
+        if (!body) return null;
+        const row = document.createElement('div');
+        row.className = 'ut-file-row';
+        const sizeStr = file.size > 1048576 ? (file.size/1048576).toFixed(1)+' MB' : (file.size/1024).toFixed(0)+' KB';
+        const thumbUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+        const thumbHTML = thumbUrl
+            ? `<img class="ut-file-thumb" src="${thumbUrl}" alt="">`
+            : `<div class="ut-file-thumb" style="display:flex;align-items:center;justify-content:center;background:#1a1a2e;color:#667eea;font-size:14px;"><i class="fa fa-film"></i></div>`;
+        row.innerHTML = `${thumbHTML}<div class="ut-file-info"><div class="ut-file-name">${file.name}</div><div class="ut-file-size">${sizeStr}</div></div><div class="ut-file-status"><div class="ut-spinner"></div></div>`;
+        body.appendChild(row);
+        body.scrollTop = body.scrollHeight;
+        return row;
+    };
+
+    window.updateTrackerRow = function(row, success) {
+        if (!row) return;
+        const s = row.querySelector('.ut-file-status');
+        s.innerHTML = success ? '<i class="fa fa-check-circle ut-check"></i>' : '<i class="fa fa-times-circle ut-error"></i>';
+    };
+
+    window.updateTrackerProgress = function(done, total) {
+        const bar = document.getElementById('utOverallBar');
+        const countEl = document.getElementById('utDoneCount');
+        const title = document.getElementById('utTitle');
+        if (bar) bar.style.width = `${(done/total)*100}%`;
+        if (countEl) countEl.textContent = done;
+        if (done >= total) {
+            if (title) title.innerHTML = `<i class="fa fa-check-circle" style="color:#22c55e"></i> ${total} file uploaded`;
+            const closeBtn = document.getElementById('utCloseBtn');
+            if (closeBtn) closeBtn.style.display = '';
+            setTimeout(() => window.closeUploadTracker(), 4000);
+        }
+    };
+
+    window.toggleTrackerCollapse = function() {
+        const body = document.getElementById('utBody');
+        const btn = document.getElementById('utCollapseBtn');
+        if (!body) return;
+        _trackerCollapsed = !_trackerCollapsed;
+        body.classList.toggle('collapsed', _trackerCollapsed);
+        if (btn) btn.innerHTML = _trackerCollapsed ? '<i class="fa fa-chevron-up"></i>' : '<i class="fa fa-chevron-down"></i>';
+    };
+
+    window.closeUploadTracker = function() {
+        const tracker = document.getElementById('uploadTracker');
+        if (tracker) {
+            tracker.classList.add('closing');
+            setTimeout(() => { tracker.remove(); _uploadTracker = null; }, 300);
+        }
+    };
+})();
+
+// Handle image upload - INSTANT upload with floating tracker
 async function handleImageUpload(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -1815,27 +1943,41 @@ async function handleImageUpload(event) {
     const variantId = productEditMatch ? getVariantId(currentVariantIndex) : null;
     console.log('Uploading to variant index:', currentVariantIndex, 'variant ID:', variantId);
 
-    // Process each file
+    // Filter valid files first
+    const validFiles = [];
     for (const file of files) {
-        // Check if it's an image or video
         const isImage = file.type.startsWith('image/');
         const isVideo = file.type.startsWith('video/');
 
         if (!isImage && !isVideo) {
-            console.warn(`${file.name} is not a supported file type.`);
             showToast(`⚠️ "${file.name}" is not a supported file type`, 'warning');
             continue;
         }
-
-        // Check for duplicate - skip if file with same name already exists
         const existingFile = uploadedImages.find(img => img.name === file.name);
         if (existingFile) {
-            console.log(`File ${file.name} already exists, skipping upload.`);
             showToast(`⚠️ "${file.name}" already exists`, 'warning');
             continue;
         }
+        validFiles.push(file);
+    }
 
-        // Show progress placeholder
+    if (validFiles.length === 0) { event.target.value = ''; return; }
+
+    // Create floating upload tracker
+    if (typeof window.createUploadTracker === 'function') {
+        window.createUploadTracker(validFiles.length);
+    }
+    let doneCount = 0;
+
+    // Process each file
+    for (const file of validFiles) {
+        // Add row to floating tracker
+        let trackerRow = null;
+        if (typeof window.addTrackerRow === 'function') {
+            trackerRow = window.addTrackerRow(file);
+        }
+
+        // Show progress placeholder in grid
         const grid = document.getElementById('image_grid');
         const placeholder = document.createElement('div');
         placeholder.className = 'image_item uploading';
@@ -1853,7 +1995,6 @@ async function handleImageUpload(event) {
 
             let data;
             if (isCreateMode) {
-                // Create mode: Use temp upload API
                 formData.append('file_type', 'variant_image');
                 formData.append('variant_temp_id', `variant_${currentVariantIndex}`);
                 formData.append('sequence', uploadedImages.length);
@@ -1865,7 +2006,6 @@ async function handleImageUpload(event) {
                 });
                 data = await response.json();
             } else {
-                // Edit mode: Use instant upload API
                 formData.append('product_id', productEditMatch);
                 const response = await fetch('/marketing/api/instant_upload_file/', {
                     method: 'POST',
@@ -1900,77 +2040,26 @@ async function handleImageUpload(event) {
 
             // Insert at beginning so new uploads appear at top
             uploadedImages.unshift(newImage);
-            const newIndex = 0;
-            const isVideo = fileType === 'video';
 
-            // Remove placeholder
+            // Remove placeholder and refresh grid
             if (placeholder) placeholder.remove();
+            refreshImageGrid();
 
-            // Create and add the new UI element
-            const newElement = document.createElement('div');
-            newElement.className = 'image_item' + (isVideo ? ' video_item' : '');
-            newElement.setAttribute('data-url', newImage.url);
-            newElement.setAttribute('data-name', newImage.name);
-            newElement.setAttribute('data-index', newIndex);
-            newElement.setAttribute('data-file-type', fileType);
-            newElement.onclick = function (e) { toggleImageSelection(this, e); };
+            // Also add to main Media gallery instantly
+            addImageToMainGallery(newImage);
 
-            if (isVideo) {
-                const thumbnailUrl = getVideoThumbnailUrlVariant(fileUrl);
-                newElement.innerHTML = `
-                    <div class="imp_card_media">
-                        <div class="imp_thumb_video">
-                            <img src="${thumbnailUrl}" alt="${newImage.name}" onerror="this.style.display='none'">
-                            <div class="imp_play"><i class="fa fa-play"></i></div>
-                        </div>
-                        <div class="imp_card_check"><i class="fa fa-check"></i></div>
-                        <div class="imp_card_actions">
-                            <button type="button" class="imp_act_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'video', ${newImage.id || 'null'})" title="Preview">
-                                <i class="fa fa-expand"></i>
-                            </button>
-                            <button type="button" class="imp_act_btn imp_act_delete" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
-                                <i class="fa fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="imp_card_name">${newImage.name}</div>
-                `;
-            } else {
-                newElement.innerHTML = `
-                    <div class="imp_card_media">
-                        <img class="imp_thumb" src="${newImage.optimized_url || newImage.url}" alt="${newImage.name}">
-                        <div class="imp_card_check"><i class="fa fa-check"></i></div>
-                        <div class="imp_card_actions">
-                            <button type="button" class="imp_act_btn" onclick="event.stopPropagation(); window.openMediaPreview('${newImage.optimized_url || newImage.url}', 'image', ${newImage.id || 'null'})" title="Preview">
-                                <i class="fa fa-expand"></i>
-                            </button>
-                            <button type="button" class="imp_act_btn imp_act_delete" onclick="removeUploadedImage(${newIndex}, event)" title="Delete">
-                                <i class="fa fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="imp_card_name">${newImage.name}</div>
-                `;
-            }
-
-            if (grid) grid.prepend(newElement);
-
-            // Re-index all grid items since we inserted at position 0
-            grid.querySelectorAll('.image_item').forEach((item, i) => {
-                item.setAttribute('data-index', i);
-            });
-
-            showToast(`✅ ${file.name} uploaded successfully!`, 'success');
-
-            // Update file count in header
-            const countEl = document.getElementById('imp_total_count');
-            if (countEl) countEl.textContent = `${uploadedImages.length} files`;
+            // Update tracker row - success
+            if (typeof window.updateTrackerRow === 'function') window.updateTrackerRow(trackerRow, true);
 
         } catch (error) {
             console.error('Upload error:', error);
             if (placeholder) placeholder.remove();
             showToast(`❌ Upload failed: ${error.message}`, 'error');
+            if (typeof window.updateTrackerRow === 'function') window.updateTrackerRow(trackerRow, false);
         }
+
+        doneCount++;
+        if (typeof window.updateTrackerProgress === 'function') window.updateTrackerProgress(doneCount, validFiles.length);
 
     } // End of for loop
 
@@ -2068,106 +2157,180 @@ function updateVariantIconInTable(variantIndex) {
     }
 }
 
-// Remove uploaded image - INSTANT delete
-async function removeUploadedImage(index, event) {
-    event.stopPropagation(); // Prevent toggling selection
+// Animate-out and remove a single DOM element
+function animateRemoveItem(el) {
+    el.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+    el.style.transform = 'scale(0.7)';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 250);
+}
 
-    const image = uploadedImages[index];
+// Fire-and-forget backend delete (no await, no blocking)
+function deleteImageInBackground(image) {
+    if (!image || !image.id) return;
+    fetch('/marketing/api/instant_delete_file/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
+        },
+        body: JSON.stringify({ file_id: image.id })
+    }).catch(err => console.error('Background delete error:', err));
+}
+
+// Remove image from all in-memory state
+function removeImageFromState(image) {
+    uploadedImages = uploadedImages.filter(img => img.url !== image.url);
+    selectionOrder = selectionOrder.filter(url => url !== image.url);
+    selectionSet.delete(image.url);
+    Object.values(variantImages).forEach(vi => {
+        if (vi && vi.images) {
+            vi.images = vi.images.filter(img => img.url !== image.url);
+        }
+    });
+}
+
+// Update file count in header
+function updateFileCount() {
+    const countEl = document.getElementById('imp_total_count');
+    if (countEl) countEl.textContent = `${uploadedImages.length} files`;
+    const grid = document.getElementById('image_grid');
+    if (grid && uploadedImages.length === 0) {
+        grid.innerHTML = '<div class="no_images_message"><i class="fa fa-cloud-upload-alt"></i><p>No files yet.<br>Upload images or videos to get started.</p></div>';
+    }
+}
+
+// Remove single image - instant UI, background backend
+async function removeUploadedImage(index, event) {
+    event.stopPropagation();
+
+    const clickedItem = event.target.closest('.image_item');
+    const imageUrl = clickedItem ? clickedItem.getAttribute('data-url') : null;
+    const image = imageUrl ? uploadedImages.find(img => img.url === imageUrl) : uploadedImages[index];
     if (!image) return;
 
-    // Get the element to remove
-    const elementToRemove = document.querySelector(`.image_item[data-index="${index}"]`);
-    if (!elementToRemove) return;
+    const confirmed = await window.showConfirmDialog('Delete Image?', 'This action cannot be undone.', 'Delete', 'Cancel');
+    if (!confirmed) return;
 
-    // Use modern confirmation
+    // 1. Animate out immediately
+    if (clickedItem) animateRemoveItem(clickedItem);
+
+    // 2. Remove from state
+    removeImageFromState(image);
+    updateFileCount();
+    updateSelectionBadges();
+
+    // 3. Remove from main product gallery + variant table previews
+    removeFromMainGalleryAndVariants(image.url);
+
+    // 4. Backend in background
+    deleteImageInBackground(image);
+
+    showToast('🗑️ Image deleted!', 'success');
+}
+
+// Bulk delete - instant UI, background backend
+async function bulkDeleteSelectedImages() {
+    const checkedItems = document.querySelectorAll('.image_item .imp_bulk_check.checked');
+    if (checkedItems.length === 0) return;
+
+    const items = [];
+    checkedItems.forEach(chk => {
+        const el = chk.closest('.image_item');
+        if (el) items.push({ el, url: el.getAttribute('data-url') });
+    });
+
     const confirmed = await window.showConfirmDialog(
-        'Delete Image?',
-        'This action cannot be undone.',
-        'Delete',
-        'Cancel'
+        `Delete ${items.length} images?`, 'This action cannot be undone.', 'Delete All', 'Cancel'
     );
+    if (!confirmed) return;
 
-    if (confirmed) {
-        // Store selections AFTER dialog closes (captures current state)
-        const selectedUrls = new Set();
-        document.querySelectorAll('.image_item.selected').forEach(item => {
-            const url = item.getAttribute('data-url');
-            if (url && url !== image.url) {
-                selectedUrls.add(url);
-            }
-        });
-        console.log('Stored selections before delete:', Array.from(selectedUrls));
+    // 1. Staggered animate out
+    items.forEach((item, i) => {
+        setTimeout(() => animateRemoveItem(item.el), i * 60);
+    });
 
-        // If image has DB ID, delete from backend
-        if (image.id) {
-            try {
-                const response = await fetch('/marketing/api/instant_delete_file/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
-                    },
-                    body: JSON.stringify({ file_id: image.id })
-                });
-
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Delete failed');
-                }
-
-                showToast('🗑️ Image deleted!', 'success');
-            } catch (error) {
-                console.error('Delete error:', error);
-                showToast(`❌ Delete failed: ${error.message}`, 'error');
-                return;
-            }
+    // 2. Remove from state + fire backend deletes + remove from main gallery
+    items.forEach(item => {
+        const image = uploadedImages.find(img => img.url === item.url);
+        if (image) {
+            removeImageFromState(image);
+            deleteImageInBackground(image);
+            removeFromMainGalleryAndVariants(image.url);
         }
+    });
 
-        // Remove from uploadedImages array
-        uploadedImages.splice(index, 1);
-
-        // Remove from selectionOrder and renumber badges
-        selectionOrder = selectionOrder.filter(url => url !== image.url);
-        selectionSet.delete(image.url);
-
-        // Also remove from variantImages selections if it was selected
-        if (variantImages[currentVariantIndex]) {
-            variantImages[currentVariantIndex].images = variantImages[currentVariantIndex].images.filter(
-                img => img.id !== image.id
-            );
-        }
-
-        // Remove element from DOM
-        elementToRemove.remove();
-
-        // Update data-index attributes for remaining elements
-        const grid = document.getElementById('image_grid');
-        if (grid) {
-            grid.querySelectorAll('.image_item').forEach((item, newIndex) => {
-                item.setAttribute('data-index', newIndex);
-                // Update onclick handler for remove button
-                const removeBtn = item.querySelector('.remove_image_btn');
-                if (removeBtn) {
-                    removeBtn.setAttribute('onclick', `removeUploadedImage(${newIndex}, event)`);
-                }
-
-                // Reapply selection if this item was selected
-                const itemUrl = item.getAttribute('data-url');
-                if (selectedUrls.has(itemUrl)) {
-                    item.classList.add('selected');
-                    console.log('Reapplied selection to:', itemUrl);
-                }
-            });
-
-            // Show empty message if no images left
-            if (uploadedImages.length === 0) {
-                grid.innerHTML = '<div class="no_images_message"><i class="fa fa-image"></i><p>No images uploaded yet. Use the "Add File" button above to add images.</p></div>';
-            }
-        }
-
-        // Update selection badges to renumber remaining selected items
+    setTimeout(() => {
+        updateFileCount();
         updateSelectionBadges();
+        hideBulkDeleteBar();
+    }, items.length * 60 + 300);
+
+    showToast(`🗑️ ${items.length} image(s) deleted!`, 'success');
+}
+
+// Re-render the entire image grid (used after upload)
+function refreshImageGrid() {
+    const grid = document.getElementById('image_grid');
+    if (!grid) return;
+
+    if (uploadedImages.length === 0) {
+        grid.innerHTML = '<div class="no_images_message"><i class="fa fa-cloud-upload-alt"></i><p>No files yet.<br>Upload images or videos to get started.</p></div>';
+    } else {
+        grid.innerHTML = generateImageGrid();
     }
+
+    selectionOrder.forEach(url => {
+        const item = grid.querySelector(`.image_item[data-url="${CSS.escape(url)}"]`);
+        if (item) item.classList.add('selected');
+    });
+    updateSelectionBadges();
+    updateFileCount();
+    updateBulkDeleteCount();
+}
+
+// Toggle bulk-select checkbox
+function toggleBulkCheck(el, event) {
+    event.stopPropagation();
+    el.classList.toggle('checked');
+    updateBulkDeleteCount();
+}
+
+// Show/hide bulk delete bar
+function updateBulkDeleteCount() {
+    const checked = document.querySelectorAll('.image_item .imp_bulk_check.checked').length;
+    let bar = document.getElementById('bulkDeleteBar');
+    if (checked > 0) {
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'bulkDeleteBar';
+            bar.className = 'imp_bulk_bar';
+            const toolbar = document.querySelector('.imp_toolbar');
+            if (toolbar) toolbar.after(bar);
+        }
+        bar.innerHTML = `
+            <span><strong>${checked}</strong> selected</span>
+            <button type="button" class="imp_bulk_delete_btn" onclick="bulkDeleteSelectedImages()">
+                <i class="fa fa-trash-alt"></i> Delete Selected
+            </button>
+            <button type="button" class="imp_bulk_cancel_btn" onclick="clearBulkSelection()">
+                Cancel
+            </button>
+        `;
+        bar.style.display = 'flex';
+    } else {
+        hideBulkDeleteBar();
+    }
+}
+
+function hideBulkDeleteBar() {
+    const bar = document.getElementById('bulkDeleteBar');
+    if (bar) bar.style.display = 'none';
+}
+
+function clearBulkSelection() {
+    document.querySelectorAll('.imp_bulk_check.checked').forEach(el => el.classList.remove('checked'));
+    hideBulkDeleteBar();
 }
 
 // Close image picker modal
@@ -3091,4 +3254,126 @@ function saveVariantDetailModal() {
     }
 
     closeVariantDetailModal();
+}
+
+// Remove a deleted image URL from ALL variant image arrays and update their UI
+function removeImageFromAllVariants(deletedUrl) {
+    if (!deletedUrl) return;
+
+    Object.keys(variantImages).forEach(vIdx => {
+        const vi = variantImages[vIdx];
+        if (!vi || !vi.images) return;
+
+        const before = vi.images.length;
+        vi.images = vi.images.filter(img => img.url !== deletedUrl);
+
+        if (vi.images.length !== before) {
+            // Reset primary index
+            if (vi.images.length === 0) {
+                vi.primaryIndex = 0;
+            } else if (vi.primaryIndex >= vi.images.length) {
+                vi.primaryIndex = 0;
+            }
+            updateVariantImagePreview(parseInt(vIdx));
+        }
+    });
+}
+
+// Remove a deleted image from main gallery + all variant table previews
+function removeFromMainGalleryAndVariants(deletedUrl) {
+    if (!deletedUrl) return;
+    removeImageFromMainGallery(deletedUrl);
+    if (typeof removeImageFromAllVariants === 'function') {
+        removeImageFromAllVariants(deletedUrl);
+    }
+}
+
+// Add a newly uploaded image to the main Media gallery instantly
+function addImageToMainGallery(image) {
+    if (!image || !image.url) return;
+
+    const gallery = document.getElementById('sortable_images');
+    if (!gallery) return;
+
+    // Don't add duplicates
+    const normalizedUrl = image.url.split('?')[0];
+    const exists = Array.from(gallery.querySelectorAll('.media-item img, .sortable-image img'))
+        .some(img => img.src.split('?')[0] === normalizedUrl);
+    if (exists) return;
+
+    const isVideo = image.file_type === 'video';
+    const displayUrl = image.optimized_url || image.url;
+    const fileId = image.id || '';
+
+    const div = document.createElement('div');
+    div.className = 'media-item sortable-image';
+    div.dataset.fileId = fileId;
+    div.dataset.fileType = image.file_type || 'image';
+    div.style.cssText = 'opacity:0; transform:scale(0.8); transition: opacity 0.3s ease, transform 0.3s ease;';
+
+    div.innerHTML = `
+        <div class="media-preview" onclick="openMediaPreview('${displayUrl}', '${image.file_type || 'image'}', ${fileId || 'null'})">
+            ${isVideo
+                ? `<img src="${displayUrl}" /><div class="play-icon"><i class="fa fa-play"></i></div>`
+                : `<img src="${displayUrl}" /><div class="preview-icon"><i class="fa fa-search-plus"></i></div>`
+            }
+        </div>
+        <div class="media-actions">
+            <button type="button" class="icon-btn delete-btn instant-delete-btn" data-file-id="${fileId}">
+                <i class="fa fa-trash"></i>
+            </button>
+            <div class="drag-handle"><i class="fa fa-grip-vertical"></i></div>
+        </div>
+    `;
+
+    // Insert before the "Add Media" placeholder
+    const placeholder = gallery.querySelector('.media-upload-placeholder');
+    if (placeholder) {
+        gallery.insertBefore(div, placeholder);
+    } else {
+        gallery.appendChild(div);
+    }
+
+    // Animate in
+    requestAnimationFrame(() => {
+        div.style.opacity = '1';
+        div.style.transform = 'scale(1)';
+    });
+
+    // Attach delete handler
+    const deleteBtn = div.querySelector('.instant-delete-btn');
+    if (deleteBtn && typeof instantDeleteFile === 'function') {
+        deleteBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            instantDeleteFile(fileId, div);
+        });
+    }
+}
+
+// Remove a deleted image URL from the main product gallery (non-variant images)
+function removeImageFromMainGallery(deletedUrl) {
+    if (!deletedUrl) return;
+
+    const gallery = document.getElementById('sortable_images');
+    if (!gallery) return;
+
+    // Normalize for comparison (src may have origin prepended)
+    const normalizedUrl = deletedUrl.split('?')[0];
+
+    gallery.querySelectorAll('.media-item, .sortable-image').forEach(item => {
+        const img = item.querySelector('img');
+        if (!img) return;
+        const imgSrc = img.src.split('?')[0];
+        if (imgSrc === normalizedUrl || imgSrc.endsWith(normalizedUrl) || normalizedUrl.endsWith(imgSrc.replace(location.origin, ''))) {
+            item.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+            item.style.transform = 'scale(0.7)';
+            item.style.opacity = '0';
+            setTimeout(() => {
+                item.remove();
+                if (typeof updatePrimaryBadge === 'function') updatePrimaryBadge();
+                if (typeof updateImageOrder === 'function') updateImageOrder();
+            }, 250);
+        }
+    });
 }

@@ -337,18 +337,23 @@ async function instantDeleteFile(fileId, element) {
             element.style.animation = 'fadeOut 0.3s ease-out';
             setTimeout(() => {
                 element.remove();
-                
+
                 // Update primary badge after deletion
                 if (typeof updatePrimaryBadge === 'function') {
                     updatePrimaryBadge();
                 }
-                
+
                 // Update image order
                 if (typeof updateImageOrder === 'function') {
                     updateImageOrder();
                 }
             }, 300);
-            
+
+            // Also remove from all variant images if cloned
+            if (data.deleted_url && typeof removeImageFromAllVariants === 'function') {
+                removeImageFromAllVariants(data.deleted_url);
+            }
+
             showToast('🗑️ File deleted!', 'success');
         } else {
             throw new Error(data.error || 'Delete failed');

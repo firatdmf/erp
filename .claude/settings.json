@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \":*)",
+      "Bash(python manage.py collectstatic --noinput)"
+    ]
+  }
+}

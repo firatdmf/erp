@@ -2108,9 +2108,7 @@ def get_product_categories(request):
         {"pk": category.pk, "name": category.name, "image_url": category.image_url, "description": category.description}
         for category in categories
     ]
-    response = JsonResponse(data, safe=False)
-    response["Cache-Control"] = "public, s-maxage=600, stale-while-revalidate=1200"
-    return response
+    return JsonResponse(data, safe=False)
 
 
 # def get_products(request):
@@ -2270,14 +2268,7 @@ def get_products(request):
             # print(f"   - Products count after filter: {products.count()}")
 
     # Optional limit parameter to reduce payload size
-    limit_param = request.GET.get("limit")
-    if limit_param:
-        try:
-            limit_val = int(limit_param)
-            if limit_val > 0:
-                products = products[:limit_val]
-        except (ValueError, TypeError):
-            pass
+  
 
     # Step 1: Get product IDs + basic fields with a single ORM query (1 round-trip)
     products = products.select_related("primary_image", "category")
@@ -2294,7 +2285,7 @@ def get_products(request):
             "product_category_description": category.description if product_category and category.description else None,
         })
         response["Access-Control-Allow-Origin"] = "*"
-        response["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+       
         return response
 
     # Step 2: Fetch ALL related data in ONE round-trip using CTEs
@@ -2418,7 +2409,7 @@ def get_products(request):
         }
     )
     response["Access-Control-Allow-Origin"] = "*"
-    response["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+   
     return response
 
 
@@ -2671,7 +2662,7 @@ def get_product(request):
     _t3 = _time.time()
     print(f"[PERF] get_product RAW SQL: Q1={_t1-_t0:.3f}s Q2={_t2-_t1:.3f}s serialize={_t3-_t2:.3f}s TOTAL={_t3-_t0:.3f}s")
 
-    response = JsonResponse(
+    return JsonResponse(
         {
             "product_category": product_category,
             "product": product_fields,
@@ -2683,8 +2674,7 @@ def get_product(request):
             "variant_attributes": variant_attributes_data,
         }
     )
-    response["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
-    return response
+   
 
 
 # ============================================================

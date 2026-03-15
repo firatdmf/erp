@@ -149,9 +149,55 @@
           <label for="id_title">Title</label>
           {{ form.title }}
         </div>
+        <!-- Hidden original description field -->
+        <div style="display:none;">{{ form.description }}</div>
+
+        <!-- Multi-language translations UI -->
         <div class="form-group">
-          <label for="id_description">Description</label>
-          {{ form.description }}
+          <div class="trans-container">
+            <div class="trans-tab-bar">
+              <button type="button" class="trans-tab active" data-lang="tr">
+                <span class="trans-tab-flag">TR</span>
+                <span class="trans-tab-name">Turkish</span>
+              </button>
+              <button type="button" class="trans-tab" data-lang="en">
+                <span class="trans-tab-flag">EN</span>
+                <span class="trans-tab-name">English</span>
+              </button>
+              <button type="button" class="trans-tab" data-lang="ru">
+                <span class="trans-tab-flag">RU</span>
+                <span class="trans-tab-name">Russian</span>
+              </button>
+              <button type="button" class="trans-tab" data-lang="pl">
+                <span class="trans-tab-flag">PL</span>
+                <span class="trans-tab-name">Polish</span>
+              </button>
+            </div>
+            <div class="trans-panel active" data-lang="tr">
+              <label class="trans-label">Product Name</label>
+              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="Urun adi giriniz...">
+              <label class="trans-label">Description</label>
+              <textarea class="trans-input trans-desc" data-lang="tr" rows="5" placeholder="Urun aciklamasi giriniz..."></textarea>
+            </div>
+            <div class="trans-panel" data-lang="en">
+              <label class="trans-label">Product Name</label>
+              <input type="text" class="trans-input trans-title" data-lang="en" placeholder="Enter product name...">
+              <label class="trans-label">Description</label>
+              <textarea class="trans-input trans-desc" data-lang="en" rows="5" placeholder="Enter product description..."></textarea>
+            </div>
+            <div class="trans-panel" data-lang="ru">
+              <label class="trans-label">Product Name</label>
+              <input type="text" class="trans-input trans-title" data-lang="ru" placeholder="Введите название продукта...">
+              <label class="trans-label">Description</label>
+              <textarea class="trans-input trans-desc" data-lang="ru" rows="5" placeholder="Введите описание продукта..."></textarea>
+            </div>
+            <div class="trans-panel" data-lang="pl">
+              <label class="trans-label">Product Name</label>
+              <input type="text" class="trans-input trans-title" data-lang="pl" placeholder="Wprowadz nazwe produktu...">
+              <label class="trans-label">Description</label>
+              <textarea class="trans-input trans-desc" data-lang="pl" rows="5" placeholder="Wprowadz opis produktu..."></textarea>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1620,6 +1666,93 @@
 
   window.openMediaPreview = openMediaPreview;
   window.closeMediaPreview = closeMediaPreview;
+</script>
+
+<script>
+// ── Translation Tabs Logic ──────────────────────────────────
+(function() {
+  const descField = document.getElementById('id_description');
+  if (!descField) return;
+
+  const langs = ['tr', 'en', 'ru', 'pl'];
+  const tabBtns = document.querySelectorAll('.trans-tab');
+  const panels = document.querySelectorAll('.trans-panel');
+
+  // ── Tab switching ──
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.lang;
+      tabBtns.forEach(b => b.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelector(`.trans-panel[data-lang="${lang}"]`).classList.add('active');
+    });
+  });
+
+  // ── Load existing data from description field ──
+  function loadFromDescription() {
+    const raw = descField.value.trim();
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw);
+      const translations = data.translations || {};
+      langs.forEach(lang => {
+        const t = translations[lang] || {};
+        const titleInput = document.querySelector(`.trans-title[data-lang="${lang}"]`);
+        const descInput = document.querySelector(`.trans-desc[data-lang="${lang}"]`);
+        if (titleInput && t.title) titleInput.value = t.title;
+        if (descInput && t.description) descInput.value = t.description;
+      });
+      updateHasContentDots();
+    } catch(e) {
+      // Not valid JSON — put raw text into TR description as fallback
+      const trDesc = document.querySelector('.trans-desc[data-lang="tr"]');
+      if (trDesc) trDesc.value = raw;
+    }
+  }
+
+  // ── Sync inputs back to hidden description field as JSON ──
+  function syncToDescription() {
+    const translations = {};
+    let hasAny = false;
+    langs.forEach(lang => {
+      const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
+      const desc = (document.querySelector(`.trans-desc[data-lang="${lang}"]`)?.value || '').trim();
+      if (title || desc) {
+        translations[lang] = {};
+        if (title) translations[lang].title = title;
+        if (desc) translations[lang].description = desc;
+        hasAny = true;
+      }
+    });
+    descField.value = hasAny ? JSON.stringify({ translations }, null, 2) : '';
+    updateHasContentDots();
+  }
+
+  // ── Show blue dots on tabs with content ──
+  function updateHasContentDots() {
+    tabBtns.forEach(btn => {
+      const lang = btn.dataset.lang;
+      const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
+      const desc = (document.querySelector(`.trans-desc[data-lang="${lang}"]`)?.value || '').trim();
+      btn.classList.toggle('has-content', !!(title || desc));
+    });
+  }
+
+  // ── Bind events ──
+  document.querySelectorAll('.trans-title, .trans-desc').forEach(el => {
+    el.addEventListener('input', syncToDescription);
+  });
+
+  // ── Sync before form submit ──
+  const form = descField.closest('form');
+  if (form) {
+    form.addEventListener('submit', syncToDescription);
+  }
+
+  // ── Initialize ──
+  loadFromDescription();
+})();
 </script>
 
 {% endblock %}

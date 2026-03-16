@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python -c \":*)",
-      "Bash(python manage.py collectstatic --noinput)"
+      "Bash(python manage.py collectstatic --noinput)",
+      "Bash(python manage.py migrate marketing 0064)"
     ]
   }
 }

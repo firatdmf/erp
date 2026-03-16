@@ -2004,7 +2004,9 @@ async function handleImageUpload(event) {
                     headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
                     body: formData
                 });
-                data = await response.json();
+                const text = await response.text();
+                if (!text) throw new Error(`Server returned empty response (status ${response.status})`);
+                try { data = JSON.parse(text); } catch(e) { throw new Error(`Server error (${response.status}): ${text.substring(0, 200)}`); }
             } else {
                 formData.append('product_id', productEditMatch);
                 const response = await fetch('/marketing/api/instant_upload_file/', {
@@ -2012,7 +2014,9 @@ async function handleImageUpload(event) {
                     headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
                     body: formData
                 });
-                data = await response.json();
+                const text = await response.text();
+                if (!text) throw new Error(`Server returned empty response (status ${response.status})`);
+                try { data = JSON.parse(text); } catch(e) { throw new Error(`Server error (${response.status}): ${text.substring(0, 200)}`); }
             }
 
             if (!data.success) {

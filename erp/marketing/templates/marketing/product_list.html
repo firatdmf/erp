@@ -667,7 +667,7 @@
       </div>
 
       <button class="filter-btn" onclick="document.getElementById('csvModal').classList.add('show')">
-        <i class="fa fa-download"></i> Export
+        <i class="fa fa-upload"></i> Import
       </button>
       <!-- Moved to right side --> <a href="{% url 'marketing:product_create' %}" class="btn-primary">
         <i class="fa fa-plus"></i> Product
@@ -749,42 +749,235 @@
   </div>
 </div>
 
-<!-- CSV Modal -->
+<!-- Import Stock Modal -->
 <div class="modal-backdrop" id="csvModal">
-  <div class="modal-card">
+  <div class="modal-card" style="max-width: 520px;">
     <div class="modal-icon info" style="background: #3b82f6; color: white;">
-      <i class="fas fa-sync-alt"></i>
+      <i class="fas fa-file-import"></i>
     </div>
-    <h3 class="modal-title">Bulk Stock Update</h3>
-    <p class="modal-desc">Upload a CSV file to update variant stock quantities</p>
+    <h3 class="modal-title">Import Stock Update</h3>
+    <p class="modal-desc">Upload a CSV or Excel file to update variant stock quantities</p>
 
-    <div
-      style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 32px; margin-bottom: 24px; background: #f8fafc; text-align: center;">
-      <div
-        style="width: 48px; height: 48px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #64748b;">
+    <!-- Drop zone -->
+    <div id="importDropZone"
+      style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 32px; margin-bottom: 20px; background: #f8fafc; text-align: center; transition: all 0.2s; cursor: pointer;"
+      onclick="document.getElementById('importFile').click()">
+      <div id="importDropIcon"
+        style="width: 48px; height: 48px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #64748b; transition: all 0.2s;">
         <i class="fas fa-cloud-upload-alt"></i>
       </div>
-      <p style="font-size: 14px; color: #64748b; margin-bottom: 16px;">Drag and drop your CSV file or</p>
-      <label for="csvFile"
-        style="display: inline-block; padding: 8px 16px; background: white; border: 1px solid #3b82f6; color: #3b82f6; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;">
-        Choose File
-      </label>
-      <input type="file" id="csvFile" style="display: none;"
-        onchange="this.previousElementSibling.textContent = this.files[0].name">
-      <p style="font-size: 12px; color: #94a3b8; margin-top: 16px;">Required columns: Kodu (SKU), Miktar (Quantity)</p>
+      <p id="importDropText" style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Drag and drop your file here or click to browse</p>
+      <div style="display: flex; gap: 6px; justify-content: center; margin-bottom: 12px;">
+        <span style="padding: 3px 10px; background: #e8f5e9; color: #2e7d32; border-radius: 4px; font-size: 11px; font-weight: 600;">CSV</span>
+        <span style="padding: 3px 10px; background: #e3f2fd; color: #1565c0; border-radius: 4px; font-size: 11px; font-weight: 600;">XLS</span>
+        <span style="padding: 3px 10px; background: #e3f2fd; color: #1565c0; border-radius: 4px; font-size: 11px; font-weight: 600;">XLSX</span>
+      </div>
+      <p style="font-size: 12px; color: #94a3b8;">Required columns: <strong>Kodu</strong> (SKU) &amp; <strong>Miktar</strong> (Quantity)</p>
+    </div>
+    <input type="file" id="importFile" accept=".csv,.xls,.xlsx" style="display: none;">
+
+    <!-- Selected file info (hidden by default) -->
+    <div id="importFileInfo" style="display: none; padding: 12px 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; margin-bottom: 20px; align-items: center; gap: 12px;">
+      <div style="flex: 1; min-width: 0;">
+        <div id="importFileName" style="font-size: 13px; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+        <div id="importFileSize" style="font-size: 11px; color: #64748b; margin-top: 2px;"></div>
+      </div>
+      <button type="button" onclick="clearImportFile()" style="border: none; background: none; color: #94a3b8; cursor: pointer; padding: 4px; font-size: 16px;">
+        <i class="fa fa-times"></i>
+      </button>
     </div>
 
+    <!-- Results area (hidden by default) -->
+    <div id="importResults" style="display: none; margin-bottom: 20px;"></div>
+
     <div class="modal-actions" style="justify-content: space-between; align-items: center;">
-      <button class="btn-secondary" style="border: none; color: #0f172a; font-weight: 600;"
-        onclick="document.getElementById('csvModal').classList.remove('show')">Cancel</button>
-      <button class="btn-primary"
-        style="background: #e2e8f0; color: #94a3b8; border: none; box-shadow: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; display: flex; align-items: center; gap: 8px;"
-        onclick="alert('Upload functionality to be implemented')">
+      <button class="btn-secondary" style="border: none; color: #0f172a; font-weight: 600;" onclick="closeImportModal()">Cancel</button>
+      <button id="importBtn" class="btn-primary" disabled
+        style="padding: 10px 20px; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px; opacity: 0.5; transition: opacity 0.2s;"
+        onclick="uploadImportFile()">
         <i class="fas fa-upload"></i> Upload & Update
       </button>
     </div>
   </div>
 </div>
+
+<script>
+// ── Import Stock Logic ──────────────────────────────
+(function() {
+  const dropZone = document.getElementById('importDropZone');
+  const fileInput = document.getElementById('importFile');
+  const fileInfo = document.getElementById('importFileInfo');
+  const importBtn = document.getElementById('importBtn');
+  const resultsDiv = document.getElementById('importResults');
+
+  // Drag & drop
+  ['dragenter','dragover'].forEach(e => {
+    dropZone.addEventListener(e, ev => {
+      ev.preventDefault();
+      dropZone.style.borderColor = '#3b82f6';
+      dropZone.style.background = '#eff6ff';
+      document.getElementById('importDropIcon').style.background = '#3b82f6';
+      document.getElementById('importDropIcon').style.color = '#fff';
+    });
+  });
+  ['dragleave','drop'].forEach(e => {
+    dropZone.addEventListener(e, ev => {
+      ev.preventDefault();
+      dropZone.style.borderColor = '#cbd5e1';
+      dropZone.style.background = '#f8fafc';
+      document.getElementById('importDropIcon').style.background = '#e2e8f0';
+      document.getElementById('importDropIcon').style.color = '#64748b';
+    });
+  });
+  dropZone.addEventListener('drop', ev => {
+    const file = ev.dataTransfer.files[0];
+    if (file) handleImportFile(file);
+  });
+
+  fileInput.addEventListener('change', function() {
+    if (this.files[0]) handleImportFile(this.files[0]);
+  });
+
+  window.handleImportFile = function(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['csv','xls','xlsx'].includes(ext)) {
+      alert('Please select a CSV or Excel (.xls/.xlsx) file');
+      return;
+    }
+    document.getElementById('importFileName').textContent = file.name;
+    document.getElementById('importFileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    fileInfo.style.display = 'flex';
+    dropZone.style.display = 'none';
+    importBtn.disabled = false;
+    importBtn.style.opacity = '1';
+    resultsDiv.style.display = 'none';
+    // Store file reference
+    fileInput._selectedFile = file;
+  };
+
+  window.clearImportFile = function() {
+    fileInput.value = '';
+    fileInput._selectedFile = null;
+    fileInfo.style.display = 'none';
+    dropZone.style.display = 'block';
+    importBtn.disabled = true;
+    importBtn.style.opacity = '0.5';
+    resultsDiv.style.display = 'none';
+  };
+
+  window.closeImportModal = function() {
+    const hadSuccess = resultsDiv.querySelector('.fa-check-circle');
+    document.getElementById('csvModal').classList.remove('show');
+    clearImportFile();
+    // Reset upload button
+    importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Update';
+    importBtn.onclick = uploadImportFile;
+    if (hadSuccess) location.reload();
+  };
+
+  window.uploadImportFile = function() {
+    const file = fileInput._selectedFile || (fileInput.files && fileInput.files[0]);
+    if (!file) return;
+
+    importBtn.disabled = true;
+    importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+
+    const formData = new FormData();
+    formData.append('csv_file', file);
+
+    fetch('{% url "marketing:csv_stock_update" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Update';
+      importBtn.disabled = false;
+
+      if (data.success) {
+        resultsDiv.style.display = 'block';
+        // Replace upload button with close button
+        importBtn.innerHTML = '<i class="fas fa-times"></i> Close';
+        importBtn.disabled = false;
+        importBtn.style.opacity = '1';
+        importBtn.onclick = closeImportModal;
+
+        let updatedHtml = '';
+        if (data.updated_items && data.updated_items.length > 0) {
+          updatedHtml = `<div style="margin-top: 12px;">
+            <strong style="font-size: 12px; color: #334155;">Updated (${data.updated}):</strong>
+            <div style="max-height: 200px; overflow-y: auto; margin-top: 6px; border: 1px solid #d1fae5; border-radius: 6px;">
+              <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                <thead><tr style="background: #ecfdf5; position: sticky; top: 0;">
+                  <th style="padding: 6px 10px; text-align: left; color: #064e3b; font-weight: 600;">SKU</th>
+                  <th style="padding: 6px 10px; text-align: left; color: #064e3b; font-weight: 600;">Name</th>
+                  <th style="padding: 6px 10px; text-align: right; color: #064e3b; font-weight: 600;">Old</th>
+                  <th style="padding: 6px 10px; text-align: center; color: #064e3b;">→</th>
+                  <th style="padding: 6px 10px; text-align: right; color: #064e3b; font-weight: 600;">New</th>
+                </tr></thead>
+                <tbody>${data.updated_items.map(v => `<tr style="border-top: 1px solid #d1fae5;">
+                  <td style="padding: 5px 10px; color: #0f172a; font-weight: 500; white-space: nowrap;">${v.sku}</td>
+                  <td style="padding: 5px 10px; color: #64748b; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${v.name}">${v.name}</td>
+                  <td style="padding: 5px 10px; text-align: right; color: #94a3b8;">${v.old}</td>
+                  <td style="padding: 5px 10px; text-align: center; color: #16a34a;">→</td>
+                  <td style="padding: 5px 10px; text-align: right; color: #16a34a; font-weight: 600;">${v.new}</td>
+                </tr>`).join('')}</tbody>
+              </table>
+            </div>
+          </div>`;
+        }
+
+        let notFoundHtml = '';
+        if (data.not_found_count > 0) {
+          notFoundHtml = `<div style="margin-top: 10px; padding: 8px 10px; background: #fef2f2; border-radius: 6px; font-size: 12px; color: #991b1b; max-height: 80px; overflow-y: auto;">
+            <strong>Not found SKUs (${data.not_found_count}):</strong> ${data.not_found.join(', ')}${data.not_found_count > 20 ? '...' : ''}
+          </div>`;
+        }
+
+        resultsDiv.innerHTML = `
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+              <i class="fas fa-check-circle" style="color: #16a34a;"></i>
+              <strong style="color: #15803d; font-size: 14px;">Import Successful</strong>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; color: #334155;">
+              <div>Total rows: <strong>${data.total_rows}</strong></div>
+              <div>Matched: <strong>${data.matched}</strong></div>
+              <div>Updated: <strong style="color: #16a34a;">${data.updated}</strong></div>
+              <div>Not found: <strong style="color: ${data.not_found_count > 0 ? '#dc2626' : '#16a34a'};">${data.not_found_count}</strong></div>
+            </div>
+            ${updatedHtml}
+            ${notFoundHtml}
+          </div>`;
+      } else {
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = `
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-exclamation-circle" style="color: #dc2626;"></i>
+              <strong style="color: #991b1b; font-size: 14px;">Import Failed</strong>
+            </div>
+            <p style="margin: 8px 0 0; font-size: 13px; color: #7f1d1d;">${data.error}</p>
+          </div>`;
+      }
+    })
+    .catch(err => {
+      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Update';
+      importBtn.disabled = false;
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = `
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-exclamation-circle" style="color: #dc2626;"></i>
+            <strong style="color: #991b1b;">Network Error</strong>
+          </div>
+          <p style="margin: 8px 0 0; font-size: 13px; color: #7f1d1d;">${err.message}</p>
+        </div>`;
+    });
+  };
+})();
+</script>
 
 </div>
 

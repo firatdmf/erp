@@ -1630,6 +1630,10 @@ async function openImagePicker(variantIndex) {
                     </button>
                     <span class="imp_drop_hint">or drop files here</span>
                 </div>
+                <label class="imp_select_all_label" title="Select All">
+                    <input type="checkbox" id="imp_select_all_cb" onchange="toggleSelectAllBulk(this)">
+                    <span>Select All</span>
+                </label>
             </div>
             <div class="imp_body image_modal_body">
                 <div class="image_grid" id="image_grid">
@@ -2302,8 +2306,25 @@ function toggleBulkCheck(el, event) {
 
 // Show/hide bulk delete bar
 function updateBulkDeleteCount() {
+    const allItems = document.querySelectorAll('.image_item .imp_bulk_check');
     const checked = document.querySelectorAll('.image_item .imp_bulk_check.checked').length;
     let bar = document.getElementById('bulkDeleteBar');
+
+    // Sync master checkbox
+    const masterCb = document.getElementById('imp_select_all_cb');
+    if (masterCb) {
+        if (checked === 0) {
+            masterCb.checked = false;
+            masterCb.indeterminate = false;
+        } else if (checked === allItems.length) {
+            masterCb.checked = true;
+            masterCb.indeterminate = false;
+        } else {
+            masterCb.checked = false;
+            masterCb.indeterminate = true;
+        }
+    }
+
     if (checked > 0) {
         if (!bar) {
             bar = document.createElement('div');
@@ -2335,6 +2356,20 @@ function hideBulkDeleteBar() {
 function clearBulkSelection() {
     document.querySelectorAll('.imp_bulk_check.checked').forEach(el => el.classList.remove('checked'));
     hideBulkDeleteBar();
+    const cb = document.getElementById('imp_select_all_cb');
+    if (cb) { cb.checked = false; cb.indeterminate = false; }
+}
+
+function toggleSelectAllBulk(masterCb) {
+    const items = document.querySelectorAll('.image_item .imp_bulk_check');
+    items.forEach(el => {
+        if (masterCb.checked) {
+            el.classList.add('checked');
+        } else {
+            el.classList.remove('checked');
+        }
+    });
+    updateBulkDeleteCount();
 }
 
 // Close image picker modal

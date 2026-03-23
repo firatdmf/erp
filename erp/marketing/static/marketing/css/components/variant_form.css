@@ -928,10 +928,19 @@ input[type=file]::-webkit-file-upload-button {
 /* Toolbar */
 .imp_toolbar {
   padding: 12px 24px; border-bottom: 1px solid #f0f0f0; background: #fafbfc;
+  display: flex; align-items: center; gap: 12px;
 }
 .imp_dropzone {
   display: flex; align-items: center; justify-content: center; gap: 12px;
   padding: 10px 16px; border: 1.5px dashed #ddd; border-radius: 10px; transition: all 0.2s;
+  flex: 1;
+}
+.imp_select_all_label {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 13px; font-weight: 500; color: #374151; user-select: none; white-space: nowrap;
+}
+.imp_select_all_label input[type="checkbox"] {
+  width: 16px; height: 16px; cursor: pointer; accent-color: #4f46e5;
 }
 .imp_dropzone:hover, .imp_dropzone.dragover { border-color: #667eea; background: #f5f7ff; }
 .imp_upload_btn {

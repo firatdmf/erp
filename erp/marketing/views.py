@@ -1314,9 +1314,17 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             context = self.get_context_data()
             print(f"⏱️  Get context: {time.time() - context_start:.3f}s")
             
-            formset_start = time.time()
-            self.save_product_files(self.object, context["productfile_formset"])
-            print(f"⏱️  Save product files formset: {time.time() - formset_start:.3f}s")
+            variants_json = self.request.POST.get("variants_json", "[]")
+            has_variants = variants_json and variants_json != "[]"
+
+            # Only save formset for products WITHOUT variants.
+            # For products WITH variants, images are handled by handle_variants via JSON.
+            # Running formset.save() with variants deletes existing ProductFile rows
+            # because the frontend doesn't submit formset management data for them.
+            if not has_variants:
+                formset_start = time.time()
+                self.save_product_files(self.object, context["productfile_formset"])
+                print(f"⏱️  Save product files formset: {time.time() - formset_start:.3f}s")
 
             # Handle product attributes
             attr_start = time.time()
@@ -1327,10 +1335,8 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             bom_start = time.time()
             self.handle_bom(self.object)
             print(f"⏱️  Handle BOM: {time.time() - bom_start:.3f}s")
-
-            variants_json = self.request.POST.get("variants_json", "[]")
             # Always process variants (needed for image changes)
-            if variants_json and variants_json != "[]":
+            if has_variants:
                 self.handle_variants(self.object, variants_json)
             
             # AUTO-UPDATE PRIMARY IMAGE LOGIC:

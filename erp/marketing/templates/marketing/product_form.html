@@ -218,12 +218,27 @@
           <span>Product images are synced from the first variant.</span>
         </div>
 
+        <!-- Bulk Actions Toolbar (hidden until selection mode) -->
+        <div id="media_bulk_toolbar" class="media-bulk-toolbar" style="display: none;">
+          <label class="bulk-select-all">
+            <input type="checkbox" id="select_all_images" onchange="toggleSelectAllImages(this)">
+            <span>Select All</span>
+          </label>
+          <span id="selected_count" class="selected-count">0 selected</span>
+          <button type="button" class="btn-bulk-delete" id="delete_selected_btn" onclick="deleteSelectedImages()">
+            <i class="fa fa-trash"></i> Delete Selected
+          </button>
+        </div>
+
         <!-- Images Container -->
         <div class="media-gallery-container">
           <div id="sortable_images" class="media-grid">
             {% for file in product.files.all %}
             {% if not file.product_variant %}
             <div class="media-item sortable-image" data-file-id="{{ file.pk }}" data-file-type="{{ file.file_type }}">
+              <div class="media-select-checkbox" onclick="event.stopPropagation(); toggleImageSelect(this);">
+                <i class="fa fa-check"></i>
+              </div>
               <div class="media-preview" onclick="openMediaPreview('{{ file.optimized_url }}', '{{ file.file_type }}', {{ file.pk }})">
                 {% if file.is_video %}
                 <img src="{{ file.video_thumbnail_url|default:file.file_url }}" />
@@ -1151,6 +1166,119 @@
         const deletedFiles = document.getElementById('deleted_files').value;
         console.log('Form submitting with deleted_files:', deletedFiles);
       });
+    }
+  });
+
+  // ---- Bulk Select & Delete ----
+  function toggleImageSelect(checkbox) {
+    const mediaItem = checkbox.closest('.media-item');
+    mediaItem.classList.toggle('selected');
+    updateBulkToolbar();
+  }
+
+  function toggleSelectAllImages(masterCheckbox) {
+    const items = document.querySelectorAll('#sortable_images .media-item.sortable-image');
+    items.forEach(item => {
+      if (masterCheckbox.checked) {
+        item.classList.add('selected');
+      } else {
+        item.classList.remove('selected');
+      }
+    });
+    updateBulkToolbar();
+  }
+
+  function updateBulkToolbar() {
+    const items = document.querySelectorAll('#sortable_images .media-item.sortable-image');
+    const selected = document.querySelectorAll('#sortable_images .media-item.sortable-image.selected');
+    const toolbar = document.getElementById('media_bulk_toolbar');
+    const countEl = document.getElementById('selected_count');
+    const masterCb = document.getElementById('select_all_images');
+
+    if (items.length === 0) {
+      toolbar.style.display = 'none';
+      return;
+    }
+
+    toolbar.style.display = 'flex';
+    countEl.textContent = selected.length + ' selected';
+
+    // Update master checkbox state
+    if (selected.length === 0) {
+      masterCb.checked = false;
+      masterCb.indeterminate = false;
+    } else if (selected.length === items.length) {
+      masterCb.checked = true;
+      masterCb.indeterminate = false;
+    } else {
+      masterCb.checked = false;
+      masterCb.indeterminate = true;
+    }
+  }
+
+  async function deleteSelectedImages() {
+    const selected = document.querySelectorAll('#sortable_images .media-item.sortable-image.selected');
+    if (selected.length === 0) return;
+
+    const confirmed = await showConfirmDialog(
+      'Delete ' + selected.length + ' image' + (selected.length > 1 ? 's' : '') + '?',
+      'This action cannot be undone.',
+      'Delete',
+      'Cancel'
+    );
+    if (!confirmed) return;
+
+    let deleted = 0;
+    let errors = 0;
+
+    for (const item of selected) {
+      const fileId = item.getAttribute('data-file-id');
+      try {
+        const response = await fetch('/marketing/api/instant_delete_file/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+          },
+          body: JSON.stringify({ file_id: fileId })
+        });
+        const data = await response.json();
+        if (data.success) {
+          item.style.animation = 'fadeOut 0.3s ease-out';
+          setTimeout(() => item.remove(), 300);
+          if (data.deleted_url && typeof removeImageFromAllVariants === 'function') {
+            removeImageFromAllVariants(data.deleted_url);
+          }
+          deleted++;
+        } else {
+          errors++;
+        }
+      } catch (e) {
+        console.error('Delete error for file ' + fileId, e);
+        errors++;
+      }
+    }
+
+    setTimeout(() => {
+      updateImageOrder();
+      updatePrimaryBadge();
+      updateBulkToolbar();
+      const masterCb = document.getElementById('select_all_images');
+      if (masterCb) masterCb.checked = false;
+    }, 350);
+
+    if (errors > 0) {
+      showToast('Deleted ' + deleted + ', failed ' + errors, 'warning');
+    } else {
+      showToast('Deleted ' + deleted + ' image' + (deleted > 1 ? 's' : ''), 'success');
+    }
+  }
+
+  // Show toolbar on load if there are images
+  document.addEventListener('DOMContentLoaded', function() {
+    const items = document.querySelectorAll('#sortable_images .media-item.sortable-image');
+    if (items.length > 0) {
+      document.getElementById('media_bulk_toolbar').style.display = 'flex';
     }
   });
 </script>

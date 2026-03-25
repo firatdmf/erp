@@ -26,8 +26,8 @@
         <div>
           <h1 class="company-title">{{ contact.name|capfirst }}</h1>
           {% if contact.job_title %}
-          <span class="company-group-badge" style="background: #10b98120; color: #059669; border-color: #10b981;">{{
-            contact.job_title }}</span>
+          <span class="company-group-badge" style="background: #10b98120; color: #059669; border-color: #10b981;">
+            {{ contact.job_title }}</span>
           {% endif %}
           {% if contact.company %}
           <span class="company-group-badge">
@@ -92,6 +92,7 @@
           <div class="info-item">
             <span class="info-label">Job Title</span>
             <span class="info-value">{{ contact.job_title }}</span>
+            <span class="info-value">Hello</span>
           </div>
           {% endif %}
           {% if contact.company %}

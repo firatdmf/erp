@@ -17,8 +17,6 @@ import os
 # from dotenv import load_dotenv
 from decouple import config
 
-# cloud cdn provider
-import cloudinary, cloudinary.uploader, cloudinary.api
 
 # load_dotenv()
 # print(os.getenv('DATABASE'))
@@ -123,9 +121,6 @@ INSTALLED_APPS = [
     "django_htmx",
     "crispy_forms",
     "crispy_bootstrap5",
-    # below is to host images
-    "cloudinary",
-    "cloudinary_storage",
     # below is for google auth
 
     # below is for google auth
@@ -286,23 +281,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-# Cloud CDN solution
-
-cloudinary.config(
-    cloud_name=config("cloudinary_cloud_name"),
-    api_key=config("cloudinary_api_key"),
-    api_secret=config("cloudinary_api_secret"),
-    secure=True,
-)
-
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': config("cloudinary_cloud_name"),
-    'API_KEY': config("cloudinary_api_key"),
-    'API_SECRET': config("cloudinary_api_secret"),
-}
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
-# Bunny CDN Configuration (New - will replace Cloudinary)
+# Bunny CDN Configuration
 # Set USE_BUNNY_CDN=True in .env to enable Bunny CDN for new uploads
 USE_BUNNY_CDN = config("USE_BUNNY_CDN", default=False, cast=bool)
 BUNNY_STORAGE_API_KEY = config("BUNNY_STORAGE_API_KEY", default="")

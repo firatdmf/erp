@@ -4,6 +4,7 @@ erp/.env
 *.pyo
 *.pyc
 .env
+*.sql
 
 #mac stupid shit
 .DS_Store
@@ -13,6 +14,7 @@ erp/.env
 *.log
 *.pot
 *.pyc
+*.sql
 __pycache__
 db.sqlite3
 media

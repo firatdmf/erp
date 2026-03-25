@@ -187,11 +187,13 @@
         {% if contacts %}
         <div class="contacts-list">
           {% for contact in contacts %}
+          <a href="{% url 'crm:contact_detail' contact.id %}" >
           <div class="contact-item" id="contact-item-{{ contact.id }}">
             <div class="contact-info">
               <i class="fa fa-user contact-icon"></i>
               <div>
-                <a href="{% url 'crm:contact_detail' contact.id %}" class="contact-name">{{ contact.name }}</a>
+                
+                  <span class="contact-name">{{ contact.name }}</span>
                 {% if contact.job_title %}<span class="contact-job">{{ contact.job_title }}</span>{% endif %}
               </div>
             </div>
@@ -200,6 +202,7 @@
               <i class="fa fa-times"></i>
             </button>
           </div>
+          </a>
           {% endfor %}
         </div>
         {% else %}

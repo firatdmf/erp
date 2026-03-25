@@ -131,7 +131,7 @@
       {% endif %}
     </div>
     <div class="header-right">
-      <a href="{% url 'marketing:product_list' %}" class="btn btn-secondary">Discard</a>
+      <a href="javascript:void(0)" class="btn btn-secondary" onclick="handleDiscard(event)">Discard</a>
       <button type="submit" form="product_form" class="btn btn-primary">Save Product</button>
     </div>
   </div>
@@ -1286,6 +1286,21 @@
 <!-- File Manager Modal -->
 <script src="{% static 'marketing/js/file_manager_modal.js' %}"></script>
 <script src="{% static 'marketing/js/instant_file_manager.js' %}"></script>
+
+<script>
+  async function handleDiscard(e) {
+    e.preventDefault();
+    const confirmed = await window.showConfirmDialog(
+      'Discard changes?',
+      'Are you sure you want to discard your changes? Any unsaved changes will be lost.',
+      'Discard',
+      'Cancel'
+    );
+    if (confirmed) {
+      window.location.href = "{% url 'marketing:product_list' %}";
+    }
+  }
+</script>
 
 <!-- Temporary File Manager for Product Creation -->
 {% if not product %}

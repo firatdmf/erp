@@ -18,6 +18,7 @@ erp/.env
 __pycache__
 db.sqlite3
 media
+postgres_dump_codes.txt
 
 # Backup files # 
 *.bak 

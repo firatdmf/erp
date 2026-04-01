@@ -474,6 +474,30 @@ class AssetAccountsReceivable(models.Model):
             return f"{self.book} |{self.currency.symbol}{self.amount} "
 
 
+class AssetFixedAsset(models.Model):
+    class Meta:
+        verbose_name_plural = "Fixed Assets"
+
+    CATEGORY_CHOICES = [
+        ("real_estate", "Real Estate"),
+        ("vehicle", "Vehicle"),
+        ("equipment", "Equipment"),
+        ("furniture", "Furniture"),
+        ("other", "Other"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="other")
+    currency = models.ForeignKey(CurrencyCategory, on_delete=models.CASCADE, default=1)
+    value = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.currency.symbol}{self.value} ({self.book})"
+
+
 class LiabilityAccountsPayable(models.Model):
     from operating.models import RawMaterialGoodReceipt
 
@@ -492,7 +516,7 @@ class LiabilityAccountsPayable(models.Model):
         "CashAccount", on_delete=models.CASCADE, blank=True, null=True
     )
     supplier = supplier = models.ForeignKey(
-        Supplier, on_delete=models.RESTRICT, null=False, blank=False
+        Supplier, on_delete=models.RESTRICT, null=True, blank=True
     )
     # receipt = models.CharField(null=True, blank=True)
     # raw_goods_receipt = models.ForeignKey(

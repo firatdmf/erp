@@ -37,6 +37,17 @@ class AssetAccountsReceivableForm(forms.ModelForm):
         }
 
 
+class AssetFixedAssetForm(forms.ModelForm):
+    class Meta:
+        model = AssetFixedAsset
+        fields = "__all__"
+
+        widgets = {
+            "book": forms.HiddenInput(),
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
 class LiabilityAccountsPayableForm(forms.ModelForm):
     class Meta:
         model = LiabilityAccountsPayable

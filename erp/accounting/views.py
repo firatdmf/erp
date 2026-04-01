@@ -766,6 +766,36 @@ class AddAccountsReceivable(generic.edit.CreateView):
 
 
 @method_decorator(login_required, name="dispatch")
+class AddFixedAsset(generic.edit.CreateView):
+    model = AssetFixedAsset
+    form_class = AssetFixedAssetForm
+    template_name = "accounting/add_fixed_asset.html"
+
+    def get_initial(self):
+        book_pk = self.kwargs.get("pk")
+        book = Book.objects.get(pk=book_pk)
+        return {"book": book, "currency": 1}
+
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
+        )
+
+
+@method_decorator(login_required, name="dispatch")
+class EditFixedAsset(generic.edit.UpdateView):
+    model = AssetFixedAsset
+    form_class = AssetFixedAssetForm
+    template_name = "accounting/add_fixed_asset.html"
+    pk_url_kwarg = "asset_pk"
+
+    def get_success_url(self) -> str:
+        return reverse_lazy(
+            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
+        )
+
+
+@method_decorator(login_required, name="dispatch")
 class AddAccountsPayable(generic.edit.CreateView):
     model = LiabilityAccountsPayable
     form_class = LiabilityAccountsPayableForm

@@ -1,0 +1,52 @@
+{% load accounting_tags %}
+
+<!-- Assets List -->
+{% if assets_list %}
+<div class="assets-list">
+  <div class="kpi-label" style="margin-bottom: 0.75rem;">Fixed Assets</div>
+  <table class="assets-table">
+    <thead>
+      <tr>
+        <th>NAME</th>
+        <th>CATEGORY</th>
+        <th>VALUE</th>
+        <th>VALUE ({{ base_currency.code }})</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in assets_list %}
+      <tr class="asset-row-clickable" onclick="window.location='{% url 'accounting:edit_fixed_asset' book_pk item.asset.pk %}'">
+        <td style="font-weight: 600;">{{ item.asset.name }}</td>
+        <td>{{ item.asset.get_category_display }}</td>
+        <td>{{ item.asset.currency.symbol }}{{ item.asset.value|format_money }}</td>
+        <td>{{ base_currency.symbol }}{{ item.value_base|format_money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.5rem;">
+  No fixed assets recorded yet.
+</div>
+{% endif %}
+
+<!-- Net Worth Equation -->
+<div class="net-worth-equation">
+  <div class="equation-row">
+    <div class="equation-item">
+      <span class="equation-label">Cash</span>
+      <span class="equation-value">{{ base_currency.symbol }}{{ cash_total|format_money }}</span>
+    </div>
+    <div class="equation-operator">+</div>
+    <div class="equation-item">
+      <span class="equation-label">Fixed Assets</span>
+      <span class="equation-value">{{ base_currency.symbol }}{{ assets_total|format_money }}</span>
+    </div>
+    <div class="equation-operator">=</div>
+    <div class="equation-item equation-total">
+      <span class="equation-label">Net Worth</span>
+      <span class="equation-value">{{ base_currency.symbol }}{{ net_worth|format_money }}</span>
+    </div>
+  </div>
+</div>

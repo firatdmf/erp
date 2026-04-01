@@ -1,12 +1,21 @@
-# from forex_python.converter import CurrencyRates
-from currency_converter import CurrencyConverter
+import httpx
 from datetime import date
 from decimal import Decimal
 from .models import CurrencyExchangeRate, CashTransactionEntry
 from .views import get_total_base_currency_balance
 
 
-# c = CurrencyRates()
+def _fetch_rate_from_google(from_currency: str, to_currency: str) -> Decimal:
+    """Fetch exchange rate from Google Finance."""
+    url = f"https://www.google.com/finance/quote/{from_currency}-{to_currency}"
+    response = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    response.raise_for_status()
+    # The rate is in a div with data-last-price attribute
+    text = response.text
+    marker = 'data-last-price="'
+    start = text.index(marker) + len(marker)
+    end = text.index('"', start)
+    return Decimal(text[start:end])
 
 
 def get_exchange_rate(from_currency: str, to_currency: str) -> Decimal:
@@ -20,12 +29,8 @@ def get_exchange_rate(from_currency: str, to_currency: str) -> Decimal:
         print(f"from {from_currency} to {to_currency} rate is: {rate_obj.rate} ")
         return rate_obj.rate
     except CurrencyExchangeRate.DoesNotExist:
-
-        # Fetch from forex-python
         try:
-            # rate_float = c.get_rate(from_currency, to_currency)
-            rate_float = CurrencyConverter().convert(1, from_currency, to_currency)
-            rate = Decimal(str(rate_float))
+            rate = _fetch_rate_from_google(from_currency, to_currency)
             print(f"from {from_currency} to {to_currency} rate is: {rate} ")
             # Save to cache
             CurrencyExchangeRate.objects.create(
@@ -33,7 +38,6 @@ def get_exchange_rate(from_currency: str, to_currency: str) -> Decimal:
             )
             return rate
         except Exception as e:
-            # Handle API failure gracefully
             print(f"Error fetching exchange rate: {e}")
             return None
 

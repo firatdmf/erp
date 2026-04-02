@@ -1068,14 +1068,14 @@
     const currentPrimaryId = manualInput ? manualInput.value : '';
     const allItems = container.querySelectorAll('.sortable-image');
 
-    // If there's a manual selection, ensure that item still exists in the product-level grid.
-    // Only clear if the grid actually has items (otherwise images are on variants
-    // and the primary picker handles selection separately).
-    const hasProductImages = allItems.length > 0;
-    if (currentPrimaryId && hasProductImages) {
-      const exists = container.querySelector(`.sortable-image[data-file-id="${currentPrimaryId}"]`);
-      if (!exists) {
-        // Selected primary was deleted, clear the manual selection
+    // If there's a manual selection, verify the image still exists somewhere
+    // (could be in the product grid OR in the primary picker which includes variant images).
+    if (currentPrimaryId) {
+      const inGrid = container.querySelector(`.sortable-image[data-file-id="${currentPrimaryId}"]`);
+      const pickerGrid = document.getElementById('primary_picker_grid');
+      const inPicker = pickerGrid ? pickerGrid.querySelector(`.primary-picker-item[data-file-id="${currentPrimaryId}"]`) : null;
+      if (!inGrid && !inPicker) {
+        // Image was truly deleted, clear the manual selection
         if (manualInput) manualInput.value = '';
       }
     }

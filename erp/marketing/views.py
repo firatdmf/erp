@@ -452,34 +452,33 @@ class BaseProductView(ModelFormMixin):
                     )
                     continue
             
-            # Handle image ordering - first image is primary (ONLY for main product images, not variants)
-            image_order = self.request.POST.get('image_order')
-            if image_order:
-                try:
-                    order_list = json.loads(image_order)
-                    if order_list:
-                        # Clear all is_primary flags for main product images only
+            # Handle image ordering - first image is primary (skip if user manually picked via picker)
+            manual_primary = self.request.POST.get('manual_primary_image', '').strip()
+            if not manual_primary:
+                image_order = self.request.POST.get('image_order')
+                if image_order:
+                    try:
+                        order_list = json.loads(image_order)
+                        if order_list:
+                            ProductFile.objects.filter(product=product, product_variant__isnull=True).update(is_primary=False)
+                            first_image_id = order_list[0]
+                            primary_file = ProductFile.objects.get(pk=first_image_id, product=product, product_variant__isnull=True)
+                            primary_file.is_primary = True
+                            primary_file.save()
+                            product.primary_image = primary_file
+                            product.save()
+                            print(f"Set primary image to {first_image_id} (main product image) based on order")
+                    except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
+                        print(f"Error setting primary from order: {e}")
+                else:
+                    first_file = ProductFile.objects.filter(product=product, product_variant__isnull=True).order_by('sequence', 'pk').first()
+                    if first_file:
                         ProductFile.objects.filter(product=product, product_variant__isnull=True).update(is_primary=False)
-                        # Set first image as primary (must be a main product image, not variant)
-                        first_image_id = order_list[0]
-                        primary_file = ProductFile.objects.get(pk=first_image_id, product=product, product_variant__isnull=True)
-                        primary_file.is_primary = True
-                        primary_file.save()
-                        product.primary_image = primary_file
+                        first_file.is_primary = True
+                        first_file.save()
+                        product.primary_image = first_file
                         product.save()
-                        print(f"Set primary image to {first_image_id} (main product image) based on order")
-                except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
-                    print(f"Error setting primary from order: {e}")
-            else:
-                # If no order specified, set first available MAIN PRODUCT image as primary
-                first_file = ProductFile.objects.filter(product=product, product_variant__isnull=True).order_by('sequence', 'pk').first()
-                if first_file:
-                    ProductFile.objects.filter(product=product, product_variant__isnull=True).update(is_primary=False)
-                    first_file.is_primary = True
-                    first_file.save()
-                    product.primary_image = first_file
-                    product.save()
-                    print(f"Set first available main product image {first_file.pk} as primary")
+                        print(f"Set first available main product image {first_file.pk} as primary")
             
             return
 
@@ -903,23 +902,19 @@ class BaseProductView(ModelFormMixin):
         print(f"  ✓ Processed variant images: {variant_loop_time:.3f}s (updated {len(all_images_to_update)} files)")
         print(f"    - Images: {total_image_time:.3f}s")
         
-        # Handle primary variant image selection
+        # Handle primary variant image selection (skip if user manually picked via picker)
         primary_start = time.time()
         primary_variant_index = self.request.POST.get('primary_variant_image')
-        if primary_variant_index:
+        if primary_variant_index and not manual_primary:
             try:
                 primary_variant_index = int(primary_variant_index)
-                # Index in form is 1-based, convert to 0-based for list
                 if 0 < primary_variant_index <= len(variants_data):
                     primary_variant_sku = variants_data[primary_variant_index - 1].get("variant_sku")
                     if primary_variant_sku:
-                        # Get the first file of the primary variant
                         primary_variant = ProductVariant.objects.get(variant_sku=primary_variant_sku, product=self.object)
                         primary_file = ProductFile.objects.filter(product_variant=primary_variant).first()
                         if primary_file:
-                            # Clear all is_primary flags
                             ProductFile.objects.filter(product=self.object).update(is_primary=False)
-                            # Set new primary
                             primary_file.is_primary = True
                             primary_file.save()
                             self.object.primary_image = primary_file
@@ -968,29 +963,27 @@ class BaseProductView(ModelFormMixin):
         if uploaded_main_files:
             print(f"  ✓ Uploaded {len(uploaded_main_files)} main files: {upload_time:.3f}s")
         
-        # After handling variants, ALWAYS use first variant's first image as product primary
-        # This ignores any main product images if variants exist
+        # After handling variants, set primary image.
+        # If user manually selected one via the picker, skip auto-logic here
+        # (it will be handled in form_valid's primary image section).
         set_primary_start = time.time()
-        # Always handle main product image ordering if provided
-        # User request: "primary imagei oradan seçelim" (select primary image from Product Images section)
-        image_order = self.request.POST.get('image_order')
-        if image_order:
-            try:
-                order_list = json.loads(image_order)
-                if order_list:
-                    # Clear all is_primary flags
-                    ProductFile.objects.filter(product=self.object).update(is_primary=False)
-                    
-                    # Set first image as primary
-                    first_image_id = order_list[0]
-                    primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object)
-                    primary_file.is_primary = True
-                    primary_file.save()
-                    self.object.primary_image = primary_file
-                    self.object.save()
-                    print(f"Set primary image to {first_image_id} based on order")
-            except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
-                print(f"Error setting primary from order: {e}")
+        manual_primary = self.request.POST.get('manual_primary_image', '').strip()
+        if not manual_primary:
+            image_order = self.request.POST.get('image_order')
+            if image_order:
+                try:
+                    order_list = json.loads(image_order)
+                    if order_list:
+                        ProductFile.objects.filter(product=self.object).update(is_primary=False)
+                        first_image_id = order_list[0]
+                        primary_file = ProductFile.objects.get(pk=first_image_id, product=self.object)
+                        primary_file.is_primary = True
+                        primary_file.save()
+                        self.object.primary_image = primary_file
+                        self.object.save()
+                        print(f"Set primary image to {first_image_id} based on order")
+                except (ValueError, ProductFile.DoesNotExist, json.JSONDecodeError) as e:
+                    print(f"Error setting primary from order: {e}")
         
         set_primary_time = time.time() - set_primary_start
         print(f"  ✓ Set primary image: {set_primary_time:.3f}s")
@@ -1317,14 +1310,9 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             variants_json = self.request.POST.get("variants_json", "[]")
             has_variants = variants_json and variants_json != "[]"
 
-            # Only save formset for products WITHOUT variants.
-            # For products WITH variants, images are handled by handle_variants via JSON.
-            # Running formset.save() with variants deletes existing ProductFile rows
-            # because the frontend doesn't submit formset management data for them.
-            if not has_variants:
-                formset_start = time.time()
-                self.save_product_files(self.object, context["productfile_formset"])
-                print(f"⏱️  Save product files formset: {time.time() - formset_start:.3f}s")
+            # NOTE: Product files are managed via instant upload/delete APIs and file manager modal.
+            # The inline formset is NOT used because the template doesn't render management form data,
+            # and calling formset.save() without it would delete all existing ProductFile records.
 
             # Handle product attributes
             attr_start = time.time()
@@ -1339,40 +1327,50 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             if has_variants:
                 self.handle_variants(self.object, variants_json)
             
-            # AUTO-UPDATE PRIMARY IMAGE LOGIC:
-            # If product has variants → primary_image = first variant's first image
-            # If no variants → primary_image = product's first image (sequence=0)
+            # PRIMARY IMAGE LOGIC:
+            # 1. If user manually selected a primary image, use that
+            # 2. Otherwise auto-set: first variant's first image, or product's first image
             primary_update_start = time.time()
-            first_variant = self.object.variants.order_by('id').first()
-            
-            if first_variant:
-                # Has variants: Use first variant's first image
-                first_variant_file = ProductFile.objects.filter(
-                    product_variant=first_variant
-                ).order_by('sequence', 'pk').first()
-                
-                if first_variant_file:
-                    if self.object.primary_image_id != first_variant_file.pk:
-                        self.object.primary_image = first_variant_file
-                        self.object.save(update_fields=['primary_image'])
-                        print(f"✓ Auto-updated primary_image to first variant's image (id={first_variant_file.pk})")
-            else:
-                # No variants: Use product's first image (sequence=0)
-                first_product_file = ProductFile.objects.filter(
-                    product=self.object,
-                    product_variant__isnull=True
-                ).order_by('sequence', 'pk').first()
-                
-                if first_product_file:
-                    if self.object.primary_image_id != first_product_file.pk:
-                        self.object.primary_image = first_product_file
-                        self.object.save(update_fields=['primary_image'])
-                        print(f"✓ Auto-updated primary_image to product's first image (id={first_product_file.pk})")
-            
+            manual_primary = self.request.POST.get('manual_primary_image', '').strip()
+
+            chosen_file = None
+
+            if manual_primary:
+                # User explicitly chose a primary image
+                try:
+                    chosen_file = ProductFile.objects.get(pk=int(manual_primary), product=self.object)
+                except (ProductFile.DoesNotExist, ValueError):
+                    manual_primary = ''  # Fall through to auto-logic
+
+            if not manual_primary:
+                # Auto-set: first variant's first image, or product's first image
+                first_variant = self.object.variants.order_by('id').first()
+
+                if first_variant:
+                    chosen_file = ProductFile.objects.filter(
+                        product_variant=first_variant
+                    ).order_by('sequence', 'pk').first()
+                else:
+                    chosen_file = ProductFile.objects.filter(
+                        product=self.object,
+                        product_variant__isnull=True
+                    ).order_by('sequence', 'pk').first()
+
+            if chosen_file:
+                self.object.primary_image = chosen_file
+                self.object.save(update_fields=['primary_image'])
+                # Sync the is_primary boolean flag on ProductFile records
+                ProductFile.objects.filter(product=self.object, is_primary=True).update(is_primary=False)
+                chosen_file.is_primary = True
+                chosen_file.save(update_fields=['is_primary'])
+
             print(f"⏱️  Primary image update: {time.time() - primary_update_start:.3f}s")
         
         redirect_start = time.time()
-        response = super().form_valid(form)
+        # Skip super().form_valid() which would call form.save() again
+        # and overwrite our primary_image. Just redirect directly.
+        from django.http import HttpResponseRedirect
+        response = HttpResponseRedirect(self.get_success_url())
         
         # Pass CDN URLs to be deleted asynchronously after redirect
         if cloudinary_urls_to_delete:
@@ -2329,17 +2327,27 @@ def get_products(request):
                     FROM marketing_productattribute
                     WHERE product_id IN (SELECT id FROM pids)
                 ) sub
+            ),
+            pfiles AS (
+                SELECT json_agg(sub ORDER BY sub.sequence) as data FROM (
+                    SELECT id, product_id, product_variant_id, file_url, file_type, is_primary, sequence, alt_text
+                    FROM marketing_productfile
+                    WHERE product_id IN (SELECT id FROM pids)
+                      AND file_url IS NOT NULL
+                ) sub
             )
             SELECT
                 (SELECT data FROM variants),
                 (SELECT data FROM m2m),
-                (SELECT data FROM prod_attrs)
+                (SELECT data FROM prod_attrs),
+                (SELECT data FROM pfiles)
         """, {"pids": product_ids})
         combined = cursor.fetchone()
 
     variant_rows = combined[0] or []
     m2m_rows = combined[1] or []
     prod_attr_rows = combined[2] or []
+    file_rows = combined[3] or []
 
     # Fetch exchange rates once (in-memory cached, refreshed every hour)
     from marketing.utils.currency_service import get_rates, convert_price as _convert_price
@@ -2353,6 +2361,23 @@ def get_products(request):
             prod_attrs_map[pid] = []
         prod_attrs_map[pid].append({"name": a["name"], "value": a["value"], "sequence": a["sequence"]})
 
+    # Build product files map: product_id -> [files]
+    prod_files_map = {}
+    for f in file_rows:
+        pid = f["product_id"]
+        if pid not in prod_files_map:
+            prod_files_map[pid] = []
+        prod_files_map[pid].append({
+            "id": f["id"],
+            "file": f["file_url"],
+            "file_type": f["file_type"],
+            "product_id": f["product_id"],
+            "product_variant_id": f["product_variant_id"],
+            "sequence": f["sequence"],
+            "is_primary": f["is_primary"],
+            "alt_text": f.get("alt_text", ""),
+        })
+
     # Build products data
     products_data = [
         {
@@ -2364,6 +2389,7 @@ def get_products(request):
             "prices": _convert_price(p.price, rates),
             "primary_image": p.primary_image.file_url if p.primary_image else None,
             "product_attributes": prod_attrs_map.get(p.id, []),
+            "product_files": prod_files_map.get(p.id, []),
         }
         for p in products_list
     ]

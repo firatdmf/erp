@@ -1,0 +1,17 @@
+.equity_expense_list table, th, td {
+    border: 1px solid black;
+  }
+
+.equity_expense_list th, .equity_expense td{
+  padding:10px;
+  text-align: center;
+}
+
+.equity_expense_list tr:nth-child(even) {
+  background-color: rgba(0,0,0,0.1);
+}
+
+
+.equity_expense_list h1{
+  color:saddlebrown;
+}

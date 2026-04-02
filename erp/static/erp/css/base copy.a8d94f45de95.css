@@ -1,0 +1,191 @@
+:root {
+  font-size: 16px;
+  font-family: Georgia, "Times New Roman", Times, serif;
+  /* --text-primary: #b6b6b6; */
+  --text-primary: #D6D6D7;
+
+
+  --text-secondary: #ececec;
+  /* --text-secondary: #fff; */
+  --bg-primary: #23232e;
+  /* below is from incognito */
+  --bg-primary: #202124;
+  /* --bg-secondary: #141418; */
+  --bg-secondary: purple;
+  --bg-secondary: #383e42;
+  --bg-secondary: #323639;
+  /* --bg-secondary: #05a; */
+  --transition-speed: 600ms;
+}
+
+body {
+  /* color: black; */
+  background-color: white;
+  margin: 0;
+  padding: 0;
+}
+
+main {
+  /* we previously set the rem to be 16px so this will always be proportionate */
+  margin-left: 5rem;
+  padding: 1rem;
+}
+
+.navbar {
+  /* matches with main element */
+  /* width: 5rem;
+  height: 100vh; */
+  /* stays the same no matter if the user scrolls the screen */
+  position: fixed;
+  background-color: var(--bg-primary);
+  transition: width 200ms ease;
+}
+
+.navbar-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.nav-item {
+  width: 100%;
+}
+.nav-item:last-child {
+  /* background: white; */
+  /* will make the margin as big as possible pushing it all the way down */
+  /* margin: auto; */
+  margin-top: auto;
+  /* align-self: flex-end; */
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  /* matching the current width, making the items perfectly squared */
+  height: 5rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  /* filter:grayscale(100%) opacity(0.7) hue-rotate(0.3); */
+  filter: grayscale(100%) opacity(0.7);
+  transition: var(--transition-speed);
+  overflow: hidden;
+}
+
+.nav-link:hover {
+  /* filter:grayscale(0%) opacity(1) hue-rotate(0.7); */
+  filter: grayscale(0%) opacity(1);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.link-text {
+  display: none;
+  margin-left: 1rem;
+}
+
+.nav-link svg, .nav-link i {
+  min-width: 2rem;
+  margin: 0 1.5rem;
+}
+/* svg icon colors */
+/* path {
+  fill: white;
+} */
+
+.navbar:hover {
+  width: 16rem;
+}
+.navbar:hover .link-text {
+  display: block;
+}
+
+path {
+  fill: #ff7eee;
+  fill:green;
+}
+path:hover {
+  fill: #df49a6;
+  fill:green;
+}
+
+path,
+path:hover {
+  /* around 600 ms */
+  transition: var(--transition-speed);
+  /* transition: 1000ms ease; */
+}
+
+a{
+  text-decoration: none;
+  color:inherit;
+}
+
+
+
+.logo {
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  text-align: center;
+  color: var(--text-seconday);
+  background: var(--bg-secondary);
+  font-size: 1.5rem;
+  letter-spacing: 0.3ch;
+  width: 100%;
+}
+
+.logo svg, .logo i {
+  transform: rotate(0deg);
+  transition: var(--transition-speed);
+  /* transition: 1000ms ease; */
+}
+
+.navbar:hover .logo svg, .navbar:hover .logo i {
+  transform: rotate(-540deg);
+}
+
+/* now let's make it responsive */
+/* small screens */
+@media only screen and (max-width: 600px) {
+  .navbar {
+    bottom: 0;
+    width:100vw;
+    height:5rem;
+
+  }
+  .logo{
+    display: none;
+  }
+
+  .navbar-nav{
+    flex-direction: row;
+  }
+
+  .nav-link{
+    justify-content: center;
+  }
+  main{
+    margin:0;
+  }
+}
+
+/* large screens */
+@media only screen and (min-width: 600px) {
+  .navbar {
+    top: 0;
+    width: 5rem;
+    height: 100vh;
+  }
+
+  .navbar:hover {
+    width: 16rem;
+  }
+  .navbar:hover .link-text {
+    display: inline;
+    transition: opacity var(--transition-speed);
+  }
+}

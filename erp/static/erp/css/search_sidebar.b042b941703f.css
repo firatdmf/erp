@@ -1,0 +1,382 @@
+/* Modern Search Sidebar - Premium Flat Design */
+:root {
+    --sidebar-width: 700px;
+    --header-height: 70px;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --border-color: #e2e8f0;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --accent-color: #3b82f6;
+    --accent-bg: #eff6ff;
+}
+
+.search-sidebar {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.search-sidebar.active {
+    display: block;
+    opacity: 1;
+}
+
+.search-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 1;
+}
+
+.search-sidebar-content {
+    position: absolute;
+    top: 0;
+    right: -100%;
+    width: var(--sidebar-width);
+    height: 100vh;
+    /* Changed to 100vh to ensure full viewport */
+    background: var(--bg-primary);
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.search-sidebar.active .search-sidebar-content {
+    right: 0;
+}
+
+/* --- Header --- */
+.search-header-styled {
+    height: var(--header-height);
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    flex-shrink: 0;
+}
+
+.sidebar-close-styled {
+    background: transparent;
+    border: none;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.sidebar-close-styled:hover {
+    background: var(--bg-secondary);
+    color: #ef4444;
+}
+
+.sidebar-title-styled {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-main);
+}
+
+.sidebar-title-styled i {
+    font-size: 1.1rem;
+    color: var(--accent-color);
+}
+
+.sidebar-title-styled h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-main);
+}
+
+/* --- Search Input Section --- */
+.search-input-section {
+    padding: 1.25rem 1.5rem 0;
+    flex-shrink: 0;
+}
+
+.search-input-wrapper-styled {
+    position: relative;
+    width: 100%;
+}
+
+.search-input-wrapper-styled input {
+    width: 100%;
+    padding: 0.875rem 2.5rem 0.875rem 2.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    font-size: 1rem;
+    color: var(--text-main);
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+.search-input-wrapper-styled input:focus {
+    outline: none;
+    background: white;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-input-wrapper-styled .fa-search {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+.clear-input-icon {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    cursor: pointer;
+    z-index: 5;
+}
+
+.clear-input-icon:hover {
+    color: #ef4444;
+}
+
+/* --- Main Layout --- */
+.search-layout {
+    flex: 1;
+    /* Grow to fill remaining space */
+    display: flex;
+    flex-direction: row;
+    margin-top: 1.25rem;
+    border-top: 1px solid var(--border-color);
+    overflow: hidden;
+    /* Ensure scroll handles inside children */
+    min-height: 0;
+    /* Crucial for nested flex scrolling */
+}
+
+/* Vertical Tabs */
+.search-tabs {
+    width: 160px;
+    background: var(--bg-secondary);
+    padding: 0;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.tab-item {
+    padding: 0.875rem 1.5rem;
+    /* Slightly compact */
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.tab-item:hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: var(--text-main);
+}
+
+.tab-item.active {
+    background: white;
+    color: var(--accent-color);
+    border-left-color: var(--accent-color);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* Results Area - FLAT LIST DESIGN */
+.search-results-wrapper {
+    flex: 1;
+    /* Fill remaining width/height of search-layout */
+    background: var(--bg-primary);
+    padding: 0;
+    overflow-y: auto;
+    /* Scroll here */
+    height: 100%;
+    /* Ensure full height usage */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Container content adjustments */
+.search-results-list,
+.default-state {
+    display: block;
+    /* Remove flex properties that might collapse height */
+}
+
+.result-section {
+    margin-bottom: 0;
+    border: none;
+    border-radius: 0;
+}
+
+.section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding: 0.75rem 1.5rem;
+    /* Compact header */
+    background: var(--bg-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    border-top: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.result-section:first-child .section-title {
+    border-top: none;
+}
+
+.result-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    /* Compact Padding - Show more items */
+    min-height: 48px;
+    /* Ensure click target */
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid var(--border-color);
+    background: white;
+}
+
+.result-card:last-child {
+    border-bottom: none;
+}
+
+.result-card:hover {
+    background: var(--accent-bg);
+}
+
+.result-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.result-icon.contact {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.result-icon.company {
+    background: #fae8ff;
+    color: #86198f;
+}
+
+.result-icon.product {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.result-icon.order {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.result-icon.menu {
+    background: #e0f2fe;
+    color: #0284c7;
+}
+
+.result-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.result-name {
+    font-weight: 600;
+    color: var(--text-main);
+    font-size: 0.9rem;
+}
+
+.result-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Spinner */
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    padding: 3rem;
+}
+
+.spinner-ring {
+    width: 30px;
+    height: 30px;
+    border: 3px solid var(--accent-bg);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 100%;
+    }
+
+    .search-layout {
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+    }
+
+    .search-tabs {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding: 0;
+        flex-shrink: 0;
+    }
+}

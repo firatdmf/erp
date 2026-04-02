@@ -27,7 +27,7 @@ class ProductForm(forms.ModelForm):
         model = Product
         # fields = ['title', 'description', 'sku', 'barcode', 'price', 'cost', 'featured', 'selling_while_out_of_stock', 'weight', 'unit_of_weight', 'vendor', 'has_variants']
         fields = "__all__"
-        exclude = ['datasheet_url']
+        exclude = ['datasheet_url', 'primary_image']
         widgets = {
             'featured': forms.CheckboxInput(attrs={'class': 'switch-input'}),
             'selling_while_out_of_stock': forms.CheckboxInput(attrs={'class': 'switch-input'}),
@@ -55,13 +55,6 @@ class ProductForm(forms.ModelForm):
             # Use count() instead of exists() for better compatibility with some cursor types
             if is_update and self.instance.variants.count() > 0:
                 self.fields["has_variants"].initial = True
-            # Force fresh queryset for primary_image filtered to this product
-            self.fields["primary_image"].queryset = ProductFile.objects.filter(
-                product=self.instance
-            ).order_by('sequence', 'pk')
-        else:
-            # For new products, show empty queryset
-            self.fields["primary_image"].queryset = ProductFile.objects.none()
 
 class ProductVariantForm(forms.ModelForm):
     class Meta:

@@ -3,7 +3,7 @@
 {% load marketing_tags %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}?v=26">
+<link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}">
 <!-- Mobile Responsive Styles -->
 <style>
   @media (max-width: 768px) {
@@ -235,7 +235,7 @@
           <div id="sortable_images" class="media-grid">
             {% for file in product.files.all %}
             {% if not file.product_variant %}
-            <div class="media-item sortable-image" data-file-id="{{ file.pk }}" data-file-type="{{ file.file_type }}">
+            <div class="media-item sortable-image{% if product.primary_image_id == file.pk %} is-primary{% endif %}" data-file-id="{{ file.pk }}" data-file-type="{{ file.file_type }}">
               <div class="media-select-checkbox" onclick="event.stopPropagation(); toggleImageSelect(this);">
                 <i class="fa fa-check"></i>
               </div>
@@ -254,9 +254,12 @@
                 </button>
                 <div class="drag-handle"><i class="fa fa-grip-vertical"></i></div>
               </div>
-              {% if file.is_primary %}
-              <div class="primary-tag">Primary</div>
+              {% if not file.is_video %}
+              <button type="button" class="set-primary-btn" data-file-id="{{ file.pk }}" onclick="event.stopPropagation(); setPrimaryImage({{ file.pk }});" title="Set as primary image">
+                <i class="fa fa-star"></i>
+              </button>
               {% endif %}
+              <div class="primary-tag" {% if product.primary_image_id != file.pk %}style="display:none"{% endif %}>Primary</div>
             </div>
             {% endif %}
             {% endfor %}
@@ -271,6 +274,53 @@
           </div>
           <input type="hidden" id="image_order" name="image_order" value="">
           <input type="hidden" id="deleted_files" name="deleted_files" value="">
+          <input type="hidden" id="manual_primary_image" name="manual_primary_image" value="{% if product.primary_image_id %}{{ product.primary_image_id }}{% endif %}">
+        </div>
+
+        <!-- Primary Image Picker -->
+        <div class="primary-image-picker" id="primary_image_picker">
+          <div class="primary-picker-header">
+            <div class="primary-picker-preview" id="primary_preview">
+              {% if product.primary_image %}
+              <img src="{{ product.primary_image.optimized_url }}" alt="Primary image" id="primary_preview_img" />
+              {% else %}
+              <div class="primary-preview-empty" id="primary_preview_empty">
+                <i class="fa fa-image"></i>
+              </div>
+              {% endif %}
+            </div>
+            <div class="primary-picker-info">
+              <div class="primary-picker-label">
+                <i class="fa fa-star" style="color: #f59e0b;"></i> Primary Image
+              </div>
+              <span class="primary-picker-hint">Displayed on the product card</span>
+            </div>
+            <button type="button" class="btn-change-primary" onclick="togglePrimaryPicker()">
+              <i class="fa fa-pen"></i> Change
+            </button>
+          </div>
+
+          <!-- Expandable selection grid -->
+          <div class="primary-picker-selection" id="primary_picker_selection" style="display: none;">
+            <div class="primary-picker-selection-header">
+              <span>Select an image</span>
+              <button type="button" class="primary-picker-close" onclick="togglePrimaryPicker()">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+            <div class="primary-picker-grid" id="primary_picker_grid">
+              {% for file in product.files.all %}
+              {% if file.file_type == 'image' %}
+              <div class="primary-picker-item{% if product.primary_image_id == file.pk %} active{% endif %}"
+                   data-file-id="{{ file.pk }}"
+                   onclick="selectPrimaryImage('{{ file.pk }}', '{{ file.optimized_url }}')">
+                <img src="{{ file.optimized_url }}" alt="Product image" />
+                <div class="primary-picker-star"><i class="fa fa-star"></i></div>
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+          </div>
         </div>
 
         {% else %}
@@ -1010,8 +1060,113 @@
   }
 
   function updatePrimaryBadge() {
-    // Deprecated: Duplicate badge removal
+    // If no manual selection has been made yet, auto-select the first image
+    const manualInput = document.getElementById('manual_primary_image');
+    const container = document.getElementById('sortable_images');
+    if (!container) return;
+
+    const currentPrimaryId = manualInput ? manualInput.value : '';
+    const allItems = container.querySelectorAll('.sortable-image');
+
+    // If there's a manual selection, ensure that item still exists in the product-level grid.
+    // Only clear if the grid actually has items (otherwise images are on variants
+    // and the primary picker handles selection separately).
+    const hasProductImages = allItems.length > 0;
+    if (currentPrimaryId && hasProductImages) {
+      const exists = container.querySelector(`.sortable-image[data-file-id="${currentPrimaryId}"]`);
+      if (!exists) {
+        // Selected primary was deleted, clear the manual selection
+        if (manualInput) manualInput.value = '';
+      }
+    }
+
+    // Update visual state: show primary-tag on current primary, hide on others
+    const activePrimaryId = manualInput ? manualInput.value : '';
+    allItems.forEach(item => {
+      const fileId = item.getAttribute('data-file-id');
+      const tag = item.querySelector('.primary-tag');
+      if (activePrimaryId && fileId === activePrimaryId) {
+        item.classList.add('is-primary');
+        if (tag) tag.style.display = '';
+      } else {
+        item.classList.remove('is-primary');
+        if (tag) tag.style.display = 'none';
+      }
+    });
   }
+
+  function setPrimaryImage(fileId) {
+    const manualInput = document.getElementById('manual_primary_image');
+    if (manualInput) {
+      manualInput.value = String(fileId);
+    }
+    updatePrimaryBadge();
+    updatePrimaryPicker();
+  }
+
+  function selectPrimaryImage(fileId, imageUrl) {
+    setPrimaryImage(fileId);
+
+    // Update the preview thumbnail
+    const previewContainer = document.getElementById('primary_preview');
+    if (previewContainer) {
+      previewContainer.innerHTML = `<img src="${imageUrl}" alt="Primary image" id="primary_preview_img" />`;
+    }
+
+    // Close the selection panel after a short delay
+    setTimeout(() => {
+      const panel = document.getElementById('primary_picker_selection');
+      if (panel) panel.style.display = 'none';
+    }, 250);
+  }
+
+  function togglePrimaryPicker() {
+    const panel = document.getElementById('primary_picker_selection');
+    if (panel) {
+      const opening = panel.style.display === 'none';
+      panel.style.display = opening ? 'block' : 'none';
+      if (opening) {
+        updatePrimaryPicker();
+      }
+    }
+  }
+
+  function updatePrimaryPicker() {
+    const manualInput = document.getElementById('manual_primary_image');
+    const activePrimaryId = manualInput ? manualInput.value : '';
+    const pickerItems = document.querySelectorAll('.primary-picker-item');
+    pickerItems.forEach(item => {
+      const fid = item.getAttribute('data-file-id');
+      if (String(fid) === String(activePrimaryId)) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+  }
+
+  // Deduplicate picker images (variants can share the same image URL)
+  (function dedupPickerImages() {
+    const grid = document.getElementById('primary_picker_grid');
+    if (!grid) return;
+    const seenUrls = new Map(); // url -> first element
+    grid.querySelectorAll('.primary-picker-item').forEach(item => {
+      const img = item.querySelector('img');
+      const url = img ? img.getAttribute('src') : '';
+      if (seenUrls.has(url)) {
+        // Keep whichever one is active (matches primary), remove the other
+        const existing = seenUrls.get(url);
+        if (item.classList.contains('active')) {
+          existing.remove();
+          seenUrls.set(url, item);
+        } else {
+          item.remove();
+        }
+      } else {
+        seenUrls.set(url, item);
+      }
+    });
+  })();
 
   function previewImages(event) {
     const files = event.target.files;

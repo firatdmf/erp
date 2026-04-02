@@ -1,0 +1,88 @@
+#variant_component{
+    display:none;
+}
+
+
+ .variant_container {
+    display: flex;
+    gap: 20px;
+}
+
+ .variantCard {
+    background: lightgray;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: max-content;
+    margin: 5px 0;
+}
+
+ .variantCard input {
+    margin: 2px 0;
+}
+
+ .variantCard .optionValues {
+    display: flex;
+    flex-direction: column;
+}
+
+ .alert {
+    color: red;
+}
+
+ .add_another_value:hover,
+ .add_another_option:hover {
+    cursor: pointer;
+}
+
+ table {
+    display: none;
+}
+
+ table,
+ th,
+ td {
+    border: 1px solid black;
+
+}
+
+ table th,
+ table td {
+    padding: 5px;
+}
+
+ .displayVariantJSON {
+    display: none;
+}
+
+ button:hover {
+    cursor: pointer;
+}
+
+ .add_another_option {
+    height: max-content;
+    width: max-content;
+}
+
+ .delete_option_name{
+    float:right;
+    cursor:pointer;
+}
+
+ .delete_option_value{
+    float:right;
+    cursor:pointer;
+    color: black;
+}
+
+ #create_table_button{
+    padding:3px;
+    background-color: lightcyan;
+    border:1px solid black;
+    border-radius:5px;
+    cursor:pointer;
+    max-width: max-content;
+}
+
+input, td, th {
+    text-transform:capitalize;
+}

@@ -54,8 +54,14 @@
       <div class="image-thumbnails">
         {% for file in product_files %}
         <div class="thumbnail {% if forloop.first %}active{% endif %}"
-          onclick="changeImage('{{ file.file_url }}', this)">
+          onclick="changeImage('{{ file.file_url }}', '{{ file.file_type }}', this)">
+          {% if file.file_type == 'video' %}
+          <div class="video-thumbnail-placeholder">
+            <i class="fa fa-play-circle"></i>
+          </div>
+          {% else %}
           <img src="{{ file.file_url }}" alt="Thumbnail {{ forloop.counter }}">
+          {% endif %}
         </div>
         {% endfor %}
       </div>
@@ -219,8 +225,13 @@
 </div>
 
 <script>
-  function changeImage(url, thumbnail) {
-    document.getElementById('mainImage').src = url;
+  function changeImage(url, fileType, thumbnail) {
+    const container = document.querySelector('.main-image');
+    if (fileType === 'video') {
+      container.innerHTML = '<video src="' + url + '" controls autoplay style="width:100%;height:100%;object-fit:contain;border-radius:12px;" id="mainMedia"></video>';
+    } else {
+      container.innerHTML = '<img src="' + url + '" alt="Product image" id="mainImage" style="width:100%;height:100%;object-fit:contain;">';
+    }
     document.querySelectorAll('.thumbnail').forEach(t => t.classList.remove('active'));
     thumbnail.classList.add('active');
   }

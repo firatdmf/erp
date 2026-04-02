@@ -311,7 +311,14 @@ class ProductDetail(generic.DetailView):
         context = super().get_context_data(**kwargs)
         
         # Pre-evaluate and cache querysets to avoid repeated DB hits in template
-        context['product_files'] = list(self.object.files.all())  # Cache files
+        # Deduplicate files by URL (variants can share the same image)
+        seen_urls = set()
+        unique_files = []
+        for f in self.object.files.all():
+            if f.file_url not in seen_urls:
+                seen_urls.add(f.file_url)
+                unique_files.append(f)
+        context['product_files'] = unique_files
         context['product_variants'] = list(self.object.variants.all())  # Cache variants
         context['product_collections'] = list(self.object.collections.all())  # Cache collections
         

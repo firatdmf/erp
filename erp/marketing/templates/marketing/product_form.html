@@ -156,13 +156,13 @@
         <div class="form-group">
           <div class="trans-container">
             <div class="trans-tab-bar">
-              <button type="button" class="trans-tab active" data-lang="tr">
-                <span class="trans-tab-flag">TR</span>
-                <span class="trans-tab-name">Turkish</span>
-              </button>
-              <button type="button" class="trans-tab" data-lang="en">
+              <button type="button" class="trans-tab active" data-lang="en">
                 <span class="trans-tab-flag">EN</span>
                 <span class="trans-tab-name">English</span>
+              </button>
+              <button type="button" class="trans-tab" data-lang="tr">
+                <span class="trans-tab-flag">TR</span>
+                <span class="trans-tab-name">Turkish</span>
               </button>
               <button type="button" class="trans-tab" data-lang="ru">
                 <span class="trans-tab-flag">RU</span>
@@ -173,17 +173,17 @@
                 <span class="trans-tab-name">Polish</span>
               </button>
             </div>
-            <div class="trans-panel active" data-lang="tr">
-              <label class="trans-label">Product Name</label>
-              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="Urun adi giriniz...">
-              <label class="trans-label">Description</label>
-              <textarea class="trans-input trans-desc" data-lang="tr" rows="5" placeholder="Urun aciklamasi giriniz..."></textarea>
-            </div>
-            <div class="trans-panel" data-lang="en">
+            <div class="trans-panel active" data-lang="en">
               <label class="trans-label">Product Name</label>
               <input type="text" class="trans-input trans-title" data-lang="en" placeholder="Enter product name...">
               <label class="trans-label">Description</label>
               <textarea class="trans-input trans-desc" data-lang="en" rows="5" placeholder="Enter product description..."></textarea>
+            </div>
+            <div class="trans-panel" data-lang="tr">
+              <label class="trans-label">Product Name</label>
+              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="Urun adi giriniz...">
+              <label class="trans-label">Description</label>
+              <textarea class="trans-input trans-desc" data-lang="tr" rows="5" placeholder="Urun aciklamasi giriniz..."></textarea>
             </div>
             <div class="trans-panel" data-lang="ru">
               <label class="trans-label">Product Name</label>
@@ -630,6 +630,7 @@
   });
 
   // ============== PRODUCT ATTRIBUTES ==============
+  const PRODUCT_ID = {% if product %}{{ product.id }}{% else %}null{% endif %};
   let attributeCounter = 0;
   let attributeSaveTimeout = null;
 

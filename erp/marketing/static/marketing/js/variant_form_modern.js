@@ -339,20 +339,20 @@ function updateOptionValue(optionId, valueIndex, value) {
 
     // Store original value if this is the first time we're editing this field
     if (oldValue && oldValue.trim() && originalOptionValues[optionId][valueIndex] === undefined) {
-        originalOptionValues[optionId][valueIndex] = oldValue.trim().toLowerCase();
+        originalOptionValues[optionId][valueIndex] = oldValue.trim();
     }
 
     // Track rename mapping: original value -> current value
     const originalValue = originalOptionValues[optionId][valueIndex];
-    if (originalValue && value.trim() && originalValue !== value.trim().toLowerCase()) {
+    if (originalValue && value.trim() && originalValue !== value.trim()) {
         // Store rename mapping
         if (!pendingValueRenames[optionId]) {
             pendingValueRenames[optionId] = {};
         }
         const optionName = variantData[optionId].name;
         if (optionName) {
-            pendingValueRenames[optionId][originalValue] = value.trim().toLowerCase();
-            console.log(`Tracking rename: ${optionName}:${originalValue} -> ${value.trim().toLowerCase()}`);
+            pendingValueRenames[optionId][originalValue] = value.trim();
+            console.log(`Tracking rename: ${optionName}:${originalValue} -> ${value.trim()}`);
         }
     }
 
@@ -562,9 +562,10 @@ function generateCombinations() {
             id,
             name: data.name,
             // Filter out empty/whitespace AND duplicate values (case-insensitive)
-            values: [...new Set(data.values
+            values: data.values
                 .filter(v => v && typeof v === 'string' && v.trim())
-                .map(v => v.trim().toLowerCase()))]
+                .map(v => v.trim())
+                .filter((v, i, arr) => arr.findIndex(x => x.toLowerCase() === v.toLowerCase()) === i)
         }));
 
     console.log('Valid options for combinations:', validOptions);

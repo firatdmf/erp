@@ -523,8 +523,8 @@ class BaseProductView(ModelFormMixin):
         for variant_data in variants_data:
             variant_attribute_values_dict = variant_data.get("variant_attribute_values", {})
             for attr_name, attr_value in variant_attribute_values_dict.items():
-                normalized_name = str(attr_name).lower().replace(" ", "")
-                normalized_value = str(attr_value).lower().replace(" ", "")
+                normalized_name = str(attr_name).strip()
+                normalized_value = str(attr_value).strip()
                 all_attr_names.add(normalized_name)
                 all_attr_value_pairs.add((normalized_name, normalized_value))
         
@@ -703,8 +703,8 @@ class BaseProductView(ModelFormMixin):
             variant_attribute_values_dict = variant_data.get("variant_attribute_values", {})
             
             for attr_name, attr_value in variant_attribute_values_dict.items():
-                normalized_name = str(attr_name).lower().replace(" ", "")
-                normalized_value = str(attr_value).lower().replace(" ", "")
+                normalized_name = str(attr_name).strip()
+                normalized_value = str(attr_value).strip()
                 value_obj = attr_value_cache.get((normalized_name, normalized_value))
                 if value_obj:
                     m2m_entries.append(ThroughModel(

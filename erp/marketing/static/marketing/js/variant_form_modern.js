@@ -681,7 +681,7 @@ function updateVariantTable() {
         const optionName = variantData[optionId]?.name;
         if (optionName) {
             for (const [oldVal, newVal] of Object.entries(renames)) {
-                renameMap[`${optionName.toLowerCase()}:${oldVal}`] = `${optionName.toLowerCase()}:${newVal}`;
+                renameMap[`${optionName}:${oldVal}`] = `${optionName}:${newVal}`;
             }
         }
     }

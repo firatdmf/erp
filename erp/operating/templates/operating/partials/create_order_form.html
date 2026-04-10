@@ -1,53 +1,403 @@
-<div class="create_order_page">
-    <form method="post" id="createOrderForm" action="{% url 'operating:create_order' %}">
-        {% csrf_token %}
+<style>
+.co-section-header{display:flex;align-items:center;gap:10px;padding:12px 0;cursor:pointer;user-select:none;font-weight:600;font-size:.875rem;color:var(--text-primary);border-bottom:1px solid var(--border-color)}
+.co-section-header:hover{color:#1e293b}
+.co-section-num{width:24px;height:24px;border-radius:50%;background:var(--border-color);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.co-section.active .co-section-num{background:#1e293b;color:#fff}
+.co-section-summary{margin-left:auto;font-weight:400;font-size:12px;color:var(--text-secondary)}
+.co-section-summary:empty{display:none}
+.co-chev{color:var(--text-secondary);font-size:10px;transition:transform .25s;flex-shrink:0}
+.co-section.active .co-chev{transform:rotate(180deg)}
+.co-section-body{max-height:0;overflow:hidden;transition:max-height .3s ease;padding:0}
+.co-section.active .co-section-body{max-height:3000px;padding:16px 0 8px}
+.co-type-group{display:flex;gap:8px}
+.co-type-btn{flex:1;padding:10px;border:1.5px solid var(--border-color);border-radius:6px;background:var(--bg-primary);cursor:pointer;text-align:center;font-size:12px;font-weight:600;color:var(--text-secondary);transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:4px}
+.co-type-btn i{font-size:16px}
+.co-type-btn input{display:none}
+.co-type-btn:has(input:checked){border-color:#1e293b;background:#f8fafc;color:#1e293b}
+.co-product-card{border:1.5px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:10px;background:var(--bg-primary)}
+.co-product-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.co-product-head strong{font-size:13px;color:var(--text-primary)}
+.co-product-head .co-sku{font-size:11px;color:var(--text-secondary);font-family:monospace;display:block;margin-top:2px}
+.co-remove-btn{background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px}
+.co-remove-btn:hover{color:#ef4444;background:#fef2f2}
+.co-row{display:flex;gap:8px}
+.co-row>.form-group{flex:1;min-width:0}
+.co-item-total{font-size:14px;font-weight:700;color:#059669;padding-top:6px}
+.co-empty{text-align:center;color:var(--text-secondary);font-size:13px;padding:20px 0}
+.co-curtain-fields{margin-top:10px;padding:12px;background:#fefce8;border:1px solid #fde68a;border-radius:6px}
+.co-curtain-fields label{color:#92400e !important}
+.co-selected-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:13px;color:#166534;margin-top:8px}
+.co-total-row{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#f8fafc;border:1.5px solid var(--border-color);border-radius:6px;margin-bottom:12px;font-weight:600;font-size:14px}
+.co-total-amount{font-size:18px;font-weight:800;color:#059669}
+.co-autocomplete-results .product_autocomplete_list ul{list-style:none;margin:4px 0 0;padding:0;background:#fff;border:1.5px solid var(--border-color);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.08);max-height:200px;overflow-y:auto}
+.co-autocomplete-results .product_autocomplete_list ul li{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f3f4f6;transition:background .15s;border:none;width:auto;margin:0}
+.co-autocomplete-results .product_autocomplete_list ul li:hover{background:#f1f5f9;color:#1e293b}
+.co-toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:6px;font-size:13px;font-weight:500;z-index:100000;opacity:0;transform:translateY(8px);transition:all .3s}
+.co-toast.show{opacity:1;transform:translateY(0)}
+.co-toast-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.co-toast-warning{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+</style>
 
-        {{ formset.management_form }}
+<form method="post" id="createOrderForm" action="{% url 'operating:create_order' %}">
+  {% csrf_token %}
 
-        <div id="customer-fields" class="form-group mb-4">
-            <label for="customer" class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-            <input id="customer-input" name="customer" type="text"
-                class="form-input w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
-                hx-target="#customer-search-results" hx-swap="innerHTML" autocomplete="off"
-                placeholder="Search by contact or company name" />
-            <input type="hidden" id="customer-type" name="customer_type" />
-            <input type="hidden" id="customer-pk" name="customer_pk" />
+  <!-- Step 1: Order Type -->
+  <div class="co-section active" id="co-step-1">
+    <div class="co-section-header" onclick="coToggle(1)">
+      <div class="co-section-num">1</div>
+      <span>Order Type</span>
+      <span class="co-section-summary" id="co-sum-1"></span>
+      <i class="fas fa-chevron-down co-chev"></i>
+    </div>
+    <div class="co-section-body">
+      <div class="form-group">
+        <label>Type</label>
+        <div class="co-type-group">
+          <label class="co-type-btn">
+            <input type="radio" name="order_type" value="web">
+            <i class="fas fa-globe"></i> Web Order
+          </label>
+          <label class="co-type-btn">
+            <input type="radio" name="order_type" value="manual" checked>
+            <i class="fas fa-store"></i> Manual
+          </label>
         </div>
-        <div id="customer-search-results" class="relative"></div>
+      </div>
+    </div>
+  </div>
 
-        <div id="product-fields" class="form-group mb-4">
-            <label for="product" class="block text-sm font-medium text-gray-700 mb-1">Add Product</label>
-            <input
-                class="form-input w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                id="product-input" name="product" type="text" autocomplete="off"
-                placeholder="Search by name, SKU, or variant SKU..." hx-get="{% url 'operating:product_autocomplete' %}"
-                hx-trigger="keyup changed delay:200ms" hx-target="#product-search-results" hx-swap="innerHTML" />
+  <!-- Step 2: Products -->
+  <div class="co-section active" id="co-step-2">
+    <div class="co-section-header" onclick="coToggle(2)">
+      <div class="co-section-num">2</div>
+      <span>Products</span>
+      <span class="co-section-summary" id="co-sum-2"></span>
+      <i class="fas fa-chevron-down co-chev"></i>
+    </div>
+    <div class="co-section-body">
+      <div class="form-group">
+        <label>Search Product</label>
+        <input type="text" id="co-product-search" class="form-input" placeholder="Name, SKU or variant SKU..."
+          hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
+          hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
+      </div>
+      <div id="co-product-results" class="co-autocomplete-results"></div>
+      <div id="co-products-list"></div>
+      <input type="hidden" id="product_json_input" name="product_json_input">
+    </div>
+  </div>
+
+  <!-- Step 3: Customer -->
+  <div class="co-section" id="co-step-3">
+    <div class="co-section-header" onclick="coToggle(3)">
+      <div class="co-section-num">3</div>
+      <span>Customer</span>
+      <span class="co-section-summary" id="co-sum-3"></span>
+      <i class="fas fa-chevron-down co-chev"></i>
+    </div>
+    <div class="co-section-body">
+      <!-- Customer Source -->
+      <div class="form-group">
+        <label>Customer Source</label>
+        <div class="co-type-group">
+          <label class="co-type-btn">
+            <input type="radio" name="customer_source" value="crm" checked onchange="coCustomerSource('crm')">
+            <i class="fas fa-address-book"></i> CRM
+          </label>
+          <label class="co-type-btn">
+            <input type="radio" name="customer_source" value="web" onchange="coCustomerSource('web')">
+            <i class="fas fa-globe"></i> Web Client
+          </label>
+          <label class="co-type-btn">
+            <input type="radio" name="customer_source" value="guest" onchange="coCustomerSource('guest')">
+            <i class="fas fa-user"></i> Guest
+          </label>
         </div>
-        <div id="product-search-results" class="relative z-10"></div>
-        <div id="product_autocomplete_error"></div>
+      </div>
 
-        <div class="order-items-container mt-4 mb-6">
-            <table class="w-full border-collapse" id="order_items_table">
-                <!-- Header will be injected by JS -->
-            </table>
+      <input type="hidden" id="customer-type" name="customer_type">
+      <input type="hidden" id="customer-pk" name="customer_pk">
+
+      <!-- CRM Customer Search -->
+      <div id="co-crm-fields">
+        <div class="form-group">
+          <label>Search Contact / Company</label>
+          <input type="text" id="co-customer-search" class="form-input" placeholder="Contact or company name..."
+            hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
+            hx-target="#co-customer-results" hx-swap="innerHTML" name="customer" autocomplete="off">
         </div>
+        <div id="co-customer-results" class="co-autocomplete-results"></div>
+        <div id="co-customer-selected" class="co-selected-badge" style="display:none;"></div>
+      </div>
 
-        {% comment %} Hidden Fields {% endcomment %}
-        {{ form.as_p }}
-        <input type="hidden" id="product_json_input" name="product_json_input" />
-
-        <div class="sidebar-footer">
-            <button type="submit" id="submit_order_button" class="btn btn-primary w-full justify-center">
-                Place Order
-            </button>
+      <!-- Web Client Search -->
+      <div id="co-web-fields" style="display:none;">
+        <div class="form-group">
+          <label>Search Web Client</label>
+          <input type="text" id="co-webclient-search" class="form-input" placeholder="Email or username..."
+            hx-get="{% url 'operating:webclient_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
+            hx-target="#co-webclient-results" hx-swap="innerHTML" name="webclient_q" autocomplete="off">
         </div>
-    </form>
-</div>
+        <div id="co-webclient-results" class="co-autocomplete-results"></div>
+        <div id="co-webclient-selected" class="co-selected-badge" style="display:none;"></div>
+        <input type="hidden" id="webclient-pk" name="webclient_pk">
+      </div>
+
+      <!-- Guest Fields -->
+      <div id="co-guest-fields" style="display:none;">
+        <div class="co-row">
+          <div class="form-group">
+            <label>First Name</label>
+            <input type="text" name="guest_first_name" class="form-input" placeholder="First name">
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input type="text" name="guest_last_name" class="form-input" placeholder="Last name">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="guest_email" class="form-input" placeholder="Email">
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" name="guest_phone" class="form-input" placeholder="Phone">
+        </div>
+      </div>
+
+      <!-- Delivery Address (shared) -->
+      <div class="form-group" style="margin-top:12px;">
+        <label>Delivery Address</label>
+        <input type="text" name="delivery_address_title" class="form-input" placeholder="Address title (Home, Work...)">
+      </div>
+      <div class="form-group">
+        <textarea name="delivery_address" class="form-textarea" placeholder="Full address" rows="2"></textarea>
+      </div>
+      <div class="co-row">
+        <div class="form-group">
+          <input type="text" name="delivery_city" class="form-input" placeholder="City">
+        </div>
+        <div class="form-group">
+          <input type="text" name="delivery_country" class="form-input" placeholder="Country" value="Turkey">
+        </div>
+      </div>
+      <div class="form-group">
+        <input type="text" name="delivery_phone" class="form-input" placeholder="Phone">
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Payment & Notes -->
+  <div class="co-section" id="co-step-4">
+    <div class="co-section-header" onclick="coToggle(4)">
+      <div class="co-section-num">4</div>
+      <span>Payment</span>
+      <span class="co-section-summary" id="co-sum-4"></span>
+      <i class="fas fa-chevron-down co-chev"></i>
+    </div>
+    <div class="co-section-body">
+      <div class="form-group">
+        <label>Payment Method</label>
+        <div class="co-type-group">
+          <label class="co-type-btn">
+            <input type="radio" name="payment_method" value="cash" checked>
+            <i class="fas fa-money-bill-wave"></i> Cash
+          </label>
+          <label class="co-type-btn">
+            <input type="radio" name="payment_method" value="credit_card">
+            <i class="fas fa-credit-card"></i> Card
+          </label>
+          <label class="co-type-btn">
+            <input type="radio" name="payment_method" value="bank_transfer">
+            <i class="fas fa-university"></i> Transfer
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea name="notes" class="form-textarea" placeholder="Order notes..." rows="2"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Total & Payment Amount -->
+  <div style="padding-top:12px;">
+    <div class="co-row" style="margin-bottom:12px;">
+      <div class="form-group">
+        <label>Total Price</label>
+        <input type="number" id="co-total-price" name="total_price" class="form-input" value="0" min="0" step="0.01" placeholder="0.00" oninput="coUpdateRemaining()">
+      </div>
+      <div class="form-group">
+        <label>Amount Paid</label>
+        <input type="number" id="co-amount-paid" name="paid_amount" class="form-input" value="0" min="0" step="0.01" placeholder="0.00" oninput="coUpdateRemaining()">
+      </div>
+      <div class="form-group">
+        <label>Remaining</label>
+        <div id="co-remaining" style="font-size:14px;font-weight:700;color:#ef4444;padding-top:8px;">$0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer" style="padding:0;border:none;margin-top:4px;">
+    <button type="submit" id="submit_order_button" class="btn btn-primary w-full" style="flex:1;justify-content:center;">
+      <i class="fas fa-check"></i> Place Order
+    </button>
+  </div>
+
+</form>
 
 <script>
-    // re-initialize the order form logic when this partial is loaded
-    if (typeof initOrderForm === 'function') {
-        initOrderForm();
+(function() {
+  let orderItems = [], itemIndex = 0;
+
+  window.coToggle = function(s) { document.getElementById('co-step-'+s).classList.toggle('active'); };
+
+  window.selectProduct = function(sku, variant, title, price, categoryName) {
+    if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
+    itemIndex++;
+    orderItems.push({
+      index: itemIndex, sku, variant, title: title||sku, price: parseFloat(price)||0,
+      quantity: 1, description: '', categoryName: categoryName||'',
+      is_custom_curtain: false, custom_width:'', custom_height:'',
+      custom_pleat_type:'', custom_pleat_density:'', custom_mounting_type:'',
+      custom_wing_type:'', custom_fabric_used_meters:''
+    });
+    renderProducts();
+    document.getElementById('co-product-search').value = '';
+    document.getElementById('co-product-results').innerHTML = '';
+    updateTotal();
+    document.getElementById('co-sum-2').textContent = orderItems.length + ' items';
+  };
+
+  function renderProducts() {
+    const el = document.getElementById('co-products-list');
+    if (!orderItems.length) { el.innerHTML = '<div class="co-empty">No products added yet</div>'; return; }
+    el.innerHTML = orderItems.map((item, i) => {
+      const cc = item.is_custom_curtain;
+      return `<div class="co-product-card">
+        <div class="co-product-head">
+          <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span></div>
+          <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="form-group" style="margin-bottom:8px">
+          <label>Product Type</label>
+          <select class="form-input" onchange="coType(${i},this.value)">
+            <option value="fabric" ${!cc?'selected':''}>Fabric</option>
+            <option value="custom_curtain" ${cc?'selected':''}>Custom Curtain</option>
+            <option value="home_textile">Home Textile</option>
+          </select>
+        </div>
+        <div class="co-row">
+          <div class="form-group"><label>Qty</label><input type="number" class="form-input" value="${item.quantity}" min="0.01" step="0.01" onchange="coUpd(${i},'quantity',this.value)"></div>
+          <div class="form-group"><label>Unit Price</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
+          <div class="form-group"><label>Total</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
+        </div>
+        <div id="co-curtain-${i}" style="display:${cc?'block':'none'}">
+          <div class="co-curtain-fields">
+            <div class="form-group"><label>Fabric Used (m)</label><input type="number" class="form-input" value="${item.custom_fabric_used_meters}" min="0" step="0.01" onchange="coUpd(${i},'custom_fabric_used_meters',this.value)"></div>
+            <div class="co-row">
+              <div class="form-group"><label>Width (cm)</label><input type="number" class="form-input" value="${item.custom_width}" min="0" step="1" onchange="coUpd(${i},'custom_width',this.value)"></div>
+              <div class="form-group"><label>Height (cm)</label><input type="number" class="form-input" value="${item.custom_height}" min="0" step="1" onchange="coUpd(${i},'custom_height',this.value)"></div>
+            </div>
+            <div class="co-row">
+              <div class="form-group"><label>Pleat Type</label>
+                <select class="form-input" onchange="coUpd(${i},'custom_pleat_type',this.value)">
+                  <option value="">Select</option><option value="flat" ${item.custom_pleat_type==='flat'?'selected':''}>Flat</option><option value="kanun" ${item.custom_pleat_type==='kanun'?'selected':''}>Kanun</option><option value="pipe" ${item.custom_pleat_type==='pipe'?'selected':''}>Pipe</option><option value="water_wave" ${item.custom_pleat_type==='water_wave'?'selected':''}>Water Wave</option><option value="american" ${item.custom_pleat_type==='american'?'selected':''}>American</option><option value="extrafor" ${item.custom_pleat_type==='extrafor'?'selected':''}>Extrafor</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Pleat Density</label>
+                <select class="form-input" onchange="coUpd(${i},'custom_pleat_density',this.value)">
+                  <option value="">Select</option><option value="1x2" ${item.custom_pleat_density==='1x2'?'selected':''}>1x2</option><option value="1x2.5" ${item.custom_pleat_density==='1x2.5'?'selected':''}>1x2.5</option><option value="1x3" ${item.custom_pleat_density==='1x3'?'selected':''}>1x3</option>
+                </select>
+              </div>
+            </div>
+            <div class="co-row">
+              <div class="form-group"><label>Mounting</label>
+                <select class="form-input" onchange="coUpd(${i},'custom_mounting_type',this.value)">
+                  <option value="">Select</option><option value="cornice" ${item.custom_mounting_type==='cornice'?'selected':''}>Cornice</option><option value="rustic" ${item.custom_mounting_type==='rustic'?'selected':''}>Rustic</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Wing</label>
+                <select class="form-input" onchange="coUpd(${i},'custom_wing_type',this.value)">
+                  <option value="">Select</option><option value="single" ${item.custom_wing_type==='single'?'selected':''}>Single</option><option value="double" ${item.custom_wing_type==='double'?'selected':''}>Double</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px;margin-bottom:0"><label>Description</label><input type="text" class="form-input" value="${esc(item.description)}" placeholder="Note..." onchange="coUpd(${i},'description',this.value)"></div>
+      </div>`;
+    }).join('');
+  }
+
+  window.coCustomerSource = function(src) {
+    document.getElementById('co-crm-fields').style.display = src === 'crm' ? 'block' : 'none';
+    document.getElementById('co-web-fields').style.display = src === 'web' ? 'block' : 'none';
+    document.getElementById('co-guest-fields').style.display = src === 'guest' ? 'block' : 'none';
+  };
+
+  window.selectWebClient = function(pk, name) {
+    document.getElementById('webclient-pk').value = pk;
+    document.getElementById('co-webclient-selected').style.display = 'flex';
+    document.getElementById('co-webclient-selected').innerHTML = '<i class="fas fa-check-circle"></i> ' + name;
+    document.getElementById('co-webclient-results').innerHTML = '';
+    document.getElementById('co-webclient-search').value = name;
+  };
+
+  window.coRemove = function(i) { orderItems.splice(i,1); renderProducts(); updateTotal(); document.getElementById('co-sum-2').textContent = orderItems.length ? orderItems.length+' items' : ''; };
+
+  window.coUpd = function(i, f, v) {
+    if (!orderItems[i]) return;
+    if (['quantity','price','custom_width','custom_height','custom_fabric_used_meters'].includes(f)) orderItems[i][f] = parseFloat(v)||0;
+    else orderItems[i][f] = v;
+    if (f==='quantity'||f==='price') {
+      const t = document.getElementById('co-itotal-'+i);
+      if (t) t.textContent = '$'+(orderItems[i].quantity*orderItems[i].price).toFixed(2);
+      updateTotal();
     }
+  };
+
+  window.coType = function(i, t) {
+    if (!orderItems[i]) return;
+    orderItems[i].is_custom_curtain = (t==='custom_curtain');
+    const el = document.getElementById('co-curtain-'+i);
+    if (el) el.style.display = (t==='custom_curtain') ? 'block' : 'none';
+  };
+
+  function updateTotal() {}
+
+  window.coUpdateRemaining = function() {
+    const total = parseFloat(document.getElementById('co-total-price').value) || 0;
+    const paid = parseFloat(document.getElementById('co-amount-paid').value) || 0;
+    const remaining = total - paid;
+    const el = document.getElementById('co-remaining');
+    el.textContent = '$' + remaining.toFixed(2);
+    el.style.color = remaining > 0 ? '#ef4444' : '#059669';
+  };
+
+  document.getElementById('createOrderForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!orderItems.length) { showToast('Add at least one product','error'); return; }
+    document.getElementById('product_json_input').value = JSON.stringify(orderItems.map(it => ({
+      item_no:it.index, product:{sku:it.sku,variant:it.variant},
+      description:it.description, quantity:it.quantity, price:it.price,
+      is_custom_curtain:it.is_custom_curtain,
+      custom_width:it.custom_width||null, custom_height:it.custom_height||null,
+      custom_pleat_type:it.custom_pleat_type||null, custom_pleat_density:it.custom_pleat_density||null,
+      custom_mounting_type:it.custom_mounting_type||null, custom_wing_type:it.custom_wing_type||null,
+      custom_fabric_used_meters:it.custom_fabric_used_meters||null
+    })));
+    this.submit();
+  });
+
+  function esc(s) { if (!s) return ''; const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+  function showToast(msg, type) {
+    const t=document.createElement('div'); t.className='co-toast co-toast-'+type; t.textContent=msg;
+    document.body.appendChild(t); setTimeout(()=>t.classList.add('show'),10);
+    setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300);},2500);
+  }
+
+  renderProducts();
+})();
 </script>

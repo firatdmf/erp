@@ -236,9 +236,7 @@ class OrderCreate(View):
 
     def post(self, request):
         form = OrderForm(request.POST)
-        # order_item_formset = OrderItemFormSet(request.POST)
 
-        customer = request.POST.get("customer")
         customer_pk = request.POST.get("customer_pk")
         customer_type = request.POST.get("customer_type")
         product_json_input = request.POST.get("product_json_input")
@@ -251,94 +249,98 @@ class OrderCreate(View):
 
         if form.is_valid():
             try:
-                # atomic reverses db changes if there are any errors in the form
                 with transaction.atomic():
                     order = form.save(commit=False)
-                    if customer_type == "contact" and customer_pk:
-                        try:
-                            order.contact = Contact.objects.get(pk=customer_pk)
-                            order.company = None
-                            # invoice = Invoice(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     order=order,
-                            #     contact=order.contact,
-                            # )
-                            # asset_accounts_receivable = AssetAccountsReceivable(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     contact=order.contact,
-                            # )
-                        except Contact.DoesNotExist:
-                            order.contact = None
-                    elif customer_type == "company" and customer_pk:
-                        try:
-                            order.company = Company.objects.get(pk=customer_pk)
-                            order.contact = None
-                            # invoice = Invoice(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     order=order,
-                            #     company=order.company,
-                            # )
-                            # asset_accounts_receivable = AssetAccountsReceivable(
-                            #     book=Book.objects.get(pk=1),
-                            #     currency=CurrencyCategory.objects.get(code="usd"),
-                            #     company=order.company,
-                            # )
-                        except Company.DoesNotExist:
-                            order.company = None
-                    else:
-                        order.contact = None
-                        order.company = None
+
+                    # Customer
+                    customer_source = request.POST.get("customer_source", "crm")
+                    if customer_source == "crm":
+                        if customer_type == "contact" and customer_pk:
+                            try:
+                                order.contact = Contact.objects.get(pk=customer_pk)
+                            except Contact.DoesNotExist:
+                                pass
+                        elif customer_type == "company" and customer_pk:
+                            try:
+                                order.company = Company.objects.get(pk=customer_pk)
+                            except Company.DoesNotExist:
+                                pass
+                    elif customer_source == "web":
+                        webclient_pk = request.POST.get("webclient_pk")
+                        if webclient_pk:
+                            from authentication.models import WebClient
+                            try:
+                                order.web_client = WebClient.objects.get(pk=webclient_pk)
+                            except WebClient.DoesNotExist:
+                                pass
+                    elif customer_source == "guest":
+                        order.is_guest_order = True
+                        order.guest_first_name = request.POST.get("guest_first_name", "")
+                        order.guest_last_name = request.POST.get("guest_last_name", "")
+                        order.guest_email = request.POST.get("guest_email", "")
+                        order.guest_phone = request.POST.get("guest_phone", "")
+
+                    # Payment
+                    order.payment_method = request.POST.get("payment_method", "cash")
+                    try:
+                        order.original_price = float(request.POST.get("total_price", 0))
+                    except (ValueError, TypeError):
+                        pass
+                    try:
+                        order.paid_amount = float(request.POST.get("paid_amount", 0))
+                    except (ValueError, TypeError):
+                        pass
+
+                    # Delivery Address
+                    order.delivery_address_title = request.POST.get("delivery_address_title", "")
+                    order.delivery_address = request.POST.get("delivery_address", "")
+                    order.delivery_city = request.POST.get("delivery_city", "")
+                    order.delivery_country = request.POST.get("delivery_country", "")
+                    order.delivery_phone = request.POST.get("delivery_phone", "")
 
                     order.save()
 
+                    # Order Items
                     for item_data in product_json_input:
-                        if item_data["product"]["variant"] == False:
-                            product = get_object_or_404(
-                                Product, sku=item_data["product"]["sku"]
-                            )
-                            OrderItem.objects.create(
-                                order=order,
-                                product=product,
-                                product_variant=None,
-                                description=item_data["description"],
-                                quantity=item_data["quantity"],
-                                price=item_data["price"],
-                            )
-                        elif item_data["product"]["variant"] == True:
-                            variant = get_object_or_404(
-                                ProductVariant, variant_sku=item_data["product"]["sku"]
-                            )
-                            OrderItem.objects.create(
-                                order=order,
-                                product=variant.product,
-                                product_variant=variant,
-                                description=item_data["description"],
-                                quantity=item_data["quantity"],
-                                price=item_data["price"],
-                            )
+                        sku = item_data["product"]["sku"]
+                        is_variant = item_data["product"]["variant"]
+                        is_custom = item_data.get("is_custom_curtain", False)
 
-                    # Generate QR code after saving
+                        if is_variant:
+                            variant = get_object_or_404(ProductVariant, variant_sku=sku)
+                            product = variant.product
+                        else:
+                            product = get_object_or_404(Product, sku=sku)
+                            variant = None
+
+                        order_item = OrderItem.objects.create(
+                            order=order,
+                            product=product,
+                            product_variant=variant,
+                            description=item_data.get("description", ""),
+                            quantity=item_data.get("quantity", 1),
+                            price=item_data.get("price", 0),
+                            is_custom_curtain=is_custom,
+                        )
+
+                        # Custom curtain fields
+                        if is_custom:
+                            order_item.custom_width = item_data.get("custom_width") or None
+                            order_item.custom_height = item_data.get("custom_height") or None
+                            order_item.custom_pleat_type = item_data.get("custom_pleat_type") or None
+                            order_item.custom_pleat_density = item_data.get("custom_pleat_density") or None
+                            order_item.custom_mounting_type = item_data.get("custom_mounting_type") or None
+                            order_item.custom_wing_type = item_data.get("custom_wing_type") or None
+                            order_item.custom_fabric_used_meters = item_data.get("custom_fabric_used_meters") or None
+                            order_item.save()
+
+                    # Generate QR code
                     generate_machine_qr_for_order(order)
-                    # Generate QR codes for each order item
-                    # for item in order.items.all():
-                    #     if not item.qr_code_url:
-                    #         generate_qr_for_order_item(item, status="pending")
-
-                    # invoice.total = order.total_value()
-                    # invoice.save()
-                    # asset_accounts_receivable.amount = order.total_value()
-                    # asset_accounts_receivable.invoice = invoice
-                    # asset_accounts_receivable.save()
 
                 return redirect("operating:order_detail", pk=order.pk)
             except Exception as e:
                 messages.error(request, f"Order creation failed: {e}")
                 return render(request, "operating/create_order.html", {"form": form})
-
-        # return render(request, "operating/create_order.html", {"form": form})
 
 
 class OrderEdit(UpdateView):
@@ -831,6 +833,27 @@ def delete_order(request, pk):
 
 
 
+def webclient_autocomplete(request):
+    from authentication.models import WebClient
+    query = request.GET.get("webclient_q", "").strip().lower()
+    if not query:
+        return HttpResponse("")
+    clients = WebClient.objects.filter(
+        Q(email__icontains=query) | Q(username__icontains=query) | Q(name__icontains=query)
+    )[:10]
+    if not clients:
+        return HttpResponse("<div class='product_autocomplete_list'><ul><li style='color:#9ca3af;padding:10px;'>No web clients found</li></ul></div>")
+    items = []
+    for c in clients:
+        name = escape(c.name or c.username)
+        email = escape(c.email)
+        items.append(
+            f"<li onclick=\"selectWebClient({c.pk}, '{name.replace(chr(39), chr(92)+chr(39))}')\">"
+            f"<strong>{name}</strong> <span style='color:#6b7280;'>— {email}</span></li>"
+        )
+    return HttpResponse(f"<div class='product_autocomplete_list'><ul>{''.join(items)}</ul></div>")
+
+
 # escape(product.title) will turn < into &lt;, > into &gt;, & into &amp;, etc.
 # This ensures that if a product title or variant SKU contains special characters (like <, >, &, or quotes), they won't break your HTML or allow malicious code to run.
 def product_autocomplete(request):
@@ -844,25 +867,38 @@ def product_autocomplete(request):
             | Q(sku__icontains=query)
             | Q(variants__variant_sku__icontains=query)
         )
+        .select_related("category")
         .distinct()
         .prefetch_related("variants")[:10]
     )
 
+    def js_str(s):
+        """Escape string for safe use inside JS onclick single quotes"""
+        return (s or "").replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", " ")
+
     def render_item(product, variant=None):
         title = escape(product.title or "")
+        cat_name = escape(product.category.name if product.category else "")
+        title_js = js_str(product.title or "")
+        cat_js = js_str(product.category.name if product.category else "")
+
         if variant:
             sku = escape(variant.variant_sku or "")
+            price = variant.variant_price or product.price or 0
+            attr_info = variant.attribute_summary() if hasattr(variant, 'attribute_summary') else ''
+            attr_display = f' <span style="color:#6b7280;font-size:11px;">({escape(attr_info)})</span>' if attr_info else ''
             return (
-                # True because this is a variant
-                f"<li data-product-id='{product.pk}' data-variant-id='{variant.pk}' onclick=\"selectProduct('{sku}',variant=true)\">"
-                f"➕ {title} - {sku}</li>"
+                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}')\">"
+                f"<strong>{title}</strong> - <code>{sku}</code>{attr_display}"
+                f" <span style='color:#059669;font-weight:600;float:right;'>${price}</span></li>"
             )
         else:
             sku = escape(product.sku or "")
+            price = product.price or 0
             return (
-                # False because this is a parent product
-                f"<li data-product-id='{product.pk}' onclick=\"selectProduct('{sku}',variant=false)\">"
-                f"➕ {title} - {sku}</li>"
+                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}')\">"
+                f"<strong>{title}</strong> - <code>{sku}</code>"
+                f" <span style='color:#059669;font-weight:600;float:right;'>${price}</span></li>"
             )
 
     items = []
@@ -888,7 +924,7 @@ def product_autocomplete(request):
                         items.append(render_item(product, variant))
 
     if not items:
-        items.append("<p>No product matches found</p>")
+        items.append("<li style='color:#9ca3af;padding:12px;'>Sonuç bulunamadı</li>")
 
     html = f"<div class='product_autocomplete_list'><ul>{''.join(items)}</ul></div>"
     return HttpResponse(html)

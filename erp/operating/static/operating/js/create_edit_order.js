@@ -57,8 +57,8 @@ const generate_order_item_row = (index, sku, variant, itemId = null) => {
     `;
 }
 
-// This function is called when a product is selected from the autocomplete
-const selectProduct = (sku, variant) => {
+// This function is called when a product is selected from the autocomplete (edit order page)
+const selectProductLegacy = (sku, variant) => {
   console.log(sku);
 
   // if the item already exists in the order_items, do not add it again

@@ -131,6 +131,9 @@ htmx_urlpatterns = [
     path(
         "product_autocomplete/", views.product_autocomplete, name="product_autocomplete"
     ),
+    path(
+        "webclient_autocomplete/", views.webclient_autocomplete, name="webclient_autocomplete"
+    ),
     path("start_production/", views.start_production, name="start_production"),
     # BOM Autocomplete
     path("raw_material_search/", views.raw_material_search, name="raw_material_search"),

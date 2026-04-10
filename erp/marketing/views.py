@@ -311,7 +311,14 @@ class ProductDetail(generic.DetailView):
         context = super().get_context_data(**kwargs)
         
         # Pre-evaluate and cache querysets to avoid repeated DB hits in template
-        context['product_files'] = list(self.object.files.all())  # Cache files
+        # Deduplicate files by URL (variants can share the same image)
+        seen_urls = set()
+        unique_files = []
+        for f in self.object.files.all():
+            if f.file_url not in seen_urls:
+                seen_urls.add(f.file_url)
+                unique_files.append(f)
+        context['product_files'] = unique_files
         context['product_variants'] = list(self.object.variants.all())  # Cache variants
         context['product_collections'] = list(self.object.collections.all())  # Cache collections
         
@@ -367,20 +374,23 @@ class BaseProductView(ModelFormMixin):
         Expects: attribute_names[] and attribute_values[] arrays
         """
         from marketing.models import ProductAttribute
-        
+
         attribute_names = self.request.POST.getlist('attribute_names[]')
         attribute_values = self.request.POST.getlist('attribute_values[]')
-        
+
         if not attribute_names:
             # No attributes submitted, clear existing
             product.attributes.all().delete()
             print("🗑️ Cleared all product attributes (none submitted)")
             return
-        
+
+        # Build old->new name mapping by sequence to sync variant attributes
+        old_attrs = {a.sequence: a.name for a in product.attributes.all()}
+
         # Delete all existing attributes for clean slate
         product.attributes.all().delete()
-        
-        # Create new attributes
+
+        # Create new attributes and sync names to variant attributes
         for idx, (name, value) in enumerate(zip(attribute_names, attribute_values)):
             if name.strip() and value.strip():  # Skip empty entries
                 ProductAttribute.objects.create(
@@ -389,6 +399,15 @@ class BaseProductView(ModelFormMixin):
                     value=value.strip(),
                     sequence=idx
                 )
+                # Sync renamed attribute names to all variant attributes
+                old_name = old_attrs.get(idx)
+                if old_name and old_name != name.strip():
+                    updated = ProductAttribute.objects.filter(
+                        product_variant__product=product,
+                        name=old_name
+                    ).update(name=name.strip())
+                    if updated:
+                        print(f"🔄 Synced attribute name '{old_name}' → '{name.strip()}' on {updated} variants")
                 print(f"✅ Created attribute: {name} = {value}")
 
     def handle_variants(self, product, variants_json):
@@ -516,8 +535,8 @@ class BaseProductView(ModelFormMixin):
         for variant_data in variants_data:
             variant_attribute_values_dict = variant_data.get("variant_attribute_values", {})
             for attr_name, attr_value in variant_attribute_values_dict.items():
-                normalized_name = str(attr_name).lower().replace(" ", "")
-                normalized_value = str(attr_value).lower().replace(" ", "")
+                normalized_name = str(attr_name).strip()
+                normalized_value = str(attr_value).strip()
                 all_attr_names.add(normalized_name)
                 all_attr_value_pairs.add((normalized_name, normalized_value))
         
@@ -696,8 +715,8 @@ class BaseProductView(ModelFormMixin):
             variant_attribute_values_dict = variant_data.get("variant_attribute_values", {})
             
             for attr_name, attr_value in variant_attribute_values_dict.items():
-                normalized_name = str(attr_name).lower().replace(" ", "")
-                normalized_value = str(attr_value).lower().replace(" ", "")
+                normalized_name = str(attr_name).strip()
+                normalized_value = str(attr_value).strip()
                 value_obj = attr_value_cache.get((normalized_name, normalized_value))
                 if value_obj:
                     m2m_entries.append(ThroughModel(
@@ -1995,9 +2014,12 @@ def save_product_attributes(request):
         except Product.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Product not found'}, status=404)
         
+        # Build old->new name mapping by sequence to sync variant attributes
+        old_attrs = {a.sequence: a.name for a in product.attributes.all()}
+
         # Delete all existing attributes
         product.attributes.all().delete()
-        
+
         # Create new attributes
         created_attrs = []
         for idx, attr_data in enumerate(attributes):
@@ -2011,7 +2033,14 @@ def save_product_attributes(request):
                     sequence=idx
                 )
                 created_attrs.append({'id': attr.id, 'name': attr.name, 'value': attr.value})
-        
+                # Sync renamed attribute names to all variant attributes
+                old_name = old_attrs.get(idx)
+                if old_name and old_name != name:
+                    ProductAttribute.objects.filter(
+                        product_variant__product=product,
+                        name=old_name
+                    ).update(name=name)
+
         return JsonResponse({
             'success': True,
             'attributes': created_attrs,

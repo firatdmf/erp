@@ -4,6 +4,19 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}">
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<style>
+  .quill-wrap { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: #fff; }
+  .quill-wrap .ql-toolbar { border: none; border-bottom: 1px solid #e0e0e0; background: #fafafa; }
+  .quill-wrap .ql-container { border: none; font-size: 14px; min-height: 120px; }
+  .quill-wrap .ql-editor { min-height: 120px; }
+  .quill-wrap .ql-editor.ql-blank::before { font-style: normal; color: #aaa; }
+  .html-source-btn { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 12px; color: #666; margin-left: auto; }
+  .html-source-btn:hover { background: #f0f0f0; }
+  .html-source-btn.active { background: #333; color: #fff; border-color: #333; }
+  .html-source-area { display: none; width: 100%; min-height: 120px; font-family: monospace; font-size: 13px; padding: 10px; border: none; border-top: 1px solid #e0e0e0; resize: vertical; box-sizing: border-box; }
+  .html-source-area.visible { display: block; }
+</style>
 <!-- Mobile Responsive Styles -->
 <style>
   @media (max-width: 768px) {
@@ -156,13 +169,13 @@
         <div class="form-group">
           <div class="trans-container">
             <div class="trans-tab-bar">
-              <button type="button" class="trans-tab active" data-lang="tr">
-                <span class="trans-tab-flag">TR</span>
-                <span class="trans-tab-name">Turkish</span>
-              </button>
-              <button type="button" class="trans-tab" data-lang="en">
+              <button type="button" class="trans-tab active" data-lang="en">
                 <span class="trans-tab-flag">EN</span>
                 <span class="trans-tab-name">English</span>
+              </button>
+              <button type="button" class="trans-tab" data-lang="tr">
+                <span class="trans-tab-flag">TR</span>
+                <span class="trans-tab-name">Turkish</span>
               </button>
               <button type="button" class="trans-tab" data-lang="ru">
                 <span class="trans-tab-flag">RU</span>
@@ -173,29 +186,41 @@
                 <span class="trans-tab-name">Polish</span>
               </button>
             </div>
-            <div class="trans-panel active" data-lang="tr">
-              <label class="trans-label">Product Name</label>
-              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="Urun adi giriniz...">
-              <label class="trans-label">Description</label>
-              <textarea class="trans-input trans-desc" data-lang="tr" rows="5" placeholder="Urun aciklamasi giriniz..."></textarea>
-            </div>
-            <div class="trans-panel" data-lang="en">
+            <div class="trans-panel active" data-lang="en">
               <label class="trans-label">Product Name</label>
               <input type="text" class="trans-input trans-title" data-lang="en" placeholder="Enter product name...">
-              <label class="trans-label">Description</label>
-              <textarea class="trans-input trans-desc" data-lang="en" rows="5" placeholder="Enter product description..."></textarea>
+              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-en" class="trans-desc" data-lang="en"></div>
+                <textarea id="html-source-en" class="html-source-area" data-lang="en"></textarea>
+              </div>
+            </div>
+            <div class="trans-panel" data-lang="tr">
+              <label class="trans-label">Product Name</label>
+              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="Urun adi giriniz...">
+              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-tr" class="trans-desc" data-lang="tr"></div>
+                <textarea id="html-source-tr" class="html-source-area" data-lang="tr"></textarea>
+              </div>
             </div>
             <div class="trans-panel" data-lang="ru">
               <label class="trans-label">Product Name</label>
               <input type="text" class="trans-input trans-title" data-lang="ru" placeholder="Введите название продукта...">
-              <label class="trans-label">Description</label>
-              <textarea class="trans-input trans-desc" data-lang="ru" rows="5" placeholder="Введите описание продукта..."></textarea>
+              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-ru" class="trans-desc" data-lang="ru"></div>
+                <textarea id="html-source-ru" class="html-source-area" data-lang="ru"></textarea>
+              </div>
             </div>
             <div class="trans-panel" data-lang="pl">
               <label class="trans-label">Product Name</label>
               <input type="text" class="trans-input trans-title" data-lang="pl" placeholder="Wprowadz nazwe produktu...">
-              <label class="trans-label">Description</label>
-              <textarea class="trans-input trans-desc" data-lang="pl" rows="5" placeholder="Wprowadz opis produktu..."></textarea>
+              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-pl" class="trans-desc" data-lang="pl"></div>
+                <textarea id="html-source-pl" class="html-source-area" data-lang="pl"></textarea>
+              </div>
             </div>
           </div>
         </div>
@@ -630,6 +655,7 @@
   });
 
   // ============== PRODUCT ATTRIBUTES ==============
+  const PRODUCT_ID = {% if object %}{{ object.id }}{% elif product %}{{ product.id }}{% else %}null{% endif %};
   let attributeCounter = 0;
   let attributeSaveTimeout = null;
 
@@ -1970,6 +1996,7 @@
   window.closeMediaPreview = closeMediaPreview;
 </script>
 
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script>
 // ── Translation Tabs Logic ──────────────────────────────────
 (function() {
@@ -1979,6 +2006,7 @@
   const langs = ['tr', 'en', 'ru', 'pl'];
   const tabBtns = document.querySelectorAll('.trans-tab');
   const panels = document.querySelectorAll('.trans-panel');
+  const quillEditors = {};
 
   // ── Tab switching ──
   tabBtns.forEach(btn => {
@@ -1991,6 +2019,74 @@
     });
   });
 
+  // ── Initialize Quill editors ──
+  const toolbarOptions = [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline'],
+    [{ 'color': [] }, { 'background': [] }],
+    [{ 'align': [] }],
+    ['link', 'image', 'video'],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+    ['blockquote', 'code-block'],
+    ['clean']
+  ];
+
+  langs.forEach(lang => {
+    const container = document.getElementById(`quill-${lang}`);
+    if (!container) return;
+    const editor = new Quill(container, {
+      theme: 'snow',
+      modules: { toolbar: toolbarOptions },
+      placeholder: lang === 'en' ? 'Enter product description...'
+        : lang === 'tr' ? 'Urun aciklamasi giriniz...'
+        : lang === 'ru' ? 'Введите описание продукта...'
+        : 'Wprowadz opis produktu...'
+    });
+    quillEditors[lang] = editor;
+    editor.on('text-change', syncToDescription);
+  });
+
+  // ── HTML source toggle ──
+  window.toggleHtmlSource = function(lang) {
+    const editor = quillEditors[lang];
+    if (!editor) return;
+    const sourceArea = document.getElementById(`html-source-${lang}`);
+    const quillContainer = document.getElementById(`quill-${lang}`).closest('.quill-wrap');
+    const btn = quillContainer.parentElement.querySelector('.html-source-btn');
+    const qlToolbar = quillContainer.querySelector('.ql-toolbar');
+    const qlContainer = quillContainer.querySelector('.ql-container');
+
+    if (sourceArea.classList.contains('visible')) {
+      // Switch back to rich editor — apply HTML from source
+      editor.root.innerHTML = sourceArea.value;
+      sourceArea.classList.remove('visible');
+      qlToolbar.style.display = '';
+      qlContainer.style.display = '';
+      btn.classList.remove('active');
+      syncToDescription();
+    } else {
+      // Switch to HTML source view
+      sourceArea.value = editor.root.innerHTML;
+      sourceArea.classList.add('visible');
+      qlToolbar.style.display = 'none';
+      qlContainer.style.display = 'none';
+      btn.classList.add('active');
+    }
+  };
+
+  // ── Get description HTML from a language editor ──
+  function getDescHtml(lang) {
+    const editor = quillEditors[lang];
+    if (!editor) return '';
+    const sourceArea = document.getElementById(`html-source-${lang}`);
+    // If HTML source is open, read from textarea
+    if (sourceArea && sourceArea.classList.contains('visible')) {
+      return sourceArea.value.trim();
+    }
+    const html = editor.root.innerHTML.trim();
+    return html === '<p><br></p>' ? '' : html;
+  }
+
   // ── Load existing data from description field ──
   function loadFromDescription() {
     const raw = descField.value.trim();
@@ -2001,15 +2097,17 @@
       langs.forEach(lang => {
         const t = translations[lang] || {};
         const titleInput = document.querySelector(`.trans-title[data-lang="${lang}"]`);
-        const descInput = document.querySelector(`.trans-desc[data-lang="${lang}"]`);
         if (titleInput && t.title) titleInput.value = t.title;
-        if (descInput && t.description) descInput.value = t.description;
+        if (t.description && quillEditors[lang]) {
+          quillEditors[lang].root.innerHTML = t.description;
+        }
       });
       updateHasContentDots();
     } catch(e) {
       // Not valid JSON — put raw text into TR description as fallback
-      const trDesc = document.querySelector('.trans-desc[data-lang="tr"]');
-      if (trDesc) trDesc.value = raw;
+      if (quillEditors['tr']) {
+        quillEditors['tr'].root.innerHTML = `<p>${raw}</p>`;
+      }
     }
   }
 
@@ -2019,7 +2117,7 @@
     let hasAny = false;
     langs.forEach(lang => {
       const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
-      const desc = (document.querySelector(`.trans-desc[data-lang="${lang}"]`)?.value || '').trim();
+      const desc = getDescHtml(lang);
       if (title || desc) {
         translations[lang] = {};
         if (title) translations[lang].title = title;
@@ -2036,13 +2134,13 @@
     tabBtns.forEach(btn => {
       const lang = btn.dataset.lang;
       const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
-      const desc = (document.querySelector(`.trans-desc[data-lang="${lang}"]`)?.value || '').trim();
+      const desc = getDescHtml(lang);
       btn.classList.toggle('has-content', !!(title || desc));
     });
   }
 
-  // ── Bind events ──
-  document.querySelectorAll('.trans-title, .trans-desc').forEach(el => {
+  // ── Bind title input events ──
+  document.querySelectorAll('.trans-title').forEach(el => {
     el.addEventListener('input', syncToDescription);
   });
 

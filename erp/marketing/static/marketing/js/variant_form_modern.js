@@ -172,6 +172,7 @@ function loadExistingVariantImages() {
             existingVariantData[attrKey] = {
                 variant_id: variant.variant_id,
                 price: variant.variant_price,
+                cost: variant.variant_cost,
                 quantity: variant.variant_quantity,
                 sku: variant.variant_sku,
                 barcode: variant.variant_barcode,
@@ -446,6 +447,7 @@ function removeValue(optionId, valueIndex) {
         // We try to get values from inputs first, then fall back to existingVariantData
         const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
         const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
+        const costInput = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
         const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
         const featuredInput = document.querySelector(`input[name="variant_featured_${index + 1}"]`);
@@ -463,6 +465,7 @@ function removeValue(optionId, valueIndex) {
         variantBackup[signature] = {
             images: images ? JSON.parse(JSON.stringify(images)) : null, // Deep copy images
             price: priceInput ? priceInput.value : '',
+            cost: costInput ? costInput.value : '',
             quantity: quantityInput ? quantityInput.value : '',
             sku: skuInput ? skuInput.value : '',
             barcode: barcodeInput ? barcodeInput.value : '',
@@ -636,8 +639,10 @@ function updateVariantTable() {
                 ? variantAttributesData[index]
                 : (existingData.product_attributes || []);
 
+            const costInput2 = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
             variantBackup[signature] = {
                 price: priceInput?.value || existingData.price || '',
+                cost: costInput2?.value || existingData.cost || '',
                 quantity: quantityInput?.value || existingData.quantity || '',
                 sku: skuInput?.value || existingData.sku || '',
                 barcode: barcodeInput?.value || existingData.barcode || '',
@@ -785,6 +790,7 @@ function updateVariantTable() {
             existingVariantData[attrKey] = {
                 variant_id: backup.variant_id,
                 price: backup.price,
+                cost: backup.cost,
                 quantity: backup.quantity,
                 sku: backup.sku,
                 barcode: backup.barcode,

@@ -33,9 +33,8 @@ from .models import STATUS_CHOICES
 # segno is for making qr codes, and it is cleaner and more efficient than qrcode.
 import segno
 
-# cloudinary is for uploading images to the cloud.
 import tempfile
-import cloudinary.uploader
+from marketing.utils.bunny_storage import upload_to_bunny
 
 # make the qr codes jso
 
@@ -72,16 +71,11 @@ def generate_machine_qr_for_order(order):
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
         qr.save(temp_file.name, scale=5)
+        path = f"media/orders/{order.pk}/qr_order_{order.pk}.png"
+        with open(temp_file.name, 'rb') as f:
+            url = upload_to_bunny(f, path)
 
-        result = cloudinary.uploader.upload(
-            temp_file.name,
-            folder=f"media/orders/{order.pk}",
-            public_id=f"qr_order_{order.pk}",
-            overwrite=True,
-            resource_type="image",
-        )
-
-    order.qr_code_url = result["secure_url"]
+    order.qr_code_url = url
     order.save(update_fields=["qr_code_url"])
 
 
@@ -100,18 +94,12 @@ def generate_qr_for_order_item_unit(order_item_unit, status="scheduled"):
     qr = segno.make(json.dumps(payload))
 
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
-        # saves the qr code as a png image file, scale 5 makes it 5x5 pixels. If you need distance scanning, increase this.
         qr.save(temp_file.name, scale=5)
+        path = f"media/orders/{order_id}/items/{order_item_id}/units/{order_item_unit_id}/qr_{order_item_unit.pk}_{status}.png"
+        with open(temp_file.name, 'rb') as f:
+            url = upload_to_bunny(f, path)
 
-        result = cloudinary.uploader.upload(
-            temp_file.name,
-            folder=f"media/orders/{order_id}/items/{order_item_id}/units/{order_item_unit_id}",
-            public_id=f"qr_order_{order_item_unit.order_item.order.pk}_order_item_unit_{order_item_unit.pk}_{status}",
-            overwrite=True,
-            resource_type="image",
-        )
-
-    return result["secure_url"]
+    return url
 
 
 # This is for reading the QR code on mobile for order_item_unit status updates.

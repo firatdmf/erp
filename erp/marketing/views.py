@@ -21,11 +21,8 @@ from .models import (
     ProductCategory,
 )
 from .forms import ProductForm, ProductFileFormSet
-from cloudinary.uploader import upload as cloudinary_upload
-from cloudinary.exceptions import Error as CloudinaryError
-from django.conf import settings as django_settings
 
-# Bunny CDN support
+# Bunny CDN
 from .utils.bunny_storage import upload_to_bunny, delete_from_bunny
 
 # AVIF Image Optimizer
@@ -34,55 +31,33 @@ from .utils.image_optimizer import optimize_image_to_avif
 
 def smart_upload(file, folder, resource_type="image"):
     """
-    Smart upload function that uses Bunny CDN when enabled, otherwise Cloudinary.
-    Automatically converts images (JPEG/PNG) to AVIF before uploading.
-    
+    Upload file to Bunny CDN. Automatically converts images to AVIF before uploading.
+
     Args:
         file: File object to upload
         folder: Target folder path
         resource_type: 'image' or 'video'
-    
+
     Returns: URL of the uploaded file
     """
-    use_bunny = getattr(django_settings, 'USE_BUNNY_CDN', False)
-    print(f"[DEBUG] smart_upload called - USE_BUNNY_CDN={use_bunny}, resource_type={resource_type}")
-    
     # ── AVIF Conversion (images only) ────────────────────────────────────
-    # Skip conversion for videos, or files that are already AVIF
     if resource_type == 'image':
         original_name = getattr(file, 'name', '') or ''
         if not original_name.lower().endswith('.avif'):
             optimized = optimize_image_to_avif(file)
             if optimized is not None:
                 print(f"[image_optimizer] Converted '{original_name}' → '{optimized.name}'")
-                file = optimized  # Replace with optimized AVIF file
+                file = optimized
             else:
-                # Fallback: reset file position in case it was partially read
                 try:
                     file.seek(0)
                 except Exception:
                     pass
     # ─────────────────────────────────────────────────────────────────────
-    
-    if use_bunny:
-        # Use Bunny CDN
-        # Extract filename from file object
-        filename = getattr(file, 'name', 'image.jpg')
-        path = f"{folder}/{filename}"
-        print(f"[DEBUG] Uploading to Bunny CDN: {path}")
-        return upload_to_bunny(file, path)
-    else:
-        # Use Cloudinary
-        print(f"[DEBUG] Uploading to Cloudinary: {folder}, resource_type={resource_type}")
-        
-        # Build upload options - no transformations for faster uploads
-        upload_options = {
-            'folder': folder,
-            'resource_type': resource_type
-        }
-        
-        result = cloudinary_upload(file, **upload_options)
-        return result.get('secure_url')
+
+    filename = getattr(file, 'name', 'image.jpg')
+    path = f"{folder}/{filename}"
+    return upload_to_bunny(file, path)
 
 
 
@@ -105,31 +80,11 @@ def get_file_type_from_name(filename):
 
 def smart_delete(url):
     """
-    Smart delete function that detects storage type from URL and deletes accordingly.
+    Delete file from Bunny CDN.
     """
     if not url:
         return False
-
-    bunny_cdn_url = getattr(django_settings, 'BUNNY_CDN_URL', '')
-    print(f"[smart_delete] url={url}, bunny_cdn_url={bunny_cdn_url}, starts_with_bunny={url.startswith(bunny_cdn_url) if bunny_cdn_url else False}")
-
-    if bunny_cdn_url and url.startswith(bunny_cdn_url):
-        # Delete from Bunny CDN
-        print(f"[smart_delete] → Routing to Bunny delete")
-        return delete_from_bunny(url)
-    elif 'cloudinary.com' in url:
-        # Delete from Cloudinary
-        import re
-        from cloudinary import uploader as cloudinary_uploader
-        match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", url)
-        if match:
-            public_id = match.group(1)
-            try:
-                result = cloudinary_uploader.destroy(public_id)
-                return result.get('result') == 'ok'
-            except Exception:
-                return False
-    return False
+    return delete_from_bunny(url)
 
 
 # ----------------------------------------------
@@ -1275,7 +1230,7 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             # Handle deleted product files from hidden input
             delete_main_start = time.time()
             deleted_files_json = self.request.POST.get("deleted_files", "")
-            cloudinary_urls_to_delete = []  # Collect URLs for async deletion
+            cdn_urls_to_delete = []  # Collect URLs for async deletion
             
             if deleted_files_json:
                 try:
@@ -1287,8 +1242,8 @@ class ProductEdit(BaseProductView, generic.UpdateView):
                         files_to_delete = list(ProductFile.objects.filter(pk__in=deleted_file_pks))
                         print(f"   🔍 Fetched files in {(time.time() - fetch_start):.3f}s")
                         
-                        cloudinary_urls_to_delete.extend([f.file_url for f in files_to_delete if f.file_url])
-                        print(f"   📎 Collected {len(cloudinary_urls_to_delete)} URLs for async cleanup")
+                        cdn_urls_to_delete.extend([f.file_url for f in files_to_delete if f.file_url])
+                        print(f"   📎 Collected {len(cdn_urls_to_delete)} URLs for async cleanup")
                         
                         # Raw SQL delete - fastest (bypasses Django ORM completely)
                         bulk_start = time.time()
@@ -1311,7 +1266,7 @@ class ProductEdit(BaseProductView, generic.UpdateView):
                         print(f"\n🗑️ Deleting {len(deleted_variant_file_pks)} variant files with bulk delete")
                         # Get URLs before deleting from DB
                         variant_files_to_delete = list(ProductFile.objects.filter(pk__in=deleted_variant_file_pks))
-                        cloudinary_urls_to_delete.extend([f.file_url for f in variant_files_to_delete if f.file_url])
+                        cdn_urls_to_delete.extend([f.file_url for f in variant_files_to_delete if f.file_url])
                         
                         # Raw SQL delete - fastest
                         from django.db import connection
@@ -1392,10 +1347,10 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         response = HttpResponseRedirect(self.get_success_url())
         
         # Pass CDN URLs to be deleted asynchronously after redirect
-        if cloudinary_urls_to_delete:
+        if cdn_urls_to_delete:
             # Store in session for next page load to trigger cleanup
-            self.request.session['cdn_cleanup_urls'] = cloudinary_urls_to_delete
-            print(f"🗑️  Scheduled {len(cloudinary_urls_to_delete)} CDN files for async deletion")
+            self.request.session['cdn_cleanup_urls'] = cdn_urls_to_delete
+            print(f"🗑️  Scheduled {len(cdn_urls_to_delete)} CDN files for async deletion")
         
         print(f"⏱️  Redirect response: {time.time() - redirect_start:.3f}s")
         print(f"\n⏱️  TOTAL form_valid: {time.time() - form_valid_start:.3f}s\n")
@@ -1504,6 +1459,16 @@ def instant_upload_file(request):
         else:
             max_seq = ProductFile.objects.filter(product=product, product_variant__isnull=True).aggregate(models.Max('sequence'))['sequence__max'] or -1
         
+        # Generate video thumbnail if it's a video
+        video_thumb_url = None
+        if file_type == 'video':
+            try:
+                from marketing.utils.video_thumbnail import generate_video_thumbnail
+                file.seek(0)  # rewind after upload
+                video_thumb_url = generate_video_thumbnail(file, folder)
+            except Exception as e:
+                print(f"⚠️ Video thumbnail generation failed: {e}")
+
         # Save to database with file_type
         product_file = ProductFile.objects.create(
             product=product,
@@ -1511,7 +1476,8 @@ def instant_upload_file(request):
             file_url=file_url,
             sequence=max_seq + 1,
             is_primary=False,
-            file_type=file_type  # 'image' or 'video'
+            file_type=file_type,  # 'image' or 'video'
+            video_thumbnail=video_thumb_url,
         )
         
         # If uploading to a variant, always ensure product primary is first variant's first image
@@ -1931,8 +1897,6 @@ def temp_upload_file(request):
             'file_data': file_data
         })
         
-    except CloudinaryError as e:
-        return JsonResponse({'success': False, 'error': f'Cloudinary error: {str(e)}'}, status=500)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -2941,8 +2905,6 @@ def upload_blog_image(request):
             'type': image_type
         })
         
-    except CloudinaryError as e:
-        return JsonResponse({'success': False, 'error': f'CDN error: {str(e)}'}, status=500)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 

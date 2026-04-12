@@ -48,3 +48,11 @@ def delete_cdn_file(sender, instance, **kwargs):
             print(f"[SIGNAL] smart_delete result: {result}")
         except Exception as e:
             print(f"[SIGNAL] Failed to delete CDN file {instance.file_url}: {e}")
+    # Also delete video thumbnail from CDN
+    if instance.video_thumbnail:
+        try:
+            from .views import smart_delete
+            print(f"[SIGNAL] Deleting video thumbnail: {instance.video_thumbnail}")
+            smart_delete(instance.video_thumbnail)
+        except Exception as e:
+            print(f"[SIGNAL] Failed to delete video thumbnail: {e}")

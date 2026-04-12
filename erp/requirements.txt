@@ -9,7 +9,6 @@ cffi==2.0.0
 gunicorn==21.2.0
 charset-normalizer==3.3.2
 click==8.1.7
-cloudinary==1.44.1
 colorama==0.4.6
 contourpy==1.2.0
 crispy-bootstrap5==2025.6
@@ -20,7 +19,6 @@ DataRecorder==3.6.2
 decorator==5.2.1
 Django==4.2.25
 django-allauth==65.14.3
-django-cloudinary-storage==0.3.0
 django-cors-headers==4.9.0
 django-crispy-forms==2.5
 django-debug-toolbar==6.1.0

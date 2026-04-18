@@ -819,6 +819,10 @@ function updateVariantTable() {
     table.style.display = 'table';
     table.style.visibility = 'visible';
 
+    // Show bulk price button
+    const bulkBtn = document.getElementById('bulk_price_btn');
+    if (bulkBtn) bulkBtn.style.display = 'inline-block';
+
     // Auto-select first option in grouping dropdown
     const select = document.getElementById('grouping_select');
     if (select && select.options.length > 0) {
@@ -3211,6 +3215,53 @@ function checkDuplicateSku(input) {
 }
 
 
+
+// ─── Cost → Suggested Price Calculator ───
+let _calcTimer = null;
+function calcSuggestedPrice() {
+    const costEl = document.getElementById('modal_variant_cost');
+    const priceEl = document.getElementById('modal_variant_price');
+    const indicator = document.getElementById('modal_price_calc_indicator');
+    if (!costEl || !priceEl) return;
+
+    const cost = parseFloat(costEl.value);
+    if (!cost || cost <= 0) return;
+
+    // Show loading indicator
+    if (indicator) indicator.style.display = 'inline';
+
+    clearTimeout(_calcTimer);
+    _calcTimer = setTimeout(() => {
+        const suggested = (cost * 2 / 0.7);
+        priceEl.value = suggested.toFixed(2);
+        if (indicator) indicator.style.display = 'none';
+    }, 400);
+}
+
+// Bulk update all variant prices from their costs
+function bulkUpdatePricesFromCost() {
+    const rows = document.querySelectorAll('tr[data-variant-index]');
+    let updated = 0;
+    rows.forEach(row => {
+        const idx = parseInt(row.getAttribute('data-variant-index')) + 1;
+        const costInput = document.querySelector(`input[name="variant_cost_${idx}"]`);
+        const priceInput = document.querySelector(`input[name="variant_price_${idx}"]`);
+        if (!costInput || !priceInput) return;
+        const cost = parseFloat(costInput.value);
+        if (!cost || cost <= 0) return;
+        const suggested = (cost * 2 / 0.7).toFixed(2);
+        priceInput.value = suggested;
+        // Update visible price cell
+        const priceCell = row.querySelector('.variant-price-cell');
+        if (priceCell) priceCell.textContent = '$' + suggested;
+        updated++;
+    });
+    if (typeof showToast === 'function') {
+        showToast(`Updated ${updated} variant prices from cost`, 'success');
+    } else {
+        alert(`Updated ${updated} variant prices from cost`);
+    }
+}
 
 // Variant Detail Modal Functions
 

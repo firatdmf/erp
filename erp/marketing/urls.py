@@ -52,5 +52,8 @@ urlpatterns = [
     path("api/get_blog_post/<slug:slug>/",views.get_blog_post,name="get_blog_post"),
     # Newsletter subscription
     path("api/subscribe/",views.newsletter_subscribe,name="newsletter_subscribe"),
+    path("api/unsubscribe/",views.newsletter_unsubscribe,name="newsletter_unsubscribe"),
+    path("api/guest_review/",views.guest_review,name="guest_review"),
+    path("api/get_guest_reviews/<str:product_sku>/",views.get_guest_reviews,name="get_guest_reviews"),
 ]
 

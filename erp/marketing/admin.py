@@ -167,6 +167,26 @@ class ProductReviewAdmin(admin.ModelAdmin):
 admin.site.register(ProductReview, ProductReviewAdmin)
 
 
+class GuestReviewImageInline(admin.TabularInline):
+    model = GuestReviewImage
+    extra = 0
+    readonly_fields = ('image_url',)
+
+
+class GuestProductReviewAdmin(admin.ModelAdmin):
+    list_display = ('id', 'display_name', 'product', 'rating', 'is_approved', 'created_at')
+    list_filter = ('is_approved', 'rating', 'created_at')
+    search_fields = ('first_name', 'last_name', 'product__title', 'comment')
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)
+    list_editable = ('is_approved',)
+    inlines = [GuestReviewImageInline]
+
+
+admin.site.register(GuestProductReview, GuestProductReviewAdmin)
+admin.site.register(GuestReviewImage)
+
+
 # Discount Code Admin
 @admin.register(DiscountCode)
 class DiscountCodeAdmin(admin.ModelAdmin):

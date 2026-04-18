@@ -694,6 +694,52 @@ class ProductReview(models.Model):
         return f"{self.web_client} - {self.product.title} ({self.rating}⭐)"
 
 
+class GuestProductReview(models.Model):
+    """Product reviews from external/guest customers (no login required)."""
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='guest_reviews',
+        help_text="The product being reviewed"
+    )
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    hide_name = models.BooleanField(default=False, help_text="Show only initials")
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    )
+    comment = models.TextField(blank=True)
+    is_approved = models.BooleanField(default=False, help_text="Must be approved by admin")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Guest Product Review"
+        verbose_name_plural = "Guest Product Reviews"
+
+    def display_name(self):
+        if self.hide_name:
+            return f"{self.first_name[0]}.{self.last_name[0]}."
+        return f"{self.first_name} {self.last_name}"
+
+    def __str__(self):
+        return f"{self.display_name()} - {self.product.title} ({self.rating}⭐)"
+
+
+class GuestReviewImage(models.Model):
+    """Images attached to guest reviews."""
+    review = models.ForeignKey(
+        GuestProductReview,
+        on_delete=models.CASCADE,
+        related_name='images'
+    )
+    image_url = models.URLField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image for review #{self.review.id}"
+
+
 # ============================================================
 # DISCOUNT CODES
 # İndirim kodları - fenomenler için

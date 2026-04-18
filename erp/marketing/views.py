@@ -3086,14 +3086,28 @@ def newsletter_subscribe(request):
                 'error': 'Bu e-posta adresi zaten kayıtlı'
             })
         
-        # Check if phone already exists
-        if WebSubscription.objects.filter(phone=phone_normalized).exists():
+        # Check if phone already exists (skip for footer/no-phone subscriptions)
+        skip_discount = data.get('skip_discount', False)
+        if not skip_discount and WebSubscription.objects.filter(phone=phone_normalized).exists():
             return JsonResponse({
-                'success': False, 
+                'success': False,
                 'error': 'Bu telefon numarası zaten kayıtlı'
             })
-        
-        # Generate unique discount code
+
+        # Generate unique discount code (skip for footer subscriptions)
+        if skip_discount:
+            # Footer subscription: no discount code
+            try:
+                subscription = WebSubscription.objects.create(
+                    email=email,
+                    phone=phone_normalized,
+                    is_active=True
+                )
+            except Exception:
+                # Email might already exist
+                pass
+            return JsonResponse({'success': True, 'message': 'Subscribed'})
+
         code_prefix = "HOSGELDIN"
         unique_suffix = uuid.uuid4().hex[:6].upper()
         discount_code_str = f"{code_prefix}{unique_suffix}"
@@ -3175,3 +3189,110 @@ def file_info_api(request, file_id):
         pf.alt_text = (data.get('alt_text') or '')[:255]
         pf.save(update_fields=['alt_text'])
         return JsonResponse({'success': True})
+
+
+@csrf_exempt
+def newsletter_unsubscribe(request):
+    """Unsubscribe from newsletter by email."""
+    from marketing.models import WebSubscription
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        email = data.get('email', '').strip().lower()
+
+        if not email:
+            return JsonResponse({'success': False, 'error': 'Email required'})
+
+        try:
+            sub = WebSubscription.objects.get(email=email)
+            sub.is_active = False
+            sub.save(update_fields=['is_active'])
+            return JsonResponse({'success': True, 'message': 'Unsubscribed'})
+        except WebSubscription.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def guest_review(request):
+    """Create a guest product review (no login required)."""
+    from marketing.models import GuestProductReview, GuestReviewImage, Product
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        product_sku = data.get('product_sku', '')
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        hide_name = data.get('hide_name', False)
+        rating = int(data.get('rating', 0))
+        comment = data.get('comment', '').strip()
+        image_urls = data.get('image_urls', [])
+
+        if not product_sku or not first_name or not last_name:
+            return JsonResponse({'success': False, 'error': 'Ad, soyad ve ürün kodu gerekli'})
+        if rating < 1 or rating > 5:
+            return JsonResponse({'success': False, 'error': 'Puan 1-5 arası olmalıdır'})
+
+        try:
+            product = Product.objects.get(sku=product_sku)
+        except Product.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Ürün bulunamadı'}, status=404)
+
+        review = GuestProductReview.objects.create(
+            product=product,
+            first_name=first_name,
+            last_name=last_name,
+            hide_name=hide_name,
+            rating=rating,
+            comment=comment,
+            is_approved=False
+        )
+
+        for url in image_urls[:5]:
+            if url:
+                GuestReviewImage.objects.create(review=review, image_url=url)
+
+        response = JsonResponse({'success': True, 'review_id': review.id})
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def get_guest_reviews(request, product_sku):
+    """Get approved guest reviews for a product."""
+    from marketing.models import GuestProductReview
+
+    try:
+        reviews = GuestProductReview.objects.filter(
+            product__sku=product_sku,
+            is_approved=True
+        ).order_by('-created_at')
+
+        data = []
+        for r in reviews:
+            data.append({
+                'id': r.id,
+                'name': r.display_name(),
+                'rating': r.rating,
+                'comment': r.comment,
+                'images': [img.image_url for img in r.images.all()],
+                'created_at': r.created_at.isoformat(),
+            })
+
+        response = JsonResponse({'success': True, 'reviews': data})
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)

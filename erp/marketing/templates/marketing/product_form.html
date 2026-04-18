@@ -194,6 +194,11 @@
                 <div id="quill-en" class="trans-desc" data-lang="en"></div>
                 <textarea id="html-source-en" class="html-source-area" data-lang="en"></textarea>
               </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Care Instructions <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-care-en" class="trans-care" data-lang="en"></div>
+                <textarea id="html-care-source-en" class="html-source-area" data-lang="en"></textarea>
+              </div>
             </div>
             <div class="trans-panel" data-lang="tr">
               <label class="trans-label">Product Name</label>
@@ -202,6 +207,11 @@
               <div class="quill-wrap">
                 <div id="quill-tr" class="trans-desc" data-lang="tr"></div>
                 <textarea id="html-source-tr" class="html-source-area" data-lang="tr"></textarea>
+              </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Bakım Talimatları <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-care-tr" class="trans-care" data-lang="tr"></div>
+                <textarea id="html-care-source-tr" class="html-source-area" data-lang="tr"></textarea>
               </div>
             </div>
             <div class="trans-panel" data-lang="ru">
@@ -212,6 +222,11 @@
                 <div id="quill-ru" class="trans-desc" data-lang="ru"></div>
                 <textarea id="html-source-ru" class="html-source-area" data-lang="ru"></textarea>
               </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Инструкции по уходу <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-care-ru" class="trans-care" data-lang="ru"></div>
+                <textarea id="html-care-source-ru" class="html-source-area" data-lang="ru"></textarea>
+              </div>
             </div>
             <div class="trans-panel" data-lang="pl">
               <label class="trans-label">Product Name</label>
@@ -220,6 +235,11 @@
               <div class="quill-wrap">
                 <div id="quill-pl" class="trans-desc" data-lang="pl"></div>
                 <textarea id="html-source-pl" class="html-source-area" data-lang="pl"></textarea>
+              </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Instrukcje pielęgnacji <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-care-pl" class="trans-care" data-lang="pl"></div>
+                <textarea id="html-care-source-pl" class="html-source-area" data-lang="pl"></textarea>
               </div>
             </div>
           </div>
@@ -1579,24 +1599,31 @@
 
       <hr class="modal-divider">
 
-      <!-- Price & Cost -->
+      <!-- Cost & Price -->
       <div class="form-row">
         <div class="form-group">
-          <label for="modal_variant_price">Price</label>
+          <label for="modal_variant_cost">Cost per item</label>
           <div class="input-with-icon">
             <span class="currency-symbol">$</span>
-            <input type="number" id="modal_variant_price" class="form-input" step="0.01" placeholder="0.00">
+            <input type="number" id="modal_variant_cost" class="form-input" step="0.01" placeholder="0.00" oninput="calcSuggestedPrice()">
           </div>
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
-          <label for="modal_variant_cost">Cost per item</label>
+          <label for="modal_variant_price">
+            Suggested Price
+            <span id="modal_price_calc_indicator" style="display:none;margin-left:6px;font-weight:400;color:#6b7280;font-size:11px;">
+              <i class="fas fa-spinner fa-spin"></i> calculating...
+            </span>
+            <span id="modal_price_formula" style="margin-left:6px;font-weight:400;color:#9ca3af;font-size:11px;">
+              (cost &times; 2 / 0.7)
+            </span>
+          </label>
           <div class="input-with-icon">
-            <span class="currency-label">Cost</span>
             <span class="currency-symbol">$</span>
-            <input type="number" id="modal_variant_cost" class="form-input" step="0.01" placeholder="0.00">
+            <input type="number" id="modal_variant_price" class="form-input" step="0.01" placeholder="0.00">
           </div>
         </div>
       </div>
@@ -2007,6 +2034,7 @@
   const tabBtns = document.querySelectorAll('.trans-tab');
   const panels = document.querySelectorAll('.trans-panel');
   const quillEditors = {};
+  const quillCareEditors = {};
 
   // ── Tab switching ──
   tabBtns.forEach(btn => {
@@ -2044,9 +2072,24 @@
     });
     quillEditors[lang] = editor;
     editor.on('text-change', syncToDescription);
+
+    // Care Instructions editor
+    const careContainer = document.getElementById(`quill-care-${lang}`);
+    if (careContainer) {
+      const careEditor = new Quill(careContainer, {
+        theme: 'snow',
+        modules: { toolbar: toolbarOptions },
+        placeholder: lang === 'en' ? 'Enter care instructions...'
+          : lang === 'tr' ? 'Bakım talimatlarını giriniz...'
+          : lang === 'ru' ? 'Введите инструкции по уходу...'
+          : 'Wprowadź instrukcje pielęgnacji...'
+      });
+      quillCareEditors[lang] = careEditor;
+      careEditor.on('text-change', syncToDescription);
+    }
   });
 
-  // ── HTML source toggle ──
+  // ── HTML source toggle (description) ──
   window.toggleHtmlSource = function(lang) {
     const editor = quillEditors[lang];
     if (!editor) return;
@@ -2057,7 +2100,6 @@
     const qlContainer = quillContainer.querySelector('.ql-container');
 
     if (sourceArea.classList.contains('visible')) {
-      // Switch back to rich editor — apply HTML from source
       editor.root.innerHTML = sourceArea.value;
       sourceArea.classList.remove('visible');
       qlToolbar.style.display = '';
@@ -2065,7 +2107,32 @@
       btn.classList.remove('active');
       syncToDescription();
     } else {
-      // Switch to HTML source view
+      sourceArea.value = editor.root.innerHTML;
+      sourceArea.classList.add('visible');
+      qlToolbar.style.display = 'none';
+      qlContainer.style.display = 'none';
+      btn.classList.add('active');
+    }
+  };
+
+  // ── HTML source toggle (care instructions) ──
+  window.toggleCareHtmlSource = function(lang) {
+    const editor = quillCareEditors[lang];
+    if (!editor) return;
+    const sourceArea = document.getElementById(`html-care-source-${lang}`);
+    const quillContainer = document.getElementById(`quill-care-${lang}`).closest('.quill-wrap');
+    const btn = quillContainer.parentElement.querySelector('.html-source-btn');
+    const qlToolbar = quillContainer.querySelector('.ql-toolbar');
+    const qlContainer = quillContainer.querySelector('.ql-container');
+
+    if (sourceArea.classList.contains('visible')) {
+      editor.root.innerHTML = sourceArea.value;
+      sourceArea.classList.remove('visible');
+      qlToolbar.style.display = '';
+      qlContainer.style.display = '';
+      btn.classList.remove('active');
+      syncToDescription();
+    } else {
       sourceArea.value = editor.root.innerHTML;
       sourceArea.classList.add('visible');
       qlToolbar.style.display = 'none';
@@ -2079,7 +2146,18 @@
     const editor = quillEditors[lang];
     if (!editor) return '';
     const sourceArea = document.getElementById(`html-source-${lang}`);
-    // If HTML source is open, read from textarea
+    if (sourceArea && sourceArea.classList.contains('visible')) {
+      return sourceArea.value.trim();
+    }
+    const html = editor.root.innerHTML.trim();
+    return html === '<p><br></p>' ? '' : html;
+  }
+
+  // ── Get care instructions HTML from a language editor ──
+  function getCareHtml(lang) {
+    const editor = quillCareEditors[lang];
+    if (!editor) return '';
+    const sourceArea = document.getElementById(`html-care-source-${lang}`);
     if (sourceArea && sourceArea.classList.contains('visible')) {
       return sourceArea.value.trim();
     }
@@ -2101,10 +2179,12 @@
         if (t.description && quillEditors[lang]) {
           quillEditors[lang].root.innerHTML = t.description;
         }
+        if (t.care_instructions && quillCareEditors[lang]) {
+          quillCareEditors[lang].root.innerHTML = t.care_instructions;
+        }
       });
       updateHasContentDots();
     } catch(e) {
-      // Not valid JSON — put raw text into TR description as fallback
       if (quillEditors['tr']) {
         quillEditors['tr'].root.innerHTML = `<p>${raw}</p>`;
       }
@@ -2118,10 +2198,12 @@
     langs.forEach(lang => {
       const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
       const desc = getDescHtml(lang);
-      if (title || desc) {
+      const care = getCareHtml(lang);
+      if (title || desc || care) {
         translations[lang] = {};
         if (title) translations[lang].title = title;
         if (desc) translations[lang].description = desc;
+        if (care) translations[lang].care_instructions = care;
         hasAny = true;
       }
     });
@@ -2135,7 +2217,8 @@
       const lang = btn.dataset.lang;
       const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
       const desc = getDescHtml(lang);
-      btn.classList.toggle('has-content', !!(title || desc));
+      const care = getCareHtml(lang);
+      btn.classList.toggle('has-content', !!(title || desc || care));
     });
   }
 

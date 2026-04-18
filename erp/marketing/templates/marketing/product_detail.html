@@ -56,8 +56,13 @@
         <div class="thumbnail {% if forloop.first %}active{% endif %}"
           onclick="changeImage('{{ file.file_url }}', '{{ file.file_type }}', this)">
           {% if file.file_type == 'video' %}
-          <div class="video-thumbnail-placeholder">
-            <i class="fa fa-play-circle"></i>
+          <div style="position:relative;">
+            {% if file.video_thumbnail %}
+            <img src="{{ file.video_thumbnail }}" alt="Video thumbnail">
+            {% else %}
+            <div class="video-thumbnail-placeholder"></div>
+            {% endif %}
+            <i class="fa fa-play-circle" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:20px;color:rgba(255,255,255,0.9);text-shadow:0 1px 3px rgba(0,0,0,0.5);pointer-events:none;"></i>
           </div>
           {% else %}
           <img src="{{ file.file_url }}" alt="Thumbnail {{ forloop.counter }}">
@@ -72,9 +77,9 @@
     <div class="product-info">
       <!-- Description -->
       <div class="info-section">
-        <h2>Description</h2>
         {% if product.description %}
-        <div class="description-text">{{ product.description|safe }}</div>
+        <script type="application/json" id="desc-raw-data">{{ product.description|safe }}</script>
+        <div id="description-display"></div>
         {% else %}
         <p class="text-muted">No description available</p>
         {% endif %}
@@ -273,5 +278,86 @@
   }
   {% endif %}
   }) ();
+
+  // ── Render multilingual description ──
+  (function() {
+    const container = document.getElementById('description-display');
+    if (!container) return;
+
+    const rawStr = document.getElementById('desc-raw-data').textContent;
+
+    const langLabels = { en: 'English', tr: 'Turkish', ru: 'Russian', pl: 'Polish' };
+    const langOrder = ['en', 'tr', 'ru', 'pl'];
+
+    let translations = {};
+    try {
+      const data = JSON.parse(rawStr);
+      translations = (data && data.translations) ? data.translations : {};
+    } catch(e) {
+      // Not JSON — show as plain HTML
+      container.innerHTML = '<div class="description-text">' + rawStr + '</div>';
+      return;
+    }
+
+    // Filter to languages that have content
+    const activeLangs = langOrder.filter(lang => {
+      const t = translations[lang];
+      return t && (t.description || t.title);
+    });
+
+    if (activeLangs.length === 0) {
+      container.innerHTML = '<p class="text-muted">No description available</p>';
+      return;
+    }
+
+    // If only one language, show it directly without tabs
+    if (activeLangs.length === 1) {
+      const t = translations[activeLangs[0]];
+      container.innerHTML = '<div class="description-text">' + (t.description || '') + '</div>';
+      return;
+    }
+
+    // Build tabbed UI
+    let tabsHtml = '<div class="desc-tab-bar">';
+    activeLangs.forEach((lang, i) => {
+      tabsHtml += '<button type="button" class="desc-tab' + (i === 0 ? ' active' : '') + '" data-lang="' + lang + '">'
+        + langLabels[lang] + '</button>';
+    });
+    tabsHtml += '</div>';
+
+    let panelsHtml = '';
+    activeLangs.forEach((lang, i) => {
+      const t = translations[lang] || {};
+      panelsHtml += '<div class="desc-panel' + (i === 0 ? ' active' : '') + '" data-lang="' + lang + '">'
+        + (t.title ? '<h3 class="desc-panel-title">' + t.title + '</h3>' : '')
+        + '<div class="description-text">' + (t.description || '') + '</div>'
+        + '</div>';
+    });
+
+    container.innerHTML = tabsHtml + panelsHtml;
+
+    // Tab switching
+    container.querySelectorAll('.desc-tab').forEach(btn => {
+      btn.addEventListener('click', function() {
+        container.querySelectorAll('.desc-tab').forEach(b => b.classList.remove('active'));
+        container.querySelectorAll('.desc-panel').forEach(p => p.classList.remove('active'));
+        this.classList.add('active');
+        container.querySelector('.desc-panel[data-lang="' + this.dataset.lang + '"]').classList.add('active');
+      });
+    });
+  })();
+
+
 </script>
+
+<style>
+  .desc-tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 0; }
+  .desc-tab { background: none; border: none; padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: 500;
+    color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .desc-tab:hover { color: #374151; }
+  .desc-tab.active { color: #4f46e5; border-bottom-color: #4f46e5; }
+  .desc-panel { display: none; }
+  .desc-panel.active { display: block; }
+  .desc-panel-title { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: #1f2937; }
+</style>
 {% endblock %}

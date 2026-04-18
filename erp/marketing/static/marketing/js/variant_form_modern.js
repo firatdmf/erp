@@ -118,6 +118,10 @@ function loadExistingVariants() {
                 // Don't add empty field - user can use "Add another value" button or type will auto-add
             });
 
+            // Load variant data (cost, price, sku, images, etc.) BEFORE rendering the table
+            // so that generateRowHTML can populate hidden inputs with existing values
+            loadExistingVariantImages();
+
             // Update table with existing variants
             console.log('About to update variant table...');
             console.log('Current variantData:', variantData);
@@ -135,9 +139,6 @@ function loadExistingVariants() {
             const grouping = document.getElementById('variant_grouping');
             console.log('Table display:', table ? table.style.display : 'null');
             console.log('Grouping display:', grouping ? grouping.style.display : 'null');
-
-            // Load variant images if available
-            loadExistingVariantImages();
         }
     } catch (e) {
         console.error('Error loading existing variants:', e);
@@ -512,6 +513,7 @@ function removeValue(optionId, valueIndex) {
             existingVariantData[signature] = {
                 variant_id: backup.variant_id,
                 price: backup.price,
+                cost: backup.cost,
                 quantity: backup.quantity,
                 sku: backup.sku,
                 barcode: backup.barcode,
@@ -976,11 +978,13 @@ function renderVariantTable(combinations, selectedGrouping = null) {
             </button>
         </td>`;
 
-        // HIDDEN INPUTS for Modal Fields
+        // HIDDEN INPUTS for Modal Fields (wrapped in td to avoid browser foster-parenting)
+        rowHTML += `<td style="display:none;">`;
         rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
         rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}">`;
         rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
         rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
+        rowHTML += `</td>`;
 
         rowHTML += `</tr>`;
         return rowHTML;
@@ -2445,7 +2449,7 @@ function prepareVariantsForSubmission() {
             variant_sku: skuInput && skuInput.value ? skuInput.value : variantValues,
             variant_attribute_values: combo,
             variant_price: priceInput ? parseFloat(priceInput.value) || 0 : 0,
-            variant_cost: costInput ? parseFloat(costInput.value) || null : null,
+            variant_cost: costInput && costInput.value !== '' ? parseFloat(costInput.value) : null,
             variant_quantity: quantityInput ? parseFloat(quantityInput.value) || 0 : 0,
             variant_barcode: barcodeInput ? barcodeInput.value : '',
             variant_featured: featuredInput ? featuredInput.checked : true,

@@ -1029,29 +1029,16 @@ def send_email_view(request):
         
         email.save()
         
-        # Handle file attachments - Upload to Cloudinary for record
+        # Handle file attachments - Upload to Bunny CDN for record
         # Note: Email already sent above, so failures here shouldn't crash
-        
+
         for file in files:
             try:
-                # Upload to Cloudinary
-                import cloudinary.uploader
-                
-                # Check if Cloudinary is configured
-                if not settings.CLOUDINARY_STORAGE.get('CLOUD_NAME'):
-                    raise Exception("Cloudinary not configured")
-                    
-                result = cloudinary.uploader.upload(
-                    file,
-                    folder='email_attachments',
-                    resource_type='auto'
-                )
-                
-                file_url = result['secure_url']
+                from marketing.utils.bunny_storage import upload_to_bunny
+                path = f"media/email_attachments/{file.name}"
+                file_url = upload_to_bunny(file, path)
             except Exception as e:
-                print(f"Cloudinary upload failed: {e}")
-                # Fallback: Use a local path or placeholder if upload fails
-                # For now just use a placeholder to avoid crashing
+                print(f"CDN upload failed: {e}")
                 file_url = f"#upload-failed-{file.name}"
             
             EmailAttachment.objects.create(

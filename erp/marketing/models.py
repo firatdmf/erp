@@ -8,10 +8,6 @@ from django.core.exceptions import ValidationError
 from crm.models import Supplier
 from django.contrib.postgres.fields import ArrayField
 
-# cdn for media
-from cloudinary.uploader import upload as cloudinary_upload
-from cloudinary.utils import cloudinary_url
-from cloudinary.exceptions import Error as CloudinaryError
 
 
 # Create your functions here.
@@ -122,32 +118,16 @@ class ProductCategory(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True, unique=True)
     description = models.TextField(null=True, blank=True)
 
-    image_url = models.URLField(null=True, blank=True)  # Store Cloudinary URL
+    image_url = models.URLField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
-
         self.name = self.name.lower().strip().replace(" ", "_")
-        # _image_file is a temporary attribute (not a model field) used to hold the uploaded file just long enough to upload it to Cloudinary in the save() method.
         image_file = getattr(self, "_image_file", None)
-        # When you upload an image via a form, the file comes in as a file object (not a URL).
-        # You need to upload this file to Cloudinary, get the resulting URL, and then store that URL in the image field.
         if image_file:
-            try:
-                # Set folder and public_id for Cloudinary
-                folder = f"media/product_categories/{self.name}"
-                public_id = os.path.splitext(image_file.name)[
-                    0
-                ]  # filename without extension
-                result = cloudinary_upload(
-                    image_file,
-                    folder=folder,
-                    public_id=public_id,
-                    overwrite=True,  # Overwrite if same name
-                    resource_type="image",
-                )
-                self.image_url = result.get("secure_url")
-            except CloudinaryError as e:
-                raise ValidationError(f"Cloudinary upload failed: {e}")
+            from .utils.bunny_storage import upload_to_bunny
+            folder = f"media/product_categories/{self.name}"
+            path = f"{folder}/{image_file.name}"
+            self.image_url = upload_to_bunny(image_file, path)
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -505,7 +485,6 @@ class ProductVariantAttributeValue(models.Model):
 #         )  # A variant cannot have duplicate attribute name
 
 import re  # regex
-from cloudinary.uploader import destroy as cloudinary_destroy
 from urllib.parse import urlparse, urlunparse
 
 # This is to save image files.
@@ -515,7 +494,6 @@ class ProductFile(models.Model):
     file_path = models.CharField(max_length=500, blank=True, null=True)
     # file = models.FileField(upload_to="uploads/")  # this triggers Django file handling
 
-    # this is the cloudinary url
     file_url = models.URLField(blank=True, null=True)
 
     product = models.ForeignKey(
@@ -540,68 +518,18 @@ class ProductFile(models.Model):
     file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='image')
     alt_text = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
+    # Server-generated thumbnail for video files (first frame uploaded to CDN)
+    video_thumbnail = models.URLField(blank=True, null=True)
 
 
     @property
     def optimized_url(self):
-        """
-        Returns the Cloudinary URL with automatic format and quality.
-        Works for both images and videos.
-        Example image: .../upload/f_auto,q_auto/.../file.png
-        Example video: .../upload/f_auto,q_auto/.../file.mp4
-        """
-        if not self.file_url:
-            return None
+        return self.file_url
 
-        # Check if it's a Cloudinary URL
-        if "/upload/" not in self.file_url:
-            return self.file_url
-
-        parts = urlparse(self.file_url)
-        # Insert transformations right after /upload/
-        # f_auto: automatic format selection (WebP/AVIF for images, WebM/MP4 for videos)
-        # q_auto: automatic quality compression
-        optimized_path = parts.path.replace("/upload/", "/upload/f_auto,q_auto/")
-        return urlunparse(parts._replace(path=optimized_path))
-    
     @property
     def thumbnail_url(self):
-        """
-        Returns optimized thumbnail URL for list views (80x80, low quality).
-        Drastically reduces file size: 300KB → ~5KB!
-        """
-        if not self.file_url:
-            return None
-        
-        parts = urlparse(self.file_url)
-        # Aggressive optimization for list view thumbnails
-        optimized_path = parts.path.replace(
-            "/upload/", 
-            "/upload/w_80,h_80,c_fill,f_auto,q_auto:low/"
-        )
-        return urlunparse(parts._replace(path=optimized_path))
-    
-    @property
-    def video_thumbnail_url(self):
-        """
-        Returns thumbnail URL for video files (first frame).
-        Uses Cloudinary's video-to-image transformation.
-        """
-        if not self.file_url or self.file_type != 'video':
-            return None
-        
-        parts = urlparse(self.file_url)
-        # Convert video to image thumbnail (jpg from first frame)
-        # w_300 = width, h_200 = height, c_fill = crop to fill, so_0 = start offset 0 (first frame)
-        optimized_path = parts.path.replace(
-            "/upload/", 
-            "/upload/w_300,h_200,c_fill,so_0,f_jpg/"
-        )
-        # Change extension to .jpg for the thumbnail
-        if optimized_path.endswith(('.mp4', '.mov', '.webm', '.avi')):
-            optimized_path = optimized_path.rsplit('.', 1)[0] + '.jpg'
-        return urlunparse(parts._replace(path=optimized_path))
-    
+        return self.file_url
+
     @property
     def is_video(self):
         """Helper property to check if file is a video."""
@@ -613,10 +541,10 @@ class ProductFile(models.Model):
         start = time.perf_counter()
         print(f"🗑️ ProductFile.delete(pk={self.pk}) called")
         """
-        Deletes the file from CDN (Bunny or Cloudinary) and then from DB.
+        Deletes the file from CDN and then from DB.
         SKIP CDN deletion if skip_cdn=True (for async cleanup).
         """
-        skip_cdn = kwargs.pop('skip_cdn', kwargs.pop('skip_cloudinary', False))
+        skip_cdn = kwargs.pop('skip_cdn', False)
         
         if self.file_url and not skip_cdn:
             try:
@@ -629,6 +557,13 @@ class ProductFile(models.Model):
                     print(f"   ⚠️ CDN delete({self.file_url}) failed or file not found")
             except Exception as e:
                 print(f"   ❌ Failed to delete CDN resource {self.file_url}: {e}")
+            # Also delete video thumbnail from CDN
+            if self.video_thumbnail:
+                try:
+                    smart_delete(self.video_thumbnail)
+                    print(f"   ✅ Deleted video thumbnail: {self.video_thumbnail}")
+                except Exception as e:
+                    print(f"   ⚠️ Failed to delete video thumbnail: {e}")
         elif skip_cdn:
             print(f"   ⚡ Skipped CDN deletion for pk={self.pk} (will be cleaned up async)")
 
@@ -896,21 +831,19 @@ class BlogPost(models.Model):
         return self.title_en or self.title_tr or self.slug
     
     def delete(self, *args, **kwargs):
-        """Delete cover and hero images from Cloudinary when deleting the post"""
+        """Delete cover and hero images from CDN when deleting the post"""
+        from .views import smart_delete
         for image_url in [self.cover_image, self.hero_image]:
-            if image_url and 'cloudinary.com' in image_url:
-                match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", image_url)
-                if match:
-                    public_id = match.group(1)
-                    try:
-                        cloudinary_destroy(public_id)
-                    except Exception as e:
-                        print(f"Failed to delete Cloudinary resource {public_id}: {e}")
+            if image_url:
+                try:
+                    smart_delete(image_url)
+                except Exception as e:
+                    print(f"Failed to delete CDN resource {image_url}: {e}")
         super().delete(*args, **kwargs)
 
 
 class BlogFile(models.Model):
-    """Blog post images - stored on Cloudinary"""
+    """Blog post images"""
     
     blog_post = models.ForeignKey(
         BlogPost,
@@ -920,9 +853,8 @@ class BlogFile(models.Model):
         blank=False
     )
     
-    # Cloudinary URL
     file_url = models.URLField(blank=True, null=True)
-    
+
     # File type: 'cover', 'hero', 'content'
     FILE_TYPE_CHOICES = [
         ('cover', 'Kapak Resmi'),
@@ -947,15 +879,13 @@ class BlogFile(models.Model):
         verbose_name_plural = "Blog Dosyaları"
     
     def delete(self, *args, **kwargs):
-        """Delete from Cloudinary when deleting the record"""
+        """Delete from CDN when deleting the record"""
         if self.file_url:
-            match = re.search(r"/upload/(?:v\d+/)?([^\.]+)", self.file_url)
-            if match:
-                public_id = match.group(1)
-                try:
-                    cloudinary_destroy(public_id)
-                except Exception as e:
-                    print(f"Failed to delete Cloudinary resource {public_id}: {e}")
+            try:
+                from .views import smart_delete
+                smart_delete(self.file_url)
+            except Exception as e:
+                print(f"Failed to delete CDN resource {self.file_url}: {e}")
         super().delete(*args, **kwargs)
     
     def __str__(self):

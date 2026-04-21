@@ -475,10 +475,19 @@ class BaseProductView(ModelFormMixin):
         submitted_skus = {
             v["variant_sku"] for v in variants_data if v.get("variant_sku")
         }
-        # delete variants that are no longer with us.
-        deleted_count = ProductVariant.objects.filter(
-            product=self.object, variant_sku__in=(existing_skus - submitted_skus)
-        ).delete()[0]
+
+        # SAFETY GUARD: Never mass-delete variants when submitted list is empty.
+        # Empty variants_data means frontend sent nothing (JS race, partial load, etc),
+        # NOT that user wanted to delete everything. Require explicit flag for mass-delete.
+        explicit_delete_all = self.request.POST.get("delete_all_variants") == "true"
+        if not submitted_skus and existing_skus and not explicit_delete_all:
+            print(f"  ⚠️ SAFETY: Skipped deleting {len(existing_skus)} variants — submitted list is empty (frontend issue?)")
+            deleted_count = 0
+        else:
+            # delete variants that are no longer with us.
+            deleted_count = ProductVariant.objects.filter(
+                product=self.object, variant_sku__in=(existing_skus - submitted_skus)
+            ).delete()[0]
         print(f"  ✓ Deleted {deleted_count} variants: {time.time() - delete_start:.3f}s")
         
         # Pre-fetch ALL data in one go to minimize queries
@@ -1539,20 +1548,12 @@ def instant_delete_file(request):
         was_variant_file = product_file.product_variant is not None
         file_url_to_delete = product_file.file_url
         
-        # Delete (will also delete from Cloudinary via model's delete method)
+        # Delete ONLY this record. CDN cleanup handled by model.delete() + signal:
+        # if other variants still reference the same file_url, CDN file stays intact.
+        # If this was the last reference, CDN file gets deleted automatically.
         product_file.delete()
 
-        # If this file was cloned for multiple variants (Virtual Sharing),
-        # we must delete all clones that share this same URL to prevent broken links
-        if product and file_url_to_delete:
-            clones = ProductFile.objects.filter(product=product, file_url=file_url_to_delete)
-            clones_count = clones.count()
-            if clones_count > 0:
-                print(f"🧹 Cleaning up {clones_count} cloned database records for deleted URL: {file_url_to_delete[-15:]}")
-                # Use .delete() on queryset to quickly remove the duplicate DB rows
-                # Note: The physical file on CDN is already gone from the first delete()
-                clones.delete()
-        
+
 
         # AUTO-UPDATE PRIMARY IMAGE after deletion
         if product:
@@ -1812,21 +1813,29 @@ def async_delete_cdn_files(request):
             return JsonResponse({'success': True, 'message': 'No files to delete'})
         
         deleted_count = 0
+        skipped_count = 0
         errors = []
-        
+
         for file_url in file_urls:
             if file_url:
                 try:
-                    # Use smart_delete to handle both Bunny and Cloudinary
+                    # CRITICAL: Virtual Sharing protection
+                    # Only delete from CDN if no other ProductFile still references this URL
+                    still_in_use = ProductFile.objects.filter(file_url=file_url).exists()
+                    if still_in_use:
+                        print(f"[async_delete_cdn_files] Skipping — URL still in use: {file_url}")
+                        skipped_count += 1
+                        continue
                     success = smart_delete(file_url)
                     if success:
                         deleted_count += 1
                 except Exception as e:
                     errors.append(f"Failed to delete {file_url}: {str(e)}")
-        
+
         return JsonResponse({
             'success': True,
             'deleted': deleted_count,
+            'skipped': skipped_count,
             'errors': errors
         })
         

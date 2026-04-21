@@ -543,27 +543,34 @@ class ProductFile(models.Model):
         """
         Deletes the file from CDN and then from DB.
         SKIP CDN deletion if skip_cdn=True (for async cleanup).
+        Also skips CDN deletion if another ProductFile still references the same URL (Virtual Sharing).
         """
         skip_cdn = kwargs.pop('skip_cdn', False)
-        
+
         if self.file_url and not skip_cdn:
-            try:
-                c_start = time.perf_counter()
-                # Use smart_delete which handles both Bunny and Cloudinary
-                success = smart_delete(self.file_url)
-                if success:
-                    print(f"   ✅ CDN delete({self.file_url}) took {(time.perf_counter()-c_start):.3f}s")
-                else:
-                    print(f"   ⚠️ CDN delete({self.file_url}) failed or file not found")
-            except Exception as e:
-                print(f"   ❌ Failed to delete CDN resource {self.file_url}: {e}")
-            # Also delete video thumbnail from CDN
-            if self.video_thumbnail:
+            # Virtual Sharing protection — skip CDN if another record uses same URL
+            other_refs = ProductFile.objects.filter(file_url=self.file_url).exclude(pk=self.pk).exists()
+            if other_refs:
+                print(f"   🛡️ Skipping CDN delete — URL still referenced by another ProductFile: {self.file_url}")
+            else:
                 try:
-                    smart_delete(self.video_thumbnail)
-                    print(f"   ✅ Deleted video thumbnail: {self.video_thumbnail}")
+                    c_start = time.perf_counter()
+                    success = smart_delete(self.file_url)
+                    if success:
+                        print(f"   ✅ CDN delete({self.file_url}) took {(time.perf_counter()-c_start):.3f}s")
+                    else:
+                        print(f"   ⚠️ CDN delete({self.file_url}) failed or file not found")
                 except Exception as e:
-                    print(f"   ⚠️ Failed to delete video thumbnail: {e}")
+                    print(f"   ❌ Failed to delete CDN resource {self.file_url}: {e}")
+                # Also delete video thumbnail from CDN (with same protection)
+                if self.video_thumbnail:
+                    thumb_refs = ProductFile.objects.filter(video_thumbnail=self.video_thumbnail).exclude(pk=self.pk).exists()
+                    if not thumb_refs:
+                        try:
+                            smart_delete(self.video_thumbnail)
+                            print(f"   ✅ Deleted video thumbnail: {self.video_thumbnail}")
+                        except Exception as e:
+                            print(f"   ⚠️ Failed to delete video thumbnail: {e}")
         elif skip_cdn:
             print(f"   ⚡ Skipped CDN deletion for pk={self.pk} (will be cleaned up async)")
 

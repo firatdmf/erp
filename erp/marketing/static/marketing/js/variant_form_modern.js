@@ -1539,9 +1539,15 @@ async function openImagePicker(variantIndex) {
     const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
     if (productEditMatch) {
         try {
-            const response = await fetch(`/marketing/api/get_product_files/?product_id=${productEditMatch}`);
+            // Cache-buster to guarantee fresh data
+            const cb = Date.now();
+            const response = await fetch(`/marketing/api/get_product_files/?product_id=${productEditMatch}&_=${cb}`, {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
             const data = await response.json();
-            if (data.success && data.files) {
+            console.log('[Picker] API raw response:', data);
+            if (data.success && Array.isArray(data.files)) {
                 data.files.forEach(file => {
                     addUniqueImage({
                         id: file.id,
@@ -1553,7 +1559,7 @@ async function openImagePicker(variantIndex) {
                         file_type: file.file_type || 'image'
                     });
                 });
-                console.log(`[Picker] Loaded ${data.files.length} files from server pool`);
+                console.log(`[Picker] Loaded ${data.files.length} files from server pool (total uploaded: ${uploadedImages.length})`);
             } else {
                 console.warn('[Picker] API returned no files:', data);
             }
@@ -1605,34 +1611,7 @@ async function openImagePicker(variantIndex) {
         }
     }
 
-    // Check if product edit or create mode (already defined above)
-    // const productEditMatch = ...
-
-    // 3. In Edit Mode, fetch server-side pool (this catches images uploaded but not yet in DOM or variants)
-    if (productEditMatch) {
-        try {
-            const response = await fetch(`/marketing/api/get_product_files/?product_id=${productEditMatch}`);
-            const data = await response.json();
-            if (data.success && data.files) {
-                data.files.forEach(file => {
-                    addUniqueImage({
-                        id: file.id,
-                        url: file.url,
-                        optimized_url: file.optimized_url || file.url,
-                        name: file.name,
-                        variant: file.variant || null,
-                        file: null,
-                        file_type: file.file_type || 'image'
-                    });
-                });
-                console.log(`Synced with server pool. Total images: ${uploadedImages.length}`);
-            }
-        } catch (error) {
-            console.error('Error loading product files:', error);
-        }
-    }
-
-    // Sort uploadedImages? Maybe put selected ones first? 
+    // Sort uploadedImages? Maybe put selected ones first?
     // For now, preservation of order or simple append is fine.
     // Maybe Main images first?
     // uploadedImages.sort((a, b) => (a.from_main === b.from_main) ? 0 : a.from_main ? -1 : 1);

@@ -1686,7 +1686,7 @@ def get_product_files(request):
                 'is_primary': f.is_primary,
                 'sequence': f.sequence,
                 'file_type': f.file_type,  # 'image' or 'video'
-                'video_thumbnail_url': f.video_thumbnail_url if f.file_type == 'video' else None,
+                'video_thumbnail_url': f.video_thumbnail if f.file_type == 'video' else None,
                 'variant': variant_info  # Shows which variant owns this file (if any)
             })
         

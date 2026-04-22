@@ -475,19 +475,10 @@ class BaseProductView(ModelFormMixin):
         submitted_skus = {
             v["variant_sku"] for v in variants_data if v.get("variant_sku")
         }
-
-        # SAFETY GUARD: Never mass-delete variants when submitted list is empty.
-        # Empty variants_data means frontend sent nothing (JS race, partial load, etc),
-        # NOT that user wanted to delete everything. Require explicit flag for mass-delete.
-        explicit_delete_all = self.request.POST.get("delete_all_variants") == "true"
-        if not submitted_skus and existing_skus and not explicit_delete_all:
-            print(f"  ⚠️ SAFETY: Skipped deleting {len(existing_skus)} variants — submitted list is empty (frontend issue?)")
-            deleted_count = 0
-        else:
-            # delete variants that are no longer with us.
-            deleted_count = ProductVariant.objects.filter(
-                product=self.object, variant_sku__in=(existing_skus - submitted_skus)
-            ).delete()[0]
+        # delete variants that are no longer with us.
+        deleted_count = ProductVariant.objects.filter(
+            product=self.object, variant_sku__in=(existing_skus - submitted_skus)
+        ).delete()[0]
         print(f"  ✓ Deleted {deleted_count} variants: {time.time() - delete_start:.3f}s")
         
         # Pre-fetch ALL data in one go to minimize queries

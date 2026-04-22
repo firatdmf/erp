@@ -1508,42 +1508,61 @@ async function openImagePicker(variantIndex) {
     selectionOrder = variantImages[variantIndex].images.map(img => img.url).filter(url => url);
     selectionSet = new Set(selectionOrder);
 
-    // Global uploadedImages array initialization
-    if (!uploadedImages) uploadedImages = [];
+    // RESET uploadedImages on every open — guarantees fresh view of shared pool
+    uploadedImages = [];
 
-    // Helper to normalize URL for comparison (remove query params, protocol variations)
+    // Helper to normalize URL for comparison
     const normalizeUrl = (url) => {
         if (!url) return '';
-        // Remove query params
         let normalized = url.split('?')[0];
-        // Remove trailing slashes
         normalized = normalized.replace(/\/$/, '');
-        // Extract just the filename for comparison as a fallback
         return normalized;
     };
 
     // Helper to add unique images to uploadedImages
     const addUniqueImage = (newImg) => {
         if (!newImg.url) return;
-
         const normalizedNewUrl = normalizeUrl(newImg.url);
         const existingIndex = uploadedImages.findIndex(img => normalizeUrl(img.url) === normalizedNewUrl);
-
         if (existingIndex === -1) {
-            // New unique image - add it
             uploadedImages.push(newImg);
         } else {
-            // Duplicate found - prefer real filenames over "Main Image X" names
             const existing = uploadedImages[existingIndex];
             if (existing.name && existing.name.startsWith('Main Image') &&
                 newImg.name && !newImg.name.startsWith('Main Image')) {
-                // Replace with the better-named version
                 uploadedImages[existingIndex] = { ...existing, ...newImg, name: newImg.name };
             }
         }
     };
 
-    // 1. Merge images from CURRENT variant (and all other variants)
+    // 1. EDIT MODE: Fetch shared pool from server (source of truth)
+    const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
+    if (productEditMatch) {
+        try {
+            const response = await fetch(`/marketing/api/get_product_files/?product_id=${productEditMatch}`);
+            const data = await response.json();
+            if (data.success && data.files) {
+                data.files.forEach(file => {
+                    addUniqueImage({
+                        id: file.id,
+                        url: file.url,
+                        optimized_url: file.optimized_url || file.url,
+                        name: file.name,
+                        variant: file.variant || null,
+                        file: null,
+                        file_type: file.file_type || 'image'
+                    });
+                });
+                console.log(`[Picker] Loaded ${data.files.length} files from server pool`);
+            } else {
+                console.warn('[Picker] API returned no files:', data);
+            }
+        } catch (error) {
+            console.error('[Picker] Error loading product files:', error);
+        }
+    }
+
+    // 2. Merge images from CURRENT variant and all other variants (for unsaved JS state)
     Object.values(variantImages).forEach(vData => {
         if (vData.images) {
             vData.images.forEach(img => {
@@ -1559,11 +1578,7 @@ async function openImagePicker(variantIndex) {
         }
     });
 
-    // 2. Scrape Main Product Images from DOM
-    // NOTE: Only do this for CREATE mode. In EDIT mode, the API call below provides accurate URLs.
-    // DOM scraping causes issues because videos show thumbnail URL in img.src, not the actual video URL.
-    const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
-
+    // 3. CREATE MODE: Scrape Main Product Images from DOM (no API yet)
     if (!productEditMatch) {
         // CREATE MODE: Scrape from DOM (no API available)
         const mainImageGrid = document.getElementById('sortable_images');
@@ -2188,17 +2203,36 @@ function animateRemoveItem(el) {
     setTimeout(() => el.remove(), 250);
 }
 
-// Fire-and-forget backend delete (no await, no blocking)
-function deleteImageInBackground(image) {
-    if (!image || !image.id) return;
-    fetch('/marketing/api/instant_delete_file/', {
+// Background delete with tracker + save button lock
+function deleteImageInBackground(image, trackerRow) {
+    if (!image || !image.id) {
+        if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, true);
+        return Promise.resolve();
+    }
+    // Reserve a pending-delete slot — save button locked until this completes
+    const token = window.__beginDelete ? window.__beginDelete() : null;
+    return fetch('/marketing/api/instant_delete_file/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : ''
         },
         body: JSON.stringify({ file_id: image.id })
-    }).catch(err => console.error('Background delete error:', err));
+    })
+    .then(r => r.json().catch(() => ({success: r.ok})))
+    .then(data => {
+        const success = !!(data && data.success !== false);
+        if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, success);
+        return success;
+    })
+    .catch(err => {
+        console.error('Background delete error:', err);
+        if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, false);
+        return false;
+    })
+    .finally(() => {
+        if (window.__endDelete && token) window.__endDelete(token);
+    });
 }
 
 // Remove image from all in-memory state
@@ -2246,10 +2280,14 @@ async function removeUploadedImage(index, event) {
     // 3. Remove from main product gallery + variant table previews
     removeFromMainGalleryAndVariants(image.url);
 
-    // 4. Backend in background
-    deleteImageInBackground(image);
+    // 4. Delete tracker — show bottom-right animation + lock save button
+    if (window.createDeleteTracker) window.createDeleteTracker(1);
+    const trackerRow = window.addDeleteTrackerRow ? window.addDeleteTrackerRow(image) : null;
 
-    showToast('🗑️ Image deleted!', 'success');
+    // 5. Backend delete with tracker
+    deleteImageInBackground(image, trackerRow).then(() => {
+        if (window.updateDeleteTrackerProgress) window.updateDeleteTrackerProgress(1, 1);
+    });
 }
 
 // Bulk delete - instant UI, background backend
@@ -2273,14 +2311,21 @@ async function bulkDeleteSelectedImages() {
         setTimeout(() => animateRemoveItem(item.el), i * 60);
     });
 
-    // 2. Remove from state + fire backend deletes + remove from main gallery
-    items.forEach(item => {
+    // 2. Show delete tracker with total count (locks save button)
+    if (window.createDeleteTracker) window.createDeleteTracker(items.length);
+
+    // 3. Remove from state + fire backend deletes + remove from main gallery
+    let doneCount = 0;
+    const deletePromises = items.map(item => {
         const image = uploadedImages.find(img => img.url === item.url);
-        if (image) {
-            removeImageFromState(image);
-            deleteImageInBackground(image);
-            removeFromMainGalleryAndVariants(image.url);
-        }
+        if (!image) return Promise.resolve();
+        removeImageFromState(image);
+        removeFromMainGalleryAndVariants(image.url);
+        const trackerRow = window.addDeleteTrackerRow ? window.addDeleteTrackerRow(image) : null;
+        return deleteImageInBackground(image, trackerRow).then(() => {
+            doneCount++;
+            if (window.updateDeleteTrackerProgress) window.updateDeleteTrackerProgress(doneCount, items.length);
+        });
     });
 
     setTimeout(() => {
@@ -2288,8 +2333,6 @@ async function bulkDeleteSelectedImages() {
         updateSelectionBadges();
         hideBulkDeleteBar();
     }, items.length * 60 + 300);
-
-    showToast(`🗑️ ${items.length} image(s) deleted!`, 'success');
 }
 
 // Re-render the entire image grid (used after upload)

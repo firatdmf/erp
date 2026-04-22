@@ -298,28 +298,31 @@ function createFilePreview(file) {
  * @param {HTMLElement} element - Element to remove from DOM
  */
 async function instantDeleteFile(fileId, element) {
-    // Modern confirmation dialog
     const confirmed = await showConfirmDialog(
         'Delete Image?',
         'This action cannot be undone.',
         'Delete',
         'Cancel'
     );
-    
-    if (!confirmed) {
-        return;
-    }
-    
-    // Check if element still exists
-    if (!element || !element.style) {
-        console.error('Element not found or already deleted');
-        return;
-    }
-    
-    // Show loading
+    if (!confirmed) return;
+    if (!element || !element.style) return;
+
+    // Delete tracker + save button lock
+    const imgEl = element.querySelector('img');
+    const fakeImage = {
+        id: fileId,
+        url: imgEl ? imgEl.src : '',
+        optimized_url: imgEl ? imgEl.src : '',
+        name: fileId,
+        file_type: 'image'
+    };
+    if (window.createDeleteTracker) window.createDeleteTracker(1);
+    const trackerRow = window.addDeleteTrackerRow ? window.addDeleteTrackerRow(fakeImage) : null;
+    const token = window.__beginDelete ? window.__beginDelete() : null;
+
     element.style.opacity = '0.5';
     element.style.pointerEvents = 'none';
-    
+
     try {
         const response = await fetch('/marketing/api/instant_delete_file/', {
             method: 'POST',
@@ -329,41 +332,32 @@ async function instantDeleteFile(fileId, element) {
             },
             body: JSON.stringify({ file_id: fileId })
         });
-        
         const data = await response.json();
-        
+
         if (data.success) {
-            // Fade out and remove
             element.style.animation = 'fadeOut 0.3s ease-out';
             setTimeout(() => {
                 element.remove();
-
-                // Update primary badge after deletion
-                if (typeof updatePrimaryBadge === 'function') {
-                    updatePrimaryBadge();
-                }
-
-                // Update image order
-                if (typeof updateImageOrder === 'function') {
-                    updateImageOrder();
-                }
+                if (typeof updatePrimaryBadge === 'function') updatePrimaryBadge();
+                if (typeof updateImageOrder === 'function') updateImageOrder();
             }, 300);
 
-            // Also remove from all variant images if cloned
             if (data.deleted_url && typeof removeImageFromAllVariants === 'function') {
                 removeImageFromAllVariants(data.deleted_url);
             }
 
-            showToast('🗑️ File deleted!', 'success');
+            if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, true);
         } else {
             throw new Error(data.error || 'Delete failed');
         }
-        
     } catch (error) {
         console.error('Delete error:', error);
         element.style.opacity = '1';
         element.style.pointerEvents = 'auto';
-        showToast(`❌ Delete error: ${error.message}`, 'error');
+        if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, false);
+    } finally {
+        if (window.updateDeleteTrackerProgress) window.updateDeleteTrackerProgress(1, 1);
+        if (window.__endDelete && token) window.__endDelete(token);
     }
 }
 

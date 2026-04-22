@@ -145,7 +145,7 @@
     </div>
     <div class="header-right">
       <a href="javascript:void(0)" class="btn btn-secondary" onclick="handleDiscard(event)">Discard</a>
-      <button type="submit" form="product_form" class="btn btn-primary">Save Product</button>
+      <button type="submit" form="product_form" id="save_product_btn" class="btn btn-primary save-product-btn" data-save-product>Save Product</button>
     </div>
   </div>
 
@@ -1429,21 +1429,36 @@
     );
     if (!confirmed) return;
 
+    // Show delete tracker + lock save button
+    if (window.createDeleteTracker) window.createDeleteTracker(selected.length);
+
     let deleted = 0;
     let errors = 0;
+    let doneCount = 0;
 
-    for (const item of selected) {
+    const deletePromises = Array.from(selected).map(item => {
       const fileId = item.getAttribute('data-file-id');
-      try {
-        const response = await fetch('/marketing/api/instant_delete_file/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-          },
-          body: JSON.stringify({ file_id: fileId })
-        });
-        const data = await response.json();
+      const imgEl = item.querySelector('img');
+      const fakeImage = {
+        id: fileId,
+        url: imgEl ? imgEl.src : '',
+        optimized_url: imgEl ? imgEl.src : '',
+        name: fileId,
+        file_type: 'image'
+      };
+      const trackerRow = window.addDeleteTrackerRow ? window.addDeleteTrackerRow(fakeImage) : null;
+      const token = window.__beginDelete ? window.__beginDelete() : null;
+
+      return fetch('/marketing/api/instant_delete_file/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify({ file_id: fileId })
+      })
+      .then(r => r.json())
+      .then(data => {
         if (data.success) {
           item.style.animation = 'fadeOut 0.3s ease-out';
           setTimeout(() => item.remove(), 300);
@@ -1451,14 +1466,25 @@
             removeImageFromAllVariants(data.deleted_url);
           }
           deleted++;
+          if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, true);
         } else {
           errors++;
+          if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, false);
         }
-      } catch (e) {
+      })
+      .catch(e => {
         console.error('Delete error for file ' + fileId, e);
         errors++;
-      }
-    }
+        if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, false);
+      })
+      .finally(() => {
+        doneCount++;
+        if (window.updateDeleteTrackerProgress) window.updateDeleteTrackerProgress(doneCount, selected.length);
+        if (window.__endDelete && token) window.__endDelete(token);
+      });
+    });
+
+    await Promise.all(deletePromises);
 
     setTimeout(() => {
       updateImageOrder();
@@ -1467,12 +1493,6 @@
       const masterCb = document.getElementById('select_all_images');
       if (masterCb) masterCb.checked = false;
     }, 350);
-
-    if (errors > 0) {
-      showToast('Deleted ' + deleted + ', failed ' + errors, 'warning');
-    } else {
-      showToast('Deleted ' + deleted + ' image' + (deleted > 1 ? 's' : ''), 'success');
-    }
   }
 
   // Show toolbar on load if there are images

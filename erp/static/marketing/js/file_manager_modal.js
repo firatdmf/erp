@@ -498,6 +498,33 @@ const modalCSS = `
   border-radius: 0 3px 3px 0;
 }
 
+/* Save button lock visual */
+.is-locked, button.is-locked {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  position: relative;
+}
+.is-locked::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 12px; height: 12px;
+  margin-top: -6px; margin-left: -6px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: utSpin 0.8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes utSpin {
+  to { transform: rotate(360deg); }
+}
+
+.delete-tracker .upload-tracker-header h4 i {
+  margin-right: 6px;
+}
+
 @keyframes trackerSlideUp {
   from { transform: translateY(100px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
@@ -1128,6 +1155,167 @@ window.updateTrackerRow = updateTrackerRow;
 window.updateTrackerProgress = updateTrackerProgress;
 window.closeUploadTracker = closeUploadTracker;
 window.toggleTrackerCollapse = toggleTrackerCollapse;
+
+// ─── DELETE TRACKER ─────────────────────────────────────────
+let deleteTracker = null;
+let deleteTotal = 0;
+let deleteDone = 0;
+
+// Track every in-flight delete by a unique token
+// Save button stays locked while this Set has ANY items, unlocks when empty
+const pendingDeletes = new Set();
+let _deleteTokenCounter = 0;
+
+function setSaveButtonLock(locked) {
+  const saveBtns = document.querySelectorAll('#save_product_btn, button[name="save"], .save-product-btn, [data-save-product]');
+  saveBtns.forEach(btn => {
+    if (locked) {
+      btn.disabled = true;
+      btn.classList.add('is-locked');
+      btn.setAttribute('title', 'Waiting for image deletion to complete...');
+    } else {
+      btn.disabled = false;
+      btn.classList.remove('is-locked');
+      btn.removeAttribute('title');
+    }
+  });
+}
+
+function beginDelete() {
+  const token = ++_deleteTokenCounter;
+  pendingDeletes.add(token);
+  setSaveButtonLock(true);
+  return token;
+}
+
+function endDelete(token) {
+  pendingDeletes.delete(token);
+  if (pendingDeletes.size === 0) {
+    // All selected deletes have completed → unlock
+    setSaveButtonLock(false);
+  }
+}
+
+function createDeleteTracker(totalFiles) {
+  if (deleteTracker) deleteTracker.remove();
+  deleteTotal = totalFiles;
+  deleteDone = 0;
+
+  const tracker = document.createElement('div');
+  tracker.className = 'upload-tracker delete-tracker';
+  tracker.id = 'deleteTracker';
+  tracker.innerHTML = `
+    <div class="upload-tracker-header" onclick="toggleDeleteTrackerCollapse()">
+      <h4>
+        <i class="fa fa-trash-alt" style="color:#ef4444;"></i>
+        <span id="dtTitle">Deleting <span id="dtDoneCount">0</span> of ${totalFiles} items</span>
+      </h4>
+      <div class="ut-actions">
+        <button onclick="event.stopPropagation(); toggleDeleteTrackerCollapse()" id="dtCollapseBtn" title="Minimize">
+          <i class="fa fa-chevron-down"></i>
+        </button>
+        <button onclick="event.stopPropagation(); closeDeleteTracker()" id="dtCloseBtn" title="Close" style="display:none;">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+    </div>
+    <div class="ut-overall-progress"><div class="ut-overall-bar" id="dtOverallBar" style="width:0%; background:#ef4444;"></div></div>
+    <div class="upload-tracker-body" id="dtBody"></div>
+  `;
+  document.body.appendChild(tracker);
+  deleteTracker = tracker;
+  return tracker;
+}
+
+function addDeleteTrackerRow(image) {
+  const body = document.getElementById('dtBody');
+  if (!body) return null;
+
+  const row = document.createElement('div');
+  row.className = 'ut-file-row';
+  const fileName = image.name || (image.url ? image.url.split('/').pop().split('?')[0] : 'image');
+
+  const thumbUrl = image.optimized_url || image.url;
+  const isVideo = image.file_type === 'video';
+  const thumbHTML = thumbUrl && !isVideo
+    ? `<img class="ut-file-thumb" src="${thumbUrl}" alt="" onerror="this.style.display='none'">`
+    : `<div class="ut-file-thumb" style="display:flex;align-items:center;justify-content:center;background:#1a1a2e;color:#ef4444;font-size:14px;"><i class="fa ${isVideo ? 'fa-film' : 'fa-image'}"></i></div>`;
+
+  row.innerHTML = `
+    ${thumbHTML}
+    <div class="ut-file-info">
+      <div class="ut-file-name">${fileName}</div>
+      <div class="ut-file-size">Deleting...</div>
+    </div>
+    <div class="ut-file-status"><div class="ut-spinner" style="border-top-color:#ef4444;"></div></div>
+  `;
+  body.appendChild(row);
+  body.scrollTop = body.scrollHeight;
+  return row;
+}
+
+function updateDeleteTrackerRow(row, success) {
+  if (!row) return;
+  const status = row.querySelector('.ut-file-status');
+  const sizeEl = row.querySelector('.ut-file-size');
+  if (success) {
+    status.innerHTML = '<i class="fa fa-check-circle ut-check" style="color:#22c55e;"></i>';
+    if (sizeEl) sizeEl.textContent = 'Deleted';
+  } else {
+    status.innerHTML = '<i class="fa fa-times-circle ut-error"></i>';
+    if (sizeEl) sizeEl.textContent = 'Failed';
+  }
+}
+
+function updateDeleteTrackerProgress(done, total) {
+  const bar = document.getElementById('dtOverallBar');
+  const countEl = document.getElementById('dtDoneCount');
+  const title = document.getElementById('dtTitle');
+  if (bar) bar.style.width = `${(done / total) * 100}%`;
+  if (countEl) countEl.textContent = done;
+
+  if (done >= total) {
+    if (title) title.innerHTML = `<i class="fa fa-check-circle" style="color:#22c55e"></i> ${total} item${total>1?'s':''} deleted`;
+    const closeBtn = document.getElementById('dtCloseBtn');
+    if (closeBtn) closeBtn.style.display = '';
+    // NOTE: Save button unlock is driven by pendingDeletes Set (see endDelete), not tracker progress
+    setTimeout(() => closeDeleteTracker(), 3000);
+  }
+}
+
+function toggleDeleteTrackerCollapse() {
+  const body = document.getElementById('dtBody');
+  const btn = document.getElementById('dtCollapseBtn');
+  if (!body) return;
+  body.classList.toggle('collapsed');
+  if (btn) btn.innerHTML = body.classList.contains('collapsed') ? '<i class="fa fa-chevron-up"></i>' : '<i class="fa fa-chevron-down"></i>';
+}
+
+function closeDeleteTracker() {
+  const tracker = document.getElementById('deleteTracker');
+  if (tracker) {
+    tracker.classList.add('closing');
+    setTimeout(() => { tracker.remove(); deleteTracker = null; }, 300);
+  }
+  // Safety: if any pending deletes left, keep locked; else unlock
+  if (pendingDeletes.size === 0) setSaveButtonLock(false);
+}
+
+window.createDeleteTracker = createDeleteTracker;
+window.addDeleteTrackerRow = addDeleteTrackerRow;
+window.updateDeleteTrackerRow = updateDeleteTrackerRow;
+window.updateDeleteTrackerProgress = updateDeleteTrackerProgress;
+window.toggleDeleteTrackerCollapse = toggleDeleteTrackerCollapse;
+window.closeDeleteTracker = closeDeleteTracker;
+window.setSaveButtonLock = setSaveButtonLock;
+// Pending-delete API: each delete takes a token, returns it when finished.
+// Save button stays locked while ANY token is outstanding, unlocks when ALL are returned.
+window.__beginDelete = beginDelete;
+window.__endDelete = endDelete;
+window.__pendingDeleteCount = () => pendingDeletes.size;
+// Back-compat aliases
+window.__incInflightDelete = () => beginDelete();
+window.__decInflightDelete = (token) => { if (token) endDelete(token); };
 
 // Upload files with progress
 async function uploadFiles(files) {

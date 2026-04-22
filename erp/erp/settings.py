@@ -54,6 +54,7 @@ ALLOWED_HOSTS = [
 # CSRF_TRUSTED_ORIGINS = ['https://*.demfirat.com','https://*.127.0.0.1']
 CSRF_TRUSTED_ORIGINS = [
     "https://*.demfirat.com",
+    "https://*.nejum.com",
     "https://*.vercel.app",
     'https://48c4e0a19cf1.ngrok-free.app',
 ]

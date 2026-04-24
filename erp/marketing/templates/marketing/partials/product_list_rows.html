@@ -7,9 +7,10 @@
         </div>
     </td>
     <td>
-        <div class="product-image-box {% if not product.primary_image %}placeholder{% endif %}">
-            {% if product.primary_image %}
-            <img src="{{ product.primary_image.thumbnail_url }}">
+        <div class="product-image-box {% if not product.primary_image.file_url %}placeholder{% endif %}">
+            {% if product.primary_image.file_url %}
+            <img src="{{ product.primary_image.thumbnail_url }}"
+                 onerror="this.onerror=null;this.parentElement.classList.add('placeholder');this.remove();this.parentElement.insertAdjacentHTML('afterbegin','<i class=\'fa fa-image\'></i>');">
             {% else %}
             <i class="fa fa-image"></i>
             {% endif %}

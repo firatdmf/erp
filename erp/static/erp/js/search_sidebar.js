@@ -1,20 +1,56 @@
 
-// Menu Data
+// Menu Data — matches the sidebar in base.html
 const MENU_ITEMS = [
+    // General
+    { name: 'Home', url: '/', icon: 'fa-home', category: 'General' },
     { name: 'Dashboard', url: '/dashboard/', icon: 'fa-chart-line', category: 'General' },
+    { name: 'Analytics', url: '/operating/order-analytics/', icon: 'fa-chart-line', category: 'General' },
+    { name: 'Notes', url: '/notes/', icon: 'fa-sticky-note', category: 'General' },
     { name: 'Reports', url: '/reports/', icon: 'fa-paste', category: 'General' },
     { name: 'Settings', url: '/settings/', icon: 'fa-cog', category: 'General' },
+
+    // My Team
+    { name: 'Team Members', url: '/team/', icon: 'fa-users', category: 'My Team' },
+    { name: 'Assign Tasks', url: '/team/tasks/', icon: 'fa-tasks', category: 'My Team' },
+    { name: 'Team Messages', url: '/team/messages/', icon: 'fa-comments', category: 'My Team' },
+    { name: 'Manage Roles', url: '/team/roles/', icon: 'fa-shield-alt', category: 'My Team' },
+    { name: 'Schedule Meetings', url: '/team/meetings/', icon: 'fa-video', category: 'My Team' },
+
+    // Accounting
+    { name: 'View Books', url: '/accounting/', icon: 'fa-book', category: 'Accounting' },
+    { name: 'Sales Dashboard', url: '/accounting/reports/sales_dashboard/', icon: 'fa-chart-bar', category: 'Accounting' },
+
+    // Marketing
+    { name: 'Product List', url: '/marketing/product_list/', icon: 'fa-box', category: 'Marketing' },
+    { name: 'Create Product', url: '/marketing/product_create/', icon: 'fa-plus-square', category: 'Marketing' },
+    { name: 'Companies', url: '/crm/companies/', icon: 'fa-building', category: 'Marketing' },
+    { name: 'Contacts', url: '/crm/contacts/', icon: 'fa-users', category: 'Marketing' },
+    { name: 'Blog List', url: '/marketing/blog_list/', icon: 'fa-newspaper', category: 'Marketing' },
+    { name: 'Create Blog Post', url: '/marketing/blog_create/', icon: 'fa-plus-circle', category: 'Marketing' },
+
+    // CRM
     { name: 'Contact List', url: '/crm/contacts/', icon: 'fa-users', category: 'CRM' },
     { name: 'Company List', url: '/crm/companies/', icon: 'fa-building', category: 'CRM' },
     { name: 'Create Contact', url: '/crm/add_contact/', icon: 'fa-user-plus', category: 'CRM' },
-    { name: 'Product List', url: '/marketing/product_list/', icon: 'fa-box', category: 'Marketing' },
-    { name: 'Create Product', url: '/marketing/product_create/', icon: 'fa-plus-square', category: 'Marketing' },
-    { name: 'Blog List', url: '/marketing/blog_list/', icon: 'fa-newspaper', category: 'Marketing' },
+    { name: 'Supplier List', url: '/crm/suppliers/', icon: 'fa-truck', category: 'CRM' },
+
+    // Operating
     { name: 'Order List', url: '/operating/orders/', icon: 'fa-shopping-cart', category: 'Operating' },
     { name: 'Create Order', url: '/operating/orders/create', icon: 'fa-cart-plus', category: 'Operating' },
     { name: 'QR Scan', url: '/operating/scan_order_item_unit/', icon: 'fa-qrcode', category: 'Operating' },
-    { name: 'Accounting Books', url: '/accounting/', icon: 'fa-book', category: 'Accounting' },
-    { name: 'Sales Dashboard', url: '/accounting/reports/sales_dashboard/', icon: 'fa-chart-bar', category: 'Accounting' },
+    { name: 'QR Scan Pack', url: '/operating/scan_order_item_unit_pack/', icon: 'fa-box', category: 'Operating' },
+    { name: 'Raw Material List', url: '/operating/raw_material_goods/', icon: 'fa-cube', category: 'Operating' },
+    { name: 'Order Analytics', url: '/operating/order-analytics/', icon: 'fa-chart-line', category: 'Operating' },
+
+    // Procurement
+    { name: 'Purchase Requests', url: '/procurement/requests/', icon: 'fa-file-alt', category: 'Procurement' },
+    { name: 'Purchase Orders', url: '/procurement/orders/', icon: 'fa-file-invoice-dollar', category: 'Procurement' },
+
+    // Mail
+    { name: 'Automatic Mail System', url: '/email/dashboard/', icon: 'fa-tachometer-alt', category: 'Mail' },
+    { name: 'My Emails', url: '/email/my_emails/', icon: 'fa-inbox', category: 'Mail' },
+
+    // Todo
     { name: 'Task List', url: '/todo/tasks/', icon: 'fa-check-circle', category: 'Todo' },
 ];
 

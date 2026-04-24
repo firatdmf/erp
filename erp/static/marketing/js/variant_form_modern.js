@@ -203,7 +203,11 @@ function loadExistingVariantImages() {
         // Load variant images if available
         if (variantFilesData && variantFilesData !== '{}') {
             const filesDict = JSON.parse(variantFilesData);
-            console.log('Variant files:', filesDict);
+            console.log('\n═══ [PAGE LOAD] Variant files from server ═══');
+            Object.entries(filesDict).forEach(([sku, files]) => {
+                console.log(`  ${sku}: ${files.length} files | IDs=${files.map(f => f.id).join(',')}`);
+            });
+            console.log('═══════════════════════════════════════════════\n');
 
             // Map images to variants
             variants.forEach(variant => {
@@ -216,7 +220,7 @@ function loadExistingVariantImages() {
 
                     if (existingVariantData[attrKey]) {
                         existingVariantData[attrKey].images = files.map(f => ({
-                            id: f.id,  // Add file ID for deletion tracking
+                            id: f.id,
                             url: f.url,
                             name: f.name || f.url.split('/').pop()
                         }));
@@ -1751,17 +1755,16 @@ function toggleImageSelection(element, event) {
     if (!url) return;
 
     if (selectionSet.has(url)) {
-        // Deselect - use splice for O(1)-ish removal
         const idx = selectionOrder.indexOf(url);
         if (idx !== -1) selectionOrder.splice(idx, 1);
         selectionSet.delete(url);
+        console.log(`[🖱️ CLICK] DESELECT variant=${currentVariantIndex} url=${url.slice(-40)} | total now: ${selectionOrder.length}`);
     } else {
-        // Select
         selectionOrder.push(url);
         selectionSet.add(url);
+        console.log(`[🖱️ CLICK] SELECT variant=${currentVariantIndex} url=${url.slice(-40)} | total now: ${selectionOrder.length}`);
     }
 
-    // Update visual numbering
     updateSelectionBadges();
 }
 
@@ -2119,15 +2122,32 @@ async function confirmImageSelection() {
     });
 
     // Check for images that were unselected (removed from this variant)
+    // CRITICAL: Compare by URL, not ID. Same URL can have multiple IDs (Virtual Sharing clones).
+    // If user kept the URL but picker's uploadedImages had a different ID (e.g. V2's clone ID
+    // instead of V1's), we must NOT mark the old ID as deleted — the image is still selected.
     if (variantImages[currentVariantIndex] && variantImages[currentVariantIndex].images) {
         const oldImages = variantImages[currentVariantIndex].images;
-        const newImageIds = images.map(i => i.id).filter(id => id);
-        
+        const newUrls = new Set(images.map(i => i.url).filter(Boolean));
+
+        console.log(`[confirmImageSelection] variant ${currentVariantIndex}: OLD=${oldImages.length} NEW=${images.length}`);
+        console.log(`  old URLs:`, oldImages.map(i => i.url));
+        console.log(`  new URLs:`, Array.from(newUrls));
+
         oldImages.forEach(oldImg => {
-            if (oldImg.id && !newImageIds.includes(oldImg.id)) {
-                // This image was unselected, notify backend to remove link
+            // Only unlink if the URL is genuinely gone from new selection
+            if (oldImg.id && oldImg.url && !newUrls.has(oldImg.url)) {
                 unlinkedVariantFiles.add(oldImg.id);
-                console.log(`Unlinked image ${oldImg.id} from variant ${currentVariantIndex}`);
+                console.log(`  → URL removed, added ID ${oldImg.id} (${oldImg.url.slice(-30)}) to unlinkedVariantFiles`);
+            }
+        });
+
+        // Preserve this variant's original IDs for images that still match by URL
+        // (don't let picker's dedup replace V1's ID with V2's ID)
+        images.forEach((img, idx) => {
+            const matchingOld = oldImages.find(o => o.url === img.url && o.id);
+            if (matchingOld && matchingOld.id !== img.id) {
+                console.log(`  🔄 Preserving this variant's ID ${matchingOld.id} for URL (picker had ${img.id})`);
+                images[idx] = { ...img, id: matchingOld.id };
             }
         });
     }
@@ -2573,12 +2593,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Prepare variants data
             const prepareStart = performance.now();
-            console.log('\n=== VARIANT IMAGES STATE ===');
-            console.log('variantImages object:', variantImages);
+            console.log('\n════════════ [SAVE] Variant state right before submit ════════════');
             Object.keys(variantImages).forEach(key => {
-                console.log(`Variant ${key}:`, variantImages[key]);
+                const vi = variantImages[key];
+                const imgs = (vi && vi.images) || [];
+                console.log(`  Variant index ${key}: ${imgs.length} images`);
+                imgs.forEach((img, i) => {
+                    console.log(`    [${i}] id=${img.id} url=...${(img.url || '').slice(-50)}`);
+                });
             });
-            console.log('===========================\n');
+            console.log(`  unlinkedVariantFiles (${unlinkedVariantFiles.size}):`, Array.from(unlinkedVariantFiles));
+            console.log('══════════════════════════════════════════════════════════════════\n');
 
             const variantsData = prepareVariantsForSubmission();
             const prepareTime = performance.now() - prepareStart;
@@ -3406,8 +3431,54 @@ function removeImageFromAllVariants(deletedUrl) {
 function removeFromMainGalleryAndVariants(deletedUrl) {
     if (!deletedUrl) return;
     removeImageFromMainGallery(deletedUrl);
+    removeImageFromPrimaryPicker(deletedUrl);
     if (typeof removeImageFromAllVariants === 'function') {
         removeImageFromAllVariants(deletedUrl);
+    }
+}
+
+// Remove a deleted image URL from the primary image picker grid
+function removeImageFromPrimaryPicker(deletedUrl) {
+    if (!deletedUrl) return;
+    const grid = document.getElementById('primary_picker_grid');
+    if (!grid) return;
+
+    const normalizedUrl = deletedUrl.split('?')[0];
+    let wasPrimary = false;
+
+    grid.querySelectorAll('.primary-picker-item').forEach(item => {
+        const img = item.querySelector('img');
+        if (!img) return;
+        const imgSrc = img.src.split('?')[0];
+        if (imgSrc === normalizedUrl || imgSrc.endsWith(normalizedUrl) || normalizedUrl.endsWith(imgSrc.replace(location.origin, ''))) {
+            if (item.classList.contains('active')) wasPrimary = true;
+            item.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+            item.style.transform = 'scale(0.7)';
+            item.style.opacity = '0';
+            setTimeout(() => item.remove(), 200);
+        }
+    });
+
+    // If deleted item was the current primary, update the preview to first remaining image
+    if (wasPrimary) {
+        setTimeout(() => {
+            const first = grid.querySelector('.primary-picker-item img');
+            const previewImg = document.getElementById('primary_preview_img');
+            const previewEmpty = document.getElementById('primary_preview_empty');
+            const manualPrimaryInput = document.getElementById('manual_primary_image');
+
+            if (first) {
+                const firstItem = first.closest('.primary-picker-item');
+                const firstId = firstItem?.dataset.fileId;
+                if (previewImg) previewImg.src = first.src;
+                if (firstItem) firstItem.classList.add('active');
+                if (manualPrimaryInput && firstId) manualPrimaryInput.value = firstId;
+            } else {
+                if (previewImg) previewImg.style.display = 'none';
+                if (previewEmpty) previewEmpty.style.display = '';
+                if (manualPrimaryInput) manualPrimaryInput.value = '';
+            }
+        }, 220);
     }
 }
 

@@ -5,51 +5,142 @@
 {% block css %}
 <style>
   /* ============================================
- * Product Catalog - Premium Modern Design
+ * Product Catalog - Premium Modern ERP Design
  * ============================================ */
 
-  /* Base & Typography */
+  /* Base with soft gradient background */
   .product-catalog {
-    background: #f8fafc;
+    background:
+      radial-gradient(ellipse 1200px 600px at 0% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 900px 400px at 100% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+      #f8fafc;
     min-height: 100vh;
-    padding: 32px 40px;
+    padding: 16px 8px 24px;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     color: #0f172a;
   }
 
-  /* Header Section */
+  /* ─── Hero Header ─── */
   .catalog-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 24px;
+    align-items: center;
+    margin-bottom: 28px;
+    padding: 0;
   }
 
   .catalog-title h1 {
-    font-size: 24px;
-    font-weight: 700;
+    font-size: 32px;
+    font-weight: 800;
     color: #0f172a;
-    margin: 0 0 4px 0;
-    letter-spacing: -0.5px;
+    margin: 0 0 6px 0;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .catalog-title p {
     font-size: 14px;
     color: #64748b;
     margin: 0;
+    font-weight: 500;
   }
 
   .compact-mode {
     display: flex;
     align-items: center;
-    gap: 12px;
-    background: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 10px 18px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
+    color: #475569;
+    transition: all 0.2s;
+  }
+
+  .compact-mode:hover {
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  /* ─── Stats Row ─── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1);
+    cursor: default;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--stat-accent, #3b82f6);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.15);
+    border-color: transparent;
+  }
+
+  .stat-card:hover::before { opacity: 1; }
+
+  .stat-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-bottom: 12px;
+    background: var(--stat-bg, #eff6ff);
+    color: var(--stat-accent, #3b82f6);
+  }
+
+  .stat-card-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+  }
+
+  .stat-card-label {
+    font-size: 12px;
+    font-weight: 600;
     color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  @media (max-width: 1100px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
   }
 
   .toggle-switch {
@@ -83,6 +174,84 @@
     left: 18px;
   }
 
+  /* ─── Category Filter Pills ─── */
+  .category-chips {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .cat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s cubic-bezier(.4,0,.2,1);
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cat-chip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    opacity: 0;
+    transition: opacity 0.25s;
+    z-index: 0;
+  }
+
+  .cat-chip > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .cat-chip:hover {
+    border-color: #3b82f6;
+    color: #1e40af;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
+  }
+
+  .cat-chip.active {
+    border-color: transparent;
+    color: #fff;
+  }
+
+  .cat-chip.active::before { opacity: 1; }
+
+  .cat-chip.active:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+  }
+
+  .cat-chip .cat-count {
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    transition: all 0.2s;
+  }
+
+  .cat-chip.active .cat-count {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+  }
+
   /* Filter Bar */
   .filter-bar {
     display: flex;
@@ -92,60 +261,107 @@
     flex-wrap: wrap;
   }
 
+
+  /* Row entrance animation */
+  /* Search — absolute-positioned icon, full-width input */
   .catalog-search-wrapper {
     position: relative;
-    flex: 0 0 320px;
+    flex: 0 0 420px;
+    max-width: 420px;
+    height: 48px;
   }
 
-  .catalog-search-input {
+  input.catalog-search-input,
+  input[type="text"].catalog-search-input {
     width: 100%;
-    height: 44px;
-    padding: 0 16px 0 44px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: white;
+    height: 100%;
+    padding: 0 44px 0 44px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
     font-size: 14px;
+    font-weight: 500;
     color: #0f172a;
-    transition: all 0.2s;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    font-family: inherit;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+    display: block;
   }
 
-  .catalog-search-input:focus {
+  input.catalog-search-input:focus,
+  input[type="text"].catalog-search-input:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  .catalog-search-input::placeholder {
+    color: #94a3b8;
+    font-weight: 400;
   }
 
   .catalog-search-icon {
     position: absolute;
-    left: 14px;
+    left: 16px;
     top: 50%;
     transform: translateY(-50%);
     color: #94a3b8;
+    font-size: 14px;
     pointer-events: none;
   }
 
+  .catalog-search-wrapper:focus-within .catalog-search-icon { color: #6366f1; }
+
+  /* Clear button */
+  .search-clear {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: #e2e8f0;
+    color: #64748b;
+    border-radius: 50%;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    transition: all 0.15s;
+    padding: 0;
+  }
+
+  .search-clear:hover { background: #cbd5e1; color: #0f172a; }
+  .search-clear.show { display: flex; }
+
   .filter-btn {
-    height: 44px;
-    padding: 0 16px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: white;
-    font-size: 14px;
-    font-weight: 500;
+    height: 48px;
+    padding: 0 18px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
     color: #334155;
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    transition: all 0.15s;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
   }
 
   .filter-btn:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
+    border-color: #6366f1;
+    color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.15);
   }
+
+  .filter-btn:hover i { color: #6366f1; }
 
   .filter-btn i {
     color: #64748b;
@@ -159,27 +375,42 @@
   }
 
   .btn-primary {
-    height: 44px;
-    padding: 0 20px;
-    background: #3b82f6;
+    height: 48px;
+    padding: 0 22px;
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: 14px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1);
     text-decoration: none;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.6s;
   }
 
   .btn-primary:hover {
-    background: #2563eb;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
   }
+
+  .btn-primary:hover::before { left: 100%; }
 
   /* Table Design */
   .table-card {
@@ -196,7 +427,7 @@
   }
 
   .product-table th {
-    background: #f8fafc;
+    background: linear-gradient(to bottom, #fcfcfd, #f1f5f9);
     padding: 16px 20px;
     text-align: left;
     font-size: 11px;
@@ -213,39 +444,75 @@
     border-bottom: 1px solid #f1f5f9;
     font-size: 14px;
     color: #334155;
+    transition: background-color 0.18s ease;
+  }
+
+  .product-row {
+    transition: background-color 0.18s ease;
   }
 
   .product-row:hover {
-    background: #f8fafc;
+    background: #f7f9fc;
+  }
+
+  .product-row:hover td {
+    background: #f7f9fc;
   }
 
   .product-row.expanded {
-    background: #eff6ff;
+    background: #eef4ff;
+  }
+
+  .product-row.expanded td {
+    background: #eef4ff;
   }
 
   /* Checkbox */
   .custom-checkbox {
-    width: 20px;
-    height: 20px;
-    border: 2px solid #cbd5e1;
-    border-radius: 6px;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 5px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.15s ease;
     position: relative;
   }
 
   .custom-checkbox:hover {
-    border-color: #3b82f6;
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
+
+  .custom-checkbox.checked {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    border-color: transparent;
+  }
+
+  .custom-checkbox.checked::after {
+    content: '\2713';
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 
   /* Image */
   .product-image-box {
     width: 48px;
     height: 48px;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
-    background: #f1f5f9;
-    border: 1px solid #f1f5f9;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .product-row:hover .product-image-box {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.15);
   }
 
   .product-image-box img {
@@ -258,62 +525,108 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #cbd5e1;
-    font-size: 20px;
+    color: #94a3b8;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  /* Hide fallback font-awesome icon; show SVG placeholder instead */
+  .product-image-box.placeholder i { display: none; }
+
+  .product-image-box.placeholder::before {
+    content: '';
+    width: 60%;
+    height: 60%;
+    background-color: #94a3b8;
+    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2' ry='2'/><circle cx='8.5' cy='8.5' r='1.5'/><polyline points='21 15 16 10 5 21'/></svg>");
+            mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2' ry='2'/><circle cx='8.5' cy='8.5' r='1.5'/><polyline points='21 15 16 10 5 21'/></svg>");
+    -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+            mask-position: center;
+    -webkit-mask-size: contain;
+            mask-size: contain;
   }
 
   /* Product Info */
   .product-name {
     font-size: 14px;
     font-weight: 600;
-    color: #0284c7;
-    /* Brand Blue */
+    color: #1e293b;
     text-decoration: none;
     display: block;
     margin-bottom: 3px;
+    transition: color 0.15s ease;
+  }
+
+  .product-name:hover {
+    color: #6366f1;
   }
 
   .product-updated {
-    font-size: 12px;
+    font-size: 11.5px;
     color: #94a3b8;
+    font-weight: 500;
   }
 
   /* SKU Badge */
   .sku-badge {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
     font-size: 12px;
     color: #475569;
     background: #f1f5f9;
-    padding: 4px 8px;
+    padding: 4px 10px;
     border-radius: 6px;
-    letter-spacing: -0.5px;
+    letter-spacing: -0.3px;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
   }
 
   /* Attributes */
   .attr-tag {
     display: inline-flex;
-    padding: 4px 10px;
-    background: #f1f5f9;
+    padding: 3px 10px;
+    background: #fff;
     color: #475569;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
     border: 1px solid #e2e8f0;
-    margin-right: 6px;
+    margin: 2px 4px 2px 0;
+    transition: all 0.15s ease;
+  }
+
+  .attr-tag:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
   }
 
   /* Stock */
   .stock-val {
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 800;
     color: #0f172a;
+    letter-spacing: -0.3px;
   }
 
   .stock-status-text {
-    font-size: 11px;
-    font-weight: 600;
-    display: block;
-    margin-top: 2px;
+    font-size: 10.5px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .stock-status-text::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
   }
 
   .text-success {
@@ -331,56 +644,76 @@
   /* Status Badges */
   .status-pill {
     display: inline-flex;
-    padding: 6px 14px;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
     border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    border: 1px solid transparent;
+  }
+
+  .status-pill::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
   }
 
   .pill-active {
-    background: #dcfce7;
-    color: #15803d;
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
   }
 
   .pill-low {
-    background: #ffedd5;
+    background: #fff7ed;
     color: #c2410c;
+    border-color: #fed7aa;
   }
 
   .pill-discontinued {
-    background: #f1f5f9;
+    background: #f8fafc;
     color: #64748b;
+    border-color: #e2e8f0;
   }
 
   .pill-premium {
-    background: #e0f2fe;
-    color: #0369a1;
+    background: #eef2ff;
+    color: #4338ca;
+    border-color: #c7d2fe;
   }
 
-  /* Expand Button */
+  /* Expand / Action Buttons */
   .btn-expand {
     width: 32px;
     height: 32px;
-    border: none;
+    border: 1px solid transparent;
     background: transparent;
     color: #94a3b8;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: all 0.18s ease;
   }
 
   .btn-expand:hover {
-    background: #f1f5f9;
-    color: #64748b;
+    background: #eef2ff;
+    color: #6366f1;
+    border-color: #c7d2fe;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px -2px rgba(99, 102, 241, 0.25);
   }
 
-  .expanded .btn-expand {
+  .expanded .btn-expand[onclick*="toggleVariants"] {
     transform: rotate(90deg);
-    background: #dbeafe;
-    color: #3b82f6;
+    background: #eef2ff;
+    color: #6366f1;
+    border-color: #c7d2fe;
   }
 
   /* Variant Row */
@@ -640,18 +973,64 @@
     </div>
   </div>
 
+  <!-- Stats Cards -->
+  <div class="stats-row">
+    <div class="stat-card" style="--stat-accent:#6366f1;--stat-bg:#eef2ff;">
+      <div class="stat-card-icon"><i class="fa fa-box-open"></i></div>
+      <div class="stat-card-value">{{ total_products_count|default:0 }}</div>
+      <div class="stat-card-label">Total Products</div>
+    </div>
+    <div class="stat-card" style="--stat-accent:#0ea5e9;--stat-bg:#e0f2fe;">
+      <div class="stat-card-icon"><i class="fa fa-layer-group"></i></div>
+      <div class="stat-card-value">{{ total_variants_count|default:0 }}</div>
+      <div class="stat-card-label">Variants</div>
+    </div>
+    <div class="stat-card" style="--stat-accent:#f59e0b;--stat-bg:#fef3c7;">
+      <div class="stat-card-icon"><i class="fa fa-exclamation-triangle"></i></div>
+      <div class="stat-card-value">{{ low_stock_count|default:0 }}</div>
+      <div class="stat-card-label">Low Stock</div>
+    </div>
+    <div class="stat-card" style="--stat-accent:#ef4444;--stat-bg:#fee2e2;">
+      <div class="stat-card-icon"><i class="fa fa-ban"></i></div>
+      <div class="stat-card-value">{{ out_of_stock_count|default:0 }}</div>
+      <div class="stat-card-label">Out of Stock</div>
+    </div>
+  </div>
+
+  <!-- Category Filter Pills -->
+  <div class="category-chips" id="categoryChips">
+    <input type="hidden" id="activeCategory" name="category" value="{{ active_category|default:'all' }}">
+    <a href="#" class="cat-chip {% if active_category == 'all' or not active_category %}active{% endif %}" data-cat="all"
+       onclick="filterByCategory('all', event)">
+      <i class="fa fa-th-large"></i>
+      <span>All</span>
+      <span class="cat-count">{{ total_products_count }}</span>
+    </a>
+    {% for cat in category_filters %}
+    <a href="#" class="cat-chip {% if active_category == cat.id|stringformat:'s' %}active{% endif %}"
+       data-cat="{{ cat.id }}"
+       onclick="filterByCategory('{{ cat.id }}', event)">
+      <span>{{ cat.name }}</span>
+      <span class="cat-count">{{ cat.count }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
   <!-- Tools Bar -->
   <div class="filter-bar">
-    <div class="catalog-search-wrapper" style="width: 280px; position: relative;">
+    <div class="catalog-search-wrapper">
       <i class="fa fa-search catalog-search-icon"></i>
-      <input type="text" class="catalog-search-input" id="instantSearch" placeholder="Filter by SKU, name..."
-        value="{{ request.GET.search }}" style="padding-left: 40px; height: 36px; font-size: 13px;"
-        hx-get="{% url 'marketing:product_list' %}" hx-trigger="keyup changed delay:300ms, search"
-        hx-target="#product-table-body" hx-indicator="#search-loader" name="search">
-      <div id="search-loader" class="htmx-indicator"
-        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);">
-        <i class="fa fa-spinner fa-spin" style="color: #94a3b8; font-size: 14px;"></i>
+      <input type="text" class="catalog-search-input" id="instantSearch" placeholder="Search products by SKU, name..."
+        value="{{ request.GET.search }}"
+        hx-get="{% url 'marketing:product_list' %}" hx-trigger="keyup changed delay:300ms, search, filterChanged from:body"
+        hx-target="#product-table-body" hx-indicator="#search-loader" name="search"
+        hx-include="#activeCategory" autocomplete="off">
+      <div id="search-loader" class="htmx-indicator" style="position: absolute; right: 44px; top: 50%; transform: translateY(-50%);">
+        <i class="fa fa-spinner fa-spin" style="color: #6366f1; font-size: 13px;"></i>
       </div>
+      <button type="button" class="search-clear" id="searchClearBtn" onclick="clearSearch()" title="Clear">
+        <i class="fa fa-times"></i>
+      </button>
     </div>
 
     <div class="actions-right">
@@ -669,11 +1048,50 @@
       <button class="filter-btn" onclick="document.getElementById('csvModal').classList.add('show')">
         <i class="fa fa-upload"></i> Import
       </button>
-      <!-- Moved to right side --> <a href="{% url 'marketing:product_create' %}" class="btn-primary">
+      <a href="{% url 'marketing:product_create' %}" class="btn-primary">
         <i class="fa fa-plus"></i> Product
       </a>
     </div>
   </div>
+
+  <script>
+    // Category filter — updates hidden input and triggers HTMX request
+    function filterByCategory(catId, event) {
+      if (event) event.preventDefault();
+      const hidden = document.getElementById('activeCategory');
+      hidden.value = catId;
+      document.querySelectorAll('#categoryChips .cat-chip').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-cat') === catId);
+      });
+      htmx.trigger(document.body, 'filterChanged');
+    }
+
+    // Search UX: clear button
+    (function() {
+      const input = document.getElementById('instantSearch');
+      const clearBtn = document.getElementById('searchClearBtn');
+      if (!input || !clearBtn) return;
+
+      function refreshClear() {
+        clearBtn.classList.toggle('show', !!input.value);
+      }
+      input.addEventListener('input', refreshClear);
+      refreshClear();
+
+      window.clearSearch = function() {
+        input.value = '';
+        refreshClear();
+        input.focus();
+        htmx.trigger(input, 'search');
+      };
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.activeElement === input) {
+          input.blur();
+        }
+      });
+    })();
+  </script>
 
   <!-- Data Table Card -->
   <div class="table-card">

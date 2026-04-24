@@ -97,13 +97,12 @@
     gap: 0.5rem;
     background-color: #ffffff;
     height: 42px;
-    /* Increased height per request */
     padding: 0 1rem;
     border-radius: 8px;
-    border: 1px solid transparent;
-    /* Hide border initially */
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    transition: all 0.15s ease;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
 }
 
 .search-box-wrapper:hover {
@@ -171,29 +170,35 @@
     display: flex !important;
 }
 
-/* Search Dropdown Panel */
+/* Search Dropdown Panel — floats below the search box as its own card */
 .search-dropdown-panel {
     display: none;
     position: absolute;
-    top: 100%;
+    top: calc(100% + 6px);
     left: 0;
     right: 0;
-    margin-top: 0;
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-top: none;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 10px 40px -5px rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px -8px rgba(15, 23, 42, 0.18);
     z-index: 2000;
+    overflow: hidden;
+    animation: cmdFadeIn 0.15s ease;
+}
+
+@keyframes cmdFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .search-container.active .search-dropdown-panel {
     display: block;
 }
 
+/* Keep the search box IDENTICAL when active — only the blue focus ring changes */
 .search-container.active .search-box-wrapper {
-    border-radius: 8px 8px 0 0;
-    border-bottom-color: #e5e7eb;
+    border-radius: 8px;
+    border-color: #3b82f6;
 }
 
 .top-bar-right {

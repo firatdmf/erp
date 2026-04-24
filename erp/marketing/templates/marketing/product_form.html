@@ -637,9 +637,90 @@
         <div class="form-card-title">Product Organization</div>
 
         <div class="form-group">
-          <label for="id_category">Category</label>
+          <label for="id_category" style="display:flex;align-items:center;justify-content:space-between;">
+            Category
+            <button type="button" onclick="openCategoryModal()" title="Add new category"
+              style="background:none;border:1px solid var(--border-color);border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary);font-size:14px;padding:0;line-height:1;">
+              <i class="fa fa-plus"></i>
+            </button>
+          </label>
           {{ form.category }}
         </div>
+
+        <!-- Category creation modal -->
+        <div id="newCategoryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10050;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:12px;width:90%;max-width:420px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.2);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h3 style="margin:0;font-size:16px;font-weight:600;color:#111827;">New Category</h3>
+              <button type="button" onclick="closeCategoryModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">&times;</button>
+            </div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px;">Name</label>
+            <input type="text" id="newCategoryName" class="form-input" placeholder="e.g. Fabric" style="margin-bottom:12px;" autofocus>
+            <div id="newCategoryError" style="color:#ef4444;font-size:12px;margin-bottom:10px;display:none;"></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+              <button type="button" onclick="closeCategoryModal()" class="btn btn-secondary">Cancel</button>
+              <button type="button" id="newCategorySubmitBtn" onclick="submitNewCategory()" class="btn btn-primary">
+                <i class="fa fa-plus"></i> Create
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          function openCategoryModal() {
+            document.getElementById('newCategoryModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('newCategoryName').focus(), 50);
+          }
+          function closeCategoryModal() {
+            document.getElementById('newCategoryModal').style.display = 'none';
+            document.getElementById('newCategoryName').value = '';
+            document.getElementById('newCategoryError').style.display = 'none';
+          }
+          async function submitNewCategory() {
+            const nameInput = document.getElementById('newCategoryName');
+            const errEl = document.getElementById('newCategoryError');
+            const btn = document.getElementById('newCategorySubmitBtn');
+            const name = nameInput.value.trim();
+            errEl.style.display = 'none';
+            if (!name) {
+              errEl.textContent = 'Name is required';
+              errEl.style.display = 'block';
+              return;
+            }
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Creating...';
+            try {
+              const res = await fetch("{% url 'marketing:create_product_category' %}", {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': (typeof csrftoken !== 'undefined' ? csrftoken : (typeof getCookie === 'function' ? getCookie('csrftoken') : ''))
+                },
+                body: JSON.stringify({ name })
+              });
+              const data = await res.json();
+              if (!data.success) throw new Error(data.error || 'Failed to create');
+
+              // Append new option to the category select and select it
+              const select = document.getElementById('id_category');
+              if (select) {
+                const opt = document.createElement('option');
+                opt.value = data.category.id;
+                opt.textContent = data.category.name;
+                opt.selected = true;
+                select.appendChild(opt);
+              }
+              if (typeof showToast === 'function') showToast('Category added', 'success');
+              closeCategoryModal();
+            } catch (e) {
+              errEl.textContent = e.message;
+              errEl.style.display = 'block';
+            } finally {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa fa-plus"></i> Create';
+            }
+          }
+        </script>
 
         <div class="form-group">
           <label for="id_type">Product Type</label>
@@ -1462,8 +1543,13 @@
         if (data.success) {
           item.style.animation = 'fadeOut 0.3s ease-out';
           setTimeout(() => item.remove(), 300);
-          if (data.deleted_url && typeof removeImageFromAllVariants === 'function') {
-            removeImageFromAllVariants(data.deleted_url);
+          if (data.deleted_url) {
+            if (typeof removeImageFromAllVariants === 'function') {
+              removeImageFromAllVariants(data.deleted_url);
+            }
+            if (typeof removeImageFromPrimaryPicker === 'function') {
+              removeImageFromPrimaryPicker(data.deleted_url);
+            }
           }
           deleted++;
           if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, true);

@@ -342,8 +342,13 @@ async function instantDeleteFile(fileId, element) {
                 if (typeof updateImageOrder === 'function') updateImageOrder();
             }, 300);
 
-            if (data.deleted_url && typeof removeImageFromAllVariants === 'function') {
-                removeImageFromAllVariants(data.deleted_url);
+            if (data.deleted_url) {
+                if (typeof removeImageFromAllVariants === 'function') {
+                    removeImageFromAllVariants(data.deleted_url);
+                }
+                if (typeof removeImageFromPrimaryPicker === 'function') {
+                    removeImageFromPrimaryPicker(data.deleted_url);
+                }
             }
 
             if (trackerRow && window.updateDeleteTrackerRow) window.updateDeleteTrackerRow(trackerRow, true);

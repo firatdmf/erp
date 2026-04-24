@@ -17,6 +17,7 @@ urlpatterns = [
     # path("product_file_create/",views.ProductFileCreate.as_view(),name="product_file_create"),
     # below are for api routes
     path("api/get_product_categories",views.get_product_categories,name="get_product_categories"),
+    path("api/create_product_category/",views.create_product_category,name="create_product_category"),
     path("api/get_products",views.get_products,name="get_products"),
     path("api/get_product",views.get_product,name="get_product"),
     path("api/update_product_stock/",api_stock_update.update_product_stock,name="update_product_stock"),

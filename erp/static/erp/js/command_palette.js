@@ -22,7 +22,7 @@ const CMD_MENU_ITEMS = (typeof MENU_ITEMS !== 'undefined') ? MENU_ITEMS : [
     { name: 'Task List', url: '/todo/tasks/', icon: 'fa-check-circle', category: 'Todo' },
 ];
 
-let cmdCurrentTab = 'contacts';
+let cmdCurrentTab = 'all';
 let cmdActiveFilter = null;
 let cmdSearchTimeout;
 let cmdRecentSearches = JSON.parse(localStorage.getItem('cmdRecentSearches') || '[]');
@@ -142,10 +142,13 @@ function renderCmdRecentSearches() {
 
     if (cmdRecentSearches.length === 0) {
         section.classList.add('hidden');
+        section.style.display = 'none';
+        container.innerHTML = '';
         return;
     }
 
     section.classList.remove('hidden');
+    section.style.display = '';
     container.innerHTML = cmdRecentSearches.slice(0, 5).map(item => `
         <div class="recent-item" onclick="useCmdRecentSearch('${item.replace(/'/g, "\\'")}')">
             <i class="fas fa-clock"></i>
@@ -247,23 +250,25 @@ async function performCmdSearch(query) {
     let searchType = cmdActiveFilter || cmdCurrentTab;
     if (searchType === 'all') searchType = 'all';
 
-    // Menu search (local)
+    // Menu search (local) — include in both 'menu' and 'all' tabs
     let menuResults = [];
-    if (searchType === 'menu') {
+    if (searchType === 'menu' || searchType === 'all') {
         menuResults = CMD_MENU_ITEMS.filter(item =>
             item.name.toLowerCase().includes(query.toLowerCase()) ||
             item.category.toLowerCase().includes(query.toLowerCase())
         );
     }
 
-    // API search
+    // API search — skip when on pure navigation tab (DB types don't include 'menu')
     let dbResults = [];
-    try {
-        const res = await fetch(`/search/?q=${encodeURIComponent(query)}&type=${searchType}`);
-        const data = await res.json();
-        dbResults = data.results || [];
-    } catch (e) {
-        console.error('Search error:', e);
+    if (searchType !== 'menu') {
+        try {
+            const res = await fetch(`/search/?q=${encodeURIComponent(query)}&type=${searchType}`);
+            const data = await res.json();
+            dbResults = data.results || [];
+        } catch (e) {
+            console.error('Search error:', e);
+        }
     }
 
     renderCmdResults(menuResults, dbResults);

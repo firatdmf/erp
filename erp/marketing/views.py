@@ -100,42 +100,91 @@ class ProductList(generic.ListView):
     template_name = "marketing/product_list.html"
     context_object_name = "products"
     paginate_by = 25  # Show 25 products per page
-    
+
     def get_template_names(self):
         if self.request.headers.get("HX-Request"):
             return ["marketing/partials/product_list_rows.html"]
         return ["marketing/product_list.html"]
-    
+
     def get_queryset(self):
         from django.db.models import Count, Sum, Value, DecimalField, F
         from django.db.models.functions import Coalesce
-        
+
         queryset = super().get_queryset()
         search_query = self.request.GET.get('search', '').strip()
-        
+        category_id = self.request.GET.get('category', '').strip()
+
         if search_query:
-            # Search by title or SKU (case-insensitive)
             queryset = queryset.filter(
                 models.Q(title__icontains=search_query) |
                 models.Q(sku__icontains=search_query)
             )
-        
-        # Optimize: Annotate variant count and total stock
-        # Use Value(0) with DecimalField to match variant_quantity type (Decimal)
+
+        if category_id and category_id != 'all':
+            if category_id == 'uncategorized':
+                queryset = queryset.filter(category__isnull=True)
+            else:
+                try:
+                    queryset = queryset.filter(category_id=int(category_id))
+                except (ValueError, TypeError):
+                    pass
+
         return queryset.select_related(
-            'category', 
-            'primary_image', 
+            'category',
+            'primary_image',
             'supplier'
         ).prefetch_related(
-            'attributes', # Product attributes
+            'attributes',
         ).annotate(
             variant_count=Count('variants'),
             total_stock=Coalesce(
-                Sum('variants__variant_quantity'), 
+                Sum('variants__variant_quantity'),
                 F('quantity'),
                 Value(0, output_field=DecimalField())
             )
-        ).order_by('title')[:50] # Limit results to 50 for speed
+        ).order_by('title')[:50]
+
+    def get_context_data(self, **kwargs):
+        from django.db.models import Count, Sum, F, DecimalField, Value
+        from django.db.models.functions import Coalesce
+        ctx = super().get_context_data(**kwargs)
+
+        category_counts = (
+            Product.objects.values('category_id', 'category__name')
+            .annotate(n=Count('id'))
+            .order_by('category__name')
+        )
+        ctx['category_filters'] = [
+            {
+                'id': c['category_id'] or 'uncategorized',
+                'name': c['category__name'] or 'Uncategorized',
+                'count': c['n'],
+            }
+            for c in category_counts
+        ]
+
+        total_products = Product.objects.count()
+        total_variants = ProductVariant.objects.count()
+
+        # Stock aggregates (use variant_quantity summed per product when variants exist)
+        product_stock = (
+            Product.objects.annotate(
+                total_stock=Coalesce(
+                    Sum('variants__variant_quantity'),
+                    F('quantity'),
+                    Value(0, output_field=DecimalField()),
+                )
+            )
+        )
+        out_of_stock = product_stock.filter(total_stock__lte=0).count()
+        low_stock = product_stock.filter(total_stock__gt=0, total_stock__lt=10).count()
+
+        ctx['total_products_count'] = total_products
+        ctx['total_variants_count'] = total_variants
+        ctx['out_of_stock_count'] = out_of_stock
+        ctx['low_stock_count'] = low_stock
+        ctx['active_category'] = self.request.GET.get('category', 'all')
+        return ctx
 
 
 @login_required
@@ -742,6 +791,69 @@ class BaseProductView(ModelFormMixin):
             all_files_dict = {f.pk: f for f in all_files}
             print(f"  ✓ Fetched {len(all_files_dict)} files from shared pool (for linking/cloning)")
         
+        # DEBUG: Log what we received
+        print(f"\n{'='*60}")
+        print(f"🔍 [DEBUG handle_variants] Received JSON:")
+        print(f"   deleted_files: {deleted_files}")
+        print(f"   variants_data count: {len(variants_data)}")
+        for vd in variants_data:
+            imgs = vd.get('variant_images', [])
+            print(f"   - {vd.get('variant_sku')}: {len(imgs)} images, IDs: {[i.get('id') for i in imgs]}")
+        print(f"{'='*60}\n")
+
+        # ═══════════════════════════════════════════════════════════════
+        # RECONCILIATION-BASED DIFF (source of truth: variant_images JSON)
+        # Frontend can't reliably track which IDs to unlink because Virtual
+        # Sharing means the SAME URL has multiple IDs. Instead, we derive
+        # deleted_files ourselves by diffing desired URLs vs current URLs.
+        # ═══════════════════════════════════════════════════════════════
+        desired_urls_per_variant = {}  # variant_sku -> set of URLs
+        for variant_data in variants_data:
+            sku = variant_data.get("variant_sku")
+            if not sku:
+                continue
+            urls = set()
+            for img_info in variant_data.get("variant_images", []):
+                img_id = img_info.get("id")
+                if img_id:
+                    try:
+                        img_id = int(img_id)
+                        src = all_files_dict.get(img_id)
+                        if src and src.file_url:
+                            urls.add(src.file_url)
+                    except (ValueError, TypeError):
+                        pass
+            desired_urls_per_variant[sku] = urls
+            print(f"   🎯 Desired URLs for {sku}: {len(urls)}")
+
+        # For each variant: find CURRENT files (linked in DB) whose URL is NOT in desired set → unlink
+        reconciled_deleted = set()
+        for variant_sku, variant in existing_variants_dict.items():
+            desired = desired_urls_per_variant.get(variant_sku, set())
+            current_files = ProductFile.objects.filter(product_variant=variant, product=self.object)
+            for cf in current_files:
+                if cf.file_url and cf.file_url not in desired:
+                    reconciled_deleted.add(cf.pk)
+                    print(f"   🗑️ Will unlink/delete pk={cf.pk} from {variant_sku} (URL not in desired set)")
+
+        # Merge any frontend-provided deleted_files too (belt-and-suspenders), but filter
+        # out IDs still used (in any variant's variant_images by URL)
+        all_desired_urls = set()
+        for urls in desired_urls_per_variant.values():
+            all_desired_urls.update(urls)
+
+        for fid in deleted_files:
+            try:
+                fid = int(fid)
+                f = all_files_dict.get(fid) or ProductFile.objects.filter(pk=fid, product=self.object).first()
+                if f and f.file_url and f.file_url not in all_desired_urls:
+                    reconciled_deleted.add(fid)
+            except (ValueError, TypeError):
+                pass
+
+        deleted_files = list(reconciled_deleted)
+        print(f"   ✅ Final reconciled deleted_files ({len(deleted_files)}): {deleted_files}")
+
         # First pass: Handle explicit deletions (unlinking)
         # We do this FIRST so if an image is unlinked from A, but assigned to B in the same request,
         # it is freed up before we try to link/clone it.
@@ -752,13 +864,14 @@ class BaseProductView(ModelFormMixin):
                     file_id = int(file_id)
                     f_to_unlink = ProductFile.objects.filter(pk=file_id, product=self.object).first()
                     if f_to_unlink:
+                        print(f"🔍 Processing deleted file {file_id}: current product_variant_id={f_to_unlink.product_variant_id}, url={f_to_unlink.file_url[-30:]}")
                         # If it's linked to a variant, unlink it
                         if f_to_unlink.product_variant_id is not None:
                             # We check if it is part of a "clone group" (same URL, different IDs)
                             # If there are other files with same URL, we just delete this clone
                             duplicates_count = ProductFile.objects.filter(product=self.object, file_url=f_to_unlink.file_url).count()
                             if duplicates_count > 1:
-                                print(f"🗑️ Deleting clone file {f_to_unlink.pk} for deselection")
+                                print(f"🗑️ Deleting clone file {f_to_unlink.pk} for deselection (dupes={duplicates_count})")
                                 f_to_unlink.delete()
                             else:
                                 # It's the only one left, just unlink it back to shared pool
@@ -767,6 +880,8 @@ class BaseProductView(ModelFormMixin):
                                 f_to_unlink.sequence = 0
                                 f_to_unlink.is_primary = False
                                 all_images_to_update.append(f_to_unlink)
+                        else:
+                            print(f"   ℹ️ File {file_id} already has no variant link (fresh upload or shared pool)")
                 except (ValueError, TypeError):
                     pass
 
@@ -902,14 +1017,17 @@ class BaseProductView(ModelFormMixin):
             print(f"  ✓ Primary variant selection: {primary_time:.3f}s")
         
         # Handle unlinking (variant image removal) passed via json data.
-        # Note: We unlink from variant (set product_variant=None), not delete from DB or Cloudinary
+        # CRITICAL: Use the already-filtered `deleted_files` (excludes IDs still in use by other variants)
+        # NOT the raw `deleted_files_pks` from the JSON, which would wipe product_variant for files
+        # that phase 2 just linked to a variant.
         delete_files_start = time.time()
         deleted_files_pks = variants_json.get("deleted_files", [])
-        print(f"deleted files pks: {deleted_files_pks}")
-        if len(deleted_files_pks) > 0:
-            # Unlink from variant instead of deleting (files stay in manage files)
-            ProductFile.objects.filter(pk__in=deleted_files_pks).update(product_variant=None)
-            print(f"  ✓ Unlinked {len(deleted_files_pks)} files from variants: {time.time() - delete_files_start:.3f}s")
+        print(f"deleted files pks (raw): {deleted_files_pks}")
+        print(f"deleted files pks (filtered): {deleted_files}")
+        # Use filtered list so we don't nuke product_variant on IDs that other variants still need
+        if len(deleted_files) > 0:
+            ProductFile.objects.filter(pk__in=deleted_files).update(product_variant=None)
+            print(f"  ✓ Unlinked {len(deleted_files)} files from variants: {time.time() - delete_files_start:.3f}s")
         
         # IMPORTANT: Upload main product images even when variants exist
         upload_start = time.time()
@@ -1538,11 +1656,22 @@ def instant_delete_file(request):
         product = product_file.product
         was_variant_file = product_file.product_variant is not None
         file_url_to_delete = product_file.file_url
-        
-        # Delete ONLY this record. CDN cleanup handled by model.delete() + signal:
-        # if other variants still reference the same file_url, CDN file stays intact.
-        # If this was the last reference, CDN file gets deleted automatically.
-        product_file.delete()
+
+        # NUCLEAR DELETE: trash icon = remove the IMAGE entirely across the product
+        # Delete ALL ProductFile rows with the same file_url (main gallery + all variant clones)
+        # This differs from deselect (which just unlinks from one variant).
+        # The signal/model delete will handle CDN cleanup once the last row is gone.
+        if file_url_to_delete:
+            all_refs = ProductFile.objects.filter(
+                product=product,
+                file_url=file_url_to_delete
+            )
+            refs_count = all_refs.count()
+            print(f"🗑️ Nuclear delete: removing {refs_count} ProductFile row(s) for URL ...{file_url_to_delete[-40:]}")
+            for ref in all_refs:
+                ref.delete()
+        else:
+            product_file.delete()
 
 
 
@@ -2108,6 +2237,37 @@ def get_product_categories(request):
     return JsonResponse(data, safe=False)
 
 
+@require_http_methods(["POST"])
+@login_required
+def create_product_category(request):
+    """Create a new ProductCategory on-the-fly from the product edit form."""
+    try:
+        data = json.loads(request.body)
+        name = (data.get("name") or "").strip()
+        if not name:
+            return JsonResponse({"success": False, "error": "Name is required"}, status=400)
+
+        # Avoid duplicates (name is unique)
+        existing = ProductCategory.objects.filter(name__iexact=name).first()
+        if existing:
+            return JsonResponse({
+                "success": True,
+                "category": {"id": existing.pk, "name": existing.name},
+                "existed": True,
+            })
+
+        category = ProductCategory.objects.create(name=name)
+        return JsonResponse({
+            "success": True,
+            "category": {"id": category.pk, "name": category.name},
+            "existed": False,
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
 # def get_products(request):
 #     product_category = request.GET.get("product_category")
 #     # do not show unfeatured products, or products with no primary image
@@ -2292,7 +2452,7 @@ def get_products(request):
             WITH pids AS (SELECT unnest(%(pids)s::bigint[]) AS id),
             variants AS (
                 SELECT json_agg(sub) as data FROM (
-                    SELECT id, product_id, variant_sku, variant_price, variant_quantity
+                    SELECT id, product_id, variant_sku, variant_price, variant_quantity, variant_featured
                     FROM marketing_productvariant
                     WHERE product_id IN (SELECT id FROM pids)
                 ) sub
@@ -2412,6 +2572,7 @@ def get_products(request):
             "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
             "variant_prices": _convert_price(v["variant_price"], rates),
             "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
+            "variant_featured": v.get("variant_featured", True),
             "product_variant_attribute_values": variant_av_map.get(v["id"], []),
         }
         for v in variant_rows

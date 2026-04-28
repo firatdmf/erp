@@ -668,9 +668,113 @@ class Warehouse(models.Model):
     name = models.CharField(max_length=150, unique=True)
     location = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    # Optional link to an accounting Book — warehouse net worth contributes to this book
+    accounting_book = models.ForeignKey(
+        'accounting.Book',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='warehouses',
+        help_text="Optional: accounting book this warehouse's value is tied to"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     def __str__(self):
         return self.name
+
+    def total_value_usd(self):
+        from django.db.models import Sum, F, DecimalField
+        from django.db.models.functions import Coalesce
+        from decimal import Decimal
+        agg = self.products.aggregate(
+            total=Coalesce(
+                Sum(F('quantity') * F('cost_usd'), output_field=DecimalField(max_digits=18, decimal_places=2)),
+                Decimal('0'),
+                output_field=DecimalField(max_digits=18, decimal_places=2),
+            )
+        )
+        return agg['total'] or Decimal('0')
+
+    def total_value_try(self):
+        from django.db.models import Sum, F, DecimalField
+        from django.db.models.functions import Coalesce
+        from decimal import Decimal
+        agg = self.products.aggregate(
+            total=Coalesce(
+                Sum(F('quantity') * F('cost_try'), output_field=DecimalField(max_digits=18, decimal_places=2)),
+                Decimal('0'),
+                output_field=DecimalField(max_digits=18, decimal_places=2),
+            )
+        )
+        return agg['total'] or Decimal('0')
+
+    def product_count(self):
+        return self.products.count()
+
+
+class WarehouseProduct(models.Model):
+    """A product instance held inside a warehouse. Mirrors marketing.Product
+    but lives under a warehouse so the same SKU can have different stock per
+    warehouse without coupling to the marketing catalog.
+    """
+
+    CURRENCY_CHOICES = [
+        ('USD', 'USD'),
+        ('TRY', 'TRY'),
+        ('EUR', 'EUR'),
+    ]
+
+    warehouse = models.ForeignKey(
+        Warehouse,
+        related_name="products",
+        on_delete=models.CASCADE,
+    )
+    name = models.CharField(max_length=255)
+    sku = models.CharField(max_length=64, blank=True, null=True, db_index=True)
+    barcode = models.CharField(max_length=64, blank=True, null=True)
+    model = models.CharField(max_length=128, blank=True, null=True)
+    quantity = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    # Original purchase price as imported from Excel
+    purchase_price = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    purchase_currency = models.CharField(
+        max_length=4, choices=CURRENCY_CHOICES, default='USD'
+    )
+
+    # Cost computed in USD and TRY (line totals = qty * unit cost)
+    cost_usd = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True,
+        help_text="Unit cost in USD"
+    )
+    cost_try = models.DecimalField(
+        max_digits=14, decimal_places=4, null=True, blank=True,
+        help_text="Unit cost in TRY"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['warehouse', 'sku']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.sku or '-'}) @ {self.warehouse.name}"
+
+    def total_cost_usd(self):
+        if self.cost_usd is None:
+            return None
+        return (self.quantity or 0) * self.cost_usd
+
+    def total_cost_try(self):
+        if self.cost_try is None:
+            return None
+        return (self.quantity or 0) * self.cost_try
 
 
 # A machine is a physical or virtual device that performs tasks in a workstation.

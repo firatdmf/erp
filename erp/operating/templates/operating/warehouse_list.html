@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+  .wh-page {
+    background: radial-gradient(ellipse 1200px 600px at 0% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 900px 400px at 100% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+                #f8fafc;
+    min-height: 100vh;
+    padding: 16px 12px 24px;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  .wh-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .wh-title h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #0f172a 0%, #6366f1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .wh-title p {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+    font-weight: 500;
+  }
+  .wh-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    transition: all 0.2s;
+  }
+  .wh-add-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
+    color: #fff;
+  }
+
+  .wh-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .wh-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 22px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .wh-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #6366f1, #3b82f6);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .wh-card:hover {
+    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.15);
+    color: inherit;
+    text-decoration: none;
+  }
+  .wh-card:hover::before { opacity: 1; }
+
+  .wh-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+    color: #6366f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+  .wh-card-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .wh-card-loc {
+    font-size: 12.5px;
+    color: #64748b;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .wh-card-stats {
+    display: flex;
+    gap: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #f1f5f9;
+  }
+  .wh-stat {
+    flex: 1;
+  }
+  .wh-stat-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .wh-stat-value {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .wh-empty {
+    grid-column: 1 / -1;
+    background: #fff;
+    border: 2px dashed #e2e8f0;
+    border-radius: 16px;
+    padding: 60px 20px;
+    text-align: center;
+    color: #64748b;
+  }
+  .wh-empty i {
+    font-size: 44px;
+    color: #cbd5e1;
+    margin-bottom: 16px;
+  }
+</style>
+
+<div class="wh-page">
+  <div class="wh-header">
+    <div class="wh-title">
+      <h1>My Warehouses</h1>
+      <p>Manage your storage locations and inventory.</p>
+    </div>
+    <a href="{% url 'operating:create_warehouse' %}" class="wh-add-btn">
+      <i class="fa fa-plus"></i> Add Warehouse
+    </a>
+  </div>
+
+  <div class="wh-grid">
+    {% for wh in warehouses %}
+    <a href="{% url 'operating:warehouse_detail' wh.pk %}" class="wh-card">
+      <div class="wh-card-icon">
+        <i class="fa fa-warehouse"></i>
+      </div>
+      <div class="wh-card-name">{{ wh.name }}</div>
+      <div class="wh-card-loc">
+        <i class="fa fa-map-marker-alt"></i>
+        {{ wh.location|default:"No location set" }}
+      </div>
+      <div class="wh-card-stats">
+        <div class="wh-stat">
+          <div class="wh-stat-label">Products</div>
+          <div class="wh-stat-value">{{ wh.n_products }}</div>
+        </div>
+        <div class="wh-stat">
+          <div class="wh-stat-label">Net Worth</div>
+          <div class="wh-stat-value" style="color:#059669;">${{ wh.total_value_usd|floatformat:0 }}</div>
+        </div>
+      </div>
+    </a>
+    {% empty %}
+    <div class="wh-empty">
+      <i class="fa fa-warehouse"></i>
+      <h3 style="margin: 0 0 6px; color:#475569;">No warehouses yet</h3>
+      <p style="margin: 0 0 18px;">Create your first warehouse to start tracking inventory.</p>
+      <a href="{% url 'operating:create_warehouse' %}" class="wh-add-btn"><i class="fa fa-plus"></i> Add Warehouse</a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

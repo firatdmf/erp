@@ -1,4 +1,4 @@
-import httpx
+import requests
 from datetime import date
 from decimal import Decimal
 from .models import CurrencyExchangeRate, CashTransactionEntry
@@ -8,7 +8,7 @@ from .views import get_total_base_currency_balance
 def _fetch_rate_from_google(from_currency: str, to_currency: str) -> Decimal:
     """Fetch exchange rate from Google Finance."""
     url = f"https://www.google.com/finance/quote/{from_currency}-{to_currency}"
-    response = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+    response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
     response.raise_for_status()
     # The rate is in a div with data-last-price attribute
     text = response.text

@@ -1,11 +1,19 @@
 from django.urls import path
 from . import views
+from . import views_warehouse
 from django.views.generic import TemplateView
 
 
 app_name = "operating"
 urlpatterns = [
     path("", views.index.as_view(), name="index"),
+    # Warehouse
+    path("warehouses/", views_warehouse.WarehouseList.as_view(), name="warehouse_list"),
+    path("warehouses/create/", views_warehouse.WarehouseCreate.as_view(), name="create_warehouse"),
+    path("warehouses/<int:pk>/", views_warehouse.WarehouseDetail.as_view(), name="warehouse_detail"),
+    path("warehouses/<int:pk>/edit/", views_warehouse.WarehouseEdit.as_view(), name="warehouse_edit"),
+    path("warehouses/<int:pk>/import/", views_warehouse.WarehouseProductImport.as_view(), name="warehouse_product_import"),
+    path("warehouses/<int:pk>/delete/", views_warehouse.WarehouseDelete.as_view(), name="warehouse_delete"),
     path("orders/create/", views.create_web_order, name="create_web_order"),
     path("orders/create", views.OrderCreate.as_view(), name="create_order"),
     path("orders/edit/<int:pk>/", views.OrderEdit.as_view(), name="edit_order"),

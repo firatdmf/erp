@@ -1,0 +1,677 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+  .wh-d-page {
+    background: radial-gradient(ellipse 1200px 600px at 0% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                #f8fafc;
+    min-height: 100vh;
+    padding: 16px 12px 24px;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  .wh-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #64748b;
+    text-decoration: none;
+    margin-bottom: 14px;
+    transition: color 0.15s;
+  }
+  .wh-back:hover { color: #6366f1; }
+
+  .wh-d-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  .wh-d-title h1 {
+    font-size: 26px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 6px;
+    letter-spacing: -0.4px;
+    background: linear-gradient(135deg, #0f172a, #6366f1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .wh-d-meta { color: #64748b; font-size: 13px; display:flex; align-items:center; gap:10px; }
+
+  .wh-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .wh-stat-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+  .wh-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent, #6366f1);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .wh-stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -8px rgba(15,23,42,0.12); }
+  .wh-stat-card:hover::before { opacity: 1; }
+  .wh-stat-card .icn {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg, #eef2ff);
+    color: var(--accent, #6366f1);
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+  .wh-stat-card .val {
+    font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px;
+  }
+  .wh-stat-card .lbl {
+    font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
+
+  @media (max-width: 1100px) { .wh-stats { grid-template-columns: repeat(2, 1fr); } }
+
+  /* Toolbar */
+  .wh-toolbar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .wh-search {
+    position: relative;
+    flex: 0 0 360px;
+    max-width: 360px;
+    height: 44px;
+  }
+  .wh-search input {
+    width: 100%; height: 100%;
+    padding: 0 16px 0 42px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+    color: #0f172a;
+    box-sizing: border-box;
+  }
+  .wh-search input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12); }
+  .wh-search .ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13px; }
+
+  .wh-action-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 44px; padding: 0 16px;
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px; font-weight: 600; color: #475569;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .wh-action-btn:hover { border-color: #6366f1; color: #6366f1; }
+
+  .wh-import-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 44px; padding: 0 18px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transition: all 0.2s;
+  }
+  .wh-import-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4); }
+
+  /* Sort dropdown */
+  .wh-sort {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0 36px 0 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .wh-sort:hover { border-color: #cbd5e1; }
+  .wh-sort:focus-within { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12); }
+
+  .wh-sort::before {
+    content: 'Sort:';
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 8px;
+  }
+
+  .wh-sort::after {
+    content: '\f078';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: 11px;
+    pointer-events: none;
+  }
+
+  .wh-sort select,
+  select.wh-sort-select,
+  .wh-sort > select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font-family: inherit;
+    min-width: 180px;
+    width: auto;
+  }
+  .wh-sort select:focus { box-shadow: none !important; border: none !important; }
+  .wh-sort select::-ms-expand { display: none; }
+
+  /* Filter chips */
+  .wh-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    color: #475569;
+    text-decoration: none;
+    transition: all 0.18s;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .wh-chip:hover {
+    border-color: #6366f1; color: #6366f1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15);
+  }
+  .wh-chip.active {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: #fff; border-color: transparent;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+  .wh-chip i { font-size: 11px; }
+
+  /* Pagination */
+  .wh-pager { display: flex; gap: 4px; align-items: center; }
+  .wh-pg-btn {
+    min-width: 32px; height: 32px;
+    padding: 0 10px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .wh-pg-btn:hover:not(:disabled):not(.active) {
+    border-color: #6366f1;
+    color: #6366f1;
+  }
+  .wh-pg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .wh-pg-btn.active {
+    background: linear-gradient(135deg, #6366f1, #3b82f6);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  }
+
+  /* Table */
+  .wh-table-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+  }
+  .wh-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .wh-table thead {
+    background: linear-gradient(to bottom, #fcfcfd, #f1f5f9);
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .wh-table th {
+    padding: 14px 18px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .wh-table td {
+    padding: 14px 18px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13.5px;
+    color: #334155;
+  }
+  .wh-table tbody tr { transition: background-color 0.15s; }
+  .wh-table tbody tr:hover { background: #f7f9fc; }
+
+  .wh-name { font-weight: 600; color: #1e293b; }
+  .wh-sku { font-family: 'SF Mono', monospace; font-size: 12px; color: #475569; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0; }
+  .wh-qty { font-weight: 800; color: #0f172a; font-size: 14px; }
+  .wh-currency-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    background: #eef2ff;
+    color: #4338ca;
+    border: 1px solid #c7d2fe;
+  }
+  .wh-cost-cell { font-weight: 700; color: #047857; }
+
+  /* Empty state */
+  .wh-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #64748b;
+  }
+  .wh-empty i { font-size: 44px; color: #cbd5e1; margin-bottom: 14px; }
+
+  /* Modal */
+  .wh-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+  }
+  .wh-modal.show { display: flex; }
+  .wh-modal-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+  }
+  .wh-modal-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 800; color: #0f172a; }
+  .wh-modal-card p { color: #64748b; font-size: 13px; margin: 0 0 18px; }
+
+  .wh-drop {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 32px 18px;
+    text-align: center;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 16px;
+  }
+  .wh-drop:hover, .wh-drop.dragging {
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
+  .wh-drop-icon {
+    width: 48px; height: 48px;
+    background: #e2e8f0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 12px;
+    color: #64748b;
+    font-size: 20px;
+  }
+  .wh-drop:hover .wh-drop-icon { background: #6366f1; color: #fff; }
+</style>
+
+<div class="wh-d-page">
+  <a href="{% url 'operating:warehouse_list' %}" class="wh-back">
+    <i class="fa fa-chevron-left"></i> Back to warehouses
+  </a>
+
+  <div class="wh-d-header">
+    <div class="wh-d-title">
+      <h1>{{ warehouse.name }}</h1>
+      <div class="wh-d-meta">
+        <span><i class="fa fa-map-marker-alt"></i> {{ warehouse.location|default:"No location" }}</span>
+        {% if warehouse.accounting_book %}
+          <span style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; border-radius:999px; font-size:11.5px; font-weight:700;">
+            <i class="fa fa-book"></i> {{ warehouse.accounting_book.name }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <a href="{% url 'operating:warehouse_edit' warehouse.pk %}" class="wh-action-btn">
+        <i class="fa fa-pencil"></i> Edit
+      </a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="wh-stats">
+    <div class="wh-stat-card" style="--accent:#6366f1; --bg:#eef2ff;">
+      <div class="icn"><i class="fa fa-box-open"></i></div>
+      <div class="val">{{ product_count|default:0 }}</div>
+      <div class="lbl">Products</div>
+    </div>
+    <div class="wh-stat-card" style="--accent:#0ea5e9; --bg:#e0f2fe;">
+      <div class="icn"><i class="fa fa-cubes"></i></div>
+      <div class="val">{{ total_quantity|floatformat:0 }}</div>
+      <div class="lbl">Total Quantity</div>
+    </div>
+    <div class="wh-stat-card" style="--accent:#10b981; --bg:#ecfdf5;">
+      <div class="icn"><i class="fa fa-dollar-sign"></i></div>
+      <div class="val">${{ total_value_usd|floatformat:2 }}</div>
+      <div class="lbl">Net Worth (USD)</div>
+    </div>
+    <div class="wh-stat-card" style="--accent:#f59e0b; --bg:#fef3c7;">
+      <div class="icn"><i class="fa fa-lira-sign"></i></div>
+      <div class="val">₺{{ total_value_try|floatformat:2 }}</div>
+      <div class="lbl">Net Worth (TRY)</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="wh-toolbar">
+    <div class="wh-search">
+      <i class="fa fa-search ico"></i>
+      <input type="text" id="whSearchInput" placeholder="Search products by name, SKU, barcode..."
+             value="{{ search }}"
+             hx-get="{% url 'operating:warehouse_detail' warehouse.pk %}"
+             hx-trigger="keyup changed delay:300ms, whFilterChanged from:body"
+             hx-target="#wh-rows"
+             hx-include="#whSortInput"
+             name="search">
+    </div>
+
+    <!-- Sort dropdown -->
+    <div class="wh-sort">
+      <select id="whSortInput" name="sort" onchange="onWhSortChange()">
+        {% for key, label in sort_options %}
+          <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="margin-left:auto; display:flex; gap:10px;">
+      <button type="button" class="wh-import-btn" onclick="document.getElementById('whImportModal').classList.add('show')">
+        <i class="fa fa-file-import"></i> Import Products
+      </button>
+    </div>
+  </div>
+
+  <!-- Quick filter chips (HTMX live) -->
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;" id="whChips">
+    <button type="button" class="wh-chip {% if sort == 'qty_desc' %}active{% endif %}" data-sort="qty_desc" onclick="setWhSort('qty_desc')">
+      <i class="fa fa-cubes"></i> Top quantity
+    </button>
+    <button type="button" class="wh-chip {% if sort == 'total_usd_desc' %}active{% endif %}" data-sort="total_usd_desc" onclick="setWhSort('total_usd_desc')">
+      <i class="fa fa-dollar-sign"></i> Most valuable (USD)
+    </button>
+    <button type="button" class="wh-chip {% if sort == 'total_try_desc' %}active{% endif %}" data-sort="total_try_desc" onclick="setWhSort('total_try_desc')">
+      <i class="fa fa-lira-sign"></i> Most valuable (TRY)
+    </button>
+    <button type="button" class="wh-chip {% if sort == 'price_desc' %}active{% endif %}" data-sort="price_desc" onclick="setWhSort('price_desc')">
+      <i class="fa fa-tag"></i> Most expensive
+    </button>
+    <button type="button" class="wh-chip {% if sort == 'recent' %}active{% endif %}" data-sort="recent" onclick="setWhSort('recent')">
+      <i class="fa fa-clock"></i> Recently updated
+    </button>
+  </div>
+
+  <!-- Product Table -->
+  <div class="wh-table-card">
+    <table class="wh-table">
+      <thead>
+        <tr>
+          <th>NAME</th>
+          <th>SKU</th>
+          <th>BARCODE</th>
+          <th>QTY</th>
+          <th>UNIT COST</th>
+          <th>TOTAL (USD)</th>
+          <th>TOTAL (TRY)</th>
+        </tr>
+      </thead>
+      <tbody id="wh-rows">
+        {% include "operating/partials/warehouse_product_table_body.html" %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="wh-modal" id="whImportModal">
+  <div class="wh-modal-card">
+    <h3>Import Products from Excel</h3>
+    <p>Upload an .xlsx file with columns: Name (Adı), Code (Kodu), Quantity (Miktar), Purchase Price (Alış Fiyatı), Currency.</p>
+
+    <div class="wh-drop" id="whDrop" onclick="document.getElementById('whFile').click()">
+      <div class="wh-drop-icon"><i class="fa fa-cloud-upload-alt"></i></div>
+      <p id="whDropText" style="margin: 0 0 6px; font-size:13px; color:#475569; font-weight:600;">Drag & drop Excel file here, or click to browse</p>
+      <p style="margin: 0; font-size:11px; color:#94a3b8;">Supports .xlsx · USD/TRY auto-converted</p>
+    </div>
+    <input type="file" id="whFile" accept=".xlsx,.xls" style="display:none;">
+
+    <div id="whImportResult" style="display:none;"></div>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button type="button" class="wh-action-btn" onclick="closeWhImportModal()">Cancel</button>
+      <button type="button" class="wh-import-btn" id="whUploadBtn" onclick="uploadWhFile()" disabled style="opacity:0.5;">
+        <i class="fa fa-upload"></i> Upload &amp; Import
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const csrftoken = '{{ csrf_token }}';
+  const importUrl = "{% url 'operating:warehouse_product_import' warehouse.pk %}";
+  let whSelectedFile = null;
+
+  function onWhSortChange() {
+    htmx.trigger(document.body, 'whFilterChanged');
+    syncWhChipsActive();
+  }
+
+  function setWhSort(sortKey) {
+    const sel = document.getElementById('whSortInput');
+    if (sel) sel.value = sortKey;
+    // Toggle active class on chips immediately for snappy feedback
+    document.querySelectorAll('#whChips .wh-chip').forEach(el => {
+      el.classList.toggle('active', el.dataset.sort === sortKey);
+    });
+    htmx.trigger(document.body, 'whFilterChanged');
+  }
+
+  function syncWhChipsActive() {
+    const sel = document.getElementById('whSortInput');
+    if (!sel) return;
+    const v = sel.value;
+    document.querySelectorAll('#whChips .wh-chip').forEach(el => {
+      el.classList.toggle('active', el.dataset.sort === v);
+    });
+  }
+
+  function closeWhImportModal() {
+    document.getElementById('whImportModal').classList.remove('show');
+    document.getElementById('whImportResult').style.display = 'none';
+    whSelectedFile = null;
+    const btn = document.getElementById('whUploadBtn');
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    document.getElementById('whDropText').textContent = 'Drag & drop Excel file here, or click to browse';
+  }
+
+  // Drop zone
+  const whDrop = document.getElementById('whDrop');
+  const whFile = document.getElementById('whFile');
+  ['dragenter','dragover'].forEach(e => {
+    whDrop.addEventListener(e, ev => { ev.preventDefault(); whDrop.classList.add('dragging'); });
+  });
+  ['dragleave','drop'].forEach(e => {
+    whDrop.addEventListener(e, ev => { ev.preventDefault(); whDrop.classList.remove('dragging'); });
+  });
+  whDrop.addEventListener('drop', ev => {
+    ev.preventDefault();
+    if (ev.dataTransfer.files.length) handleWhFile(ev.dataTransfer.files[0]);
+  });
+  whFile.addEventListener('change', ev => {
+    if (ev.target.files.length) handleWhFile(ev.target.files[0]);
+  });
+
+  function handleWhFile(file) {
+    whSelectedFile = file;
+    document.getElementById('whDropText').textContent = '✓ ' + file.name;
+    const btn = document.getElementById('whUploadBtn');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+
+  async function uploadWhFile() {
+    if (!whSelectedFile) return;
+    const fd = new FormData();
+    fd.append('file', whSelectedFile);
+    const btn = document.getElementById('whUploadBtn');
+    const resultDiv = document.getElementById('whImportResult');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Importing...';
+
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `
+      <div style="padding:14px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; margin-bottom:14px;">
+        <div id="whProgressTitle" style="font-weight:700; color:#3730a3; margin-bottom:8px;">
+          <i class="fa fa-spinner fa-spin"></i> Reading file...
+        </div>
+        <div style="height:8px; background:#e0e7ff; border-radius:999px; overflow:hidden; margin-bottom:8px;">
+          <div id="whProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg,#6366f1,#3b82f6); transition:width .25s ease;"></div>
+        </div>
+        <div id="whProgressText" style="font-size:12px; color:#4338ca;">Preparing...</div>
+      </div>`;
+
+    try {
+      const res = await fetch(importUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken },
+        body: fd,
+      });
+
+      // If server responded with regular JSON error (e.g. 400)
+      const ct = res.headers.get('content-type') || '';
+      if (!res.ok && !ct.includes('x-ndjson')) {
+        const data = await res.json();
+        resultDiv.innerHTML = `
+          <div style="padding:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px;">
+            <div style="font-weight:700; color:#991b1b;"><i class="fa fa-exclamation-triangle"></i> ${data.error || 'Import failed'}</div>
+            ${data.detected_headers ? '<div style="font-size:11px; color:#7f1d1d; margin-top:6px;">Detected headers: ' + (data.detected_headers || []).join(', ') + '</div>' : ''}
+          </div>`;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-upload"></i> Upload &amp; Import';
+        return;
+      }
+
+      // Stream NDJSON progress updates
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalData = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Split on newline
+        let nl;
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+
+          let msg;
+          try { msg = JSON.parse(line); } catch (e) { continue; }
+
+          if (msg.phase === 'start') {
+            const title = document.getElementById('whProgressTitle');
+            const text = document.getElementById('whProgressText');
+            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Importing ' + msg.total + ' rows...';
+            if (text) text.textContent = '0 / ' + msg.total;
+          } else if (msg.phase === 'processing') {
+            const pct = Math.min(100, (msg.current / msg.total) * 100);
+            const bar = document.getElementById('whProgressBar');
+            const text = document.getElementById('whProgressText');
+            if (bar) bar.style.width = pct.toFixed(1) + '%';
+            if (text) text.innerHTML = `<b>${msg.current.toLocaleString()}</b> / ${msg.total.toLocaleString()} · created: <b>${msg.created}</b> · updated: <b>${msg.updated}</b> · unchanged: <b>${msg.unchanged}</b>`;
+          } else if (msg.phase === 'saving') {
+            const title = document.getElementById('whProgressTitle');
+            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (msg.message || 'Saving...');
+          } else if (msg.phase === 'done') {
+            finalData = msg;
+          }
+        }
+      }
+
+      if (finalData && finalData.success) {
+        resultDiv.innerHTML = `
+          <div style="padding:14px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; margin-bottom:14px;">
+            <div style="font-weight:700; color:#065f46; margin-bottom:6px;">
+              <i class="fa fa-check-circle"></i> Import complete
+            </div>
+            <div style="font-size:12.5px; color:#047857;">
+              Created: <b>${finalData.created}</b> · Updated: <b>${finalData.updated}</b> · Unchanged: <b>${finalData.unchanged}</b> · Skipped: <b>${finalData.skipped}</b><br>
+              Total processed: <b>${finalData.total.toLocaleString()}</b> · USD/TRY rate: <b>${finalData.usd_to_try_rate}</b>
+            </div>
+          </div>`;
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        resultDiv.innerHTML = `
+          <div style="padding:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px;">
+            <div style="font-weight:700; color:#991b1b;">Import did not complete cleanly</div>
+          </div>`;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-upload"></i> Upload &amp; Import';
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa fa-upload"></i> Upload &amp; Import';
+      resultDiv.innerHTML = `<div style="padding:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; color:#991b1b;">Upload error: ${e.message}</div>`;
+    }
+  }
+</script>
+{% endblock %}

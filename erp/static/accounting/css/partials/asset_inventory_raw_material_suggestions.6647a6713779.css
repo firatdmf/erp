@@ -1,0 +1,24 @@
+#asset_inventory_raw_material_suggestions_partial .suggestion-list {
+  border: 1px solid #ccc;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: white;
+  position: absolute;
+  z-index: 100;
+  width: 100%;
+}
+#asset_inventory_raw_material_suggestions_partial .suggestion-list li {
+  padding: 5px;
+  cursor: pointer;
+}
+#asset_inventory_raw_material_suggestions_partial .suggestion-list li:hover {
+  background: #eee;
+}
+#asset_inventory_raw_material_suggestions_partial .no-match {
+  background: white;
+  border: 1px solid #ccc;
+  padding: 5px;
+  position: absolute;
+  z-index: 100;
+}

@@ -1,0 +1,55 @@
+.history_component .HistoryContainer{
+    border:1px solid;
+}
+
+.history_component .historyEntries li{
+    border:1px solid rgba(0,0,0,0.6);
+    /* padding:5px;
+    margin:5px; */
+}
+
+.history_component .historyEntries ul >*{
+    padding:10px;
+}
+
+.history_component .historyEntries ul{
+    margin:0;
+    padding:0;
+}
+
+
+
+.history_component a{
+    text-decoration: none;
+}
+
+.history_component .buttons{
+    display: inline-flex;
+
+}
+
+.history_component .buttons button{
+    margin-top:10px;
+}
+
+.history_component .buttons .deleteButton{
+    color:red;
+}
+
+.history_component .buttons .completeTaskButton{
+    color:green;
+}
+
+.history_component .note_form_text_input{
+    width: 100%;
+    padding:0;
+    margin:0;
+}
+
+.history_component .addNoteButton{
+    display:flex;
+    justify-content: end;
+}
+.history_component .addNoteButton button{
+    font-size: 1.3rem;
+}

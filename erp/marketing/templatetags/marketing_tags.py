@@ -21,6 +21,21 @@ def variant_form(variants, product, current_url):
     tag_start = time.time()
     product_variant_list = []
     variant_files_dict = {}
+    # attribute_value_images: { attribute_name (lowercase): { value: image_url } }
+    attribute_value_images = {}
+    if product:
+        try:
+            from marketing.models import VariantAttributeValueImage
+            for img in VariantAttributeValueImage.objects.filter(product=product).select_related(
+                'attribute_value__product_variant_attribute'
+            ):
+                attr_name = img.attribute_value.product_variant_attribute.name
+                value = img.attribute_value.product_variant_attribute_value
+                if attr_name not in attribute_value_images:
+                    attribute_value_images[attr_name] = {}
+                attribute_value_images[attr_name][value] = img.image_url
+        except Exception:
+            pass
 
     if variants:
         for variant in variants:
@@ -124,6 +139,8 @@ def variant_form(variants, product, current_url):
     if tag_time > 0.1:
         print(f"⚠️  variant_form tag took {tag_time:.4f}s")
     
+    attribute_value_images_json = json.dumps(attribute_value_images)
+
     return render_to_string(
         "marketing/components/variant_form.html",
         {
@@ -132,6 +149,7 @@ def variant_form(variants, product, current_url):
             "product_variant_options": mark_safe(product_variant_options),
             "variant_files_json": mark_safe(variant_files_json),
             "product_attributes": mark_safe(product_attributes_json),
+            "attribute_value_images": mark_safe(attribute_value_images_json),
         },
     )
 

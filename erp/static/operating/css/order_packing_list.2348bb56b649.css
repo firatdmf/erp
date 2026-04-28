@@ -1,0 +1,12 @@
+#order_packing_list_page .pack-group td {
+  border-left: 2px solid #000;
+  border-right: 2px solid #000;
+}
+
+#order_packing_list_page .pack-group.first-row td {
+  border-top: 2px solid #000;
+}
+
+#order_packing_list_page .pack-group.last-row td {
+  border-bottom: 2px solid #000;
+}

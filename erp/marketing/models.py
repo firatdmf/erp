@@ -434,7 +434,6 @@ class ProductVariantAttributeValue(models.Model):
     product_variant_attribute_value = models.CharField(
         max_length=255, verbose_name="Attribute Value", db_index=True
     )  # e.g., "S", "Red"
-    # code = models.CharField(max_length=255, unique=True, blank=True, null=True)
 
     def __str__(self):
         return f"{self.product_variant_attribute.name}: {self.product_variant_attribute_value}"
@@ -443,13 +442,38 @@ class ProductVariantAttributeValue(models.Model):
         self.product_variant_attribute_value = (
             self.product_variant_attribute_value.lower().replace(" ", "_")
         )
-        # if not self.code:
-        #     attr_code = str(self.product_variant_attribute.pk)
-        #     value_code = (
-        #         self.product_variant_attribute_value.strip().upper().replace(" ", "_")
-        #     )
-        #     self.code = f"{attr_code}_{value_code}"
         super().save(*args, **kwargs)
+
+
+class VariantAttributeValueImage(models.Model):
+    """Stores a single image per (product, attribute_value) — used for color swatches.
+
+    Per-product because different products may need different swatches for the
+    same color value (e.g. velvet red vs. cotton red).
+    """
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='attribute_value_images',
+    )
+    attribute_value = models.ForeignKey(
+        ProductVariantAttributeValue,
+        on_delete=models.CASCADE,
+        related_name='product_images',
+    )
+    image_url = models.URLField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('product', 'attribute_value')
+        indexes = [
+            models.Index(fields=['product', 'attribute_value']),
+        ]
+
+    def __str__(self):
+        return f"{self.product.sku} / {self.attribute_value} → {self.image_url[-30:]}"
 
 
 # class ProductVariantAttributeValue(models.Model):

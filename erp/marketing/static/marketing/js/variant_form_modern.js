@@ -121,6 +121,7 @@ function loadExistingVariants() {
             // Load variant data (cost, price, sku, images, etc.) BEFORE rendering the table
             // so that generateRowHTML can populate hidden inputs with existing values
             loadExistingVariantImages();
+            applyExistingAttributeValueImages();
 
             // Update table with existing variants
             console.log('About to update variant table...');
@@ -235,6 +236,36 @@ function loadExistingVariantImages() {
     }
 }
 
+// Apply previously-saved attribute value images (color swatches) to variantData.
+// Called after options are rendered so that imagesByValue is set per option.
+function applyExistingAttributeValueImages() {
+    const raw = window.attribute_value_images_data;
+    if (!raw || raw === '{}') return;
+    let imagesByAttr;
+    try { imagesByAttr = JSON.parse(raw); } catch (e) { return; }
+    if (!imagesByAttr || !Object.keys(imagesByAttr).length) return;
+
+    Object.keys(variantData).forEach(optId => {
+        const optName = (variantData[optId].name || '').toLowerCase().trim();
+        if (!optName || !imagesByAttr[optName]) return;
+        if (!variantData[optId].imagesByValue) variantData[optId].imagesByValue = {};
+        Object.entries(imagesByAttr[optName]).forEach(([val, url]) => {
+            variantData[optId].imagesByValue[val] = { url, id: null };
+        });
+    });
+    console.log('Loaded attribute value images:', imagesByAttr);
+
+    // Re-render value field thumbnails for each option
+    Object.keys(variantData).forEach(optId => {
+        refreshColorOptionState(optId);
+        const valuesList = document.getElementById(`${optId}_values`);
+        if (!valuesList) return;
+        Array.from(valuesList.children).forEach((wrapper, idx) => {
+            restoreColorValueImage(optId, idx);
+        });
+    });
+}
+
 // Show variant section and initialize
 function showVariantSection() {
     document.getElementById('add_variant_trigger').style.display = 'none';
@@ -302,11 +333,26 @@ function addValueField(optionId, value = '') {
     const valueHTML = `
         <div class="value_field_wrapper" data-value-index="${valueIndex}">
             <span class="drag_handle_small"><i class="fa fa-grip-vertical"></i></span>
-            <input type="text" 
-                   placeholder="${valueIndex === 0 ? '' : 'Add another value'}" 
+            <input type="text"
+                   placeholder="${valueIndex === 0 ? '' : 'Add another value'}"
                    value="${value}"
                    oninput="updateOptionValue('${optionId}', ${valueIndex}, this.value)"
                    class="value_input">
+            <div class="value_color_image" data-option-id="${optionId}" data-value-index="${valueIndex}">
+                <input type="file" accept="image/*" style="display:none;"
+                       onchange="onColorValueImagePick('${optionId}', ${valueIndex}, this)">
+                <button type="button" class="btn_color_image" title="Set image for this color"
+                        onclick="this.previousElementSibling.click()">
+                    <i class="fa fa-image"></i>
+                </button>
+                <div class="color_image_thumb" style="display:none;">
+                    <img alt="">
+                    <button type="button" class="btn_remove_color_image" title="Remove image"
+                            onclick="onColorValueImageRemove('${optionId}', ${valueIndex})">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            </div>
             <button type="button" class="btn_remove_value" onclick="removeValue('${optionId}', ${valueIndex})">
                 <i class="fa fa-trash"></i>
             </button>
@@ -314,12 +360,194 @@ function addValueField(optionId, value = '') {
     `;
 
     valuesList.insertAdjacentHTML('beforeend', valueHTML);
+
+    // Restore thumbnail if we already have an image stored for this value
+    restoreColorValueImage(optionId, valueIndex);
 }
+
+// ─── Color attribute image upload ───────────────────────────────
+// Storage: variantData[optionId].imagesByValue = { 'red': { url, id }, ... }
+// Visible only when option name is 'color' / 'renk'
+
+function isColorOption(optionId) {
+    const name = (variantData[optionId] && variantData[optionId].name) || '';
+    const n = name.toLowerCase().trim();
+    return n === 'color' || n === 'colour' || n === 'renk';
+}
+
+function refreshColorOptionState(optionId) {
+    const card = document.getElementById(optionId);
+    if (!card) return;
+    card.classList.toggle('is-color-option', isColorOption(optionId));
+}
+
+function restoreColorValueImage(optionId, valueIndex) {
+    const data = variantData[optionId];
+    if (!data) return;
+    const valueText = (data.values && data.values[valueIndex]) || '';
+    if (!valueText) return;
+    const stored = (data.imagesByValue && data.imagesByValue[valueText.trim()]) || null;
+    if (stored && stored.url) {
+        showColorValueThumb(optionId, valueIndex, stored.url);
+    }
+}
+
+function showColorValueThumb(optionId, valueIndex, url) {
+    const wrapper = document.querySelector(
+        `.value_color_image[data-option-id="${optionId}"][data-value-index="${valueIndex}"]`
+    );
+    if (!wrapper) return;
+    const btn = wrapper.querySelector('.btn_color_image');
+    const thumb = wrapper.querySelector('.color_image_thumb');
+    const img = thumb.querySelector('img');
+    img.src = url;
+    btn.style.display = 'none';
+    thumb.style.display = 'inline-flex';
+}
+
+function hideColorValueThumb(optionId, valueIndex) {
+    const wrapper = document.querySelector(
+        `.value_color_image[data-option-id="${optionId}"][data-value-index="${valueIndex}"]`
+    );
+    if (!wrapper) return;
+    const btn = wrapper.querySelector('.btn_color_image');
+    const thumb = wrapper.querySelector('.color_image_thumb');
+    btn.style.display = '';
+    thumb.style.display = 'none';
+}
+
+// Resize an image File to a square TARGET×TARGET PNG via Canvas
+function resizeImageTo40(file, target = 40) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Could not load image'));
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = target;
+                canvas.height = target;
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+
+                // Cover-fit: scale up to fill, crop center
+                const ratio = Math.max(target / img.width, target / img.height);
+                const w = img.width * ratio;
+                const h = img.height * ratio;
+                const dx = (target - w) / 2;
+                const dy = (target - h) / 2;
+                ctx.drawImage(img, dx, dy, w, h);
+
+                canvas.toBlob((blob) => {
+                    if (!blob) return reject(new Error('Resize failed'));
+                    // Preserve filename, swap extension to .png
+                    const baseName = (file.name || 'swatch').replace(/\.[^.]+$/, '');
+                    const newFile = new File([blob], baseName + '_40.png', { type: 'image/png' });
+                    resolve(newFile);
+                }, 'image/png', 0.92);
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function onColorValueImagePick(optionId, valueIndex, fileInput) {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    const data = variantData[optionId];
+    if (!data) return;
+    const valueText = ((data.values && data.values[valueIndex]) || '').trim();
+    if (!valueText) {
+        showToast('Enter the color value first', 'warning');
+        fileInput.value = '';
+        return;
+    }
+
+    // Auto-resize to 40×40 PNG before upload
+    let uploadFile = file;
+    try {
+        if (file.type.startsWith('image/')) {
+            uploadFile = await resizeImageTo40(file, 40);
+            console.log(`[color] resized ${file.name}: ${file.size}B → ${uploadFile.size}B (40×40)`);
+        }
+    } catch (e) {
+        console.warn('Resize failed, uploading original:', e);
+    }
+
+    // Upload using existing instant_upload endpoint when product exists,
+    // otherwise temp_upload (create mode)
+    const productEditMatch = window.location.pathname.match(/\/product_edit\/(\d+)\//)?.[1];
+    const isCreateMode = window.location.pathname.includes('/product_create/');
+
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+    let url = '';
+    let id = null;
+
+    try {
+        if (productEditMatch) {
+            formData.append('product_id', productEditMatch);
+            const res = await fetch('/marketing/api/instant_upload_file/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
+                body: formData,
+            });
+            const data2 = await res.json();
+            if (!data2.success) throw new Error(data2.error || 'Upload failed');
+            url = data2.file.url;
+            id = data2.file.id;
+        } else if (isCreateMode) {
+            formData.append('file_type', 'color_image');
+            formData.append('variant_temp_id', `color_${optionId}_${valueIndex}`);
+            const res = await fetch('/marketing/api/temp_upload_file/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.getCookie ? window.getCookie('csrftoken') : '' },
+                body: formData,
+            });
+            const data2 = await res.json();
+            if (!data2.success) throw new Error(data2.error || 'Upload failed');
+            url = data2.file_data.url;
+            id = data2.file_data.public_id;
+        } else {
+            throw new Error('Save the product first');
+        }
+
+        // Persist into variantData
+        if (!data.imagesByValue) data.imagesByValue = {};
+        data.imagesByValue[valueText] = { url, id };
+
+        showColorValueThumb(optionId, valueIndex, url);
+        showToast(`Image set for ${valueText}`, 'success');
+    } catch (e) {
+        console.error(e);
+        showToast('Upload error: ' + e.message, 'error');
+    } finally {
+        fileInput.value = '';
+    }
+}
+
+function onColorValueImageRemove(optionId, valueIndex) {
+    const data = variantData[optionId];
+    if (!data) return;
+    const valueText = ((data.values && data.values[valueIndex]) || '').trim();
+    if (data.imagesByValue && valueText in data.imagesByValue) {
+        delete data.imagesByValue[valueText];
+    }
+    hideColorValueThumb(optionId, valueIndex);
+}
+
+window.onColorValueImagePick = onColorValueImagePick;
+window.onColorValueImageRemove = onColorValueImageRemove;
 
 // Update option name
 function updateOptionName(optionId, name) {
     if (!variantData[optionId]) return;
     variantData[optionId].name = name;
+    refreshColorOptionState(optionId);
     updateVariantTable();
     updateGroupingOptions();
 }
@@ -2623,6 +2851,30 @@ document.addEventListener('DOMContentLoaded', () => {
             variantsInput.value = JSON.stringify(variantsData);
             const jsonTime = performance.now() - jsonStart;
             console.log(`✓ JSON stringify: ${jsonTime.toFixed(2)}ms`);
+
+            // ─── Send attribute value images (color swatches) ───
+            // Format: { "color": { "red": "url", "blue": "url" }, "material": {...} }
+            const attrValueImages = {};
+            Object.values(variantData).forEach(opt => {
+                const optName = (opt.name || '').toLowerCase().trim();
+                if (!optName || !opt.imagesByValue) return;
+                const byValue = {};
+                Object.entries(opt.imagesByValue).forEach(([val, info]) => {
+                    if (info && info.url) byValue[val.toLowerCase().replace(/\s+/g, '_')] = info.url;
+                });
+                if (Object.keys(byValue).length > 0) attrValueImages[optName] = byValue;
+            });
+
+            let attrImagesInput = document.getElementById('attribute_value_images_input');
+            if (!attrImagesInput) {
+                attrImagesInput = document.createElement('input');
+                attrImagesInput.type = 'hidden';
+                attrImagesInput.id = 'attribute_value_images_input';
+                attrImagesInput.name = 'attribute_value_images';
+                productForm.appendChild(attrImagesInput);
+            }
+            attrImagesInput.value = JSON.stringify(attrValueImages);
+            console.log('Attribute value images:', attrValueImages);
 
             console.log('Submitting variants data:', variantsData);
 

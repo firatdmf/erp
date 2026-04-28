@@ -1,0 +1,69 @@
+.edit_order_page button {
+  cursor: pointer;
+}
+
+.edit_order_page ul {
+  list-style-type: none;
+}
+
+.edit_order_page .product_autocomplete_list ul li {
+  cursor: pointer;
+  margin: 5px 0;
+  border: 1px solid #ccc;
+  width: max-content;
+  padding: 5px;
+}
+
+.edit_order_page .product_autocomplete_list ul li:hover {
+  background-color: #f0f0f0;
+  color: teal;
+}
+
+.edit_order_page #order_items_table {
+  border-collapse: collapse;
+  margin: 30px 0;
+}
+
+.edit_order_page #order_items_table th,
+.edit_order_page #order_items_table td {
+  border: 1px solid;
+  padding: 5px 10px;
+  /* text-align: center; */
+}
+
+.edit_order_page .sku-dropdown {
+  display: block;
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+.edit_order_page .sku-dropdown ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.edit_order_page .sku-dropdown li {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.edit_order_page .sku-dropdown li:hover {
+  background: #f0f0f0;
+  color: teal;
+}
+
+.edit_order_page #generate_order_list_button {
+  width: max-content;
+  cursor: pointer;
+  background-color: #4caf50; /* Green */
+  color: white;
+  margin:20px 0;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+}

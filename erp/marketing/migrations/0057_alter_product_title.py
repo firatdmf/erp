@@ -10,6 +10,16 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Drop any pre-existing index from earlier migrations (0049) so that
+        # AlterField's CREATE INDEX below doesn't collide on environments
+        # where the index already exists.
+        migrations.RunSQL(
+            sql=(
+                "DROP INDEX IF EXISTS marketing_product_title_a2adac67;"
+                "DROP INDEX IF EXISTS marketing_product_title_a2adac67_like;"
+            ),
+            reverse_sql=migrations.RunSQL.noop,
+        ),
         migrations.AlterField(
             model_name='product',
             name='title',

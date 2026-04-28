@@ -372,6 +372,60 @@ class BaseProductView(ModelFormMixin):
             formset.instance = product
             formset.save()
     
+    def handle_attribute_value_images(self, product):
+        """Save per-product color/attribute swatch images.
+
+        Expected POST: attribute_value_images = JSON like
+            {"color": {"red": "https://cdn/.../red.jpg", "blue": "..."}}
+        """
+        from marketing.models import (
+            VariantAttributeValueImage,
+            ProductVariantAttribute,
+            ProductVariantAttributeValue,
+        )
+        raw = self.request.POST.get("attribute_value_images")
+        if not raw:
+            return
+        try:
+            data = json.loads(raw) or {}
+        except json.JSONDecodeError:
+            return
+        if not isinstance(data, dict) or not data:
+            return
+
+        # Normalize attribute name → lowercase trimmed
+        for attr_name, by_value in data.items():
+            if not isinstance(by_value, dict):
+                continue
+            attr_name_norm = (attr_name or '').strip().lower()
+            if not attr_name_norm:
+                continue
+            try:
+                attr = ProductVariantAttribute.objects.filter(name=attr_name_norm).first()
+            except Exception:
+                attr = None
+            if not attr:
+                continue
+
+            for value, url in by_value.items():
+                if not url:
+                    continue
+                value_norm = (value or '').strip().lower().replace(' ', '_')
+                if not value_norm:
+                    continue
+                av = ProductVariantAttributeValue.objects.filter(
+                    product_variant_attribute=attr,
+                    product_variant_attribute_value=value_norm,
+                ).first()
+                if not av:
+                    continue
+
+                VariantAttributeValueImage.objects.update_or_create(
+                    product=product,
+                    attribute_value=av,
+                    defaults={'image_url': url},
+                )
+
     def handle_attributes(self, product):
         """
         Handle Product Attributes from POST data
@@ -1242,6 +1296,9 @@ class ProductCreate(BaseProductView, generic.CreateView):
                 variants_json_str = self.request.POST.get("variants_json", "[]")
             self.handle_variants(self.object, variants_json_str)
 
+            # Save color/attribute swatch images per attribute value
+            self.handle_attribute_value_images(self.object)
+
             # Handle Manufacturing Recipe (BOM)
             self.handle_bom(self.object)
 
@@ -1418,7 +1475,10 @@ class ProductEdit(BaseProductView, generic.UpdateView):
             # Always process variants (needed for image changes)
             if has_variants:
                 self.handle_variants(self.object, variants_json)
-            
+
+            # Save color/attribute swatch images per attribute value
+            self.handle_attribute_value_images(self.object)
+
             # PRIMARY IMAGE LOGIC:
             # 1. If user manually selected a primary image, use that
             # 2. Otherwise auto-set: first variant's first image, or product's first image
@@ -2514,6 +2574,24 @@ def get_products(request):
             prod_attrs_map[pid] = []
         prod_attrs_map[pid].append({"name": a["name"], "value": a["value"], "sequence": a["sequence"]})
 
+    # Build attribute_value_images map per product: { product_id: { attr_name: { value: url } } }
+    attr_value_images_map = {}
+    try:
+        from marketing.models import VariantAttributeValueImage
+        for img in VariantAttributeValueImage.objects.filter(product_id__in=product_ids).select_related(
+            'attribute_value__product_variant_attribute'
+        ):
+            pid = img.product_id
+            attr_name = img.attribute_value.product_variant_attribute.name
+            value = img.attribute_value.product_variant_attribute_value
+            if pid not in attr_value_images_map:
+                attr_value_images_map[pid] = {}
+            if attr_name not in attr_value_images_map[pid]:
+                attr_value_images_map[pid][attr_name] = {}
+            attr_value_images_map[pid][attr_name][value] = img.image_url
+    except Exception:
+        pass
+
     # Build product files map: product_id -> [files]
     prod_files_map = {}
     for f in file_rows:
@@ -2543,6 +2621,7 @@ def get_products(request):
             "primary_image": p.primary_image.file_url if p.primary_image else None,
             "product_attributes": prod_attrs_map.get(p.id, []),
             "product_files": prod_files_map.get(p.id, []),
+            "attribute_value_images": attr_value_images_map.get(p.id, {}),
         }
         for p in products_list
     ]

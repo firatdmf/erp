@@ -1,0 +1,14 @@
+.expense_container, .income_container{
+    border:1px dashed gray;
+    padding:0 20px;
+}
+
+.form_container{
+    display:flex;
+    flex-direction:row;
+    flex-wrap:wrap;
+    justify-content: flex-start;
+    align-items:stretch;
+    /* align-content: flex-start; */
+}
+

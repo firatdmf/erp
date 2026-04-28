@@ -401,7 +401,7 @@
       <div class="lbl">Net Worth (USD)</div>
     </div>
     <div class="wh-stat-card" style="--accent:#f59e0b; --bg:#fef3c7;">
-      <div class="icn"><i class="fa fa-lira-sign"></i></div>
+      <div class="icn" style="font-weight:800;">₺</div>
       <div class="val">₺{{ total_value_try|floatformat:2 }}</div>
       <div class="lbl">Net Worth (TRY)</div>
     </div>
@@ -445,7 +445,7 @@
       <i class="fa fa-dollar-sign"></i> Most valuable (USD)
     </button>
     <button type="button" class="wh-chip {% if sort == 'total_try_desc' %}active{% endif %}" data-sort="total_try_desc" onclick="setWhSort('total_try_desc')">
-      <i class="fa fa-lira-sign"></i> Most valuable (TRY)
+      <span style="font-weight:800; font-size:13px;">₺</span> Most valuable (TRY)
     </button>
     <button type="button" class="wh-chip {% if sort == 'price_desc' %}active{% endif %}" data-sort="price_desc" onclick="setWhSort('price_desc')">
       <i class="fa fa-tag"></i> Most expensive

@@ -21,7 +21,7 @@ def variant_form(variants, product, current_url):
     tag_start = time.time()
     product_variant_list = []
     variant_files_dict = {}
-    # attribute_value_images: { attribute_name (lowercase): { value: image_url } }
+    # attribute_value_images: { attribute_name: { value: { name: "Red", url: "..." } } }
     attribute_value_images = {}
     if product:
         try:
@@ -31,9 +31,11 @@ def variant_form(variants, product, current_url):
             ):
                 attr_name = img.attribute_value.product_variant_attribute.name
                 value = img.attribute_value.product_variant_attribute_value
-                if attr_name not in attribute_value_images:
-                    attribute_value_images[attr_name] = {}
-                attribute_value_images[attr_name][value] = img.image_url
+                display_name = img.display_name or value
+                attribute_value_images.setdefault(attr_name, {})[value] = {
+                    'name': display_name,
+                    'url': img.image_url,
+                }
         except Exception:
             pass
 

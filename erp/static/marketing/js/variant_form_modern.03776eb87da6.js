@@ -249,17 +249,8 @@ function applyExistingAttributeValueImages() {
         const optName = (variantData[optId].name || '').toLowerCase().trim();
         if (!optName || !imagesByAttr[optName]) return;
         if (!variantData[optId].imagesByValue) variantData[optId].imagesByValue = {};
-        Object.entries(imagesByAttr[optName]).forEach(([val, payload]) => {
-            // Accept both new {name, url} and legacy "url" string
-            if (typeof payload === 'string') {
-                variantData[optId].imagesByValue[val] = { url: payload, id: null, display_name: val };
-            } else if (payload && typeof payload === 'object') {
-                variantData[optId].imagesByValue[val] = {
-                    url: payload.url || '',
-                    id: null,
-                    display_name: payload.name || val,
-                };
-            }
+        Object.entries(imagesByAttr[optName]).forEach(([val, url]) => {
+            variantData[optId].imagesByValue[val] = { url, id: null };
         });
     });
     console.log('Loaded attribute value images:', imagesByAttr);
@@ -534,10 +525,9 @@ async function onColorValueImagePick(optionId, valueIndex, fileInput) {
         }
 
         // Persist into variantData using normalized key (matches DB format)
-        // Keep the original case-preserved name as display_name.
         if (!data.imagesByValue) data.imagesByValue = {};
         const key = normalizeAttrValue(valueText);
-        data.imagesByValue[key] = { url, id, display_name: valueText };
+        data.imagesByValue[key] = { url, id };
 
         showColorValueThumb(optionId, valueIndex, url);
         showToast(`Image set for ${valueText}`, 'success');
@@ -2873,18 +2863,14 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`✓ JSON stringify: ${jsonTime.toFixed(2)}ms`);
 
             // ─── Send attribute value images (color swatches) ───
-            // Format: { "color": { "red": { "name": "Red", "url": "..." }, ... } }
+            // Format: { "color": { "red": "url", "blue": "url" }, "material": {...} }
             const attrValueImages = {};
             Object.values(variantData).forEach(opt => {
                 const optName = (opt.name || '').toLowerCase().trim();
                 if (!optName || !opt.imagesByValue) return;
                 const byValue = {};
                 Object.entries(opt.imagesByValue).forEach(([val, info]) => {
-                    if (!info || !info.url) return;
-                    const normKey = val.toLowerCase().replace(/\s+/g, '_');
-                    // Use stored display_name if present, fall back to the original key
-                    const displayName = (info.display_name || val).trim();
-                    byValue[normKey] = { name: displayName, url: info.url };
+                    if (info && info.url) byValue[val.toLowerCase().replace(/\s+/g, '_')] = info.url;
                 });
                 if (Object.keys(byValue).length > 0) attrValueImages[optName] = byValue;
             });

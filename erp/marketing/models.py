@@ -446,9 +446,9 @@ class ProductVariantAttributeValue(models.Model):
 
 
 class VariantAttributeValueImage(models.Model):
-    """Stores a single image per (product, attribute_value) — used for color swatches.
+    """Stores a single image + display name per (product, attribute_value) — used for color swatches.
 
-    Per-product because different products may need different swatches for the
+    Per-product because different products may need different swatches/names for the
     same color value (e.g. velvet red vs. cotton red).
     """
 
@@ -462,6 +462,9 @@ class VariantAttributeValueImage(models.Model):
         on_delete=models.CASCADE,
         related_name='product_images',
     )
+    # Original case-preserved display name (e.g. "Crimson Red"); the
+    # canonical normalized form lives on attribute_value.product_variant_attribute_value.
+    display_name = models.CharField(max_length=255, blank=True, default='')
     image_url = models.URLField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -473,7 +476,8 @@ class VariantAttributeValueImage(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.product.sku} / {self.attribute_value} → {self.image_url[-30:]}"
+        name = self.display_name or self.attribute_value.product_variant_attribute_value
+        return f"{self.product.sku} / {name} → {self.image_url[-30:]}"
 
 
 # class ProductVariantAttributeValue(models.Model):

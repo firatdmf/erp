@@ -373,10 +373,16 @@ class BaseProductView(ModelFormMixin):
             formset.save()
     
     def handle_attribute_value_images(self, product):
-        """Save per-product color/attribute swatch images.
+        """Save per-product color/attribute swatch images with display name.
 
         Expected POST: attribute_value_images = JSON like
-            {"color": {"red": "https://cdn/.../red.jpg", "blue": "..."}}
+            {
+              "color": {
+                "red": {"name": "Red", "url": "https://cdn/.../red.jpg"},
+                "blue": {"name": "Crimson Blue", "url": "..."}
+              }
+            }
+        Also accepts legacy flat form { "red": "url" } for backward compat.
         """
         from marketing.models import (
             VariantAttributeValueImage,
@@ -384,47 +390,73 @@ class BaseProductView(ModelFormMixin):
             ProductVariantAttributeValue,
         )
         raw = self.request.POST.get("attribute_value_images")
+        print(f"\n🎨 [handle_attribute_value_images] raw POST: {raw!r}")
         if not raw:
+            print("  ❌ No POST data — exiting")
             return
         try:
             data = json.loads(raw) or {}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"  ❌ JSON decode error: {e}")
             return
+        print(f"  ✓ Parsed data: {data}")
         if not isinstance(data, dict) or not data:
+            print("  ❌ Empty dict")
             return
 
-        # Normalize attribute name → lowercase trimmed
         for attr_name, by_value in data.items():
+            print(f"  🔍 Processing attr_name={attr_name!r} → values: {list(by_value.keys()) if isinstance(by_value, dict) else by_value}")
             if not isinstance(by_value, dict):
                 continue
             attr_name_norm = (attr_name or '').strip().lower()
             if not attr_name_norm:
                 continue
-            try:
-                attr = ProductVariantAttribute.objects.filter(name=attr_name_norm).first()
-            except Exception:
-                attr = None
+            # Match attribute by case-insensitive normalized name
+            attr = ProductVariantAttribute.objects.filter(name__iexact=attr_name_norm).first()
+            if not attr:
+                # Try with spaces removed (model.save normalization)
+                attr = ProductVariantAttribute.objects.filter(name__iexact=attr_name_norm.replace(' ', '')).first()
+            print(f"    attr lookup '{attr_name_norm}' → pk={attr.pk if attr else None} name={attr.name if attr else None!r}")
             if not attr:
                 continue
 
-            for value, url in by_value.items():
+            for value, payload in by_value.items():
+                # Accept either {"name": ..., "url": ...} or plain url string
+                if isinstance(payload, dict):
+                    url = payload.get('url') or ''
+                    display_name = (payload.get('name') or '').strip()
+                else:
+                    url = (payload or '').strip()
+                    display_name = ''
+
                 if not url:
                     continue
                 value_norm = (value or '').strip().lower().replace(' ', '_')
                 if not value_norm:
                     continue
-                av = ProductVariantAttributeValue.objects.filter(
+
+                # get_or_create — AttributeValue may not exist yet if the user
+                # added a color value but didn't yet pair it with a variant row
+                av, created = ProductVariantAttributeValue.objects.get_or_create(
                     product_variant_attribute=attr,
                     product_variant_attribute_value=value_norm,
-                ).first()
-                if not av:
-                    continue
+                )
+                if created:
+                    print(f"    🆕 Created new attr value '{value_norm}' (pk={av.pk})")
+                else:
+                    print(f"    🔗 Found existing attr value '{value_norm}' (pk={av.pk})")
 
-                VariantAttributeValueImage.objects.update_or_create(
+                # Default display_name to original value if not provided
+                if not display_name:
+                    display_name = value.strip() if value else value_norm
+
+                obj, created = VariantAttributeValueImage.objects.update_or_create(
                     product=product,
                     attribute_value=av,
-                    defaults={'image_url': url},
+                    defaults={'image_url': url, 'display_name': display_name},
                 )
+                action = 'created' if created else 'updated'
+                print(f"    ✅ {action} VariantAttributeValueImage pk={obj.pk} for {display_name!r}")
 
     def handle_attributes(self, product):
         """
@@ -2574,7 +2606,8 @@ def get_products(request):
             prod_attrs_map[pid] = []
         prod_attrs_map[pid].append({"name": a["name"], "value": a["value"], "sequence": a["sequence"]})
 
-    # Build attribute_value_images map per product: { product_id: { attr_name: { value: url } } }
+    # Build attribute_value_images map per product:
+    #   { product_id: { attr_name: { value: { name: "Red", url: "..." } } } }
     attr_value_images_map = {}
     try:
         from marketing.models import VariantAttributeValueImage
@@ -2584,11 +2617,11 @@ def get_products(request):
             pid = img.product_id
             attr_name = img.attribute_value.product_variant_attribute.name
             value = img.attribute_value.product_variant_attribute_value
-            if pid not in attr_value_images_map:
-                attr_value_images_map[pid] = {}
-            if attr_name not in attr_value_images_map[pid]:
-                attr_value_images_map[pid][attr_name] = {}
-            attr_value_images_map[pid][attr_name][value] = img.image_url
+            display_name = img.display_name or value
+            attr_value_images_map.setdefault(pid, {}).setdefault(attr_name, {})[value] = {
+                'name': display_name,
+                'url': img.image_url,
+            }
     except Exception:
         pass
 
@@ -2856,6 +2889,24 @@ def get_product(request):
         "minimum_inventory_level": float(p_min_inv) if p_min_inv is not None else None,
         "primary_image": p_primary_image_url,
     }
+
+    # Attribute value images (color swatches per attribute value)
+    try:
+        from marketing.models import VariantAttributeValueImage
+        avi_map = {}
+        for img in VariantAttributeValueImage.objects.filter(product_id=p_id).select_related(
+            'attribute_value__product_variant_attribute'
+        ):
+            attr_name = img.attribute_value.product_variant_attribute.name
+            value = img.attribute_value.product_variant_attribute_value
+            display_name = img.display_name or value
+            avi_map.setdefault(attr_name, {})[value] = {
+                'name': display_name,
+                'url': img.image_url,
+            }
+        product_fields['attribute_value_images'] = avi_map
+    except Exception:
+        product_fields['attribute_value_images'] = {}
 
     # Files (already JSON dicts from Postgres)
     product_files = [

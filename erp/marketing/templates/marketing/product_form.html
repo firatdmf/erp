@@ -199,6 +199,11 @@
                 <div id="quill-care-en" class="trans-care" data-lang="en"></div>
                 <textarea id="html-care-source-en" class="html-source-area" data-lang="en"></textarea>
               </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Additional Info <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-extra-en" class="trans-extra" data-lang="en"></div>
+                <textarea id="html-extra-source-en" class="html-source-area" data-lang="en"></textarea>
+              </div>
             </div>
             <div class="trans-panel" data-lang="tr">
               <label class="trans-label">Product Name</label>
@@ -212,6 +217,11 @@
               <div class="quill-wrap">
                 <div id="quill-care-tr" class="trans-care" data-lang="tr"></div>
                 <textarea id="html-care-source-tr" class="html-source-area" data-lang="tr"></textarea>
+              </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Ek Bilgi <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-extra-tr" class="trans-extra" data-lang="tr"></div>
+                <textarea id="html-extra-source-tr" class="html-source-area" data-lang="tr"></textarea>
               </div>
             </div>
             <div class="trans-panel" data-lang="ru">
@@ -227,6 +237,11 @@
                 <div id="quill-care-ru" class="trans-care" data-lang="ru"></div>
                 <textarea id="html-care-source-ru" class="html-source-area" data-lang="ru"></textarea>
               </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Дополнительная информация <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-extra-ru" class="trans-extra" data-lang="ru"></div>
+                <textarea id="html-extra-source-ru" class="html-source-area" data-lang="ru"></textarea>
+              </div>
             </div>
             <div class="trans-panel" data-lang="pl">
               <label class="trans-label">Product Name</label>
@@ -240,6 +255,11 @@
               <div class="quill-wrap">
                 <div id="quill-care-pl" class="trans-care" data-lang="pl"></div>
                 <textarea id="html-care-source-pl" class="html-source-area" data-lang="pl"></textarea>
+              </div>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Dodatkowe informacje <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
+              <div class="quill-wrap">
+                <div id="quill-extra-pl" class="trans-extra" data-lang="pl"></div>
+                <textarea id="html-extra-source-pl" class="html-source-area" data-lang="pl"></textarea>
               </div>
             </div>
           </div>
@@ -554,6 +574,16 @@
           <div class="form-group">
             <label for="id_sku">SKU (Stock Keeping Unit)</label>
             {{ form.sku }}
+            {% if product and product.sku %}
+              {% with cat=product.category.name|default:'fabric'|lower %}
+              <a href="https://demfirat.com/tr/product/{{ cat }}/{{ product.sku }}/"
+                 target="_blank" rel="noopener"
+                 style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#3b82f6;text-decoration:none;font-weight:500;">
+                <i class="fas fa-external-link-alt" style="font-size:10px;"></i>
+                View on demfirat.com
+              </a>
+              {% endwith %}
+            {% endif %}
           </div>
           <div class="form-group">
             <label for="id_barcode">Barcode (ISBN, UPC, GTIN, etc.)</label>
@@ -2141,6 +2171,7 @@
   const panels = document.querySelectorAll('.trans-panel');
   const quillEditors = {};
   const quillCareEditors = {};
+  const quillExtraEditors = {};
 
   // ── Tab switching ──
   tabBtns.forEach(btn => {
@@ -2192,6 +2223,21 @@
       });
       quillCareEditors[lang] = careEditor;
       careEditor.on('text-change', syncToDescription);
+    }
+
+    // Additional Info editor
+    const extraContainer = document.getElementById(`quill-extra-${lang}`);
+    if (extraContainer) {
+      const extraEditor = new Quill(extraContainer, {
+        theme: 'snow',
+        modules: { toolbar: toolbarOptions },
+        placeholder: lang === 'en' ? 'Additional info (optional)...'
+          : lang === 'tr' ? 'Ek bilgi (opsiyonel)...'
+          : lang === 'ru' ? 'Дополнительная информация...'
+          : 'Dodatkowe informacje (opcjonalnie)...'
+      });
+      quillExtraEditors[lang] = extraEditor;
+      extraEditor.on('text-change', syncToDescription);
     }
   });
 
@@ -2247,6 +2293,32 @@
     }
   };
 
+  // ── HTML source toggle (additional info) ──
+  window.toggleExtraHtmlSource = function(lang) {
+    const editor = quillExtraEditors[lang];
+    if (!editor) return;
+    const sourceArea = document.getElementById(`html-extra-source-${lang}`);
+    const quillContainer = document.getElementById(`quill-extra-${lang}`).closest('.quill-wrap');
+    const btn = quillContainer.parentElement.querySelector('.html-source-btn');
+    const qlToolbar = quillContainer.querySelector('.ql-toolbar');
+    const qlContainer = quillContainer.querySelector('.ql-container');
+
+    if (sourceArea.classList.contains('visible')) {
+      editor.root.innerHTML = sourceArea.value;
+      sourceArea.classList.remove('visible');
+      qlToolbar.style.display = '';
+      qlContainer.style.display = '';
+      btn.classList.remove('active');
+      syncToDescription();
+    } else {
+      sourceArea.value = editor.root.innerHTML;
+      sourceArea.classList.add('visible');
+      qlToolbar.style.display = 'none';
+      qlContainer.style.display = 'none';
+      btn.classList.add('active');
+    }
+  };
+
   // ── Get description HTML from a language editor ──
   function getDescHtml(lang) {
     const editor = quillEditors[lang];
@@ -2271,6 +2343,18 @@
     return html === '<p><br></p>' ? '' : html;
   }
 
+  // ── Get additional info HTML from a language editor ──
+  function getExtraHtml(lang) {
+    const editor = quillExtraEditors[lang];
+    if (!editor) return '';
+    const sourceArea = document.getElementById(`html-extra-source-${lang}`);
+    if (sourceArea && sourceArea.classList.contains('visible')) {
+      return sourceArea.value.trim();
+    }
+    const html = editor.root.innerHTML.trim();
+    return html === '<p><br></p>' ? '' : html;
+  }
+
   // ── Load existing data from description field ──
   function loadFromDescription() {
     const raw = descField.value.trim();
@@ -2287,6 +2371,9 @@
         }
         if (t.care_instructions && quillCareEditors[lang]) {
           quillCareEditors[lang].root.innerHTML = t.care_instructions;
+        }
+        if (t.additional_info && quillExtraEditors[lang]) {
+          quillExtraEditors[lang].root.innerHTML = t.additional_info;
         }
       });
       updateHasContentDots();
@@ -2305,11 +2392,13 @@
       const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
       const desc = getDescHtml(lang);
       const care = getCareHtml(lang);
-      if (title || desc || care) {
+      const extra = getExtraHtml(lang);
+      if (title || desc || care || extra) {
         translations[lang] = {};
         if (title) translations[lang].title = title;
         if (desc) translations[lang].description = desc;
         if (care) translations[lang].care_instructions = care;
+        if (extra) translations[lang].additional_info = extra;
         hasAny = true;
       }
     });
@@ -2324,7 +2413,8 @@
       const title = (document.querySelector(`.trans-title[data-lang="${lang}"]`)?.value || '').trim();
       const desc = getDescHtml(lang);
       const care = getCareHtml(lang);
-      btn.classList.toggle('has-content', !!(title || desc || care));
+      const extra = getExtraHtml(lang);
+      btn.classList.toggle('has-content', !!(title || desc || care || extra));
     });
   }
 

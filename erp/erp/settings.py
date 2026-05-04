@@ -70,6 +70,7 @@ ALLOWED_HOSTS = [
     "app.nejum.com",
     "www.nejum.com",
     "demfirat.nejum.com",
+    "erp-production-52e2.up.railway.app"
     "erp-2hs3.onrender.com",
     '192.168.1.106',
     '48c4e0a19cf1.ngrok-free.app',
@@ -97,6 +98,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://karvenhome.com",
     "https://www.karvenhome.com",
     "https://demfirat.com",
+    "https://erp-production-52e2.up.railway.app/"
     "https://www.demfirat.com",
 ]
 
@@ -212,6 +214,8 @@ ROOT_URLCONF = "erp.urls"
 # (DB_SCHEMA, BRAND_NAME, …) still take precedence when set, so a
 # deployment can override any single value without losing the rest.
 # ------------------------------------------------------------------
+BRAND = config("BRAND", default="").strip().lower() or "demfirat"
+
 BRAND_DEFAULTS = {
     "demfirat": {
         "DB_SCHEMA": "public",
@@ -228,21 +232,7 @@ BRAND_DEFAULTS = {
         "STOREFRONT_PREVIEW_URL": "http://localhost:3010/",
     },
 }
-
-# `BRAND` is the canonical switch. If it isn't set but `BRAND_NAME`
-# matches a known key (e.g. someone sets BRAND_NAME=belino in .env
-# expecting it to be the switch), accept that as the trigger too —
-# avoids the "I set BRAND_NAME=belino but it still loads Demfirat"
-# foot-gun.
-_brand_explicit = config("BRAND", default="").strip().lower()
-_brand_from_name = config("BRAND_NAME", default="").strip().lower()
-if _brand_explicit and _brand_explicit in BRAND_DEFAULTS:
-    BRAND = _brand_explicit
-elif _brand_from_name and _brand_from_name in BRAND_DEFAULTS:
-    BRAND = _brand_from_name
-else:
-    BRAND = "demfirat"
-_brand_cfg = BRAND_DEFAULTS[BRAND]
+_brand_cfg = BRAND_DEFAULTS.get(BRAND, BRAND_DEFAULTS["demfirat"])
 
 # Each setting: explicit env var wins, else the brand profile default.
 UI_THEME = config("UI_THEME", default=_brand_cfg["UI_THEME"]).strip()

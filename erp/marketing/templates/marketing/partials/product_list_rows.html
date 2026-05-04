@@ -1,91 +1,90 @@
+{% load marketing_tags %}
 {% for product in products %}
-<tr class="product-row" data-id="{{ product.id }}" onclick="toggleVariants({{ product.id }}, this, event)"
-    style="cursor: pointer;">
-    <td>
-        <div class="custom-checkbox row-checkbox" onclick="toggleRowCheckbox(this, event)">
-            <input type="checkbox" name="product_ids" value="{{ product.id }}" style="display: none;">
-        </div>
-    </td>
-    <td>
-        <div class="product-image-box {% if not product.primary_image.file_url %}placeholder{% endif %}">
-            {% if product.primary_image.file_url %}
-            <img src="{{ product.primary_image.thumbnail_url }}"
-                 onerror="this.onerror=null;this.parentElement.classList.add('placeholder');this.remove();this.parentElement.insertAdjacentHTML('afterbegin','<i class=\'fa fa-image\'></i>');">
-            {% else %}
-            <i class="fa fa-image"></i>
-            {% endif %}
-        </div>
-    </td>
-    <td>
-        <a href="{% url 'marketing:product_detail' product.id %}" class="product-name">{{ product.title }}</a>
-        <div class="product-updated">Updated recently</div>
-    </td>
-    <td>
-        <span class="sku-badge">{{ product.sku|default:"-" }}</span>
-    </td>
-    <td>
-        <span style="font-weight: 500; font-size: 13px;">{{ product.category.name|title|default:"-" }}</span>
-    </td>
-    <td>
-        {% for attr in product.attributes.all|slice:":3" %}
-        <span class="attr-tag" title="{{ attr.name }}: {{ attr.value }}">{{ attr.value }}</span>
-        {% empty %}
-        <span style="color: #cbd5e1; font-size: 12px;">-</span>
-        {% endfor %}
-    </td>
-    <td style="text-align: center;">
-        {% with stock=product.total_stock %}
-        <div class="stock-val">{{ stock|floatformat:0|default:"0" }}</div>
-        {% if stock > 500 %}
-        <span class="stock-status-text text-success">High Stock</span>
-        {% elif stock > 0 %}
-        <span class="stock-status-text text-warning">Restock</span>
-        {% else %}
-        <span class="stock-status-text text-danger">OOS</span>
-        {% endif %}
-        {% endwith %}
-    </td>
-    <td>
-        <div style="font-weight: 600; color: #0f172a;">${{ product.price|default:"0.00" }}</div>
-    </td>
-    <td>
-        {% if product.featured %}
-        <span class="status-pill pill-premium">Featured</span>
-        {% else %}
-        <span class="status-pill pill-active">Regular</span>
-        {% endif %}
-    </td>
-    <td>
-        <div style="display: flex; gap: 8px; justify-content: flex-end;">
-            <a href="{% url 'marketing:product_edit' product.id %}" class="btn-expand"
-                style="text-decoration: none; color: inherit;">
-                <i class="fa fa-pencil"></i>
-            </a>
-            <button class="btn-expand" onclick="toggleVariants({{ product.id }}, this.closest('tr')); return false;">
-                <i class="fa fa-chevron-right"></i>
-            </button>
-        </div>
-    </td>
-</tr>
+{% with stock=product.total_stock %}
+<div class="pr-wrap" id="prod-{{ product.id }}"
+     data-id="{{ product.id }}">
+  <div class="pr" onclick="toggleVariants({{ product.id }}, this.parentElement, event)">
+    <label class="pr-check" onclick="event.stopPropagation();">
+      <input type="checkbox" name="product_ids" value="{{ product.id }}"
+             onchange="updateBulkActions()">
+    </label>
 
-<!-- Expanded Variants Row (Lazy Loaded) -->
-<tr class="variant-row" id="variants-{{ product.id }}">
-    <td colspan="10" style="padding: 0; border: none;">
-        <div class="variant-box" hx-get="{% url 'marketing:product_variants' product.id %}"
-            hx-trigger="variant-load once" hx-swap="innerHTML">
-            <div style="text-align: center; padding: 20px; color: #94a3b8;">
-                <i class="fa fa-spinner fa-spin"></i> Loading variants...
-            </div>
-        </div>
-    </td>
-</tr>
+    <div class="pr-img">
+      {% if product.primary_image.file_url %}
+        <img class="pl-thumb"
+             src="{{ product.primary_image.thumbnail_url }}"
+             alt="{{ product|product_name }}"
+             onerror="this.outerHTML='<div class=&quot;pl-thumb-fallback&quot;><i data-lucide=&quot;image&quot;></i></div>';">
+      {% else %}
+        <div class="pl-thumb-fallback"><i data-lucide="image"></i></div>
+      {% endif %}
+    </div>
+
+    <div class="pr-text">
+      <a class="pr-name" href="{% url 'marketing:product_detail' product.id %}"
+         onclick="event.stopPropagation();" style="text-decoration: none;">
+        {{ product|product_name }}
+      </a>
+      <div class="pr-sub">
+        <span class="pr-sku">{{ product.sku|default:"—" }}</span>
+        {% if product.category.name %}
+          <span class="pr-cat">{{ product.category.name|title }}</span>
+        {% endif %}
+        {% if product.variant_count %}
+          <span class="pr-vars">
+            <span class="pr-vars-l">{{ product.variant_count }} variants</span>
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="pr-stock {% if stock <= 0 %}out{% elif stock < 10 %}low{% endif %}">
+      <i data-lucide="{% if stock <= 0 %}package-x{% else %}boxes{% endif %}"></i>
+      <div>
+        <div class="pr-stock-num">{{ stock|floatformat:0|default:"0" }}</div>
+        <div class="pr-stock-l">stock</div>
+      </div>
+    </div>
+
+    <div class="pr-price">
+      ${{ product.price|default:"0.00" }}
+    </div>
+
+    <span class="pr-status pc-status {% if stock <= 0 %}out{% elif stock < 10 %}low{% else %}on{% endif %}">
+      <span class="dot"></span>
+      {% if stock <= 0 %}Out of stock
+      {% elif stock < 10 %}Low stock
+      {% elif product.featured %}Featured
+      {% else %}Active{% endif %}
+    </span>
+
+    <div class="pr-up">{{ product.created_at|timesince|default:"—" }}</div>
+
+    <div class="pr-actions">
+      <button title="Show variants" type="button" class="pr-expand"
+              onclick="event.stopPropagation(); toggleVariants({{ product.id }}, this.closest('.pr-wrap'));">
+        <i data-lucide="chevron-down"></i>
+      </button>
+    </div>
+  </div>
+
+  {# === EXPANDABLE VARIANT PANEL (lazy-loaded via HTMX) === #}
+  <div class="pr-variants" id="variants-{{ product.id }}">
+    <div class="variant-box"
+         hx-get="{% url 'marketing:product_variants' product.id %}"
+         hx-trigger="variant-load once"
+         hx-swap="innerHTML">
+      <div class="htmx-loader">
+        <i class="fa fa-spinner fa-spin"></i> Loading variants…
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
 {% empty %}
-<tr>
-    <td colspan="10" style="text-align: center; padding: 48px;">
-        <div style="margin-bottom: 16px; font-size: 48px; color: #e2e8f0;">
-            <i class="fa fa-box-open"></i>
-        </div>
-        <h3 style="margin: 0; color: #64748b;">No products found</h3>
-    </td>
-</tr>
+<div class="pl-empty">
+  <span class="pl-empty-ico"><i data-lucide="search-x"></i></span>
+  <h3>No matching products found</h3>
+  <p>Try changing the filters or running a different search.</p>
+</div>
 {% endfor %}

@@ -29,7 +29,11 @@ def dashboard_component(csrf_token,path,member):
     from django.db.models import Count, Q, Case, When, IntegerField
     from django.db.models.functions import TruncDate
     
-    today_date = django_timezone.now().date()
+    # Use the LOCAL date (settings.TIME_ZONE = Europe/Istanbul) — using
+    # django_timezone.now().date() directly returns UTC, which slips a
+    # day during the late-evening hours and breaks "today vs overdue"
+    # bucketing.
+    today_date = django_timezone.localtime(django_timezone.now()).date()
     
     # ⚡ Single query for today's leads (contacts + companies)
     from django.db.models import Sum
@@ -119,13 +123,145 @@ def dashboard_component(csrf_token,path,member):
     
     tasks_calendar_data = json.dumps(dict(tasks_by_date))
     
-    return render_to_string('components/dashboard_new.html',{
+    # Per-brand theme: Nejum profile uses dashboard_nejum.html which
+    # mirrors the design kit's ScreenHome 1:1. Other tenants (e.g.
+    # demfirat) keep dashboard_new.html — original layout untouched.
+    from django.conf import settings as _dj_settings
+    _theme = getattr(_dj_settings, 'UI_THEME', '')
+
+    # ALL of this user's OPEN tasks for the Nejum dashboard. Completed
+    # tasks are filtered out at the DB query so they never show up on
+    # the calendar list view. Hand the full set to the client and let
+    # JS slice by selected day. Demfirat path skips this work.
+    all_tasks_by_date = {}
+    today_tasks_data = []
+    delegated_tasks_data = []
+    if _theme == 'nejum' and member:
+        try:
+            qs = (
+                Task.objects
+                .filter(member=member, completed=False)
+                .order_by('-due_date', 'priority', 'id')[:200]
+            )
+
+            # Delegated = tasks where the user is in `assignees` but not
+            # the owner (`member`). Captures "tasks others assigned to me".
+            # NOTE: distinct() must come BEFORE the slice — calling it
+            # on a sliced QuerySet raises TypeError, which previously
+            # got swallowed by the surrounding except and cleared every
+            # other list.
+            delegated_qs = (
+                Task.objects
+                .filter(assignees=member, completed=False)
+                .exclude(member=member)
+                .distinct()
+                .order_by('-due_date', 'priority', 'id')[:200]
+            )
+            for t in qs:
+                age_days = (today_date - t.due_date).days
+                if age_days >= 14:
+                    aging = {'label': f'{age_days}d', 'tone': 'red'}
+                elif age_days >= 1:
+                    aging = {'label': f'{age_days}d', 'tone': 'amber'}
+                elif age_days == 0:
+                    aging = {'label': 'Today', 'tone': 'green'}
+                elif age_days == -1:
+                    aging = {'label': 'Tomorrow', 'tone': 'green'}
+                else:
+                    aging = {'label': f'in {abs(age_days)}d', 'tone': 'amber'}
+                assignee = t.member.user.first_name if (t.member and t.member.user and t.member.user.first_name) else (t.member.user.username if (t.member and t.member.user) else '?')
+                payload = {
+                    'id': t.id,
+                    'name': t.name,
+                    'priority': (t.priority or 'medium'),
+                    'date_label': t.due_date.strftime('%d.%m.%Y'),
+                    # ISO date string for client-side sorting/grouping
+                    'date_iso': t.due_date.isoformat(),
+                    'aging_label': aging['label'],
+                    'aging_tone': aging['tone'],
+                    'assignee': assignee,
+                    'avatar_letter': (assignee[:1] or '?').upper(),
+                    'completed': bool(t.completed),
+                }
+                key = t.due_date.isoformat()  # YYYY-MM-DD
+                all_tasks_by_date.setdefault(key, []).append(payload)
+                # Initial server-rendered list = today's open + every
+                # still-open earlier (overdue) task. Mirrors the JS
+                # default landing view so the page paints right away.
+                # Future tasks are excluded by design.
+                if t.due_date <= today_date:
+                    today_tasks_data.append(payload)
+
+            # Sort the initial list to match the JS default order:
+            # today's tasks first (priority high→low), then overdue
+            # newest-past first. Server-side rendering paints the same
+            # order JS would render right after hydration.
+            _prio = {'urgent': 0, 'high': 1, 'medium': 2, 'low': 3}
+            _today_iso = today_date.isoformat()
+            today_tasks_data.sort(key=lambda p: (
+                0 if p['date_iso'] == _today_iso else 1,    # today first
+                -int(''.join(p['date_iso'].split('-')))      # newer past before older past
+                  if p['date_iso'] != _today_iso else 0,
+                _prio.get(p['priority'], 9),                  # priority within day
+            ))
+
+            # Delegated tasks payload — same shape so the existing
+            # task-card template works without branching.
+            for t in delegated_qs:
+                age_days = (today_date - t.due_date).days
+                if age_days >= 14:
+                    aging = {'label': f'{age_days}d', 'tone': 'red'}
+                elif age_days >= 1:
+                    aging = {'label': f'{age_days}d', 'tone': 'amber'}
+                elif age_days == 0:
+                    aging = {'label': 'Today', 'tone': 'green'}
+                elif age_days == -1:
+                    aging = {'label': 'Tomorrow', 'tone': 'green'}
+                else:
+                    aging = {'label': f'in {abs(age_days)}d', 'tone': 'amber'}
+                # Show the original owner as the "from" person on the card
+                owner = t.member.user.first_name if (t.member and t.member.user and t.member.user.first_name) else (t.member.user.username if (t.member and t.member.user) else '?')
+                delegated_tasks_data.append({
+                    'id': t.id,
+                    'name': t.name,
+                    'priority': (t.priority or 'medium'),
+                    'date_label': t.due_date.strftime('%d.%m.%Y'),
+                    'date_iso': t.due_date.isoformat(),
+                    'aging_label': aging['label'],
+                    'aging_tone': aging['tone'],
+                    'assignee': owner,  # who delegated it to me
+                    'avatar_letter': (owner[:1] or '?').upper(),
+                    'completed': bool(t.completed),
+                })
+        except Exception as _e:
+            # Surface the cause instead of silently swallowing it —
+            # last time this hid a slice-then-distinct bug for a while.
+            import traceback as _tb
+            print(f"[dashboard_component] task fetch failed: {_e}")
+            _tb.print_exc()
+            today_tasks_data = []
+            all_tasks_by_date = {}
+            delegated_tasks_data = []
+
+    template = (
+        'components/dashboard_nejum.html' if _theme == 'nejum'
+        else 'components/dashboard_new.html'
+    )
+    return render_to_string(template, {
         'csrf_token':csrf_token,
         'number_of_leads_added':number_of_leads_added,
         'pending_tasks_count':pending_tasks_count,
         'my_tasks_count':my_tasks_count,
         'assigned_tasks_count':assigned_tasks_count,
         'tasks_calendar_data':tasks_calendar_data,
+        'today_tasks':today_tasks_data,
+        'today_date':today_date,
+        # JSON dict { 'YYYY-MM-DD': [ {task...}, ... ] } consumed by
+        # the Nejum dashboard JS for day-by-day filtering.
+        'tasks_by_date_json': json.dumps(all_tasks_by_date),
+        # Tasks assigned TO me by others (TeamTask-lite via Task.assignees)
+        'delegated_tasks_json': json.dumps(delegated_tasks_data),
+        'assigned_tasks_count': len(delegated_tasks_data),
         # 'country_of_the_day':country_of_the_day,
         'path':path,
         'member':member,

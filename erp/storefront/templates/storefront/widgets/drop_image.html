@@ -1,0 +1,23 @@
+{% comment %}
+Drop-zone image input. Replaces the default <input type="file"> with a
+Shopify-style outlined zone that previews the chosen file inline. Uses
+data-attrs so storefront.js can wire up drag-drop after DOMContentLoaded.
+{% endcomment %}
+<div class="sf-drop" data-sf-drop>
+  <input type="file" name="{{ widget.name }}" accept="{{ widget.attrs.accept|default:'image/*' }}"
+         {% include "django/forms/widgets/attrs.html" %}
+         class="sf-drop-input" />
+  <div class="sf-drop-zone">
+    <div class="sf-drop-icon" aria-hidden="true">
+      <i data-lucide="image-up"></i>
+    </div>
+    <div class="sf-drop-cta">
+      <strong>Görseli sürükle</strong> veya <span class="sf-drop-link">dosya seç</span>
+    </div>
+    <div class="sf-drop-hint">PNG / JPG / WebP · max 4MB</div>
+  </div>
+  <div class="sf-drop-preview" hidden>
+    <img alt="" />
+    <button type="button" class="sf-drop-clear" aria-label="Temizle">×</button>
+  </div>
+</div>

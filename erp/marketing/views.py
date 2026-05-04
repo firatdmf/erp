@@ -1,6 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 import time
+import sys as _sys
+try:
+    _sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    _sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 from django.views import View, generic
 from django.views.generic.edit import ModelFormMixin
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, Http404
@@ -2652,6 +2658,8 @@ def get_products(request):
             "price": p.price,
             "prices": _convert_price(p.price, rates),
             "primary_image": p.primary_image.file_url if p.primary_image else None,
+            "is_packaged": bool(p.is_packaged),
+            "pack_count": int(p.pack_count) if p.pack_count else None,
             "product_attributes": prod_attrs_map.get(p.id, []),
             "product_files": prod_files_map.get(p.id, []),
             "attribute_value_images": attr_value_images_map.get(p.id, {}),

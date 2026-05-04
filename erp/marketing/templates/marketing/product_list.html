@@ -1,1226 +1,425 @@
 {% extends "base.html" %}
 {% load static %}
-<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
 {% block css %}
+<link rel="stylesheet" href="{% static 'marketing/css/products_v2.css' %}?v=1">
 <style>
-  /* ============================================
- * Product Catalog - Premium Modern ERP Design
- * ============================================ */
-
-  /* Base with soft gradient background */
-  .product-catalog {
-    background:
-      radial-gradient(ellipse 1200px 600px at 0% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse 900px 400px at 100% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-      #f8fafc;
-    min-height: 100vh;
-    padding: 16px 8px 24px;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    color: #0f172a;
-  }
-
-  /* ─── Hero Header ─── */
-  .catalog-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 28px;
-    padding: 0;
-  }
-
-  .catalog-title h1 {
-    font-size: 32px;
-    font-weight: 800;
-    color: #0f172a;
-    margin: 0 0 6px 0;
-    letter-spacing: -1px;
-    background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .catalog-title p {
-    font-size: 14px;
-    color: #64748b;
-    margin: 0;
-    font-weight: 500;
-  }
-
-  .compact-mode {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 10px 18px;
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    border-radius: 999px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    font-size: 13px;
-    font-weight: 600;
-    color: #475569;
-    transition: all 0.2s;
-  }
-
-  .compact-mode:hover {
-    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-    border-color: rgba(59, 130, 246, 0.3);
-  }
-
-  /* ─── Stats Row ─── */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 28px;
-  }
-
-  .stat-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 20px 22px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.25s cubic-bezier(.4,0,.2,1);
-    cursor: default;
-  }
-
-  .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--stat-accent, #3b82f6);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.15);
-    border-color: transparent;
-  }
-
-  .stat-card:hover::before { opacity: 1; }
-
-  .stat-card-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    margin-bottom: 12px;
-    background: var(--stat-bg, #eff6ff);
-    color: var(--stat-accent, #3b82f6);
-  }
-
-  .stat-card-value {
-    font-size: 26px;
-    font-weight: 800;
-    color: #0f172a;
-    line-height: 1;
-    margin-bottom: 6px;
-    letter-spacing: -0.5px;
-  }
-
-  .stat-card-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-  }
-
-  @media (max-width: 1100px) {
-    .stats-row { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  .toggle-switch {
-    width: 36px;
-    height: 20px;
-    background: #e2e8f0;
-    border-radius: 10px;
-    position: relative;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .toggle-switch::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    background: white;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  }
-
-  .toggle-switch.active {
-    background: #3b82f6;
-  }
-
-  .toggle-switch.active::after {
-    left: 18px;
-  }
-
-  /* ─── Category Filter Pills ─── */
-  .category-chips {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .cat-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: #fff;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #475569;
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.2s cubic-bezier(.4,0,.2,1);
-    text-decoration: none;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .cat-chip::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
-    opacity: 0;
-    transition: opacity 0.25s;
-    z-index: 0;
-  }
-
-  .cat-chip > * {
-    position: relative;
-    z-index: 1;
-  }
-
-  .cat-chip:hover {
-    border-color: #3b82f6;
-    color: #1e40af;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
-  }
-
-  .cat-chip.active {
-    border-color: transparent;
-    color: #fff;
-  }
-
-  .cat-chip.active::before { opacity: 1; }
-
-  .cat-chip.active:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
-  }
-
-  .cat-chip .cat-count {
-    background: #f1f5f9;
-    color: #64748b;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1.2;
-    transition: all 0.2s;
-  }
-
-  .cat-chip.active .cat-count {
-    background: rgba(255, 255, 255, 0.22);
-    color: #fff;
-  }
-
-  /* Filter Bar */
-  .filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-  }
-
-
-  /* Row entrance animation */
-  /* Search — absolute-positioned icon, full-width input */
-  .catalog-search-wrapper {
-    position: relative;
-    flex: 0 0 420px;
-    max-width: 420px;
-    height: 48px;
-  }
-
-  input.catalog-search-input,
-  input[type="text"].catalog-search-input {
-    width: 100%;
-    height: 100%;
-    padding: 0 44px 0 44px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 12px;
-    background: #fff;
-    font-size: 14px;
-    font-weight: 500;
-    color: #0f172a;
-    font-family: inherit;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-    transition: border-color 0.2s, box-shadow 0.2s;
-    box-sizing: border-box;
-    display: block;
-  }
-
-  input.catalog-search-input:focus,
-  input[type="text"].catalog-search-input:focus {
-    outline: none;
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
-  }
-
-  .catalog-search-input::placeholder {
-    color: #94a3b8;
-    font-weight: 400;
-  }
-
-  .catalog-search-icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #94a3b8;
-    font-size: 14px;
-    pointer-events: none;
-  }
-
-  .catalog-search-wrapper:focus-within .catalog-search-icon { color: #6366f1; }
-
-  /* Clear button */
-  .search-clear {
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 22px;
-    height: 22px;
-    border: none;
-    background: #e2e8f0;
-    color: #64748b;
-    border-radius: 50%;
-    cursor: pointer;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    transition: all 0.15s;
-    padding: 0;
-  }
-
-  .search-clear:hover { background: #cbd5e1; color: #0f172a; }
-  .search-clear.show { display: flex; }
-
-  .filter-btn {
-    height: 48px;
-    padding: 0 18px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 14px;
-    background: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    color: #334155;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(.4,0,.2,1);
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-  }
-
-  .filter-btn:hover {
-    border-color: #6366f1;
-    color: #6366f1;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.15);
-  }
-
-  .filter-btn:hover i { color: #6366f1; }
-
-  .filter-btn i {
-    color: #64748b;
-    font-size: 12px;
-  }
-
-  .actions-right {
-    margin-left: auto;
-    display: flex;
-    gap: 12px;
-  }
-
-  .btn-primary {
-    height: 48px;
-    padding: 0 22px;
-    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
-    color: white;
-    border: none;
-    border-radius: 14px;
-    font-size: 14px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(.4,0,.2,1);
-    text-decoration: none;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .btn-primary::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.6s;
-  }
-
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
-  }
-
-  .btn-primary:hover::before { left: 100%; }
-
-  /* Table Design */
-  .table-card {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
-  }
-
-  .product-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .product-table th {
-    background: linear-gradient(to bottom, #fcfcfd, #f1f5f9);
-    padding: 16px 20px;
-    text-align: left;
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  .product-table td {
-    padding: 16px 20px;
-    vertical-align: middle;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 14px;
-    color: #334155;
-    transition: background-color 0.18s ease;
-  }
-
-  .product-row {
-    transition: background-color 0.18s ease;
-  }
-
-  .product-row:hover {
-    background: #f7f9fc;
-  }
-
-  .product-row:hover td {
-    background: #f7f9fc;
-  }
-
-  .product-row.expanded {
-    background: #eef4ff;
-  }
-
-  .product-row.expanded td {
-    background: #eef4ff;
-  }
-
-  /* Checkbox */
-  .custom-checkbox {
-    width: 18px;
-    height: 18px;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    position: relative;
-  }
-
-  .custom-checkbox:hover {
-    border-color: #6366f1;
-    background: #eef2ff;
-  }
-
-  .custom-checkbox.checked {
-    background: linear-gradient(135deg, #6366f1, #3b82f6);
-    border-color: transparent;
-  }
-
-  .custom-checkbox.checked::after {
-    content: '\2713';
-    color: #fff;
-    font-size: 11px;
-    font-weight: 900;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-  }
-
-  /* Image */
-  .product-image-box {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .product-row:hover .product-image-box {
-    transform: scale(1.05);
-    box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.15);
-  }
-
-  .product-image-box img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .product-image-box.placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #94a3b8;
-    background: #f8fafc;
-    border-color: #e2e8f0;
-  }
-
-  /* Hide fallback font-awesome icon; show SVG placeholder instead */
-  .product-image-box.placeholder i { display: none; }
-
-  .product-image-box.placeholder::before {
-    content: '';
-    width: 60%;
-    height: 60%;
-    background-color: #94a3b8;
-    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2' ry='2'/><circle cx='8.5' cy='8.5' r='1.5'/><polyline points='21 15 16 10 5 21'/></svg>");
-            mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2' ry='2'/><circle cx='8.5' cy='8.5' r='1.5'/><polyline points='21 15 16 10 5 21'/></svg>");
-    -webkit-mask-repeat: no-repeat;
-            mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-            mask-position: center;
-    -webkit-mask-size: contain;
-            mask-size: contain;
-  }
-
-  /* Product Info */
-  .product-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: #1e293b;
-    text-decoration: none;
-    display: block;
-    margin-bottom: 3px;
-    transition: color 0.15s ease;
-  }
-
-  .product-name:hover {
-    color: #6366f1;
-  }
-
-  .product-updated {
-    font-size: 11.5px;
-    color: #94a3b8;
-    font-weight: 500;
-  }
-
-  /* SKU Badge */
-  .sku-badge {
-    font-family: 'SF Mono', 'JetBrains Mono', 'Menlo', monospace;
-    font-size: 12px;
-    color: #475569;
-    background: #f1f5f9;
-    padding: 4px 10px;
-    border-radius: 6px;
-    letter-spacing: -0.3px;
-    font-weight: 600;
-    border: 1px solid #e2e8f0;
-  }
-
-  /* Attributes */
-  .attr-tag {
-    display: inline-flex;
-    padding: 3px 10px;
-    background: #fff;
-    color: #475569;
-    border-radius: 999px;
-    font-size: 11.5px;
-    font-weight: 600;
-    border: 1px solid #e2e8f0;
-    margin: 2px 4px 2px 0;
-    transition: all 0.15s ease;
-  }
-
-  .attr-tag:hover {
-    border-color: #cbd5e1;
-    background: #f8fafc;
-  }
-
-  /* Stock */
-  .stock-val {
-    font-size: 15px;
-    font-weight: 800;
-    color: #0f172a;
-    letter-spacing: -0.3px;
-  }
-
-  .stock-status-text {
-    font-size: 10.5px;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 3px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-  }
-
-  .stock-status-text::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
-  }
-
-  .text-success {
-    color: #16a34a;
-  }
-
-  .text-warning {
-    color: #d97706;
-  }
-
-  .text-danger {
-    color: #dc2626;
-  }
-
-  /* Status Badges */
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    border-radius: 999px;
-    font-size: 11.5px;
-    font-weight: 700;
-    letter-spacing: 0.2px;
-    border: 1px solid transparent;
-  }
-
-  .status-pill::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-
-  .pill-active {
-    background: #ecfdf5;
-    color: #047857;
-    border-color: #a7f3d0;
-  }
-
-  .pill-low {
-    background: #fff7ed;
-    color: #c2410c;
-    border-color: #fed7aa;
-  }
-
-  .pill-discontinued {
-    background: #f8fafc;
-    color: #64748b;
-    border-color: #e2e8f0;
-  }
-
-  .pill-premium {
-    background: #eef2ff;
-    color: #4338ca;
-    border-color: #c7d2fe;
-  }
-
-  /* Expand / Action Buttons */
-  .btn-expand {
-    width: 32px;
-    height: 32px;
-    border: 1px solid transparent;
-    background: transparent;
-    color: #94a3b8;
-    border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.18s ease;
-  }
-
-  .btn-expand:hover {
-    background: #eef2ff;
-    color: #6366f1;
-    border-color: #c7d2fe;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px -2px rgba(99, 102, 241, 0.25);
-  }
-
-  .expanded .btn-expand[onclick*="toggleVariants"] {
-    transform: rotate(90deg);
-    background: #eef2ff;
-    color: #6366f1;
-    border-color: #c7d2fe;
-  }
-
-  /* Variant Row */
-  .variant-row {
-    display: none;
-  }
-
-  .variant-row.show {
-    display: table-row;
-  }
-
-  .variant-box {
-    background: #f8fafc;
-    padding: 24px 32px 24px 84px;
-    border-top: 1px solid #e2e8f0;
-    border-bottom: 1px solid #e2e8f0;
-    box-shadow: inset 0 4px 6px -4px rgba(0, 0, 0, 0.05);
-  }
-
-  .variant-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 2px solid #e2e8f0;
-  }
-
-  .variant-title {
-    font-size: 12px;
-    font-weight: 700;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .add-variant-link {
-    font-size: 12px;
-    font-weight: 600;
-    color: #3b82f6;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .add-variant-link:hover {
-    text-decoration: underline;
-  }
-
-  .v-table {
-    width: 100%;
-  }
-
-  .v-table td {
-    padding: 12px 16px;
-    font-size: 13px;
-    color: #334155;
-    border-bottom: 1px solid #e2e8f0;
-    background: transparent;
-  }
-
-  .v-table tr:last-child td {
-    border-bottom: none;
-  }
-
-  .v-name {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-weight: 500;
-  }
-
-  .v-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #3b82f6;
-    box-shadow: 0 0 0 2px #dbeafe;
-  }
-
-  /* Modals (Hidden by Default) */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(4px);
-    z-index: 1000;
-    display: none;
-    /* Hidden by default */
-    align-items: center;
-    justify-content: center;
-  }
-
-  .modal-backdrop.show {
-    display: flex;
-  }
-
-  .modal-card {
-    background: white;
-    width: 100%;
-    max-width: 440px;
-    border-radius: 16px;
-    padding: 32px;
-    text-align: center;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: modalSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  @keyframes modalSlide {
-    from {
-      transform: translateY(20px);
-      opacity: 0;
-    }
-
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  .modal-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    margin: 0 auto 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-  }
-
-  .modal-icon.danger {
-    background: #fef2f2;
-    color: #dc2626;
-  }
-
-  .modal-icon.info {
-    background: #eff6ff;
-    color: #3b82f6;
-  }
-
-  .modal-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 8px;
-  }
-
-  .modal-desc {
-    font-size: 14px;
-    color: #64748b;
-    margin-bottom: 24px;
-    line-height: 1.5;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-
-  .btn-secondary {
-    padding: 10px 20px;
-    background: white;
-    border: 1px solid #cbd5e1;
-    color: #475569;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .btn-secondary:hover {
-    background: #f8fafc;
-    border-color: #94a3b8;
-  }
-
-  .btn-danger {
-    padding: 10px 20px;
-    background: #dc2626;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2);
-  }
-
-  .btn-danger:hover {
-    background: #b91c1c;
-    transform: translateY(-1px);
-  }
-
-  /* Pagination Top Border */
-  .pagination-container {
-    border-top: 1px solid #e2e8f0;
-    padding: 16px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #f8fafc;
-    /* Subtle contrast footer */
-  }
-
-  /* Fixed height pagination buttons */
-  .pagination-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 32px;
-    min-width: 32px;
-    padding: 0 12px;
-    font-size: 13px;
-    font-weight: 500;
-    border-radius: 6px;
-    text-decoration: none;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-    line-height: 1;
-  }
-
-  .pagination-btn.active {
-    background: #3b82f6;
-    color: white;
-    border-color: #3b82f6;
-  }
-
-  .pagination-btn.neutral {
-    background: white;
-    border-color: #cbd5e1;
-    color: #475569;
-  }
-
-  .pagination-btn.neutral:hover {
-    border-color: #94a3b8;
-    color: #0f172a;
-    background: #f8fafc;
-  }
+/* === Local overrides + missing token fallbacks === */
+.pl { padding: 22px 28px 100px; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; color: #0F1419; }
+.pl, .pl * { box-sizing: border-box; }
+.pl .pl-head-r .pl-btn { text-decoration: none; }
+.pl .pl-search input::placeholder { color: #6B7680; }
+.pl-thumb {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block;
+}
+.pl-thumb-fallback {
+  width: 100%; height: 100%; border-radius: 10px;
+  background: linear-gradient(135deg, #EEF1F5, #DDE3E7);
+  display: flex; align-items: center; justify-content: center;
+  color: #9AA5AD;
+}
+.pl-thumb-fallback i { width: 22px; height: 22px; }
+
+/* PR row image override (img, not gradient) */
+.pl-list .pr-img { background: #F4F7FB; padding: 0; overflow: hidden; }
+.pl-list .pr-img::after { display: none; }
+
+/* Tab line animation + kill scrollbar arrows */
+.pl-tabs {
+  overflow-x: visible !important;
+  scrollbar-width: none;
+  position: relative;
+}
+.pl-tabs::-webkit-scrollbar { display: none; }
+.pl-tab {
+  position: relative;
+  border-bottom: 2px solid transparent !important;
+  transition: color 200ms ease;
+}
+.pl-tab::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--nejum-teal-500, #008080);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pl-tab.active::after { transform: scaleX(1); }
+.pl-tab.active { border-bottom-color: transparent !important; }
+
+/* PR-expand chevron — make it visible + premium */
+.pr-actions { display: flex !important; gap: 6px; justify-content: flex-end; align-items: center; }
+.pr-expand {
+  display: inline-flex !important;
+  align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  background: white;
+  border: 1px solid #E2E8EE;
+  border-radius: 8px;
+  color: #4D5760;
+  cursor: pointer;
+  padding: 0;
+  transition: all 160ms;
+}
+.pr-expand i { width: 14px; height: 14px; transition: transform 240ms cubic-bezier(0.22,1,0.36,1); }
+.pr-expand:hover { border-color: #008080; color: #00696A; background: #E5F1F0; }
+.pr-wrap.open .pr-expand {
+  background: #0F1419;
+  border-color: #0F1419;
+  color: white;
+}
+.pr-wrap.open .pr-expand i { transform: rotate(180deg); }
+
+/* Search section polish — strip inherited global input styles */
+.pl-search { flex: 1 1 320px !important; max-width: 480px !important; }
+.pl-search input,
+.pl-search input[type="text"] {
+  border: 0 !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 10px 8px !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+}
+.pl-search input:focus,
+.pl-search input:hover,
+.pl-search input:active {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.pl-search i:first-child { width: 16px !important; height: 16px !important; }
+.pl-search .pl-kbd { flex-shrink: 0; }
+
+/* Variant lazy box inside pr-variants */
+.pr-wrap .pr-variants { display: none; padding: 4px 18px 18px 126px; }
+.pr-wrap.open .pr-variants { display: block; }
+.pr-wrap .variant-box { background: white; border: 1px solid #E2E8EE; border-radius: 10px; padding: 14px; min-height: 60px; }
+.pr-wrap .variant-box .htmx-loader { color: #9AA5AD; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; }
+
+/* HTMX search loader */
+.pl-search-loader { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; }
+.htmx-request .pl-search-loader { display: inline-flex; }
+.pl-search-loader i { width: 14px; height: 14px; color: #008080; animation: pl-spin 700ms linear infinite; }
+@keyframes pl-spin { to { transform: translateY(-50%) rotate(360deg); } }
+
+/* Modals — light polish */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,23,31,0.55);
+  z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-backdrop.show { display: flex; }
+.modal-card {
+  background: white; border-radius: 16px;
+  padding: 28px 28px 22px;
+  max-width: 460px; width: 100%;
+  box-shadow: 0 24px 60px rgba(15,23,31,0.30);
+  text-align: center;
+}
+.modal-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  font-size: 22px;
+}
+.modal-icon.danger { background: #FEE2E2; color: #B91C1C; }
+.modal-icon.info { background: #DBEAFE; color: #1D4ED8; }
+.modal-title { font: 700 18px 'Plus Jakarta Sans', sans-serif; color: #0F1419; margin: 0 0 6px; }
+.modal-desc { font: 500 13px 'Plus Jakarta Sans', sans-serif; color: #6B7680; margin: 0 0 20px; line-height: 1.5; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.modal-actions .btn-secondary,
+.modal-actions .btn-danger,
+.modal-actions .btn-primary {
+  padding: 9px 16px; font: 600 13px 'Plus Jakarta Sans', sans-serif;
+  border-radius: 9px; cursor: pointer; border: 1px solid transparent;
+}
+.modal-actions .btn-secondary { background: white; border-color: #E0E6EE; color: #4D5760; }
+.modal-actions .btn-secondary:hover { background: #F8FAFC; }
+.modal-actions .btn-danger { background: #DC2626; color: white; }
+.modal-actions .btn-danger:hover { background: #B91C1C; }
+.modal-actions .btn-primary { background: linear-gradient(180deg, #008080, #00696A); color: white; }
+.modal-actions .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
-{% endblock %}
+{% endblock css %}
 
 {% block content %}
-<div class="product-catalog">
+<div class="pl" id="productListRoot">
 
-  <!-- Header -->
-  <div class="catalog-header">
-    <div class="catalog-title">
-      <h1>Product Catalog</h1>
-      <p>Manage inventory, variants, and pricing.</p>
+  {# ==================== HEADER ==================== #}
+  <header class="pl-head">
+    <div class="pl-head-l">
+      <div>
+        <div class="pl-eyebrow">CATALOG</div>
+        <h1 class="pl-title">Products</h1>
+      </div>
+      <span class="pl-meta-pill">
+        <i data-lucide="package"></i>
+        <span><b>{{ total_products_count|default:0 }}</b> products</span>
+        <span class="dot-sep"></span>
+        <span><b>{{ total_variants_count|default:0 }}</b> variants</span>
+        <span class="dot-sep"></span>
+        <span><b>{{ low_stock_count|default:0 }}</b> low stock</span>
+        <span class="dot-sep"></span>
+        <span><b>{{ out_of_stock_count|default:0 }}</b> out of stock</span>
+      </span>
     </div>
-    <div class="compact-mode">
-      <span>Compact Mode</span>
-      <div style="width: 12px;"></div>
-      <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+    <div class="pl-head-r">
+      <button class="pl-btn ghost" type="button" onclick="document.getElementById('csvModal').classList.add('show')">
+        <i data-lucide="upload"></i><span>Import</span>
+      </button>
+      <a class="pl-btn primary" href="{% url 'marketing:product_create' %}">
+        <i data-lucide="plus"></i><span>Add product</span>
+      </a>
     </div>
-  </div>
+  </header>
 
-  <!-- Stats Cards -->
-  <div class="stats-row">
-    <div class="stat-card" style="--stat-accent:#6366f1;--stat-bg:#eef2ff;">
-      <div class="stat-card-icon"><i class="fa fa-box-open"></i></div>
-      <div class="stat-card-value">{{ total_products_count|default:0 }}</div>
-      <div class="stat-card-label">Total Products</div>
-    </div>
-    <div class="stat-card" style="--stat-accent:#0ea5e9;--stat-bg:#e0f2fe;">
-      <div class="stat-card-icon"><i class="fa fa-layer-group"></i></div>
-      <div class="stat-card-value">{{ total_variants_count|default:0 }}</div>
-      <div class="stat-card-label">Variants</div>
-    </div>
-    <div class="stat-card" style="--stat-accent:#f59e0b;--stat-bg:#fef3c7;">
-      <div class="stat-card-icon"><i class="fa fa-exclamation-triangle"></i></div>
-      <div class="stat-card-value">{{ low_stock_count|default:0 }}</div>
-      <div class="stat-card-label">Low Stock</div>
-    </div>
-    <div class="stat-card" style="--stat-accent:#ef4444;--stat-bg:#fee2e2;">
-      <div class="stat-card-icon"><i class="fa fa-ban"></i></div>
-      <div class="stat-card-value">{{ out_of_stock_count|default:0 }}</div>
-      <div class="stat-card-label">Out of Stock</div>
-    </div>
-  </div>
-
-  <!-- Category Filter Pills -->
-  <div class="category-chips" id="categoryChips">
+  {# ==================== CATEGORY TABS ==================== #}
+  <div class="pl-tabs" id="categoryChips">
     <input type="hidden" id="activeCategory" name="category" value="{{ active_category|default:'all' }}">
-    <a href="#" class="cat-chip {% if active_category == 'all' or not active_category %}active{% endif %}" data-cat="all"
-       onclick="filterByCategory('all', event)">
-      <i class="fa fa-th-large"></i>
-      <span>All</span>
-      <span class="cat-count">{{ total_products_count }}</span>
-    </a>
+    <button type="button"
+            class="pl-tab {% if active_category == 'all' or not active_category %}active{% endif %}"
+            data-cat="all"
+            onclick="filterByCategory('all', event)">
+      All
+      <span class="pl-tab-count">{{ total_products_count }}</span>
+    </button>
     {% for cat in category_filters %}
-    <a href="#" class="cat-chip {% if active_category == cat.id|stringformat:'s' %}active{% endif %}"
-       data-cat="{{ cat.id }}"
-       onclick="filterByCategory('{{ cat.id }}', event)">
-      <span>{{ cat.name }}</span>
-      <span class="cat-count">{{ cat.count }}</span>
-    </a>
+    <button type="button"
+            class="pl-tab {% if active_category == cat.id|stringformat:'s' %}active{% endif %}"
+            data-cat="{{ cat.id }}"
+            onclick="filterByCategory('{{ cat.id }}', event)">
+      {{ cat.name }}
+      <span class="pl-tab-count">{{ cat.count }}</span>
+    </button>
     {% endfor %}
   </div>
 
-  <!-- Tools Bar -->
-  <div class="filter-bar">
-    <div class="catalog-search-wrapper">
-      <i class="fa fa-search catalog-search-icon"></i>
-      <input type="text" class="catalog-search-input" id="instantSearch" placeholder="Search products by SKU, name..."
-        value="{{ request.GET.search }}"
-        hx-get="{% url 'marketing:product_list' %}" hx-trigger="keyup changed delay:300ms, search, filterChanged from:body"
-        hx-target="#product-table-body" hx-indicator="#search-loader" name="search"
-        hx-include="#activeCategory" autocomplete="off">
-      <div id="search-loader" class="htmx-indicator" style="position: absolute; right: 44px; top: 50%; transform: translateY(-50%);">
-        <i class="fa fa-spinner fa-spin" style="color: #6366f1; font-size: 13px;"></i>
-      </div>
-      <button type="button" class="search-clear" id="searchClearBtn" onclick="clearSearch()" title="Clear">
-        <i class="fa fa-times"></i>
-      </button>
+  {# ==================== TOOLBAR ==================== #}
+  <div class="pl-toolbar">
+    <div class="pl-search">
+      <i data-lucide="search"></i>
+      <input type="text" id="instantSearch" name="search"
+             placeholder="Search by product name, SKU or barcode…"
+             value="{{ request.GET.search }}"
+             autocomplete="off"
+             hx-get="{% url 'marketing:product_list' %}"
+             hx-trigger="keyup changed delay:300ms, search, filterChanged from:body"
+             hx-target="#product-table-body"
+             hx-include="#activeCategory">
+      <span class="pl-search-loader htmx-indicator">
+        <i data-lucide="loader-2"></i>
+      </span>
+      <kbd class="pl-kbd">⌘K</kbd>
     </div>
 
-    <div class="actions-right">
-      <!-- Bulk Actions (Hidden by default) -->
-      <div id="bulkActions"
-        style="display: none; align-items: center; gap: 12px; margin-right: 12px; animation: fadeIn 0.2s;">
-        <span style="font-size: 13px; color: #64748b; font-weight: 500;">
-          <span id="selectedCount">0</span> selected
-        </span>
-        <button class="btn-danger" style="padding: 10px 16px; font-size: 13px;" onclick="openBulkDeleteModal()">
-          <i class="fa fa-trash"></i> Delete
-        </button>
+    <div class="pl-toolbar-r">
+      <div class="pl-sort">
+        <span class="pl-sort-l">Sort</span>
+        <select name="sort" onchange="this.form && this.form.submit()">
+          <option value="updated">Recently updated</option>
+          <option value="name">By name</option>
+          <option value="price-asc">Price ↑</option>
+          <option value="price-desc">Price ↓</option>
+          <option value="stock">Stock</option>
+        </select>
       </div>
-
-      <button class="filter-btn" onclick="document.getElementById('csvModal').classList.add('show')">
-        <i class="fa fa-upload"></i> Import
-      </button>
-      <a href="{% url 'marketing:product_create' %}" class="btn-primary">
-        <i class="fa fa-plus"></i> Product
-      </a>
     </div>
   </div>
 
-  <script>
-    // Category filter — updates hidden input and triggers HTMX request
-    function filterByCategory(catId, event) {
-      if (event) event.preventDefault();
-      const hidden = document.getElementById('activeCategory');
-      hidden.value = catId;
-      document.querySelectorAll('#categoryChips .cat-chip').forEach(el => {
-        el.classList.toggle('active', el.getAttribute('data-cat') === catId);
-      });
-      htmx.trigger(document.body, 'filterChanged');
-    }
+  {# ==================== RESULT META ==================== #}
+  <div class="pl-meta">
+    <span class="pl-result">
+      <b id="plResultCount">{{ products|length }}</b> products shown
+    </span>
+    <label class="pl-checkall">
+      <input type="checkbox" id="selectAllCheckbox" onclick="toggleAllProductCheckboxes(this)">
+      <span>Select all</span>
+    </label>
+  </div>
 
-    // Search UX: clear button
-    (function() {
-      const input = document.getElementById('instantSearch');
-      const clearBtn = document.getElementById('searchClearBtn');
-      if (!input || !clearBtn) return;
-
-      function refreshClear() {
-        clearBtn.classList.toggle('show', !!input.value);
-      }
-      input.addEventListener('input', refreshClear);
-      refreshClear();
-
-      window.clearSearch = function() {
-        input.value = '';
-        refreshClear();
-        input.focus();
-        htmx.trigger(input, 'search');
-      };
-
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && document.activeElement === input) {
-          input.blur();
-        }
-      });
-    })();
-  </script>
-
-  <!-- Data Table Card -->
-  <div class="table-card">
-    <form id="bulkForm">
-      <table class="product-table">
-        <thead>
-          <tr>
-            <th style="width: 48px;">
-              <div class="custom-checkbox" onclick="toggleAllCheckboxes(this)"></div>
-            </th>
-            <th style="width: 72px;">IMAGE</th>
-            <th>PRODUCT NAME</th>
-            <th>SKU</th>
-            <th>CATEGORY</th>
-            <th>ATTRIBUTES</th>
-            <th style="text-align: center;">STOCK</th>
-            <th>PRICE</th>
-            <th>STATUS</th>
-            <th style="width: 48px;"></th>
-          </tr>
-        </thead>
-        <tbody id="product-table-body">
-          {% include "marketing/partials/product_list_rows.html" %}
-        </tbody>
-      </table>
-    </form>
-
-
-    <!-- Pagination -->
-    {% if is_paginated %}
-    <div class="pagination-container">
-      <div style="font-size: 13px; color: #64748b;">
-        Showing <span style="font-weight: 600; color: #0f172a;">{{ page_obj.start_index }}-{{page_obj.end_index}}</span>
-        of {{ paginator.count }} products
-      </div>
-      <div style="display: flex; gap: 6px;">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-          class="pagination-btn neutral">Previous</a>
-        {% endif %}
-
-        {% for num in page_obj.paginator.page_range %}
-        {% if page_obj.number == num %}
-        <span class="pagination-btn active">{{ num }}</span>
-        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
-          href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-          class="pagination-btn neutral">{{ num }}</a>
-          {% endif %}
-          {% endfor %}
-
-          {% if page_obj.has_next %}
-          <a href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}"
-            class="pagination-btn neutral">Next</a>
-          {% endif %}
-      </div>
+  {# ==================== LIST ==================== #}
+  <form id="bulkForm" onsubmit="return false">
+    <div class="pl-list" id="product-table-body">
+      {% include "marketing/partials/product_list_rows.html" %}
     </div>
-    {% endif %}
+  </form>
+</div>
+
+{# ==================== BULK ACTION BAR (sticky bottom) ==================== #}
+<div class="pl-bulk" id="bulkActions" style="display: none;">
+  <span class="pl-bulk-l">
+    <button class="pl-bulk-x" type="button" onclick="clearSelection()" title="Clear selection">
+      <i data-lucide="x"></i>
+    </button>
+    <span><b id="selectedCount">0</b> products selected</span>
+  </span>
+  <div class="pl-bulk-r">
+    <button class="pl-bulk-btn" type="button" onclick="alert('Publish — coming soon')">
+      <i data-lucide="rocket"></i>Publish
+    </button>
+    <button class="pl-bulk-btn" type="button" onclick="alert('Archive — coming soon')">
+      <i data-lucide="archive"></i>Archive
+    </button>
+    <span class="pl-bulk-sep"></span>
+    <button class="pl-bulk-btn danger" type="button" onclick="openBulkDeleteModal()">
+      <i data-lucide="trash-2"></i>Delete
+    </button>
   </div>
 </div>
 
-<!-- Delete Modal -->
-<div class="modal-backdrop" id="deleteModal">
-  <div class="modal-card">
-    <div class="modal-icon danger"><i class="fa fa-exclamation-triangle"></i></div>
-    <h3 class="modal-title">Delete Product</h3>
-    <p class="modal-desc">Are you sure you want to delete <strong id="delProdName"></strong>? This action cannot be
-      undone.</p>
-    <div class="modal-actions">
-      <button class="btn-secondary"
-        onclick="document.getElementById('deleteModal').classList.remove('show')">Cancel</button>
-      <button class="btn-danger" onclick="confirmDelete()">Delete Product</button>
-    </div>
-  </div>
-</div>
-
-<!-- Import Stock Modal -->
+{# ==================== CSV IMPORT MODAL ==================== #}
 <div class="modal-backdrop" id="csvModal">
   <div class="modal-card" style="max-width: 520px;">
-    <div class="modal-icon info" style="background: #3b82f6; color: white;">
-      <i class="fas fa-file-import"></i>
-    </div>
-    <h3 class="modal-title">Import Stock Update</h3>
-    <p class="modal-desc">Upload a CSV or Excel file to update variant stock quantities</p>
+    <div class="modal-icon info"><i class="fas fa-file-import"></i></div>
+    <h3 class="modal-title">Import stock update</h3>
+    <p class="modal-desc">Upload a CSV or Excel file with SKU + Quantity columns to bulk-update variant stock.</p>
 
-    <!-- Drop zone -->
     <div id="importDropZone"
-      style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 32px; margin-bottom: 20px; background: #f8fafc; text-align: center; transition: all 0.2s; cursor: pointer;"
-      onclick="document.getElementById('importFile').click()">
+         style="border: 2px dashed #DDE3E7; border-radius: 12px; padding: 28px; margin-bottom: 18px; background: #FAFBFD; text-align: center; cursor: pointer; transition: all .2s;"
+         onclick="document.getElementById('importFile').click()">
       <div id="importDropIcon"
-        style="width: 48px; height: 48px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #64748b; transition: all 0.2s;">
+           style="width: 48px; height: 48px; background: #EEF1F5; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; color: #6B7680; transition: all .2s;">
         <i class="fas fa-cloud-upload-alt"></i>
       </div>
-      <p id="importDropText" style="font-size: 14px; color: #64748b; margin-bottom: 12px;">Drag and drop your file here or click to browse</p>
-      <div style="display: flex; gap: 6px; justify-content: center; margin-bottom: 12px;">
-        <span style="padding: 3px 10px; background: #e8f5e9; color: #2e7d32; border-radius: 4px; font-size: 11px; font-weight: 600;">CSV</span>
-        <span style="padding: 3px 10px; background: #e3f2fd; color: #1565c0; border-radius: 4px; font-size: 11px; font-weight: 600;">XLS</span>
-        <span style="padding: 3px 10px; background: #e3f2fd; color: #1565c0; border-radius: 4px; font-size: 11px; font-weight: 600;">XLSX</span>
+      <p id="importDropText" style="font-size: 13.5px; color: #4D5760; margin-bottom: 10px;">Drag & drop or click to select</p>
+      <div style="display: flex; gap: 6px; justify-content: center; margin-bottom: 8px;">
+        <span style="padding: 3px 9px; background: #DCFCE7; color: #166534; border-radius: 4px; font: 700 10.5px 'Plus Jakarta Sans', sans-serif;">CSV</span>
+        <span style="padding: 3px 9px; background: #DBEAFE; color: #1E40AF; border-radius: 4px; font: 700 10.5px 'Plus Jakarta Sans', sans-serif;">XLS</span>
+        <span style="padding: 3px 9px; background: #DBEAFE; color: #1E40AF; border-radius: 4px; font: 700 10.5px 'Plus Jakarta Sans', sans-serif;">XLSX</span>
       </div>
-      <p style="font-size: 12px; color: #94a3b8;">Required columns: <strong>Kodu</strong> (SKU) &amp; <strong>Miktar</strong> (Quantity)</p>
+      <p style="font-size: 11.5px; color: #9AA5AD;">Required columns: <strong>Kodu</strong> (SKU) &amp; <strong>Miktar</strong> (Quantity)</p>
     </div>
     <input type="file" id="importFile" accept=".csv,.xls,.xlsx" style="display: none;">
 
-    <!-- Selected file info (hidden by default) -->
-    <div id="importFileInfo" style="display: none; padding: 12px 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; margin-bottom: 20px; align-items: center; gap: 12px;">
+    <div id="importFileInfo" style="display: none; padding: 12px 14px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 9px; margin-bottom: 18px; align-items: center; gap: 12px;">
       <div style="flex: 1; min-width: 0;">
-        <div id="importFileName" style="font-size: 13px; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
-        <div id="importFileSize" style="font-size: 11px; color: #64748b; margin-top: 2px;"></div>
+        <div id="importFileName" style="font-size: 13px; font-weight: 700; color: #0F1419; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+        <div id="importFileSize" style="font-size: 11px; color: #6B7680; margin-top: 2px;"></div>
       </div>
-      <button type="button" onclick="clearImportFile()" style="border: none; background: none; color: #94a3b8; cursor: pointer; padding: 4px; font-size: 16px;">
+      <button type="button" onclick="clearImportFile()" style="border: none; background: none; color: #9AA5AD; cursor: pointer; padding: 4px;">
         <i class="fa fa-times"></i>
       </button>
     </div>
 
-    <!-- Results area (hidden by default) -->
-    <div id="importResults" style="display: none; margin-bottom: 20px;"></div>
+    <div id="importResults" style="display: none; margin-bottom: 18px;"></div>
 
-    <div class="modal-actions" style="justify-content: space-between; align-items: center;">
-      <button class="btn-secondary" style="border: none; color: #0f172a; font-weight: 600;" onclick="closeImportModal()">Cancel</button>
-      <button id="importBtn" class="btn-primary" disabled
-        style="padding: 10px 20px; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px; opacity: 0.5; transition: opacity 0.2s;"
-        onclick="uploadImportFile()">
-        <i class="fas fa-upload"></i> Upload & Update
+    <div class="modal-actions" style="justify-content: space-between;">
+      <button class="btn-secondary" type="button" onclick="closeImportModal()">Cancel</button>
+      <button id="importBtn" class="btn-primary" type="button" disabled onclick="uploadImportFile()">
+        <i class="fas fa-upload"></i> Upload &amp; update
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ==================== BULK DELETE MODAL ==================== #}
+<div class="modal-backdrop" id="bulkDeleteModal">
+  <div class="modal-card">
+    <div class="modal-icon danger"><i class="fa fa-exclamation-triangle"></i></div>
+    <h3 class="modal-title">Delete products</h3>
+    <p class="modal-desc">
+      Are you sure you want to delete <strong id="bulkDelCount">0</strong> selected products?
+      This action cannot be undone.
+    </p>
+    <div class="modal-actions">
+      <button class="btn-secondary" type="button"
+              onclick="document.getElementById('bulkDeleteModal').classList.remove('show')">
+        Cancel
+      </button>
+      <button class="btn-danger" type="button"
+              hx-post="{% url 'marketing:product_bulk_delete' %}"
+              hx-trigger="click"
+              hx-include="#bulkForm input[name='product_ids']:checked"
+              hx-target="body">
+        Yes, delete all
       </button>
     </div>
   </div>
 </div>
 
 <script>
-// ── Import Stock Logic ──────────────────────────────
+/* =====================================================================
+   PRODUCT LIST — JS
+   ===================================================================== */
+
+// ---- Category filter ----
+function filterByCategory(catId, event) {
+  if (event) event.preventDefault();
+  document.getElementById('activeCategory').value = catId;
+  document.querySelectorAll('#categoryChips .pl-tab').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-cat') === catId);
+  });
+  htmx.trigger(document.body, 'filterChanged');
+}
+
+// ---- Variant lazy expand ----
+function toggleVariants(pid, wrap, event) {
+  if (event) {
+    const t = event.target;
+    if (t.closest('a') || t.closest('button') || t.closest('input') || t.closest('label')) return;
+  }
+  wrap.classList.toggle('open');
+  if (wrap.classList.contains('open')) {
+    const box = wrap.querySelector('.variant-box');
+    if (box && typeof htmx !== 'undefined') htmx.trigger(box, 'variant-load');
+  }
+}
+
+// ---- Bulk selection ----
+function toggleAllProductCheckboxes(masterCb) {
+  const isChecked = masterCb.checked;
+  document.querySelectorAll('#bulkForm input[name="product_ids"]').forEach(cb => {
+    cb.checked = isChecked;
+  });
+  updateBulkActions();
+}
+function clearSelection() {
+  document.querySelectorAll('#bulkForm input[name="product_ids"]').forEach(cb => cb.checked = false);
+  const master = document.getElementById('selectAllCheckbox');
+  if (master) master.checked = false;
+  updateBulkActions();
+}
+function updateBulkActions() {
+  const count = document.querySelectorAll('#bulkForm input[name="product_ids"]:checked').length;
+  const bar = document.getElementById('bulkActions');
+  document.getElementById('selectedCount').textContent = count;
+  bar.style.display = count > 0 ? 'flex' : 'none';
+}
+function openBulkDeleteModal() {
+  const count = document.querySelectorAll('#bulkForm input[name="product_ids"]:checked').length;
+  if (count === 0) return;
+  document.getElementById('bulkDelCount').textContent = count;
+  document.getElementById('bulkDeleteModal').classList.add('show');
+}
+
+// Re-render lucide + re-init counts after HTMX swaps
+document.body.addEventListener('htmx:afterSwap', () => {
+  if (window.lucide) window.lucide.createIcons();
+  updateBulkActions();
+  // Update result count
+  const rows = document.querySelectorAll('#product-table-body .pr-wrap').length;
+  const el = document.getElementById('plResultCount');
+  if (el) el.textContent = rows;
+});
+
+// ESC closes any modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.classList.remove('show'));
+  }
+});
+
+// ---- CSV Import (preserved from old template) ----
 (function() {
   const dropZone = document.getElementById('importDropZone');
   const fileInput = document.getElementById('importFile');
@@ -1228,330 +427,101 @@
   const importBtn = document.getElementById('importBtn');
   const resultsDiv = document.getElementById('importResults');
 
-  // Drag & drop
   ['dragenter','dragover'].forEach(e => {
     dropZone.addEventListener(e, ev => {
       ev.preventDefault();
-      dropZone.style.borderColor = '#3b82f6';
-      dropZone.style.background = '#eff6ff';
-      document.getElementById('importDropIcon').style.background = '#3b82f6';
-      document.getElementById('importDropIcon').style.color = '#fff';
+      dropZone.style.borderColor = '#008080';
+      dropZone.style.background = '#E5F1F0';
     });
   });
   ['dragleave','drop'].forEach(e => {
     dropZone.addEventListener(e, ev => {
       ev.preventDefault();
-      dropZone.style.borderColor = '#cbd5e1';
-      dropZone.style.background = '#f8fafc';
-      document.getElementById('importDropIcon').style.background = '#e2e8f0';
-      document.getElementById('importDropIcon').style.color = '#64748b';
+      dropZone.style.borderColor = '#DDE3E7';
+      dropZone.style.background = '#FAFBFD';
     });
   });
   dropZone.addEventListener('drop', ev => {
-    const file = ev.dataTransfer.files[0];
-    if (file) handleImportFile(file);
+    const f = ev.dataTransfer.files[0]; if (f) handleImportFile(f);
   });
-
   fileInput.addEventListener('change', function() {
     if (this.files[0]) handleImportFile(this.files[0]);
   });
 
   window.handleImportFile = function(file) {
     const ext = file.name.split('.').pop().toLowerCase();
-    if (!['csv','xls','xlsx'].includes(ext)) {
-      alert('Please select a CSV or Excel (.xls/.xlsx) file');
-      return;
-    }
+    if (!['csv','xls','xlsx'].includes(ext)) { alert('Select a CSV / XLS / XLSX file'); return; }
     document.getElementById('importFileName').textContent = file.name;
-    document.getElementById('importFileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    document.getElementById('importFileSize').textContent = (file.size/1024).toFixed(1) + ' KB';
     fileInfo.style.display = 'flex';
     dropZone.style.display = 'none';
     importBtn.disabled = false;
-    importBtn.style.opacity = '1';
     resultsDiv.style.display = 'none';
-    // Store file reference
     fileInput._selectedFile = file;
   };
-
   window.clearImportFile = function() {
     fileInput.value = '';
     fileInput._selectedFile = null;
     fileInfo.style.display = 'none';
     dropZone.style.display = 'block';
     importBtn.disabled = true;
-    importBtn.style.opacity = '0.5';
     resultsDiv.style.display = 'none';
   };
-
   window.closeImportModal = function() {
-    const hadSuccess = resultsDiv.querySelector('.fa-check-circle');
+    const ok = resultsDiv.querySelector('.fa-check-circle');
     document.getElementById('csvModal').classList.remove('show');
     clearImportFile();
-    // Reset upload button
-    importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Update';
+    importBtn.innerHTML = '<i class="fas fa-upload"></i> Yükle & Güncelle';
     importBtn.onclick = uploadImportFile;
-    if (hadSuccess) location.reload();
+    if (ok) location.reload();
   };
-
   window.uploadImportFile = function() {
     const file = fileInput._selectedFile || (fileInput.files && fileInput.files[0]);
     if (!file) return;
-
     importBtn.disabled = true;
-    importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-
-    const formData = new FormData();
-    formData.append('csv_file', file);
-
+    importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yükleniyor…';
+    const fd = new FormData(); fd.append('csv_file', file);
     fetch('{% url "marketing:csv_stock_update" %}', {
       method: 'POST',
       headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-      body: formData
-    })
-    .then(r => r.json())
-    .then(data => {
-      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Update';
-      importBtn.disabled = false;
-
-      if (data.success) {
-        resultsDiv.style.display = 'block';
-        // Replace upload button with close button
-        importBtn.innerHTML = '<i class="fas fa-times"></i> Close';
-        importBtn.disabled = false;
-        importBtn.style.opacity = '1';
-        importBtn.onclick = closeImportModal;
-
-        let updatedHtml = '';
-        if (data.updated_items && data.updated_items.length > 0) {
-          updatedHtml = `<div style="margin-top: 12px;">
-            <strong style="font-size: 12px; color: #334155;">Updated (${data.updated}):</strong>
-            <div style="max-height: 200px; overflow-y: auto; margin-top: 6px; border: 1px solid #d1fae5; border-radius: 6px;">
-              <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-                <thead><tr style="background: #ecfdf5; position: sticky; top: 0;">
-                  <th style="padding: 6px 10px; text-align: left; color: #064e3b; font-weight: 600;">SKU</th>
-                  <th style="padding: 6px 10px; text-align: left; color: #064e3b; font-weight: 600;">Name</th>
-                  <th style="padding: 6px 10px; text-align: right; color: #064e3b; font-weight: 600;">Old</th>
-                  <th style="padding: 6px 10px; text-align: center; color: #064e3b;">→</th>
-                  <th style="padding: 6px 10px; text-align: right; color: #064e3b; font-weight: 600;">New</th>
-                </tr></thead>
-                <tbody>${data.updated_items.map(v => `<tr style="border-top: 1px solid #d1fae5;">
-                  <td style="padding: 5px 10px; color: #0f172a; font-weight: 500; white-space: nowrap;">${v.sku}</td>
-                  <td style="padding: 5px 10px; color: #64748b; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${v.name}">${v.name}</td>
-                  <td style="padding: 5px 10px; text-align: right; color: #94a3b8;">${v.old}</td>
-                  <td style="padding: 5px 10px; text-align: center; color: #16a34a;">→</td>
-                  <td style="padding: 5px 10px; text-align: right; color: #16a34a; font-weight: 600;">${v.new}</td>
-                </tr>`).join('')}</tbody>
-              </table>
-            </div>
-          </div>`;
-        }
-
-        let notFoundHtml = '';
-        if (data.not_found_count > 0) {
-          notFoundHtml = `<div style="margin-top: 10px; padding: 8px 10px; background: #fef2f2; border-radius: 6px; font-size: 12px; color: #991b1b; max-height: 80px; overflow-y: auto;">
-            <strong>Not found SKUs (${data.not_found_count}):</strong> ${data.not_found.join(', ')}${data.not_found_count > 20 ? '...' : ''}
-          </div>`;
-        }
-
-        resultsDiv.innerHTML = `
-          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-              <i class="fas fa-check-circle" style="color: #16a34a;"></i>
-              <strong style="color: #15803d; font-size: 14px;">Import Successful</strong>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; color: #334155;">
-              <div>Total rows: <strong>${data.total_rows}</strong></div>
-              <div>Matched: <strong>${data.matched}</strong></div>
-              <div>Updated: <strong style="color: #16a34a;">${data.updated}</strong></div>
-              <div>Not found: <strong style="color: ${data.not_found_count > 0 ? '#dc2626' : '#16a34a'};">${data.not_found_count}</strong></div>
-            </div>
-            ${updatedHtml}
-            ${notFoundHtml}
-          </div>`;
-      } else {
-        resultsDiv.style.display = 'block';
-        resultsDiv.innerHTML = `
-          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <i class="fas fa-exclamation-circle" style="color: #dc2626;"></i>
-              <strong style="color: #991b1b; font-size: 14px;">Import Failed</strong>
-            </div>
-            <p style="margin: 8px 0 0; font-size: 13px; color: #7f1d1d;">${data.error}</p>
-          </div>`;
-      }
-    })
-    .catch(err => {
-      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & Update';
+      body: fd
+    }).then(r => r.json()).then(data => {
+      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & update';
       importBtn.disabled = false;
       resultsDiv.style.display = 'block';
-      resultsDiv.innerHTML = `
-        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-exclamation-circle" style="color: #dc2626;"></i>
-            <strong style="color: #991b1b;">Network Error</strong>
-          </div>
-          <p style="margin: 8px 0 0; font-size: 13px; color: #7f1d1d;">${err.message}</p>
-        </div>`;
+      if (data.success) {
+        importBtn.innerHTML = '<i class="fas fa-times"></i> Close';
+        importBtn.onclick = closeImportModal;
+        resultsDiv.innerHTML = `
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:14px;text-align:left;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <i class="fas fa-check-circle" style="color:#16A34A;"></i>
+              <strong style="color:#15803D;font-size:14px;">Import complete</strong>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px;color:#334155;">
+              <div>Total: <strong>${data.total_rows}</strong></div>
+              <div>Matched: <strong>${data.matched}</strong></div>
+              <div>Updated: <strong style="color:#16A34A;">${data.updated}</strong></div>
+              <div>Not found: <strong style="color:${data.not_found_count>0?'#DC2626':'#16A34A'};">${data.not_found_count}</strong></div>
+            </div>
+          </div>`;
+      } else {
+        resultsDiv.innerHTML = `
+          <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;padding:14px;text-align:left;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <i class="fas fa-exclamation-circle" style="color:#DC2626;"></i>
+              <strong style="color:#991B1B;font-size:14px;">Import failed</strong>
+            </div>
+            <p style="margin:8px 0 0;font-size:13px;color:#7F1D1D;">${data.error}</p>
+          </div>`;
+      }
+    }).catch(err => {
+      importBtn.disabled = false;
+      importBtn.innerHTML = '<i class="fas fa-upload"></i> Upload & update';
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;padding:14px;color:#991B1B;text-align:left;">${err.message}</div>`;
     });
   };
 })();
-</script>
-
-</div>
-
-<!-- Bulk Delete Modal -->
-<div class="modal-backdrop" id="bulkDeleteModal">
-  <div class="modal-card">
-    <div class="modal-icon danger"><i class="fa fa-exclamation-triangle"></i></div>
-    <h3 class="modal-title">Delete Products</h3>
-    <p class="modal-desc">
-      Are you sure you want to delete <strong id="bulkDelCount">0</strong> selected products?
-      This action cannot be undone.
-    </p>
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="document.getElementById('bulkDeleteModal').classList.remove('show')">
-        Cancel
-      </button>
-      <button class="btn-danger" hx-post="{% url 'marketing:product_bulk_delete' %}" hx-trigger="click"
-        hx-include="#bulkForm input[name='product_ids']:checked" hx-target="body">
-        Yes, Delete All
-      </button>
-    </div>
-  </div>
-</div>
-
-<script>
-  // Toggle Variants
-  function toggleVariants(pid, tr, event) {
-    // If event is provided (row click), check source
-    if (event) {
-      const target = event.target;
-      // Ignore clicks on interactive elements
-      if (target.closest('a') ||
-        target.closest('button') ||
-        target.closest('input') ||
-        target.closest('.custom-checkbox')) {
-        return;
-      }
-    }
-
-    tr.classList.toggle('expanded');
-    const variantRow = document.getElementById('variants-' + pid);
-    if (variantRow) {
-      variantRow.classList.toggle('show');
-
-      // Trigger lazy load if expanding
-      if (variantRow.classList.contains('show')) {
-        const box = variantRow.querySelector('.variant-box');
-        // Trigger HTMX if found
-        if (box && typeof htmx !== 'undefined') {
-          htmx.trigger(box, 'variant-load');
-        }
-      }
-    }
-
-    // Rotate chevron if present
-    const chevron = tr.querySelector('.btn-expand i');
-    if (chevron && tr.classList.contains('expanded')) {
-      chevron.style.transform = 'rotate(90deg)';
-    } else if (chevron) {
-      chevron.style.transform = '';
-    }
-  }
-
-  // Bulk Selection Logic
-  function toggleAllCheckboxes(headerCheckbox) {
-    const isChecked = !headerCheckbox.classList.contains('active');
-
-    if (isChecked) {
-      headerCheckbox.classList.add('active');
-      headerCheckbox.style.backgroundColor = '#3b82f6';
-      headerCheckbox.style.borderColor = '#3b82f6';
-      headerCheckbox.innerHTML = '<i class="fa fa-check" style="color: white; font-size: 12px; display: block; text-align: center; line-height: 18px;"></i>';
-    } else {
-      headerCheckbox.classList.remove('active');
-      headerCheckbox.style.backgroundColor = '';
-      headerCheckbox.style.borderColor = '';
-      headerCheckbox.innerHTML = '';
-    }
-
-    const checkboxes = document.querySelectorAll('.row-checkbox');
-    checkboxes.forEach(cb => {
-      const input = cb.querySelector('input');
-      input.checked = isChecked;
-      updateCheckboxVisual(cb, isChecked);
-    });
-    updateBulkActions();
-  }
-
-  // Row Checkbox Handling - Inline Function
-  function toggleRowCheckbox(checkboxDiv, event) {
-    if (event) {
-      event.preventDefault(); // Prevent default browser behavior
-      event.stopPropagation(); // Stop bubbling
-    }
-
-    // Determine new state based on current VISUAL state (source of truth for user)
-    const isActive = checkboxDiv.classList.contains('active');
-    const newState = !isActive;
-
-    const input = checkboxDiv.querySelector('input');
-    input.checked = newState; // Force input to match desired state
-
-    updateCheckboxVisual(checkboxDiv, newState);
-    updateBulkActions();
-  }
-
-  function updateCheckboxVisual(container, isChecked) {
-    let icon = container.querySelector('i.fa-check');
-
-    if (isChecked) {
-      container.classList.add('active');
-      container.style.backgroundColor = '#3b82f6';
-      container.style.borderColor = '#3b82f6';
-      if (!icon) {
-        // Add icon if not present
-        const i = document.createElement('i');
-        i.className = 'fa fa-check';
-        i.style.cssText = 'color: white; font-size: 12px; display: block; text-align: center; line-height: 18px; pointer-events: none;';
-        container.appendChild(i);
-      }
-    } else {
-      container.classList.remove('active');
-      container.style.backgroundColor = '';
-      container.style.borderColor = '';
-      if (icon) {
-        icon.remove();
-      }
-    }
-  }
-
-  function updateBulkActions() {
-    const selected = document.querySelectorAll('input[name="product_ids"]:checked').length;
-    const bulkActions = document.getElementById('bulkActions');
-    const searchWrapper = document.querySelector('.catalog-search-wrapper');
-
-    if (selected > 0) {
-      bulkActions.style.display = 'flex';
-      document.getElementById('selectedCount').textContent = selected;
-    } else {
-      bulkActions.style.display = 'none';
-      searchWrapper.style.display = 'block';
-    }
-  }
-
-  function openBulkDeleteModal() {
-    const selected = document.querySelectorAll('input[name="product_ids"]:checked').length;
-    if (selected === 0) return;
-    document.getElementById('bulkDelCount').textContent = selected;
-    document.getElementById('bulkDeleteModal').classList.add('show');
-  }
-
-  // Global Modal Close on ESC
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      document.querySelectorAll('.modal-backdrop').forEach(el => el.classList.remove('show'));
-    }
-  });
 </script>
 {% endblock content %}

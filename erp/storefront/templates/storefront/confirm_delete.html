@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="sf-page sf-page-narrow">
+  <div class="sf-confirm">
+    <div class="sf-confirm-icon"><i data-lucide="alert-triangle"></i></div>
+    <h1 class="sf-h1">Silinsin mi?</h1>
+    <p class="sf-meta">{{ object }}</p>
+    <form method="post" class="sf-confirm-actions">
+      {% csrf_token %}
+      <a class="sf-btn-ghost" href="{{ back_url }}">Vazgeç</a>
+      <button class="sf-btn-danger" type="submit"><i data-lucide="trash-2"></i> Evet, sil</button>
+    </form>
+  </div>
+</div>
+
+<link rel="stylesheet" href="{% load static %}{% static 'storefront/css/storefront.css' %}?v=11" />
+{% endblock %}

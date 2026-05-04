@@ -567,6 +567,37 @@
         </div>
       </div>
 
+      <!-- Packaging (B2B wholesale) -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title">Packaging</div>
+        <div class="toggle-item">
+          <div class="toggle-info">
+            <span class="toggle-label">Sold as a pack</span>
+            <span class="toggle-desc">e.g. pack of 12, pack of 5</span>
+          </div>
+          <label class="switch-container">
+            {{ form.is_packaged }}
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div class="form-row" id="pack_count_row" style="margin-top: 12px;">
+          <div class="form-group" style="width: 100%;">
+            <label for="id_pack_count">Items per pack</label>
+            {{ form.pack_count }}
+          </div>
+        </div>
+        <script>
+          (function () {
+            var cb = document.getElementById('id_is_packaged');
+            var row = document.getElementById('pack_count_row');
+            if (!cb || !row) return;
+            function sync() { row.style.display = cb.checked ? '' : 'none'; }
+            cb.addEventListener('change', sync);
+            sync();
+          })();
+        </script>
+      </div>
+
       <!-- Inventory (Moved to Sidebar) -->
       <div class="form-card sidebar-card">
         <div class="form-card-title">Inventory</div>

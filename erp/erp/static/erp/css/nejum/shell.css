@@ -1,0 +1,682 @@
+/* ============================================================
+   Nejum Shell — full sidebar replacement.
+   Templates render an entirely new <aside class="nj-sidebar"> when
+   ui_theme=nejum (see components/_sidebar_nejum.html). The legacy
+   <nav class="navbar"> is hidden via inline style. This file styles
+   the new structure 1:1 from the design kit.
+   ============================================================ */
+
+html, body {
+  font-family: var(--font-sans, 'Plus Jakarta Sans', -apple-system, system-ui, sans-serif) !important;
+  background: var(--bg-app, #FCFCFD) !important;
+  color: var(--fg-default, #1B2128) !important;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+button, input, select, textarea { font-family: inherit; }
+
+/* ============================================================
+   SIDEBAR (.nj-sidebar)
+   ============================================================ */
+.nj-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 88px;
+  height: 100vh;
+  padding: 10px 8px 6px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFC 100%);
+  border-right: 1px solid #E6ECEE;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* z-index 70 (above topbar's 50) so the flyout — which renders at
+     x=94, overlapping the topbar's column — isn't trapped beneath the
+     topbar by its parent stacking context. Sidebar and topbar don't
+     visually overlap (topbar starts at left:88, sidebar ends at 88),
+     so bumping this above topbar has no visual side-effects. */
+  z-index: 70;
+  font-family: var(--font-sans, 'Plus Jakarta Sans');
+  /* No scrolling — every nav item must fit in 100vh. Spacing below
+     is tightened so 12 items fit even on a 720px laptop screen.
+     Flyouts use position:fixed so overflow:visible is safe. */
+  overflow: visible;
+}
+
+/* Push the rest of the page right of the sidebar */
+body main,
+body > main {
+  margin-left: 88px !important;
+}
+
+/* Logo */
+.nj-logo {
+  padding: 4px 0 9px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-bottom: 1px solid #EEF2F4;
+  margin-bottom: 4px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.nj-wm {
+  font-family: 'Caveat', cursive;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--nejum-teal-500, #008080);
+  letter-spacing: -0.005em;
+}
+.nj-pulse { display: none !important; }
+
+/* Nav items — flex: 1 distributes remaining vertical space evenly
+   across all items so the sidebar always fills 100vh exactly without
+   scrolling. Padding/gap are minimal because flex grows them anyway. */
+.nj-nav-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 10px;
+  font: 500 10px var(--font-sans, 'Plus Jakarta Sans');
+  flex: 1 1 0;
+  min-height: 0;
+  letter-spacing: -0.005em;
+  color: var(--gray-600, #4D5760);
+  cursor: pointer;
+  text-align: center;
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition:
+    background var(--dur-fast, 120ms) var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    color var(--dur-fast, 120ms) var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    border-color var(--dur-fast, 120ms) var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.nj-nav-item svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.5 !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  flex-shrink: 0;
+}
+/* Force every shape inside Lucide SVGs to be stroke-only. Some icons
+   (user-circle, message-circle, sticky-note, etc.) ship with explicit
+   fill="currentColor" on inner circles/paths — without this they
+   render as solid filled shapes against the sidebar bg. */
+.nj-nav-item svg *,
+.nj-flyout svg *,
+.njdash svg * {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+.nj-label {
+  display: block;
+  max-width: 100%;
+  /* Allow long labels (Procurement, Operations) to wrap to a second
+     line instead of being truncated with an ellipsis. font-size kept
+     small + tight line-height so two lines still fit each item. */
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+  line-height: 1.15;
+  word-break: keep-all;
+  hyphens: none;
+  font-size: 9.5px;
+}
+.nj-chev { display: none; }
+
+.nj-nav-item:hover {
+  background: var(--nejum-teal-50, #E6F5F5);
+  color: var(--nejum-teal-700, #005354);
+  border-color: rgba(0, 128, 128, 0.18);
+}
+
+/* Active state — subtle teal tint, not a heavy capsule */
+.nj-nav-item.active {
+  background: var(--nejum-teal-50, #E6F5F5);
+  border: 1px solid rgba(0, 128, 128, 0.20);
+  color: var(--nejum-teal-700, #005354);
+  font-weight: 600;
+}
+
+/* + Add (dashed teal frame) */
+.nj-nav-item.nj-add {
+  margin-bottom: 0;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F4F8F9 100%);
+  border: 1px dashed rgba(0, 128, 128, 0.35);
+  color: var(--nejum-teal-600, #00696A);
+  font-weight: 600;
+}
+.nj-nav-item.nj-add:hover {
+  background: var(--nejum-teal-50, #E6F5F5);
+  border-color: var(--nejum-teal-500, #008080);
+  color: var(--nejum-teal-700, #005354);
+}
+.nj-nav-item.nj-add svg { color: var(--nejum-teal-500, #008080); }
+.nj-nav-item.nj-add.active {
+  color: var(--nejum-teal-700, #005354);
+}
+.nj-nav-item.nj-add.active svg { color: var(--nejum-teal-600, #00696A); }
+
+/* Hover/pinned hint when a flyout is showing */
+.nj-nav-item.nj-pinned:not(.active) {
+  background: var(--nejum-teal-50, #E6F5F5);
+  color: var(--nejum-teal-700, #005354);
+  border-color: rgba(0, 128, 128, 0.18);
+}
+
+/* ============================================================
+   FLYOUT (.nj-flyout)
+   Position: fixed, JS-positioned. Lifted out of the sidebar's
+   stacking context so overflow can't clip it. Visibility is
+   driven by .nj-open (hover-toggled) or .nj-pinned (click-toggled).
+   ============================================================ */
+.nj-flyout {
+  position: fixed;
+  left: 102px;     /* JS recomputes this when an item opens */
+  top: 80px;
+  width: 308px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFC 100%);
+  border: 1px solid #E2E8EB;
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 1px 2px rgba(15, 23, 31, 0.04),
+    0 12px 28px rgba(15, 23, 31, 0.10),
+    0 28px 56px rgba(15, 23, 31, 0.10);
+  z-index: 60;
+  padding: 14px 0 8px;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transform: translateX(-6px) scale(0.985);
+  transition:
+    opacity 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 220ms;
+  text-align: left;
+  cursor: default;
+}
+.nj-nav-item.nj-open > .nj-flyout,
+.nj-nav-item.nj-pinned > .nj-flyout {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transform: translateX(0) scale(1);
+  transition:
+    opacity 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear;
+}
+
+/* Left-pointing arrow */
+.nj-fly-arrow {
+  position: absolute;
+  left: -7px;
+  top: 26px;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, #FFFFFF 0%, #FAFCFC 100%);
+  border-left: 1px solid #E2E8EB;
+  border-bottom: 1px solid #E2E8EB;
+  transform: rotate(45deg);
+  border-radius: 0 0 0 3px;
+}
+
+/* Header (icon + title) */
+.nj-fly-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 18px 14px;
+  border-bottom: 1px solid #EEF2F4;
+  margin-bottom: 8px;
+}
+.nj-fly-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, #F4F7F8 0%, #E8EEEF 100%);
+  border: 1px solid #DCE3E5;
+  color: var(--gray-700, #2F3740);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+.nj-fly-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.5 !important;
+  fill: none !important;
+  stroke: currentColor !important;
+}
+.nj-fi-icon svg,
+.nj-flyout svg {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+.nj-fly-title {
+  font: 700 17px var(--font-sans, 'Plus Jakarta Sans');
+  letter-spacing: -0.01em;
+  color: var(--gray-800, #1B2128);
+}
+
+/* Body */
+.nj-fly-body { padding: 0 8px 6px; }
+.nj-fly-group + .nj-fly-group {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #F1F4F6;
+}
+.nj-fly-group-title {
+  font: 700 10px var(--font-sans, 'Plus Jakarta Sans');
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gray-400, #9AA5AD);
+  padding: 10px 12px 6px;
+}
+
+.nj-fly-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  margin: 0 2px;
+  border-radius: 9px;
+  cursor: pointer;
+  font: 500 13.5px var(--font-sans, 'Plus Jakarta Sans');
+  color: var(--gray-700, #2F3740);
+  text-decoration: none;
+  transition:
+    background 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nj-fly-item:hover {
+  background: var(--nejum-teal-50, #E6F5F5);
+  color: var(--nejum-teal-700, #005354);
+}
+.nj-fi-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #E6ECEE;
+  color: var(--gray-600, #4D5760);
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+.nj-fi-icon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.5 !important;
+}
+.nj-fly-item:hover .nj-fi-icon {
+  background: white;
+  border-color: var(--nejum-teal-300, #66B5B5);
+  color: var(--nejum-teal-700, #005354);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+.nj-fi-label {
+  font: 500 13.5px var(--font-sans, 'Plus Jakarta Sans');
+  color: inherit;
+}
+
+/* ============================================================
+   TOP BAR (.global-top-bar) — Nejum premium skin
+   ============================================================ */
+.global-top-bar {
+  display: grid !important;
+  grid-template-columns: minmax(180px, 1fr) minmax(280px, 560px) minmax(180px, 1fr) !important;
+  align-items: center !important;
+  gap: 18px !important;
+  height: 64px !important;
+  padding: 0 24px !important;
+  background: #FFFFFF !important;
+  border-bottom: 1px solid var(--border-subtle, #E8ECEF) !important;
+  /* fixed (not sticky) — some legacy parent has overflow that breaks
+     sticky behaviour, so the header was scrolling away. fixed pins it
+     to the viewport unconditionally. */
+  position: fixed !important;
+  top: 0 !important;
+  left: 88px !important;
+  right: 0 !important;
+  z-index: 50 !important;
+  margin-left: 0 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 31, 0.04) !important;
+}
+/* Push content below the fixed header */
+body { padding-top: 64px !important; }
+.global-top-bar .top-bar-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 18px !important;
+  min-width: 0 !important;
+  padding-left: 24px !important; /* push the cluster further right */
+}
+
+/* Analog wall clock — small, premium, subtle */
+.global-top-bar .header-clock {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFC 100%);
+  border: 1px solid var(--border-default, #DDE3E7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 1px 2px rgba(15, 23, 31, 0.04);
+}
+.global-top-bar .clock-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.global-top-bar .clock-face {
+  fill: transparent;
+  stroke: transparent;
+}
+.global-top-bar .clock-ticks line {
+  stroke: var(--gray-300, #C5CDD3);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+.global-top-bar .clock-hour,
+.global-top-bar .clock-min,
+.global-top-bar .clock-sec {
+  stroke-linecap: round;
+}
+.global-top-bar .clock-hour {
+  stroke: var(--gray-800, #1B2128);
+  stroke-width: 2;
+}
+.global-top-bar .clock-min {
+  stroke: var(--gray-700, #2F3740);
+  stroke-width: 1.5;
+}
+.global-top-bar .clock-sec {
+  stroke: var(--nejum-teal-500, #008080);
+  stroke-width: 1;
+}
+.global-top-bar .clock-pin {
+  fill: var(--nejum-teal-500, #008080);
+  stroke: none;
+}
+.global-top-bar .welcome-text {
+  font: 600 13.5px var(--font-sans, 'Plus Jakarta Sans') !important;
+  color: var(--gray-800, #1B2128) !important;
+  letter-spacing: -0.01em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.global-top-bar .header-date {
+  font: 500 11.5px var(--font-mono, 'JetBrains Mono') !important;
+  color: var(--gray-500, #6B7680) !important;
+  padding: 4px 10px !important;
+  background: var(--gray-50, #F8FAFB) !important;
+  border: 1px solid var(--border-subtle, #E8ECEF) !important;
+  border-radius: var(--radius-pill, 999px) !important;
+  white-space: nowrap !important;
+}
+/* Brand label + user pill (Nejum theme) */
+.global-top-bar .brand-name {
+  font: 800 14px var(--font-sans, 'Plus Jakarta Sans') !important;
+  letter-spacing: 0.10em !important;
+  color: var(--gray-900, #0E1217) !important;
+  white-space: nowrap !important;
+}
+.global-top-bar .user-name-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 12px !important;
+  background: var(--nejum-teal-50, #E6F5F5) !important;
+  color: var(--nejum-teal-700, #005354) !important;
+  border: 1px solid rgba(0, 128, 128, 0.18) !important;
+  border-radius: var(--radius-pill, 999px) !important;
+  font: 600 12px var(--font-sans, 'Plus Jakarta Sans') !important;
+  letter-spacing: -0.005em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 180px !important;
+}
+.global-top-bar .top-bar-center {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+/* Premium search box */
+.global-top-bar .search-container {
+  width: 100% !important;
+  max-width: 560px !important;
+  position: relative !important;
+}
+.global-top-bar .search-box-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  height: 40px !important;
+  padding: 0 14px !important;
+  background: var(--gray-50, #F8FAFB) !important;
+  border: 1px solid var(--border-subtle, #E8ECEF) !important;
+  border-radius: var(--radius-md, 10px) !important;
+  transition:
+    background-color 180ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    border-color 180ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.global-top-bar .search-box-wrapper:hover {
+  background: #FFFFFF !important;
+  border-color: var(--border-default, #DDE3E7) !important;
+}
+.global-top-bar .search-box-wrapper:focus-within {
+  background: #FFFFFF !important;
+  border-color: var(--gray-300, #C5CDD3) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+/* Kill legacy outline/border on the input itself when focused */
+.global-top-bar .search-input,
+.global-top-bar .search-input:focus,
+.global-top-bar .search-input:active {
+  border: 0 !important;
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+.global-top-bar .search-icon {
+  font-size: 13.5px !important;
+  color: var(--gray-500, #6B7680) !important;
+  flex-shrink: 0 !important;
+}
+.global-top-bar .search-box-wrapper:focus-within .search-icon {
+  color: var(--nejum-teal-600, #00696A) !important;
+}
+.global-top-bar .search-input {
+  flex: 1 !important;
+  min-width: 0 !important;
+  border: 0 !important;
+  outline: none !important;
+  background: transparent !important;
+  font: 500 13.5px var(--font-sans, 'Plus Jakarta Sans') !important;
+  color: var(--gray-800, #1B2128) !important;
+  letter-spacing: -0.005em !important;
+  padding: 0 !important;
+  height: 100% !important;
+}
+.global-top-bar .search-input::placeholder {
+  color: var(--gray-400, #9AA5AD) !important;
+  font-weight: 500 !important;
+}
+.global-top-bar .search-shortcut {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  flex-shrink: 0 !important;
+}
+.global-top-bar .search-shortcut kbd {
+  font: 700 10px var(--font-sans, 'Plus Jakarta Sans') !important;
+  color: var(--gray-600, #4D5760) !important;
+  background: var(--bg-surface, #FFFFFF) !important;
+  border: 1px solid var(--border-subtle, #E8ECEF) !important;
+  border-radius: var(--radius-xs, 4px) !important;
+  padding: 2px 5px !important;
+  box-shadow: inset 0 -1px 0 rgba(15, 23, 31, 0.04) !important;
+  letter-spacing: 0 !important;
+}
+.global-top-bar .search-clear-btn,
+.global-top-bar .filter-toggle-btn {
+  background: transparent !important;
+  border: 0 !important;
+  cursor: pointer !important;
+  color: var(--gray-500, #6B7680) !important;
+  font-size: 13px !important;
+  padding: 4px !important;
+  border-radius: var(--radius-xs, 4px) !important;
+  transition: all 140ms !important;
+}
+.global-top-bar .search-clear-btn:hover,
+.global-top-bar .filter-toggle-btn:hover {
+  background: var(--gray-100, #F1F4F6) !important;
+  color: var(--gray-800, #1B2128) !important;
+}
+.global-top-bar .search-filter-chips:empty { display: none !important; }
+
+/* Right side actions */
+.global-top-bar .top-bar-right {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 4px !important;
+}
+.global-top-bar .top-bar-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-sm, 6px) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  color: var(--gray-600, #4D5760) !important;
+  text-decoration: none !important;
+  position: relative !important;
+  transition: all 180ms var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+}
+.global-top-bar .top-bar-btn:hover {
+  background: var(--gray-50, #F8FAFB) !important;
+  border-color: var(--border-subtle, #E8ECEF) !important;
+  color: var(--gray-800, #1B2128) !important;
+}
+.global-top-bar .top-bar-btn i {
+  font-size: 15px !important;
+  color: inherit !important;
+}
+.global-top-bar .notification-dot {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: var(--danger-500, #DC2626) !important;
+  box-shadow: 0 0 0 2px var(--bg-surface, #FFFFFF) !important;
+  border: 0 !important;
+}
+
+/* Sign-out button: subtle red hover */
+.global-top-bar .top-bar-right > a[href*="signout"]:hover {
+  color: var(--danger-600, #B91C1C) !important;
+  background: var(--danger-50, #FEEAEA) !important;
+  border-color: rgba(220, 38, 38, 0.18) !important;
+}
+
+/* Search dropdown panel premium polish */
+.global-top-bar .search-dropdown-panel {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFC 100%) !important;
+  border: 1px solid var(--border-default, #DDE3E7) !important;
+  border-radius: var(--radius-md, 10px) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 12px 28px rgba(15, 23, 31, 0.10),
+    0 28px 56px rgba(15, 23, 31, 0.10) !important;
+  margin-top: 8px !important;
+}
+.global-top-bar .cmd-tab {
+  font: 600 12px var(--font-sans, 'Plus Jakarta Sans') !important;
+  color: var(--gray-500, #6B7680) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  padding: 10px 14px !important;
+  cursor: pointer !important;
+  transition: all 160ms !important;
+}
+.global-top-bar .cmd-tab:hover { color: var(--gray-800, #1B2128) !important; }
+.global-top-bar .cmd-tab.active {
+  color: var(--nejum-teal-600, #00696A) !important;
+  border-bottom-color: var(--nejum-teal-500, #008080) !important;
+}
+
+/* Main content area pushes 88px to the right of new sidebar */
+main {
+  background: var(--bg-app, #FCFCFD) !important;
+  margin-left: 88px !important;
+  padding: 2rem 3rem;
+}
+
+/* ============================================================
+   GENERAL POLISH
+   ============================================================ */
+.card,
+.box,
+.panel {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFC 100%);
+  border: 1px solid #E6ECEE;
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 1px 2px rgba(15, 23, 31, 0.04),
+    0 12px 30px rgba(15, 23, 31, 0.06);
+}
+.btn-primary,
+button.primary {
+  background: linear-gradient(180deg, #00A0A0 0%, #008080 55%, #006B6C 100%) !important;
+  border: 1px solid #005354 !important;
+  color: white !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px rgba(0, 128, 128, 0.18),
+    0 6px 14px rgba(0, 128, 128, 0.22) !important;
+}
+.btn-primary:hover,
+button.primary:hover {
+  transform: translateY(-1px);
+}
+
+h1 { font: 700 30px var(--font-sans, 'Plus Jakarta Sans'); letter-spacing: -0.015em; color: var(--gray-800, #1B2128); }
+h2 { font: 700 24px var(--font-sans, 'Plus Jakarta Sans'); letter-spacing: -0.01em; color: var(--gray-800, #1B2128); }
+h3 { font: 600 20px var(--font-sans, 'Plus Jakarta Sans'); color: var(--gray-800, #1B2128); }

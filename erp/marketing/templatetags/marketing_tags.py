@@ -16,6 +16,33 @@ class DecimalEncoder(json.JSONEncoder):
         return super(DecimalEncoder, self).default(obj)
 
 
+@register.filter
+def product_name(product, locale="tr"):
+    """
+    Resolve the user-facing product name. Belino stores the localized
+    title inside `description` as JSON:
+        {"translations": {"tr": {"title": "..."}, "en": {"title": "..."}}}
+    Fall back to product.title when description is plain HTML or missing.
+    """
+    raw = getattr(product, "description", None) or ""
+    if raw and raw.lstrip().startswith("{"):
+        try:
+            data = json.loads(raw)
+            t = (data.get("translations") or {}).get(locale) or {}
+            name = (t.get("title") or "").strip()
+            if name:
+                return name
+            # Fallback: try the other locale if requested one is empty
+            other = "en" if locale == "tr" else "tr"
+            t2 = (data.get("translations") or {}).get(other) or {}
+            name2 = (t2.get("title") or "").strip()
+            if name2:
+                return name2
+        except (ValueError, TypeError):
+            pass
+    return getattr(product, "title", "") or ""
+
+
 @register.simple_tag
 def variant_form(variants, product, current_url):
     tag_start = time.time()

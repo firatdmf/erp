@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Mağazam · {{ storefront.name }}{% endblock %}
+
+{% block content %}
+<div class="cms2">
+  <div class="cms2-top">
+    <div class="cms2-bread">
+      <span class="bc"><i data-lucide="store"></i>Mağazam</span>
+      <i data-lucide="chevron-right" class="bc-sep"></i>
+      <span class="bc">Genel bakış</span>
+      <span class="bc-status published">
+        <span class="dot"></span>{{ storefront.name }}
+      </span>
+      {% if last_changed %}
+        <span class="bc-time">son kayıt {{ last_changed|timesince }} önce</span>
+      {% endif %}
+    </div>
+    <div class="cms2-actions">
+      <a class="cms2-btn ghost" href="{{ STOREFRONT_PREVIEW_URL }}" target="_blank" rel="noreferrer noopener">
+        <i data-lucide="external-link"></i><span>Siteyi aç</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="cms2-body single">
+    <main class="menu-editor">
+      <div class="menu-shell">
+        <div class="menu-head">
+          <div>
+            <div class="menu-eyebrow">{{ storefront.name|upper }} · GENEL BAKIŞ</div>
+            <h1>Mağaza paneli</h1>
+            <p>Anasayfa bölümlerini, header menüsünü ve ürünleri tek bir yerden yönet. Değişiklikler anında siteye yansır.</p>
+          </div>
+        </div>
+
+        <div class="dash-cards">
+          <a class="dash-card" href="{% url 'storefront:edit_home' %}">
+            <div class="dash-card-ico"><i data-lucide="layout-template"></i></div>
+            <div class="dash-card-body">
+              <div class="dash-card-title">Anasayfa bölümleri</div>
+              <div class="dash-card-sub">Hero · Sezon kartları · Vitrin · Güven bandı</div>
+              <div class="dash-card-foot">
+                <span class="dash-card-stat">{{ home_count }} bölüm</span>
+                <span class="dash-card-arrow"><i data-lucide="arrow-right"></i></span>
+              </div>
+            </div>
+          </a>
+          <a class="dash-card" href="{% url 'storefront:edit_menu' %}">
+            <div class="dash-card-ico"><i data-lucide="menu"></i></div>
+            <div class="dash-card-body">
+              <div class="dash-card-title">Menü &amp; Navigasyon</div>
+              <div class="dash-card-sub">Header başlıkları ve flyout vitrinleri</div>
+              <div class="dash-card-foot">
+                <span class="dash-card-stat">{{ nav_count }} ana başlık</span>
+                <span class="dash-card-arrow"><i data-lucide="arrow-right"></i></span>
+              </div>
+            </div>
+          </a>
+          <a class="dash-card" href="{% url 'marketing:product_list' %}">
+            <div class="dash-card-ico"><i data-lucide="tag"></i></div>
+            <div class="dash-card-body">
+              <div class="dash-card-title">Ürünler</div>
+              <div class="dash-card-sub">Fiyat, varyant, görsel ve stok yönetimi</div>
+              <div class="dash-card-foot">
+                <span class="dash-card-stat">Marketing modülü</span>
+                <span class="dash-card-arrow"><i data-lucide="arrow-right"></i></span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<link rel="stylesheet" href="{% load static %}{% static 'storefront/css/cms-v2.css' %}?v=4" />
+<link rel="stylesheet" href="{% load static %}{% static 'storefront/css/storefront.css' %}?v=12" />
+{% endblock %}

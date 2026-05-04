@@ -1416,7 +1416,7 @@ def get_exchange_rates(request):
                 # Filter for currencies we support
                 supported_currencies = ['USD', 'EUR', 'TRY', 'RUB', 'PLN']
                 
-                print(f"[EXCHANGE RATES] ✓ Live rates fetched successfully!")
+                print(f"[EXCHANGE RATES] OK Live rates fetched successfully!")
                 print(f"[EXCHANGE RATES] Base currency: USD")
                 print(f"[EXCHANGE RATES] Current rates:")
                 
@@ -1427,10 +1427,10 @@ def get_exchange_rates(request):
                             'currency_code': code,
                             'rate': rate_value
                         })
-                        print(f"  • 1 USD = {rate_value} {code}")
+                        print(f"  - 1 USD = {rate_value} {code}")
     except Exception as e:
-        print(f"[EXCHANGE RATES] ✗ Error fetching live rates: {e}")
-        print(f"[EXCHANGE RATES] → Using fallback mock data")
+        print(f"[EXCHANGE RATES] ERR Error fetching live rates: {e}")
+        print(f"[EXCHANGE RATES] -> Using fallback mock data")
         # Fallback to mock rates if live fetch fails
         rates_data = [
             {'currency_code': 'USD', 'rate': 1.0},
@@ -1441,12 +1441,12 @@ def get_exchange_rates(request):
         ]
         print(f"[EXCHANGE RATES] Fallback rates:")
         for rate in rates_data:
-            print(f"  • 1 USD = {rate['rate']} {rate['currency_code']}")
+            print(f"  - 1 USD = {rate['rate']} {rate['currency_code']}")
     
     # If live fetch returned empty (e.g. API changed structure), use fallback
     if not rates_data:
-        print(f"[EXCHANGE RATES] ✗ Live fetch returned empty data")
-        print(f"[EXCHANGE RATES] → Using fallback mock data")
+        print(f"[EXCHANGE RATES] ERR Live fetch returned empty data")
+        print(f"[EXCHANGE RATES] -> Using fallback mock data")
         rates_data = [
             {'currency_code': 'USD', 'rate': 1.0},
             {'currency_code': 'EUR', 'rate': 0.95},
@@ -1456,7 +1456,7 @@ def get_exchange_rates(request):
         ]
         print(f"[EXCHANGE RATES] Fallback rates:")
         for rate in rates_data:
-            print(f"  • 1 USD = {rate['rate']} {rate['currency_code']}")
+            print(f"  - 1 USD = {rate['rate']} {rate['currency_code']}")
 
     print(f"{'='*60}\n")
 

@@ -1,0 +1,77 @@
+{% comment %}
+Live preview pane for the storefront. Drops the Belino site into an
+iframe with a device-size switcher (Desktop / Tablet / Mobile) and a
+manual reload button. Auto-bumps the iframe src with a cache-buster
+on every reload so Next.js ISR doesn't serve a stale page.
+
+Pass `preview_url` to override the default (e.g. for a deep-link).
+{% endcomment %}
+{% load static %}
+
+<aside class="sf-preview" data-preview-root data-preview-base="{{ STOREFRONT_PREVIEW_URL }}"
+       {% if lock_page %}data-preview-locked{% endif %}>
+  <div class="sf-preview-bar">
+    <span class="sf-preview-title">
+      <i data-lucide="monitor"></i>
+      Canlı Önizleme
+    </span>
+    {% if not lock_page %}
+      {% comment %}
+        Page selector — only shown on broad CMS pages. On a specific
+        item's edit page the iframe is locked to that item's URL.
+      {% endcomment %}
+      <select class="sf-preview-page" data-preview-pageselect title="Önizlenecek sayfa">
+        <option value="/">Anasayfa</option>
+        <option value="/products">Tüm Ürünler</option>
+        <option value="/products?cat=erkek-corap">Erkek Çorap</option>
+        <option value="/products?cat=kadin-corap">Kadın Çorap</option>
+        <option value="/products?cat=cocuk-corap">Çocuk Çorabı</option>
+        <option value="/products?cat=erkek-boxer">Erkek Boxer</option>
+        <option value="/products?season=ss26">SS26 Sezon</option>
+        <option value="/products?season=aw25">AW25 Sezon</option>
+        <option value="/login">Giriş Sayfası</option>
+        <option value="/account">Hesabım</option>
+        <option value="/account/orders">Siparişlerim</option>
+        <option value="/account/favorites">Favorilerim</option>
+      </select>
+    {% endif %}
+    <div class="sf-preview-devices" role="tablist">
+      <button type="button" class="sf-dv on" data-device="desktop" data-w="100%">
+        <i data-lucide="monitor"></i>
+      </button>
+      <button type="button" class="sf-dv" data-device="tablet" data-w="820px">
+        <i data-lucide="tablet"></i>
+      </button>
+      <button type="button" class="sf-dv" data-device="mobile" data-w="380px">
+        <i data-lucide="smartphone"></i>
+      </button>
+    </div>
+    <div class="sf-preview-actions">
+      <button type="button" class="sf-icon-btn" data-preview-reload title="Yenile">
+        <i data-lucide="refresh-cw"></i>
+      </button>
+      <a class="sf-icon-btn"
+         href="{{ preview_url|default:STOREFRONT_PREVIEW_URL }}"
+         target="_blank" rel="noreferrer noopener" title="Yeni sekmede aç">
+        <i data-lucide="external-link"></i>
+      </a>
+    </div>
+  </div>
+  <div class="sf-preview-stage">
+    <div class="sf-preview-frame-wrap" data-preview-wrap>
+      {% comment %}
+        `?edit=1` activates Belino's EditorOverlay (visual editor).
+        When the view passes `iframe_src` it already includes ?edit=1
+        (built from the item's URL). Falls back to the storefront root.
+      {% endcomment %}
+      <iframe
+        class="sf-preview-frame"
+        src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"
+        title="Belino canlı önizleme"
+        loading="lazy"
+        data-preview-iframe
+        data-base-src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"
+      ></iframe>
+    </div>
+  </div>
+</aside>

@@ -1,0 +1,494 @@
+{% comment %}
+  Nejum-exact sidebar partial. Loaded from base.html only when
+  ui_theme == "nejum". Uses Nejum's <aside class="sidebar"> structure
+  + Lucide icons + CSS-driven hover flyouts. All Django URLs and
+  legacy onclick handlers (openTaskSidebar, openOrderSidebar, etc.)
+  are preserved verbatim from the old sidebar.
+{% endcomment %}
+
+<aside class="nj-sidebar">
+  <a class="nj-logo" href="{% url 'index' %}">
+    <span class="nj-wm">nejum</span>
+    <span class="nj-pulse"></span>
+  </a>
+
+  {# ============ ADD (+) ============ #}
+  <div class="nj-nav-item nj-add" data-flyout="add">
+    <i data-lucide="plus"></i>
+    <span class="nj-label">Add</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="plus-circle"></i></span>
+        <span class="nj-fly-title">Add new record</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">ADD SINGLE RECORD</div>
+          <a class="nj-fly-item" href="#" onclick="openMainContactSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="user"></i></span>
+            <span class="nj-fi-label">Contact</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openCompanySidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="building-2"></i></span>
+            <span class="nj-fi-label">Company</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openTaskSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="check-circle"></i></span>
+            <span class="nj-fi-label">Task</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'marketing:product_create' %}">
+            <span class="nj-fi-icon"><i data-lucide="tag"></i></span>
+            <span class="nj-fi-label">Product</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openOrderSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="shopping-cart"></i></span>
+            <span class="nj-fi-label">Order</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'marketing:blog_create' %}">
+            <span class="nj-fi-icon"><i data-lucide="book-open"></i></span>
+            <span class="nj-fi-label">Blog post</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openAddSupplierSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="truck"></i></span>
+            <span class="nj-fi-label">Supplier</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ DASHBOARD ============ #}
+  <a class="nj-nav-item {% if request.path == '/' %}active{% endif %}" href="{% url 'index' %}">
+    <i data-lucide="layout-grid"></i>
+    <span class="nj-label">Dashboard</span>
+  </a>
+
+  {# ============ MY TEAM ============ #}
+  <div class="nj-nav-item" data-flyout="team">
+    <i data-lucide="users"></i>
+    <span class="nj-label">My Team</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="users"></i></span>
+        <span class="nj-fly-title">My Team</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">TEAM MANAGEMENT</div>
+          <a class="nj-fly-item" href="{% url 'team:team_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
+            <span class="nj-fi-label">Team members</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'team:team_tasks' %}">
+            <span class="nj-fi-icon"><i data-lucide="list-checks"></i></span>
+            <span class="nj-fi-label">Assign task</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'team:team_messages' %}">
+            <span class="nj-fi-icon"><i data-lucide="message-circle"></i></span>
+            <span class="nj-fi-label">Messages</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'team:team_roles' %}">
+            <span class="nj-fi-icon"><i data-lucide="shield"></i></span>
+            <span class="nj-fi-label">Manage roles</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'team:team_meetings' %}">
+            <span class="nj-fi-icon"><i data-lucide="video"></i></span>
+            <span class="nj-fi-label">Schedule meeting</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ ACCOUNTING ============ #}
+  <div class="nj-nav-item" data-flyout="accounting">
+    <i data-lucide="calculator"></i>
+    <span class="nj-label">Accounting</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="calculator"></i></span>
+        <span class="nj-fly-title">Accounting</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">LEDGERS</div>
+          <a class="nj-fly-item" href="{% url 'accounting:index' %}">
+            <span class="nj-fi-icon"><i data-lucide="book"></i></span>
+            <span class="nj-fi-label">View ledgers</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openBookSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
+            <span class="nj-fi-label">Create ledger</span>
+          </a>
+        </div>
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">REPORTS</div>
+          <a class="nj-fly-item" href="{% url 'accounting:sales_dashboard' %}">
+            <span class="nj-fi-icon"><i data-lucide="bar-chart-3"></i></span>
+            <span class="nj-fi-label">Sales dashboard</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ MARKETING ============ #}
+  <div class="nj-nav-item" data-flyout="marketing">
+    <i data-lucide="target"></i>
+    <span class="nj-label">Marketing</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="target"></i></span>
+        <span class="nj-fly-title">Marketing</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">PRODUCTS</div>
+          <a class="nj-fly-item" href="{% url 'marketing:product_create' %}">
+            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
+            <span class="nj-fi-label">Create product</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'marketing:product_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
+            <span class="nj-fi-label">Product list</span>
+          </a>
+        </div>
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">CUSTOMERS</div>
+          <a class="nj-fly-item" href="{% url 'crm:company_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="building-2"></i></span>
+            <span class="nj-fi-label">Companies</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'crm:contact_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="users"></i></span>
+            <span class="nj-fi-label">Contacts</span>
+          </a>
+        </div>
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">BLOG</div>
+          <a class="nj-fly-item" href="{% url 'marketing:blog_create' %}">
+            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
+            <span class="nj-fi-label">Create blog post</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'marketing:blog_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="book-open"></i></span>
+            <span class="nj-fi-label">Blog list</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ OPERATIONS ============ #}
+  <div class="nj-nav-item" data-flyout="operations">
+    <i data-lucide="settings-2"></i>
+    <span class="nj-label">Operations</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="settings-2"></i></span>
+        <span class="nj-fly-title">Operations</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">QR ACTIONS</div>
+          <a class="nj-fly-item" href="{% url 'operating:scan_order_item_unit' %}">
+            <span class="nj-fi-icon"><i data-lucide="qr-code"></i></span>
+            <span class="nj-fi-label">QR scan</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'operating:scan_order_item_unit_pack' %}">
+            <span class="nj-fi-icon"><i data-lucide="package-2"></i></span>
+            <span class="nj-fi-label">QR scan package</span>
+          </a>
+        </div>
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">RAW MATERIAL</div>
+          <a class="nj-fly-item" href="{% url 'operating:raw_material_good_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
+            <span class="nj-fi-label">Raw material list</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openRawMaterialSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="box"></i></span>
+            <span class="nj-fi-label">Create raw material</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openRawMaterialReceiptSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="file-text"></i></span>
+            <span class="nj-fi-label">Raw material receipt</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openRawMaterialItemSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="plus-square"></i></span>
+            <span class="nj-fi-label">Raw material item</span>
+          </a>
+        </div>
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">ORDERS</div>
+          <a class="nj-fly-item" href="#" onclick="openOrderSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
+            <span class="nj-fi-label">Create order</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'operating:order_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
+            <span class="nj-fi-label">Order list</span>
+          </a>
+        </div>
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">WAREHOUSE</div>
+          <a class="nj-fly-item" href="{% url 'operating:warehouse_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="warehouse"></i></span>
+            <span class="nj-fi-label">My warehouses</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'operating:create_warehouse' %}">
+            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
+            <span class="nj-fi-label">Add warehouse</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ PROCUREMENT ============ #}
+  <div class="nj-nav-item" data-flyout="procurement">
+    <i data-lucide="shopping-basket"></i>
+    <span class="nj-label">Procurement</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="shopping-basket"></i></span>
+        <span class="nj-fly-title">Procurement</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">PURCHASING</div>
+          <a class="nj-fly-item" href="{% url 'procurement:request_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="file-text"></i></span>
+            <span class="nj-fi-label">Purchase requests</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'procurement:order_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="receipt"></i></span>
+            <span class="nj-fi-label">Purchase orders</span>
+          </a>
+        </div>
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">SUPPLIERS</div>
+          <a class="nj-fly-item" href="{% url 'crm:supplier_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="truck"></i></span>
+            <span class="nj-fi-label">Supplier list</span>
+          </a>
+          <a class="nj-fly-item" href="#" onclick="openAddSupplierSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
+            <span class="nj-fi-label">Add supplier</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ ANALYTICS ============ #}
+  <a class="nj-nav-item" href="{% url 'operating:order_analytics' %}">
+    <i data-lucide="line-chart"></i>
+    <span class="nj-label">Analytics</span>
+  </a>
+
+  {# ============ MAIL ============ #}
+  <div class="nj-nav-item" data-flyout="mail">
+    <i data-lucide="mail"></i>
+    <span class="nj-label">Mail</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="mail"></i></span>
+        <span class="nj-fly-title">Mail</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <a class="nj-fly-item" href="{% url 'email_automation:dashboard' %}">
+            <span class="nj-fi-icon"><i data-lucide="gauge"></i></span>
+            <span class="nj-fi-label">Email automation</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'email_automation:my_emails' %}">
+            <span class="nj-fi-icon"><i data-lucide="inbox"></i></span>
+            <span class="nj-fi-label">My emails</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ MY STORE ============ #}
+  <div class="nj-nav-item" data-flyout="storefront">
+    <i data-lucide="store"></i>
+    <span class="nj-label">My Store</span>
+    <i data-lucide="chevron-right" class="nj-chev"></i>
+    <div class="nj-flyout">
+      <div class="nj-fly-arrow"></div>
+      <div class="nj-fly-head">
+        <span class="nj-fly-icon"><i data-lucide="store"></i></span>
+        <span class="nj-fly-title">My Store</span>
+      </div>
+      <div class="nj-fly-body">
+        <div class="nj-fly-group">
+          <div class="nj-fly-group-title">STOREFRONT CMS</div>
+          <a class="nj-fly-item" href="{% url 'storefront:dashboard' %}">
+            <span class="nj-fi-icon"><i data-lucide="layout-dashboard"></i></span>
+            <span class="nj-fi-label">Mağaza paneli</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'storefront:edit_home' %}">
+            <span class="nj-fi-icon"><i data-lucide="layout-template"></i></span>
+            <span class="nj-fi-label">Anasayfa düzenle</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'storefront:edit_menu' %}">
+            <span class="nj-fi-icon"><i data-lucide="menu"></i></span>
+            <span class="nj-fi-label">Menü &amp; navigasyon</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============ NOTES ============ #}
+  <a class="nj-nav-item" href="{% url 'notes:index' %}">
+    <i data-lucide="sticky-note"></i>
+    <span class="nj-label">Notes</span>
+  </a>
+
+  {# ============ REPORTS ============ #}
+  <a class="nj-nav-item" href="{% url 'reports' %}">
+    <i data-lucide="file-text"></i>
+    <span class="nj-label">Reports</span>
+  </a>
+</aside>
+
+<script>
+  // Lucide icons + hover-driven flyouts (with click-to-pin), mirrors the
+  // Nejum design kit's React Sidebar behaviour using vanilla JS.
+  (function() {
+    if (window.__nejum_sidebar_inited) return;
+    window.__nejum_sidebar_inited = true;
+
+    function ready(fn) {
+      if (document.readyState !== 'loading') fn();
+      else document.addEventListener('DOMContentLoaded', fn);
+    }
+
+    ready(function() {
+      if (window.lucide) window.lucide.createIcons();
+      var sidebar = document.querySelector('.nj-sidebar');
+      if (!sidebar) return;
+
+      var openItem = null;
+      var pinnedItem = null;
+      var closeTimer = null;
+      var CLOSE_DELAY = 160;  // ms — matches the Nejum design kit
+
+      function position(item) {
+        var fly = item.querySelector(':scope > .nj-flyout');
+        if (!fly) return;
+        var navRect = item.getBoundingClientRect();
+        // Topbar is 64px tall and fixed at top:0 — flyout must start
+        // BELOW it so the header (icon+title) is always visible.
+        // No scrolling: tall menus simply overflow the viewport bottom.
+        var topMargin = 76;
+        var bottomMargin = 12;
+        var flyHeight = fly.offsetHeight || 320;
+        var navCenter = navRect.top + navRect.height / 2;
+        // Header sits ~38px below the flyout's top — anchor center to nav center.
+        var top = navCenter - 38;
+        var maxTop = window.innerHeight - flyHeight - bottomMargin;
+        // topMargin wins: header must never go under the topbar.
+        if (top > maxTop) top = maxTop;
+        if (top < topMargin) top = topMargin;
+        fly.style.top = top + 'px';
+        // Sidebar is 88px + 6px gap = 94px from the left edge.
+        fly.style.left = '94px';
+        // Reposition the arrow to point at the nav item's vertical center.
+        var arrow = fly.querySelector('.nj-fly-arrow');
+        if (arrow) {
+          var arrowTop = navCenter - top - 6;
+          if (arrowTop < 14) arrowTop = 14;
+          if (arrowTop > flyHeight - 26) arrowTop = flyHeight - 26;
+          arrow.style.top = arrowTop + 'px';
+        }
+      }
+
+      function open(item) {
+        if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+        if (openItem && openItem !== item) openItem.classList.remove('nj-open');
+        openItem = item;
+        item.classList.add('nj-open');
+        position(item);
+      }
+
+      function scheduleClose() {
+        if (pinnedItem) return;  // pinned stays open
+        if (closeTimer) clearTimeout(closeTimer);
+        closeTimer = setTimeout(function() {
+          if (openItem) {
+            openItem.classList.remove('nj-open');
+            openItem = null;
+          }
+        }, CLOSE_DELAY);
+      }
+
+      function cancelClose() {
+        if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+      }
+
+      sidebar.querySelectorAll('.nj-nav-item[data-flyout]').forEach(function(item) {
+        item.addEventListener('mouseenter', function() {
+          open(item);
+        });
+        item.addEventListener('mouseleave', scheduleClose);
+
+        // Click on the nav-item TILE pins/unpins. Clicks inside the flyout
+        // (e.g. on a menu link) navigate normally and don't pin.
+        item.addEventListener('click', function(e) {
+          if (e.target.closest('.nj-flyout')) return;
+          e.preventDefault();
+          if (pinnedItem === item) {
+            pinnedItem = null;
+            item.classList.remove('nj-pinned');
+            scheduleClose();
+          } else {
+            if (pinnedItem) pinnedItem.classList.remove('nj-pinned');
+            pinnedItem = item;
+            item.classList.add('nj-pinned');
+            open(item);
+          }
+        });
+
+        // Keep open while the cursor is inside the flyout itself
+        var fly = item.querySelector(':scope > .nj-flyout');
+        if (fly) {
+          fly.addEventListener('mouseenter', cancelClose);
+          fly.addEventListener('mouseleave', scheduleClose);
+        }
+      });
+
+      // Outside-click closes any pinned flyout
+      document.addEventListener('mousedown', function(e) {
+        if (!pinnedItem) return;
+        if (e.target.closest('.nj-sidebar')) return;
+        if (e.target.closest('.nj-flyout')) return;
+        pinnedItem.classList.remove('nj-pinned');
+        pinnedItem = null;
+        scheduleClose();
+      });
+
+      // Keep arrow + position correct on resize
+      window.addEventListener('resize', function() {
+        if (openItem) position(openItem);
+      });
+    });
+  })();
+</script>

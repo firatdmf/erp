@@ -1,6 +1,8 @@
 vir_env
 pass.txt
 erp/.env
+erp/.env.*
+.env.*
 *.pyo
 *.pyc
 .env

@@ -1,0 +1,601 @@
+{% load static %}
+{% comment %}
+  Nejum-exact dashboard partial. Mirrors Nejum design kit's
+  ScreenHome.jsx structure 1:1: top tab bar (Takvim / Görevlerim /
+  Atanan Görevler) + 2-col grid (calendar card + today's tasks card)
+  + premium task cards with stripe / aging / assignee / actions.
+
+  Kept entirely separate from dashboard_new.html. erp_tags.py
+  dispatches on UI_THEME so demfirat keeps the legacy dashboard.
+
+  Calendar JS injects task counts from `tasks_calendar_data`.
+{% endcomment %}
+
+<div class="content home-content njdash" id="njDashRoot" data-tab="calendar">
+
+  <div class="home-tabs">
+    <button class="home-tab active" data-tab="calendar">
+      <i data-lucide="calendar"></i> Calendar View
+    </button>
+    <button class="home-tab" data-tab="mine">
+      <i data-lucide="user"></i> My Tasks
+      <span class="tab-count{% if my_tasks_count == 0 %} zero{% endif %}">{{ my_tasks_count|default:0 }}</span>
+    </button>
+    <button class="home-tab" data-tab="delegated">
+      <i data-lucide="user-check"></i> Assigned Tasks
+      <span class="tab-count{% if assigned_tasks_count == 0 %} zero{% endif %}">{{ assigned_tasks_count|default:0 }}</span>
+    </button>
+
+    <div class="home-tabs-spacer"></div>
+
+    <div class="njdash-search">
+      <svg class="njdash-search-icon" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/>
+        <path d="m21 21-4.3-4.3"/>
+      </svg>
+      <input type="search" id="njSearch" placeholder="Search tasks…" autocomplete="off" />
+    </div>
+
+    <div class="njdash-filter-wrap">
+      <button class="home-action ghost" type="button" id="njFilterBtn" aria-haspopup="true" aria-expanded="false">
+        <i data-lucide="filter"></i> Filter
+        <span class="njdash-filter-count" id="njFilterCount" hidden></span>
+      </button>
+      <div class="njdash-filter-menu" id="njFilterMenu" hidden>
+        <div class="njdash-filter-title">Priority</div>
+        <label class="njdash-filter-row">
+          <input type="checkbox" data-prio="urgent"><span class="prio-dot prio-urgent"></span>Urgent
+        </label>
+        <label class="njdash-filter-row">
+          <input type="checkbox" data-prio="high"><span class="prio-dot prio-high"></span>High
+        </label>
+        <label class="njdash-filter-row">
+          <input type="checkbox" data-prio="medium"><span class="prio-dot prio-medium"></span>Medium
+        </label>
+        <label class="njdash-filter-row">
+          <input type="checkbox" data-prio="low"><span class="prio-dot prio-low"></span>Low
+        </label>
+        <div class="njdash-filter-foot">
+          <button type="button" class="njdash-filter-clear" id="njFilterClear">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="home-action primary" type="button" onclick="openTaskSidebar(); return false;">
+      <i data-lucide="plus"></i> New Task
+    </button>
+  </div>
+
+  <div class="home-grid">
+
+    <div class="cal-card">
+      <div class="cal-head">
+        <div class="cal-title-wrap">
+          <span class="cal-title-icon"><i data-lucide="calendar"></i></span>
+          <span class="cal-title">Calendar</span>
+        </div>
+        <div class="cal-nav">
+          <button class="cal-nav-btn" type="button" onclick="njCalPrev()" aria-label="Previous month">
+            <span class="cal-nav-chev" aria-hidden="true">‹</span>
+          </button>
+          <span class="cal-month-label" id="njCalLabel"></span>
+          <button class="cal-nav-btn" type="button" onclick="njCalNext()" aria-label="Next month">
+            <span class="cal-nav-chev" aria-hidden="true">›</span>
+          </button>
+        </div>
+      </div>
+      <div class="cal-grid" id="njCalGrid">
+        {# Filled in by JS — preserves dotted task indicators per day #}
+      </div>
+      <div class="cal-foot">
+        <div class="cal-legend">
+          <span class="legend-item"><span class="legend-dot c0"></span>Urgent</span>
+          <span class="legend-item"><span class="legend-dot c1"></span>Normal</span>
+          <span class="legend-item"><span class="legend-dot c2"></span>Low</span>
+        </div>
+        <button class="cal-jump" type="button" onclick="njCalToday()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg>
+          Back to today
+        </button>
+      </div>
+    </div>
+
+    <div class="today-card">
+      <div class="today-head">
+        <div class="today-title-wrap">
+          <span class="today-check"><i data-lucide="check-square"></i></span>
+          <div>
+            <div class="today-title" id="njTodayTitle">Today's Tasks</div>
+            <div class="today-sub" id="njTodaySub">{{ pending_tasks_count|default:0 }} pending · {{ number_of_leads_added|default:0 }} new leads</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="task-list" id="njTaskList">
+        {% if today_tasks %}
+          {% for t in today_tasks %}
+            <div class="task-card prio-{{ t.priority }}{% if t.completed %} done{% endif %}" data-task-id="{{ t.id }}">
+              <div class="task-stripe"></div>
+              <div class="task-body">
+                <div class="task-top">
+                  <div class="task-text">{{ t.name }}</div>
+                  <span class="task-aging aging-{{ t.aging_tone }}">{{ t.aging_label }}</span>
+                </div>
+                <div class="task-meta">
+                  <span class="task-assignee">
+                    <span class="avatar avatar-teal">{{ t.avatar_letter }}</span>
+                    <span>{{ t.assignee }}</span>
+                  </span>
+                  <span class="task-date">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    {{ t.date_label }}
+                  </span>
+                </div>
+              </div>
+              <div class="task-actions">
+                <button type="button"
+                        class="btn-complete{% if t.completed %} completed{% endif %}"
+                        data-task-id="{{ t.id }}"
+                        data-action="complete">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  {% if t.completed %}Completed{% else %}Complete{% endif %}
+                </button>
+                <a class="btn-view" href="{% url 'todo:task_detail' task_id=t.id %}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  View
+                </a>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="njdash-empty">
+            <div class="njdash-empty-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <div class="njdash-empty-title">No tasks for today</div>
+            <div class="njdash-empty-sub">Add a new task with "+ New Task".</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  (function() {
+    if (window.__nejum_dash_inited) return;
+    window.__nejum_dash_inited = true;
+
+    var tasksData = {{ tasks_calendar_data|safe }};         // {date: count}
+    var tasksByDate = {{ tasks_by_date_json|safe }};        // {date: [tasks]}
+    var delegatedTasks = {{ delegated_tasks_json|safe }};   // [tasks] — assigned to me
+    var current = new Date();
+    var selected = new Date();
+
+    var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    function ymd(d) {
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function sameDay(a, b) {
+      return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+    }
+
+    function render() {
+      var y = current.getFullYear(), m = current.getMonth();
+      var label = document.getElementById('njCalLabel');
+      if (label) label.textContent = monthNames[m] + ' ' + y;
+
+      var firstDow = new Date(y, m, 1).getDay();
+      var daysInMonth = new Date(y, m+1, 0).getDate();
+      var grid = document.getElementById('njCalGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      // weekday header row
+      var dow = document.createElement('div');
+      dow.className = 'cal-row dow';
+      dayNames.forEach(function(name) {
+        var c = document.createElement('div');
+        c.className = 'cal-dow';
+        c.textContent = name;
+        dow.appendChild(c);
+      });
+      grid.appendChild(dow);
+
+      var cells = [];
+      for (var i = 0; i < firstDow; i++) cells.push(null);
+      for (var d = 1; d <= daysInMonth; d++) cells.push(d);
+      while (cells.length % 7) cells.push(null);
+
+      var today = new Date();
+      for (var i = 0; i < cells.length; i += 7) {
+        var row = document.createElement('div');
+        row.className = 'cal-row';
+        for (var j = 0; j < 7; j++) {
+          var d = cells[i+j];
+          var cell = document.createElement('button');
+          cell.type = 'button';
+          var classes = ['cal-cell'];
+          if (!d) classes.push('empty');
+          else {
+            var date = new Date(y, m, d);
+            if (sameDay(selected, date)) classes.push('selected');
+            if (sameDay(today, date)) classes.push('today');
+          }
+          cell.className = classes.join(' ');
+          if (d) {
+            var num = document.createElement('span');
+            num.className = 'cal-num';
+            num.textContent = d;
+            cell.appendChild(num);
+            var key = ymd(new Date(y, m, d));
+            var count = tasksData[key];
+            if (count) {
+              var dots = document.createElement('span');
+              dots.className = 'cal-dots';
+              var n = Math.min(count, 3);
+              for (var k = 0; k < n; k++) {
+                var dot = document.createElement('span');
+                dot.className = 'cal-dot c' + k;
+                dots.appendChild(dot);
+              }
+              if (count > 3) {
+                var more = document.createElement('span');
+                more.className = 'cal-dot-more';
+                more.textContent = '+' + (count - 3);
+                dots.appendChild(more);
+              }
+              cell.appendChild(dots);
+            }
+            (function(date) {
+              cell.addEventListener('click', function() {
+                selected = date;
+                render();
+                updateTodayHeader();
+                renderTasksForSelected();
+              });
+            })(new Date(y, m, d));
+          } else {
+            cell.disabled = true;
+          }
+          row.appendChild(cell);
+        }
+        grid.appendChild(row);
+      }
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    /* Returns the tasks to render for the currently selected day,
+       PRE-SORTED for display:
+       - Selected = today → today's tasks FIRST (priority sorted),
+         then overdue tasks ordered newest-past first (so most recent
+         overdue sits right under today). Future tasks excluded.
+       - Selected = any other day → just that day's tasks (priority).
+       Server already filters out completed tasks. */
+    var prioOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+    function byPriority(a, b) {
+      var pa = prioOrder[a.priority] != null ? prioOrder[a.priority] : 9;
+      var pb = prioOrder[b.priority] != null ? prioOrder[b.priority] : 9;
+      return pa - pb;
+    }
+    /* Active dashboard tab + free-text search + priority filter set.
+       'calendar' honours the day click; 'mine' shows every open task;
+       'delegated' is a stub until TeamTask data is wired up. */
+    var currentTab = 'calendar';
+    var searchTerm = '';
+    var prioFilter = new Set();   // empty = no filter (show all)
+
+    function fold(s) {
+      // Locale-aware lowercase + diacritic stripping. Use tr-TR so
+      // Turkish I/i pairs fold the same way the Belino frontend does;
+      // English content passes through unchanged.
+      return (s || '').toLocaleLowerCase('tr-TR')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i');
+    }
+
+    function applySearchAndFilter(list) {
+      var q = fold(searchTerm.trim());
+      var hasFilter = prioFilter.size > 0;
+      if (!q && !hasFilter) return list;
+      return list.filter(function(t) {
+        if (hasFilter && !prioFilter.has(t.priority)) return false;
+        if (q) {
+          if (fold(t.name).indexOf(q) < 0 &&
+              fold(t.assignee || '').indexOf(q) < 0) return false;
+        }
+        return true;
+      });
+    }
+
+    function tasksForCurrentSelection() {
+      if (currentTab === 'mine') {
+        var all = [];
+        Object.keys(tasksByDate).forEach(function(k) {
+          tasksByDate[k].forEach(function(t) { all.push(t); });
+        });
+        // Priority first; then closest-due-date as tiebreak
+        all.sort(function(a, b) {
+          var p = byPriority(a, b);
+          if (p !== 0) return p;
+          return (a.date_iso || '').localeCompare(b.date_iso || '');
+        });
+        return all;
+      }
+      if (currentTab === 'delegated') {
+        // Already sorted server-side by date desc, priority asc
+        return (delegatedTasks || []).slice();
+      }
+      // Calendar tab (default)
+      var today = new Date();
+      var isToday = sameDay(selected, today);
+      var key = ymd(selected);
+      if (!isToday) {
+        return (tasksByDate[key] || []).slice().sort(byPriority);
+      }
+      var todayKey = ymd(today);
+      var todayTasks = (tasksByDate[todayKey] || []).slice().sort(byPriority);
+      var pastKeys = Object.keys(tasksByDate)
+        .filter(function(k) { return k < todayKey; })
+        .sort()
+        .reverse();
+      var overdue = [];
+      pastKeys.forEach(function(k) {
+        var bucket = tasksByDate[k].slice().sort(byPriority);
+        bucket.forEach(function(t) { overdue.push(t); });
+      });
+      return todayTasks.concat(overdue);
+    }
+
+    function updateTodayHeader() {
+      var sub = document.getElementById('njTodaySub');
+      var title = document.getElementById('njTodayTitle');
+      var tasks = tasksForCurrentSelection();
+      var count = tasks.length;
+
+      if (currentTab === 'mine') {
+        if (title) title.textContent = 'My Tasks';
+        if (sub) sub.textContent = count + ' open tasks · sorted by priority';
+        return;
+      }
+      if (currentTab === 'delegated') {
+        if (title) title.textContent = 'Assigned Tasks';
+        if (sub) sub.textContent = 'Tasks assigned to you by team members';
+        return;
+      }
+
+      // Calendar tab
+      var today = new Date();
+      var isToday = sameDay(selected, today);
+      if (title) title.textContent = isToday ? "Today's Tasks" : "Selected Day's Tasks";
+      if (sub) {
+        if (isToday) {
+          sub.textContent = monthNames[selected.getMonth()] + ' ' + selected.getDate() +
+            ', ' + selected.getFullYear() + ' · ' + count + ' tasks (incl. overdue)';
+        } else {
+          sub.textContent = monthNames[selected.getMonth()] + ' ' + selected.getDate() +
+            ', ' + selected.getFullYear() + ' · ' + count + ' tasks';
+        }
+      }
+    }
+
+    /* Render the task-card list for the selected day. Mirrors the
+       server-rendered markup so styling and JS hooks stay identical. */
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function emptyMarkup() {
+      var title, sub;
+      if (currentTab === 'mine') {
+        title = 'No tasks yet';
+        sub = 'Create your first task with "+ New Task".';
+      } else if (currentTab === 'delegated') {
+        title = 'No assigned tasks';
+        sub = 'Tasks assigned to you by team members will appear here.';
+      } else {
+        title = 'No tasks for this day';
+        sub = 'Add a new task with "+ New Task".';
+      }
+      return '<div class="njdash-empty">' +
+        '<div class="njdash-empty-icon">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' +
+        '</div>' +
+        '<div class="njdash-empty-title">' + title + '</div>' +
+        '<div class="njdash-empty-sub">' + sub + '</div>' +
+        '</div>';
+    }
+    function taskCardMarkup(t) {
+      var done = t.completed ? ' done' : '';
+      var doneCls = t.completed ? ' completed' : '';
+      var doneLabel = t.completed ? 'Completed' : 'Complete';
+      return '<div class="task-card prio-' + escapeHtml(t.priority) + done + '" data-task-id="' + t.id + '">' +
+        '<div class="task-stripe"></div>' +
+        '<div class="task-body">' +
+        '<div class="task-top">' +
+        '<div class="task-text">' + escapeHtml(t.name) + '</div>' +
+        '<span class="task-aging aging-' + escapeHtml(t.aging_tone) + '">' + escapeHtml(t.aging_label) + '</span>' +
+        '</div>' +
+        '<div class="task-meta">' +
+        '<span class="task-assignee"><span class="avatar avatar-teal">' + escapeHtml(t.avatar_letter) + '</span><span>' + escapeHtml(t.assignee) + '</span></span>' +
+        '<span class="task-date">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+        escapeHtml(t.date_label) +
+        '</span>' +
+        '</div>' +
+        '</div>' +
+        '<div class="task-actions">' +
+        '<button type="button" class="btn-complete' + doneCls + '" data-task-id="' + t.id + '" data-action="complete">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+        doneLabel +
+        '</button>' +
+        '<a class="btn-view" href="/todo/tasks/' + t.id + '/detail/">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+        'View' +
+        '</a>' +
+        '</div>' +
+        '</div>';
+    }
+    function renderTasksForSelected() {
+      var list = document.getElementById('njTaskList');
+      if (!list) return;
+      var tasks = applySearchAndFilter(tasksForCurrentSelection());
+      if (!tasks.length) { list.innerHTML = emptyMarkup(); return; }
+      list.innerHTML = tasks.map(taskCardMarkup).join('');
+      wireTaskActions();
+    }
+
+    window.njCalPrev = function() { current = new Date(current.getFullYear(), current.getMonth()-1, 1); render(); };
+    window.njCalNext = function() { current = new Date(current.getFullYear(), current.getMonth()+1, 1); render(); };
+    window.njCalToday = function() {
+      current = new Date(); selected = new Date();
+      render(); updateTodayHeader(); renderTasksForSelected();
+    };
+
+    function ready(fn) {
+      if (document.readyState !== 'loading') fn();
+      else document.addEventListener('DOMContentLoaded', fn);
+    }
+    ready(function() {
+      render();
+      updateTodayHeader();
+      var root = document.getElementById('njDashRoot');
+
+      // Wire tabs to actually change the right-hand list
+      document.querySelectorAll('.njdash .home-tab').forEach(function(b) {
+        b.addEventListener('click', function() {
+          document.querySelectorAll('.njdash .home-tab').forEach(function(x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          currentTab = b.getAttribute('data-tab') || 'calendar';
+          if (root) root.setAttribute('data-tab', currentTab);
+          updateTodayHeader();
+          renderTasksForSelected();
+        });
+      });
+
+      // Search input — debounced, applies to whichever tab is active
+      var searchInput = document.getElementById('njSearch');
+      if (searchInput) {
+        var searchTimer = null;
+        searchInput.addEventListener('input', function() {
+          searchTerm = searchInput.value;
+          if (searchTimer) clearTimeout(searchTimer);
+          searchTimer = setTimeout(function() {
+            updateTodayHeader();
+            renderTasksForSelected();
+          }, 120);
+        });
+      }
+
+      // Filter dropdown
+      var filterBtn = document.getElementById('njFilterBtn');
+      var filterMenu = document.getElementById('njFilterMenu');
+      var filterCount = document.getElementById('njFilterCount');
+      var filterClear = document.getElementById('njFilterClear');
+
+      function refreshFilterCount() {
+        if (!filterCount) return;
+        if (prioFilter.size === 0) {
+          filterCount.hidden = true;
+          filterCount.textContent = '';
+        } else {
+          filterCount.hidden = false;
+          filterCount.textContent = String(prioFilter.size);
+        }
+      }
+      function closeFilter() {
+        if (!filterMenu) return;
+        filterMenu.hidden = true;
+        if (filterBtn) filterBtn.setAttribute('aria-expanded', 'false');
+      }
+      if (filterBtn && filterMenu) {
+        filterBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var open = !filterMenu.hidden;
+          filterMenu.hidden = open;
+          filterBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
+        });
+        filterMenu.addEventListener('click', function(e) { e.stopPropagation(); });
+        document.addEventListener('mousedown', function(e) {
+          if (filterMenu.hidden) return;
+          if (!filterMenu.contains(e.target) && e.target !== filterBtn && !filterBtn.contains(e.target)) {
+            closeFilter();
+          }
+        });
+        filterMenu.querySelectorAll('input[type="checkbox"][data-prio]').forEach(function(cb) {
+          cb.addEventListener('change', function() {
+            var p = cb.getAttribute('data-prio');
+            if (cb.checked) prioFilter.add(p);
+            else prioFilter.delete(p);
+            refreshFilterCount();
+            updateTodayHeader();
+            renderTasksForSelected();
+          });
+        });
+      }
+      if (filterClear) {
+        filterClear.addEventListener('click', function() {
+          prioFilter.clear();
+          if (filterMenu) {
+            filterMenu.querySelectorAll('input[type="checkbox"][data-prio]').forEach(function(cb) { cb.checked = false; });
+          }
+          refreshFilterCount();
+          updateTodayHeader();
+          renderTasksForSelected();
+        });
+      }
+
+      wireTaskActions();
+    });
+
+    /* (Re-)bind the Tamamla click handler. Called on first paint AND
+       after the task list is re-rendered for a different day, so
+       newly-injected buttons get wired up too. */
+    function getCsrf() {
+      var m = document.cookie.match(/csrftoken=([^;]+)/);
+      if (m) return m[1];
+      var input = document.querySelector('input[name=csrfmiddlewaretoken]');
+      return input ? input.value : '';
+    }
+    function wireTaskActions() {
+      document.querySelectorAll('.njdash .btn-complete[data-action="complete"]').forEach(function(btn) {
+        if (btn.__wired) return;
+        btn.__wired = true;
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          if (btn.classList.contains('completed')) return;
+          var taskId = btn.getAttribute('data-task-id');
+          if (!taskId) return;
+          btn.disabled = true;
+          var card = btn.closest('.task-card');
+          var fd = new FormData();
+          fd.append('status', 'done');
+          fd.append('csrfmiddlewaretoken', getCsrf());
+          fetch('/todo/tasks/' + taskId + '/complete_task', {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': getCsrf() }
+          }).then(function(res) {
+            if (!res.ok) throw new Error(res.status);
+            if (card) card.classList.add('done');
+            btn.classList.add('completed');
+            btn.innerHTML = btn.innerHTML.replace('Complete', 'Completed');
+            btn.disabled = false;
+            // Sync local cache so a re-render reflects completion
+            var key = ymd(selected);
+            (tasksByDate[key] || []).forEach(function(t) {
+              if (String(t.id) === String(taskId)) t.completed = true;
+            });
+          }).catch(function() {
+            btn.disabled = false;
+            alert('Failed to update task. Please try again.');
+          });
+        });
+      });
+    }
+  })();
+</script>

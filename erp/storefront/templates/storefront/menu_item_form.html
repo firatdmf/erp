@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+{% block title %}{% if is_create %}Yeni başlık{% else %}{{ item.label_tr }}{% endif %} · Mağazam{% endblock %}
+
+{% block content %}
+<style>
+/* === SCROLLABLE LAYOUT — full width, left-aligned === */
+.cms2 {
+  height: auto !important;
+  min-height: calc(100vh - var(--topbar-h, 64px)) !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  background: linear-gradient(180deg, #F7F9FA 0%, #F0F3F5 100%);
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+/* Cancel <main> default padding so form & preview hug the same left edge */
+body > main:has(.cms2) {
+  padding: 0 !important;
+}
+.cms2-top {
+  position: sticky !important;
+  top: 0;
+  z-index: 30;
+  background: white;
+}
+.cms2-body.stack,
+.cms2-body.split {
+  display: block !important;
+  height: auto !important;
+  overflow: visible !important;
+  background: transparent;
+}
+
+/* === FORM PANE — natural height, no inner scroll === */
+.cms2-body.stack > .form-pane,
+.cms2-body.split > .form-pane {
+  background: white;
+  border-bottom: 1px solid #E5EAEC;
+  padding: 24px 32px 28px;
+  max-height: none !important;
+  overflow: visible !important;
+  box-shadow: 0 1px 0 rgba(15,23,31,0.02);
+}
+.form-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+  margin: 0;
+}
+@media (max-width: 1100px) {
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 720px) {
+  .form-grid { grid-template-columns: 1fr !important; }
+}
+.form-grid > .fs { display: flex; flex-direction: column; }
+.form-grid .fs-body { padding: 14px !important; gap: 12px !important; }
+
+/* Compact drop-zone — fix [hidden] preview bug */
+.sf-drop { min-height: 0 !important; }
+.sf-drop-zone {
+  padding: 14px !important;
+  min-height: 92px !important;
+  gap: 4px !important;
+  border-radius: 10px !important;
+}
+.sf-drop-icon { width: 32px !important; height: 32px !important; }
+.sf-drop-icon svg { width: 14px !important; height: 14px !important; }
+.sf-drop-cta { font-size: 12px !important; }
+.sf-drop-hint { font-size: 9.5px !important; }
+.sf-drop-preview[hidden] { display: none !important; }
+.sf-drop-preview {
+  margin-top: 8px;
+  min-height: 0 !important;
+}
+.sf-drop-preview img { max-height: 180px !important; }
+
+/* === SECTION CARD === */
+.form-grid .fs {
+  background: white;
+  border: 1px solid #EAEFF1;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+.form-grid .fs:hover {
+  border-color: #D7DFE2;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.04), 0 12px 28px -10px rgba(15,23,31,0.10);
+  transform: translateY(-1px);
+}
+
+/* Section header */
+.form-grid .fs-head {
+  display: flex !important;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 16px !important;
+  background: linear-gradient(180deg, #FAFBFC 0%, #F5F7F8 100%);
+  border-bottom: 1px solid #EEF2F3 !important;
+  cursor: default !important;
+}
+.form-grid .fs-ico {
+  width: 30px !important; height: 30px !important;
+  border-radius: 9px !important;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%) !important;
+  border: 1px solid #B8DCDC !important;
+  color: #006B6C !important;
+  display: inline-flex !important;
+  align-items: center; justify-content: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.form-grid .fs-ico svg {
+  width: 14px !important; height: 14px !important;
+  stroke-width: 2 !important;
+}
+.form-grid .fs-t {
+  font: 700 13.5px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #0F172A !important;
+  letter-spacing: -0.01em !important;
+  flex: 1;
+}
+.form-grid .fs-chev { display: none !important; }
+
+/* Section body */
+.form-grid .fs-body {
+  padding: 16px !important;
+  display: flex !important;
+  flex-direction: column;
+  gap: 14px !important;
+}
+
+/* === FIELD === */
+.form-grid .f {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+}
+.form-grid .f-l {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 3px !important;
+  font: 700 10.5px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #475569 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+}
+.form-grid .f-h {
+  font: 500 11.5px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #94A3B8 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  line-height: 1.4 !important;
+  margin-top: 1px;
+}
+
+/* Inputs */
+.form-grid .f input[type="text"],
+.form-grid .f input[type="url"],
+.form-grid .f input[type="email"],
+.form-grid .f input[type="number"],
+.form-grid .f input[type="password"],
+.form-grid .f select,
+.form-grid .f textarea {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  font: 500 13px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #0F172A !important;
+  background: #FAFBFC !important;
+  border: 1px solid #DDE3E5 !important;
+  border-radius: 9px !important;
+  outline: 0 !important;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms;
+  box-sizing: border-box !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.form-grid .f input:hover,
+.form-grid .f select:hover,
+.form-grid .f textarea:hover {
+  border-color: #C5CDD3 !important;
+  background: white !important;
+}
+.form-grid .f input:focus,
+.form-grid .f select:focus,
+.form-grid .f textarea:focus {
+  border-color: #008080 !important;
+  box-shadow: 0 0 0 3px rgba(0,128,128,0.10) !important;
+  background: white !important;
+}
+.form-grid .f textarea { min-height: 64px; resize: vertical; }
+
+/* Select dropdown arrow */
+.form-grid .f select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 11px center !important;
+  padding-right: 32px !important;
+  cursor: pointer;
+}
+
+/* File input */
+.form-grid .f input[type="file"] {
+  width: 100% !important;
+  padding: 8px 10px !important;
+  font: 500 12px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #475569 !important;
+  background: #FAFBFC !important;
+  border: 1px dashed #C5CDD3 !important;
+  border-radius: 9px !important;
+  cursor: pointer;
+  box-sizing: border-box !important;
+}
+.form-grid .f input[type="file"]:hover {
+  border-color: #008080 !important;
+  background: #F0F9F9 !important;
+  color: #006B6C !important;
+}
+.form-grid .f input[type="file"]::file-selector-button {
+  padding: 5px 11px;
+  margin-right: 10px;
+  font: 600 11px 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #006B6C;
+  background: white;
+  border: 1px solid #C7DEDE;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* === TOGGLE SWITCH (replaces checkbox) === */
+.form-grid .f:has(input[type="checkbox"]) {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 10px 14px !important;
+  background: linear-gradient(180deg, #FAFBFC, #F5F7F8) !important;
+  border: 1px solid #EAEFF1 !important;
+  border-radius: 10px !important;
+  cursor: pointer;
+}
+.form-grid .f:has(input[type="checkbox"]) .f-l {
+  flex: 1;
+  margin: 0 !important;
+}
+.form-grid .f input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 40px !important;
+  height: 22px !important;
+  border-radius: 999px !important;
+  background: #CBD5DD !important;
+  border: 0 !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: background 200ms !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+.form-grid .f input[type="checkbox"]::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 2px; left: 2px !important;
+  width: 18px; height: 18px !important;
+  border-radius: 50% !important;
+  background: white !important;
+  box-shadow: 0 1px 3px rgba(15,23,31,0.20) !important;
+  transition: left 200ms cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+.form-grid .f input[type="checkbox"]:checked {
+  background: linear-gradient(135deg, #00A0A0, #008080) !important;
+}
+.form-grid .f input[type="checkbox"]:checked::before {
+  left: 20px !important;
+}
+
+/* Errors */
+.form-grid .f-err {
+  font: 500 11.5px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #DC2626 !important;
+  margin-top: 2px;
+  padding-left: 1px;
+}
+
+/* === CANVAS (preview, scroll-into-view) === */
+.canvas.canvas-stack {
+  height: auto !important;
+  padding: 28px 32px 40px !important;
+  overflow: visible !important;
+  display: block !important;
+}
+.canvas.canvas-stack .canvas-rule {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 0 0 14px !important;
+  font: 600 12px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #64748B !important;
+}
+.canvas.canvas-stack .canvas-rule .mono {
+  font: 500 11.5px 'JetBrains Mono', monospace !important;
+  color: #475569;
+  background: white;
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid #E5EAEC;
+}
+.canvas.canvas-stack .canvas-w {
+  font: 500 10.5px 'JetBrains Mono', monospace !important;
+  color: #94A3B8 !important;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+}
+.canvas.canvas-stack .frame {
+  height: 720px !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  background: white !important;
+  border-radius: 14px !important;
+  border: 1px solid #E5EAEC !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 4px rgba(15,23,31,0.04), 0 24px 60px -12px rgba(15,23,31,0.14) !important;
+}
+.canvas.canvas-stack .canvas-iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  display: block !important;
+  background: white;
+}
+</style>
+<div class="cms2">
+  {# ==================== TOP BAR ==================== #}
+  <div class="cms2-top">
+    <div class="cms2-bread">
+      <a class="bc" href="{% url 'storefront:dashboard' %}">
+        <i data-lucide="store"></i>Mağazam
+      </a>
+      <i data-lucide="chevron-right" class="bc-sep"></i>
+      <a class="bc" href="{% url 'storefront:edit_menu' %}">Menü</a>
+      <i data-lucide="chevron-right" class="bc-sep"></i>
+      <span class="bc">{% if is_create %}Yeni başlık{% else %}{{ item.label_tr }}{% endif %}</span>
+      {% if not is_create %}
+        <span class="bc-status {% if item.is_active %}published{% else %}draft{% endif %}">
+          <span class="dot"></span>{% if item.is_active %}Yayında{% else %}Taslak{% endif %}
+        </span>
+      {% endif %}
+    </div>
+    <div class="cms2-actions">
+      {% if not is_create %}
+        <a class="cms2-btn ghost danger" href="{% url 'storefront:delete_menu_item' item.pk %}">
+          <i data-lucide="trash-2"></i><span>Sil</span>
+        </a>
+      {% endif %}
+      <button class="cms2-btn primary" type="submit" form="sf-edit-form">
+        <i data-lucide="check"></i><span>Kaydet</span>
+      </button>
+    </div>
+  </div>
+
+  {# ==================== BODY: FORM (top) | CANVAS (bottom) ==================== #}
+  <div class="cms2-body stack">
+    {# TOP: compact form panel — sections side-by-side, fits on screen #}
+    <section class="form-pane">
+      <form id="sf-edit-form" method="post" enctype="multipart/form-data" class="form-grid">
+        {% csrf_token %}
+
+        <div class="fs open">
+          <div class="fs-head">
+            <span class="fs-ico"><i data-lucide="type"></i></span>
+            <span class="fs-t">Etiket &amp; Ayarlar</span>
+          </div>
+          <div class="fs-body">
+            {% for f in form %}{% if f.name == 'label_tr' or f.name == 'label_en' or f.name == 'order' or f.name == 'is_active' %}
+              <div class="f">
+                <label class="f-l">{{ f.label }}{% if f.help_text %}<span class="f-h">{{ f.help_text }}</span>{% endif %}</label>
+                {{ f }}
+                {% for e in f.errors %}<div class="f-err">{{ e }}</div>{% endfor %}
+              </div>
+            {% endif %}{% endfor %}
+          </div>
+        </div>
+
+        <div class="fs open">
+          <div class="fs-head">
+            <span class="fs-ico"><i data-lucide="link"></i></span>
+            <span class="fs-t">Bağlantı &amp; Hiyerarşi</span>
+          </div>
+          <div class="fs-body">
+            {% for f in form %}{% if f.name == 'href' or f.name == 'parent' or f.name == 'category' or f.name == 'swatch' %}
+              <div class="f">
+                <label class="f-l">{{ f.label }}{% if f.help_text %}<span class="f-h">{{ f.help_text }}</span>{% endif %}</label>
+                {{ f }}
+                {% for e in f.errors %}<div class="f-err">{{ e }}</div>{% endfor %}
+              </div>
+            {% endif %}{% endfor %}
+          </div>
+        </div>
+
+        <div class="fs open">
+          <div class="fs-head">
+            <span class="fs-ico"><i data-lucide="layout-grid"></i></span>
+            <span class="fs-t">Vitrin Kartı</span>
+          </div>
+          <div class="fs-body">
+            {% for f in form %}{% if f.name == 'image_upload' or f.name == 'feature_image_url' or f.name == 'feature_title' or f.name == 'feature_meta' %}
+              <div class="f">
+                <label class="f-l">{{ f.label }}{% if f.help_text %}<span class="f-h">{{ f.help_text }}</span>{% endif %}</label>
+                {{ f }}
+                {% for e in f.errors %}<div class="f-err">{{ e }}</div>{% endfor %}
+              </div>
+            {% endif %}{% endfor %}
+          </div>
+        </div>
+      </form>
+    </section>
+
+    {# BOTTOM: canvas — site önizleme, item href varsa o sayfa açılır #}
+    <main class="canvas canvas-stack">
+      <div class="canvas-rule">
+        <span>{{ item.label_tr|default:"Önizleme" }} · <span class="mono">{{ item.href|default:"/" }}</span></span>
+        <span class="canvas-w">canlı önizleme</span>
+      </div>
+      <div class="frame frame-desktop">
+        <iframe src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"
+                class="canvas-iframe"
+                title="Belino önizleme"
+                loading="lazy"
+                data-preview-iframe
+                data-base-src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"></iframe>
+      </div>
+    </main>
+  </div>
+</div>
+
+<link rel="stylesheet" href="{% load static %}{% static 'storefront/css/cms-v2.css' %}?v=8" />
+<link rel="stylesheet" href="{% load static %}{% static 'storefront/css/storefront.css' %}?v=12" />
+<script src="{% load static %}{% static 'storefront/js/storefront.js' %}?v=14" defer></script>
+{% endblock %}

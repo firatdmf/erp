@@ -5,6 +5,25 @@ from itertools import chain
 from operator import attrgetter
 from django.db.models import Value, CharField
 from django.core.cache import cache
+from django.conf import settings as _settings
+
+
+def ui_theme(request):
+    """Expose the active UI theme name + brand identity to every template.
+
+    Settings.py reads these from the active env profile (.env or
+    .env.<ENV_PROFILE>) and stores them as Django constants. Templates
+    use `{{ UI_THEME }}`, `{{ DB_SCHEMA }}`, `{{ BRAND_NAME }}`.
+    """
+    base = getattr(_settings, "STOREFRONT_PREVIEW_URL", "http://localhost:3010/")
+    sep = "&" if "?" in base else "?"
+    return {
+        "UI_THEME": getattr(_settings, "UI_THEME", ""),
+        "DB_SCHEMA": getattr(_settings, "DB_SCHEMA", "public"),
+        "BRAND_NAME": getattr(_settings, "BRAND_NAME", "Nejum"),
+        "STOREFRONT_PREVIEW_URL": base,
+        "STOREFRONT_PREVIEW_URL_WITH_EDIT": f"{base}{sep}edit=1",
+    }
 
 # This is for base view functions to work on everywhere
 # Made lazy to avoid unnecessary database queries on every page load

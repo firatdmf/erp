@@ -15,13 +15,37 @@ import os
 
 # below is for loading environment variables for establishing security
 # from dotenv import load_dotenv
-from decouple import config
+from decouple import config as _default_config, Config, RepositoryEnv
 
 
 # load_dotenv()
 # print(os.getenv('DATABASE'))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# ----------------------------------------------------------------------
+# Multi-tenant env profile loader
+# ----------------------------------------------------------------------
+# Default behaviour (no ENV_PROFILE set): read .env, identical to the
+# original demfirat setup — public schema, demfirat data — nothing
+# changes for that deployment.
+#
+# When ENV_PROFILE=foo is set, we load .env.foo instead. Lets one ERP
+# codebase serve multiple brands (Belino, future tenants) where each
+# brand has its own DB credentials and target schema.
+#   ENV_PROFILE=belino python manage.py runserver 8001
+# ----------------------------------------------------------------------
+_env_profile = os.environ.get("ENV_PROFILE", "").strip()
+if _env_profile:
+    _env_path = BASE_DIR / f".env.{_env_profile}"
+    if _env_path.exists():
+        config = Config(RepositoryEnv(str(_env_path)))
+        print(f"[ENV_PROFILE] Using {_env_path.name}")
+    else:
+        config = _default_config
+        print(f"[ENV_PROFILE] {_env_path.name} not found, falling back to .env")
+else:
+    config = _default_config
 
 
 # Quick-start development settings - unsuitable for production
@@ -57,12 +81,19 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.nejum.com",
     "https://*.vercel.app",
     'https://48c4e0a19cf1.ngrok-free.app',
+    # Inline image upload from Belino dev server (cross-origin POST).
+    "http://localhost:3010",
+    "http://127.0.0.1:3010",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 # CORS Settings for Next.js Frontend
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3010",  # Belino B2B frontend
+    "http://127.0.0.1:3010",
     "https://karvenhome.com",
     "https://www.karvenhome.com",
     "https://demfirat.com",
@@ -119,6 +150,7 @@ INSTALLED_APPS = [
     "team",  # Team management system
     "notes", # My Notes system
     "procurement", # Procurement system
+    "storefront",  # Online store CMS (header menu, home sections, featured products)
     "django_htmx",
     "crispy_forms",
     "crispy_bootstrap5",
@@ -174,10 +206,35 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "erp.urls"
 
+# When the active env profile sets UI_THEME=<name>, prepend that theme's
+# template dir so its files win the lookup. Default lookup (no UI_THEME)
+# is unchanged — demfirat keeps its existing UI exactly as-is.
+UI_THEME = config("UI_THEME", default="").strip()
+DB_SCHEMA = config("DB_SCHEMA", default="public").strip()
+# Display name for the active brand. Defaults to a humanised DB_SCHEMA
+# so a profile that only sets DB_SCHEMA still gets a sensible label.
+BRAND_NAME = config(
+    "BRAND_NAME",
+    default=("Nejum" if DB_SCHEMA == "public" else DB_SCHEMA.title()),
+).strip()
+
+# Storefront preview — Belino Next.js dev server URL'i. ERP CMS
+# sayfalarındaki canlı önizleme iframe'i bu URL'yi yükler. Production'da
+# canlı domain'e işaret etsin (.env içinden override edilebilir).
+STOREFRONT_PREVIEW_URL = config(
+    "STOREFRONT_PREVIEW_URL", default="http://localhost:3010/"
+).strip()
+
+_template_dirs = [os.path.join(BASE_DIR, "templates")]
+if UI_THEME:
+    _theme_dir = os.path.join(BASE_DIR, "templates", "themes", UI_THEME)
+    if os.path.isdir(_theme_dir):
+        _template_dirs.insert(0, _theme_dir)
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, "templates")],
+        "DIRS": _template_dirs,
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -189,6 +246,7 @@ TEMPLATES = [
                 "erp.context_processors.last_ten_entities",
                 "erp.context_processors.client_groups",
                 "erp.context_processors.all_members",
+                "erp.context_processors.ui_theme",
                 # Removed: product_categories and suppliers - not used in base.html
                 # "erp.context_processors.product_categories",
                 # "erp.context_processors.suppliers",
@@ -228,6 +286,13 @@ DATABASES = {
         "OPTIONS": {
             # PostgreSQL specific optimizations
             "connect_timeout": 10,
+            # When DB_SCHEMA is set on the active env profile, scope
+            # this connection to that schema (per-brand isolation).
+            # If unset (e.g. demfirat's .env), default search_path is
+            # `public` — i.e. existing behaviour.
+            "options": (
+                f'-c search_path="{config("DB_SCHEMA", default="public")}",public'
+            ),
         },
         "TEST": {
             "NAME": "nejum_test",  # test DB

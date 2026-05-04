@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py showmigrations --plan)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py showmigrations)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py makemigrations --dry-run)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py makemigrations storefront)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py migrate storefront)"
+    ]
+  }
+}

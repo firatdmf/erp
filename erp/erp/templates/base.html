@@ -6,6 +6,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>{% block title %}Nejum ERP{% endblock %}</title>
 
   <!-- CSS Files -->
@@ -13,6 +16,23 @@
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=9" />
+
+  {% comment %}
+    Nejum design system overlay — only loaded when the active brand
+    opts in via UI_THEME in its env profile (.env.belino sets
+    UI_THEME=nejum). Loaded after base.css so its overrides win.
+    Demfirat (no UI_THEME set) gets the original ERP look untouched.
+    Removing UI_THEME from the profile + restart reverts the look.
+  {% endcomment %}
+  {% if UI_THEME == "nejum" %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=19" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=28" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=19" />
+    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
+  {% endif %}
 
 
   <!-- jQuery -->
@@ -402,8 +422,28 @@
   <!-- Global Top Bar -->
   <div class="global-top-bar">
     <div class="top-bar-left">
-      <span class="welcome-text">Welcome to the base page, {{ user.first_name }} {{ user.last_name }}!</span>
-      <span class="header-date">{% now 'F j, Y' %}</span>
+      {% if UI_THEME == "nejum" %}
+        <div class="header-clock" aria-label="Saat" title="">
+          <svg viewBox="0 0 40 40" class="clock-svg">
+            <circle cx="20" cy="20" r="18" class="clock-face"/>
+            <g class="clock-ticks">
+              {% comment %} Major ticks at 12, 3, 6, 9 {% endcomment %}
+              <line x1="20" y1="3.5" x2="20" y2="6"/>
+              <line x1="36.5" y1="20" x2="34" y2="20"/>
+              <line x1="20" y1="36.5" x2="20" y2="34"/>
+              <line x1="3.5" y1="20" x2="6" y2="20"/>
+            </g>
+            <line x1="20" y1="20" x2="20" y2="11" class="clock-hour" id="clkH"/>
+            <line x1="20" y1="20" x2="20" y2="7" class="clock-min"  id="clkM"/>
+            <line x1="20" y1="20" x2="20" y2="5" class="clock-sec"  id="clkS"/>
+            <circle cx="20" cy="20" r="1.6" class="clock-pin"/>
+          </svg>
+        </div>
+        <span class="header-date">{% now 'l, j F Y' %}</span>
+      {% else %}
+        <span class="welcome-text">Welcome to the base page, {{ user.first_name }} {{ user.last_name }}!</span>
+        <span class="header-date">{% now 'F j, Y' %}</span>
+      {% endif %}
     </div>
 
     <div class="top-bar-center">
@@ -489,7 +529,10 @@
   </div>
 
   {% with member=user.member %}
-  <nav class="navbar">
+  {% if UI_THEME == "nejum" %}
+    {% include "components/_sidebar_nejum.html" %}
+  {% endif %}
+  <nav class="navbar"{% if UI_THEME == "nejum" %} style="display:none !important"{% endif %}>
     <ul class="navbar-nav">
       <!-- Logo in sidebar -->
       <li class="logo">
@@ -4520,6 +4563,47 @@
       }
     </script>
     <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
+
+    {% if UI_THEME == "nejum" %}
+      {% comment %}Defer until Lucide CDN has loaded; sidebar.js calls lucide.createIcons() to swap data-lucide attributes for SVGs.{% endcomment %}
+      <script src="{% static 'erp/js/nejum/sidebar.js' %}" defer></script>
+      <script>
+        // Live analog wall clock in the topbar — rotates hour/minute/
+        // second hands every second using SVG transform around the
+        // SVG-centre (20,20) in user units. Rebuilt on visibility
+        // change so a backgrounded tab catches up immediately.
+        (function() {
+          if (window.__nejum_clock_inited) return;
+          window.__nejum_clock_inited = true;
+          function tick() {
+            var h = document.getElementById('clkH');
+            var m = document.getElementById('clkM');
+            var s = document.getElementById('clkS');
+            if (!h || !m || !s) return;
+            var now = new Date();
+            var sec = now.getSeconds();
+            var min = now.getMinutes() + sec / 60;
+            var hr = (now.getHours() % 12) + min / 60;
+            h.setAttribute('transform', 'rotate(' + (hr * 30) + ' 20 20)');
+            m.setAttribute('transform', 'rotate(' + (min * 6) + ' 20 20)');
+            s.setAttribute('transform', 'rotate(' + (sec * 6) + ' 20 20)');
+            // Tooltip mirrors the live time
+            var clock = document.querySelector('.header-clock');
+            if (clock) {
+              var hh = String(now.getHours()).padStart(2, '0');
+              var mm = String(now.getMinutes()).padStart(2, '0');
+              clock.title = hh + ':' + mm;
+            }
+          }
+          function start() { tick(); setInterval(tick, 1000); }
+          if (document.readyState !== 'loading') start();
+          else document.addEventListener('DOMContentLoaded', start);
+          document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) tick();
+          });
+        })();
+      </script>
+    {% endif %}
 </body>
 
 </html>

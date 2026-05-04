@@ -217,6 +217,20 @@ class Product(models.Model):
 
     # If true, the product will be displayed on marketing channels (website etc)
     featured = models.BooleanField(default=True, blank=True, null=True, db_index=True)
+
+    # B2B wholesale: when the product is sold as a multi-pack rather than
+    # by individual unit, set is_packaged=True and put the pack size in
+    # pack_count. The storefront uses these to render copy like
+    # "12'li paket" / "Pack of 12" — pulled live from the API instead of
+    # being hardcoded in the front-end.
+    is_packaged = models.BooleanField(
+        default=False,
+        help_text="Bu ürün paket halinde mi satılıyor? (12'li, 5'li vb.)",
+    )
+    pack_count = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Pakette kaç adet var? (is_packaged=True ise zorunlu)",
+    )
     # If true, the product will be available for sale even if you have no stock.
     selling_while_out_of_stock = models.BooleanField(
         default=False, blank=True, null=True

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}Mağazam · {{ storefront.name }}{% endblock %}
+
+{% block content %}
+<style>
+/* === SEC-CARD V2 — premium nav row === */
+.sec-list { padding: 4px 12px 16px !important; gap: 8px !important; }
+.sec-card.sec-card-v2 {
+  display: grid !important;
+  grid-template-columns: 18px 36px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px 14px !important;
+  background: white !important;
+  border: 1px solid #EAEFF1 !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease !important;
+  box-shadow: 0 1px 0 rgba(15,23,31,0.02);
+}
+.sec-card.sec-card-v2:hover {
+  border-color: #C7DEDE !important;
+  box-shadow: 0 2px 4px rgba(15,23,31,0.04), 0 12px 24px -10px rgba(15,23,31,0.10) !important;
+  transform: translateY(-1px);
+}
+.sec-card.sec-card-v2.off { opacity: 0.55; }
+.sec-card-v2 .sec-grip {
+  color: #C5CDD3;
+  cursor: grab;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px;
+}
+.sec-card-v2 .sec-grip:hover { color: #008080; }
+.sec-card-v2 .sec-grip svg { width: 14px; height: 14px; }
+.sec-card-v2 .sec-ico {
+  width: 36px !important; height: 36px !important;
+  border-radius: 10px !important;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  flex-shrink: 0;
+}
+.sec-card-v2 .sec-ico svg { width: 16px; height: 16px; stroke-width: 1.9; }
+
+.sec-card-v2 .sec-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sec-card-v2 .sec-title {
+  font: 700 13.5px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: #0F172A !important;
+  letter-spacing: -0.01em !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sec-card-v2 .sec-meta {
+  display: flex !important; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 0 !important;
+}
+.sec-card-v2 .sec-kind-chip {
+  font: 600 10px 'JetBrains Mono', monospace;
+  color: #475569;
+  background: #F1F5F7;
+  padding: 2px 8px;
+  border-radius: 5px;
+  letter-spacing: 0.02em;
+}
+.sec-card-v2 .sec-num-pill {
+  font: 600 10px 'JetBrains Mono', monospace;
+  color: #94A3B8;
+  padding: 2px 0;
+  letter-spacing: 0.04em;
+}
+
+/* Premium toggle — match form switches */
+.sec-card-v2 .sa-toggle {
+  width: 40px !important; height: 22px !important;
+  border-radius: 999px !important;
+  background: #CBD5DD !important;
+  border: 0 !important;
+  position: relative !important;
+  cursor: pointer !important;
+  flex-shrink: 0;
+  transition: background 200ms !important;
+}
+.sec-card-v2 .sa-toggle span {
+  position: absolute !important;
+  top: 2px !important; left: 2px !important;
+  width: 18px !important; height: 18px !important;
+  border-radius: 50% !important;
+  background: white !important;
+  box-shadow: 0 1px 3px rgba(15,23,31,0.20) !important;
+  transition: left 200ms cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+.sec-card-v2 .sa-toggle.on { background: linear-gradient(135deg, #00A0A0, #008080) !important; }
+.sec-card-v2 .sa-toggle.on span { left: 20px !important; }
+</style>
+<div class="cms2">
+  {# ==================== TOP BAR ==================== #}
+  <div class="cms2-top">
+    <div class="cms2-bread">
+      <span class="bc"><i data-lucide="store"></i>Mağazam</span>
+      <i data-lucide="chevron-right" class="bc-sep"></i>
+
+      {# Sayfa seçici dropdown #}
+      <div class="page-pick" data-page-pick>
+        <button class="page-pick-btn" type="button" data-page-pick-toggle>
+          <i data-lucide="menu"></i>
+          <span class="ppb-name">Menü navigasyon</span>
+          <i data-lucide="chevron-down" class="ppb-chev"></i>
+        </button>
+        <div class="page-pick-menu" hidden data-page-pick-menu>
+          <div class="ppm-list">
+            <a class="ppm-row" href="{% url 'storefront:edit_home' %}">
+              <span class="ppm-icon"><i data-lucide="home"></i></span>
+              <span class="ppm-text">
+                <span class="ppm-n">Anasayfa</span>
+                <span class="ppm-s">/</span>
+              </span>
+              <span class="ppm-st published"><span></span></span>
+            </a>
+            <button class="ppm-row active" type="button">
+              <span class="ppm-icon"><i data-lucide="menu"></i></span>
+              <span class="ppm-text">
+                <span class="ppm-n">Menü navigasyon</span>
+                <span class="ppm-s">/header</span>
+              </span>
+              <span class="ppm-st published"><span></span></span>
+            </button>
+            {% for item in items %}
+              {% if item.href %}
+                <a class="ppm-row" href="{% url 'storefront:edit_menu_item' item.pk %}">
+                  <span class="ppm-icon"><i data-lucide="layout-grid"></i></span>
+                  <span class="ppm-text">
+                    <span class="ppm-n">{{ item.label_tr }}</span>
+                    <span class="ppm-s">{{ item.href }}</span>
+                  </span>
+                  <span class="ppm-st {% if item.is_active %}published{% else %}draft{% endif %}"><span></span></span>
+                </a>
+              {% endif %}
+            {% endfor %}
+          </div>
+          <div class="ppm-foot">
+            <a class="ppm-link" href="{% url 'storefront:create_menu_item' %}">
+              <i data-lucide="plus"></i>Yeni başlık
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <span class="bc-status published">
+        <span class="dot"></span>Yayında
+      </span>
+    </div>
+
+    <div class="cms2-actions">
+      <button class="cms2-btn ghost" type="button" data-sections-toggle>
+        <i data-lucide="layout-list"></i>
+        <span>Bölümler</span>
+        <span class="cms2-pill">{{ items|length }}</span>
+      </button>
+      <a class="cms2-btn ghost" href="{{ STOREFRONT_PREVIEW_URL }}" target="_blank" rel="noreferrer noopener">
+        <i data-lucide="eye"></i><span>Önizle</span>
+      </a>
+      <a class="cms2-btn primary" href="{% url 'storefront:create_menu_item' %}">
+        <i data-lucide="plus"></i><span>Yeni başlık</span>
+      </a>
+    </div>
+  </div>
+
+  {# ==================== BODY ==================== #}
+  <div class="cms2-body single">
+    {# Drawer — Bölümler listesi (default kapalı, "Bölümler" butonu açar) #}
+    <aside class="drawer" hidden data-sections-drawer>
+      <div class="drawer-head">
+        <div>
+          <div class="rail-eyebrow">MENÜ · BAŞLIKLAR</div>
+          <div class="rail-title">Üst menü öğeleri</div>
+        </div>
+        <button class="drawer-x" type="button" data-sections-close>
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="rail-help">
+        <i data-lucide="info"></i>
+        <span>Sürükleyerek sırala · ada tıklayıp düzenle</span>
+      </div>
+      <div class="sec-list" data-sortable data-sortable-model="navmenu">
+        {% for item in items %}
+          <div class="sec-card sec-card-v2 {% if not item.is_active %}off{% endif %}"
+               data-sortable-id="{{ item.pk }}"
+               data-edit-href="{% url 'storefront:edit_menu_item' item.pk %}">
+            <span class="sec-grip" data-sortable-handle>
+              <i data-lucide="grip-vertical"></i>
+            </span>
+            <span class="sec-ico">
+              {% if item.children.count %}<i data-lucide="layout-grid"></i>
+              {% elif item.href %}<i data-lucide="link"></i>
+              {% else %}<i data-lucide="menu"></i>{% endif %}
+            </span>
+            <span class="sec-text">
+              <span class="sec-title">{{ item.label_tr }}</span>
+              <span class="sec-meta">
+                <span class="sec-kind-chip">{{ item.href|default:"—" }}</span>
+                {% if item.children.count %}<span class="sec-num-pill">{{ item.children.count }} alt</span>{% endif %}
+                <span class="sec-num-pill">#{{ item.order|stringformat:"02d" }}</span>
+              </span>
+            </span>
+            <span class="sec-actions">
+              <button type="button"
+                      class="sa-toggle {% if item.is_active %}on{% endif %}"
+                      data-toggle-active="navmenu" data-id="{{ item.pk }}"
+                      title="{% if item.is_active %}Yayında — kapat{% else %}Taslak — yayınla{% endif %}">
+                <span></span>
+              </button>
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+      <a class="sec-add" href="{% url 'storefront:create_menu_item' %}">
+        <i data-lucide="plus"></i> Yeni bölüm ekle
+      </a>
+    </aside>
+
+    {# Canvas — Belino önizleme + tıklayarak edit #}
+    <main class="canvas">
+      <div class="canvas-rule">
+        <span>Header · <span class="mono">/header</span></span>
+        <span class="canvas-w">canlı önizleme</span>
+      </div>
+      <div class="frame frame-desktop">
+        <iframe src="{{ STOREFRONT_PREVIEW_URL }}?edit=1"
+                class="canvas-iframe"
+                title="Belino önizleme"
+                loading="lazy"></iframe>
+      </div>
+    </main>
+  </div>
+</div>
+
+<link rel="stylesheet" href="{% load static %}{% static 'storefront/css/cms-v2.css' %}?v=4" />
+<link rel="stylesheet" href="{% load static %}{% static 'storefront/css/storefront.css' %}?v=12" />
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="{% load static %}{% static 'storefront/js/storefront.js' %}?v=14" defer></script>
+<script>
+(function () {
+  // Page picker dropdown — open on click, close on outside click
+  document.addEventListener('click', (e) => {
+    const root = e.target.closest('[data-page-pick]');
+    document.querySelectorAll('[data-page-pick-menu]').forEach((m) => {
+      const owns = m.closest('[data-page-pick]') === root;
+      if (!owns) m.hidden = true;
+    });
+    if (root && e.target.closest('[data-page-pick-toggle]')) {
+      const menu = root.querySelector('[data-page-pick-menu]');
+      menu.hidden = !menu.hidden;
+    }
+  });
+
+  // Sections drawer toggle
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-sections-toggle]')) {
+      const d = document.querySelector('[data-sections-drawer]');
+      if (d) d.hidden = !d.hidden;
+    }
+    if (e.target.closest('[data-sections-close]')) {
+      const d = document.querySelector('[data-sections-drawer]');
+      if (d) d.hidden = true;
+    }
+    // Click on a sec-card → navigate to its edit page
+    const card = e.target.closest('[data-edit-href]');
+    if (card && !e.target.closest('.sec-actions') && !e.target.closest('[data-sortable-handle]')) {
+      window.location.href = card.dataset.editHref;
+    }
+  });
+})();
+</script>
+{% endblock %}

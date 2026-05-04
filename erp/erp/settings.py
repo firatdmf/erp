@@ -81,13 +81,32 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.demfirat.com",
     "https://*.nejum.com",
     "https://*.vercel.app",
-    'https://48c4e0a19cf1.ngrok-free.app',
+    "https://*.up.railway.app",   # any Railway-hosted service URL
+    "https://*.onrender.com",     # Render fallback
+    "https://48c4e0a19cf1.ngrok-free.app",
     # Inline image upload from Belino dev server (cross-origin POST).
     "http://localhost:3010",
     "http://127.0.0.1:3010",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+# ------------------------------------------------------------------
+# Reverse-proxy aware HTTPS detection
+# ------------------------------------------------------------------
+# Railway / Render / Vercel / Heroku terminate TLS at the edge and
+# forward plain HTTP to the app, but they also set
+# X-Forwarded-Proto: https. Without this header mapping Django thinks
+# the request is HTTP, sees the request's Origin header as `https://…`,
+# and rejects it as a CSRF mismatch (403). Telling Django to honour
+# the forwarded scheme fixes both CSRF and any redirect-to-https logic.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+# Cookies travel over HTTPS only in production. Keep them lax in DEBUG
+# so local dev on http://localhost keeps working.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 # CORS Settings for Next.js Frontend
 CORS_ALLOWED_ORIGINS = [

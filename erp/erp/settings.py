@@ -206,24 +206,53 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "erp.urls"
 
-# When the active env profile sets UI_THEME=<name>, prepend that theme's
-# template dir so its files win the lookup. Default lookup (no UI_THEME)
-# is unchanged — demfirat keeps its existing UI exactly as-is.
-UI_THEME = config("UI_THEME", default="").strip()
-DB_SCHEMA = config("DB_SCHEMA", default="public").strip()
-# Display name for the active brand. Defaults to a humanised DB_SCHEMA
-# so a profile that only sets DB_SCHEMA still gets a sensible label.
-BRAND_NAME = config(
-    "BRAND_NAME",
-    default=("Nejum" if DB_SCHEMA == "public" else DB_SCHEMA.title()),
-).strip()
+# ------------------------------------------------------------------
+# BRAND switch — in production, set ONE env var (BRAND=belino) and
+# every brand-specific setting flips together. Individual env vars
+# (DB_SCHEMA, BRAND_NAME, …) still take precedence when set, so a
+# deployment can override any single value without losing the rest.
+# ------------------------------------------------------------------
+BRAND_DEFAULTS = {
+    "demfirat": {
+        "DB_SCHEMA": "public",
+        "BRAND_NAME": "Demfirat",
+        "UI_THEME": "nejum",
+        "CLIENT_PUBLIC_URL": "http://localhost:3000",
+        "STOREFRONT_PREVIEW_URL": "http://localhost:3000/",
+    },
+    "belino": {
+        "DB_SCHEMA": "BELINO",
+        "BRAND_NAME": "Belino",
+        "UI_THEME": "nejum",
+        "CLIENT_PUBLIC_URL": "http://localhost:3010",
+        "STOREFRONT_PREVIEW_URL": "http://localhost:3010/",
+    },
+}
 
-# Storefront preview — Belino Next.js dev server URL'i. ERP CMS
-# sayfalarındaki canlı önizleme iframe'i bu URL'yi yükler. Production'da
-# canlı domain'e işaret etsin (.env içinden override edilebilir).
+# `BRAND` is the canonical switch. If it isn't set but `BRAND_NAME`
+# matches a known key (e.g. someone sets BRAND_NAME=belino in .env
+# expecting it to be the switch), accept that as the trigger too —
+# avoids the "I set BRAND_NAME=belino but it still loads Demfirat"
+# foot-gun.
+_brand_explicit = config("BRAND", default="").strip().lower()
+_brand_from_name = config("BRAND_NAME", default="").strip().lower()
+if _brand_explicit and _brand_explicit in BRAND_DEFAULTS:
+    BRAND = _brand_explicit
+elif _brand_from_name and _brand_from_name in BRAND_DEFAULTS:
+    BRAND = _brand_from_name
+else:
+    BRAND = "demfirat"
+_brand_cfg = BRAND_DEFAULTS[BRAND]
+
+# Each setting: explicit env var wins, else the brand profile default.
+UI_THEME = config("UI_THEME", default=_brand_cfg["UI_THEME"]).strip()
+DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
+BRAND_NAME = config("BRAND_NAME", default=_brand_cfg["BRAND_NAME"]).strip()
+CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL", default=_brand_cfg["CLIENT_PUBLIC_URL"]).strip()
 STOREFRONT_PREVIEW_URL = config(
-    "STOREFRONT_PREVIEW_URL", default="http://localhost:3010/"
+    "STOREFRONT_PREVIEW_URL", default=_brand_cfg["STOREFRONT_PREVIEW_URL"]
 ).strip()
+print(f"[BRAND] Active brand: {BRAND} (schema={DB_SCHEMA}, preview={STOREFRONT_PREVIEW_URL})")
 
 _template_dirs = [os.path.join(BASE_DIR, "templates")]
 if UI_THEME:

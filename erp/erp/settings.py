@@ -70,7 +70,7 @@ ALLOWED_HOSTS = [
     "app.nejum.com",
     "www.nejum.com",
     "demfirat.nejum.com",
-    "erp-production-52e2.up.railway.app"
+    "erp-production-52e2.up.railway.app",
     "erp-2hs3.onrender.com",
     '192.168.1.106',
     '48c4e0a19cf1.ngrok-free.app',
@@ -98,7 +98,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://karvenhome.com",
     "https://www.karvenhome.com",
     "https://demfirat.com",
-    "https://erp-production-52e2.up.railway.app/"
+    "https://erp-production-52e2.up.railway.app",
     "https://www.demfirat.com",
 ]
 

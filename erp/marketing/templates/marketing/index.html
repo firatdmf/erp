@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% block content %}
 {% load static %}
 
@@ -6,7 +7,7 @@
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/index.css' %}" />
 {% endblock css %}
-<h1>Marketing Index</h1>
+<h1>{% trans "Marketing Index" %}</h1>
 <p>Welcome to the marketing homepage.</p>
 <a href={% url 'crm:index' %}>Go to your crm.</a>
 <br>

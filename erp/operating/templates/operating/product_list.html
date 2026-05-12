@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% block css %}
@@ -6,19 +7,19 @@
   {% endblock %}
 
   <div class="product">
-    <h1>Products Table</h1>
+    <h1>{% trans "Products Table" %}</h1>
     <table>
       <tr>
-        <th>SKU</th>
-        {% comment %} <th>Transaction #</th> {% endcomment %}
-        <th>Name</th>
-        <th>Manufacturer</th>
-        {% comment %} <th>Currency</th> {% endcomment %}
-        <th>Description</th>
-        {% comment %} <th>Variant</th> {% endcomment %}
-        <th>Cost</th>
-        <th>Unit</th>
-        <th>Stock Quantity</th>
+        <th>{% trans "SKU" %}</th>
+        {% comment %} <th>{% trans "Transaction #" %}</th> {% endcomment %}
+        <th>{% trans "Name" %}</th>
+        <th>{% trans "Manufacturer" %}</th>
+        {% comment %} <th>{% trans "Currency" %}</th> {% endcomment %}
+        <th>{% trans "Description" %}</th>
+        {% comment %} <th>{% trans "Variant" %}</th> {% endcomment %}
+        <th>{% trans "Cost" %}</th>
+        <th>{% trans "Unit" %}</th>
+        <th>{% trans "Stock Quantity" %}</th>
       </tr>0
       {% for product in object_list|dictsortreversed:'pk'|dictsortreversed:'created_at' %}
         <tr>

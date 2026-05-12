@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -9,7 +10,7 @@
 <div class="product-detail-container">
   <!-- Breadcrumb -->
   <div class="breadcrumb">
-    <a href="{% url 'marketing:product_list' %}"><i class="fa fa-arrow-left"></i> Back to Products</a>
+    <a href="{% url 'marketing:product_list' %}"><i class="fa fa-arrow-left"></i> {% trans "Back to Products" %}</a>
   </div>
 
   <!-- Product Header -->
@@ -32,13 +33,13 @@
         <span class="badge badge-category">{{ product.category.name|title }}</span>
         {% endif %}
         {% if product.featured %}
-        <span class="badge badge-featured"><i class="fa fa-star"></i> Featured</span>
+        <span class="badge badge-featured"><i class="fa fa-star"></i> {% trans "Featured" %}</span>
         {% endif %}
       </div>
     </div>
     <div class="header-right">
       <a href="{% url 'marketing:product_edit' product.id %}" class="btn btn-primary">
-        <i class="fa fa-edit"></i> Edit Product
+        <i class="fa fa-edit"></i> {% trans "Edit Product" %}
       </a>
     </div>
   </div>
@@ -55,7 +56,7 @@
         {% else %}
         <div class="image-placeholder">
           <i class="fa fa-image"></i>
-          <p>No image available</p>
+          <p>{% trans "No image available" %}</p>
         </div>
         {% endif %}
       </div>
@@ -91,60 +92,140 @@
         <script type="application/json" id="desc-raw-data">{{ product.description|safe }}</script>
         <div id="description-display"></div>
         {% else %}
-        <p class="text-muted">No description available</p>
+        <p class="text-muted">{% trans "No description available" %}</p>
         {% endif %}
       </div>
 
       <!-- Basic Info -->
       <div class="info-section">
-        <h2>Product Information</h2>
+        <h2>{% trans "Product Information" %}</h2>
         <div class="info-grid">
           <div class="info-item">
-            <span class="label">SKU</span>
+            <span class="label">{% trans "SKU" %}</span>
             <span class="value">{{ product.sku|default:"-" }}</span>
           </div>
           {% if product.barcode %}
           <div class="info-item">
-            <span class="label">Barcode</span>
+            <span class="label">{% trans "Barcode" %}</span>
             <span class="value">{{ product.barcode }}</span>
           </div>
           {% endif %}
           {% if not product.variants.all %}
           <div class="info-item">
-            <span class="label">Price</span>
+            <span class="label">{% trans "Price" %}</span>
             <span class="value price">${{ product.price|default:"0.00" }}</span>
           </div>
+          {# B2B stock display: hide exact qty. Below 50 = hidden entirely, 50+ shown as "50+". #}
+          {% if product.quantity and product.quantity >= 50 %}
           <div class="info-item">
-            <span class="label">Quantity</span>
-            <span class="value">{{ product.quantity|default:"0" }} {{ product.unit_of_measurement|default:"units"
-              }}</span>
+            <span class="label">{% trans "Availability" %}</span>
+            <span class="value"><b>50+</b> {% trans "in stock" %}</span>
           </div>
+          {% endif %}
           {% endif %}
           {% if product.weight %}
           <div class="info-item">
-            <span class="label">Weight</span>
+            <span class="label">{% trans "Weight" %}</span>
             <span class="value">{{ product.weight }} {{ product.unit_of_weight|default:"kg" }}</span>
           </div>
           {% endif %}
           {% if product.supplier %}
           <div class="info-item">
-            <span class="label">Supplier</span>
+            <span class="label">{% trans "Supplier" %}</span>
             <span class="value">{{ product.supplier.company_name|default:product.supplier.contact_name }}</span>
           </div>
           {% endif %}
           {% if product.minimum_inventory_level %}
           <div class="info-item">
-            <span class="label">Min Inventory</span>
+            <span class="label">{% trans "Min Inventory" %}</span>
             <span class="value">{{ product.minimum_inventory_level }}</span>
           </div>
           {% endif %}
         </div>
       </div>
 
+      {# ============ B2B QUICK ORDER / QUOTE PANEL ============ #}
+      {% with camp=product.campaign %}
+      <div class="b2b-quote" id="b2bQuote"
+           data-base-price="{{ product.price|default:0 }}"
+           data-campaign-type="{{ camp.campaign_type|default:'' }}"
+           data-campaign-percent="{{ camp.discount_percent|default:0 }}"
+           data-campaign-end="{{ camp.end_date|date:'Y-m-d'|default:'' }}">
+        <div class="b2b-head">
+          <span class="b2b-ico"><i data-lucide="shopping-cart"></i></span>
+          <div class="b2b-titles">
+            <h3 class="b2b-title">{% trans "Quick Order" %}</h3>
+            <p class="b2b-sub">{% trans "Enter a quantity to see your price." %}</p>
+          </div>
+          {% if camp %}
+            {% if camp.campaign_type == 'percentage' %}
+              <span class="b2b-badge b2b-badge--pct">
+                <i data-lucide="percent"></i> %{{ camp.discount_percent|floatformat:'-2' }}
+                {% if camp.end_date %} · {{ camp.end_date|date:"d M" }}{% endif %}
+              </span>
+            {% elif camp.campaign_type == 'volume' %}
+              <span class="b2b-badge b2b-badge--vol">
+                <i data-lucide="layers"></i> {% trans "Volume tiers" %}
+              </span>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        {# Tier ladder (visible only when volume campaign exists) #}
+        {% if camp and camp.campaign_type == 'volume' and camp.tiers.all %}
+        <div class="b2b-tiers" id="b2bTiers">
+          {% for t in camp.tiers.all %}
+          <div class="b2b-tier"
+               data-min="{{ t.min_qty }}"
+               data-max="{{ t.max_qty|default_if_none:'' }}"
+               data-pct="{{ t.discount_percent }}">
+            <div class="b2b-tier-range">
+              {{ t.min_qty }}{% if t.max_qty %} – {{ t.max_qty }}{% else %}+{% endif %}
+              <small>{% trans "units" %}</small>
+            </div>
+            <div class="b2b-tier-pct">%{{ t.discount_percent|floatformat:'-2' }} {% trans "off" %}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Quantity stepper + price preview #}
+        <div class="b2b-row">
+          <div class="b2b-qty" data-min="50" data-step="10">
+            <button type="button" class="b2b-step" data-step="-10" aria-label="–">−</button>
+            <input type="number" id="b2bQty" min="50" step="1" value="50" inputmode="numeric">
+            <button type="button" class="b2b-step" data-step="10" aria-label="+">+</button>
+          </div>
+
+          <div class="b2b-prices">
+            <div class="b2b-unit">
+              <span class="b2b-unit-l">{% trans "Unit price" %}</span>
+              <span class="b2b-unit-v" id="b2bUnit">${{ product.price|default:"0.00" }}</span>
+              <span class="b2b-unit-orig" id="b2bUnitOrig" hidden>${{ product.price|default:"0.00" }}</span>
+            </div>
+            <div class="b2b-total">
+              <span class="b2b-total-l">{% trans "Total" %}</span>
+              <span class="b2b-total-v" id="b2bTotal">${{ product.price|default:"0.00" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="b2b-min-hint" id="b2bMinHint">
+          <i data-lucide="info"></i>
+          {% blocktrans %}Minimum order: <b>50 packs</b>.{% endblocktrans %}
+        </p>
+
+        <button type="button" class="b2b-cta" id="b2bAddToQuote">
+          <i data-lucide="file-plus"></i>
+          {% trans "Add to Quote" %}
+        </button>
+      </div>
+      {% endwith %}
+
       <!-- Tags -->
       {% if product.tags %}
       <div class="info-section">
-        <h2>Tags</h2>
+        <h2>{% trans "Tags" %}</h2>
         <div class="tags-container">
           {% for tag in product.tags %}
           <span class="tag">{{ tag }}</span>
@@ -156,7 +237,7 @@
       <!-- Collections -->
       {% if product_collections %}
       <div class="info-section">
-        <h2>Collections</h2>
+        <h2>{% trans "Collections" %}</h2>
         <div class="collections-container">
           {% for collection in product_collections %}
           <span class="collection-badge">{{ collection.title }}</span>
@@ -168,10 +249,10 @@
       <!-- Datasheet -->
       {% if product.datasheet_url %}
       <div class="info-section">
-        <h2>Documents</h2>
+        <h2>{% trans "Documents" %}</h2>
         <a href="{{ product.datasheet_url }}" target="_blank" class="document-link">
           <i class="fa fa-file-pdf"></i>
-          <span>Product Datasheet</span>
+          <span>{% trans "Product Datasheet" %}</span>
           <i class="fa fa-external-link"></i>
         </a>
       </div>
@@ -182,18 +263,18 @@
   <!-- Variants Section -->
   {% if product_variants %}
   <div class="variants-section">
-    <h2>Product Variants ({{ product_variants|length }})</h2>
+    <h2>{% trans "Product Variants" %} ({{ product_variants|length }})</h2>
     <div class="table-container">
       <table class="variants-table">
         <thead>
           <tr>
-            <th>Image</th>
-            <th>SKU</th>
-            <th>Attributes</th>
-            <th>Price</th>
-            <th>Quantity</th>
-            <th>Barcode</th>
-            <th>Status</th>
+            <th>{% trans "Image" %}</th>
+            <th>{% trans "SKU" %}</th>
+            <th>{% trans "Attributes" %}</th>
+            <th>{% trans "Price" %}</th>
+            <th>{% trans "Availability" %}</th>
+            <th>{% trans "Barcode" %}</th>
+            <th>{% trans "Status" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -221,13 +302,19 @@
               </div>
             </td>
             <td><span class="variant-price">${{ variant.variant_price|default:"0.00" }}</span></td>
-            <td>{{ variant.variant_quantity|default:"0" }}</td>
+            <td>
+              {% if variant.variant_quantity >= 50 %}
+                <span class="variant-availability"><b>50+</b></span>
+              {% else %}
+                <span class="variant-availability is-out">{% trans "Unavailable" %}</span>
+              {% endif %}
+            </td>
             <td>{{ variant.variant_barcode|default:"-" }}</td>
             <td>
               {% if variant.variant_featured %}
-              <span class="badge badge-featured">Featured</span>
+              <span class="badge badge-featured">{% trans "Featured" %}</span>
               {% else %}
-              <span class="badge badge-regular">Regular</span>
+              <span class="badge badge-regular">{% trans "Regular" %}</span>
               {% endif %}
             </td>
           </tr>
@@ -289,85 +376,386 @@
   {% endif %}
   }) ();
 
-  // ── Render multilingual description ──
+  // ── Render description in the active UI language ──
   (function() {
     const container = document.getElementById('description-display');
     if (!container) return;
 
     const rawStr = document.getElementById('desc-raw-data').textContent;
-
-    const langLabels = { en: 'English', tr: 'Turkish' };
-    const langOrder = ['en', 'tr'];
+    // Active Django language (en/tr), falling back to en.
+    {% get_current_language as DJ_LANG %}
+    const uiLang = ('{{ DJ_LANG|default:"en" }}' || 'en').toLowerCase().slice(0, 2);
+    // Order tried: UI language first, then the other one as fallback.
+    const fallback = uiLang === 'tr' ? 'en' : 'tr';
+    const tryOrder = [uiLang, fallback];
 
     let translations = {};
     try {
       const data = JSON.parse(rawStr);
       translations = (data && data.translations) ? data.translations : {};
-    } catch(e) {
-      // Not JSON — show as plain HTML
+    } catch (e) {
+      // Not JSON — render as plain HTML
       container.innerHTML = '<div class="description-text">' + rawStr + '</div>';
       return;
     }
 
-    // Filter to languages that have content
-    const activeLangs = langOrder.filter(lang => {
+    // Pick the first language that actually has content
+    let picked = null;
+    for (const lang of tryOrder) {
       const t = translations[lang];
-      return t && (t.description || t.title);
-    });
+      if (t && (t.description || t.title)) { picked = t; break; }
+    }
 
-    if (activeLangs.length === 0) {
-      container.innerHTML = '<p class="text-muted">No description available</p>';
+    if (!picked) {
+      container.innerHTML = '<p class="text-muted">{% trans "No description available" %}</p>';
       return;
     }
 
-    // If only one language, show it directly without tabs
-    if (activeLangs.length === 1) {
-      const t = translations[activeLangs[0]];
-      container.innerHTML = '<div class="description-text">' + (t.description || '') + '</div>';
-      return;
-    }
-
-    // Build tabbed UI
-    let tabsHtml = '<div class="desc-tab-bar">';
-    activeLangs.forEach((lang, i) => {
-      tabsHtml += '<button type="button" class="desc-tab' + (i === 0 ? ' active' : '') + '" data-lang="' + lang + '">'
-        + langLabels[lang] + '</button>';
-    });
-    tabsHtml += '</div>';
-
-    let panelsHtml = '';
-    activeLangs.forEach((lang, i) => {
-      const t = translations[lang] || {};
-      panelsHtml += '<div class="desc-panel' + (i === 0 ? ' active' : '') + '" data-lang="' + lang + '">'
-        + (t.title ? '<h3 class="desc-panel-title">' + t.title + '</h3>' : '')
-        + '<div class="description-text">' + (t.description || '') + '</div>'
-        + '</div>';
-    });
-
-    container.innerHTML = tabsHtml + panelsHtml;
-
-    // Tab switching
-    container.querySelectorAll('.desc-tab').forEach(btn => {
-      btn.addEventListener('click', function() {
-        container.querySelectorAll('.desc-tab').forEach(b => b.classList.remove('active'));
-        container.querySelectorAll('.desc-panel').forEach(p => p.classList.remove('active'));
-        this.classList.add('active');
-        container.querySelector('.desc-panel[data-lang="' + this.dataset.lang + '"]').classList.add('active');
-      });
-    });
+    container.innerHTML = '<div class="description-text">' + (picked.description || '') + '</div>';
   })();
 
 
 </script>
 
 <style>
-  .desc-tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 0; }
-  .desc-tab { background: none; border: none; padding: 8px 16px; cursor: pointer; font-size: 13px; font-weight: 500;
-    color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
-  .desc-tab:hover { color: #374151; }
-  .desc-tab.active { color: #4f46e5; border-bottom-color: #4f46e5; }
-  .desc-panel { display: none; }
-  .desc-panel.active { display: block; }
-  .desc-panel-title { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: #1f2937; }
+  /* Description (rendered in the active UI language) */
+  #description-display .description-text {
+    font: 400 14.5px 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.7;
+    color: #374151;
+  }
+  #description-display .description-text p { margin: 0 0 12px; }
+  #description-display .description-text p:last-child { margin-bottom: 0; }
+
+  /* ============ B2B Quick Order panel ============ */
+  .b2b-quote {
+    background: linear-gradient(180deg, #FAFBFC 0%, #FFFFFF 100%);
+    border: 1px solid #EAEFF1;
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin: 18px 0 22px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  .b2b-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+  .b2b-ico {
+    width: 38px; height: 38px;
+    border-radius: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+    border: 1px solid #B8DCDC;
+    color: #006B6C;
+    flex-shrink: 0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .b2b-ico svg { width: 18px; height: 18px; stroke-width: 1.85; }
+  .b2b-titles { flex: 1; min-width: 0; }
+  .b2b-title { margin: 0 0 2px; font: 700 16px 'Plus Jakarta Sans', sans-serif; color: #0F172A; letter-spacing: -0.01em; line-height: 1.2; }
+  .b2b-sub { margin: 0; font: 500 12.5px 'Plus Jakarta Sans', sans-serif; color: #64748B; }
+
+  .b2b-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font: 700 10.5px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+  .b2b-badge svg { width: 11px; height: 11px; stroke-width: 2; }
+  .b2b-badge--pct { background: #FFF7ED; color: #C2410C; border-color: #FED7AA; }
+  .b2b-badge--vol { background: linear-gradient(135deg, #E6F3F3, #D0E8E8); color: #005354; border-color: #B8DCDC; }
+
+  /* Tier ladder */
+  .b2b-tiers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #EAEFF1;
+    border-radius: 12px;
+  }
+  .b2b-tier {
+    padding: 10px 12px;
+    background: #FAFBFC;
+    border: 1px solid #EAEFF1;
+    border-radius: 10px;
+    text-align: center;
+    transition: all 200ms cubic-bezier(0.22,1,0.36,1);
+  }
+  .b2b-tier-range { font: 700 14px 'Plus Jakarta Sans', sans-serif; color: #0F172A; line-height: 1.1; }
+  .b2b-tier-range small { display: block; font: 500 10px 'Plus Jakarta Sans', sans-serif; color: #94A3B8; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .b2b-tier-pct { margin-top: 6px; font: 700 12px 'Plus Jakarta Sans', sans-serif; color: #006B6C; }
+  .b2b-tier.is-active {
+    background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+    border-color: #0F766E;
+    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.18);
+    transform: translateY(-1px);
+  }
+  .b2b-tier.is-active .b2b-tier-pct { color: #0F4C4C; }
+
+  /* Quantity stepper + price preview */
+  .b2b-row { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; margin-bottom: 14px; }
+  .b2b-qty {
+    display: inline-flex; align-items: center;
+    background: white;
+    border: 1px solid #DDE3E5;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .b2b-step {
+    width: 40px; height: 44px;
+    background: white;
+    border: 0; outline: 0;
+    color: #0F172A;
+    font: 700 18px 'Plus Jakarta Sans', sans-serif;
+    cursor: pointer;
+    transition: background 140ms;
+  }
+  .b2b-step:hover { background: #F4F6F8; }
+  .b2b-step:active { background: #E6F3F3; color: #0F766E; }
+  .b2b-qty input {
+    width: 80px; height: 44px;
+    border: 0; outline: 0;
+    background: transparent;
+    text-align: center;
+    font: 700 16px 'Plus Jakarta Sans', sans-serif;
+    color: #0F172A;
+    -moz-appearance: textfield;
+  }
+  .b2b-qty input::-webkit-outer-spin-button,
+  .b2b-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  .b2b-prices { display: flex; align-items: center; justify-content: flex-end; gap: 22px; }
+  .b2b-unit, .b2b-total { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .b2b-unit-l, .b2b-total-l {
+    font: 700 9.5px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.10em; text-transform: uppercase; color: #94A3B8;
+  }
+  .b2b-unit-v { font: 700 15px 'Plus Jakarta Sans', sans-serif; color: #0F172A; letter-spacing: -0.005em; }
+  .b2b-unit-orig {
+    margin-left: 8px;
+    font: 500 12px 'Plus Jakarta Sans', sans-serif;
+    color: #94A3B8;
+    text-decoration: line-through;
+  }
+  .b2b-total-v { font: 800 22px 'Plus Jakarta Sans', sans-serif; color: #0F766E; letter-spacing: -0.015em; line-height: 1.1; }
+
+  .b2b-cta {
+    width: 100%;
+    height: 46px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    background: linear-gradient(180deg, #0F766E 0%, #0D6660 100%);
+    border: 1px solid #0B5650;
+    border-radius: 12px;
+    color: white;
+    font: 700 13.5px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    outline: 0;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.16),
+      0 1px 2px rgba(11, 86, 80, 0.20),
+      0 6px 16px rgba(15, 118, 110, 0.22);
+    transition: background 160ms, border-color 160ms, transform 160ms, box-shadow 200ms;
+  }
+  .b2b-cta:hover {
+    background: linear-gradient(180deg, #115E59 0%, #0F4F4B 100%);
+    border-color: #0A4844;
+    transform: translateY(-1px);
+  }
+  .b2b-cta:active { transform: translateY(0); }
+  .b2b-cta svg { width: 16px; height: 16px; stroke-width: 1.85; }
+
+  /* B2B availability badge (variant table + info-grid) */
+  .variant-availability {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px;
+    background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+    color: #005354;
+    border: 1px solid #B8DCDC;
+    border-radius: 999px;
+    font: 700 12px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.005em;
+  }
+  .variant-availability b { font-weight: 800; }
+  .variant-availability.is-out {
+    background: #F4F6F8;
+    color: #94A3B8;
+    border-color: #E2E8EE;
+  }
+
+  /* Minimum-order hint */
+  .b2b-min-hint {
+    display: inline-flex; align-items: center; gap: 7px;
+    margin: 0 0 12px;
+    padding: 7px 12px;
+    background: #FFF7ED;
+    border: 1px solid #FED7AA;
+    border-radius: 999px;
+    font: 600 11.5px 'Plus Jakarta Sans', sans-serif;
+    color: #9A3412;
+    letter-spacing: -0.005em;
+    transition: all 200ms cubic-bezier(0.22,1,0.36,1);
+  }
+  .b2b-min-hint b { font-weight: 800; color: #7C2D12; }
+  .b2b-min-hint svg { width: 12px; height: 12px; stroke-width: 2; flex-shrink: 0; color: #C2410C; }
+  .b2b-min-hint.is-flash {
+    background: #FEE2E2;
+    border-color: #FCA5A5;
+    color: #991B1B;
+    transform: scale(1.02);
+  }
+  .b2b-min-hint.is-flash svg { color: #B91C1C; }
+  .b2b-min-hint.is-flash b { color: #7F1D1D; }
+
+  /* Quantity input red flash when below minimum */
+  .b2b-qty.is-invalid { border-color: #FCA5A5 !important; box-shadow: 0 0 0 3px rgba(220,38,38,0.12) !important; }
+
+  @media (max-width: 640px) {
+    .b2b-row { grid-template-columns: 1fr; }
+    .b2b-prices { justify-content: space-between; }
+  }
 </style>
+
+<script>
+  (function () {
+    const root = document.getElementById('b2bQuote');
+    if (!root) return;
+
+    const basePrice    = parseFloat(root.dataset.basePrice) || 0;
+    const campaignType = root.dataset.campaignType;
+    const flatPct      = parseFloat(root.dataset.campaignPercent) || 0;
+    const endDate      = root.dataset.campaignEnd;
+
+    // Read tiers (volume campaign)
+    const tierRows = Array.from(root.querySelectorAll('.b2b-tier')).map(el => ({
+      el,
+      min: parseInt(el.dataset.min, 10),
+      max: el.dataset.max ? parseInt(el.dataset.max, 10) : null,
+      pct: parseFloat(el.dataset.pct) || 0,
+    }));
+
+    const qtyInput  = document.getElementById('b2bQty');
+    const unitEl    = document.getElementById('b2bUnit');
+    const unitOrig  = document.getElementById('b2bUnitOrig');
+    const totalEl   = document.getElementById('b2bTotal');
+    const ctaBtn    = document.getElementById('b2bAddToQuote');
+
+    const fmt = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    function activeFlatPercentage() {
+      // Percentage campaign honoured only if not expired
+      if (campaignType !== 'percentage') return 0;
+      if (endDate) {
+        const end = new Date(endDate + 'T23:59:59');
+        if (Date.now() > end.getTime()) return 0;
+      }
+      return flatPct;
+    }
+
+    function activeTier(qty) {
+      if (campaignType !== 'volume') return null;
+      // Find the highest-min tier the qty falls into
+      let active = null;
+      tierRows.forEach(t => {
+        const inRange = qty >= t.min && (t.max === null || qty <= t.max);
+        if (inRange && (!active || t.min > active.min)) active = t;
+      });
+      return active;
+    }
+
+    // B2B minimum order — wholesale rule
+    const MIN_QTY = 50;
+    const qtyWrap = root.querySelector('.b2b-qty');
+    const minHint = document.getElementById('b2bMinHint');
+
+    function flashMinViolation() {
+      if (!minHint) return;
+      minHint.classList.add('is-flash');
+      qtyWrap && qtyWrap.classList.add('is-invalid');
+      setTimeout(() => {
+        minHint.classList.remove('is-flash');
+        qtyWrap && qtyWrap.classList.remove('is-invalid');
+      }, 900);
+    }
+
+    function recalc() {
+      let qty = parseInt(qtyInput.value, 10);
+      if (!qty || qty < 1) qty = MIN_QTY;
+      // Allow user to type freely; we don't auto-snap during typing,
+      // only on blur / button click. So keep qty as-is for calc preview.
+
+      let pct = 0;
+      tierRows.forEach(t => t.el.classList.remove('is-active'));
+      const tier = activeTier(qty);
+      if (tier) {
+        pct = tier.pct;
+        tier.el.classList.add('is-active');
+      } else {
+        pct = activeFlatPercentage();
+      }
+
+      const unit  = basePrice * (1 - pct / 100);
+      const total = unit * qty;
+
+      unitEl.textContent  = fmt(unit);
+      totalEl.textContent = fmt(total);
+
+      if (pct > 0) {
+        unitOrig.textContent = fmt(basePrice);
+        unitOrig.hidden = false;
+      } else {
+        unitOrig.hidden = true;
+      }
+    }
+
+    // Snap to min on blur (after user stops typing)
+    qtyInput.addEventListener('blur', () => {
+      let qty = parseInt(qtyInput.value, 10);
+      if (!qty || qty < MIN_QTY) {
+        qtyInput.value = MIN_QTY;
+        flashMinViolation();
+        recalc();
+      }
+    });
+
+    // Steppers — respect MIN_QTY floor; "−" below 50 also flashes
+    root.querySelectorAll('.b2b-step').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const step = parseInt(btn.dataset.step, 10);
+        const cur  = Math.max(MIN_QTY, parseInt(qtyInput.value, 10) || MIN_QTY);
+        const next = cur + step;
+        if (next < MIN_QTY) {
+          qtyInput.value = MIN_QTY;
+          flashMinViolation();
+        } else {
+          qtyInput.value = next;
+        }
+        recalc();
+      });
+    });
+    qtyInput.addEventListener('input', recalc);
+
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', () => {
+        let qty = parseInt(qtyInput.value, 10) || 0;
+        if (qty < MIN_QTY) {
+          qtyInput.value = MIN_QTY;
+          flashMinViolation();
+          recalc();
+          return;
+        }
+        // Placeholder action — wire to your real Quote/Order endpoint later
+        alert(`{% trans "Added to quote" %}: ${qty} ${qty === 1 ? '{% trans "unit" %}' : '{% trans "units" %}'}`);
+      });
+    }
+
+    recalc();
+  })();
+</script>
 {% endblock %}

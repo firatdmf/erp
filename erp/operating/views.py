@@ -1303,15 +1303,17 @@ def create_web_order(request):
                         product = Product.objects.get(sku=product_sku)
                     except Product.DoesNotExist:
                         pass
-                
-                # Get variant if specified
+
+                # Get variant if specified — scope by product first to avoid
+                # MultipleObjectsReturned when the same variant_sku string
+                # (e.g. "red-m") exists across multiple products.
                 if variant_sku:
-                    try:
-                        variant = ProductVariant.objects.get(variant_sku=variant_sku)
-                        if not product and variant:
-                            product = variant.product
-                    except ProductVariant.DoesNotExist:
-                        pass
+                    qs = ProductVariant.objects.filter(variant_sku=variant_sku)
+                    if product:
+                        qs = qs.filter(product=product)
+                    variant = qs.first()
+                    if not product and variant:
+                        product = variant.product
                 
                 if product:
                     # Get custom curtain attributes if present
@@ -1925,17 +1927,18 @@ class WebOrderStatusEdit(View):
             order.tracking_number = tracking_number
         
         order.save()
-        
+
         status_label = dict(status_choices_en).get(new_status, new_status)
         messages.success(request, f"Order status updated successfully: {status_label}")
-        
-        # Stay on the same page to show updated data
-        context = {
-            'order': order,
-            'status_choices': status_choices_en,
-            'carrier_choices': carrier_choices_en,
-        }
-        return render(request, self.template_name, context)
+
+        # Honour ?next= so callers can return the user to the detail page
+        # (where the inline status changer lives) instead of the dedicated
+        # legacy edit screen.
+        next_url = request.POST.get('next') or request.GET.get('next')
+        if next_url:
+            return redirect(next_url)
+        # Default: bounce back to the order detail page.
+        return redirect('operating:order_detail', pk=order.pk)
 
 # -----------------------------------------------------------------------------
 # HTMX / API Views

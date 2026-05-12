@@ -1,600 +1,371 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static i18n %}
+{% get_current_language as LANGUAGE_CODE %}
 
 {% block title %}Settings | Nejum ERP{% endblock %}
 
 {% block css %}
-<style>
-    /* Scoped Settings Styles - Inlined for immediate reliability */
-    .settings-wrapper {
-        background-color: #f3f4f6;
-        /* Light gray background for whole page */
-        min-height: calc(100vh - 80px);
-        /* Full height minus header */
-        padding: 2rem;
-    }
-
-    .settings-container {
-        display: flex;
-        gap: 2rem;
-        max-width: 1200px;
-        margin: 0 auto;
-        background: transparent;
-        position: relative;
-        z-index: 10;
-        /* Ensure above any sidebar ghosts */
-    }
-
-    /* Sidebar Navigation */
-    .settings-sidebar {
-        width: 280px;
-        flex-shrink: 0;
-        background: #ffffff;
-        border-radius: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        padding: 1.5rem;
-        height: fit-content;
-        position: sticky;
-        top: 2rem;
-    }
-
-    .settings-nav-title {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #9ca3af;
-        font-weight: 600;
-        margin: 0 0 1rem 1rem;
-    }
-
-    .settings-nav-item {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1rem 1.25rem;
-        color: #4b5563;
-        text-decoration: none;
-        border-radius: 12px;
-        margin-bottom: 0.5rem;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        font-weight: 500;
-        font-size: 0.95rem;
-    }
-
-    .settings-nav-item i {
-        width: 24px;
-        text-align: center;
-        color: #9ca3af;
-        transition: color 0.2s ease;
-        font-size: 1.1rem;
-    }
-
-    .settings-nav-item:hover {
-        background-color: #f9fafb;
-        color: #111827;
-        transform: translateX(4px);
-    }
-
-    .settings-nav-item:hover i {
-        color: #4b5563;
-    }
-
-    .settings-nav-item.active {
-        background-color: #eff6ff;
-        color: #2563eb;
-        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
-    }
-
-    .settings-nav-item.active i {
-        color: #2563eb;
-    }
-
-    /* Main Content Area */
-    .settings-content {
-        flex: 1;
-        background: #ffffff;
-        border-radius: 16px;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
-        padding: 2.5rem;
-        min-height: 600px;
-        position: relative;
-    }
-
-    /* Section Styles */
-    .settings-section {
-        display: none;
-        animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .settings-section.active {
-        display: block;
-    }
-
-    .settings-header {
-        margin-bottom: 2.5rem;
-        padding-bottom: 1.5rem;
-        border-bottom: 2px solid #f3f4f6;
-    }
-
-    .settings-header h2 {
-        font-size: 1.75rem;
-        color: #111827;
-        margin: 0 0 0.5rem 0;
-        font-weight: 700;
-        letter-spacing: -0.025em;
-    }
-
-    .settings-header p {
-        color: #6b7280;
-        margin: 0;
-        font-size: 1rem;
-    }
-
-    /* Avatar Section */
-    .profile-card {
-        display: flex;
-        align-items: center;
-        gap: 2rem;
-        padding: 2rem;
-        background: #f9fafb;
-        border-radius: 12px;
-        border: 1px solid #e5e7eb;
-        margin-bottom: 2.5rem;
-    }
-
-    .large-avatar {
-        width: 100px;
-        height: 100px;
-        background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
-        color: #ffffff;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.5rem;
-        font-weight: 700;
-        border: 4px solid #ffffff;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .avatar-actions h3 {
-        margin: 0 0 0.25rem 0;
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #111827;
-    }
-
-    .avatar-actions p {
-        margin: 0 0 1rem 0;
-        color: #6b7280;
-        font-size: 0.9rem;
-    }
-
-    .badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        background-color: #dbeafe;
-        color: #1e40af;
-    }
-
-    /* Form Styles */
-    .settings-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 2rem;
-    }
-
-    .settings-form-group {
-        margin-bottom: 1.5rem;
-    }
-
-    .full-width {
-        grid-column: 1 / -1;
-    }
-
-    .settings-form-group label {
-        display: block;
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 0.5rem;
-    }
-
-    .settings-input {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        background: #ffffff;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 0.95rem;
-        color: #1f2937;
-        transition: all 0.2s;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    }
-
-    .settings-input:focus {
-        border-color: #3b82f6;
-        outline: none;
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-    }
-
-    .settings-input:disabled {
-        background-color: #f3f4f6;
-        cursor: not-allowed;
-    }
-
-    .form-actions {
-        margin-top: 2rem;
-        padding-top: 2rem;
-        border-top: 1px solid #e5e7eb;
-        display: flex;
-        justify-content: flex-end;
-        gap: 1rem;
-    }
-
-    .settings-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.75rem 1.5rem;
-        font-size: 0.95rem;
-        font-weight: 500;
-        border-radius: 8px;
-        transition: all 0.2s;
-        cursor: pointer;
-        border: none;
-        gap: 0.5rem;
-    }
-
-    .btn-primary {
-        background-color: #2563eb;
-        color: white;
-        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-    }
-
-    .btn-primary:hover {
-        background-color: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 6px 8px -1px rgba(37, 99, 235, 0.3);
-    }
-
-    .btn-secondary {
-        background-color: #ffffff;
-        border: 1px solid #d1d5db;
-        color: #374151;
-    }
-
-    .btn-secondary:hover {
-        background-color: #f9fafb;
-        border-color: #9ca3af;
-        color: #111827;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    /* Responsive */
-    @media (max-width: 1024px) {
-        .settings-container {
-            flex-direction: column;
-        }
-
-        .settings-sidebar {
-            width: 100%;
-            position: relative;
-            top: 0;
-            overflow-x: auto;
-            white-space: nowrap;
-        }
-
-        .settings-sidebar nav {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .settings-nav-title {
-            display: none;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .settings-wrapper {
-            padding: 1rem;
-        }
-
-        .settings-content {
-            padding: 1.5rem;
-        }
-
-        .settings-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .profile-card {
-            flex-direction: column;
-            text-align: center;
-        }
-    }
-</style>
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'erp/css/nejum/settings.css' %}?v=4" />
 {% endblock %}
 
 {% block content %}
-<div class="settings-wrapper">
-    <div class="settings-container">
-        <!-- Sidebar Navigation -->
-        <aside class="settings-sidebar">
-            <div class="settings-nav-title">Menu</div>
-            <nav>
-                <a href="#profile" class="settings-nav-item active" onclick="switchTab('profile', event)">
-                    <i class="fas fa-user-circle"></i>
-                    Profile
-                </a>
-                <a href="#security" class="settings-nav-item" onclick="switchTab('security', event)">
-                    <i class="fas fa-shield-alt"></i>
-                    Security
-                </a>
-                <a href="#notifications" class="settings-nav-item" onclick="switchTab('notifications', event)">
-                    <i class="fas fa-bell"></i>
-                    Notifications
-                </a>
-                <a href="#preferences" class="settings-nav-item" onclick="switchTab('preferences', event)">
-                    <i class="fas fa-sliders-h"></i>
-                    App Settings
-                </a>
-                <a href="#integrations" class="settings-nav-item" onclick="switchTab('integrations', event)">
-                    <i class="fas fa-plug"></i>
-                    Integrations
-                </a>
-            </nav>
-        </aside>
+<div id="Settings_Page">
 
-        <!-- Main Content -->
-        <main class="settings-content">
-            <!-- Message Container for HTMX responses -->
-            <div id="settings-messages"></div>
-
-            <!-- 1. Profile Section -->
-            <section id="profile-section" class="settings-section active">
-                <div class="settings-header">
-                    <h2>Profile Settings</h2>
-                    <p>Manage your public profile and private information.</p>
-                </div>
-
-                <div class="profile-card">
-                    <div class="large-avatar">
-                        {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
-                    </div>
-                    <div class="avatar-actions">
-                        <h3>{{ user.get_full_name|default:user.username }}</h3>
-                        <p>{{ user.email }}</p>
-                        <span class="badge">Member</span>
-                    </div>
-                </div>
-
-                <form hx-post="{% url 'authentication:update_profile' %}" hx-target="#settings-messages"
-                    hx-swap="innerHTML">
-                    {% csrf_token %}
-                    <div class="settings-grid">
-                        <div class="settings-form-group">
-                            <label for="id_first_name">First Name</label>
-                            <input type="text" name="first_name" id="id_first_name" class="settings-input"
-                                value="{{ user.first_name }}">
-                        </div>
-
-                        <div class="settings-form-group">
-                            <label for="id_last_name">Last Name</label>
-                            <input type="text" name="last_name" id="id_last_name" class="settings-input"
-                                value="{{ user.last_name }}">
-                        </div>
-
-                        <div class="settings-form-group full-width">
-                            <label for="id_email">Email Address</label>
-                            <input type="email" name="email" id="id_email" class="settings-input"
-                                value="{{ user.email }}">
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="button" class="settings-btn btn-secondary">Cancel</button>
-                        <button type="submit" class="settings-btn btn-primary">
-                            <i class="fas fa-save"></i> Save Changes
-                        </button>
-                    </div>
-                </form>
-            </section>
-
-            <!-- 2. Security Section -->
-            <section id="security-section" class="settings-section">
-                <div class="settings-header">
-                    <h2>Security</h2>
-                    <p>Ensure your account is secure by using a strong password.</p>
-                </div>
-
-                <div class="profile-card" style="margin-bottom: 2rem;">
-                    <div style="flex:1">
-                        <h3 style="margin:0; font-size:1.1rem; color:#1f2937; margin-bottom:0.5rem;">Password
-                            Requirements</h3>
-                        <ul style="color:#6b7280; font-size:0.9rem; padding-left:1.2rem; margin:0;">
-                            <li>Minimum 8 characters long</li>
-                            <li>At least one uppercase letter</li>
-                            <li>At least one number</li>
-                            <li>At least one special character</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <form hx-post="{% url 'authentication:change_password_settings' %}" hx-target="#settings-messages"
-                    hx-swap="innerHTML">
-                    {% csrf_token %}
-                    <div class="settings-form-group full-width">
-                        <label for="id_current_password">Current Password</label>
-                        <input type="password" name="old_password" id="id_current_password" class="settings-input"
-                            required>
-                    </div>
-
-                    <div class="settings-grid">
-                        <div class="settings-form-group">
-                            <label for="id_new_password">New Password</label>
-                            <input type="password" name="new_password" id="id_new_password" class="settings-input"
-                                required>
-                        </div>
-
-                        <div class="settings-form-group">
-                            <label for="id_confirm_password">Confirm New Password</label>
-                            <input type="password" name="confirm_password" id="id_confirm_password"
-                                class="settings-input" required>
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="settings-btn btn-primary">
-                            <i class="fas fa-key"></i> Update Password
-                        </button>
-                    </div>
-                </form>
-            </section>
-
-            <!-- 3. Notifications (Placeholder) -->
-            <section id="notifications-section" class="settings-section">
-                <div class="settings-header">
-                    <h2>Notifications</h2>
-                    <p>Manage how you receive updates and alerts.</p>
-                </div>
-
-                <div
-                    style="text-align: center; padding: 4rem 2rem; background: #f9fafb; border-radius: 12px; border: 2px dashed #e5e7eb;">
-                    <div
-                        style="background: #e0e7ff; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto;">
-                        <i class="fas fa-bell" style="font-size: 24px; color: #4338ca;"></i>
-                    </div>
-                    <h3 style="color: #1f2937; margin-bottom: 0.5rem;">Notification Settings Coming Soon</h3>
-                    <p style="color: #6b7280; max-width: 400px; margin: 0 auto;">We're working on a detailed
-                        notification center to give you full control over your alerts.</p>
-                </div>
-            </section>
-
-            <!-- 4. Preferences (Placeholder) -->
-            <section id="preferences-section" class="settings-section">
-                <div class="settings-header">
-                    <h2>App Preferences</h2>
-                    <p>Customize your workspace experience.</p>
-                </div>
-
-                <div class="settings-form-group">
-                    <label>Theme Preference</label>
-                    <select class="settings-input" disabled style="opacity: 0.7;">
-                        <option>Light Mode (Default)</option>
-                        <option>Dark Mode (Coming Soon)</option>
-                        <option>System Sync</option>
-                    </select>
-                    <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 0.5rem;">Dark mode is currently under
-                        development.</p>
-                </div>
-            </section>
-
-            <!-- 5. Integrations -->
-            <section id="integrations-section" class="settings-section">
-                <div class="settings-header">
-                    <h2>Integrations</h2>
-                    <p>Manage third-party connections and services.</p>
-                </div>
-
-                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px;">
-                    <!-- Google Integration -->
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; gap: 16px;">
-                            <div
-                                style="width: 48px; height: 48px; background: #f8fafc; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                                <i class="fab fa-google" style="font-size: 24px; color: #DB4437;"></i>
-                            </div>
-                            <div>
-                                <h4 style="margin: 0 0 4px; font-size: 15px; font-weight: 500;">Google Account</h4>
-                                {% if google_creds %}
-                                <p style="margin: 0; font-size: 13px; color: #334155; font-weight: 500;">
-                                    {% if google_creds.avatar_url %}
-                                    <img src="{{ google_creds.avatar_url }}" alt="Avatar"
-                                        style="width: 20px; height: 20px; border-radius: 50%; vertical-align: middle; margin-right: 6px;">
-                                    {% endif %}
-                                    {{ google_creds.email|default:"Google Connected" }}
-                                </p>
-                                <div
-                                    style="display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 2px 8px; background: #dcfce7; color: #166534; border-radius: 20px; font-size: 11px; font-weight: 600;">
-                                    <i class="fas fa-check-circle"></i> Active
-                                </div>
-                                {% else %}
-                                <p style="margin: 0; font-size: 13px; color: #64748b;">Connect your Google account to
-                                    access Google Chat.</p>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div>
-                            {% if is_google_connected %}
-                            <a href="{% url 'authentication:google_disconnect' %}"
-                                onclick="return confirm('Are you sure you want to disconnect Google Chat?')"
-                                style="text-decoration: none; padding: 8px 16px; background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;">
-                                <i class="fas fa-unlink"></i> Disconnect
-                            </a>
-                            {% else %}
-                            <a href="{% url 'authentication:google_login' %}"
-                                style="text-decoration: none; padding: 10px 20px; background: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                                <i class="fab fa-google"></i> Connect Google
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-        </main>
+  <!-- Sticky header -->
+  <header class="st-header">
+    <div class="st-header-left">
+      <span class="st-header-icon"><i class="fas fa-sliders-h"></i></span>
+      <div class="st-header-text">
+        <h1>{% trans "Settings" %}</h1>
+        <p class="st-header-sub">{% trans "Manage your account, integrations, and preferences for this workspace." %}</p>
+      </div>
     </div>
+    <div class="st-header-right">
+      <i class="fas fa-circle"></i> {% trans "Workspace" %}
+    </div>
+  </header>
+
+  <div class="st-layout">
+
+    <!-- Left nav -->
+    <aside class="st-nav">
+      <div class="st-nav-group">{% trans "General" %}</div>
+      <a href="#profile" class="st-nav-link is-active" onclick="stSwitchTab('profile', event)">
+        <span class="st-nav-ico"><i class="fas fa-user"></i></span>
+        {% trans "Profile" %}
+      </a>
+      <a href="#security" class="st-nav-link" onclick="stSwitchTab('security', event)">
+        <span class="st-nav-ico"><i class="fas fa-shield-alt"></i></span>
+        {% trans "Security" %}
+      </a>
+      <a href="#notifications" class="st-nav-link" onclick="stSwitchTab('notifications', event)">
+        <span class="st-nav-ico"><i class="fas fa-bell"></i></span>
+        {% trans "Notifications" %}
+      </a>
+
+      <div class="st-nav-group">{% trans "Workspace" %}</div>
+      <a href="#preferences" class="st-nav-link" onclick="stSwitchTab('preferences', event)">
+        <span class="st-nav-ico"><i class="fas fa-palette"></i></span>
+        {% trans "App Settings" %}
+      </a>
+      <a href="#integrations" class="st-nav-link" onclick="stSwitchTab('integrations', event)">
+        <span class="st-nav-ico"><i class="fas fa-plug"></i></span>
+        {% trans "Integrations" %}
+      </a>
+    </aside>
+
+    <!-- Right content -->
+    <main class="st-content">
+      <div id="settings-messages"></div>
+
+      <!-- ========== PROFILE ========== -->
+      <section id="profile-section" class="st-section is-active">
+        <div class="st-card">
+          <div class="st-card-header">
+            <span class="st-card-ico"><i class="fas fa-user"></i></span>
+            <div class="st-card-titles">
+              <h2 class="st-card-title">{% trans "Profile Settings" %}</h2>
+              <p class="st-card-sub">{% trans "Manage your public profile and private information." %}</p>
+            </div>
+          </div>
+          <div class="st-card-body">
+
+            <div class="st-profile-card">
+              <div class="st-profile-avatar">
+                {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+              </div>
+              <div class="st-profile-info">
+                <h3 class="st-profile-name">{{ user.get_full_name|default:user.username }}</h3>
+                <p class="st-profile-email">{{ user.email }}</p>
+                <span class="st-badge"><i class="fas fa-circle" style="font-size: 6px;"></i> {% trans "Member" %}</span>
+                <span class="st-workspace-chip"><i class="fas fa-building"></i> {{ BRAND_NAME }}</span>
+              </div>
+            </div>
+
+            <form hx-post="{% url 'authentication:update_profile' %}" hx-target="#settings-messages" hx-swap="innerHTML">
+              {% csrf_token %}
+              <div class="st-form-grid">
+                <div class="st-form-group">
+                  <label class="st-form-label" for="id_first_name">{% trans "First Name" %}</label>
+                  <input type="text" name="first_name" id="id_first_name" class="st-input" value="{{ user.first_name }}">
+                </div>
+                <div class="st-form-group">
+                  <label class="st-form-label" for="id_last_name">{% trans "Last Name" %}</label>
+                  <input type="text" name="last_name" id="id_last_name" class="st-input" value="{{ user.last_name }}">
+                </div>
+                <div class="st-form-group is-full">
+                  <label class="st-form-label" for="id_email">{% trans "Email Address" %}</label>
+                  <input type="email" name="email" id="id_email" class="st-input" value="{{ user.email }}">
+                </div>
+                <div class="st-form-group is-full">
+                  <label class="st-form-label" for="id_company">{% trans "Company / Workspace" %}</label>
+                  <input type="text" id="id_company" class="st-input" value="{{ BRAND_NAME }}" disabled>
+                  <p class="st-help">{% trans "Your workspace name is managed by an administrator." %}</p>
+                </div>
+              </div>
+              <div class="st-form-actions">
+                <button type="button" class="st-btn st-btn--secondary">{% trans "Cancel" %}</button>
+                <button type="submit" class="st-btn st-btn--primary">
+                  <i class="fas fa-save"></i> {% trans "Save Changes" %}
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== SECURITY ========== -->
+      <section id="security-section" class="st-section">
+        <div class="st-card">
+          <div class="st-card-header">
+            <span class="st-card-ico"><i class="fas fa-shield-alt"></i></span>
+            <div class="st-card-titles">
+              <h2 class="st-card-title">{% trans "Security" %}</h2>
+              <p class="st-card-sub">{% trans "Ensure your account is secure by using a strong password." %}</p>
+            </div>
+          </div>
+          <div class="st-card-body">
+
+            <div class="st-info-panel">
+              <span class="st-info-ico"><i class="fas fa-key"></i></span>
+              <div class="st-info-text">
+                <h4 class="st-info-title">{% trans "Password Requirements" %}</h4>
+                <ul>
+                  <li>{% trans "Minimum 8 characters long" %}</li>
+                  <li>{% trans "At least one uppercase letter" %}</li>
+                  <li>{% trans "At least one number" %}</li>
+                  <li>{% trans "At least one special character" %}</li>
+                </ul>
+              </div>
+            </div>
+
+            <form hx-post="{% url 'authentication:change_password_settings' %}" hx-target="#settings-messages" hx-swap="innerHTML">
+              {% csrf_token %}
+              <div class="st-form-grid">
+                <div class="st-form-group is-full">
+                  <label class="st-form-label" for="id_current_password">{% trans "Current Password" %}</label>
+                  <input type="password" name="old_password" id="id_current_password" class="st-input" required>
+                </div>
+                <div class="st-form-group">
+                  <label class="st-form-label" for="id_new_password">{% trans "New Password" %}</label>
+                  <input type="password" name="new_password" id="id_new_password" class="st-input" required>
+                </div>
+                <div class="st-form-group">
+                  <label class="st-form-label" for="id_confirm_password">{% trans "Confirm New Password" %}</label>
+                  <input type="password" name="confirm_password" id="id_confirm_password" class="st-input" required>
+                </div>
+              </div>
+              <div class="st-form-actions">
+                <button type="submit" class="st-btn st-btn--primary">
+                  <i class="fas fa-key"></i> {% trans "Update Password" %}
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== NOTIFICATIONS ========== -->
+      <section id="notifications-section" class="st-section">
+        <div class="st-card">
+          <div class="st-card-header">
+            <span class="st-card-ico"><i class="fas fa-bell"></i></span>
+            <div class="st-card-titles">
+              <h2 class="st-card-title">{% trans "Notifications" %}</h2>
+              <p class="st-card-sub">{% trans "Manage how you receive updates and alerts." %}</p>
+            </div>
+          </div>
+          <div class="st-card-body">
+            <div class="st-soon-card">
+              <span class="st-soon-ico"><i class="fas fa-bell"></i></span>
+              <h3>{% trans "Notification Settings Coming Soon" %}</h3>
+              <p>{% trans "We're working on a detailed notification center to give you full control over your alerts across email, in-app and mobile." %}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== PREFERENCES ========== -->
+      <section id="preferences-section" class="st-section">
+        <div class="st-card">
+          <div class="st-card-header">
+            <span class="st-card-ico"><i class="fas fa-palette"></i></span>
+            <div class="st-card-titles">
+              <h2 class="st-card-title">{% trans "App Preferences" %}</h2>
+              <p class="st-card-sub">{% trans "Customize your workspace experience." %}</p>
+            </div>
+          </div>
+          <div class="st-card-body">
+            <div class="st-form-group is-full">
+              <label class="st-form-label">{% trans "Theme Preference" %}</label>
+              <div class="st-theme-switcher" id="themeSwitcher" role="tablist">
+                <button type="button" class="st-theme-option" data-theme-value="light">
+                  <i class="fas fa-sun"></i> {% trans "Light Mode" %}
+                </button>
+                <button type="button" class="st-theme-option" data-theme-value="dark">
+                  <i class="fas fa-moon"></i> {% trans "Dark Mode" %}
+                </button>
+              </div>
+              <p class="st-help">{% trans "Choose your preferred appearance. Dark mode is in beta — visual polish across modules will improve gradually." %}</p>
+            </div>
+
+            <div class="st-form-group is-full" style="margin-top: 22px;">
+              <label class="st-form-label">{% trans "Language" %}</label>
+              <form action="{% url 'set_language' %}" method="post" id="langForm">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <div class="st-theme-switcher" role="tablist">
+                  <button type="submit" name="language" value="en"
+                          class="st-theme-option {% if LANGUAGE_CODE|slice:':2' == 'en' %}is-active{% endif %}">
+                    <span style="font-size:14px; line-height:1;">🇬🇧</span> English
+                  </button>
+                  <button type="submit" name="language" value="tr"
+                          class="st-theme-option {% if LANGUAGE_CODE|slice:':2' == 'tr' %}is-active{% endif %}">
+                    <span style="font-size:14px; line-height:1;">🇹🇷</span> Türkçe
+                  </button>
+                </div>
+              </form>
+              <p class="st-help">{% trans "Interface language. The whole UI updates after saving." %}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== INTEGRATIONS ========== -->
+      <section id="integrations-section" class="st-section">
+        <div class="st-card">
+          <div class="st-card-header">
+            <span class="st-card-ico"><i class="fas fa-plug"></i></span>
+            <div class="st-card-titles">
+              <h2 class="st-card-title">{% trans "Integrations" %}</h2>
+              <p class="st-card-sub">{% trans "Manage third-party connections and services tied to your account." %}</p>
+            </div>
+          </div>
+          <div class="st-card-body">
+
+            <!-- Google Account -->
+            <div class="st-row">
+              <div class="st-row-info">
+                <span class="st-row-icon is-google"><i class="fab fa-google"></i></span>
+                <div class="st-row-text">
+                  <h3 class="st-row-name">{% trans "Google Account" %}</h3>
+                  {% if google_creds %}
+                    <p class="st-row-desc">{% trans "Used for Google Chat and Gmail integrations." %}</p>
+                    <div class="st-row-meta">
+                      <span class="st-account-chip">
+                        {% if google_creds.avatar_url %}
+                          <img src="{{ google_creds.avatar_url }}" alt="">
+                        {% endif %}
+                        {{ google_creds.email|default:"Google Connected" }}
+                      </span>
+                      <span class="st-status is-active"><i class="fas fa-circle"></i> Active</span>
+                    </div>
+                  {% else %}
+                    <p class="st-row-desc">{% trans "Connect your Google account to access Google Chat and Gmail." %}</p>
+                    <div class="st-row-meta">
+                      <span class="st-status is-inactive"><i class="fas fa-circle"></i> Not connected</span>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="st-row-actions">
+                {% if is_google_connected %}
+                  <a href="{% url 'authentication:google_disconnect' %}"
+                     onclick="return confirm('{% trans "Are you sure you want to disconnect Google Chat?" %}')"
+                     class="st-btn st-btn--danger">
+                    <i class="fas fa-unlink"></i> {% trans "Disconnect" %}
+                  </a>
+                {% else %}
+                  <a href="{% url 'authentication:google_login' %}" class="st-btn st-btn--primary">
+                    <i class="fab fa-google"></i> {% trans "Connect Google" %}
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Gmail -->
+            <div class="st-row">
+              <div class="st-row-info">
+                <span class="st-row-icon is-gmail"><i class="fas fa-envelope"></i></span>
+                <div class="st-row-text">
+                  <h3 class="st-row-name">{% trans "Gmail — Mail System" %}</h3>
+                  {% if is_google_connected %}
+                    <p class="st-row-desc">{% trans "Send and receive emails directly from your workspace inbox." %}</p>
+                    <div class="st-row-meta">
+                      <span class="st-account-chip">
+                        <i class="fas fa-envelope" style="font-size: 11px; color: #EA4335;"></i>
+                        {{ google_creds.email|default:"Google Connected" }}
+                      </span>
+                      <span class="st-status is-active"><i class="fas fa-circle"></i> Send & Receive</span>
+                    </div>
+                  {% else %}
+                    <p class="st-row-desc">{% trans "Connect your Google account above to enable Gmail integration." %}</p>
+                    <div class="st-row-meta">
+                      <span class="st-status is-inactive"><i class="fas fa-circle"></i> Requires Google</span>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="st-row-actions">
+                {% if is_google_connected %}
+                  <span class="st-btn st-btn--ghost-success">
+                    <i class="fas fa-check-circle"></i> {% trans "Connected" %}
+                  </span>
+                {% else %}
+                  <a href="{% url 'authentication:google_login' %}" class="st-btn st-btn--secondary">
+                    <i class="fab fa-google"></i> {% trans "Connect Google" %}
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
 </div>
 
 <script>
-    function switchTab(tabName, event) {
-        if (event) event.preventDefault();
-
-        // 1. Remove active class from all nav items
-        document.querySelectorAll('.settings-nav-item').forEach(el => el.classList.remove('active'));
-
-        // 2. Add active class to clicked item (if triggered by event)
-        if (event) {
-            event.currentTarget.classList.add('active');
-        } else {
-            // Find nav item by href
-            const navItem = document.querySelector(`.settings-nav-item[href="#${tabName}"]`);
-            if (navItem) navItem.classList.add('active');
-        }
-
-        // 3. Hide all sections
-        document.querySelectorAll('.settings-section').forEach(el => el.classList.remove('active'));
-
-        // 4. Show target section
-        const targetSection = document.getElementById(tabName + '-section');
-        if (targetSection) {
-            targetSection.classList.add('active');
-        }
+  function stSwitchTab(tabName, event) {
+    if (event) event.preventDefault();
+    document.querySelectorAll('#Settings_Page .st-nav-link').forEach(el => el.classList.remove('is-active'));
+    if (event && event.currentTarget) {
+      event.currentTarget.classList.add('is-active');
+    } else {
+      const navItem = document.querySelector(`#Settings_Page .st-nav-link[href="#${tabName}"]`);
+      if (navItem) navItem.classList.add('is-active');
     }
+    document.querySelectorAll('#Settings_Page .st-section').forEach(el => el.classList.remove('is-active'));
+    const target = document.getElementById(tabName + '-section');
+    if (target) target.classList.add('is-active');
+  }
+  window.addEventListener('load', () => {
+    const hash = window.location.hash.substring(1);
+    if (hash) stSwitchTab(hash, null);
 
-    // Handle hash change for direct linking
-    window.addEventListener('load', () => {
-        const hash = window.location.hash.substring(1);
-        if (hash) {
-            switchTab(hash, null);
-        }
-    });
+    // Theme switcher
+    const switcher = document.getElementById('themeSwitcher');
+    if (switcher) {
+      const stored = (function () {
+        try { return localStorage.getItem('nejum-theme') || 'light'; }
+        catch (e) { return 'light'; }
+      })();
+      const opts = switcher.querySelectorAll('.st-theme-option');
+      opts.forEach(btn => {
+        btn.classList.toggle('is-active', btn.dataset.themeValue === stored);
+        btn.addEventListener('click', () => {
+          const v = btn.dataset.themeValue;
+          try { localStorage.setItem('nejum-theme', v); } catch (e) {}
+          document.documentElement.setAttribute('data-theme', v);
+          opts.forEach(b => b.classList.toggle('is-active', b === btn));
+        });
+      });
+    }
+  });
 </script>
 {% endblock %}

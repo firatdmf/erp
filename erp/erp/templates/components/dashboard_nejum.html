@@ -1,4 +1,5 @@
 {% load static %}
+{% load i18n %}
 {% comment %}
   Nejum-exact dashboard partial. Mirrors Nejum design kit's
   ScreenHome.jsx structure 1:1: top tab bar (Takvim / Görevlerim /
@@ -56,7 +57,7 @@
           <input type="checkbox" data-prio="low"><span class="prio-dot prio-low"></span>Low
         </label>
         <div class="njdash-filter-foot">
-          <button type="button" class="njdash-filter-clear" id="njFilterClear">Clear</button>
+          <button type="button" class="njdash-filter-clear" id="njFilterClear">{% trans "Clear" %}</button>
         </div>
       </div>
     </div>
@@ -126,6 +127,16 @@
                     <span class="avatar avatar-teal">{{ t.avatar_letter }}</span>
                     <span>{{ t.assignee }}</span>
                   </span>
+                  {% if t.entity_name %}
+                  <span class="task-entity task-entity-{{ t.entity_type }}" title="{{ t.entity_name }}">
+                    {% if t.entity_type == 'company' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>
+                    {% else %}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    {% endif %}
+                    {{ t.entity_name|truncatechars:24 }}
+                  </span>
+                  {% endif %}
                   <span class="task-date">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     {{ t.date_label }}
@@ -388,6 +399,10 @@
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
+    function truncate(s, n) {
+      s = String(s == null ? '' : s);
+      return s.length > n ? s.slice(0, n - 1) + '…' : s;
+    }
     function emptyMarkup() {
       var title, sub;
       if (currentTab === 'mine') {
@@ -421,6 +436,15 @@
         '</div>' +
         '<div class="task-meta">' +
         '<span class="task-assignee"><span class="avatar avatar-teal">' + escapeHtml(t.avatar_letter) + '</span><span>' + escapeHtml(t.assignee) + '</span></span>' +
+        (t.entity_name
+          ? '<span class="task-entity task-entity-' + escapeHtml(t.entity_type || '') + '" title="' + escapeHtml(t.entity_name) + '">' +
+            (t.entity_type === 'company'
+              ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>'
+              : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+            ) +
+            escapeHtml(truncate(t.entity_name, 24)) +
+            '</span>'
+          : '') +
         '<span class="task-date">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
         escapeHtml(t.date_label) +

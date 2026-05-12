@@ -1,0 +1,712 @@
+/* ====================================================================
+   TEAM OVERVIEW — Premium overlay (Nejum design language)
+   --------------------------------------------------------------------
+   Mirrors product_form_v2 + settings premium conventions:
+   gradient page bg, sticky header card, gradient card headers with
+   teal icon pills, deep teal buttons, soft borders & shadows.
+   ==================================================================== */
+
+#Team_List_Page {
+  --tm-radius: 14px;
+  --tm-radius-sm: 10px;
+  --tm-radius-xs: 8px;
+  --tm-border: #EAEFF1;
+  --tm-border-strong: #D7DFE2;
+  --tm-bg: #F7F9FA;
+  --tm-bg-soft: #FAFBFC;
+  --tm-ink: #0F172A;
+  --tm-ink-2: #475569;
+  --tm-ink-3: #64748B;
+  --tm-ink-4: #94A3B8;
+  --tm-teal: var(--nejum-teal-500, #008080);
+  --tm-teal-deep: var(--nejum-teal-700, #005354);
+  --tm-teal-bg: var(--nejum-teal-50, #E6F3F3);
+
+  background: linear-gradient(180deg, var(--tm-bg) 0%, #F0F3F5 100%);
+  padding: 24px 28px 80px;
+  min-height: calc(100vh - var(--topbar-h, 64px));
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: var(--tm-ink);
+}
+
+/* ───────── HEADER (sticky) ───────── */
+#Team_List_Page .tm-header {
+  background: white;
+  border: 1px solid var(--tm-border);
+  border-radius: var(--tm-radius);
+  padding: 16px 22px;
+  margin-bottom: 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  position: sticky; top: 12px; z-index: 30;
+  backdrop-filter: blur(8px);
+}
+#Team_List_Page .tm-header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+#Team_List_Page .tm-header-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Team_List_Page .tm-header-icon i { font-size: 14px; }
+#Team_List_Page .tm-header-text { min-width: 0; }
+#Team_List_Page .tm-header h1 {
+  font: 700 22px 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: var(--tm-ink);
+  letter-spacing: -0.012em;
+  margin: 0 0 2px;
+  line-height: 1.15;
+}
+#Team_List_Page .tm-header-sub {
+  margin: 0;
+  font: 500 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink-3);
+}
+#Team_List_Page .tm-header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+/* Search box — premium pill */
+#Team_List_Page .tm-search {
+  position: relative;
+  display: inline-flex; align-items: center;
+  background: var(--tm-bg-soft);
+  border: 1px solid var(--tm-border);
+  border-radius: 999px;
+  padding: 0 16px 0 40px;
+  height: 40px;
+  width: 280px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  transition: border-color 180ms cubic-bezier(0.22,1,0.36,1),
+              background 180ms,
+              box-shadow 180ms,
+              width 200ms;
+}
+#Team_List_Page .tm-search:hover {
+  background: white;
+  border-color: var(--tm-border-strong);
+}
+#Team_List_Page .tm-search:focus-within {
+  background: white;
+  border-color: var(--tm-teal);
+  box-shadow: 0 0 0 3px rgba(0,128,128,0.12), inset 0 1px 0 rgba(255,255,255,1);
+  width: 320px;
+}
+#Team_List_Page .tm-search i {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--tm-ink-4); font-size: 13px;
+  transition: color 180ms;
+}
+#Team_List_Page .tm-search:focus-within i { color: var(--tm-teal-deep); }
+#Team_List_Page .tm-search input,
+#Team_List_Page .tm-search input[type="text"] {
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  width: 100% !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font: 500 13.5px 'Plus Jakarta Sans', sans-serif !important;
+  color: var(--tm-ink) !important;
+  letter-spacing: -0.005em !important;
+  height: 100% !important;
+}
+#Team_List_Page .tm-search input::placeholder {
+  color: var(--tm-ink-4) !important;
+  font-weight: 500 !important;
+}
+#Team_List_Page .tm-search input:focus {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* ───────── BUTTONS ───────── */
+#Team_List_Page .tm-btn {
+  height: 40px;
+  padding: 0 18px;
+  font: 600 13px 'Plus Jakarta Sans', system-ui, sans-serif;
+  letter-spacing: -0.005em;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background 160ms cubic-bezier(0.22,1,0.36,1),
+              border-color 160ms,
+              color 160ms,
+              box-shadow 200ms,
+              transform 160ms;
+  user-select: none;
+  position: relative;
+}
+#Team_List_Page .tm-btn i { font-size: 12px; }
+#Team_List_Page .tm-btn--primary {
+  background: linear-gradient(180deg, #0F766E 0%, #0D6660 100%);
+  border-color: #0B5650;
+  color: white;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 1px 2px rgba(11, 86, 80, 0.20),
+    0 4px 12px rgba(15, 118, 110, 0.22);
+}
+#Team_List_Page .tm-btn--primary:hover {
+  background: linear-gradient(180deg, #115E59 0%, #0F4F4B 100%);
+  border-color: #0A4844;
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    0 4px 8px rgba(11, 86, 80, 0.28),
+    0 8px 18px rgba(15, 118, 110, 0.28);
+}
+#Team_List_Page .tm-btn--primary:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.18),
+    0 1px 2px rgba(11, 86, 80, 0.20);
+}
+#Team_List_Page .tm-btn--primary:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 0 0 3px rgba(15, 118, 110, 0.30);
+}
+#Team_List_Page .tm-btn--secondary {
+  background: white;
+  border-color: #DDE3E5;
+  color: var(--tm-ink-2);
+  box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+}
+#Team_List_Page .tm-btn--secondary:hover {
+  background: var(--tm-bg-soft);
+  border-color: #C5CDD3;
+  color: var(--tm-ink);
+  box-shadow: 0 1px 2px rgba(15,23,31,0.06), 0 4px 12px rgba(15,23,31,0.06);
+}
+#Team_List_Page .tm-btn--ghost {
+  background: var(--tm-bg-soft);
+  border-color: var(--tm-border);
+  color: var(--tm-ink-2);
+  height: 38px;
+  padding: 0 14px;
+  flex: 1;
+  justify-content: center;
+  border-radius: 10px;
+  font: 600 12.5px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.005em;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Team_List_Page .tm-btn--ghost:hover {
+  background: white;
+  border-color: var(--tm-teal);
+  color: var(--tm-teal-deep);
+  box-shadow: 0 1px 2px rgba(0,128,128,0.10), 0 4px 12px rgba(0,128,128,0.08);
+}
+#Team_List_Page .tm-btn--ghost:hover i { color: var(--tm-teal-deep); }
+#Team_List_Page .tm-btn--ghost i { color: var(--tm-ink-3); transition: color 160ms; }
+
+/* ───────── TABS (pill row) ───────── */
+#Team_List_Page .tm-tabs {
+  display: inline-flex;
+  background: white;
+  border: 1px solid var(--tm-border);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+  margin-bottom: 22px;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+}
+#Team_List_Page .tm-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font: 600 12.5px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.005em;
+  color: var(--tm-ink-3);
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-family: inherit;
+  transition: background 160ms cubic-bezier(0.22, 1, 0.36, 1),
+              color 160ms;
+}
+#Team_List_Page .tm-tab:focus-visible {
+  outline: 2px solid var(--tm-teal);
+  outline-offset: 2px;
+}
+#Team_List_Page .tm-tab i { font-size: 11px; }
+#Team_List_Page .tm-tab:hover { color: var(--tm-ink); }
+#Team_List_Page .tm-tab.is-active {
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  color: var(--tm-teal-deep);
+  box-shadow: inset 0 0 0 1px #B8DCDC;
+}
+#Team_List_Page .tm-tab-count {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px;
+  background: var(--tm-bg-soft);
+  border: 1px solid var(--tm-border);
+  border-radius: 999px;
+  font: 700 10px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink-3);
+  letter-spacing: 0.04em;
+  min-width: 20px;
+  justify-content: center;
+}
+#Team_List_Page .tm-tab.is-active .tm-tab-count {
+  background: white;
+  border-color: #B8DCDC;
+  color: var(--tm-teal-deep);
+}
+
+/* ───────── TEAMS GRID ───────── */
+#Team_List_Page .tm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+/* ───────── TEAM CARD — premium ───────── */
+#Team_List_Page .tm-card {
+  background: white;
+  border: 1px solid var(--tm-border);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,1) inset,
+    0 1px 2px rgba(15,23,31,0.04);
+  overflow: hidden;
+  transition: border-color 240ms cubic-bezier(0.22,1,0.36,1),
+              box-shadow 240ms,
+              transform 240ms;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+#Team_List_Page .tm-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, var(--tm-teal) 50%, transparent 100%);
+  opacity: 0;
+  transition: opacity 240ms;
+  z-index: 1;
+}
+#Team_List_Page .tm-card:hover {
+  border-color: var(--tm-border-strong);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,1) inset,
+    0 1px 2px rgba(15,23,31,0.05),
+    0 16px 36px -12px rgba(15,23,31,0.14),
+    0 4px 12px -4px rgba(15,23,31,0.08);
+  transform: translateY(-3px);
+}
+#Team_List_Page .tm-card:hover::before { opacity: 1; }
+
+/* Card top: gradient strip + icon + title */
+#Team_List_Page .tm-card-top {
+  background: linear-gradient(180deg, var(--tm-bg-soft) 0%, white 100%);
+  border-bottom: 1px solid #EEF2F3;
+  padding: 20px 20px 16px;
+  display: flex; align-items: flex-start; gap: 14px;
+}
+#Team_List_Page .tm-card-icon {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  border: 1px solid;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.7),
+    0 2px 4px rgba(15,23,31,0.04);
+  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#Team_List_Page .tm-card:hover .tm-card-icon { transform: scale(1.05) rotate(-2deg); }
+#Team_List_Page .tm-card-icon.is-blue   { background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); color: #1D4ED8; border-color: #BFDBFE; }
+#Team_List_Page .tm-card-icon.is-green  { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); color: #047857; border-color: #A7F3D0; }
+#Team_List_Page .tm-card-icon.is-orange { background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%); color: #C2410C; border-color: #FED7AA; }
+#Team_List_Page .tm-card-icon.is-purple { background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%); color: #6D28D9; border-color: #DDD6FE; }
+#Team_List_Page .tm-card-icon.is-red    { background: linear-gradient(135deg, #FEF2F2 0%, #FEE2E2 100%); color: #B91C1C; border-color: #FECACA; }
+#Team_List_Page .tm-card-icon.is-teal   { background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%); color: #006B6C; border-color: #B8DCDC; }
+
+#Team_List_Page .tm-card-title { min-width: 0; flex: 1; padding-top: 2px; }
+#Team_List_Page .tm-card-title h3 {
+  margin: 0 0 4px;
+  font: 700 16px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.012em;
+  color: var(--tm-ink);
+  line-height: 1.25;
+  text-transform: capitalize;
+}
+#Team_List_Page .tm-card-meta {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 600 10.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink-4);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+#Team_List_Page .tm-card-meta::before {
+  content: '';
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--tm-ink-4);
+  opacity: 0.7;
+}
+
+/* Card menu (3-dots) */
+#Team_List_Page .tm-card-menu {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tm-ink-4);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 200ms, background 160ms, border-color 160ms, color 160ms;
+}
+#Team_List_Page .tm-card:hover .tm-card-menu { opacity: 1; }
+#Team_List_Page .tm-card-menu:hover {
+  background: var(--tm-bg-soft);
+  border-color: var(--tm-border);
+  color: var(--tm-ink-2);
+}
+
+/* Dropdown menu */
+#Team_List_Page .tm-dropdown {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  min-width: 180px;
+  background: white;
+  border: 1px solid var(--tm-border);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,1) inset,
+    0 8px 16px rgba(15,23,31,0.06),
+    0 24px 48px rgba(15,23,31,0.10);
+  padding: 6px;
+  display: none;
+  z-index: 50;
+}
+#Team_List_Page .tm-dropdown.show { display: block; }
+#Team_List_Page .tm-dropdown a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font: 500 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink);
+  text-decoration: none;
+  transition: background 140ms;
+}
+#Team_List_Page .tm-dropdown a i {
+  width: 16px; text-align: center;
+  font-size: 11px;
+  color: var(--tm-ink-3);
+}
+#Team_List_Page .tm-dropdown a:hover {
+  background: var(--tm-teal-bg);
+  color: var(--tm-teal-deep);
+}
+#Team_List_Page .tm-dropdown a:hover i { color: var(--tm-teal-deep); }
+#Team_List_Page .tm-dropdown-divider { height: 1px; background: var(--tm-border); margin: 4px 6px; }
+#Team_List_Page .tm-dropdown a.is-danger { color: #B91C1C; }
+#Team_List_Page .tm-dropdown a.is-danger i { color: #B91C1C; }
+#Team_List_Page .tm-dropdown a.is-danger:hover { background: #FEF2F2; color: #B91C1C; }
+
+/* Card body */
+#Team_List_Page .tm-card-body {
+  padding: 16px 20px 18px;
+  flex: 1;
+  display: flex; flex-direction: column; gap: 14px;
+}
+#Team_List_Page .tm-card-desc {
+  margin: 0;
+  font: 500 13px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink-3);
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}
+
+/* Members row — pill-style chip container */
+#Team_List_Page .tm-members {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: auto;
+  padding: 10px 12px;
+  background: var(--tm-bg-soft);
+  border: 1px solid var(--tm-border);
+  border-radius: 12px;
+}
+#Team_List_Page .tm-avatar-stack { display: flex; }
+#Team_List_Page .tm-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 2.5px solid white;
+  margin-left: -8px;
+  font: 700 10.5px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.01em;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow:
+    0 1px 2px rgba(15,23,31,0.12),
+    0 0 0 1px rgba(15,23,31,0.04);
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#Team_List_Page .tm-avatar:first-child { margin-left: 0; }
+#Team_List_Page .tm-avatar:hover {
+  transform: translateY(-2px) scale(1.08);
+  z-index: 2;
+}
+#Team_List_Page .tm-avatar.is-more {
+  background: white;
+  color: var(--tm-ink-3);
+  border: 2.5px solid white;
+  box-shadow: inset 0 0 0 1px var(--tm-border-strong),
+              0 1px 2px rgba(15,23,31,0.06);
+}
+#Team_List_Page .tm-member-count {
+  font: 600 12px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink-2);
+  letter-spacing: -0.005em;
+}
+#Team_List_Page .tm-member-count strong {
+  color: var(--tm-ink);
+  font-weight: 700;
+}
+
+/* Card actions row */
+#Team_List_Page .tm-card-actions {
+  display: flex; gap: 8px;
+  padding: 14px 20px 20px;
+  border-top: 1px solid var(--tm-border);
+  background: linear-gradient(180deg, white 0%, var(--tm-bg-soft) 100%);
+}
+#Team_List_Page .tm-action-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px;
+  padding: 0 6px;
+  background: linear-gradient(180deg, #0F766E 0%, #0D6660 100%);
+  color: white;
+  font: 700 10px 'Plus Jakarta Sans', sans-serif;
+  border-radius: 999px;
+  margin-left: 6px;
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.30);
+}
+
+/* ───────── CREATE CARD (dashed) ───────── */
+#Team_List_Page .tm-card-create {
+  background: linear-gradient(180deg, var(--tm-bg-soft) 0%, white 100%);
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius);
+  padding: 32px 24px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  text-align: center;
+  min-height: 220px;
+  transition: border-color 180ms, background 180ms, transform 180ms;
+}
+#Team_List_Page .tm-card-create:hover {
+  border-color: var(--tm-teal);
+  background: var(--tm-teal-bg);
+  transform: translateY(-2px);
+}
+#Team_List_Page .tm-create-icon {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  margin-bottom: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: var(--tm-teal-deep);
+  font-size: 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Team_List_Page .tm-card-create h4 {
+  margin: 0 0 4px;
+  font: 700 14px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink);
+  letter-spacing: -0.005em;
+}
+#Team_List_Page .tm-card-create p {
+  margin: 0;
+  font: 500 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink-3);
+  line-height: 1.5;
+  max-width: 200px;
+}
+
+/* ───────── MODAL ───────── */
+#Team_List_Page-modal {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 31, 0.55);
+  z-index: 1000;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(6px);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+#Team_List_Page-modal.show { display: flex; }
+#Team_List_Page-modal .tm-modal {
+  background: white;
+  border: 1px solid var(--tm-border, #EAEFF1);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,1) inset,
+    0 24px 48px rgba(15,23,31,0.18),
+    0 8px 16px rgba(15,23,31,0.12);
+}
+#Team_List_Page-modal .tm-modal-header {
+  display: flex; align-items: center; gap: 11px;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, #FAFBFC 0%, white 100%);
+  border-bottom: 1px solid #EEF2F3;
+}
+#Team_List_Page-modal .tm-modal-ico {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  font-size: 12px;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Team_List_Page-modal .tm-modal-header h2 {
+  margin: 0;
+  font: 700 14px 'Plus Jakarta Sans', sans-serif;
+  color: #0F172A;
+  letter-spacing: -0.005em;
+}
+#Team_List_Page-modal .tm-modal-body { padding: 18px 20px; }
+#Team_List_Page-modal .tm-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid #EAEFF1;
+  display: flex; justify-content: flex-end; gap: 8px;
+}
+#Team_List_Page-modal .tm-form-group { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
+#Team_List_Page-modal .tm-form-label {
+  font: 700 10.5px 'Plus Jakarta Sans', sans-serif;
+  color: #475569;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+#Team_List_Page-modal .tm-input,
+#Team_List_Page-modal .tm-textarea {
+  padding: 10px 12px;
+  background: #FAFBFC;
+  border: 1px solid #DDE3E5;
+  border-radius: 8px;
+  font: 500 13px 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #0F172A;
+  outline: 0;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+#Team_List_Page-modal .tm-input:focus,
+#Team_List_Page-modal .tm-textarea:focus {
+  background: white;
+  border-color: #008080;
+  box-shadow: 0 0 0 3px rgba(0,128,128,0.10);
+}
+
+/* Color picker (modal) */
+#Team_List_Page-modal .tm-color-picker {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+#Team_List_Page-modal .tm-color-option {
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  outline: 1px solid #EAEFF1;
+  outline-offset: -1px;
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              border-color 160ms;
+}
+#Team_List_Page-modal .tm-color-option:hover { transform: scale(1.1); }
+#Team_List_Page-modal .tm-color-option.is-selected {
+  border-color: #0F766E;
+  outline-color: transparent;
+  transform: scale(1.05);
+}
+
+/* Modal buttons (reuse tm-btn) */
+#Team_List_Page-modal .tm-btn { height: 36px; padding: 0 16px; }
+#Team_List_Page-modal .tm-btn--secondary {
+  background: white;
+  border-color: #DDE3E5;
+  color: #475569;
+}
+#Team_List_Page-modal .tm-btn--primary {
+  background: #0F766E;
+  border-color: #0F766E;
+  color: white;
+}
+#Team_List_Page-modal .tm-btn--primary:hover {
+  background: #115E59;
+  border-color: #115E59;
+}
+
+/* ───────── EMPTY STATE ───────── */
+#Team_List_Page .tm-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 24px;
+  background: linear-gradient(180deg, var(--tm-bg-soft) 0%, white 100%);
+  border: 1px dashed var(--tm-border-strong);
+  border-radius: var(--tm-radius);
+}
+#Team_List_Page .tm-empty-ico {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  margin: 0 auto 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  font-size: 20px;
+}
+#Team_List_Page .tm-empty h3 {
+  margin: 0 0 4px;
+  font: 700 14px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink);
+}
+#Team_List_Page .tm-empty p {
+  margin: 0;
+  font: 500 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--tm-ink-3);
+}
+
+/* ───────── MOBILE ───────── */
+@media (max-width: 880px) {
+  #Team_List_Page { padding: 14px; }
+  #Team_List_Page .tm-header { flex-direction: column; align-items: stretch; gap: 14px; }
+  #Team_List_Page .tm-header-actions { flex-direction: column; align-items: stretch; }
+  #Team_List_Page .tm-search { width: 100%; }
+  #Team_List_Page .tm-btn { justify-content: center; }
+  #Team_List_Page .tm-grid { grid-template-columns: 1fr; }
+}

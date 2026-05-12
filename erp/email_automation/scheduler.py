@@ -17,11 +17,11 @@ def send_scheduled_emails_job():
         from .email_service import process_scheduled_campaigns
         sent_count = process_scheduled_campaigns()
         if sent_count > 0:
-            logger.info(f"✓ Background: Sent {sent_count} scheduled emails")
-            print(f"✓ Background: Sent {sent_count} scheduled emails")
+            logger.info(f"[OK] Background: Sent {sent_count} scheduled emails")
+            print(f"[OK] Background: Sent {sent_count} scheduled emails")
     except Exception as e:
-        logger.error(f"✗ Background: Error in scheduled email job: {str(e)}")
-        print(f"✗ Background: Error in scheduled email job: {str(e)}")
+        logger.error(f"[ERR] Background: Error in scheduled email job: {str(e)}")
+        print(f"[ERR] Background: Error in scheduled email job: {str(e)}")
 
 
 def check_replies_job():
@@ -39,11 +39,11 @@ def check_replies_job():
             total_replies += reply_count
         
         if total_replies > 0:
-            logger.info(f"✓ Background: Detected {total_replies} new replies")
-            print(f"✓ Background: Detected {total_replies} new replies")
+            logger.info(f"[OK] Background: Detected {total_replies} new replies")
+            print(f"[OK] Background: Detected {total_replies} new replies")
     except Exception as e:
-        logger.error(f"✗ Background: Error in reply detection job: {str(e)}")
-        print(f"✗ Background: Error in reply detection job: {str(e)}")
+        logger.error(f"[ERR] Background: Error in reply detection job: {str(e)}")
+        print(f"[ERR] Background: Error in reply detection job: {str(e)}")
 
 
 def start_scheduler():
@@ -76,10 +76,10 @@ def start_scheduler():
     )
     
     scheduler.start()
-    print("✓ APScheduler started")
+    print("[OK] APScheduler started")
     print("  - Email sending: every 1 minute")
     print("  - Reply detection: every 5 minutes")
-    logger.info("✓ APScheduler started with email sending and reply detection")
+    logger.info("APScheduler started with email sending and reply detection")
     
     # Shut down scheduler when app exits
     atexit.register(lambda: scheduler.shutdown())
@@ -92,5 +92,5 @@ def stop_scheduler():
     if scheduler is not None:
         scheduler.shutdown()
         scheduler = None
-        print("✓ Email scheduler stopped")
-        logger.info("✓ Email scheduler stopped")
+        print("[OK] Email scheduler stopped")
+        logger.info("Email scheduler stopped")

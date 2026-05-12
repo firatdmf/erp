@@ -1,0 +1,4179 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Nejum ERP 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-07 00:00+0000\n"
+"PO-Revision-Date: 2026-05-07 00:00+0000\n"
+"Last-Translator: Nejum\n"
+"Language-Team: Turkish\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Add"
+msgstr "Ekle"
+
+msgid "Add new record"
+msgstr "Yeni kayıt ekle"
+
+msgid "ADD SINGLE RECORD"
+msgstr "TEKİL KAYIT EKLE"
+
+msgid "Contact"
+msgstr "Kişi"
+
+msgid "Company"
+msgstr "Şirket"
+
+msgid "Task"
+msgstr "Görev"
+
+msgid "Product"
+msgstr "Ürün"
+
+msgid "Order"
+msgstr "Sipariş"
+
+msgid "Blog post"
+msgstr "Blog yazısı"
+
+msgid "Supplier"
+msgstr "Tedarikçi"
+
+msgid "Dashboard"
+msgstr "Pano"
+
+msgid "My Team"
+msgstr "Takımım"
+
+msgid "TEAM MANAGEMENT"
+msgstr "TAKIM YÖNETİMİ"
+
+msgid "Team members"
+msgstr "Takım üyeleri"
+
+msgid "Team Members"
+msgstr "Takım Üyeleri"
+
+msgid "Assign task"
+msgstr "Görev ata"
+
+msgid "Tasks"
+msgstr "Görevler"
+
+msgid "Messages"
+msgstr "Mesajlar"
+
+msgid "Manage roles"
+msgstr "Rolleri yönet"
+
+msgid "Manage Roles"
+msgstr "Rolleri Yönet"
+
+msgid "Schedule meeting"
+msgstr "Toplantı planla"
+
+msgid "Meetings"
+msgstr "Toplantılar"
+
+msgid "Accounting"
+msgstr "Muhasebe"
+
+msgid "LEDGERS"
+msgstr "DEFTERLER"
+
+msgid "View ledgers"
+msgstr "Defterleri görüntüle"
+
+msgid "Ledgers"
+msgstr "Defterler"
+
+msgid "Create ledger"
+msgstr "Defter oluştur"
+
+msgid "REPORTS"
+msgstr "RAPORLAR"
+
+msgid "Reports"
+msgstr "Raporlar"
+
+msgid "Sales dashboard"
+msgstr "Satış panosu"
+
+msgid "Sales Dashboard"
+msgstr "Satış Panosu"
+
+msgid "Marketing"
+msgstr "Pazarlama"
+
+msgid "PRODUCTS"
+msgstr "ÜRÜNLER"
+
+msgid "Create product"
+msgstr "Ürün oluştur"
+
+msgid "Product list"
+msgstr "Ürün listesi"
+
+msgid "CUSTOMERS"
+msgstr "MÜŞTERİLER"
+
+msgid "Companies"
+msgstr "Şirketler"
+
+msgid "Contacts"
+msgstr "Kişiler"
+
+msgid "BLOG"
+msgstr "BLOG"
+
+msgid "Create blog post"
+msgstr "Blog yazısı oluştur"
+
+msgid "Blog list"
+msgstr "Blog listesi"
+
+msgid "Blog"
+msgstr "Blog"
+
+msgid "Operations"
+msgstr "Operasyon"
+
+msgid "QR ACTIONS"
+msgstr "KARE-KOD İŞLEMLERİ"
+
+msgid "QR scan"
+msgstr "QR tarama"
+
+msgid "QR Scan"
+msgstr "QR Tarama"
+
+msgid "QR scan package"
+msgstr "Paket QR tarama"
+
+msgid "RAW MATERIAL"
+msgstr "HAMMADDE"
+
+msgid "Raw material list"
+msgstr "Hammadde listesi"
+
+msgid "Raw Materials"
+msgstr "Hammaddeler"
+
+msgid "Create raw material"
+msgstr "Hammadde oluştur"
+
+msgid "Raw material receipt"
+msgstr "Hammadde girişi"
+
+msgid "Raw material item"
+msgstr "Hammadde kalemi"
+
+msgid "ORDERS"
+msgstr "SİPARİŞLER"
+
+msgid "Orders"
+msgstr "Siparişler"
+
+msgid "Create order"
+msgstr "Sipariş oluştur"
+
+msgid "Order list"
+msgstr "Sipariş listesi"
+
+msgid "WAREHOUSE"
+msgstr "DEPO"
+
+msgid "My warehouses"
+msgstr "Depolarım"
+
+msgid "Warehouses"
+msgstr "Depolar"
+
+msgid "Add warehouse"
+msgstr "Depo ekle"
+
+msgid "Procurement"
+msgstr "Satın Alma"
+
+msgid "PURCHASING"
+msgstr "SATIN ALMA"
+
+msgid "Purchase requests"
+msgstr "Satın alma talepleri"
+
+msgid "Purchase Requests"
+msgstr "Satın Alma Talepleri"
+
+msgid "Purchase orders"
+msgstr "Satın alma siparişleri"
+
+msgid "Purchase Orders"
+msgstr "Satın Alma Siparişleri"
+
+msgid "SUPPLIERS"
+msgstr "TEDARİKÇİLER"
+
+msgid "Suppliers"
+msgstr "Tedarikçiler"
+
+msgid "Supplier list"
+msgstr "Tedarikçi listesi"
+
+msgid "Add supplier"
+msgstr "Tedarikçi ekle"
+
+msgid "Analytics"
+msgstr "Analitik"
+
+msgid "Mail"
+msgstr "Posta"
+
+msgid "Email automation"
+msgstr "E-posta otomasyonu"
+
+msgid "Email Automation"
+msgstr "E-posta Otomasyonu"
+
+msgid "Email Campaigns"
+msgstr "E-posta Kampanyaları"
+
+msgid "My emails"
+msgstr "E-postalarım"
+
+msgid "My Emails"
+msgstr "E-postalarım"
+
+msgid "Notes"
+msgstr "Notlar"
+
+msgid "Sales & CRM"
+msgstr "Satış & CRM"
+
+msgid "Account"
+msgstr "Hesap"
+
+msgid "Workspace"
+msgstr "Çalışma Alanı"
+
+msgid "Workspace Tools"
+msgstr "Çalışma Alanı Araçları"
+
+msgid "Favorites"
+msgstr "Favoriler"
+
+msgid "Inbox"
+msgstr "Gelen Kutusu"
+
+msgid "Settings"
+msgstr "Ayarlar"
+
+msgid "Sign Out"
+msgstr "Çıkış Yap"
+
+msgid "Search…"
+msgstr "Ara…"
+
+msgid "Theme Preference"
+msgstr "Tema Tercihi"
+
+msgid "Light Mode"
+msgstr "Açık Mod"
+
+msgid "Dark Mode"
+msgstr "Koyu Mod"
+
+msgid ""
+"Choose your preferred appearance. Dark mode is in beta — visual polish "
+"across modules will improve gradually."
+msgstr ""
+"Tercih ettiğin görünümü seç. Koyu mod beta aşamasında — modüllerin görsel "
+"rötuşları zamanla iyileşecek."
+
+msgid "Language"
+msgstr "Dil"
+
+msgid "Interface language. The whole UI updates after saving."
+msgstr "Arayüz dili. Kaydet'e bastığında tüm arayüz güncellenir."
+
+msgid "CATALOG"
+msgstr "KATALOG"
+
+msgid "Products"
+msgstr "Ürünler"
+
+msgid "Import"
+msgstr "İçe Aktar"
+
+msgid "Add product"
+msgstr "Ürün ekle"
+
+msgid "products"
+msgstr "ürün"
+
+msgid "variants"
+msgstr "varyant"
+
+msgid "low stock"
+msgstr "az stok"
+
+msgid "out of stock"
+msgstr "stok yok"
+
+msgid "Search by product name, SKU or barcode…"
+msgstr "Ürün adı, SKU veya barkod ile ara…"
+
+msgid "Sort"
+msgstr "Sırala"
+
+msgid "Recently updated"
+msgstr "Son güncellenen"
+
+msgid "By name"
+msgstr "İsme göre"
+
+msgid "Stock"
+msgstr "Stok"
+
+msgid "products shown"
+msgstr "ürün gösteriliyor"
+
+msgid "Select all"
+msgstr "Tümünü seç"
+
+msgid "All"
+msgstr "Tümü"
+
+msgid "No matching products found"
+msgstr "Eşleşen ürün bulunamadı"
+
+msgid "General Information"
+msgstr "Genel Bilgiler"
+
+msgid "Media"
+msgstr "Medya"
+
+msgid "Variants"
+msgstr "Varyantlar"
+
+msgid "Manufacturing Recipe (BOM)"
+msgstr "Üretim Reçetesi (BOM)"
+
+msgid "Sales Channels"
+msgstr "Satış Kanalları"
+
+msgid "Pricing"
+msgstr "Fiyatlandırma"
+
+msgid "Packaging"
+msgstr "Paketleme"
+
+msgid "Campaign / Discount"
+msgstr "Kampanya / İndirim"
+
+msgid "Price"
+msgstr "Fiyat"
+
+msgid "Cost per item"
+msgstr "Birim maliyet"
+
+msgid "Sold as a pack"
+msgstr "Paket halinde satılıyor"
+
+msgid "e.g. pack of 12, pack of 5"
+msgstr "örn. 12'li paket, 5'li paket"
+
+msgid "Discount (%)"
+msgstr "İndirim (%)"
+
+msgid "Ends on"
+msgstr "Bitiş tarihi"
+
+msgid "Add tier"
+msgstr "Kademe ekle"
+
+msgid "None"
+msgstr "Yok"
+
+msgid "No discount"
+msgstr "İndirim yok"
+
+msgid "Flat % off"
+msgstr "Sabit % indirim"
+
+msgid "Until a date"
+msgstr "Belirli bir tarihe kadar"
+
+msgid "Volume tiers"
+msgstr "Kademeli adet"
+
+msgid "By quantity"
+msgstr "Adete göre"
+
+msgid "Care Instructions"
+msgstr "Bakım Talimatları"
+
+msgid "Additional Info"
+msgstr "Ek Bilgi"
+
+msgid "Alt text"
+msgstr "Alternatif metin"
+
+msgid "Barcode (ISBN, UPC, GTIN, etc.)"
+msgstr "Barkod (ISBN, UPC, GTIN, vb.)"
+
+msgid "Cancel"
+msgstr "İptal"
+
+msgid "Collections"
+msgstr "Koleksiyonlar"
+
+msgid "Details"
+msgstr "Ayrıntılar"
+
+msgid "Done"
+msgstr "Tamam"
+
+msgid "Edit Variant"
+msgstr "Varyantı Düzenle"
+
+msgid "File name"
+msgstr "Dosya adı"
+
+msgid "Inventory"
+msgstr "Stok"
+
+msgid "Items per pack"
+msgstr "Paket başına adet"
+
+msgid "Min. Inventory Level"
+msgstr "Min. Stok Seviyesi"
+
+msgid "Name"
+msgstr "Ad"
+
+msgid "New Category"
+msgstr "Yeni Kategori"
+
+msgid "Product Name"
+msgstr "Ürün Adı"
+
+msgid "Product Type"
+msgstr "Ürün Türü"
+
+msgid "Qty Used"
+msgstr "Kullanılan Miktar"
+
+msgid "Quantity"
+msgstr "Adet"
+
+msgid "Raw Material"
+msgstr "Hammadde"
+
+msgid "SKU (Stock Keeping Unit)"
+msgstr "SKU (Stok Kodu)"
+
+msgid "Save Product"
+msgstr "Ürünü Kaydet"
+
+msgid "Tags"
+msgstr "Etiketler"
+
+msgid "Title"
+msgstr "Başlık"
+
+msgid "Total Cost"
+msgstr "Toplam Maliyet"
+
+msgid "Unit"
+msgstr "Birim"
+
+msgid "Unit Cost"
+msgstr "Birim Maliyet"
+
+msgid "Upload New"
+msgstr "Yeni Yükle"
+
+msgid "Used in"
+msgstr "Kullanıldığı yerler"
+
+msgid "Vendor"
+msgstr "Tedarikçi"
+
+msgid "Weight"
+msgstr "Ağırlık"
+
+msgid "English"
+msgstr "İngilizce"
+
+msgid "Türkçe"
+msgstr "Türkçe"
+
+msgid "Add new category"
+msgstr "Yeni kategori ekle"
+
+msgid "Clear selection"
+msgstr "Seçimi temizle"
+
+msgid "Delete"
+msgstr "Sil"
+
+msgid "Describe this image for SEO"
+msgstr "SEO için bu görseli tanımla"
+
+msgid "Enter product name..."
+msgstr "Ürün adı girin..."
+
+msgid "Name (e.g. Color)"
+msgstr "Ad (örn. Renk)"
+
+msgid "Name (e.g. Material)"
+msgstr "Ad (örn. Materyal)"
+
+msgid "Search collections..."
+msgstr "Koleksiyonlarda ara..."
+
+msgid "Search raw materials to add..."
+msgstr "Eklemek için hammaddelerde ara..."
+
+msgid "Set as primary image"
+msgstr "Ana görsel olarak ayarla"
+
+msgid "Urun adi giriniz..."
+msgstr "Ürün adı giriniz..."
+
+msgid "Value (e.g. Red)"
+msgstr "Değer (örn. Kırmızı)"
+
+msgid "Value (e.g. Wool)"
+msgstr "Değer (örn. Yün)"
+
+msgid "Vintage, Summer, Cotton"
+msgstr "Vintage, Yaz, Pamuk"
+
+msgid "e.g. 15"
+msgstr "örn. 15"
+
+msgid "e.g. Fabric"
+msgstr "örn. Kumaş"
+
+msgid "Wprowadz nazwe produktu..."
+msgstr "Wprowadz nazwe produktu..."
+
+msgid "∞ (open)"
+msgstr "∞ (açık)"
+
+msgid "Welcome, %(first)s %(last)s!"
+msgstr "Hoş geldin, %(first)s %(last)s!"
+
+msgid "Search..."
+msgstr "Ara..."
+
+msgid "RECENT SEARCHES"
+msgstr "SON ARAMALAR"
+
+msgid "Clear history"
+msgstr "Geçmişi temizle"
+
+msgid "Search for something..."
+msgstr "Birşey aramaya başla..."
+
+msgid "Notifications"
+msgstr "Bildirimler"
+
+msgid "No new notifications"
+msgstr "Yeni bildirim yok"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Profile Settings"
+msgstr "Profil Ayarları"
+
+msgid "Manage your public profile and private information."
+msgstr "Genel profilini ve özel bilgilerini yönet."
+
+msgid "Manage your account, integrations, and preferences for this workspace."
+msgstr ""
+"Bu çalışma alanı için hesabını, entegrasyonlarını ve tercihlerini yönet."
+
+msgid "First Name"
+msgstr "Ad"
+
+msgid "Last Name"
+msgstr "Soyad"
+
+msgid "Email Address"
+msgstr "E-posta Adresi"
+
+msgid "Company / Workspace"
+msgstr "Şirket / Çalışma Alanı"
+
+msgid "Your workspace name is managed by an administrator."
+msgstr "Çalışma alanı adın yönetici tarafından yönetilir."
+
+msgid "Save Changes"
+msgstr "Değişiklikleri Kaydet"
+
+msgid "Security"
+msgstr "Güvenlik"
+
+msgid "Ensure your account is secure by using a strong password."
+msgstr "Güçlü bir parola kullanarak hesabını güvende tut."
+
+msgid "Password Requirements"
+msgstr "Parola Gereksinimleri"
+
+msgid "Minimum 8 characters long"
+msgstr "En az 8 karakter uzunluğunda"
+
+msgid "At least one uppercase letter"
+msgstr "En az bir büyük harf"
+
+msgid "At least one number"
+msgstr "En az bir rakam"
+
+msgid "At least one special character"
+msgstr "En az bir özel karakter"
+
+msgid "Current Password"
+msgstr "Mevcut Parola"
+
+msgid "New Password"
+msgstr "Yeni Parola"
+
+msgid "Confirm New Password"
+msgstr "Yeni Parolayı Onayla"
+
+msgid "Update Password"
+msgstr "Parolayı Güncelle"
+
+msgid "Manage how you receive updates and alerts."
+msgstr "Güncellemeleri ve bildirimleri nasıl alacağını yönet."
+
+msgid "Notification Settings Coming Soon"
+msgstr "Bildirim Ayarları Yakında"
+
+msgid ""
+"We're working on a detailed notification center to give you full control "
+"over your alerts across email, in-app and mobile."
+msgstr ""
+"E-posta, uygulama içi ve mobil bildirimlerin üzerinde tam kontrol sağlamak "
+"için detaylı bir bildirim merkezi üzerinde çalışıyoruz."
+
+msgid "App Preferences"
+msgstr "Uygulama Tercihleri"
+
+msgid "Customize your workspace experience."
+msgstr "Çalışma alanı deneyimini özelleştir."
+
+msgid "Integrations"
+msgstr "Entegrasyonlar"
+
+msgid "Manage third-party connections and services tied to your account."
+msgstr "Hesabınla ilişkili üçüncü taraf bağlantıları ve servisleri yönet."
+
+msgid "Google Account"
+msgstr "Google Hesabı"
+
+msgid "Used for Google Chat and Gmail integrations."
+msgstr "Google Chat ve Gmail entegrasyonları için kullanılır."
+
+msgid "Connect your Google account to access Google Chat and Gmail."
+msgstr "Google Chat ve Gmail erişimi için Google hesabını bağla."
+
+msgid "Connect Google"
+msgstr "Google'ı Bağla"
+
+msgid "Disconnect"
+msgstr "Bağlantıyı Kes"
+
+msgid "Connected"
+msgstr "Bağlı"
+
+msgid "Active"
+msgstr "Aktif"
+
+msgid "Send & Receive"
+msgstr "Gönder & Al"
+
+msgid "Not connected"
+msgstr "Bağlı değil"
+
+msgid "Requires Google"
+msgstr "Google gerektirir"
+
+msgid "Gmail — Mail System"
+msgstr "Gmail — Posta Sistemi"
+
+msgid "Send and receive emails directly from your workspace inbox."
+msgstr "E-postaları doğrudan çalışma alanı gelen kutusundan gönder ve al."
+
+msgid "Connect your Google account above to enable Gmail integration."
+msgstr ""
+"Gmail entegrasyonunu etkinleştirmek için yukarıdaki Google hesabını bağla."
+
+msgid "More integrations"
+msgstr "Daha fazla entegrasyon"
+
+msgid "Slack, Stripe, Meta and more — coming soon."
+msgstr "Slack, Stripe, Meta ve daha fazlası — yakında."
+
+msgid "New integrations are on the way."
+msgstr "Yeni entegrasyonlar yolda."
+
+msgid "Are you sure you want to disconnect Google Chat?"
+msgstr "Google Chat bağlantısını kesmek istediğine emin misin?"
+
+msgid "App Settings"
+msgstr "Uygulama Ayarları"
+
+msgid "Member"
+msgstr "Üye"
+
+msgid "Soon"
+msgstr "Yakında"
+
+msgid "General"
+msgstr "Genel"
+
+msgid "Out of stock"
+msgstr "Stok yok"
+
+msgid "Low stock"
+msgstr "Az stok"
+
+msgid "Featured"
+msgstr "Öne çıkan"
+
+msgid "Barcode"
+msgstr "Barkod"
+
+msgid "Description"
+msgstr "Açıklama"
+
+msgid "Specifications"
+msgstr "Özellikler"
+
+msgid "Reviews"
+msgstr "Yorumlar"
+
+msgid "Show variants"
+msgstr "Varyantları göster"
+
+msgid "Hide variants"
+msgstr "Varyantları gizle"
+
+msgid "Edit"
+msgstr "Düzenle"
+
+msgid "View"
+msgstr "Görüntüle"
+
+msgid "Back"
+msgstr "Geri"
+
+msgid "Status"
+msgstr "Durum"
+
+msgid "Save"
+msgstr "Kaydet"
+
+msgid "Submit"
+msgstr "Gönder"
+
+msgid "Close"
+msgstr "Kapat"
+
+msgid "Confirm"
+msgstr "Onayla"
+
+msgid "OK"
+msgstr "Tamam"
+
+msgid "Yes"
+msgstr "Evet"
+
+msgid "No"
+msgstr "Hayır"
+
+msgid "Loading…"
+msgstr "Yükleniyor…"
+
+msgid "Loading..."
+msgstr "Yükleniyor..."
+
+msgid "Edit Product"
+msgstr "Ürünü düzenle"
+
+msgid "Discard"
+msgstr "Vazgeç"
+
+msgid "Discard changes?"
+msgstr "Değişiklikleri sıfırla?"
+
+msgid "Turkish"
+msgstr "Türkçe"
+
+msgid "Russian"
+msgstr "Rusça"
+
+msgid "Polish"
+msgstr "Lehçe"
+
+msgid "Add options like size or color to create variants for this product."
+msgstr ""
+"Bu ürün için varyant oluşturmak amacıyla beden veya renk gibi seçenekler "
+"ekle."
+
+msgid "Online Store"
+msgstr "Online Mağaza"
+
+msgid "Listed on website"
+msgstr "Web sitesinde listeleniyor"
+
+msgid "Point of Sale"
+msgstr "Satış Noktası"
+
+msgid "Selling policy enabled"
+msgstr "Satış politikası aktif"
+
+msgid "Shipping"
+msgstr "Kargo"
+
+msgid "Product Attributes"
+msgstr "Ürün özellikleri"
+
+msgid "Product Organization"
+msgstr "Ürün organizasyonu"
+
+msgid "Back to Products"
+msgstr "Ürünlere Dön"
+
+msgid "Product Information"
+msgstr "Ürün Bilgileri"
+
+msgid "Uncategorized"
+msgstr "Kategorisiz"
+
+msgid "VARIANT"
+msgstr "VARYANT"
+
+msgid "ATTRIBUTES"
+msgstr "ÖZELLİKLER"
+
+msgid "STOCK"
+msgstr "STOK"
+
+msgid "PRICE"
+msgstr "FİYAT"
+
+msgid "Add option"
+msgstr "Seçenek ekle"
+
+msgid "Add variant"
+msgstr "Varyant ekle"
+
+msgid "' + t.title + '"
+msgstr "' + t.title + '"
+
+msgid "Account Balance"
+msgstr "Hesap Bakiyesi"
+
+msgid "Action"
+msgstr "İşlem"
+
+msgid "Actions"
+msgstr "İşlemler"
+
+msgid "Activity report"
+msgstr "Etkinlik raporu"
+
+msgid "Add Another File"
+msgstr "Başka Dosya Ekle"
+
+msgid "Add Contact"
+msgstr "Kişi Ekle"
+
+msgid "Add Equity Capital"
+msgstr "Sermaye Ekle"
+
+msgid "Add Equity Expense"
+msgstr "Gider Ekle"
+
+msgid "Add Equity Revenue"
+msgstr "Gelir Ekle"
+
+msgid "Add File"
+msgstr "Dosya Ekle"
+
+msgid "Add File (Optional)"
+msgstr "Dosya Ekle (İsteğe Bağlı)"
+
+msgid "Add Item to Receipt"
+msgstr "Fişe Kalem Ekle"
+
+msgid "Add Member"
+msgstr "Üye Ekle"
+
+msgid "Add Member to Team"
+msgstr "Takıma Üye Ekle"
+
+msgid "Add New Product"
+msgstr "Yeni Ürün Ekle"
+
+msgid "Add New Section"
+msgstr "Yeni Bölüm Ekle"
+
+msgid "Add Note"
+msgstr "Not Ekle"
+
+msgid "Add Raw Material"
+msgstr "Hammadde Ekle"
+
+msgid "Add Receipt"
+msgstr "Fiş Ekle"
+
+msgid "Add Supplier"
+msgstr "Tedarikçi Ekle"
+
+msgid "Add Task"
+msgstr "Görev Ekle"
+
+msgid "Add a Company"
+msgstr "Şirket Ekle"
+
+msgid "Add a Contact"
+msgstr "Kişi Ekle"
+
+msgid "Add a single record"
+msgstr "Tek bir kayıt ekle"
+
+msgid "Add another item"
+msgstr "Başka kalem ekle"
+
+msgid "Add new records"
+msgstr "Yeni kayıtlar ekle"
+
+msgid "Additional Details"
+msgstr "Ek Ayrıntılar"
+
+msgid "Address"
+msgstr "Adres"
+
+msgid "Addresses"
+msgstr "Adresler"
+
+msgid "Admin"
+msgstr "Yönetici"
+
+msgid "All Materials"
+msgstr "Tüm Malzemeler"
+
+msgid "All Notes"
+msgstr "Tüm Notlar"
+
+msgid "All Teams"
+msgstr "Tüm Takımlar"
+
+msgid "All Time"
+msgstr "Tüm Zamanlar"
+
+msgid "American"
+msgstr "Amerikan"
+
+msgid "Amount"
+msgstr "Tutar"
+
+msgid "Amount Paid"
+msgstr "Ödenen Tutar"
+
+msgid "Assign To"
+msgstr "Ata"
+
+msgid "Assign to"
+msgstr "Ata"
+
+msgid "Assignees"
+msgstr "Atananlar"
+
+msgid "Attach Contact"
+msgstr "Kişi Ekle"
+
+msgid "Attachments"
+msgstr "Ekler"
+
+msgid "Attachments (Google Drive)"
+msgstr "Ekler (Google Drive)"
+
+msgid "Author"
+msgstr "Yazar"
+
+msgid "BALANCE"
+msgstr "BAKİYE"
+
+msgid "BARCODE"
+msgstr "BARKOD"
+
+msgid "Background info"
+msgstr "Arkaplan bilgisi"
+
+msgid "Basic Informationnn"
+msgstr "Temel Bilgiler"
+
+msgid "Bcc"
+msgstr "Gizli Kopya"
+
+msgid "Blog Yazısını Sil"
+msgstr "Blog Yazısını Sil"
+
+msgid "Books"
+msgstr "Defterler"
+
+msgid "Box"
+msgstr "Kutu"
+
+msgid "CATEGORY"
+msgstr "KATEGORİ"
+
+msgid "CRM Index"
+msgstr "CRM Anasayfa"
+
+msgid "CURRENCY"
+msgstr "PARA BİRİMİ"
+
+msgid "Carrier"
+msgstr "Kargo firması"
+
+msgid "Category"
+msgstr "Kategori"
+
+msgid "Category (EN)"
+msgstr "Kategori (EN)"
+
+msgid "Category (PL)"
+msgstr "Kategori (PL)"
+
+msgid "Category (RU)"
+msgstr "Kategori (RU)"
+
+msgid "Category (Turkish) *"
+msgstr "Kategori (Türkçe) *"
+
+msgid "Channel Name *"
+msgstr "Kanal Adı *"
+
+msgid "Check Inbox"
+msgstr "Check Inbox"
+
+msgid "Choose a status"
+msgstr "Choose a status"
+
+msgid "Choose pack number"
+msgstr "Choose pack number"
+
+msgid "Claim an Asset"
+msgstr "Claim an Asset"
+
+msgid "Clear"
+msgstr "Temizle"
+
+msgid "Client"
+msgstr "Client"
+
+msgid "Color Tag"
+msgstr "Renk Etiketi"
+
+msgid "Comment"
+msgstr "Yorum"
+
+msgid "Comments"
+msgstr "Yorumlar"
+
+msgid "Communication"
+msgstr "Communication"
+
+msgid "Company / Contact"
+msgstr "Company / Contact"
+
+msgid "Company Name"
+msgstr "Company Name"
+
+msgid "Complete"
+msgstr "Tamamla"
+
+msgid "Complete Task"
+msgstr "Görevi Tamamla"
+
+msgid "Confirm Delete"
+msgstr "Silmeyi Onayla"
+
+msgid "Connect Your Google Account"
+msgstr "Connect Your Google Account"
+
+msgid "Contact Name"
+msgstr "Contact Name"
+
+msgid "Content (EN) - Markdown supported"
+msgstr "Content (EN) - Markdown supported"
+
+msgid "Content (PL) - Markdown supported"
+msgstr "Content (PL) - Markdown supported"
+
+msgid "Content (RU) - Markdown supported"
+msgstr "Content (RU) - Markdown supported"
+
+msgid "Content (TR) * - Markdown supported"
+msgstr "Content (TR) * - Markdown supported"
+
+msgid "Content Type"
+msgstr "Content Type"
+
+msgid "Content Type #"
+msgstr "Content Type #"
+
+msgid "Cornice"
+msgstr "Cornice"
+
+msgid "Cost"
+msgstr "Maliyet"
+
+msgid "Country"
+msgstr "Ülke"
+
+msgid "Cover"
+msgstr "Cover"
+
+msgid "Cover Image (for list view)"
+msgstr "Cover Image (for list view)"
+
+msgid "Create"
+msgstr "Oluştur"
+
+msgid "Create Book"
+msgstr "Book Oluştur"
+
+msgid "Create Channel"
+msgstr "Kanal Oluştur"
+
+msgid "Create Contact Form"
+msgstr "Contact Form Oluştur"
+
+msgid "Create Invoice"
+msgstr "Invoice Oluştur"
+
+msgid "Create New Team"
+msgstr "Yeni Takım Oluştur"
+
+msgid "Create Order"
+msgstr "Order Oluştur"
+
+msgid "Create Product Formm"
+msgstr "Product Formm Oluştur"
+
+msgid "Create Purchase Order"
+msgstr "Purchase Order Oluştur"
+
+msgid "Create Purchase Request"
+msgstr "Purchase Request Oluştur"
+
+msgid "Create Section"
+msgstr "Section Oluştur"
+
+msgid "Create Task"
+msgstr "Görev Oluştur"
+
+msgid "Create Team"
+msgstr "Takım Oluştur"
+
+msgid "Create a new task"
+msgstr "a new task Oluştur"
+
+msgid "Create task"
+msgstr "task Oluştur"
+
+msgid "Created"
+msgstr "Oluşturuldu"
+
+msgid "Created At"
+msgstr "Created At"
+
+msgid "Currency"
+msgstr "Para birimi"
+
+msgid "Current Quantity"
+msgstr "Current Quantity"
+
+msgid "Custom Curtain"
+msgstr "Custom Curtain"
+
+msgid "Customer"
+msgstr "Müşteri"
+
+msgid "Customer Information"
+msgstr "Müşteri Bilgileri"
+
+msgid "Customer Source"
+msgstr "Customer Source"
+
+msgid "Customers"
+msgstr "Müşteriler"
+
+msgid "DEFAULT ALIVE?"
+msgstr "DEFAULT ALIVE?"
+
+msgid "Date"
+msgstr "Tarih"
+
+msgid "Date & Time"
+msgstr "Tarih ve Saat"
+
+msgid "Date & Time *"
+msgstr "Tarih ve Saat *"
+
+msgid "Date Added"
+msgstr "Eklenme Tarihi"
+
+msgid "Date Range"
+msgstr "Tarih Aralığı"
+
+msgid "Delete Blog Post?"
+msgstr "Blog Post?'yi Sil"
+
+msgid "Delete Company"
+msgstr "Company'yi Sil"
+
+msgid "Delete Contact"
+msgstr "Contact'yi Sil"
+
+msgid "Delete Note?"
+msgstr "Note?'yi Sil"
+
+msgid "Delete Order"
+msgstr "Order'yi Sil"
+
+msgid "Delete Task"
+msgstr "Görevi Sil"
+
+msgid "Delete Team Task"
+msgstr "Team Task'yi Sil"
+
+msgid "Delivery Address"
+msgstr "Delivery Address"
+
+msgid "Department"
+msgstr "Department"
+
+msgid "Description (optional)"
+msgstr "Description (optional)"
+
+msgid "Direct (Production)"
+msgstr "Direct (Production)"
+
+msgid "Double"
+msgstr "Double"
+
+msgid "Due Date"
+msgstr "Vade Tarihi"
+
+msgid "Due Date *"
+msgstr "Due Date *"
+
+msgid "Due date"
+msgstr "Due date"
+
+msgid "Duration (min)"
+msgstr "Süre (dk)"
+
+msgid "E-posta Detayı"
+msgstr "E-posta Detayı"
+
+msgid "EUR (€)"
+msgstr "EUR (€)"
+
+msgid "Edit Company"
+msgstr "Company'yi Düzenle"
+
+msgid "Edit Contact"
+msgstr "Contact'yi Düzenle"
+
+msgid "Edit Raw Material"
+msgstr "Raw Material'yi Düzenle"
+
+msgid "Edit Section"
+msgstr "Bölümü Düzenle"
+
+msgid "Edit Task"
+msgstr "Görevi Düzenle"
+
+msgid "Email"
+msgstr "E-posta"
+
+msgid "Email addresses"
+msgstr "Email addresses"
+
+msgid "Est. Price"
+msgstr "Est. Price"
+
+msgid "Excerpt (EN)"
+msgstr "Excerpt (EN)"
+
+msgid "Excerpt (PL)"
+msgstr "Excerpt (PL)"
+
+msgid "Excerpt (RU)"
+msgstr "Excerpt (RU)"
+
+msgid "Excerpt (TR) *"
+msgstr "Excerpt (TR) *"
+
+msgid "Expense #"
+msgstr "Expense #"
+
+msgid "Expenses Table"
+msgstr "Expenses Table"
+
+msgid "Extra Footer Content (Scripts)"
+msgstr "Extra Footer Content (Scripts)"
+
+msgid "Extra Header Content (CSS/Styles/Meta)"
+msgstr "Extra Header Content (CSS/Styles/Meta)"
+
+msgid "Extrafor"
+msgstr "Extrafor"
+
+msgid "Fabric"
+msgstr "Fabric"
+
+msgid "Fabric Used (m)"
+msgstr "Fabric Used (m)"
+
+msgid "Filter"
+msgstr "Filtrele"
+
+msgid "Find users to invite"
+msgstr "Find users to invite"
+
+msgid "Flat"
+msgstr "Flat"
+
+msgid "Folder is empty"
+msgstr "Folder is empty"
+
+msgid "GBP (£)"
+msgstr "GBP (£)"
+
+msgid "Gmail Connected"
+msgstr "Gmail Connected"
+
+msgid "Gmail Not Connected"
+msgstr "Gmail Not Connected"
+
+msgid "Group"
+msgstr "Grup"
+
+msgid "Height (cm)"
+msgstr "Height (cm)"
+
+msgid "Hero Image (for detail page)"
+msgstr "Hero Image (for detail page)"
+
+msgid "High"
+msgstr "Yüksek"
+
+msgid "High Priority"
+msgstr "High Priority"
+
+msgid "History"
+msgstr "Geçmiş"
+
+msgid "Home Textile"
+msgstr "Home Textile"
+
+msgid "Icon"
+msgstr "Simge"
+
+msgid "Icon Color"
+msgstr "Simge Rengi"
+
+msgid "Ideas"
+msgstr "Ideas"
+
+msgid "Import Products from Excel"
+msgstr "Import Products from Excel"
+
+msgid "Important"
+msgstr "Important"
+
+msgid "In Progress"
+msgstr "Devam ediyor"
+
+msgid "Inactive"
+msgstr "Pasif"
+
+msgid "Indirect (Overhead)"
+msgstr "Indirect (Overhead)"
+
+msgid "Initial Quantity"
+msgstr "Initial Quantity"
+
+msgid "Item"
+msgstr "Item"
+
+msgid "Item No"
+msgstr "Item No"
+
+msgid "Item Status"
+msgstr "Item Status"
+
+msgid "Items"
+msgstr "Items"
+
+msgid "Items in Pack"
+msgstr "Items in Pack"
+
+msgid "Job Title"
+msgstr "Job Title"
+
+msgid "KPI Dashboard"
+msgstr "KPI Dashboard"
+
+msgid "Kanun"
+msgstr "Kanun"
+
+msgid "Kilogram"
+msgstr "Kilogram"
+
+msgid "Last 1 year"
+msgstr "Last 1 year"
+
+msgid "Last 2 years"
+msgstr "Last 2 years"
+
+msgid "Last 30 days"
+msgstr "Son 30 gün"
+
+msgid "Last 6 months"
+msgstr "Last 6 months"
+
+msgid "Last 7 days"
+msgstr "Son 7 gün"
+
+msgid "Last 90 days"
+msgstr "Last 90 days"
+
+msgid "Liter"
+msgstr "Liter"
+
+msgid "Location"
+msgstr "Konum"
+
+msgid "Location / Link"
+msgstr "Konum / Bağlantı"
+
+msgid "Low"
+msgstr "Düşük"
+
+msgid "Low Priority"
+msgstr "Low Priority"
+
+msgid "MONEY IN"
+msgstr "MONEY IN"
+
+msgid "MONEY OUT"
+msgstr "MONEY OUT"
+
+msgid "Manage Members"
+msgstr "Üyeleri Yönet"
+
+msgid "Manage Templates"
+msgstr "Templates'yi Yönet"
+
+msgid "Manager"
+msgstr "Yönetici"
+
+msgid "Manufacturer"
+msgstr "Manufacturer"
+
+msgid "Marketing Index"
+msgstr "Marketing Index"
+
+msgid "Medium"
+msgstr "Orta"
+
+msgid "Medium Priority"
+msgstr "Medium Priority"
+
+msgid "Meeting"
+msgstr "Toplantı"
+
+msgid "Meeting History"
+msgstr "Toplantı Geçmişi"
+
+msgid "Meeting Type"
+msgstr "Toplantı Türü"
+
+msgid "Meter"
+msgstr "Meter"
+
+msgid "Monthly"
+msgstr "Aylık"
+
+msgid "Mounting"
+msgstr "Mounting"
+
+msgid "Multi-Team Management"
+msgstr "Multi-Team Management"
+
+msgid "My Notes"
+msgstr "Benim Notes"
+
+msgid "My Teams"
+msgstr "Benim Teams"
+
+msgid "My Warehouses"
+msgstr "Benim Warehouses"
+
+msgid "NAME"
+msgstr "AD"
+
+msgid "Navigation"
+msgstr "Navigation"
+
+msgid "New Message"
+msgstr "Yeni Message"
+
+msgid "New Raw Material"
+msgstr "Yeni Raw Material"
+
+msgid "Next"
+msgstr "İleri"
+
+msgid "No B2B orders"
+msgstr "B2B sipariş yok"
+
+msgid "No assigned tasks"
+msgstr "No assigned tasks"
+
+msgid "No campaigns yet"
+msgstr "No campaigns yet"
+
+msgid "No email selected"
+msgstr "No email selected"
+
+msgid "No email templates yet"
+msgstr "No email templates yet"
+
+msgid "No emails"
+msgstr "No emails"
+
+msgid "No emails here"
+msgstr "No emails here"
+
+msgid "No favorites yet"
+msgstr "No favorites yet"
+
+msgid "No meeting history"
+msgstr "No meeting history"
+
+msgid "No notes found"
+msgstr "No notes found"
+
+msgid "No orders yet"
+msgstr "Henüz sipariş yok"
+
+msgid "No products in this warehouse"
+msgstr "No products in this warehouse"
+
+msgid "No replies yet"
+msgstr "No replies yet"
+
+msgid "No sent emails yet"
+msgstr "No sent emails yet"
+
+msgid "No tasks found"
+msgstr "No tasks found"
+
+msgid "No tasks yet"
+msgstr "No tasks yet"
+
+msgid "No teams yet"
+msgstr "Henüz takım yok"
+
+msgid "No upcoming meetings"
+msgstr "No upcoming meetings"
+
+msgid "No warehouses yet"
+msgstr "No warehouses yet"
+
+msgid "No web orders"
+msgstr "Web sipariş yok"
+
+msgid "Note"
+msgstr "Not"
+
+msgid "Note Content"
+msgstr "Note Content"
+
+msgid "Note Title"
+msgstr "Note Title"
+
+msgid "Operating"
+msgstr "Operasyon"
+
+msgid "Operating Index"
+msgstr "Operating Index"
+
+msgid "Option Name"
+msgstr "Option Name"
+
+msgid "Option Values"
+msgstr "Option Values"
+
+msgid "Order #"
+msgstr "Order #"
+
+msgid "Order Completed"
+msgstr "Order Completed"
+
+msgid "Order Details"
+msgstr "Order Details"
+
+msgid "Order ID"
+msgstr "Sipariş No"
+
+msgid "Order Item"
+msgstr "Order Item"
+
+msgid "Order Items"
+msgstr "Sipariş Kalemleri"
+
+msgid "Order Items:"
+msgstr "Order Items:"
+
+msgid "Order QR Code"
+msgstr "Order QR Code"
+
+msgid "Order QR Code:"
+msgstr "Order QR Code:"
+
+msgid "Order Quantity"
+msgstr "Order Quantity"
+
+msgid "Order Shipping Status"
+msgstr "Order Shipping Status"
+
+msgid "Order Status"
+msgstr "Sipariş Durumu"
+
+msgid "Order Value"
+msgstr "Order Value"
+
+msgid "Organizer"
+msgstr "Organizer"
+
+msgid "Overview"
+msgstr "Genel Bakış"
+
+msgid "Pack Count"
+msgstr "Pack Count"
+
+msgid "Pack Number"
+msgstr "Pack Number"
+
+msgid "Participants"
+msgstr "Katılımcılar"
+
+msgid "Pay Dividend"
+msgstr "Pay Dividend"
+
+msgid "Payment"
+msgstr "Ödeme"
+
+msgid "Payment Information"
+msgstr "Payment Information"
+
+msgid "Payment Method"
+msgstr "Ödeme Yöntemi"
+
+msgid "Personal"
+msgstr "Kişisel"
+
+msgid "Phone"
+msgstr "Telefon"
+
+msgid "Phone numbers"
+msgstr "Phone numbers"
+
+msgid "Photo"
+msgstr "Photo"
+
+msgid "Pipe"
+msgstr "Pipe"
+
+msgid "Pleat Density"
+msgstr "Pleat Density"
+
+msgid "Pleat Type"
+msgstr "Pleat Type"
+
+msgid "Previous"
+msgstr "Önceki"
+
+msgid "Pricing & Inventoryyy"
+msgstr "Pricing & Inventoryyy"
+
+msgid "Primary"
+msgstr "Birincil"
+
+msgid "Priority"
+msgstr "Öncelik"
+
+msgid "Priority Level"
+msgstr "Priority Level"
+
+msgid "Product Files"
+msgstr "Product Files"
+
+msgid "Products Table"
+msgstr "Products Table"
+
+msgid "Profit"
+msgstr "Profit"
+
+msgid "Prospect"
+msgstr "Prospect"
+
+msgid "Publish"
+msgstr "Publish"
+
+msgid "Publish Date *"
+msgstr "Publish Date *"
+
+msgid "Published"
+msgstr "Yayımlandı"
+
+msgid "Purchasing"
+msgstr "Purchasing"
+
+msgid "QR Operations"
+msgstr "QR Operations"
+
+msgid "QTY"
+msgstr "QTY"
+
+msgid "Qty"
+msgstr "Adet"
+
+msgid "Qualified"
+msgstr "Qualified"
+
+msgid "Quick Search"
+msgstr "Quick Search"
+
+msgid "RUNWAY"
+msgstr "RUNWAY"
+
+msgid "Remaining"
+msgstr "Remaining"
+
+msgid "Report Expense"
+msgstr "Report Expense"
+
+msgid "Report an Expense"
+msgstr "Report an Expense"
+
+msgid "Report an Income"
+msgstr "Report an Income"
+
+msgid "Request Details"
+msgstr "Request Details"
+
+msgid "Requester"
+msgstr "Requester"
+
+msgid "Revenue"
+msgstr "Gelir"
+
+msgid "Review"
+msgstr "Review"
+
+msgid "Role"
+msgstr "Rol"
+
+msgid "Rustic"
+msgstr "Rustic"
+
+msgid "SKU"
+msgstr "SKU"
+
+msgid "SKU (Optional)"
+msgstr "SKU (Optional)"
+
+msgid "Sales Trends"
+msgstr "Sales Trends"
+
+msgid "Save Supplier"
+msgstr "Supplier'yi Kaydet"
+
+msgid "Scan Next"
+msgstr "Scan Next"
+
+msgid "Scan Order Item QR"
+msgstr "Scan Order Item QR"
+
+msgid "Schedule Meeting"
+msgstr "Toplantı Planla"
+
+msgid "Search Contact / Company"
+msgstr "Contact / Company ara"
+
+msgid "Search Product"
+msgstr "Product ara"
+
+msgid "Search User"
+msgstr "Kullanıcı Ara"
+
+msgid "Search Web Client"
+msgstr "Web Client ara"
+
+msgid "Search company"
+msgstr "company ara"
+
+msgid "Search contact"
+msgstr "contact ara"
+
+msgid "Section Title"
+msgstr "Bölüm Başlığı"
+
+msgid "Select"
+msgstr "Seç"
+
+msgid "Select Team"
+msgstr "Takım Seç"
+
+msgid "Select Team"
+msgstr "Takım Seç"
+
+msgid "(Optional)"
+msgstr "(Optional)"
+
+msgid "Select a conversation"
+msgstr "Bir sohbet seç"
+
+msgid "Select an email"
+msgstr "Select an email"
+
+msgid "Select..."
+msgstr "Select..."
+
+msgid "Send"
+msgstr "Gönder"
+
+msgid "Send to Supplier"
+msgstr "Send to Supplier"
+
+msgid "Shipping Information"
+msgstr "Shipping Information"
+
+msgid "Single"
+msgstr "Tekil"
+
+msgid "Start & Tag"
+msgstr "Start & Tag"
+
+msgid "Stock Quantity"
+msgstr "Stock Quantity"
+
+msgid "Submit Order"
+msgstr "Siparişi Gönder"
+
+msgid "Supplier SKU"
+msgstr "Supplier SKU"
+
+msgid "TOTAL (TRY)"
+msgstr "TOTAL (TRY)"
+
+msgid "TOTAL (USD)"
+msgstr "TOTAL (USD)"
+
+msgid "TRY (₺)"
+msgstr "TRY (₺)"
+
+msgid "Tag"
+msgstr "Tag"
+
+msgid "Target Quantity per Pack"
+msgstr "Target Quantity per Pack"
+
+msgid "Task Details"
+msgstr "Task Details"
+
+msgid "Task Name"
+msgstr "Task Name"
+
+msgid "Task Name *"
+msgstr "Task Name *"
+
+msgid "Task Title"
+msgstr "Task Title"
+
+msgid "Task name"
+msgstr "Task name"
+
+msgid "Tasks that are due"
+msgstr "Tasks that are due"
+
+msgid "Tasks that are in the future"
+msgstr "Tasks that are in the future"
+
+msgid "Team"
+msgstr "Takım"
+
+msgid "Team Management"
+msgstr "Team Management"
+
+msgid "Team Meetings"
+msgstr "Team Meetings"
+
+msgid "Team Name"
+msgstr "Takım Adı"
+
+msgid "Team Name *"
+msgstr "Takım Adı *"
+
+msgid "Team Overview"
+msgstr "Takım Genel Bakış"
+
+msgid "This Month"
+msgstr "Bu Ay"
+
+msgid "This Week"
+msgstr "Bu Hafta"
+
+msgid "Title (EN)"
+msgstr "Başlık (EN)"
+
+msgid "Title (PL)"
+msgstr "Başlık (PL)"
+
+msgid "Title (RU)"
+msgstr "Başlık (RU)"
+
+msgid "Title (TR) *"
+msgstr "Title (TR) *"
+
+msgid "Title *"
+msgstr "Başlık *"
+
+msgid "To Do"
+msgstr "Yapılacak"
+
+msgid "Today"
+msgstr "Bugün"
+
+msgid "Total"
+msgstr "Tutar"
+
+msgid "Total Balance"
+msgstr "Total Balance"
+
+msgid "Total Price"
+msgstr "Total Price"
+
+msgid "Tracking Number"
+msgstr "Tracking Number"
+
+msgid "Transaction #"
+msgstr "Transaction #"
+
+msgid "Transaction Table"
+msgstr "Transaction Table"
+
+msgid "Trash is empty"
+msgstr "Trash is empty"
+
+msgid "Type"
+msgstr "Tür"
+
+msgid "UNIT COST"
+msgstr "UNIT COST"
+
+msgid "URL Slug *"
+msgstr "URL Slug *"
+
+msgid "USD ($)"
+msgstr "USD ($)"
+
+msgid "Unit ID"
+msgstr "Unit ID"
+
+msgid "Unit Price"
+msgstr "Birim Fiyat"
+
+msgid "Unit of Measure"
+msgstr "Unit of Measure"
+
+msgid "Unit of Measurement"
+msgstr "Unit of Measurement"
+
+msgid "Upcoming Meetings"
+msgstr "Yaklaşan Toplantılar"
+
+msgid "Update"
+msgstr "Güncelle"
+
+msgid "Update Order"
+msgstr "Siparişi Güncelle"
+
+msgid "Update Task"
+msgstr "Update Task"
+
+msgid "Urgent"
+msgstr "Urgent"
+
+msgid "VALUE"
+msgstr "VALUE"
+
+msgid "Variant"
+msgstr "Varyant"
+
+msgid "View Campaigns"
+msgstr "Campaigns'yi Görüntüle"
+
+msgid "Warehouse"
+msgstr "Depo"
+
+msgid "Water Wave"
+msgstr "Water Wave"
+
+msgid "Website"
+msgstr "Web sitesi"
+
+msgid "Weekly"
+msgstr "Haftalık"
+
+msgid "Width (cm)"
+msgstr "Width (cm)"
+
+msgid "Wing"
+msgstr "Wing"
+
+msgid "Work"
+msgstr "Work"
+
+msgid "Yearly"
+msgstr "Yıllık"
+
+msgid "You have unsaved data!"
+msgstr "You have unsaved data!"
+
+msgid "✨ Create New Note"
+msgstr "✨ Create New Note"
+
+msgid "Search"
+msgstr "Ara"
+
+msgid "Reset"
+msgstr "Sıfırla"
+
+msgid "Apply"
+msgstr "Uygula"
+
+msgid "Continue"
+msgstr "Devam et"
+
+msgid "Reply"
+msgstr "Yanıtla"
+
+msgid "Forward"
+msgstr "Yönlendir"
+
+msgid "Refresh"
+msgstr "Yenile"
+
+msgid "Export"
+msgstr "Dışa aktar"
+
+msgid "Download"
+msgstr "İndir"
+
+msgid "Upload"
+msgstr "Yükle"
+
+msgid "Print"
+msgstr "Yazdır"
+
+msgid "Copy"
+msgstr "Kopyala"
+
+msgid "Paste"
+msgstr "Yapıştır"
+
+msgid "Duplicate"
+msgstr "Çoğalt"
+
+msgid "Archive"
+msgstr "Arşivle"
+
+msgid "Restore"
+msgstr "Geri Yükle"
+
+msgid "Remove"
+msgstr "Kaldır"
+
+msgid "Pending"
+msgstr "Bekliyor"
+
+msgid "Approved"
+msgstr "Onaylandı"
+
+msgid "Rejected"
+msgstr "Reddedildi"
+
+msgid "Draft"
+msgstr "Taslak"
+
+msgid "Archived"
+msgstr "Arşivlendi"
+
+msgid "Completed"
+msgstr "Tamamlandı"
+
+msgid "Cancelled"
+msgstr "İptal"
+
+msgid "Open"
+msgstr "Açık"
+
+msgid "Closed"
+msgstr "Kapalı"
+
+msgid "Paid"
+msgstr "Ödendi"
+
+msgid "Unpaid"
+msgstr "Ödenmedi"
+
+msgid "New"
+msgstr "Yeni"
+
+msgid "Hot"
+msgstr "Popüler"
+
+msgid "Sold"
+msgstr "Satıldı"
+
+msgid "In stock"
+msgstr "Stokta"
+
+msgid "Full name"
+msgstr "Tam ad"
+
+msgid "Username"
+msgstr "Kullanıcı adı"
+
+msgid "Password"
+msgstr "Parola"
+
+msgid "City"
+msgstr "Şehir"
+
+msgid "Zip code"
+msgstr "Posta kodu"
+
+msgid "Time"
+msgstr "Saat"
+
+msgid "Created at"
+msgstr "Oluşturulma tarihi"
+
+msgid "Updated"
+msgstr "Güncellendi"
+
+msgid "Updated at"
+msgstr "Güncellenme tarihi"
+
+msgid "Categories"
+msgstr "Kategoriler"
+
+msgid "Subcategory"
+msgstr "Alt kategori"
+
+msgid "Owner"
+msgstr "Sahip"
+
+msgid "Assignee"
+msgstr "Atanan kişi"
+
+msgid "Information"
+msgstr "Bilgi"
+
+msgid "Preferences"
+msgstr "Tercihler"
+
+msgid "Options"
+msgstr "Seçenekler"
+
+msgid "Option"
+msgstr "Seçenek"
+
+msgid "Other"
+msgstr "Diğer"
+
+msgid "Subtotal"
+msgstr "Ara toplam"
+
+msgid "Tax"
+msgstr "Vergi"
+
+msgid "Discount"
+msgstr "İndirim"
+
+msgid "Dimensions"
+msgstr "Boyutlar"
+
+msgid "Members"
+msgstr "Üyeler"
+
+msgid "Roles"
+msgstr "Roller"
+
+msgid "Permission"
+msgstr "İzin"
+
+msgid "Permissions"
+msgstr "İzinler"
+
+msgid "Groups"
+msgstr "Gruplar"
+
+msgid "Home"
+msgstr "Ana Sayfa"
+
+msgid "Logout"
+msgstr "Çıkış Yap"
+
+msgid "Login"
+msgstr "Giriş Yap"
+
+msgid "Sign In"
+msgstr "Giriş Yap"
+
+msgid "Sign Up"
+msgstr "Kayıt Ol"
+
+msgid "Register"
+msgstr "Kaydol"
+
+msgid "My Tasks"
+msgstr "Görevlerim"
+
+msgid "My Orders"
+msgstr "Siparişlerim"
+
+msgid "Message"
+msgstr "Mesaj"
+
+msgid "Sales"
+msgstr "Satışlar"
+
+msgid "Purchases"
+msgstr "Satın Almalar"
+
+msgid "Add Product"
+msgstr "Ürün Ekle"
+
+msgid "Product List"
+msgstr "Ürün Listesi"
+
+msgid "Remove Member"
+msgstr "Üyeyi Çıkar"
+
+msgid "Add to Favorites"
+msgstr "Favorilere Ekle"
+
+msgid "Archive Team"
+msgstr "Takımı Arşivle"
+
+msgid "Add Section"
+msgstr "Bölüm Ekle"
+
+msgid "Save Section"
+msgstr "Bölümü Kaydet"
+
+msgid "Move Left"
+msgstr "Sola Taşı"
+
+msgid "Move Right"
+msgstr "Sağa Taşı"
+
+msgid "Board"
+msgstr "Pano"
+
+msgid "List"
+msgstr "Liste"
+
+msgid "View Details"
+msgstr "Ayrıntıları Görüntüle"
+
+msgid "Individual"
+msgstr "Bireysel"
+
+msgid "Generate Google Meet Link"
+msgstr "Google Meet Bağlantısı Oluştur"
+
+msgid "Direct Messages"
+msgstr "Doğrudan Mesajlar"
+
+msgid "Channels"
+msgstr "Kanallar"
+
+msgid "Quick Find"
+msgstr "Hızlı Bul"
+
+msgid "Google Chat"
+msgstr "Google Sohbet"
+
+msgid "TODAY"
+msgstr "BUGÜN"
+
+msgid "System Operational"
+msgstr "Sistem Çalışıyor"
+
+msgid "No channels yet"
+msgstr "Henüz kanal yok"
+
+msgid "No other team members"
+msgstr "Başka takım üyesi yok"
+
+msgid "No data"
+msgstr "Veri yok"
+
+msgid "No items"
+msgstr "Öğe yok"
+
+msgid "No results"
+msgstr "Sonuç yok"
+
+msgid "Showing"
+msgstr "Gösteriliyor"
+
+msgid "Bold"
+msgstr "Kalın"
+
+msgid "Italic"
+msgstr "İtalik"
+
+msgid "Strikethrough"
+msgstr "Üstü çizili"
+
+msgid "Attach file"
+msgstr "Dosya ekle"
+
+msgid "Add emoji"
+msgstr "Emoji ekle"
+
+msgid "Mention"
+msgstr "Bahset"
+
+msgid "Mention a teammate"
+msgstr "Bir takım arkadaşından bahset"
+
+msgid "Emoji"
+msgstr "Emoji"
+
+msgid "No teammates available"
+msgstr "Takım arkadaşı yok"
+
+msgid "Add Customer"
+msgstr "Müşteri Ekle"
+
+msgid "Add Order"
+msgstr "Sipariş Ekle"
+
+msgid "Add Variant"
+msgstr "Varyant Ekle"
+
+msgid "Add Field"
+msgstr "Alan Ekle"
+
+msgid "Add Channel"
+msgstr "Kanal Ekle"
+
+msgid "All Orders"
+msgstr "Tüm Siparişler"
+
+msgid "All Tasks"
+msgstr "Tüm Görevler"
+
+msgid "All Products"
+msgstr "Tüm Ürünler"
+
+msgid "All Contacts"
+msgstr "Tüm Kişiler"
+
+msgid "All Companies"
+msgstr "Tüm Şirketler"
+
+msgid "All Suppliers"
+msgstr "Tüm Tedarikçiler"
+
+msgid "All Customers"
+msgstr "Tüm Müşteriler"
+
+msgid "All Categories"
+msgstr "Tüm Kategoriler"
+
+msgid "Activity Log"
+msgstr "Etkinlik Günlüğü"
+
+msgid "Activity"
+msgstr "Etkinlik"
+
+msgid "Amount Due"
+msgstr "Ödenecek Tutar"
+
+msgid "Approve"
+msgstr "Onayla"
+
+msgid "Approver"
+msgstr "Onaylayan"
+
+msgid "Archived Messages"
+msgstr "Arşivlenmiş Mesajlar"
+
+msgid "Are you sure?"
+msgstr "Emin misin?"
+
+msgid "Assigned Tasks"
+msgstr "Atanan Görevler"
+
+msgid "Assigned to me"
+msgstr "Bana atananlar"
+
+msgid "Assigned to"
+msgstr "Atanan"
+
+msgid "Attach"
+msgstr "Ekle"
+
+msgid "Attachment"
+msgstr "Ek"
+
+msgid "Attribute"
+msgstr "Özellik"
+
+msgid "Avatar"
+msgstr "Avatar"
+
+msgid "Background Info"
+msgstr "Arkaplan Bilgisi"
+
+msgid "Balance"
+msgstr "Bakiye"
+
+msgid "Beta"
+msgstr "Beta"
+
+msgid "Billing"
+msgstr "Faturalandırma"
+
+msgid "Birthday"
+msgstr "Doğum Günü"
+
+msgid "Booked"
+msgstr "Rezerve"
+
+msgid "Calendar"
+msgstr "Takvim"
+
+msgid "Calendar View"
+msgstr "Takvim Görünümü"
+
+msgid "Call"
+msgstr "Ara"
+
+msgid "Capacity"
+msgstr "Kapasite"
+
+msgid "Card"
+msgstr "Kart"
+
+msgid "Change Password"
+msgstr "Parola Değiştir"
+
+msgid "Channel"
+msgstr "Kanal"
+
+msgid "Chat"
+msgstr "Sohbet"
+
+msgid "Check"
+msgstr "Kontrol Et"
+
+msgid "Checked"
+msgstr "İşaretli"
+
+msgid "Choose File"
+msgstr "Dosya Seç"
+
+msgid "Chosen"
+msgstr "Seçildi"
+
+msgid "Click here"
+msgstr "Buraya tıkla"
+
+msgid "Click to upload"
+msgstr "Yüklemek için tıkla"
+
+msgid "Code"
+msgstr "Kod"
+
+msgid "Color"
+msgstr "Renk"
+
+msgid "Communications"
+msgstr "İletişim"
+
+msgid "Confirm Password"
+msgstr "Parolayı Onayla"
+
+msgid "Conversation"
+msgstr "Sohbet"
+
+msgid "Conversations"
+msgstr "Sohbetler"
+
+msgid "Copy Link"
+msgstr "Bağlantıyı Kopyala"
+
+msgid "Cost Price"
+msgstr "Maliyet Fiyatı"
+
+msgid "Daily"
+msgstr "Günlük"
+
+msgid "Date Created"
+msgstr "Oluşturulma Tarihi"
+
+msgid "Date Modified"
+msgstr "Düzenleme Tarihi"
+
+msgid "Default"
+msgstr "Varsayılan"
+
+msgid "Define"
+msgstr "Tanımla"
+
+msgid "Delete File"
+msgstr "Dosyayı Sil"
+
+msgid "Direct Message"
+msgstr "Doğrudan Mesaj"
+
+msgid "Double-click to edit"
+msgstr "Düzenlemek için çift tıkla"
+
+msgid "Drag & drop or click to select"
+msgstr "Sürükle bırak veya seçmek için tıkla"
+
+msgid "Due"
+msgstr "Vade"
+
+msgid "Editor"
+msgstr "Düzenleyici"
+
+msgid "Email Subject"
+msgstr "E-posta Konusu"
+
+msgid "Email me"
+msgstr "Bana e-posta gönder"
+
+msgid "Empty"
+msgstr "Boş"
+
+msgid "Enable"
+msgstr "Etkinleştir"
+
+msgid "Enabled"
+msgstr "Etkin"
+
+msgid "Enter"
+msgstr "Gir"
+
+msgid "Enter description"
+msgstr "Açıklama gir"
+
+msgid "Enter email"
+msgstr "E-posta gir"
+
+msgid "Enter name"
+msgstr "Ad gir"
+
+msgid "Enter password"
+msgstr "Parola gir"
+
+msgid "Enter title"
+msgstr "Başlık gir"
+
+msgid "Enter your email"
+msgstr "E-postanı gir"
+
+msgid "Enter your name"
+msgstr "Adını gir"
+
+msgid "Error"
+msgstr "Hata"
+
+msgid "Event"
+msgstr "Etkinlik"
+
+msgid "Events"
+msgstr "Etkinlikler"
+
+msgid "Expand"
+msgstr "Genişlet"
+
+msgid "Expense"
+msgstr "Gider"
+
+msgid "Expenses"
+msgstr "Giderler"
+
+msgid "Filter by"
+msgstr "Filtrele"
+
+msgid "Final"
+msgstr "Son"
+
+msgid "First"
+msgstr "İlk"
+
+msgid "Folder"
+msgstr "Klasör"
+
+msgid "Follow"
+msgstr "Takip Et"
+
+msgid "Forgot password?"
+msgstr "Parolanı mı unuttun?"
+
+msgid "From"
+msgstr "Kimden"
+
+msgid "Full"
+msgstr "Tam"
+
+msgid "Go back"
+msgstr "Geri dön"
+
+msgid "Got it"
+msgstr "Anladım"
+
+msgid "Group by"
+msgstr "Grupla"
+
+msgid "Image"
+msgstr "Görsel"
+
+msgid "Images"
+msgstr "Görseller"
+
+msgid "Income"
+msgstr "Gelir"
+
+msgid "Income Statement"
+msgstr "Gelir Tablosu"
+
+msgid "Initial"
+msgstr "Başlangıç"
+
+msgid "Integration"
+msgstr "Entegrasyon"
+
+msgid "Invite"
+msgstr "Davet Et"
+
+msgid "Invoice"
+msgstr "Fatura"
+
+msgid "Invoices"
+msgstr "Faturalar"
+
+msgid "Join"
+msgstr "Katıl"
+
+msgid "Joined"
+msgstr "Katıldı"
+
+msgid "Keep"
+msgstr "Tut"
+
+msgid "Key"
+msgstr "Anahtar"
+
+msgid "Last"
+msgstr "Son"
+
+msgid "Last Month"
+msgstr "Geçen Ay"
+
+msgid "Last Week"
+msgstr "Geçen Hafta"
+
+msgid "Last Year"
+msgstr "Geçen Yıl"
+
+msgid "Leave"
+msgstr "Çık"
+
+msgid "Less"
+msgstr "Daha az"
+
+msgid "Link"
+msgstr "Bağlantı"
+
+msgid "Live"
+msgstr "Canlı"
+
+msgid "Logged in"
+msgstr "Giriş yapıldı"
+
+msgid "Manage"
+msgstr "Yönet"
+
+msgid "Manage Permissions"
+msgstr "İzinleri Yönet"
+
+msgid "Mark all as read"
+msgstr "Tümünü okundu olarak işaretle"
+
+msgid "Mark as read"
+msgstr "Okundu olarak işaretle"
+
+msgid "Mark as unread"
+msgstr "Okunmadı olarak işaretle"
+
+msgid "Material"
+msgstr "Malzeme"
+
+msgid "Maybe later"
+msgstr "Belki sonra"
+
+msgid "Member since"
+msgstr "Üyelik tarihi"
+
+msgid "Method"
+msgstr "Yöntem"
+
+msgid "Mine"
+msgstr "Benim"
+
+msgid "Modified"
+msgstr "Düzenlendi"
+
+msgid "More"
+msgstr "Daha fazla"
+
+msgid "More options"
+msgstr "Daha fazla seçenek"
+
+msgid "Move"
+msgstr "Taşı"
+
+msgid "Move to"
+msgstr "Taşı"
+
+msgid "Multiple"
+msgstr "Çoklu"
+
+msgid "Newest"
+msgstr "En yeni"
+
+msgid "Next Page"
+msgstr "Sonraki Sayfa"
+
+msgid "No file selected"
+msgstr "Dosya seçilmedi"
+
+msgid "No items found"
+msgstr "Öğe bulunamadı"
+
+msgid "No notifications"
+msgstr "Bildirim yok"
+
+msgid "No record"
+msgstr "Kayıt yok"
+
+msgid "No result"
+msgstr "Sonuç yok"
+
+msgid "Not found"
+msgstr "Bulunamadı"
+
+msgid "Notification"
+msgstr "Bildirim"
+
+msgid "Off"
+msgstr "Kapalı"
+
+msgid "On"
+msgstr "Açık"
+
+msgid "Online"
+msgstr "Çevrimiçi"
+
+msgid "Optional"
+msgstr "İsteğe bağlı"
+
+msgid "Order Date"
+msgstr "Sipariş Tarihi"
+
+msgid "Order Summary"
+msgstr "Sipariş Özeti"
+
+msgid "Order Total"
+msgstr "Sipariş Toplamı"
+
+msgid "Organization"
+msgstr "Organizasyon"
+
+msgid "Overdue"
+msgstr "Gecikti"
+
+msgid "Page"
+msgstr "Sayfa"
+
+msgid "Past Due"
+msgstr "Vadesi Geçti"
+
+msgid "Payments"
+msgstr "Ödemeler"
+
+msgid "Period"
+msgstr "Dönem"
+
+msgid "Phone Number"
+msgstr "Telefon Numarası"
+
+msgid "Pin"
+msgstr "Sabitle"
+
+msgid "Pinned"
+msgstr "Sabitlendi"
+
+msgid "Please wait..."
+msgstr "Lütfen bekle..."
+
+msgid "Position"
+msgstr "Pozisyon"
+
+msgid "Posted"
+msgstr "Yayımlandı"
+
+msgid "Preview"
+msgstr "Önizleme"
+
+msgid "Previous Page"
+msgstr "Önceki Sayfa"
+
+msgid "Print Order"
+msgstr "Siparişi Yazdır"
+
+msgid "Processing"
+msgstr "İşleniyor"
+
+msgid "Profile Picture"
+msgstr "Profil Resmi"
+
+msgid "Project"
+msgstr "Proje"
+
+msgid "Public"
+msgstr "Herkese açık"
+
+msgid "Purchase"
+msgstr "Satın Al"
+
+msgid "Quantity Unit"
+msgstr "Adet Birimi"
+
+msgid "Question"
+msgstr "Soru"
+
+msgid "Read more"
+msgstr "Devamını oku"
+
+msgid "Reason"
+msgstr "Sebep"
+
+msgid "Receive"
+msgstr "Al"
+
+msgid "Recent"
+msgstr "Son"
+
+msgid "Recent Activity"
+msgstr "Son Etkinlikler"
+
+msgid "Recent Orders"
+msgstr "Son Siparişler"
+
+msgid "Reference"
+msgstr "Referans"
+
+msgid "Region"
+msgstr "Bölge"
+
+msgid "Reject"
+msgstr "Reddet"
+
+msgid "Remove File"
+msgstr "Dosyayı Kaldır"
+
+msgid "Replace"
+msgstr "Değiştir"
+
+msgid "Required"
+msgstr "Zorunlu"
+
+msgid "Resend"
+msgstr "Tekrar Gönder"
+
+msgid "Reset Password"
+msgstr "Parolayı Sıfırla"
+
+msgid "Result"
+msgstr "Sonuç"
+
+msgid "Results"
+msgstr "Sonuçlar"
+
+msgid "Revenue Account"
+msgstr "Gelir Hesabı"
+
+msgid "Sales Channel"
+msgstr "Satış Kanalı"
+
+msgid "Sales Order"
+msgstr "Satış Siparişi"
+
+msgid "Save & Close"
+msgstr "Kaydet ve Kapat"
+
+msgid "Save Order"
+msgstr "Siparişi Kaydet"
+
+msgid "Saving..."
+msgstr "Kaydediliyor..."
+
+msgid "Schedule"
+msgstr "Planla"
+
+msgid "Scheduled"
+msgstr "Planlandı"
+
+msgid "Search results"
+msgstr "Arama sonuçları"
+
+msgid "Section"
+msgstr "Bölüm"
+
+msgid "See all"
+msgstr "Tümünü gör"
+
+msgid "See less"
+msgstr "Daha az göster"
+
+msgid "See more"
+msgstr "Daha fazla göster"
+
+msgid "Select All"
+msgstr "Tümünü seç"
+
+msgid "Select Date"
+msgstr "Tarih Seç"
+
+msgid "Select File"
+msgstr "Dosya Seç"
+
+msgid "Select Files"
+msgstr "Dosyalar Seç"
+
+msgid "Select Image"
+msgstr "Görsel Seç"
+
+msgid "Select Option"
+msgstr "Seçenek Seç"
+
+msgid "Send Message"
+msgstr "Mesaj Gönder"
+
+msgid "Set"
+msgstr "Ayarla"
+
+msgid "Share"
+msgstr "Paylaş"
+
+msgid "Show"
+msgstr "Göster"
+
+msgid "Show All"
+msgstr "Tümünü Göster"
+
+msgid "Show More"
+msgstr "Daha Fazla Göster"
+
+msgid "Sign in to your account"
+msgstr "Hesabına giriş yap"
+
+msgid "Skip"
+msgstr "Atla"
+
+msgid "Sort By"
+msgstr "Sırala"
+
+msgid "Source"
+msgstr "Kaynak"
+
+msgid "Start"
+msgstr "Başla"
+
+msgid "Started"
+msgstr "Başladı"
+
+msgid "Statistics"
+msgstr "İstatistikler"
+
+msgid "Stock Level"
+msgstr "Stok Seviyesi"
+
+msgid "Subject"
+msgstr "Konu"
+
+msgid "Success"
+msgstr "Başarılı"
+
+msgid "Summary"
+msgstr "Özet"
+
+msgid "Support"
+msgstr "Destek"
+
+msgid "Switch"
+msgstr "Değiştir"
+
+msgid "System"
+msgstr "Sistem"
+
+msgid "Tax Rate"
+msgstr "Vergi Oranı"
+
+msgid "Team Tasks"
+msgstr "Takım Görevleri"
+
+msgid "Templates"
+msgstr "Şablonlar"
+
+msgid "Test"
+msgstr "Test"
+
+msgid "This Year"
+msgstr "Bu Yıl"
+
+msgid "Time Zone"
+msgstr "Saat Dilimi"
+
+msgid "Tip"
+msgstr "İpucu"
+
+msgid "To"
+msgstr "Kime"
+
+msgid "Today's Tasks"
+msgstr "Bugünkü Görevler"
+
+msgid "Tomorrow"
+msgstr "Yarın"
+
+msgid "Total Amount"
+msgstr "Toplam Tutar"
+
+msgid "Total Items"
+msgstr "Toplam Kalem"
+
+msgid "Total Sales"
+msgstr "Toplam Satış"
+
+msgid "Tracking"
+msgstr "Takip"
+
+msgid "Type a message"
+msgstr "Bir mesaj yaz"
+
+msgid "Type here"
+msgstr "Buraya yaz"
+
+msgid "Unassigned"
+msgstr "Atanmamış"
+
+msgid "Undo"
+msgstr "Geri Al"
+
+msgid "Unknown"
+msgstr "Bilinmiyor"
+
+msgid "Unread"
+msgstr "Okunmamış"
+
+msgid "Until"
+msgstr "Kadar"
+
+msgid "Update Profile"
+msgstr "Profili Güncelle"
+
+msgid "Updated by"
+msgstr "Güncelleyen"
+
+msgid "Upload File"
+msgstr "Dosya Yükle"
+
+msgid "Upload a file"
+msgstr "Dosya yükle"
+
+msgid "Uploaded"
+msgstr "Yüklendi"
+
+msgid "Use"
+msgstr "Kullan"
+
+msgid "User"
+msgstr "Kullanıcı"
+
+msgid "Users"
+msgstr "Kullanıcılar"
+
+msgid "Verify"
+msgstr "Doğrula"
+
+msgid "Version"
+msgstr "Sürüm"
+
+msgid "View All"
+msgstr "Tümünü Görüntüle"
+
+msgid "View Profile"
+msgstr "Profili Görüntüle"
+
+msgid "Visible"
+msgstr "Görünür"
+
+msgid "Waiting"
+msgstr "Bekleniyor"
+
+msgid "Warning"
+msgstr "Uyarı"
+
+msgid "Welcome"
+msgstr "Hoş geldin"
+
+msgid "Welcome back"
+msgstr "Tekrar hoş geldin"
+
+msgid "Yesterday"
+msgstr "Dün"
+
+msgid "Zip Code"
+msgstr "Posta Kodu"
+
+msgid "Zoom"
+msgstr "Yakınlaştır"
+
+msgid "Cc"
+msgstr "Kopya"
+
+msgid "Channel Logs"
+msgstr "Kanal Günlükleri"
+
+msgid "Click to add"
+msgstr "Eklemek için tıkla"
+
+msgid "Click to copy"
+msgstr "Kopyalamak için tıkla"
+
+msgid "Combined"
+msgstr "Birleşik"
+
+msgid "Confirm Login"
+msgstr "Girişi Onayla"
+
+msgid "Contact Details"
+msgstr "Kişi Ayrıntıları"
+
+msgid "Contact Information"
+msgstr "Kişi Bilgileri"
+
+msgid "Contact Person"
+msgstr "İlgili Kişi"
+
+msgid "Conversion"
+msgstr "Dönüşüm"
+
+msgid "Currency Exchange"
+msgstr "Döviz Çevirisi"
+
+msgid "Custom"
+msgstr "Özel"
+
+msgid "DATE"
+msgstr "TARİH"
+
+msgid "DESCRIPTION"
+msgstr "AÇIKLAMA"
+
+msgid "DISCOUNT"
+msgstr "İNDİRİM"
+
+msgid "DUE DATE"
+msgstr "VADE TARİHİ"
+
+msgid "Daily Activity"
+msgstr "Günlük Etkinlik"
+
+msgid "Daily Sales"
+msgstr "Günlük Satışlar"
+
+msgid "Default Currency"
+msgstr "Varsayılan Para Birimi"
+
+msgid "Delete Item"
+msgstr "Kalemi Sil"
+
+msgid "Description (EN)"
+msgstr "Açıklama (EN)"
+
+msgid "Description (PL)"
+msgstr "Açıklama (PL)"
+
+msgid "Description (RU)"
+msgstr "Açıklama (RU)"
+
+msgid "Description (Turkish) *"
+msgstr "Açıklama (Türkçe) *"
+
+msgid "Discount Code"
+msgstr "İndirim Kodu"
+
+msgid "Discount Percentage"
+msgstr "İndirim Yüzdesi"
+
+msgid "Document"
+msgstr "Belge"
+
+msgid "Documents"
+msgstr "Belgeler"
+
+msgid "EMAIL"
+msgstr "E-POSTA"
+
+msgid "Edit Order"
+msgstr "Siparişi Düzenle"
+
+msgid "Equity"
+msgstr "Özkaynak"
+
+msgid "Equity Account"
+msgstr "Özkaynak Hesabı"
+
+msgid "Expense Category"
+msgstr "Gider Kategorisi"
+
+msgid "FILE"
+msgstr "DOSYA"
+
+msgid "Field Name"
+msgstr "Alan Adı"
+
+msgid "Files"
+msgstr "Dosyalar"
+
+msgid "Final Amount"
+msgstr "Nihai Tutar"
+
+msgid "Finance"
+msgstr "Finans"
+
+msgid "Finished Goods"
+msgstr "Mamul Mallar"
+
+msgid "Fixed Asset"
+msgstr "Sabit Varlık"
+
+msgid "Forgot"
+msgstr "Unuttum"
+
+msgid "From Date"
+msgstr "Başlangıç Tarihi"
+
+msgid "Generate"
+msgstr "Oluştur"
+
+msgid "Gmail Connection"
+msgstr "Gmail Bağlantısı"
+
+msgid "Hide"
+msgstr "Gizle"
+
+msgid "Highest"
+msgstr "En Yüksek"
+
+msgid "INVOICE"
+msgstr "FATURA"
+
+msgid "ITEM"
+msgstr "KALEM"
+
+msgid "Inactive Members"
+msgstr "Pasif Üyeler"
+
+msgid "Influencer"
+msgstr "Fenomen"
+
+msgid "Internal"
+msgstr "Dahili"
+
+msgid "Item Name"
+msgstr "Kalem Adı"
+
+msgid "Item Type"
+msgstr "Kalem Türü"
+
+msgid "Just now"
+msgstr "Az önce"
+
+msgid "Keep editing"
+msgstr "Düzenlemeye devam et"
+
+msgid "Last Activity"
+msgstr "Son Etkinlik"
+
+msgid "Last Login"
+msgstr "Son Giriş"
+
+msgid "Last Modified"
+msgstr "Son Değişiklik"
+
+msgid "Lead"
+msgstr "Aday"
+
+msgid "Liability"
+msgstr "Yükümlülük"
+
+msgid "Liquid Asset"
+msgstr "Likit Varlık"
+
+msgid "Live Stock"
+msgstr "Canlı Stok"
+
+msgid "Lock"
+msgstr "Kilitle"
+
+msgid "Locked"
+msgstr "Kilitli"
+
+msgid "MESSAGES"
+msgstr "MESAJLAR"
+
+msgid "MORE"
+msgstr "DAHA"
+
+msgid "Mailbox"
+msgstr "Posta Kutusu"
+
+msgid "Make Default"
+msgstr "Varsayılan Yap"
+
+msgid "Mark Complete"
+msgstr "Tamamlandı İşaretle"
+
+msgid "Member List"
+msgstr "Üye Listesi"
+
+msgid "Member Name"
+msgstr "Üye Adı"
+
+msgid "Members Online"
+msgstr "Çevrimiçi Üyeler"
+
+msgid "Min Inventory"
+msgstr "Min Stok"
+
+msgid "Modal"
+msgstr "Modal"
+
+msgid "Money In"
+msgstr "Gelen Para"
+
+msgid "Money Out"
+msgstr "Giden Para"
+
+msgid "Monthly Sales"
+msgstr "Aylık Satışlar"
+
+msgid "NOTES"
+msgstr "NOTLAR"
+
+msgid "New Account"
+msgstr "Yeni Hesap"
+
+msgid "New Activity"
+msgstr "Yeni Etkinlik"
+
+msgid "New Note"
+msgstr "Yeni Not"
+
+msgid "New Order"
+msgstr "Yeni Sipariş"
+
+msgid "Newsletter"
+msgstr "Bülten"
+
+msgid "No description provided."
+msgstr "Açıklama yok."
+
+msgid "Not Set"
+msgstr "Ayarlı değil"
+
+msgid "ORDER"
+msgstr "SİPARİŞ"
+
+msgid "Online Members"
+msgstr "Çevrimiçi Üyeler"
+
+msgid "Open Tasks"
+msgstr "Açık Görevler"
+
+msgid "PAID"
+msgstr "ÖDENDİ"
+
+msgid "Page Not Found"
+msgstr "Sayfa Bulunamadı"
+
+msgid "Past Activity"
+msgstr "Geçmiş Etkinlik"
+
+msgid "Pending Approval"
+msgstr "Onay Bekliyor"
+
+msgid "Pending Tasks"
+msgstr "Bekleyen Görevler"
+
+msgid "Permission Denied"
+msgstr "İzin Reddedildi"
+
+msgid "Personal Tasks"
+msgstr "Kişisel Görevler"
+
+msgid "Phone Numbers"
+msgstr "Telefon Numaraları"
+
+msgid "Place Order"
+msgstr "Sipariş Ver"
+
+msgid "Plain Text"
+msgstr "Düz Metin"
+
+msgid "Posted by"
+msgstr "Gönderen"
+
+msgid "Post a Message"
+msgstr "Mesaj Gönder"
+
+msgid "Procurement Officer"
+msgstr "Satın Alma Yetkilisi"
+
+msgid "Product Categories"
+msgstr "Ürün Kategorileri"
+
+msgid "Product Code"
+msgstr "Ürün Kodu"
+
+msgid "Product Variants"
+msgstr "Ürün varyantları"
+
+msgid "Promotion"
+msgstr "Promosyon"
+
+msgid "Pull from Gmail"
+msgstr "Gmail'den Çek"
+
+msgid "Purchase Date"
+msgstr "Satın Alma Tarihi"
+
+msgid "QUANTITY"
+msgstr "MİKTAR"
+
+msgid "Quick Actions"
+msgstr "Hızlı İşlemler"
+
+msgid "Quick Note"
+msgstr "Hızlı Not"
+
+msgid "RECEIPT"
+msgstr "FİŞ"
+
+msgid "Read Time"
+msgstr "Okunma Süresi"
+
+msgid "Receipt Items"
+msgstr "Fiş Kalemleri"
+
+msgid "Receivable"
+msgstr "Alacak"
+
+msgid "Recipient"
+msgstr "Alıcı"
+
+msgid "Recipients"
+msgstr "Alıcılar"
+
+msgid "Record"
+msgstr "Kayıt"
+
+msgid "Records"
+msgstr "Kayıtlar"
+
+msgid "Refresh Inbox"
+msgstr "Gelen Kutusunu Yenile"
+
+msgid "Region Settings"
+msgstr "Bölge Ayarları"
+
+msgid "Reorder"
+msgstr "Yeniden Sırala"
+
+msgid "Report a Bug"
+msgstr "Hata Bildir"
+
+msgid "Report Issue"
+msgstr "Sorun Bildir"
+
+msgid "Resource"
+msgstr "Kaynak"
+
+msgid "Revenue Total"
+msgstr "Toplam Gelir"
+
+msgid "Role Name"
+msgstr "Rol Adı"
+
+msgid "Run"
+msgstr "Çalıştır"
+
+msgid "SALES"
+msgstr "SATIŞLAR"
+
+msgid "STATUS"
+msgstr "DURUM"
+
+msgid "Sales Person"
+msgstr "Satış Temsilcisi"
+
+msgid "Save & New"
+msgstr "Kaydet ve Yeni"
+
+msgid "Search Channel"
+msgstr "Kanal Ara"
+
+msgid "Search Contacts"
+msgstr "Kişilerde Ara"
+
+msgid "Search Customers"
+msgstr "Müşterilerde Ara"
+
+msgid "Search Members"
+msgstr "Üyelerde Ara"
+
+msgid "Search Notes"
+msgstr "Notlarda Ara"
+
+msgid "Search Orders"
+msgstr "Siparişlerde Ara"
+
+msgid "Search Products"
+msgstr "Ürünlerde Ara"
+
+msgid "Search Suppliers"
+msgstr "Tedarikçilerde Ara"
+
+msgid "Search Tasks"
+msgstr "Görevlerde Ara"
+
+msgid "Search Users"
+msgstr "Kullanıcılarda Ara"
+
+msgid "Section Name"
+msgstr "Bölüm Adı"
+
+msgid "Send invitation"
+msgstr "Davet Gönder"
+
+msgid "Set Default"
+msgstr "Varsayılan Yap"
+
+msgid "Set due date"
+msgstr "Vade tarihi belirle"
+
+msgid "Set Priority"
+msgstr "Öncelik belirle"
+
+msgid "Setup"
+msgstr "Kurulum"
+
+msgid "Show Less"
+msgstr "Daha Az Göster"
+
+msgid "Show Password"
+msgstr "Parolayı Göster"
+
+msgid "Side Panel"
+msgstr "Yan Panel"
+
+msgid "Single Record"
+msgstr "Tek Kayıt"
+
+msgid "Site Settings"
+msgstr "Site Ayarları"
+
+msgid "Snooze"
+msgstr "Ertele"
+
+msgid "Source Currency"
+msgstr "Kaynak Para Birimi"
+
+msgid "Status Update"
+msgstr "Durum Güncelle"
+
+msgid "Sub Category"
+msgstr "Alt Kategori"
+
+msgid "Sub-Total"
+msgstr "Ara Toplam"
+
+msgid "Subscribe"
+msgstr "Abone Ol"
+
+msgid "TITLE"
+msgstr "BAŞLIK"
+
+msgid "TOTAL"
+msgstr "TOPLAM"
+
+msgid "Take Note"
+msgstr "Not Al"
+
+msgid "Target Currency"
+msgstr "Hedef Para Birimi"
+
+msgid "Tax Amount"
+msgstr "Vergi Tutarı"
+
+msgid "Team Settings"
+msgstr "Takım Ayarları"
+
+msgid "Template"
+msgstr "Şablon"
+
+msgid "Threshold"
+msgstr "Eşik"
+
+msgid "Time Spent"
+msgstr "Harcanan Süre"
+
+msgid "Title (Turkish) *"
+msgstr "Başlık (Türkçe) *"
+
+msgid "To Date"
+msgstr "Bitiş Tarihi"
+
+msgid "Top Customers"
+msgstr "En İyi Müşteriler"
+
+msgid "Top Products"
+msgstr "En İyi Ürünler"
+
+msgid "Top Sellers"
+msgstr "En Çok Satanlar"
+
+msgid "Total Orders"
+msgstr "Toplam Siparişler"
+
+msgid "Total Products"
+msgstr "Toplam Ürünler"
+
+msgid "Total Revenue"
+msgstr "Toplam Gelir"
+
+msgid "Total Stock"
+msgstr "Toplam Stok"
+
+msgid "Track Order"
+msgstr "Siparişi Takip Et"
+
+msgid "Transaction"
+msgstr "İşlem"
+
+msgid "Transactions"
+msgstr "İşlemler"
+
+msgid "Translation"
+msgstr "Çeviri"
+
+msgid "Trial"
+msgstr "Deneme"
+
+msgid "UNIT"
+msgstr "BİRİM"
+
+msgid "Unarchive"
+msgstr "Arşivden Çıkar"
+
+msgid "Unsent"
+msgstr "Gönderilmemiş"
+
+msgid "Unsubscribe"
+msgstr "Aboneliği iptal et"
+
+msgid "Untitled"
+msgstr "Başlıksız"
+
+msgid "Update Avatar"
+msgstr "Avatarı Güncelle"
+
+msgid "Use Default"
+msgstr "Varsayılanı Kullan"
+
+msgid "User Name"
+msgstr "Kullanıcı Adı"
+
+msgid "User Settings"
+msgstr "Kullanıcı Ayarları"
+
+msgid "VAT"
+msgstr "KDV"
+
+msgid "Validate"
+msgstr "Doğrula"
+
+msgid "Variant Name"
+msgstr "Varyant Adı"
+
+msgid "View Order"
+msgstr "Siparişi Görüntüle"
+
+msgid "View Receipt"
+msgstr "Fişi Görüntüle"
+
+msgid "View Task"
+msgstr "Görevi Görüntüle"
+
+msgid "Welcome back!"
+msgstr "Tekrar hoş geldin!"
+
+msgid "Whole Team"
+msgstr "Tüm Takım"
+
+msgid "Wholesale"
+msgstr "Toptan"
+
+msgid "Wholesale Price"
+msgstr "Toptan Fiyat"
+
+msgid "Yearly Sales"
+msgstr "Yıllık Satışlar"
+
+msgid "Your Cart"
+msgstr "Sepetin"
+
+msgid "Your Order"
+msgstr "Siparişin"
+
+msgid "Your Orders"
+msgstr "Siparişlerin"
+
+msgid "Your Profile"
+msgstr "Profilin"
+
+msgid "Quick Order"
+msgstr "Hızlı Sipariş"
+
+msgid "Enter a quantity to see your price."
+msgstr "Fiyatı görmek için adet gir."
+
+msgid "units"
+msgstr "adet"
+
+msgid "unit"
+msgstr "adet"
+
+msgid "off"
+msgstr "indirim"
+
+msgid "Unit price"
+msgstr "Birim fiyat"
+
+msgid "Add to Quote"
+msgstr "Teklife Ekle"
+
+msgid "Added to quote"
+msgstr "Teklife eklendi"
+
+msgid "Minimum order: <b>50 packs</b>."
+msgstr "Minimum sipariş: <b>50 paket</b>."
+
+msgid "Availability"
+msgstr "Stok Durumu"
+
+msgid "in stock"
+msgstr "stokta"
+
+msgid "Unavailable"
+msgstr "Mevcut değil"
+
+msgid "Order Management"
+msgstr "Sipariş Yönetimi"
+
+msgid "New order"
+msgstr "Yeni sipariş"
+
+msgid "B2B Orders"
+msgstr "B2B Siparişler"
+
+msgid "B2C / Web"
+msgstr "B2C / Web"
+
+msgid "Search order no, customer, product…"
+msgstr "Sipariş no, müşteri, ürün ara…"
+
+msgid "orders"
+msgstr "sipariş"
+
+msgid "B2B · Contact"
+msgstr "B2B · Kişi"
+
+msgid "B2B · Company"
+msgstr "B2B · Şirket"
+
+msgid "Web customer"
+msgstr "Web Müşteri"
+
+msgid "ERP"
+msgstr "ERP"
+
+msgid "Create your first order to get started"
+msgstr "İlk siparişini oluşturarak başla"
+
+msgid "Company and contact orders will appear here"
+msgstr "Şirket ve kişi siparişleri burada görünecek"
+
+msgid "Orders from your website will appear here"
+msgstr "Web sitenden gelen siparişler burada görünecek"
+
+msgid "Back to orders"
+msgstr "Siparişlere dön"
+
+msgid "Production"
+msgstr "Üretim"
+
+msgid "Packing"
+msgstr "Paketleme"
+
+msgid "Order status"
+msgstr "Sipariş durumu"
+
+msgid "Updating the status sends an automatic notification to the customer"
+msgstr "Durumu güncellediğinizde müşteriye otomatik bildirim gider"
+
+msgid "Confirmed"
+msgstr "Onaylandı"
+
+msgid "Preparing / Sourcing"
+msgstr "Hazırlanıyor / Tedarik"
+
+msgid "Shipped"
+msgstr "Kargoda"
+
+msgid "In transit"
+msgstr "Yolda"
+
+msgid "Out for delivery"
+msgstr "Dağıtımda"
+
+msgid "Delivered"
+msgstr "Teslim edildi"
+
+msgid "Returned"
+msgstr "İade"
+
+msgid "Order received"
+msgstr "Sipariş alındı"
+
+msgid "Preparing"
+msgstr "Hazırlanıyor"
+
+msgid "items"
+msgstr "kalem"
+
+msgid "(deleted product)"
+msgstr "(silinmiş ürün)"
+
+msgid "Excl. VAT"
+msgstr "KDV hariç"
+
+msgid "Grand total"
+msgstr "Genel toplam"
+
+msgid "This order has no items yet"
+msgstr "Bu siparişte henüz ürün yok"
+
+msgid "Status auto-updates when a tracking number is entered"
+msgstr "Takip numarası girildiğinde durum otomatik güncellenir"
+
+msgid "Select…"
+msgstr "Seç…"
+
+msgid "Tracking number"
+msgstr "Takip numarası"
+
+msgid "Save shipping info"
+msgstr "Kargo bilgisini kaydet"
+
+msgid "Shipped at:"
+msgstr "Kargoya verildi:"
+
+msgid "Delivered at:"
+msgstr "Teslim edildi:"
+
+msgid "B2B · Individual"
+msgstr "B2B · Bireysel kişi"
+
+msgid "Open profile"
+msgstr "Profili aç"
+
+msgid "B2B · Corporate"
+msgstr "B2B · Kurumsal"
+
+msgid "Open company profile"
+msgstr "Şirket profilini aç"
+
+msgid "Dealer no"
+msgstr "Bayi no"
+
+msgid "Guest order"
+msgstr "Misafir sipariş"
+
+msgid "No customer assigned"
+msgstr "Müşteri atanmamış"
+
+msgid "Delivery address"
+msgstr "Teslimat adresi"
+
+msgid "Billing address"
+msgstr "Fatura adresi"
+
+msgid "Payment info"
+msgstr "Ödeme bilgisi"
+
+msgid "Customer paid"
+msgstr "Müşterinin ödediği"
+
+msgid "products selected"
+msgstr "ürün seçildi"
+
+msgid "No image available"
+msgstr "Görsel yok"
+
+msgid "No description available"
+msgstr "Açıklama yok"
+
+msgid "Product Datasheet"
+msgstr "Ürün dokümanı"
+
+msgid "Regular"
+msgstr "Standart"
+
+msgid "Please fix the following errors:"
+msgstr "Lütfen aşağıdaki hataları düzeltin:"
+
+msgid "Unsaved"
+msgstr "Kaydedilmedi"
+
+msgid "Add from URL"
+msgstr "URL'den ekle"
+
+msgid "Product images are synced from the first variant."
+msgstr "Ürün görselleri ilk varyanttan senkronlanır."
+
+msgid "0 selected"
+msgstr "0 seçili"
+
+msgid "Delete Selected"
+msgstr "Seçilileri sil"
+
+msgid "Add Media"
+msgstr "Medya ekle"
+
+msgid "Primary Image"
+msgstr "Birincil görsel"
+
+msgid "Displayed on the product card"
+msgstr "Ürün kartında gösterilir"
+
+msgid "Change"
+msgstr "Değiştir"
+
+msgid "Select an image"
+msgstr "Bir görsel seçin"
+
+msgid "Accepts images, videos, or 3D models"
+msgstr "Görsel, video veya 3D model kabul eder"
+
+msgid "Track Manufacturing"
+msgstr "Üretim takibi"
+
+msgid "Total Material Cost per Unit:"
+msgstr "Birim başına toplam malzeme maliyeti:"
+
+msgid "No materials added. Search above to create a recipe."
+msgstr "Henüz malzeme eklenmedi. Reçete oluşturmak için yukarıdan arayın."
+
+msgid ""
+"Add <b>one</b> kind of campaign to this product. Either a flat percentage "
+"discount with an end date, OR volume-tier (bulk) pricing where the price "
+"drops as the buyer orders more."
+msgstr ""
+"Bu ürüne <b>bir</b> tür kampanya ekleyin. Bitiş tarihli sabit yüzde indirimi"
+" VEYA alıcı daha fazla sipariş ettikçe fiyatın düştüğü kademeli (toplu) "
+"fiyatlandırma."
+
+msgid ""
+"Whole catalog price will drop by this % until the chosen end date "
+"(inclusive)."
+msgstr ""
+"Tüm katalog fiyatı, seçilen bitiş tarihine (dahil) kadar bu yüzde oranında "
+"düşer."
+
+msgid ""
+"Each tier is \"from X units → %Y off\". Leave the top tier's <b>Max</b> "
+"empty to mean \"X+ and above\"."
+msgstr ""
+"Her kademe \"X adetten itibaren → %Y indirim\" şeklindedir. En üst kademenin"
+" <b>Max</b> alanını boş bırakırsanız \"X ve üzeri\" anlamına gelir."
+
+msgid "View on demfirat.com"
+msgstr "demfirat.com'da görüntüle"
+
+msgid "Add Attribute"
+msgstr "Özellik ekle"
+
+msgid "No attributes yet."
+msgstr "Henüz özellik yok."
+
+msgid "stock"
+msgstr "stok"
+
+msgid "Loading variants…"
+msgstr "Varyantlar yükleniyor…"
+
+msgid "Try changing the filters or running a different search."
+msgstr "Filtreleri değiştirin veya farklı bir arama yapın."
+
+msgid "No active variants found for this product."
+msgstr "Bu ürün için aktif varyant bulunamadı."
+
+msgid "Add Product Variants"
+msgstr "Ürün varyantları ekle"
+
+msgid "Add another option"
+msgstr "Başka bir seçenek ekle"
+
+msgid "Grouping by"
+msgstr "Gruplama"
+
+msgid "Attributes"
+msgstr "Özellikler"
+
+msgid "PHOTO"
+msgstr "GÖRSEL"
+
+msgid "FEATURED"
+msgstr "ÖNE ÇIKAN"
+
+msgid "Update All Prices from Cost (cost x 2 / 0.7)"
+msgstr "Tüm fiyatları maliyetten güncelle (maliyet x 2 / 0.7)"
+
+msgid "Option name"
+msgstr "Seçenek adı"
+
+msgid "Option values"
+msgstr "Seçenek değerleri"
+
+msgid "e.g. Size, Color"
+msgstr "örn. Beden, Renk"
+
+msgid "Add another value"
+msgstr "Başka bir değer ekle"
+
+msgid "COLOR"
+msgstr "RENK"
+
+msgid "SIZE"
+msgstr "BEDEN"
+
+msgid "MATERIAL"
+msgstr "MALZEME"
+
+msgid "STYLE"
+msgstr "STİL"
+
+msgid "PATTERN"
+msgstr "DESEN"
+
+msgid "LENGTH"
+msgstr "UZUNLUK"
+
+msgid "WIDTH"
+msgstr "GENİŞLİK"
+
+msgid "HEIGHT"
+msgstr "YÜKSEKLİK"
+
+msgid "WEIGHT"
+msgstr "AĞIRLIK"
+
+msgid "Variant Attributes"
+msgstr "Varyant Özellikleri"
+
+msgid ""
+"Customize attributes for this specific variant. Leave empty to use product-"
+"level defaults."
+msgstr ""
+"Bu varyant için özellikleri özelleştirin. Ürün düzeyindeki varsayılanları "
+"kullanmak için boş bırakın."
+
+msgid "Variant value"
+msgstr "Varyant değeri"
+
+msgid ""
+"No product-level attributes defined. Add attributes in the Product "
+"Attributes section above."
+msgstr ""
+"Henüz ürün düzeyinde özellik tanımlanmadı. Yukarıdaki Ürün Özellikleri "
+"bölümünden ekleyin."
+
+msgid "Attributes saved for variant"
+msgstr "Varyant özellikleri kaydedildi"

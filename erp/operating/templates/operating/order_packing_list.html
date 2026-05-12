@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% block css %}
@@ -15,12 +16,12 @@
       <table style="border-collapse: collapse; width: 100%; margin-top: 2rem; font-family: sans-serif;">
         <thead>
           <tr style="background-color: #f2f2f2;">
-            <th style="border: 2px solid #333; padding: 8px;">Pack Number</th>
-            <th style="border: 2px solid #333; padding: 8px;">SKU</th>
-            <th style="border: 2px solid #333; padding: 8px;">Description</th>
-            <th style="border: 2px solid #333; padding: 8px;">Quantity</th>
-            <th style="border: 2px solid #333; padding: 8px;">Unit of Measure</th>
-            <th style="border: 2px solid #333; padding: 8px;">Unit ID</th>
+            <th style="border: 2px solid #333; padding: 8px;">{% trans "Pack Number" %}</th>
+            <th style="border: 2px solid #333; padding: 8px;">{% trans "SKU" %}</th>
+            <th style="border: 2px solid #333; padding: 8px;">{% trans "Description" %}</th>
+            <th style="border: 2px solid #333; padding: 8px;">{% trans "Quantity" %}</th>
+            <th style="border: 2px solid #333; padding: 8px;">{% trans "Unit of Measure" %}</th>
+            <th style="border: 2px solid #333; padding: 8px;">{% trans "Unit ID" %}</th>
           </tr>
         </thead>
         <tbody>

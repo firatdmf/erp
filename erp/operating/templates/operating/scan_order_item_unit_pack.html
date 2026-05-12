@@ -1,8 +1,9 @@
 <!-- templates/scan.html -->
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
-  <h2>Scan Order Item QR</h2>
-  <label for="pack_number">Choose pack number</label>
+  <h2>{% trans "Scan Order Item QR" %}</h2>
+  <label for="pack_number">{% trans "Choose pack number" %}</label>
   <select name="pack_number" id="select_pack_number">
     {% for i in max_pack_range %}
       <option value="{{ i }}">{{ i }}</option>
@@ -10,7 +11,7 @@
   </select>
   <div id="qr-reader" style="width: 300px"></div>
   <div id="qr-result" style="margin-top: 1rem; font-weight: bold;"></div>
-  <button id="scan-next-button" style="display:none; margin-top: 1rem;">Scan Next</button>
+  <button id="scan-next-button" style="display:none; margin-top: 1rem;">{% trans "Scan Next" %}</button>
   {% comment %}This line loads the html5-qrcode JavaScript library. It uses your device’s camera to scan QR codes.{% endcomment %}
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script>

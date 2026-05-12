@@ -1,3 +1,4 @@
+{% load i18n %}
 <form id="rawMaterialReceiptForm" method="post" onsubmit="submitRawMaterialReceiptForm(event); return false;"
     enctype="multipart/form-data">
     {% csrf_token %}
@@ -23,6 +24,6 @@
                 Creating...
             </span>
         </button>
-        <button type="button" class="btn btn-secondary" onclick="closeRawMaterialReceiptSidebar()">Cancel</button>
+        <button type="button" class="btn btn-secondary" onclick="closeRawMaterialReceiptSidebar()">{% trans "Cancel" %}</button>
     </div>
 </form>

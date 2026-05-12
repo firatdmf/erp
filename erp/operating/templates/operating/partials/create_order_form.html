@@ -1,3 +1,4 @@
+{% load i18n %}
 <style>
 .co-section-header{display:flex;align-items:center;gap:10px;padding:12px 0;cursor:pointer;user-select:none;font-weight:600;font-size:.875rem;color:var(--text-primary);border-bottom:1px solid var(--border-color)}
 .co-section-header:hover{color:#1e293b}
@@ -51,7 +52,7 @@
     </div>
     <div class="co-section-body">
       <div class="form-group">
-        <label>Type</label>
+        <label>{% trans "Type" %}</label>
         <div class="co-type-group">
           <label class="co-type-btn">
             <input type="radio" name="order_type" value="web">
@@ -76,7 +77,7 @@
     </div>
     <div class="co-section-body">
       <div class="form-group">
-        <label>Search Product</label>
+        <label>{% trans "Search Product" %}</label>
         <input type="text" id="co-product-search" class="form-input" placeholder="Name, SKU or variant SKU..."
           hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
           hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
@@ -98,7 +99,7 @@
     <div class="co-section-body">
       <!-- Customer Source -->
       <div class="form-group">
-        <label>Customer Source</label>
+        <label>{% trans "Customer Source" %}</label>
         <div class="co-type-group">
           <label class="co-type-btn">
             <input type="radio" name="customer_source" value="crm" checked onchange="coCustomerSource('crm')">
@@ -121,7 +122,7 @@
       <!-- CRM Customer Search -->
       <div id="co-crm-fields">
         <div class="form-group">
-          <label>Search Contact / Company</label>
+          <label>{% trans "Search Contact / Company" %}</label>
           <input type="text" id="co-customer-search" class="form-input" placeholder="Contact or company name..."
             hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
             hx-target="#co-customer-results" hx-swap="innerHTML" name="customer" autocomplete="off">
@@ -133,7 +134,7 @@
       <!-- Web Client Search -->
       <div id="co-web-fields" style="display:none;">
         <div class="form-group">
-          <label>Search Web Client</label>
+          <label>{% trans "Search Web Client" %}</label>
           <input type="text" id="co-webclient-search" class="form-input" placeholder="Email or username..."
             hx-get="{% url 'operating:webclient_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
             hx-target="#co-webclient-results" hx-swap="innerHTML" name="webclient_q" autocomplete="off">
@@ -147,27 +148,27 @@
       <div id="co-guest-fields" style="display:none;">
         <div class="co-row">
           <div class="form-group">
-            <label>First Name</label>
+            <label>{% trans "First Name" %}</label>
             <input type="text" name="guest_first_name" class="form-input" placeholder="First name">
           </div>
           <div class="form-group">
-            <label>Last Name</label>
+            <label>{% trans "Last Name" %}</label>
             <input type="text" name="guest_last_name" class="form-input" placeholder="Last name">
           </div>
         </div>
         <div class="form-group">
-          <label>Email</label>
+          <label>{% trans "Email" %}</label>
           <input type="email" name="guest_email" class="form-input" placeholder="Email">
         </div>
         <div class="form-group">
-          <label>Phone</label>
+          <label>{% trans "Phone" %}</label>
           <input type="text" name="guest_phone" class="form-input" placeholder="Phone">
         </div>
       </div>
 
       <!-- Delivery Address (shared) -->
       <div class="form-group" style="margin-top:12px;">
-        <label>Delivery Address</label>
+        <label>{% trans "Delivery Address" %}</label>
         <input type="text" name="delivery_address_title" class="form-input" placeholder="Address title (Home, Work...)">
       </div>
       <div class="form-group">
@@ -197,7 +198,7 @@
     </div>
     <div class="co-section-body">
       <div class="form-group">
-        <label>Payment Method</label>
+        <label>{% trans "Payment Method" %}</label>
         <div class="co-type-group">
           <label class="co-type-btn">
             <input type="radio" name="payment_method" value="cash" checked>
@@ -215,7 +216,7 @@
       </div>
 
       <div class="form-group">
-        <label>Notes</label>
+        <label>{% trans "Notes" %}</label>
         <textarea name="notes" class="form-textarea" placeholder="Order notes..." rows="2"></textarea>
       </div>
     </div>
@@ -225,15 +226,15 @@
   <div style="padding-top:12px;">
     <div class="co-row" style="margin-bottom:12px;">
       <div class="form-group">
-        <label>Total Price</label>
+        <label>{% trans "Total Price" %}</label>
         <input type="number" id="co-total-price" name="total_price" class="form-input" value="0" min="0" step="0.01" placeholder="0.00" oninput="coUpdateRemaining()">
       </div>
       <div class="form-group">
-        <label>Amount Paid</label>
+        <label>{% trans "Amount Paid" %}</label>
         <input type="number" id="co-amount-paid" name="paid_amount" class="form-input" value="0" min="0" step="0.01" placeholder="0.00" oninput="coUpdateRemaining()">
       </div>
       <div class="form-group">
-        <label>Remaining</label>
+        <label>{% trans "Remaining" %}</label>
         <div id="co-remaining" style="font-size:14px;font-weight:700;color:#ef4444;padding-top:8px;">$0.00</div>
       </div>
     </div>
@@ -281,52 +282,52 @@
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>
         </div>
         <div class="form-group" style="margin-bottom:8px">
-          <label>Product Type</label>
+          <label>{% trans "Product Type" %}</label>
           <select class="form-input" onchange="coType(${i},this.value)">
-            <option value="fabric" ${!cc?'selected':''}>Fabric</option>
-            <option value="custom_curtain" ${cc?'selected':''}>Custom Curtain</option>
-            <option value="home_textile">Home Textile</option>
+            <option value="fabric" ${!cc?'selected':''}>{% trans "Fabric" %}</option>
+            <option value="custom_curtain" ${cc?'selected':''}>{% trans "Custom Curtain" %}</option>
+            <option value="home_textile">{% trans "Home Textile" %}</option>
           </select>
         </div>
         <div class="co-row">
-          <div class="form-group"><label>Qty</label><input type="number" class="form-input" value="${item.quantity}" min="0.01" step="0.01" onchange="coUpd(${i},'quantity',this.value)"></div>
-          <div class="form-group"><label>Unit Price</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
-          <div class="form-group"><label>Total</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
+          <div class="form-group"><label>{% trans "Qty" %}</label><input type="number" class="form-input" value="${item.quantity}" min="0.01" step="0.01" onchange="coUpd(${i},'quantity',this.value)"></div>
+          <div class="form-group"><label>{% trans "Unit Price" %}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
+          <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
         </div>
         <div id="co-curtain-${i}" style="display:${cc?'block':'none'}">
           <div class="co-curtain-fields">
-            <div class="form-group"><label>Fabric Used (m)</label><input type="number" class="form-input" value="${item.custom_fabric_used_meters}" min="0" step="0.01" onchange="coUpd(${i},'custom_fabric_used_meters',this.value)"></div>
+            <div class="form-group"><label>{% trans "Fabric Used (m)" %}</label><input type="number" class="form-input" value="${item.custom_fabric_used_meters}" min="0" step="0.01" onchange="coUpd(${i},'custom_fabric_used_meters',this.value)"></div>
             <div class="co-row">
-              <div class="form-group"><label>Width (cm)</label><input type="number" class="form-input" value="${item.custom_width}" min="0" step="1" onchange="coUpd(${i},'custom_width',this.value)"></div>
-              <div class="form-group"><label>Height (cm)</label><input type="number" class="form-input" value="${item.custom_height}" min="0" step="1" onchange="coUpd(${i},'custom_height',this.value)"></div>
+              <div class="form-group"><label>{% trans "Width (cm)" %}</label><input type="number" class="form-input" value="${item.custom_width}" min="0" step="1" onchange="coUpd(${i},'custom_width',this.value)"></div>
+              <div class="form-group"><label>{% trans "Height (cm)" %}</label><input type="number" class="form-input" value="${item.custom_height}" min="0" step="1" onchange="coUpd(${i},'custom_height',this.value)"></div>
             </div>
             <div class="co-row">
-              <div class="form-group"><label>Pleat Type</label>
+              <div class="form-group"><label>{% trans "Pleat Type" %}</label>
                 <select class="form-input" onchange="coUpd(${i},'custom_pleat_type',this.value)">
-                  <option value="">Select</option><option value="flat" ${item.custom_pleat_type==='flat'?'selected':''}>Flat</option><option value="kanun" ${item.custom_pleat_type==='kanun'?'selected':''}>Kanun</option><option value="pipe" ${item.custom_pleat_type==='pipe'?'selected':''}>Pipe</option><option value="water_wave" ${item.custom_pleat_type==='water_wave'?'selected':''}>Water Wave</option><option value="american" ${item.custom_pleat_type==='american'?'selected':''}>American</option><option value="extrafor" ${item.custom_pleat_type==='extrafor'?'selected':''}>Extrafor</option>
+                  <option value="">{% trans "Select" %}</option><option value="flat" ${item.custom_pleat_type==='flat'?'selected':''}>{% trans "Flat" %}</option><option value="kanun" ${item.custom_pleat_type==='kanun'?'selected':''}>{% trans "Kanun" %}</option><option value="pipe" ${item.custom_pleat_type==='pipe'?'selected':''}>{% trans "Pipe" %}</option><option value="water_wave" ${item.custom_pleat_type==='water_wave'?'selected':''}>{% trans "Water Wave" %}</option><option value="american" ${item.custom_pleat_type==='american'?'selected':''}>{% trans "American" %}</option><option value="extrafor" ${item.custom_pleat_type==='extrafor'?'selected':''}>{% trans "Extrafor" %}</option>
                 </select>
               </div>
-              <div class="form-group"><label>Pleat Density</label>
+              <div class="form-group"><label>{% trans "Pleat Density" %}</label>
                 <select class="form-input" onchange="coUpd(${i},'custom_pleat_density',this.value)">
-                  <option value="">Select</option><option value="1x2" ${item.custom_pleat_density==='1x2'?'selected':''}>1x2</option><option value="1x2.5" ${item.custom_pleat_density==='1x2.5'?'selected':''}>1x2.5</option><option value="1x3" ${item.custom_pleat_density==='1x3'?'selected':''}>1x3</option>
+                  <option value="">{% trans "Select" %}</option><option value="1x2" ${item.custom_pleat_density==='1x2'?'selected':''}>1x2</option><option value="1x2.5" ${item.custom_pleat_density==='1x2.5'?'selected':''}>1x2.5</option><option value="1x3" ${item.custom_pleat_density==='1x3'?'selected':''}>1x3</option>
                 </select>
               </div>
             </div>
             <div class="co-row">
-              <div class="form-group"><label>Mounting</label>
+              <div class="form-group"><label>{% trans "Mounting" %}</label>
                 <select class="form-input" onchange="coUpd(${i},'custom_mounting_type',this.value)">
-                  <option value="">Select</option><option value="cornice" ${item.custom_mounting_type==='cornice'?'selected':''}>Cornice</option><option value="rustic" ${item.custom_mounting_type==='rustic'?'selected':''}>Rustic</option>
+                  <option value="">{% trans "Select" %}</option><option value="cornice" ${item.custom_mounting_type==='cornice'?'selected':''}>{% trans "Cornice" %}</option><option value="rustic" ${item.custom_mounting_type==='rustic'?'selected':''}>{% trans "Rustic" %}</option>
                 </select>
               </div>
-              <div class="form-group"><label>Wing</label>
+              <div class="form-group"><label>{% trans "Wing" %}</label>
                 <select class="form-input" onchange="coUpd(${i},'custom_wing_type',this.value)">
-                  <option value="">Select</option><option value="single" ${item.custom_wing_type==='single'?'selected':''}>Single</option><option value="double" ${item.custom_wing_type==='double'?'selected':''}>Double</option>
+                  <option value="">{% trans "Select" %}</option><option value="single" ${item.custom_wing_type==='single'?'selected':''}>{% trans "Single" %}</option><option value="double" ${item.custom_wing_type==='double'?'selected':''}>{% trans "Double" %}</option>
                 </select>
               </div>
             </div>
           </div>
         </div>
-        <div class="form-group" style="margin-top:8px;margin-bottom:0"><label>Description</label><input type="text" class="form-input" value="${esc(item.description)}" placeholder="Note..." onchange="coUpd(${i},'description',this.value)"></div>
+        <div class="form-group" style="margin-top:8px;margin-bottom:0"><label>{% trans "Description" %}</label><input type="text" class="form-input" value="${esc(item.description)}" placeholder="Note..." onchange="coUpd(${i},'description',this.value)"></div>
       </div>`;
     }).join('');
   }

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block title %}Multi-Team Management | Nejum ERP{% endblock %}
@@ -462,7 +463,7 @@
   <!-- Sidebar -->
   <div class="dashboard-sidebar">
     <div class="sidebar-section">
-      <h3 class="sidebar-title">My Teams</h3>
+      <h3 class="sidebar-title">{% trans "My Teams" %}</h3>
       <ul class="team-list">
         {% for team in user_teams %}
           <li class="team-item {% if team.id == active_team.id %}active{% endif %}" onclick="switchTeam({{ team.id }})">
@@ -483,7 +484,7 @@
   <!-- Main Content -->
   <div class="dashboard-content">
     <div class="content-header">
-      <h1>Multi-Team Management</h1>
+      <h1>{% trans "Multi-Team Management" %}</h1>
       <div class="header-search">
         <i class="fas fa-search"></i>
         <input type="text" placeholder="Search members, teams or roles..." id="searchInput">
@@ -517,7 +518,7 @@
 
     <!-- Team Selection Tabs -->
     <div class="team-tabs">
-      <button class="team-tab active" onclick="filterTeam('all')">All Teams</button>
+      <button class="team-tab active" onclick="filterTeam('all')">{% trans "All Teams" %}</button>
       {% for team in user_teams %}
         <button class="team-tab" onclick="filterTeam({{ team.id }})">{{ team.name }}</button>
       {% endfor %}
@@ -570,16 +571,16 @@
     <form id="createTeamForm">
       {% csrf_token %}
       <div class="form-group">
-        <label class="form-label">Team Name</label>
+        <label class="form-label">{% trans "Team Name" %}</label>
         <input type="text" class="form-input" name="team_name" placeholder="e.g. Marketing Team" required>
       </div>
       <div class="form-group">
-        <label class="form-label">Description</label>
+        <label class="form-label">{% trans "Description" %}</label>
         <textarea class="form-input" name="description" placeholder="What is this team about?" style="resize: vertical; min-height: 100px;"></textarea>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('createTeamModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Team</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('createTeamModal')">{% trans "Cancel" %}</button>
+        <button type="submit" class="btn btn-primary">{% trans "Create Team" %}</button>
       </div>
     </form>
   </div>
@@ -592,21 +593,21 @@
     <form id="addMemberForm">
       {% csrf_token %}
       <div class="form-group">
-        <label class="form-label">Find users to invite</label>
+        <label class="form-label">{% trans "Find users to invite" %}</label>
         <input type="text" class="form-input" id="memberSearch" placeholder="Search by name or email...">
         <div id="memberSearchResults" style="margin-top: 1rem;"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Role</label>
+        <label class="form-label">{% trans "Role" %}</label>
         <select class="form-input" name="role" required>
-          <option value="member">Member</option>
-          <option value="manager">Manager</option>
-          <option value="admin">Admin</option>
+          <option value="member">{% trans "Member" %}</option>
+          <option value="manager">{% trans "Manager" %}</option>
+          <option value="admin">{% trans "Admin" %}</option>
         </select>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('addMemberModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Add Member</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addMemberModal')">{% trans "Cancel" %}</button>
+        <button type="submit" class="btn btn-primary">{% trans "Add Member" %}</button>
       </div>
     </form>
   </div>

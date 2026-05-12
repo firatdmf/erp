@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% block css %}
@@ -6,18 +7,18 @@
   {% endblock %}
 
   <div class="equity_expense">
-    <h1>Expenses Table</h1>
+    <h1>{% trans "Expenses Table" %}</h1>
     <table>
       <tr>
-        <th>Expense #</th>
-        {% comment %} <th>Transaction #</th> {% endcomment %}
-        <th>Date</th>
-        <th>Category</th>
-        {% comment %} <th>Currency</th> {% endcomment %}
-        <th>Amount</th>
-        <th>Description</th>
-        <th>Account</th>
-        <th>Account Balance</th>
+        <th>{% trans "Expense #" %}</th>
+        {% comment %} <th>{% trans "Transaction #" %}</th> {% endcomment %}
+        <th>{% trans "Date" %}</th>
+        <th>{% trans "Category" %}</th>
+        {% comment %} <th>{% trans "Currency" %}</th> {% endcomment %}
+        <th>{% trans "Amount" %}</th>
+        <th>{% trans "Description" %}</th>
+        <th>{% trans "Account" %}</th>
+        <th>{% trans "Account Balance" %}</th>
       </tr>
 
       {% for expense in object_list|dictsortreversed:'pk'|dictsortreversed:'date' %}

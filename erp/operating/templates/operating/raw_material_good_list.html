@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -239,7 +240,7 @@
     <!-- Header -->
     <div class="page-header">
         <div class="header-title">
-            <h1>Raw Materials</h1>
+            <h1>{% trans "Raw Materials" %}</h1>
             <p>Manage raw materials inventory and definitions.</p>
         </div>
     </div>
@@ -269,12 +270,12 @@
         <table class="modern-table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>SKU</th>
-                    <th>Type</th>
-                    <th>Unit</th>
-                    <th style="text-align: right;">Quantity</th>
-                    <th style="width: 100px; text-align: center;">Actions</th>
+                    <th>{% trans "Name" %}</th>
+                    <th>{% trans "SKU" %}</th>
+                    <th>{% trans "Type" %}</th>
+                    <th>{% trans "Unit" %}</th>
+                    <th style="text-align: right;">{% trans "Quantity" %}</th>
+                    <th style="width: 100px; text-align: center;">{% trans "Actions" %}</th>
                 </tr>
             </thead>
             <tbody>
@@ -330,7 +331,7 @@
             </button>
             <div class="sidebar-title">
                 <i class="fas fa-pen"></i>
-                <h2>Edit Raw Material</h2>
+                <h2>{% trans "Edit Raw Material" %}</h2>
             </div>
         </div>
         <div class="sidebar-content">
@@ -350,36 +351,36 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="edit_rm_sku">SKU</label>
+                    <label for="edit_rm_sku">{% trans "SKU" %}</label>
                     <input type="text" name="sku" id="edit_rm_sku" class="form-input">
                 </div>
 
                 <div class="form-group">
-                    <label for="edit_rm_supplier_sku">Supplier SKU</label>
+                    <label for="edit_rm_supplier_sku">{% trans "Supplier SKU" %}</label>
                     <input type="text" name="supplier_sku" id="edit_rm_supplier_sku" class="form-input">
                 </div>
 
                 <div class="form-group">
-                    <label for="edit_rm_type">Type</label>
+                    <label for="edit_rm_type">{% trans "Type" %}</label>
                     <select name="raw_type" id="edit_rm_type" class="form-input">
-                        <option value="direct">Direct (Production)</option>
-                        <option value="indirect">Indirect (Overhead)</option>
+                        <option value="direct">{% trans "Direct (Production)" %}</option>
+                        <option value="indirect">{% trans "Indirect (Overhead)" %}</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label for="edit_rm_unit">Unit of Measurement</label>
+                    <label for="edit_rm_unit">{% trans "Unit of Measurement" %}</label>
                     <select name="unit_of_measurement" id="edit_rm_unit" class="form-input">
-                        <option value="units">Unit</option>
-                        <option value="mt">Meter</option>
-                        <option value="kg">Kilogram</option>
-                        <option value="l">Liter</option>
-                        <option value="bx">Box</option>
+                        <option value="units">{% trans "Unit" %}</option>
+                        <option value="mt">{% trans "Meter" %}</option>
+                        <option value="kg">{% trans "Kilogram" %}</option>
+                        <option value="l">{% trans "Liter" %}</option>
+                        <option value="bx">{% trans "Box" %}</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label for="edit_rm_quantity">Current Quantity</label>
+                    <label for="edit_rm_quantity">{% trans "Current Quantity" %}</label>
                     <input type="number" name="quantity" id="edit_rm_quantity" class="form-input" step="0.01">
                 </div>
 
@@ -395,7 +396,7 @@
                         </span>
                     </button>
                     <button type="button" class="btn btn-secondary"
-                        onclick="closeEditRawMaterialSidebar()">Cancel</button>
+                        onclick="closeEditRawMaterialSidebar()">{% trans "Cancel" %}</button>
                 </div>
             </form>
         </div>

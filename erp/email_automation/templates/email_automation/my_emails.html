@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block title %}{{ page_title }} - Nejum ERP{% endblock %}
@@ -921,7 +922,7 @@
     <!-- Not Connected -->
     <div class="em-empty-state" style="margin-top: 60px;">
         <div class="em-empty-icon"><i class="fas fa-envelope-open-text"></i></div>
-        <h3>Connect Your Google Account</h3>
+        <h3>{% trans "Connect Your Google Account" %}</h3>
         <p>To view and send emails, connect your Google account.</p>
         <a href="{% url 'authentication:google_login' %}" class="em-connect-btn">
             <i class="fab fa-google"></i> Connect with Google

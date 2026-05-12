@@ -182,17 +182,40 @@
 }
 
 .tab-item {
+    position: relative;
     padding: 0.875rem 1.5rem;
     /* Slightly compact */
     cursor: pointer;
     font-size: 0.9rem;
     color: var(--text-muted);
     font-weight: 500;
-    transition: all 0.2s;
+    transition: color 0.2s, background 0.2s;
     border-left: 3px solid transparent;
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+/* Sliding underline indicator */
+.tab-item::after {
+    content: "";
+    position: absolute;
+    left: 1.5rem;
+    right: 1.5rem;
+    bottom: 6px;
+    height: 2px;
+    background: var(--accent-color);
+    border-radius: 2px;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.25s;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.tab-item:hover::after {
+    transform: scaleX(1);
+    opacity: 0.55;
 }
 
 .tab-item:hover {
@@ -206,6 +229,11 @@
     border-left-color: var(--accent-color);
     font-weight: 600;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.tab-item.active::after {
+    transform: scaleX(1);
+    opacity: 1;
 }
 
 /* Results Area - FLAT LIST DESIGN */

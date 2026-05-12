@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -262,12 +263,12 @@
     <table class="blog-table" id="blogTable">
         <thead>
             <tr>
-                <th>Cover</th>
-                <th>Title</th>
-                <th>Category</th>
-                <th>Published</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{% trans "Cover" %}</th>
+                <th>{% trans "Title" %}</th>
+                <th>{% trans "Category" %}</th>
+                <th>{% trans "Published" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Actions" %}</th>
             </tr>
         </thead>
         <tbody>
@@ -331,10 +332,10 @@
         <div class="delete-modal-icon">
             <i class="fas fa-exclamation-triangle"></i>
         </div>
-        <h3>Delete Blog Post?</h3>
+        <h3>{% trans "Delete Blog Post?" %}</h3>
         <p>Are you sure you want to delete "<span id="deletePostTitle"></span>"? This action cannot be undone.</p>
         <div class="delete-modal-actions">
-            <button type="button" class="btn-modal-cancel" onclick="hideDeleteModal()">Cancel</button>
+            <button type="button" class="btn-modal-cancel" onclick="hideDeleteModal()">{% trans "Cancel" %}</button>
             <button type="button" class="btn-modal-delete" id="confirmDeleteBtn" hx-delete="" hx-target=""
                 hx-swap="outerHTML swap:0.2s" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 onclick="hideDeleteModal()">

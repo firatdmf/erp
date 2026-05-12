@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -540,8 +541,8 @@
         <div class="activity-heading">Activity</div>
         <!-- Pill Toggle -->
         <div class="pill-switcher">
-          <button class="pill-btn active" onclick="switchTab('comments')">Comments</button>
-          <button class="pill-btn" onclick="switchTab('history')">History</button>
+          <button class="pill-btn active" onclick="switchTab('comments')">{% trans "Comments" %}</button>
+          <button class="pill-btn" onclick="switchTab('history')">{% trans "History" %}</button>
         </div>
       </div>
 
@@ -562,7 +563,7 @@
                 <i class="far fa-smile" style="cursor: pointer;"></i>
                 <i class="fa fa-at" style="cursor: pointer;"></i>
               </div>
-              <button type="submit" class="btn-primary">Send</button>
+              <button type="submit" class="btn-primary">{% trans "Send" %}</button>
             </div>
           </form>
         </div>
@@ -636,7 +637,7 @@
     <div class="sidebar-widget">
       <!-- Status (Clickable) -->
       <div class="form-group">
-        <label class="form-label">Status</label>
+        <label class="form-label">{% trans "Status" %}</label>
         <div class="select-box" onclick="toggleModal('statusModal')">
           <div style="display:flex; align-items:center;">
             {% if task.status == 'done' %}
@@ -655,7 +656,7 @@
 
       <!-- Priority (Static / Non-clickable visually) -->
       <div class="form-group">
-        <label class="form-label">Priority</label>
+        <label class="form-label">{% trans "Priority" %}</label>
         <div class="static-box">
           <i class="fa fa-flag" style="color:#EF4444; margin-right:0.5rem;"></i>
           {{ task.get_priority_display }}
@@ -664,7 +665,7 @@
 
       <!-- Assignees -->
       <div class="form-group">
-        <label class="form-label">Assignees</label>
+        <label class="form-label">{% trans "Assignees" %}</label>
         <div class="facepile-row">
           <div class="facepile-group" style="flex-wrap: wrap;">
             {% if task.assignees.exists %}
@@ -701,7 +702,7 @@
 
       <!-- Due Date -->
       <div class="form-group">
-        <label class="form-label">Due Date</label>
+        <label class="form-label">{% trans "Due Date" %}</label>
         <div class="static-box">
           <i class="far fa-calendar" style="color:#6B7280; margin-right:0.5rem;"></i>
           {{ task.due_date|date:"F j, Y" }}
@@ -728,10 +729,10 @@
 <!-- Modals -->
 <div id="statusModal" class="modal-overlay" onclick="if(event.target===this) toggleModal('statusModal')">
   <div class="dropdown-menu">
-    <button class="dropdown-item" onclick="updateStatus('todo')">To Do</button>
-    <button class="dropdown-item" onclick="updateStatus('in_progress')">In Progress</button>
-    <button class="dropdown-item" onclick="updateStatus('review')">Review</button>
-    <button class="dropdown-item" onclick="updateStatus('done')">Done</button>
+    <button class="dropdown-item" onclick="updateStatus('todo')">{% trans "To Do" %}</button>
+    <button class="dropdown-item" onclick="updateStatus('in_progress')">{% trans "In Progress" %}</button>
+    <button class="dropdown-item" onclick="updateStatus('review')">{% trans "Review" %}</button>
+    <button class="dropdown-item" onclick="updateStatus('done')">{% trans "Done" %}</button>
   </div>
 </div>
 

@@ -1,969 +1,674 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --accent-primary: #2563eb;
-    --accent-hover: #1d4ed8;
-    --accent-light: #dbeafe;
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-hover: #f1f5f9;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --text-muted: #94a3b8;
-    --border-color: #e2e8f0;
-    --success-bg: #dcfce7;
-    --success-text: #166534;
-    --warning-bg: #fef3c7;
-    --warning-text: #92400e;
-    --danger-bg: #fee2e2;
-    --danger-text: #991b1b;
-    --border-radius: 12px;
-    --border-radius-sm: 8px;
-    --transition-speed: 150ms;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
   }
 
-  .order-detail-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 2rem;
+  .ord { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
+
+  /* CRUMBS */
+  .od-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; background: white; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); cursor: pointer; transition: all 140ms;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04); text-decoration: none;
+  }
+  .od-back i { width: 14px; height: 14px; }
+  .od-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-sep { color: var(--gray-400); }
+  .od-crumb-here { font: 600 12.5px var(--font-mono); color: var(--gray-700); }
+
+  /* HEAD */
+  .od-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 24px; margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px solid #E2E8EE;
+  }
+  .od-head-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .od-title { font: 800 28px var(--font-mono); letter-spacing: 0.01em; color: #0F1419; margin: 0; }
+  .od-meta { display: flex; align-items: center; gap: 10px; font: 500 12.5px var(--font-sans); color: var(--gray-600); flex-wrap: wrap; }
+  .od-meta i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; color: var(--gray-500); }
+  .od-dot { width: 3px; height: 3px; background: #C5CCD3; border-radius: 50%; display: inline-block; }
+  .od-head-r { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* BUTTONS */
+  .ord-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 10px;
+    font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms;
+    white-space: nowrap; text-decoration: none;
+  }
+  .ord-btn i { width: 14px; height: 14px; }
+  .ord-btn.ghost {
+    background: white; border: 1px solid #E0E6EE; color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .ord-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border: 1px solid var(--nejum-teal-700); color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+
+  /* KIND + STATUS PILLS */
+  .ord-kind {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 5px 11px; border-radius: 6px;
+    font: 700 11.5px var(--font-sans); letter-spacing: 0.12em;
+  }
+  .ord-kind.b2b { background: #FEF3C7; color: #8B5A00; box-shadow: inset 0 0 0 1px #F5D78B; }
+  .ord-kind.b2c { background: #E0F2F1; color: #0B5F60; box-shadow: inset 0 0 0 1px #B3DDD9; }
+  .ord-kind.int { background: #EEF1F5; color: var(--gray-700); box-shadow: inset 0 0 0 1px #D6DDE5; }
+  .ord-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px 6px 12px; border-radius: 999px;
+    font: 600 12.5px var(--font-sans); white-space: nowrap; width: fit-content;
+  }
+  .ord-status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .ord-status.pending       { color: #B27500; background: #FEF3C7; }
+  .ord-status.pending       .ord-status-dot { background: #F59E0B; }
+  .ord-status.confirmed     { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.confirmed     .ord-status-dot { background: #10B981; }
+  .ord-status.preparing     { color: #1565C0; background: #DBEAFE; }
+  .ord-status.preparing     .ord-status-dot { background: #3B82F6; }
+  .ord-status.shipped, .ord-status.in_transit, .ord-status.out_for_delivery {
+    color: #B27500; background: #FFEDD5;
+  }
+  .ord-status.shipped       .ord-status-dot,
+  .ord-status.in_transit    .ord-status-dot,
+  .ord-status.out_for_delivery .ord-status-dot { background: #F97316; }
+  .ord-status.delivered     { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.delivered     .ord-status-dot { background: #10B981; }
+  .ord-status.cancelled, .ord-status.returned { color: #B23B3B; background: #FEE2E2; }
+  .ord-status.cancelled .ord-status-dot, .ord-status.returned .ord-status-dot { background: #EF4444; }
+  .ord-status.in_production { color: #7E22CE; background: #F3E8FF; }
+  .ord-status.in_production .ord-status-dot { background: #A855F7; }
+  .ord-status.scheduled, .ord-status.ready, .ord-status.quality_check { color: #1565C0; background: #DBEAFE; }
+  .ord-status.scheduled .ord-status-dot, .ord-status.ready .ord-status-dot, .ord-status.quality_check .ord-status-dot { background: #3B82F6; }
+  .ord-status.completed { color: #0F1419; background: #E5E7EB; }
+  .ord-status.completed .ord-status-dot { background: #374151; }
+  .ord-status.in_repair { color: #B27500; background: #FEF3C7; }
+  .ord-status.in_repair .ord-status-dot { background: #F59E0B; }
+
+  /* GRID */
+  .od-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; }
+  .od-left, .od-right { display: flex; flex-direction: column; gap: 16px; }
+
+  /* CARDS */
+  .od-card {
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .od-card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-card-h h3 { font: 700 14px var(--font-sans); color: #0F1419; margin: 0; letter-spacing: -0.005em; }
+  .od-card-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; }
+
+  /* STATUS PICKER */
+  .od-spk { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .od-spk-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 12px; background: white; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); cursor: pointer; transition: all 140ms;
+  }
+  .od-spk-dot { width: 8px; height: 8px; border-radius: 50%; background: #C5CCD3; }
+  .od-spk-btn:hover { border-color: #9AA3AC; color: #0F1419; }
+  .od-spk-btn.active { font-weight: 700; box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+
+  /* TIMELINE */
+  .od-tl {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+    padding-top: 12px; border-top: 1px dashed #E2E8EE;
+  }
+  .od-tl-step { display: flex; gap: 10px; align-items: flex-start; }
+  .od-tl-ico {
+    width: 32px; height: 32px; background: #F4F7FB; color: var(--gray-400);
+    border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: inset 0 0 0 1px #E0E6EE;
+  }
+  .od-tl-ico i { width: 14px; height: 14px; }
+  .od-tl-step.done .od-tl-ico {
+    background: var(--nejum-teal-50); color: var(--nejum-teal-700);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,0.30);
+  }
+  .od-tl-step.now .od-tl-ico {
+    background: var(--nejum-teal-600); color: white;
+    box-shadow: 0 0 0 4px rgba(20,127,116,0.18), inset 0 0 0 1px var(--nejum-teal-700);
+  }
+  .od-tl-l { font: 700 12.5px var(--font-sans); color: #0F1419; line-height: 1.2; }
+  .od-tl-step:not(.done) .od-tl-l { color: var(--gray-500); }
+  .od-tl-t { font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 3px; }
+
+  /* PRODUCTS TABLE */
+  .od-prods { width: 100%; border-collapse: collapse; }
+  .od-prods th, .od-prods td {
+    padding: 10px 8px; text-align: left;
+    border-bottom: 1px solid #EEF1F5; font-size: 12.5px;
+  }
+  .od-prods th {
+    font: 600 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--gray-500); background: transparent; border-bottom: 1px solid #E2E8EE;
+  }
+  .od-prods th.num, .od-prods td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .od-prods tr:last-child td { border-bottom: none; }
+  .od-prods .mono { font: 500 11.5px var(--font-mono); color: var(--gray-600); }
+  .od-prod { display: flex; align-items: center; gap: 10px; }
+  .od-prod-img {
+    width: 36px; height: 36px; border-radius: 7px; flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(15,23,31,0.06); object-fit: cover;
+    background: linear-gradient(135deg, #E5F1F0, #C2D5D2);
+  }
+  .od-prod span:last-child { font: 600 13px var(--font-sans); color: #0F1419; }
+  .od-prod-link { color: inherit; text-decoration: none; }
+  .od-prod-link:hover .od-prod span:last-child { color: var(--nejum-teal-700); }
+  .od-totals { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #E2E8EE; }
+  .od-tot-row { display: flex; justify-content: space-between; padding: 5px 8px; font: 500 12.5px var(--font-sans); color: var(--gray-700); }
+  .od-tot-row.total {
+    border-top: 1px solid #E2E8EE; margin-top: 6px; padding-top: 11px;
+    font: 700 15px var(--font-sans); color: #0F1419;
   }
 
-  /* Header Section */
-  .order-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 2px solid var(--border-color);
+  /* SHIPPING FORM */
+  .od-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .od-form label { display: flex; flex-direction: column; gap: 6px; }
+  .od-form label > span {
+    font: 600 11.5px var(--font-sans); color: var(--gray-700); letter-spacing: 0.02em;
   }
-
-  .order-header-left h1 {
-    font-size: 2rem;
-    color: var(--text-primary);
-    margin: 0 0 0.5rem 0;
-  }
-
-  .order-meta {
-    display: flex;
-    gap: 1.5rem;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-  }
-
-  .order-meta span {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .order-actions {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  /* Status Badge */
-  .status-badge {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    border-radius: 16px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-  }
-
-  .status-badge.pending {
-    background: var(--warning-bg);
-    color: var(--warning-text);
-  }
-
-  .status-badge.in_production {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-
-  .status-badge.ready {
-    background: var(--success-bg);
-    color: var(--success-text);
-  }
-
-  .status-badge.shipped {
-    background: #e0e7ff;
-    color: #3730a3;
-  }
-
-  .status-badge.completed {
-    background: var(--success-bg);
-    color: var(--success-text);
-  }
-
-  .status-badge.cancelled {
-    background: var(--danger-bg);
-    color: var(--danger-text);
-  }
-
-  .status-badge.success {
-    background: var(--success-bg);
-    color: var(--success-text);
-  }
-
-  .status-badge.failed {
-    background: var(--danger-bg);
-    color: var(--danger-text);
-  }
-
-  /* Grid Layout */
-  .order-grid {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-  }
-
-  /* Cards */
-  .card {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .card-header {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .card-header h2 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-  }
-
-  .card-header i {
-    color: var(--accent-primary);
-    font-size: 1.25rem;
-  }
-
-  .card-body {
-    padding: 1.5rem;
-  }
-
-  /* Customer Info */
-  .customer-info {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .customer-type {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: var(--accent-light);
-    color: var(--accent-primary);
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 0.875rem;
-    width: fit-content;
-  }
-
-  .customer-name {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    text-decoration: none;
-    transition: color var(--transition-speed);
-  }
-
-  .customer-name:hover {
-    color: var(--accent-primary);
-  }
-
-  .info-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .info-row:last-child {
-    border-bottom: none;
-  }
-
-  .info-row i {
-    color: var(--text-secondary);
-    width: 20px;
-    margin-top: 0.125rem;
-  }
-
-  .info-content {
-    flex: 1;
-  }
-
-  .info-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    margin-bottom: 0.25rem;
-  }
-
-  .info-value {
-    color: var(--text-primary);
-    font-weight: 500;
-  }
-
-  /* Address Card */
-  .address-block {
-    background: var(--bg-secondary);
-    padding: 1rem;
-    border-radius: var(--border-radius-sm);
-    margin-bottom: 1rem;
-  }
-
-  .address-block:last-child {
-    margin-bottom: 0;
-  }
-
-  .address-title {
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .address-text {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    font-size: 0.875rem;
-  }
-
-  /* Items Table */
-  .items-table {
+  .od-input, .od-select {
     width: 100%;
-    border-collapse: collapse;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #E0E6EE;
+    border-radius: 8px;
+    font: 500 13px var(--font-sans);
+    color: #0F1419;
+    outline: none;
+    transition: all 140ms;
+    box-sizing: border-box;
+  }
+  .od-input::placeholder { color: var(--gray-500); }
+  .od-input:focus, .od-select:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .od-select { cursor: pointer; }
+  .od-form-foot {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 16px; padding-top: 14px; border-top: 1px dashed #E2E8EE;
   }
 
-  .items-table thead {
-    background: var(--bg-secondary);
+  /* RIGHT COLUMN */
+  .od-cust {
+    display: flex; align-items: center; gap: 12px;
+    padding-bottom: 14px; border-bottom: 1px dashed #E2E8EE; margin-bottom: 12px;
   }
-
-  .items-table th {
-    padding: 1rem;
-    text-align: left;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 2px solid var(--border-color);
+  .od-cust .od-cust-avatar {
+    width: 44px; height: 44px; border-radius: 50%; color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 14px var(--font-sans); letter-spacing: 0.04em;
   }
-
-  .items-table td {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-primary);
+  .od-cust .od-cust-n { font: 700 14px var(--font-sans); color: #0F1419; }
+  .od-cust .od-cust-c { font: 500 12px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .od-detail-list { display: flex; flex-direction: column; gap: 10px; }
+  .od-dt { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .od-dt span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-dt b { font: 600 12.5px var(--font-sans); color: #0F1419; text-align: right; word-break: break-word; }
+  .od-dt b.mono { font-family: var(--font-mono); font-weight: 500; }
+  .od-link {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 12px;
+    font: 600 12.5px var(--font-sans); color: var(--nejum-teal-700); text-decoration: none;
   }
+  .od-link i { width: 12px; height: 12px; }
+  .od-link:hover { text-decoration: underline; }
 
-  .items-table tbody tr:hover {
-    background: var(--bg-hover);
+  .od-addr { font: 500 13px var(--font-sans); color: var(--gray-700); line-height: 1.55; }
+  .od-addr-name { font-weight: 700; color: #0F1419; }
+  .od-empty-mute { font: 500 12.5px var(--font-sans); color: var(--gray-400); }
+
+  /* SUCCESS BANNER */
+  .od-banner {
+    padding: 10px 14px; background: #D1FAE5; color: #0E6E4A;
+    border: 1px solid #A7F3D0; border-radius: 8px; margin-bottom: 14px;
+    font: 600 12.5px var(--font-sans);
   }
+  .od-banner i { margin-right: 8px; }
 
-  .items-table tbody tr:last-child td {
-    border-bottom: none;
+  @media (max-width: 1100px) {
+    .od-grid { grid-template-columns: 1fr; }
+    .od-tl { grid-template-columns: repeat(2, 1fr); }
   }
-
-  .product-link {
-    color: var(--accent-primary);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color var(--transition-speed);
-  }
-
-  .product-link:hover {
-    color: var(--accent-hover);
-    text-decoration: underline;
-  }
-
-  .product-desc {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-  }
-
-  /* Order Total */
-  .order-total {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem;
-    background: var(--bg-secondary);
-    border-radius: var(--border-radius);
-    margin-top: 1.5rem;
-  }
-
-  .order-total-label {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--text-primary);
-  }
-
-  .order-total-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--accent-primary);
-  }
-
-  /* Buttons */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    border-radius: var(--border-radius-sm);
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-decoration: none;
-    transition: all var(--transition-speed);
-    border: 1px solid transparent;
-    cursor: pointer;
-  }
-
-  .btn-primary {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-  }
-
-  .btn-primary:hover {
-    background: var(--accent-hover);
-    border-color: var(--accent-hover);
-  }
-
-  .btn-secondary {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border-color: var(--border-color);
-  }
-
-  .btn-secondary:hover {
-    background: var(--bg-hover);
-  }
-
-  .btn-danger {
-    background: var(--danger-bg);
-    color: var(--danger-text);
-    border-color: var(--danger-bg);
-  }
-
-  .btn-danger:hover {
-    background: #fecaca;
-  }
-
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* QR Code */
-  .qr-code {
-    text-align: center;
-  }
-
-  .qr-code img {
-    max-width: 200px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    padding: 0.5rem;
-  }
-
-  /* Notes */
-  .notes-text {
-    color: var(--text-secondary);
-    line-height: 1.6;
-    white-space: pre-wrap;
-  }
-
-  /* Empty State */
-  .empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: var(--text-muted);
-  }
-
-  .empty-state i {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    opacity: 0.3;
-  }
-
-  /* Payment Info */
-  .payment-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  }
-
-  .payment-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  @media (max-width: 1024px) {
-    .order-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .payment-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .order-detail-container {
-      padding: 1rem;
-    }
-
-    .order-header {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 1rem;
-    }
-
-    .order-header-left h1 {
-      font-size: 1.5rem;
-    }
-
-    .order-meta {
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .order-actions {
-      width: 100%;
-      flex-direction: column;
-    }
-
-    .order-actions .btn {
-      width: 100%;
-      justify-content: center;
-    }
-
-    /* Grid stacks on mobile */
-    .order-grid {
-      grid-template-columns: 1fr !important;
-    }
-
-    /* Card compacting */
-    .card-header {
-      padding: 1rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .card-body {
-      padding: 1rem;
-    }
-
-    /* Table horizontal scroll */
-    .items-table {
-      display: block;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      font-size: 0.875rem;
-    }
-
-    .items-table th,
-    .items-table td {
-      padding: 0.75rem 0.5rem;
-      white-space: nowrap;
-    }
-
-    /* Hide description column on mobile */
-    .items-table th:nth-child(2),
-    .items-table td:nth-child(2) {
-      display: none;
-    }
-
-    /* Order total compact */
-    .order-total {
-      flex-direction: column;
-      text-align: center;
-      gap: 0.5rem;
-      padding: 1rem;
-    }
-
-    /* Payment grid stack */
-    .payment-grid {
-      grid-template-columns: 1fr !important;
-    }
-
-    /* Address blocks compact */
-    .address-block {
-      padding: 0.75rem;
-    }
+  @media (max-width: 700px) {
+    .od-head { flex-direction: column; align-items: stretch; }
+    .od-form { grid-template-columns: 1fr; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="order-detail-container">
+<div class="ord">
 
-  <!-- Header -->
-  <div class="order-header">
-    <div class="order-header-left">
-      <h1>Order #{{ order.pk }}</h1>
-      <div class="order-meta">
-        <span>
-          <i class="fa fa-calendar"></i>
-          {{ order.created_at|date:"M d, Y H:i" }}
-        </span>
-        <span>
-          <i class="fa fa-clock"></i>
-          Updated {{ order.updated_at|date:"M d, Y H:i" }}
-        </span>
-      </div>
-    </div>
-    <div class="order-actions">
-      {% if order.status != 'completed' %}
-      <a href="{% url 'operating:edit_order' order.pk %}" class="btn btn-primary">
-        <i class="fa fa-edit"></i> Edit Order
-      </a>
-      <a href="{% url 'operating:order_production' order.pk %}" class="btn btn-secondary">
-        <i class="fa fa-industry"></i> Production
-      </a>
-      <a href="{% url 'operating:order_packing_list' order.pk %}" class="btn btn-secondary">
-        <i class="fa fa-box"></i> Packing List
-      </a>
-      {% else %}
-      <button class="btn btn-secondary" disabled>
-        <i class="fa fa-check"></i> Order Completed
-      </button>
-      {% endif %}
-      <a href="{% url 'operating:order_list' %}" class="btn btn-secondary">
-        <i class="fa fa-arrow-left"></i> Back to Orders
-      </a>
-    </div>
+  <!-- CRUMBS -->
+  <div class="od-crumbs">
+    <a href="{% url 'operating:order_list' %}" class="od-back">
+      <i class="fa fa-arrow-left"></i> {% trans "Back to orders" %}
+    </a>
+    <span class="od-sep">/</span>
+    <span class="od-crumb-here">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
   </div>
 
-  <!-- Main Grid -->
-  <div class="order-grid">
-
-    <!-- Left Column: Items -->
+  <!-- HEAD -->
+  <div class="od-head">
     <div>
-      <!-- Order Items Card -->
-      <div class="card">
-        <div class="card-header">
-          <i class="fa fa-shopping-cart"></i>
-          <h2>Order Items</h2>
-          <span class="status-badge {{ order.status }}">{{ order.get_status_display }}</span>
-        </div>
-        <div class="card-body" style="padding: 0;">
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Description</th>
-                <th>Quantity</th>
-                <th>Price</th>
-                <th>Total</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for item in order.items.all %}
-              <tr>
-                <td>
-                  <a href="{% url 'marketing:product_detail' item.product.pk %}" class="product-link">
-                    {{ item.product.title }}
-                  </a>
-                  {% if item.is_custom_curtain %}
-                  <div style="margin-top: 0.5rem;">
-                    <span
-                      style="display: inline-block; padding: 0.25rem 0.75rem; background: #7c3aed; color: white; font-size: 0.75rem; font-weight: 700; border-radius: 9999px;">
-                      ✂️ ÖZEL PERDE
-                    </span>
-                    <div
-                      style="background: #f5f3ff; padding: 0.5rem; border-radius: 6px; margin-top: 0.5rem; font-size: 0.8rem; color: #5b21b6;">
-                      {% if item.product.sku %}
-                      <div style="font-weight: 600; color: #1e40af;">🏷️ SKU: {{ item.product.sku }}</div>
-                      {% endif %}
-                      {% if item.product_variant %}
-                      <div style="font-weight: 600; color: #7c3aed;">🎨 Renk: {{ item.product_variant.variant_sku }}
-                      </div>
-                      {% endif %}
-                      {% if item.custom_width and item.custom_height %}
-                      <div>📏 Boyut: {{ item.custom_width }}cm x {{ item.custom_height }}cm</div>
-                      {% endif %}
-                      {% if item.custom_pleat_type %}
-                      <div>🧵 Pile: {{ item.custom_pleat_type }}</div>
-                      {% endif %}
-                      {% if item.custom_pleat_density %}
-                      <div>📊 Pile Sıklığı: {{ item.custom_pleat_density }}</div>
-                      {% endif %}
-                      {% if item.custom_mounting_type %}
-                      <div>🔧 Montaj: {% if item.custom_mounting_type == 'cornice' %}Korniş{% else %}Rustik{% endif %}
-                      </div>
-                      {% endif %}
-                      {% if item.custom_wing_type %}
-                      <div>🪟 Kanat: {% if item.custom_wing_type == 'single' %}Tek{% else %}Çift{% endif %}</div>
-                      {% endif %}
-                      {% if item.custom_fabric_used_meters %}
-                      <div style="font-weight: 600; color: #7c3aed;">🧶 Kumaş: {{ item.custom_fabric_used_meters }}
-                        metre</div>
-                      {% endif %}
-                    </div>
-                  </div>
-                  {% endif %}
-                  {% if item.product.description and not item.is_custom_curtain %}
-                  <div class="product-desc">{{ item.product.description|truncatewords:8 }}</div>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if item.description %}
-                  {{ item.description }}
-                  {% else %}
-                  <span style="color: var(--text-muted);">—</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {{ item.quantity }}
-                  {% if item.product.unit_of_measurement %}
-                  {{ item.product.unit_of_measurement }}
-                  {% endif %}
-                </td>
-                <td>${{ item.price|floatformat:2 }}</td>
-                <td><strong>${{ item.subtotal|floatformat:2 }}</strong></td>
-                <td>
-                  <span class="status-badge {{ item.status }}">{{ item.status|capfirst }}</span>
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="6" class="empty-state">
-                  <i class="fa fa-inbox"></i>
-                  <p>No items in this order</p>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+      <div class="od-head-row">
+        <h1 class="od-title">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</h1>
 
-          <!-- Order Total -->
-          <div class="order-total">
-            <span class="order-total-label">Total Order Value</span>
-            <span class="order-total-value">${{ order.total_value|floatformat:2 }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Column: Customer & Details -->
-    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-
-      <!-- Customer Info Card -->
-      <div class="card" style="min-height: 420px;">
-        <div class="card-header">
-          <i class="fa fa-user"></i>
-          <h2>Customer Information</h2>
-        </div>
-        <div class="card-body">
-          <div class="customer-info">
-            {% if order.is_guest_order %}
-            <div class="customer-type" style="background: #fef3c7; color: #92400e;">
-              <i class="fa fa-user-secret"></i>
-              Guest Order (No Account)
-            </div>
-            <div class="info-row">
-              <i class="fa fa-user"></i>
-              <div class="info-content">
-                <div class="info-label">Guest Name</div>
-                <div class="info-value">{{ order.guest_first_name }} {{ order.guest_last_name }}</div>
-              </div>
-            </div>
-            {% if order.guest_email %}
-            <div class="info-row">
-              <i class="fa fa-envelope"></i>
-              <div class="info-content">
-                <div class="info-label">Email</div>
-                <div class="info-value">{{ order.guest_email }}</div>
-              </div>
-            </div>
-            {% endif %}
-            {% if order.guest_phone %}
-            <div class="info-row">
-              <i class="fa fa-phone"></i>
-              <div class="info-content">
-                <div class="info-label">Phone</div>
-                <div class="info-value">{{ order.guest_phone }}</div>
-              </div>
-            </div>
-            {% endif %}
-            {% elif order.web_client %}
-            <div class="customer-type">
-              <i class="fa fa-globe"></i>
-              Web Order (B2C)
-            </div>
-            <div class="info-row">
-              <i class="fa fa-user"></i>
-              <div class="info-content">
-                <div class="info-label">Customer Name</div>
-                <div class="info-value">{{ order.web_client.name|default:order.web_client.username }}</div>
-              </div>
-            </div>
-            {% if order.web_client.email %}
-            <div class="info-row">
-              <i class="fa fa-envelope"></i>
-              <div class="info-content">
-                <div class="info-label">Email</div>
-                <div class="info-value">{{ order.web_client.email }}</div>
-              </div>
-            </div>
-            {% endif %}
-            {% if order.web_client.phone %}
-            <div class="info-row">
-              <i class="fa fa-phone"></i>
-              <div class="info-content">
-                <div class="info-label">Phone</div>
-                <div class="info-value">{{ order.web_client.phone }}</div>
-              </div>
-            </div>
-            {% endif %}
-            {% elif order.contact %}
-            <div class="customer-type">
-              <i class="fa fa-user"></i>
-              B2B Contact
-            </div>
-            <a href="{% url 'crm:contact_detail' order.contact.pk %}" class="customer-name">
-              <i class="fa fa-user"></i> {{ order.contact.name|capfirst }}
-            </a>
-            {% elif order.company %}
-            <div class="customer-type">
-              <i class="fa fa-briefcase"></i>
-              B2B Company
-            </div>
-            <a href="{% url 'crm:company_detail' order.company.pk %}" class="customer-name">
-              <i class="fa fa-briefcase"></i> {{ order.company.name|capfirst }}
-            </a>
-            {% else %}
-            <div style="text-align: center; color: var(--text-muted); padding: 1rem;">
-              No customer assigned
-            </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Payment & Address Section (Side by Side) -->
-  {% if order.payment_status or order.delivery_address or order.billing_address %}
-  <div
-    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-
-    <!-- Payment Info (Web Orders & Guest Orders) -->
-    {% if order.payment_status %}
-    <div class="card">
-      <div class="card-header">
-        <i class="fa fa-credit-card"></i>
-        <h2>Payment Information</h2>
-      </div>
-      <div class="card-body">
-        <div class="payment-grid">
-          <div class="payment-item">
-            <div class="info-label">Payment Status</div>
-            <span class="status-badge {{ order.payment_status }}">{{ order.get_payment_status_display }}</span>
-          </div>
-          {% if order.payment_method %}
-          <div class="payment-item">
-            <div class="info-label">Payment Method</div>
-            <div class="info-value">{{ order.payment_method }}</div>
-          </div>
-          {% endif %}
-          {% if order.paid_amount %}
-          <div class="payment-item">
-            <div class="info-label">Paid Amount</div>
-            <div class="info-value">{{ order.paid_amount|floatformat:2 }} {{ order.paid_currency|default:"TRY" }}</div>
-          </div>
-          {% endif %}
-          {% if order.original_price %}
-          <div class="payment-item">
-            <div class="info-label">Original Price</div>
-            <div class="info-value">${{ order.original_price|floatformat:2 }}</div>
-          </div>
-          {% endif %}
-          {% if order.card_last_four %}
-          <div class="payment-item">
-            <div class="info-label">Card</div>
-            <div class="info-value">
-              {{ order.card_association|default:"Card" }} •••• {{ order.card_last_four }}
-            </div>
-          </div>
-          {% endif %}
-          {% if order.payment_id %}
-          <div class="payment-item">
-            <div class="info-label">Payment ID</div>
-            <div class="info-value" style="font-size: 0.75rem; word-break: break-all;">{{ order.payment_id }}</div>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Delivery & Billing Addresses -->
-    {% if order.delivery_address or order.billing_address %}
-    <div class="card">
-      <div class="card-header">
-        <i class="fa fa-map-marker-alt"></i>
-        <h2>Addresses</h2>
-      </div>
-      <div class="card-body">
-        {% if order.delivery_address %}
-        <div class="address-block">
-          <div class="address-title">
-            <i class="fa fa-truck"></i>
-            Delivery Address
-            {% if order.delivery_address_title %}
-            - {{ order.delivery_address_title }}
-            {% endif %}
-          </div>
-          <div class="address-text">
-            {{ order.delivery_address }}<br>
-            {% if order.delivery_city %}{{ order.delivery_city }}, {% endif %}
-            {% if order.delivery_country %}{{ order.delivery_country }}{% endif %}
-            {% if order.delivery_phone %}
-            <br><i class="fa fa-phone"></i> {{ order.delivery_phone }}
-            {% endif %}
-          </div>
-        </div>
+        {% if order.web_client %}
+          <span class="ord-kind b2c">B2C</span>
+        {% elif order.contact or order.company %}
+          <span class="ord-kind b2b">B2B</span>
+        {% else %}
+          <span class="ord-kind int">INT</span>
         {% endif %}
 
-        {% if order.billing_address %}
-        <div class="address-block">
-          <div class="address-title">
-            <i class="fa fa-file-invoice"></i>
-            Billing Address
-            {% if order.billing_address_title %}
-            - {{ order.billing_address_title }}
-            {% endif %}
-          </div>
-          <div class="address-text">
-            {{ order.billing_address }}<br>
-            {% if order.billing_city %}{{ order.billing_city }}, {% endif %}
-            {% if order.billing_country %}{{ order.billing_country }}{% endif %}
-            {% if order.billing_phone %}
-            <br><i class="fa fa-phone"></i> {{ order.billing_phone }}
-            {% endif %}
-          </div>
-        </div>
+        {% if order.order_status %}
+          <span class="ord-status {{ order.order_status }}">
+            <span class="ord-status-dot"></span>
+            {% if order.order_status == 'pending' %}{% trans "Pending" %}
+            {% elif order.order_status == 'confirmed' %}{% trans "Confirmed" %}
+            {% elif order.order_status == 'preparing' %}{% trans "Preparing" %}
+            {% elif order.order_status == 'shipped' %}{% trans "Shipped" %}
+            {% elif order.order_status == 'in_transit' %}{% trans "In transit" %}
+            {% elif order.order_status == 'out_for_delivery' %}{% trans "Out for delivery" %}
+            {% elif order.order_status == 'delivered' %}{% trans "Delivered" %}
+            {% elif order.order_status == 'cancelled' %}{% trans "Cancelled" %}
+            {% elif order.order_status == 'returned' %}{% trans "Returned" %}
+            {% else %}{{ order.order_status }}{% endif %}
+          </span>
+        {% else %}
+          <span class="ord-status {{ order.status }}">
+            <span class="ord-status-dot"></span>
+            {{ order.get_status_display }}
+          </span>
         {% endif %}
       </div>
-    </div>
-    {% endif %}
-
-  </div>
-  {% endif %}
-
-  <!-- Shipping & QR Section -->
-  {% if order.tracking_number or order.qr_code_url %}
-  <div
-    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-
-    <!-- Shipping Tracking -->
-    {% if order.tracking_number %}
-    <div class="card">
-      <div class="card-header">
-        <i class="fa fa-shipping-fast"></i>
-        <h2>Shipping Information</h2>
-      </div>
-      <div class="card-body">
-        <div class="info-row">
-          <i class="fa fa-barcode"></i>
-          <div class="info-content">
-            <div class="info-label">Tracking Number</div>
-            <div class="info-value">{{ order.tracking_number }}</div>
-          </div>
-        </div>
-        {% if order.shipped_at %}
-        <div class="info-row">
-          <i class="fa fa-calendar"></i>
-          <div class="info-content">
-            <div class="info-label">Shipped At</div>
-            <div class="info-value">{{ order.shipped_at|date:"M d, Y H:i" }}</div>
-          </div>
-        </div>
-        {% endif %}
-        {% if order.delivered_at %}
-        <div class="info-row">
-          <i class="fa fa-check-circle"></i>
-          <div class="info-content">
-            <div class="info-label">Delivered At</div>
-            <div class="info-value">{{ order.delivered_at|date:"M d, Y H:i" }}</div>
-          </div>
-        </div>
-        {% endif %}
+      <div class="od-meta">
+        <span><i class="fa fa-calendar"></i>{{ order.created_at|date:"d M Y · H:i" }}</span>
+        <span class="od-dot"></span>
+        <span><i class="fa fa-user"></i>
+          {% if order.contact %}{{ order.contact.name|capfirst }}
+          {% elif order.company %}{{ order.company.name|capfirst }}
+          {% elif order.web_client %}{{ order.web_client.name|default:order.web_client.username }}
+          {% else %}—{% endif %}
+        </span>
+        <span class="od-dot"></span>
+        <span><i class="fa fa-clock"></i>{% trans "Updated" %} {{ order.updated_at|date:"d M Y · H:i" }}</span>
       </div>
     </div>
-    {% endif %}
-
-    <!-- QR Code -->
-    {% if order.qr_code_url %}
-    <div class="card">
-      <div class="card-header">
-        <i class="fa fa-qrcode"></i>
-        <h2>Order QR Code</h2>
-      </div>
-      <div class="card-body qr-code">
-        <img src="{{ order.qr_code_url }}" alt="QR Code for Order #{{ order.pk }}" />
-      </div>
-    </div>
-    {% endif %}
-
-  </div>
-  {% endif %}
-
-  <!-- Notes Section (Full Width) -->
-  {% if order.notes %}
-  <div class="card" style="margin-bottom: 1.5rem;">
-    <div class="card-header">
-      <i class="fa fa-sticky-note"></i>
-      <h2>Notes</h2>
-    </div>
-    <div class="card-body">
-      <div class="notes-text">{{ order.notes }}</div>
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Delete Button -->
-  <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
-    <form action="{% url 'operating:delete_order' order.pk %}" method="post">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-danger"
-        onclick="return confirm('Are you sure you want to delete this order?');">
-        <i class="fa fa-trash"></i> Delete Order
+    <div class="od-head-r">
+      <button type="button" class="ord-btn ghost" onclick="window.print()">
+        <i class="fa fa-print"></i>{% trans "Print" %}
       </button>
-    </form>
+      {% if order.status != 'completed' %}
+        <a href="{% url 'operating:edit_order' order.pk %}" class="ord-btn ghost">
+          <i class="fa fa-edit"></i>{% trans "Edit" %}
+        </a>
+        <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
+          <i class="fa fa-industry"></i>{% trans "Production" %}
+        </a>
+        <a href="{% url 'operating:order_packing_list' order.pk %}" class="ord-btn primary">
+          <i class="fa fa-box"></i>{% trans "Packing" %}
+        </a>
+      {% endif %}
+    </div>
   </div>
 
+  {% if messages %}
+    {% for message in messages %}
+      <div class="od-banner"><i class="fa fa-check-circle"></i>{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- MAIN GRID -->
+  <div class="od-grid">
+
+    {# ============== LEFT ============== #}
+    <div class="od-left">
+
+      {% if order.web_client or order.is_guest_order %}
+      <!-- STATUS PICKER + TIMELINE (web orders only) -->
+      <section class="od-card">
+        <div class="od-card-h">
+          <h3>{% trans "Order status" %}</h3>
+          <span class="od-card-sub">{% trans "Updating the status sends an automatic notification to the customer" %}</span>
+        </div>
+
+        <form method="post" action="{% url 'operating:web_order_status' order.pk %}" id="od-status-form">
+          {% csrf_token %}
+          <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}"/>
+
+          <div class="od-spk">
+            {% for code, label, color, bg, dot in nejum_status_choices %}{% endfor %}
+            {# inline list — keep labels TR for the user-facing pill colors #}
+            <button type="button" data-status="pending"          class="od-spk-btn {% if order.order_status == 'pending' or not order.order_status %}active{% endif %}"   style="{% if order.order_status == 'pending' or not order.order_status %}color:#B27500;background:#FEF3C7;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F59E0B;"></span>{% trans "Pending" %}</button>
+            <button type="button" data-status="confirmed"        class="od-spk-btn {% if order.order_status == 'confirmed' %}active{% endif %}" style="{% if order.order_status == 'confirmed' %}color:#0E6E4A;background:#D1FAE5;border-color:#0E6E4A;{% endif %}"><span class="od-spk-dot" style="background:#10B981;"></span>{% trans "Confirmed" %}</button>
+            <button type="button" data-status="preparing"        class="od-spk-btn {% if order.order_status == 'preparing' %}active{% endif %}" style="{% if order.order_status == 'preparing' %}color:#1565C0;background:#DBEAFE;border-color:#1565C0;{% endif %}"><span class="od-spk-dot" style="background:#3B82F6;"></span>{% trans "Preparing / Sourcing" %}</button>
+            <button type="button" data-status="shipped"          class="od-spk-btn {% if order.order_status == 'shipped' %}active{% endif %}" style="{% if order.order_status == 'shipped' %}color:#B27500;background:#FFEDD5;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F97316;"></span>{% trans "Shipped" %}</button>
+            <button type="button" data-status="in_transit"       class="od-spk-btn {% if order.order_status == 'in_transit' %}active{% endif %}" style="{% if order.order_status == 'in_transit' %}color:#B27500;background:#FFEDD5;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F97316;"></span>{% trans "In transit" %}</button>
+            <button type="button" data-status="out_for_delivery" class="od-spk-btn {% if order.order_status == 'out_for_delivery' %}active{% endif %}" style="{% if order.order_status == 'out_for_delivery' %}color:#B27500;background:#FFEDD5;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F97316;"></span>{% trans "Out for delivery" %}</button>
+            <button type="button" data-status="delivered"        class="od-spk-btn {% if order.order_status == 'delivered' %}active{% endif %}" style="{% if order.order_status == 'delivered' %}color:#0E6E4A;background:#D1FAE5;border-color:#0E6E4A;{% endif %}"><span class="od-spk-dot" style="background:#10B981;"></span>{% trans "Delivered" %}</button>
+            <button type="button" data-status="cancelled"        class="od-spk-btn {% if order.order_status == 'cancelled' %}active{% endif %}" style="{% if order.order_status == 'cancelled' %}color:#B23B3B;background:#FEE2E2;border-color:#B23B3B;{% endif %}"><span class="od-spk-dot" style="background:#EF4444;"></span>{% trans "Cancelled" %}</button>
+            <button type="button" data-status="returned"         class="od-spk-btn {% if order.order_status == 'returned' %}active{% endif %}" style="{% if order.order_status == 'returned' %}color:#B23B3B;background:#FEE2E2;border-color:#B23B3B;{% endif %}"><span class="od-spk-dot" style="background:#EF4444;"></span>{% trans "Returned" %}</button>
+          </div>
+
+          {# Timeline #}
+          {% with current=order.order_status|default:'pending' %}
+          <div class="od-tl">
+            {# Step 1: pending always done #}
+            <div class="od-tl-step done {% if current == 'pending' %}now{% endif %}">
+              <div class="od-tl-ico"><i class="fa fa-shopping-bag"></i></div>
+              <div>
+                <div class="od-tl-l">{% trans "Order received" %}</div>
+                <div class="od-tl-t">{{ order.created_at|date:"d M · H:i" }}</div>
+              </div>
+            </div>
+
+            <div class="od-tl-step {% if current == 'confirmed' or current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}done{% endif %} {% if current == 'confirmed' %}now{% endif %}">
+              <div class="od-tl-ico"><i class="fa fa-check-circle"></i></div>
+              <div>
+                <div class="od-tl-l">{% trans "Confirmed" %}</div>
+                <div class="od-tl-t">{% if current == 'confirmed' or current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}{{ order.updated_at|date:"d M · H:i" }}{% else %}—{% endif %}</div>
+              </div>
+            </div>
+
+            <div class="od-tl-step {% if current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}done{% endif %} {% if current == 'preparing' %}now{% endif %}">
+              <div class="od-tl-ico"><i class="fa fa-cube"></i></div>
+              <div>
+                <div class="od-tl-l">{% trans "Preparing" %}</div>
+                <div class="od-tl-t">{% if current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}—{% else %}—{% endif %}</div>
+              </div>
+            </div>
+
+            <div class="od-tl-step {% if current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}done{% endif %} {% if current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' %}now{% endif %}">
+              <div class="od-tl-ico"><i class="fa fa-truck"></i></div>
+              <div>
+                <div class="od-tl-l">{% trans "Shipped" %}</div>
+                <div class="od-tl-t">{% if order.shipped_at %}{{ order.shipped_at|date:"d M · H:i" }}{% else %}—{% endif %}</div>
+              </div>
+            </div>
+
+            <div class="od-tl-step {% if current == 'delivered' %}done now{% endif %}">
+              <div class="od-tl-ico"><i class="fa fa-flag-checkered"></i></div>
+              <div>
+                <div class="od-tl-l">{% trans "Delivered" %}</div>
+                <div class="od-tl-t">{% if order.delivered_at %}{{ order.delivered_at|date:"d M · H:i" }}{% else %}—{% endif %}</div>
+              </div>
+            </div>
+          </div>
+          {% endwith %}
+        </form>
+      </section>
+      {% endif %}
+
+      <!-- PRODUCTS -->
+      <section class="od-card">
+        <div class="od-card-h">
+          <h3>{% trans "Products" %}</h3>
+          <span class="od-card-sub">{{ order.items.count }} {% trans "items" %}</span>
+        </div>
+        {% if order.items.all %}
+        <table class="od-prods">
+          <thead>
+            <tr>
+              <th>{% trans "Product" %}</th>
+              <th>SKU</th>
+              <th>{% trans "Variant" %}</th>
+              <th class="num">{% trans "Qty" %}</th>
+              <th class="num">{% trans "Unit" %}</th>
+              <th class="num">{% trans "Amount" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in order.items.all %}
+            <tr>
+              <td>
+                {% if item.product %}
+                <a href="{% url 'marketing:product_detail' item.product.pk %}" class="od-prod-link">
+                  <div class="od-prod">
+                    {% with first_file=item.product.files.first %}
+                      {% if first_file and first_file.file_url %}
+                        <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
+                      {% else %}
+                        <span class="od-prod-img"></span>
+                      {% endif %}
+                    {% endwith %}
+                    <span>{{ item.product.title }}</span>
+                  </div>
+                </a>
+                {% else %}
+                <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
+                {% endif %}
+              </td>
+              <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
+              <td><span class="mono">{{ item.product_variant.variant_sku|default:"—" }}</span></td>
+              <td class="num">{{ item.quantity|default:0 }}</td>
+              <td class="num">${{ item.price|default:0|floatformat:2 }}</td>
+              <td class="num"><b>${{ item.subtotal|floatformat:2 }}</b></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="od-totals">
+          {% if order.original_price %}
+          <div class="od-tot-row">
+            <span>{% trans "Subtotal" %} <small style="color: var(--gray-500);">({% trans "Excl. VAT" %})</small></span>
+            <span>${{ order.original_price|floatformat:2 }}</span>
+          </div>
+          <div class="od-tot-row total">
+            <span>{% trans "Grand total" %}</span>
+            <span>${{ order.original_price|floatformat:2 }}</span>
+          </div>
+          {% if order.paid_amount and order.paid_currency and order.paid_currency != 'USD' %}
+          <div class="od-tot-row" style="opacity:0.7;">
+            <span style="font-size: 11.5px;">{% trans "Customer paid" %} ({{ order.paid_currency }})</span>
+            <span>{{ order.paid_amount|floatformat:2 }} {{ order.paid_currency }}</span>
+          </div>
+          {% endif %}
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="od-empty-mute" style="padding: 20px 0; text-align: center;">{% trans "This order has no items yet" %}</div>
+        {% endif %}
+      </section>
+
+      {% if order.web_client or order.is_guest_order %}
+      <!-- SHIPPING FORM -->
+      <section class="od-card">
+        <div class="od-card-h">
+          <h3>{% trans "Shipping" %}</h3>
+          <span class="od-card-sub">{% trans "Status auto-updates when a tracking number is entered" %}</span>
+        </div>
+        <form method="post" action="{% url 'operating:web_order_status' order.pk %}">
+          {% csrf_token %}
+          {# preserve current order_status when only updating carrier/tracking #}
+          <input type="hidden" name="order_status" value="{{ order.order_status|default:'pending' }}"/>
+          <div class="od-form">
+            <label>
+              <span>{% trans "Carrier" %}</span>
+              <select name="carrier" class="od-select">
+                <option value="">{% trans "Select…" %}</option>
+                <option value="yurtici" {% if order.carrier == 'yurtici' %}selected{% endif %}>Yurtiçi Kargo</option>
+                <option value="mng"     {% if order.carrier == 'mng' %}selected{% endif %}>MNG Kargo</option>
+                <option value="aras"    {% if order.carrier == 'aras' %}selected{% endif %}>Aras Kargo</option>
+                <option value="ptt"     {% if order.carrier == 'ptt' %}selected{% endif %}>PTT Kargo</option>
+                <option value="ups"     {% if order.carrier == 'ups' %}selected{% endif %}>UPS</option>
+                <option value="other"   {% if order.carrier == 'other' %}selected{% endif %}>Other</option>
+              </select>
+            </label>
+            <label>
+              <span>{% trans "Tracking number" %}</span>
+              <input type="text" name="tracking_number" class="od-input"
+                     value="{{ order.tracking_number|default:'' }}"
+                     placeholder="örn. 4012589631"/>
+            </label>
+            <label>
+              <span>{% trans "Save" %}</span>
+              <button type="submit" class="ord-btn primary" style="height: 38px;"><i class="fa fa-check"></i>{% trans "Save shipping info" %}</button>
+            </label>
+          </div>
+        </form>
+        {% if order.shipped_at or order.delivered_at %}
+        <div class="od-form-foot">
+          {% if order.shipped_at %}<span style="font: 500 12px var(--font-sans); color: var(--gray-600);"><i class="fa fa-truck" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "Shipped at:" %} <b>{{ order.shipped_at|date:"d M Y · H:i" }}</b></span>{% endif %}
+          {% if order.delivered_at %}<span style="font: 500 12px var(--font-sans); color: var(--gray-600);"><i class="fa fa-flag-checkered" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "Delivered at:" %} <b>{{ order.delivered_at|date:"d M Y · H:i" }}</b></span>{% endif %}
+        </div>
+        {% endif %}
+      </section>
+      {% endif %}
+    </div>
+
+    {# ============== RIGHT ============== #}
+    <div class="od-right">
+      <!-- CUSTOMER -->
+      <section class="od-card">
+        <div class="od-card-h"><h3>{% trans "Customer" %}</h3></div>
+
+        {% if order.contact %}
+          <div class="od-cust">
+            <div class="od-cust-avatar" style="background:#147F74;">{{ order.contact.name|slice:":2"|upper }}</div>
+            <div>
+              <div class="od-cust-n">{{ order.contact.name|capfirst }}</div>
+              <div class="od-cust-c">{% trans "B2B · Individual" %}</div>
+            </div>
+          </div>
+          <div class="od-detail-list">
+            {% if order.contact.email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.contact.email.0|default:"—" }}</b></div>{% endif %}
+            {% if order.contact.phone %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.contact.phone.0|default:"—" }}</b></div>{% endif %}
+          </div>
+          <a class="od-link" href="{% url 'crm:contact_detail' order.contact.pk %}">{% trans "Open profile" %} <i class="fa fa-external-link-alt"></i></a>
+
+        {% elif order.company %}
+          <div class="od-cust">
+            <div class="od-cust-avatar" style="background:#0A5F70;">{{ order.company.name|slice:":2"|upper }}</div>
+            <div>
+              <div class="od-cust-n">{{ order.company.name|capfirst }}</div>
+              <div class="od-cust-c">{% trans "B2B · Corporate" %}</div>
+            </div>
+          </div>
+          <div class="od-detail-list">
+            {% if order.company.email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.company.email }}</b></div>{% endif %}
+            {% if order.company.phone %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.company.phone }}</b></div>{% endif %}
+          </div>
+          <a class="od-link" href="{% url 'crm:company_detail' order.company.pk %}">{% trans "Open company profile" %} <i class="fa fa-external-link-alt"></i></a>
+
+        {% elif order.web_client %}
+          {% with display=order.web_client.name|default:order.web_client.username %}
+          <div class="od-cust">
+            <div class="od-cust-avatar" style="background:#C2A45A;">{{ display|slice:":2"|upper }}</div>
+            <div>
+              <div class="od-cust-n">{{ display }}</div>
+              <div class="od-cust-c">{% trans "Web customer" %}</div>
+            </div>
+          </div>
+          {% endwith %}
+          <div class="od-detail-list">
+            {% if order.web_client.email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.web_client.email }}</b></div>{% endif %}
+            {% if order.web_client.phone_number %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.web_client.phone_number }}</b></div>{% endif %}
+            <div class="od-dt"><span>{% trans "Dealer no" %}</span><b class="mono">BLN-{{ order.web_client.id|stringformat:"04d" }}</b></div>
+          </div>
+
+        {% elif order.is_guest_order %}
+          <div class="od-cust">
+            <div class="od-cust-avatar" style="background:#6B8E7F;">G</div>
+            <div>
+              <div class="od-cust-n">{{ order.guest_first_name }} {{ order.guest_last_name }}</div>
+              <div class="od-cust-c">{% trans "Guest order" %}</div>
+            </div>
+          </div>
+          <div class="od-detail-list">
+            {% if order.guest_email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.guest_email }}</b></div>{% endif %}
+            {% if order.guest_phone %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.guest_phone }}</b></div>{% endif %}
+          </div>
+
+        {% else %}
+          <div class="od-empty-mute" style="padding: 12px 0;">{% trans "No customer assigned" %}</div>
+        {% endif %}
+      </section>
+
+      <!-- DELIVERY ADDRESS -->
+      {% if order.delivery_address %}
+      <section class="od-card">
+        <div class="od-card-h"><h3>{% trans "Delivery address" %}</h3></div>
+        <div class="od-addr">
+          {% if order.delivery_address_title %}<div class="od-addr-name">{{ order.delivery_address_title }}</div>{% endif %}
+          <div>{{ order.delivery_address }}</div>
+          <div>{{ order.delivery_city }}{% if order.delivery_country %} · {{ order.delivery_country }}{% endif %}</div>
+          {% if order.delivery_phone %}<div>{{ order.delivery_phone }}</div>{% endif %}
+        </div>
+      </section>
+      {% endif %}
+
+      <!-- BILLING ADDRESS -->
+      {% if order.billing_address %}
+      <section class="od-card">
+        <div class="od-card-h"><h3>{% trans "Billing address" %}</h3></div>
+        <div class="od-addr">
+          {% if order.billing_address_title %}<div class="od-addr-name">{{ order.billing_address_title }}</div>{% endif %}
+          <div>{{ order.billing_address }}</div>
+          <div>{{ order.billing_city }}{% if order.billing_country %} · {{ order.billing_country }}{% endif %}</div>
+          {% if order.billing_phone %}<div>{{ order.billing_phone }}</div>{% endif %}
+        </div>
+      </section>
+      {% endif %}
+
+      <!-- PAYMENT INFO (web orders) -->
+      {% if order.payment_status or order.original_price %}
+      <section class="od-card">
+        <div class="od-card-h"><h3>{% trans "Payment info" %}</h3></div>
+        <div class="od-detail-list">
+          {% if order.payment_status %}<div class="od-dt"><span>{% trans "Status" %}</span><b>{{ order.get_payment_status_display }}</b></div>{% endif %}
+          {% if order.payment_method %}<div class="od-dt"><span>{% trans "Method" %}</span><b>{{ order.payment_method }}</b></div>{% endif %}
+          {% if order.original_price %}<div class="od-dt"><span>{% trans "Amount" %}</span><b>${{ order.original_price|floatformat:2 }}</b></div>{% endif %}
+          {% if order.card_last_four %}<div class="od-dt"><span>{% trans "Card" %}</span><b>{{ order.card_association|default:"Card" }} •••• {{ order.card_last_four }}</b></div>{% endif %}
+        </div>
+      </section>
+      {% endif %}
+    </div>
+  </div>
 </div>
+
+<script>
+  // Status picker — submits the form with the chosen status
+  const statusForm = document.getElementById('od-status-form');
+  const statusInput = document.getElementById('od-status-input');
+  if (statusForm && statusInput) {
+    document.querySelectorAll('.od-spk-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const s = btn.dataset.status;
+        if (!s) return;
+        statusInput.value = s;
+        statusForm.submit();
+      });
+    });
+  }
+</script>
 {% endblock %}

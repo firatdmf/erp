@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -333,7 +334,7 @@
     {% else %}
       <div class="empty-state">
         <i class="fa fa-rocket"></i>
-        <h3>No campaigns yet</h3>
+        <h3>{% trans "No campaigns yet" %}</h3>
         <p>Campaigns will be automatically created for prospect companies when email automation is active.</p>
       </div>
     {% endif %}

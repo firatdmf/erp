@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% block css %}
@@ -9,7 +10,7 @@
     {% csrf_token %}
     {{ form.as_p }}  <!-- Invoice fields -->
 
-    <h3>Products</h3>
+    <h3>{% trans "Products" %}</h3>
     <div>
         {% for form in item_formset %}
             <div>
@@ -18,6 +19,6 @@
         {% endfor %}
     </div>
     
-    <button type="submit">Create Invoice</button>
+    <button type="submit">{% trans "Create Invoice" %}</button>
 </form>
 {% endblock %}

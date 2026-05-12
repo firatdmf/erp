@@ -1,7 +1,8 @@
+{% load i18n %}
 <div class="modal-backdrop" onclick="closeComposeModal()"></div>
 <div class="compose-modal">
     <div class="compose-header">
-        <h3>New Message</h3>
+        <h3>{% trans "New Message" %}</h3>
         <button class="close-btn" onclick="closeComposeModal()"><i class="fas fa-times"></i></button>
     </div>
 
@@ -40,7 +41,7 @@
         </div>
 
         <div class="compose-field" style="display: none;" id="bccField">
-            <label class="field-label">Bcc</label>
+            <label class="field-label">{% trans "Bcc" %}</label>
             <div class="recipient-container" id="bccContainer">
                 <div class="recipient-chips" id="bccChips"></div>
                 <input type="text" class="recipient-input" id="bccInput"

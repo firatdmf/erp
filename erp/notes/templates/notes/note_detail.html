@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block title %}{{ note.title }} - My Notes{% endblock %}
@@ -638,25 +639,25 @@
                     <div class="sidebar-title"><i class="fas fa-sliders-h"></i> DETAILS</div>
 
                     <div class="detail-row">
-                        <label class="detail-label">Category</label>
+                        <label class="detail-label">{% trans "Category" %}</label>
                         <select name="category" class="sidebar-select">
-                            <option value="work" {% if note.category == 'work' %}selected{% endif %}>Work</option>
-                            <option value="personal" {% if note.category == 'personal' %}selected{% endif %}>Personal
+                            <option value="work" {% if note.category == 'work' %}selected{% endif %}>{% trans "Work" %}</option>
+                            <option value="personal" {% if note.category == 'personal' %}selected{% endif %}>{% trans "Personal" %}
                             </option>
-                            <option value="important" {% if note.category == 'important' %}selected{% endif %}>Important
+                            <option value="important" {% if note.category == 'important' %}selected{% endif %}>{% trans "Important" %}
                             </option>
-                            <option value="ideas" {% if note.category == 'ideas' %}selected{% endif %}>Ideas</option>
-                            <option value="meeting" {% if note.category == 'meeting' %}selected{% endif %}>Meeting
+                            <option value="ideas" {% if note.category == 'ideas' %}selected{% endif %}>{% trans "Ideas" %}</option>
+                            <option value="meeting" {% if note.category == 'meeting' %}selected{% endif %}>{% trans "Meeting" %}
                             </option>
                         </select>
                     </div>
 
                     <div class="detail-row">
-                        <label class="detail-label">Priority</label>
+                        <label class="detail-label">{% trans "Priority" %}</label>
                         <select name="priority" class="sidebar-select">
-                            <option value="high" {% if note.priority == 'high' %}selected{% endif %}>High</option>
-                            <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>Medium</option>
-                            <option value="low" {% if note.priority == 'low' %}selected{% endif %}>Low</option>
+                            <option value="high" {% if note.priority == 'high' %}selected{% endif %}>{% trans "High" %}</option>
+                            <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
+                            <option value="low" {% if note.priority == 'low' %}selected{% endif %}>{% trans "Low" %}</option>
                         </select>
                     </div>
 

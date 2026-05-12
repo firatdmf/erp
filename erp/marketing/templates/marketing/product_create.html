@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 {% load marketing_tags %}
 
@@ -101,13 +102,13 @@
 {% endblock %}
 {% block content %}
 <div class="ProductCreatePage">
-  <h1>Create Product Formm</h1>
+  <h1>{% trans "Create Product Formm" %}</h1>
   <form id="product_form" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.non_field_errors }}
 
     <div class="form-section">
-      <h2>Basic Informationnn</h2>
+      <h2>{% trans "Basic Informationnn" %}</h2>
       <div class="form-field">
         {{ form.title.label_tag }}
         {{ form.title }}
@@ -135,7 +136,7 @@
     </div>
 
     <div class="form-section">
-      <h2>Pricing & Inventoryyy</h2>
+      <h2>{% trans "Pricing & Inventoryyy" %}</h2>
       <div class="form-row">
         <div class="form-field">
           {{ form.price.label_tag }}
@@ -177,7 +178,7 @@
     </div>
 
     <div class="form-section">
-      <h2>Additional Details</h2>
+      <h2>{% trans "Additional Details" %}</h2>
       <div class="form-row">
         <div class="form-field">
           {{ form.vendor.label_tag }}
@@ -243,7 +244,7 @@
 
 
       <table id="variant_table">
-        <!-- <button onclick=tableSubmit()>Submit</button> -->
+        <!-- <button onclick=tableSubmit()>{% trans "Submit" %}</button> -->
       </table>
 
       <input type="hidden" id="variant_json" name="variant_json">
@@ -251,7 +252,7 @@
     </div>
 
     <div id="product_files_form">
-      <h2>Product Files</h2>
+      <h2>{% trans "Product Files" %}</h2>
       {% comment %} ManagementForm form is used by the formset to manage the collection of forms contained in the
       formset. {% endcomment %}
       {{ productfile_formset.management_form }}
@@ -263,11 +264,11 @@
         </div>
         {% endfor %}
       </div>
-      <button type="button" id="add-productfile-form">Add Another File</button>
+      <button type="button" id="add-productfile-form">{% trans "Add Another File" %}</button>
     </div>
 
     {% variant_form current_url=request.path product=product variants=variants %}
-    <button type="submit" id="product_form_submit_button">Submit</button>
+    <button type="submit" id="product_form_submit_button">{% trans "Submit" %}</button>
   </form>
 </div>
 {% block js %}

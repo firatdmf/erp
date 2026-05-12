@@ -33,23 +33,25 @@ def get_user_team(user):
 
 @login_required
 def team_list(request):
-    """Team Overview - Display all user's teams with cards"""
+    """Team Overview - Display all user's teams with cards.
+    All teams (active + archived) are rendered; tab switching is client-side."""
     filter_type = request.GET.get('filter', 'all')
-    
-    if filter_type == 'favorites':
-        favorite_ids = FavoriteTeam.objects.filter(user=request.user).values_list('team_id', flat=True)
-        teams = request.user.teams.filter(id__in=favorite_ids, is_archived=False)
-    elif filter_type == 'archived':
-        teams = request.user.teams.filter(is_archived=True)
-    else:
-        teams = request.user.teams.filter(is_archived=False)
-    
-    teams = teams.prefetch_related('member_objects__user', 'tasks')
-    
+
+    teams = request.user.teams.all().prefetch_related('member_objects__user', 'tasks')
+    favorite_ids = set(FavoriteTeam.objects.filter(user=request.user).values_list('team_id', flat=True))
+    for t in teams:
+        t.is_favorite = t.id in favorite_ids
+
+    active_count = sum(1 for t in teams if not t.is_archived)
+    favorite_count = sum(1 for t in teams if t.is_favorite and not t.is_archived)
+    archived_count = sum(1 for t in teams if t.is_archived)
+
     context = {
         'teams': teams,
         'filter': filter_type,
-        'all_count': request.user.teams.filter(is_archived=False).count(),
+        'all_count': active_count,
+        'favorite_count': favorite_count,
+        'archived_count': archived_count,
         'page_title': 'Team Overview',
     }
     return render(request, 'team_list.html', context)

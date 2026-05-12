@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -101,7 +102,7 @@
 
   <div class="form-card">
     <div class="form-header">
-      <h1 class="form-title">New Raw Material</h1>
+      <h1 class="form-title">{% trans "New Raw Material" %}</h1>
       <p class="form-desc">Define a new raw material for manufacturing.</p>
     </div>
 
@@ -122,7 +123,7 @@
       </div>
       {% endfor %}
 
-      <button type="submit" class="btn-submit">All Materials</button>
+      <button type="submit" class="btn-submit">{% trans "All Materials" %}</button>
     </form>
 
     <div style="text-align: center; margin-top: 16px;">

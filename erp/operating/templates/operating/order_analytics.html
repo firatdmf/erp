@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block title %}Analytics Dashboard{% endblock %}
@@ -456,7 +457,7 @@
         <!-- Header -->
         <div class="analytics-header">
             <div class="header-left">
-                <h1>Overview</h1>
+                <h1>{% trans "Overview" %}</h1>
                 <p>Review your order data and performance metrics</p>
             </div>
             <div class="header-right">
@@ -518,20 +519,20 @@
         <div class="chart-section">
             <div class="chart-header">
                 <div class="chart-title">
-                    <h3>Sales Trends</h3>
+                    <h3>{% trans "Sales Trends" %}</h3>
                     <p>Revenue distribution over time</p>
                 </div>
                 <div class="chart-controls">
                     <div class="period-tabs">
                         <button type="button" onclick="switchPeriod('weekly')"
                             class="period-tab {% if period == 'weekly' %}active{% endif %}"
-                            data-period="weekly">Weekly</button>
+                            data-period="weekly">{% trans "Weekly" %}</button>
                         <button type="button" onclick="switchPeriod('monthly')"
                             class="period-tab {% if period == 'monthly' or not period %}active{% endif %}"
-                            data-period="monthly">Monthly</button>
+                            data-period="monthly">{% trans "Monthly" %}</button>
                         <button type="button" onclick="switchPeriod('yearly')"
                             class="period-tab {% if period == 'yearly' %}active{% endif %}"
-                            data-period="yearly">Yearly</button>
+                            data-period="yearly">{% trans "Yearly" %}</button>
                     </div>
                     <button class="weekly-btn" id="toggleWeeklyBtn" onclick="toggleWeeklyView()">
                         <i class="fas fa-calendar-week"></i> Last 7 Days
@@ -619,14 +620,14 @@
         <div class="filter-card">
             <div class="filter-header">
                 <i class="fas fa-sliders-h"></i>
-                <h3>Filter</h3>
+                <h3>{% trans "Filter" %}</h3>
             </div>
 
             <form method="get" action="">
                 <input type="hidden" name="period" value="{{ period|default:'monthly' }}">
 
                 <div class="filter-section">
-                    <label class="filter-label">Product Type</label>
+                    <label class="filter-label">{% trans "Product Type" %}</label>
                     <div class="product-type-buttons">
                         <a href="?period={{ period }}&days={{ days }}&product_type=all"
                             class="product-type-btn {% if product_type == 'all' or not product_type %}active{% endif %}">
@@ -644,14 +645,14 @@
                 </div>
 
                 <div class="filter-section">
-                    <label class="filter-label">Date Range</label>
+                    <label class="filter-label">{% trans "Date Range" %}</label>
                     <select name="days" class="filter-select" onchange="this.form.submit()">
-                        <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
-                        <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
-                        <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
-                        <option value="180" {% if days == 180 %}selected{% endif %}>Last 6 months</option>
-                        <option value="365" {% if days == 365 or not days %}selected{% endif %}>Last 1 year</option>
-                        <option value="730" {% if days == 730 %}selected{% endif %}>Last 2 years</option>
+                        <option value="7" {% if days == 7 %}selected{% endif %}>{% trans "Last 7 days" %}</option>
+                        <option value="30" {% if days == 30 %}selected{% endif %}>{% trans "Last 30 days" %}</option>
+                        <option value="90" {% if days == 90 %}selected{% endif %}>{% trans "Last 90 days" %}</option>
+                        <option value="180" {% if days == 180 %}selected{% endif %}>{% trans "Last 6 months" %}</option>
+                        <option value="365" {% if days == 365 or not days %}selected{% endif %}>{% trans "Last 1 year" %}</option>
+                        <option value="730" {% if days == 730 %}selected{% endif %}>{% trans "Last 2 years" %}</option>
                     </select>
                 </div>
 

@@ -20,7 +20,7 @@ from .models import (
 )
 
 
-def _resolve_category_id(item: NavMenu) -> int | None:
+def _resolve_category_id(item: "NavMenu"):
     """Find the ProductCategory id behind a nav item.
 
     Tries the explicit FK first, then falls back to parsing the slug out

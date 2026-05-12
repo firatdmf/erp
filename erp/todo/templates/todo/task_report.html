@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 {% load todo_filters %}
 {% block content %}
 <link rel="stylesheet" href="{% static 'todo/task_list.css' %}">
 <p><a href="{% url 'todo:index' %}"><--- Go to Todo List page</a></p>
-<h1>Tasks that are in the future</h1>
+<h1>{% trans "Tasks that are in the future" %}</h1>
 <div class="task_container">
     <ul>
         {% for task in tasks|dictsortreversed:"due_date" %}
@@ -27,11 +28,11 @@
         </li>
         <form action="{% url 'todo:complete_task' task.id %}" method="post">
             {% csrf_token %}
-            <button type="submit" >Complete Task</button><br />
+            <button type="submit" >{% trans "Complete Task" %}</button><br />
         </form>
         <form action="{% url 'todo:delete_task' task.id %}" method="post">
             {% csrf_token %}
-            <button type="submit" >Delete Task</button><br />
+            <button type="submit" >{% trans "Delete Task" %}</button><br />
         </form>
         <a href="{% url 'todo:update_task' task.id %}">Update Task</a>
 

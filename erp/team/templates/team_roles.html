@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block title %}Manage Members - {{ team.name }} | Nejum ERP{% endblock %}
@@ -398,7 +399,7 @@
 
   <!-- Header -->
   <div class="mm-header">
-    <h1>Manage Members</h1>
+    <h1>{% trans "Manage Members" %}</h1>
     <p>Manage who has access to this team, assign roles, and edit their permissions.</p>
   </div>
 
@@ -425,10 +426,10 @@
     <table class="members-table">
       <thead>
         <tr>
-          <th>Member</th>
-          <th>Role</th>
-          <th>Date Added</th>
-          <th>Actions</th>
+          <th>{% trans "Member" %}</th>
+          <th>{% trans "Role" %}</th>
+          <th>{% trans "Date Added" %}</th>
+          <th>{% trans "Actions" %}</th>
         </tr>
       </thead>
       <tbody id="membersTable">
@@ -487,8 +488,8 @@
     <div class="table-footer">
       <span>Showing {{ members|length }} of {{ members|length }} members</span>
       <div class="pagination">
-        <button class="page-btn disabled">Previous</button>
-        <button class="page-btn disabled">Next</button>
+        <button class="page-btn disabled">{% trans "Previous" %}</button>
+        <button class="page-btn disabled">{% trans "Next" %}</button>
       </div>
     </div>
   </div>
@@ -499,11 +500,11 @@
   style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; padding: 1rem;">
   <div class="modal-content"
     style="background: white; border-radius: 12px; width: 100%; max-width: 440px; padding: 1.5rem; box-sizing: border-box; max-height: 90vh; overflow-y: auto;">
-    <h2 style="margin: 0 0 1.5rem; font-size: 1.25rem; font-weight: 700;">Add Member to Team</h2>
+    <h2 style="margin: 0 0 1.5rem; font-size: 1.25rem; font-weight: 700;">{% trans "Add Member to Team" %}</h2>
     <form id="inviteForm">
       <input type="hidden" name="team_id" value="{{ team.id }}">
       <div style="margin-bottom: 1rem; position: relative;">
-        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem;">Search User</label>
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem;">{% trans "Search User" %}</label>
         <input type="text" id="userSearchInput" class="form-control" placeholder="Search by name or email..."
           style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box;">
         <div id="userSearchResults"
@@ -527,20 +528,20 @@
         </div>
       </div>
       <div style="margin-bottom: 1rem;">
-        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem;">Role</label>
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.875rem;">{% trans "Role" %}</label>
         <select name="role" class="form-control"
           style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <option value="member">Member</option>
-          <option value="manager">Manager</option>
-          <option value="admin">Admin</option>
+          <option value="member">{% trans "Member" %}</option>
+          <option value="manager">{% trans "Manager" %}</option>
+          <option value="admin">{% trans "Admin" %}</option>
         </select>
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
         <button type="button" onclick="closeInviteModal()"
-          style="padding: 0.65rem 1.25rem; background: #f1f5f9; border: none; border-radius: 8px; color: #64748b; font-weight: 600; cursor: pointer;">Cancel</button>
+          style="padding: 0.65rem 1.25rem; background: #f1f5f9; border: none; border-radius: 8px; color: #64748b; font-weight: 600; cursor: pointer;">{% trans "Cancel" %}</button>
         <button type="submit"
-          style="padding: 0.65rem 1.25rem; background: #3b82f6; border: none; border-radius: 8px; color: white; font-weight: 600; cursor: pointer;">Add
-          Member</button>
+          style="padding: 0.65rem 1.25rem; background: #3b82f6; border: none; border-radius: 8px; color: white; font-weight: 600; cursor: pointer;">{% trans "Add
+          Member" %}</button>
       </div>
     </form>
   </div>

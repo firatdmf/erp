@@ -1,3 +1,4 @@
+{% load i18n %}
 <!-- Summary Cards -->
 <div class="summary-cards">
     <div class="summary-card">
@@ -43,13 +44,13 @@
     <table class="orders-table">
         <thead>
             <tr>
-                <th>Order #</th>
-                <th>Customer</th>
-                <th>Date</th>
-                <th>Revenue</th>
-                <th>Cost</th>
-                <th>Profit</th>
-                <th>Status</th>
+                <th>{% trans "Order #" %}</th>
+                <th>{% trans "Customer" %}</th>
+                <th>{% trans "Date" %}</th>
+                <th>{% trans "Revenue" %}</th>
+                <th>{% trans "Cost" %}</th>
+                <th>{% trans "Profit" %}</th>
+                <th>{% trans "Status" %}</th>
             </tr>
         </thead>
         <tbody>

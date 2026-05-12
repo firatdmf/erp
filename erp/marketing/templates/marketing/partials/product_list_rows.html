@@ -1,4 +1,5 @@
-{% load marketing_tags %}
+{% load i18n %}
+{% load marketing_tags i18n %}
 {% for product in products %}
 {% with stock=product.total_stock %}
 <div class="pr-wrap" id="prod-{{ product.id }}"
@@ -32,7 +33,7 @@
         {% endif %}
         {% if product.variant_count %}
           <span class="pr-vars">
-            <span class="pr-vars-l">{{ product.variant_count }} variants</span>
+            <span class="pr-vars-l">{{ product.variant_count }} {% trans "variants" %}</span>
           </span>
         {% endif %}
       </div>
@@ -42,7 +43,7 @@
       <i data-lucide="{% if stock <= 0 %}package-x{% else %}boxes{% endif %}"></i>
       <div>
         <div class="pr-stock-num">{{ stock|floatformat:0|default:"0" }}</div>
-        <div class="pr-stock-l">stock</div>
+        <div class="pr-stock-l">{% trans "stock" %}</div>
       </div>
     </div>
 
@@ -52,16 +53,16 @@
 
     <span class="pr-status pc-status {% if stock <= 0 %}out{% elif stock < 10 %}low{% else %}on{% endif %}">
       <span class="dot"></span>
-      {% if stock <= 0 %}Out of stock
-      {% elif stock < 10 %}Low stock
-      {% elif product.featured %}Featured
-      {% else %}Active{% endif %}
+      {% if stock <= 0 %}{% trans "Out of stock" %}
+      {% elif stock < 10 %}{% trans "Low stock" %}
+      {% elif product.featured %}{% trans "Featured" %}
+      {% else %}{% trans "Active" %}{% endif %}
     </span>
 
     <div class="pr-up">{{ product.created_at|timesince|default:"—" }}</div>
 
     <div class="pr-actions">
-      <button title="Show variants" type="button" class="pr-expand"
+      <button title="{% trans 'Show variants' %}" type="button" class="pr-expand"
               onclick="event.stopPropagation(); toggleVariants({{ product.id }}, this.closest('.pr-wrap'));">
         <i data-lucide="chevron-down"></i>
       </button>
@@ -75,7 +76,7 @@
          hx-trigger="variant-load once"
          hx-swap="innerHTML">
       <div class="htmx-loader">
-        <i class="fa fa-spinner fa-spin"></i> Loading variants…
+        <i class="fa fa-spinner fa-spin"></i> {% trans "Loading variants…" %}
       </div>
     </div>
   </div>
@@ -84,7 +85,7 @@
 {% empty %}
 <div class="pl-empty">
   <span class="pl-empty-ico"><i data-lucide="search-x"></i></span>
-  <h3>No matching products found</h3>
-  <p>Try changing the filters or running a different search.</p>
+  <h3>{% trans "No matching products found" %}</h3>
+  <p>{% trans "Try changing the filters or running a different search." %}</p>
 </div>
 {% endfor %}

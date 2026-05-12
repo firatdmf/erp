@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% block css %}
@@ -12,12 +13,12 @@
       <table id="production_table">
         <thead>
           <tr>
-            <th>Order Item</th>
-            <th>Item Status</th>
-            <th>Order Quantity</th>
-            <th>Target Quantity per Pack</th>
-            <th>Pack Count</th>
-            <th>Tag</th>
+            <th>{% trans "Order Item" %}</th>
+            <th>{% trans "Item Status" %}</th>
+            <th>{% trans "Order Quantity" %}</th>
+            <th>{% trans "Target Quantity per Pack" %}</th>
+            <th>{% trans "Pack Count" %}</th>
+            <th>{% trans "Tag" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -47,7 +48,7 @@
                   <input type="hidden" name="target_quantity_per_pack" id="hidden_target_quantity_per_pack_{{ forloop.counter0 }}" value="" />
                   <input type="hidden" name="pack_count" id="hidden_pack_count_{{ forloop.counter0 }}" value="" />
                   <input type="hidden" name="order_item_id" value="{{ item.pk }}" />
-                  <button type="submit" class="print_barcode_button" id="start_and_tag_{{ forloop.counter0 }}">Start & Tag</button>
+                  <button type="submit" class="print_barcode_button" id="start_and_tag_{{ forloop.counter0 }}">{% trans "Start & Tag" %}</button>
                 </form>
               {% endif %}
                 <div id="spinner_{{forloop.counter0}}" class="htmx-indicator">

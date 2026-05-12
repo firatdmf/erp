@@ -1,0 +1,453 @@
+' + t.title + '
+ATTRIBUTES
+Account
+Account Balance
+Accounting
+Action
+Actions
+Active
+Activity report
+Add
+          Member
+Add Another File
+Add Contact
+Add Equity Capital
+Add Equity Expense
+Add Equity Revenue
+Add File
+Add File (Optional)
+Add Item to Receipt
+Add Member
+Add Member to Team
+Add New Product
+Add New Section
+Add Note
+Add Raw Material
+Add Receipt
+Add Supplier
+Add Task
+Add a Company
+Add a Contact
+Add a single record
+Add another item
+Add new records
+Additional Details
+Address
+Addresses
+Admin
+All
+All Materials
+All Notes
+All Teams
+All Time
+American
+Amount
+Amount Paid
+Assign To
+Assign to
+Assignees
+Attach Contact
+Attachments
+Attachments (Google Drive)
+Author
+BALANCE
+BARCODE
+Background info
+Barcode
+Basic Informationnn
+Bcc
+Blog
+Blog Yazısını Sil
+Books
+Box
+CATEGORY
+CRM Index
+CURRENCY
+Cancel
+Carrier
+Category
+Category (EN)
+Category (PL)
+Category (RU)
+Category (Turkish) *
+Channel Name *
+Check Inbox
+Choose a status
+Choose pack number
+Claim an Asset
+Clear
+Client
+Close
+Color Tag
+Comment
+Comments
+Communication
+Companies
+Company
+Company / Contact
+Company Name
+Complete
+          Task
+Complete Task
+Confirm Delete
+Connect Your Google Account
+Contact
+Contact Name
+Contacts
+Content (EN) - Markdown supported
+Content (PL) - Markdown supported
+Content (RU) - Markdown supported
+Content (TR) * - Markdown supported
+Content Type
+Content Type #
+Cornice
+Cost
+Country
+Cover
+Cover Image (for list view)
+Create
+Create Book
+Create Channel
+Create Contact Form
+Create Invoice
+Create New Team
+Create Order
+Create Product Formm
+Create Purchase Order
+Create Purchase Request
+Create Section
+Create Task
+Create Team
+Create a new task
+Create task
+Created
+Created At
+Currency
+Current Quantity
+Custom Curtain
+Customer
+Customer Information
+Customer Source
+Customers
+DEFAULT ALIVE?
+Date
+Date & Time
+Date & Time *
+Date Added
+Date Range
+Delete
+Delete
+          Task
+Delete Blog Post?
+Delete Company
+Delete Contact
+Delete Note?
+Delete Order
+Delete Task
+Delete Team Task
+Delivery Address
+Department
+Description
+Description (optional)
+Direct (Production)
+Done
+Double
+Due Date
+Due Date *
+Due date
+Duration (min)
+E-posta Detayı
+EUR (€)
+Edit Company
+Edit Contact
+Edit Raw Material
+Edit Section
+Edit Task
+Email
+Email Automation
+Email addresses
+Est. Price
+Excerpt (EN)
+Excerpt (PL)
+Excerpt (RU)
+Excerpt (TR) *
+Expense #
+Expenses Table
+Extra Footer Content (Scripts)
+Extra Header Content (CSS/Styles/Meta)
+Extrafor
+Fabric
+Fabric Used (m)
+Featured
+Filter
+Find users to invite
+First Name
+Flat
+Folder is empty
+GBP (£)
+Gmail Connected
+Gmail Not Connected
+Group
+Height (cm)
+Hero Image (for detail page)
+High
+High Priority
+History
+Home Textile
+Icon
+Icon Color
+Ideas
+Import Products from Excel
+Important
+In Progress
+Inactive
+Indirect (Overhead)
+Initial Quantity
+Item
+Item No
+Item Status
+Items
+Items in Pack
+Job Title
+KPI Dashboard
+Kanun
+Kilogram
+Last 1 year
+Last 2 years
+Last 30 days
+Last 6 months
+Last 7 days
+Last 90 days
+Last Name
+Liter
+Location
+Location / Link
+Low
+Low Priority
+MONEY IN
+MONEY OUT
+Manage Members
+Manage Templates
+Manager
+Manufacturer
+Marketing
+Marketing Index
+Medium
+Medium Priority
+Meeting
+Meeting History
+Meeting Type
+Member
+Meter
+Monthly
+Mounting
+Multi-Team Management
+My Emails
+My Notes
+My Team
+My Teams
+My Warehouses
+NAME
+Name
+Navigation
+New Message
+New Raw Material
+Next
+No B2B orders
+No assigned tasks
+No campaigns yet
+No email selected
+No email templates yet
+No emails
+No emails here
+No favorites yet
+No meeting history
+No notes found
+No orders yet
+No products in this warehouse
+No replies yet
+No sent emails yet
+No tasks found
+No tasks yet
+No teams yet
+No upcoming meetings
+No warehouses yet
+No web orders
+Note
+Note Content
+Note Title
+Notes
+Operating
+Operating Index
+Option Name
+Option Values
+Order #
+Order Completed
+Order Details
+Order ID
+Order Item
+Order Items
+Order Items:
+Order QR Code
+Order QR Code:
+Order Quantity
+Order Shipping Status
+Order Status
+Order Value
+Orders
+Organizer
+Overview
+PRICE
+Pack Count
+Pack Number
+Participants
+Pay Dividend
+Payment
+Payment Information
+Payment Method
+Personal
+Phone
+Phone numbers
+Photo
+Pipe
+Pleat Density
+Pleat Type
+Previous
+Price
+Pricing & Inventoryyy
+Primary
+Priority
+Priority Level
+Procurement
+Product
+Product Files
+Product Type
+Products
+Products Table
+Profit
+Prospect
+Publish
+Publish Date *
+Published
+Purchase Orders
+Purchase Requests
+Purchasing
+QR Operations
+QTY
+Qty
+Qualified
+Quantity
+Quick Search
+RUNWAY
+Raw Materials
+Remaining
+Report Expense
+Report an Expense
+Report an Income
+Reports
+Request Details
+Requester
+Revenue
+Review
+Role
+Rustic
+SKU
+SKU (Optional)
+STOCK
+Sales Dashboard
+Sales Trends
+Save
+Save Changes
+Save Supplier
+Scan Next
+Scan Order Item QR
+Schedule Meeting
+Search Contact / Company
+Search Product
+Search User
+Search Web Client
+Search company
+Search contact
+Section Title
+Select
+Select Team
+Select Team
+                (Optional)
+Select a conversation
+Select an email
+Select...
+Send
+Send to Supplier
+Shipping Information
+Single
+Start & Tag
+Status
+Stock Quantity
+Submit
+Submit Order
+Supplier
+Supplier SKU
+Suppliers
+TOTAL (TRY)
+TOTAL (USD)
+TRY (₺)
+Tag
+Target Quantity per Pack
+Task Details
+Task Name
+Task Name *
+Task Title
+Task name
+Tasks that are due
+Tasks that are in the future
+Team
+Team Management
+Team Meetings
+Team Name
+Team Name *
+Team Overview
+This Month
+This Week
+Title
+Title (EN)
+Title (PL)
+Title (RU)
+Title (TR) *
+Title *
+To Do
+Today
+Total
+Total Balance
+Total Price
+Tracking Number
+Transaction #
+Transaction Table
+Trash is empty
+Type
+UNIT COST
+URL Slug *
+USD ($)
+Unit
+Unit ID
+Unit Price
+Unit of Measure
+Unit of Measurement
+Upcoming Meetings
+Update
+Update Order
+Update Task
+Urgent
+VALUE
+VARIANT
+Variant
+View Campaigns
+Warehouse
+Water Wave
+Website
+Weekly
+Width (cm)
+Wing
+Work
+Yearly
+You have unsaved data!
+✨ Create New Note

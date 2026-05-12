@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -473,7 +474,7 @@
         {% else %}
           <div class="empty-state" style="height: 300px;">
             <i class="fa fa-inbox"></i>
-            <h3>No emails</h3>
+            <h3>{% trans "No emails" %}</h3>
             <p>Your inbox is empty</p>
           </div>
         {% endif %}
@@ -543,7 +544,7 @@
       {% else %}
         <div class="empty-state">
           <i class="fa fa-inbox"></i>
-          <h3>No email selected</h3>
+          <h3>{% trans "No email selected" %}</h3>
           <p>Select an email from the list to view its contents</p>
         </div>
       {% endif %}

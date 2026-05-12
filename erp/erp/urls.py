@@ -29,6 +29,8 @@ urlpatterns = [
     path("", views.index.as_view(), name="index"),
     path("dashboard/", views.Dashboard.as_view(), name="dashboard"),
     path("settings/",views.user_settings.as_view(),name="user_settings"),
+    # Built-in i18n endpoint: POST { language: 'tr' } sets cookie + redirects
+    path("i18n/", include("django.conf.urls.i18n")),
     path("admin/", admin.site.urls),
     path('authentication/',include('authentication.urls')),
     path('accounting/',include('accounting.urls')),

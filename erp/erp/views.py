@@ -134,7 +134,26 @@ class Dashboard(View):
                     tasks = list(base_query.filter(
                         Q(member=current_member) | Q(assignees=current_member)
                     ).distinct().select_related('contact', 'company', 'member', 'member__user', 'created_by', 'created_by__user').order_by('-due_date'))
-                    print(f"My Tasks count: {len(tasks)}")
+
+                    # ─── DEBUG: log Python/Django/server info + each task's contact/company ───
+                    import sys, socket, os
+                    from django.conf import settings
+                    try:
+                        from django import get_version as _dj_ver
+                        dj_v = _dj_ver()
+                    except Exception:
+                        dj_v = '?'
+                    print(f"\n{'='*60}")
+                    print(f"🐍 [DASHBOARD DEBUG] Server={socket.gethostname()} Port={request.META.get('SERVER_PORT')} PID={os.getpid()}")
+                    print(f"   Python={sys.version.split()[0]}  Django={dj_v}")
+                    print(f"   DB={settings.DATABASES['default'].get('NAME')} HOST={settings.DATABASES['default'].get('HOST')}")
+                    print(f"   user={current_user} member={current_member}")
+                    print(f"   My Tasks count: {len(tasks)}")
+                    for t in tasks[:30]:
+                        cname = (getattr(getattr(t, 'contact', None), 'name', None) if t.contact_id else None)
+                        coname = (getattr(getattr(t, 'company', None), 'name', None) if t.company_id else None)
+                        print(f"   • Task#{t.id} {t.name!r} | contact_id={t.contact_id}({cname!r}) company_id={t.company_id}({coname!r})")
+                    print(f"{'='*60}\n")
                     
                     # Subquery to get current user's role in the task's team
                     user_role_subquery = TeamMember.objects.filter(
@@ -230,18 +249,29 @@ class GlobalSearch(View):
             if search_type == 'products':
                 from marketing.models import Product
                 # Return last 50 products
-                recent_products = Product.objects.all().order_by('-id')[:50]
+                recent_products = (
+                    Product.objects.all()
+                    .select_related('primary_image')
+                    .order_by('-id')[:50]
+                )
                 for p in recent_products:
                     try:
                         url = reverse('marketing:product_edit', args=[p.id])
                     except:
                         url = '#'
+                    pi = getattr(p, 'primary_image', None)
+                    image = (
+                        getattr(pi, 'thumbnail_url', None)
+                        or getattr(pi, 'file_url', None)
+                        or None
+                    )
                     results.append({
                         'type': 'Product',
                         'name': p.title,
                         'detail': p.sku,
                         'url': url,
-                        'icon': 'fa-box'
+                        'icon': 'fa-box',
+                        'image': image,
                     })
                 return JsonResponse({'results': results})
             
@@ -322,20 +352,30 @@ class GlobalSearch(View):
         # 3. Products
         if search_type in ['all', 'products']:
             from marketing.models import Product
-            products = Product.objects.filter(
-                Q(title__icontains=query) | Q(sku__icontains=query)
-            )[:limit]
+            products = (
+                Product.objects
+                .filter(Q(title__icontains=query) | Q(sku__icontains=query))
+                .select_related('primary_image')[:limit]
+            )
             for p in products:
                 try:
                     url = reverse('marketing:product_edit', args=[p.id])
                 except:
                     url = '#'
+                # Prefer the small thumbnail; fall back to full file_url.
+                pi = getattr(p, 'primary_image', None)
+                image = (
+                    getattr(pi, 'thumbnail_url', None)
+                    or getattr(pi, 'file_url', None)
+                    or None
+                )
                 results.append({
                     'type': 'Product',
                     'name': p.title,
                     'detail': p.sku,
                     'url': url,
-                    'icon': 'fa-box'
+                    'icon': 'fa-box',
+                    'image': image,
                 })
             
         # 4. Tasks (Todo) -- Mapped to 'orders' tab? No, maybe 'all' only or add 'tasks' tab. 

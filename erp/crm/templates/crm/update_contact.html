@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 {% block css %}
 <style>
@@ -141,7 +142,7 @@
 <div class="modern-form-container">
   <div class="modern-form-header">
     <i class="fa fa-user"></i>
-    <h1>Edit Contact</h1>
+    <h1>{% trans "Edit Contact" %}</h1>
   </div>
   <div class="modern-form-body">
     <form method="post" action="{% url 'crm:update_contact' contact.id %}" id="contactUpdateForm">
@@ -161,14 +162,14 @@
       
       <!-- Dynamic Email Fields -->
       <p>
-        <label>Email addresses</label>
+        <label>{% trans "Email addresses" %}</label>
         <div id="edit_emails_container"></div>
         {{ form.emails_data }}
       </p>
       
       <!-- Dynamic Phone Fields -->
       <p>
-        <label>Phone numbers</label>
+        <label>{% trans "Phone numbers" %}</label>
         <div id="edit_phones_container"></div>
         {{ form.phones_data }}
       </p>

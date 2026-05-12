@@ -939,3 +939,62 @@ class BlogFile(models.Model):
     
     def __str__(self):
         return f"{self.blog_post.title_tr} - {self.file_type}"
+
+
+# ============================================================
+# PRODUCT CAMPAIGNS / DISCOUNTS
+# Bir ürüne tek tip kampanya bağlanır:
+#   - 'percentage' : sabit yüzde indirim + bitiş tarihi
+#   - 'volume'     : adet bazlı kademe (tier) indirimi
+# ============================================================
+class ProductCampaign(models.Model):
+    TYPE_CHOICES = [
+        ('percentage', 'Percentage Discount'),
+        ('volume',     'Volume / Quantity Tier'),
+    ]
+    product = models.OneToOneField(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='campaign',
+    )
+    campaign_type = models.CharField(max_length=12, choices=TYPE_CHOICES)
+    is_active = models.BooleanField(default=True)
+    # Used only when campaign_type == 'percentage'
+    discount_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text='Used only for percentage campaigns. Example: 15.00 = %15'
+    )
+    end_date = models.DateField(
+        null=True, blank=True,
+        help_text='When the percentage discount expires (inclusive).'
+    )
+    note = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'Campaign({self.product.title}, {self.campaign_type})'
+
+
+class ProductCampaignTier(models.Model):
+    '''A single bracket in a volume campaign:
+       e.g. 0–1000 units → %5 off.'''
+    campaign = models.ForeignKey(
+        ProductCampaign,
+        on_delete=models.CASCADE,
+        related_name='tiers',
+    )
+    min_qty = models.PositiveIntegerField()
+    max_qty = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Leave blank for an open-ended top tier (7500+).'
+    )
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2)
+
+    class Meta:
+        ordering = ['min_qty']
+
+    def __str__(self):
+        cap = self.max_qty if self.max_qty else '+'
+        return f'{self.min_qty}–{cap} → %{self.discount_percent}'
+

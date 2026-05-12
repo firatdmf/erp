@@ -1,11 +1,21 @@
 {% load static %}
 {% load erp_tags %}
+{% load i18n %}
+{% get_current_language as LANGUAGE_CODE %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('nejum-theme') || 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -15,7 +25,7 @@
   <link rel="stylesheet" href="{% static 'erp/css/base.css' %}?v=5.1" />
   <link rel="shortcut icon" type="image/ico" href="{% static 'erp/images/favicon.ico' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=9" />
+  <link rel="stylesheet" href="{% static 'erp/css/command_palette.css' %}?v=11" />
 
   {% comment %}
     Nejum design system overlay — only loaded when the active brand
@@ -28,9 +38,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=19" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=28" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=19" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=20" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=42" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=5" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=20" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=5" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/responsive-content.css' %}?v=4" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/dark.css' %}?v=9" />
     <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
   {% endif %}
 
@@ -441,7 +455,7 @@
         </div>
         <span class="header-date">{% now 'l, j F Y' %}</span>
       {% else %}
-        <span class="welcome-text">Welcome to the base page, {{ user.first_name }} {{ user.last_name }}!</span>
+        <span class="welcome-text">{% blocktrans with first=user.first_name last=user.last_name %}Welcome, {{ first }} {{ last }}!{% endblocktrans %}</span>
         <span class="header-date">{% now 'F j, Y' %}</span>
       {% endif %}
     </div>
@@ -452,7 +466,7 @@
         <div class="search-box-wrapper" id="searchBoxWrapper">
           <i class="fas fa-search search-icon"></i>
           <div class="search-filter-chips" id="cmdFilterChips"></div>
-          <input type="text" class="search-input" id="cmdSearchInput" placeholder="Search..." autocomplete="off"
+          <input type="text" class="search-input" id="cmdSearchInput" placeholder="{% trans 'Search...' %}" autocomplete="off"
             onfocus="openSearchDropdown()" />
           <div class="search-shortcut" id="searchShortcut">
             <kbd>Ctrl</kbd><kbd>K</kbd>
@@ -469,25 +483,25 @@
         <!-- Dropdown Panel (no separate search header) -->
         <div class="search-dropdown-panel" id="searchDropdownPanel">
           <div class="search-dropdown-tabs" id="cmdModalTabs">
-            <button class="cmd-tab active" data-tab="all" onclick="setCmdTab('all')">All</button>
-            <button class="cmd-tab" data-tab="contacts" onclick="setCmdTab('contacts')">Contacts</button>
-            <button class="cmd-tab" data-tab="products" onclick="setCmdTab('products')">Products</button>
-            <button class="cmd-tab" data-tab="orders" onclick="setCmdTab('orders')">Orders</button>
-            <button class="cmd-tab" data-tab="menu" onclick="setCmdTab('menu')">Navigation</button>
+            <button class="cmd-tab active" data-tab="all" onclick="setCmdTab('all')">{% trans "All" %}</button>
+            <button class="cmd-tab" data-tab="contacts" onclick="setCmdTab('contacts')">{% trans "Contacts" %}</button>
+            <button class="cmd-tab" data-tab="products" onclick="setCmdTab('products')">{% trans "Products" %}</button>
+            <button class="cmd-tab" data-tab="orders" onclick="setCmdTab('orders')">{% trans "Orders" %}</button>
+            <button class="cmd-tab" data-tab="menu" onclick="setCmdTab('menu')">{% trans "Navigation" %}</button>
           </div>
 
           <div class="search-dropdown-body" id="cmdModalBody">
             <div class="search-section" id="cmdRecentSection">
               <div class="section-header">
-                <span>RECENT SEARCHES</span>
-                <button class="clear-recent-btn" onclick="clearCmdRecentSearches()">Clear history</button>
+                <span>{% trans "RECENT SEARCHES" %}</span>
+                <button class="clear-recent-btn" onclick="clearCmdRecentSearches()">{% trans "Clear history" %}</button>
               </div>
               <div class="recent-list" id="cmdRecentList"></div>
             </div>
             <div class="search-results-container" id="cmdResultsContainer"></div>
             <div class="search-empty-state hidden" id="cmdEmptyState">
               <i class="fas fa-search"></i>
-              <p>Search for something...</p>
+              <p>{% trans "Search for something..." %}</p>
             </div>
             <div class="filter-menu hidden" id="cmdFilterMenu">
               <div class="filter-menu-header">Filter by category</div>
@@ -499,14 +513,40 @@
     </div>
 
     <div class="top-bar-right">
+      <div class="favorites-container">
+        <button class="top-bar-btn" onclick="toggleFavorites()" id="topBarFavoritesBtn" title="{% trans 'Favorites' %}">
+          <i class="far fa-star"></i>
+          <span class="top-bar-btn-label">{% trans "Favorites" %}</span>
+        </button>
+        <div class="favorites-dropdown" id="favoritesDropdown">
+          <div class="favorites-header">
+            <h3>{% trans "Favorites" %}</h3>
+          </div>
+          <div class="favorites-list">
+            <a href="{% url 'marketing:product_list' %}" class="favorites-item">
+              <span class="favorites-item-icon"><i class="fas fa-list"></i></span>
+              <span class="favorites-item-label">{% trans "Product list" %}</span>
+            </a>
+            <a href="{% url 'marketing:product_create' %}" class="favorites-item">
+              <span class="favorites-item-icon"><i class="fas fa-plus"></i></span>
+              <span class="favorites-item-label">{% trans "Add product" %}</span>
+            </a>
+            <a href="{% url 'team:team_list' %}" class="favorites-item">
+              <span class="favorites-item-icon"><i class="fas fa-users"></i></span>
+              <span class="favorites-item-label">{% trans "Team Members" %}</span>
+            </a>
+          </div>
+        </div>
+      </div>
       <div class="notification-container">
         <button class="top-bar-btn" onclick="toggleNotifications()" id="topBarNotificationBell">
           <i class="far fa-bell"></i>
+          <span class="top-bar-btn-label">{% trans "Notifications" %}</span>
           <span class="notification-dot hidden" id="notificationBadge"></span>
         </button>
         <div class="notification-dropdown" id="notificationDropdown">
           <div class="notification-header">
-            <h3>Notifications</h3>
+            <h3>{% trans "Notifications" %}</h3>
             <button class="mark-all-read-btn" onclick="markAllNotificationsRead()">
               <i class="fas fa-check-double"></i>
             </button>
@@ -514,16 +554,18 @@
           <div class="notification-list" id="notificationList">
             <div class="notification-empty">
               <i class="far fa-bell-slash"></i>
-              <p>No new notifications</p>
+              <p>{% trans "No new notifications" %}</p>
             </div>
           </div>
         </div>
       </div>
-      <a href="{% url 'user_settings' %}" class="top-bar-btn" title="Settings">
+      <a href="{% url 'user_settings' %}" class="top-bar-btn" title="{% trans 'Settings' %}">
         <i class="fas fa-cog"></i>
+        <span class="top-bar-btn-label">{% trans "Settings" %}</span>
       </a>
-      <a href="{% url 'authentication:signout' %}" class="top-bar-btn" title="Sign Out">
+      <a href="{% url 'authentication:signout' %}" class="top-bar-btn" title="{% trans 'Sign Out' %}">
         <i class="fas fa-sign-out-alt"></i>
+        <span class="top-bar-btn-label">{% trans "Sign Out" %}</span>
       </a>
     </div>
   </div>
@@ -531,6 +573,9 @@
   {% with member=user.member %}
   {% if UI_THEME == "nejum" %}
     {% include "components/_sidebar_nejum.html" %}
+    {% if user.is_authenticated %}
+      {% include "components/_mobile_shell.html" %}
+    {% endif %}
   {% endif %}
   <nav class="navbar"{% if UI_THEME == "nejum" %} style="display:none !important"{% endif %}>
     <ul class="navbar-nav">
@@ -549,10 +594,10 @@
         <div id="addExpanded">
           <div class="add-menu-header">
             <i class="fas fa-plus-circle" aria-hidden="true"></i>
-            <h2>Add new records</h2>
+            <h2>{% trans "Add new records" %}</h2>
           </div>
           <div class="add-menu-section">
-            <h3>Add a single record</h3>
+            <h3>{% trans "Add a single record" %}</h3>
             <ul>
               <li>
                 <a href="#" onclick="openMainContactSidebar(); return false;">
@@ -618,10 +663,10 @@
         <div id="teamExpanded" style="top: 135px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-users" aria-hidden="true"></i>
-            <h2>My Team</h2>
+            <h2>{% trans "My Team" %}</h2>
           </div>
           <div class="add-menu-section">
-            <h3>Team Management</h3>
+            <h3>{% trans "Team Management" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'team:team_list' %}">
@@ -672,10 +717,10 @@
           style="top: 195px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-money-bill" aria-hidden="true"></i>
-            <h2>Accounting</h2>
+            <h2>{% trans "Accounting" %}</h2>
           </div>
           <div class="add-menu-section">
-            <h3>Books</h3>
+            <h3>{% trans "Books" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'accounting:index' %}">
@@ -692,7 +737,7 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>Reports</h3>
+            <h3>{% trans "Reports" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'accounting:sales_dashboard' %}">
@@ -714,10 +759,10 @@
           style="top: 255px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-bullseye" aria-hidden="true"></i>
-            <h2>Marketing</h2>
+            <h2>{% trans "Marketing" %}</h2>
           </div>
           <div class="add-menu-section">
-            <h3>Products</h3>
+            <h3>{% trans "Products" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'marketing:product_create' %}">
@@ -734,7 +779,7 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>Customers</h3>
+            <h3>{% trans "Customers" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'crm:company_list' %}">
@@ -751,7 +796,7 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>Blog</h3>
+            <h3>{% trans "Blog" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'marketing:blog_create' %}">
@@ -778,10 +823,10 @@
           style="top: 315px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-cogs" aria-hidden="true"></i>
-            <h2>Operating</h2>
+            <h2>{% trans "Operating" %}</h2>
           </div>
           <div class="add-menu-section">
-            <h3>QR Operations</h3>
+            <h3>{% trans "QR Operations" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'operating:scan_order_item_unit' %}">
@@ -798,7 +843,7 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>Raw Materials</h3>
+            <h3>{% trans "Raw Materials" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'operating:raw_material_good_list' %}">
@@ -827,7 +872,7 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>Orders</h3>
+            <h3>{% trans "Orders" %}</h3>
             <ul>
               <li>
                 <a href="#" onclick="openOrderSidebar(); return false;">
@@ -844,7 +889,7 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>Warehouse</h3>
+            <h3>{% trans "Warehouse" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'operating:warehouse_list' %}">
@@ -871,10 +916,10 @@
           style="top: 375px !important; max-height: 90vh !important; overflow-y: auto !important;">
           <div class="add-menu-header">
             <i class="fas fa-shopping-basket" aria-hidden="true"></i>
-            <h2>Procurement</h2>
+            <h2>{% trans "Procurement" %}</h2>
           </div>
           <div class="add-menu-section">
-            <h3>Purchasing</h3>
+            <h3>{% trans "Purchasing" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'procurement:request_list' %}">
@@ -891,7 +936,7 @@
             </ul>
           </div>
           <div class="add-menu-section">
-            <h3>Suppliers</h3>
+            <h3>{% trans "Suppliers" %}</h3>
             <ul>
               <li>
                 <a href="{% url 'crm:supplier_list' %}">
@@ -974,7 +1019,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-check-circle"></i>
-          <h2>Create a new task</h2>
+          <h2>{% trans "Create a new task" %}</h2>
         </div>
       </div>
       <div class="sidebar-content">
@@ -982,33 +1027,33 @@
           data-action-personal="{% url 'todo:create_task' %}" data-action-team="{% url 'team:create_task' %}">
           {% csrf_token %}
           <div class="form-group">
-            <label for="id_name">Task name</label>
+            <label for="id_name">{% trans "Task name" %}</label>
             <input type="text" name="name" id="id_name" class="form-input" required autofocus>
           </div>
 
           <div class="form-group">
-            <label for="id_due_date">Due date</label>
+            <label for="id_due_date">{% trans "Due date" %}</label>
             <input type="date" name="due_date" id="id_due_date" class="form-input" value="{{ today }}">
           </div>
 
           <div class="form-group">
-            <label for="id_priority">Priority</label>
+            <label for="id_priority">{% trans "Priority" %}</label>
             <select name="priority" id="id_priority" class="form-input">
-              <option value="low">Low</option>
-              <option value="medium" selected>Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="low">{% trans "Low" %}</option>
+              <option value="medium" selected>{% trans "Medium" %}</option>
+              <option value="high">{% trans "High" %}</option>
+              <option value="urgent">{% trans "Urgent" %}</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="id_description">Description</label>
+            <label for="id_description">{% trans "Description" %}</label>
             <textarea name="description" id="id_description" class="form-textarea" rows="3"
               placeholder="Enter a description or any notes about this task."></textarea>
           </div>
 
           <div class="form-group">
-            <label>Assign To</label>
+            <label>{% trans "Assign To" %}</label>
 
             <!-- Hidden inputs for logic -->
             <input type="hidden" name="team_id" id="id_task_team_id">
@@ -1019,8 +1064,8 @@
             <!-- Global Team Selector -->
             <div id="globalTeamSelectContainer" style="display:none; margin-bottom: 0.5rem;">
               <label class="form-label"
-                style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem; display:block;">Select Team
-                (Optional)</label>
+                style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem; display:block;">{% trans "Select Team
+                (Optional)" %}</label>
               <select id="globalTeamSelect" class="form-input" style="width: 100%;"
                 onchange="handleGlobalTeamSelect(this.value)">
                 <option value="">-- Personal Task --</option>
@@ -1132,7 +1177,7 @@
               </button>
             </div>
             <div class="form-group">
-              <label for="id_task_company_search">Search company</label>
+              <label for="id_task_company_search">{% trans "Search company" %}</label>
               <input type="text" id="id_task_company_search" class="form-input" placeholder="Type company name..."
                 hx-get="{% url 'crm:company_search' %}" hx-trigger="keyup changed delay:300ms"
                 hx-target="#taskCompanyResults" hx-params="*" name="company_name" autocomplete="off">
@@ -1150,7 +1195,7 @@
               </button>
             </div>
             <div class="form-group">
-              <label for="id_task_contact_search">Search contact</label>
+              <label for="id_task_contact_search">{% trans "Search contact" %}</label>
               <input type="text" id="id_task_contact_search" class="form-input" placeholder="Type contact name..."
                 hx-post="{% url 'crm:search_contacts_only' %}" hx-trigger="keyup changed delay:300ms"
                 hx-target="#taskContactResults" hx-params="*" name="searchInput" autocomplete="off">
@@ -1161,15 +1206,15 @@
 
           <!-- Attachments (Temporarily Disabled by User Request)
           <div class="form-group" style="margin-top: 1rem;">
-            <label for="id_task_files">Attachments (Google Drive)</label>
+            <label for="id_task_files">{% trans "Attachments (Google Drive)" %}</label>
             <input type="file" name="task_files" id="id_task_files" class="form-input" multiple>
             <small style="color: #64748b; font-size: 0.8rem;">Selected files will be uploaded to Google Drive</small>
           </div>
           -->
 
           <div class="sidebar-footer">
-            <button type="submit" class="btn btn-primary">Create task</button>
-            <button type="button" class="btn btn-secondary" onclick="closeTaskSidebar()">Cancel</button>
+            <button type="submit" class="btn btn-primary">{% trans "Create task" %}</button>
+            <button type="button" class="btn btn-secondary" onclick="closeTaskSidebar()">{% trans "Cancel" %}</button>
           </div>
         </form>
       </div>
@@ -1185,7 +1230,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-building"></i>
-          <h2>Add a Company</h2>
+          <h2>{% trans "Add a Company" %}</h2>
         </div>
       </div>
       <div class="sidebar-content">
@@ -1200,39 +1245,39 @@
           </div>
 
           <div class="form-group">
-            <label>Email addresses</label>
+            <label>{% trans "Email addresses" %}</label>
             <div id="company_emails_container"></div>
             <input type="hidden" name="emails_data" id="emails_data">
           </div>
 
           <div class="form-group">
-            <label>Phone numbers</label>
+            <label>{% trans "Phone numbers" %}</label>
             <div id="company_phones_container"></div>
             <input type="hidden" name="phones_data" id="phones_data">
           </div>
 
           <div class="form-group">
-            <label for="id_company_website">Website</label>
+            <label for="id_company_website">{% trans "Website" %}</label>
             <input type="text" name="website" id="id_company_website" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="id_company_address">Address</label>
+            <label for="id_company_address">{% trans "Address" %}</label>
             <textarea name="address" id="id_company_address" class="form-textarea" rows="3"></textarea>
           </div>
 
           <div class="form-group">
-            <label for="id_company_background">Background info</label>
+            <label for="id_company_background">{% trans "Background info" %}</label>
             <textarea name="backgroundInfo" id="id_company_background" class="form-textarea" rows="2"></textarea>
           </div>
 
           <div class="form-group">
-            <label for="id_company_country">Country</label>
+            <label for="id_company_country">{% trans "Country" %}</label>
             <input type="text" name="country" id="id_company_country" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="id_company_group">Group</label>
+            <label for="id_company_group">{% trans "Group" %}</label>
             <select name="group" id="id_company_group" class="form-input">
               <option value="">---------</option>
               {% for group in client_groups %}
@@ -1242,10 +1287,10 @@
           </div>
 
           <div class="form-group">
-            <label for="id_company_status">Status</label>
+            <label for="id_company_status">{% trans "Status" %}</label>
             <select name="status" id="id_company_status" class="form-input" required>
-              <option value="prospect">Prospect</option>
-              <option value="qualified">Qualified</option>
+              <option value="prospect">{% trans "Prospect" %}</option>
+              <option value="qualified">{% trans "Qualified" %}</option>
             </select>
           </div>
 
@@ -1311,7 +1356,7 @@
               </button>
             </div>
             <div class="form-group">
-              <label for="id_company_note">Note</label>
+              <label for="id_company_note">{% trans "Note" %}</label>
               <textarea name="note_content" id="id_company_note" class="form-textarea" rows="3"></textarea>
             </div>
           </div>
@@ -1326,20 +1371,20 @@
             </div>
             <div class="form-row">
               <div class="form-group" style="flex: 1;">
-                <label for="id_company_task_name">Task name</label>
+                <label for="id_company_task_name">{% trans "Task name" %}</label>
                 <input type="text" name="task_name" id="id_company_task_name" class="form-input">
               </div>
               <div class="form-group" style="flex: 1;">
-                <label for="id_company_task_due">Due date</label>
+                <label for="id_company_task_due">{% trans "Due date" %}</label>
                 <input type="date" name="task_due_date" id="id_company_task_due" class="form-input">
               </div>
             </div>
             <div class="form-group">
-              <label for="id_company_task_desc">Description</label>
+              <label for="id_company_task_desc">{% trans "Description" %}</label>
               <textarea name="task_description" id="id_company_task_desc" class="form-textarea" rows="3"></textarea>
             </div>
             <div class="form-group">
-              <label for="id_company_task_member">Assign to</label>
+              <label for="id_company_task_member">{% trans "Assign to" %}</label>
               <select name="task_member" id="id_company_task_member" class="form-input">
                 {% for member in all_members %}
                 <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
@@ -1359,7 +1404,7 @@
                 Creating...
               </span>
             </button>
-            <button type="button" class="btn btn-secondary" onclick="closeCompanySidebar()">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="closeCompanySidebar()">{% trans "Cancel" %}</button>
           </div>
         </form>
       </div>
@@ -1375,7 +1420,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-user"></i>
-          <h2>Add a Contact</h2>
+          <h2>{% trans "Add a Contact" %}</h2>
         </div>
       </div>
       <div class="sidebar-content">
@@ -1390,24 +1435,24 @@
           </div>
 
           <div class="form-group">
-            <label>Email addresses</label>
+            <label>{% trans "Email addresses" %}</label>
             <div id="main_contact_emails_container"></div>
             <input type="hidden" name="emails_data" id="contact_emails_data">
           </div>
 
           <div class="form-group">
-            <label>Phone numbers</label>
+            <label>{% trans "Phone numbers" %}</label>
             <div id="main_contact_phones_container"></div>
             <input type="hidden" name="phones_data" id="contact_phones_data">
           </div>
 
           <div class="form-group">
-            <label for="id_main_contact_job">Job Title</label>
+            <label for="id_main_contact_job">{% trans "Job Title" %}</label>
             <input type="text" name="job_title" id="id_main_contact_job" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="id_main_contact_address">Address</label>
+            <label for="id_main_contact_address">{% trans "Address" %}</label>
             <textarea name="address" id="id_main_contact_address" class="form-textarea" rows="2"></textarea>
           </div>
 
@@ -1436,7 +1481,7 @@
               </button>
             </div>
             <div class="form-group">
-              <label for="id_main_contact_note">Note</label>
+              <label for="id_main_contact_note">{% trans "Note" %}</label>
               <textarea name="note_content" id="id_main_contact_note" class="form-textarea" rows="3"></textarea>
             </div>
           </div>
@@ -1451,21 +1496,21 @@
             </div>
             <div class="form-row">
               <div class="form-group" style="flex: 1;">
-                <label for="id_main_contact_task_name">Task name</label>
+                <label for="id_main_contact_task_name">{% trans "Task name" %}</label>
                 <input type="text" name="task_name" id="id_main_contact_task_name" class="form-input">
               </div>
               <div class="form-group" style="flex: 1;">
-                <label for="id_main_contact_task_due">Due date</label>
+                <label for="id_main_contact_task_due">{% trans "Due date" %}</label>
                 <input type="date" name="task_due_date" id="id_main_contact_task_due" class="form-input">
               </div>
             </div>
             <div class="form-group">
-              <label for="id_main_contact_task_desc">Description</label>
+              <label for="id_main_contact_task_desc">{% trans "Description" %}</label>
               <textarea name="task_description" id="id_main_contact_task_desc" class="form-textarea"
                 rows="3"></textarea>
             </div>
             <div class="form-group">
-              <label for="id_main_contact_task_member">Assign to</label>
+              <label for="id_main_contact_task_member">{% trans "Assign to" %}</label>
               <select name="task_member" id="id_main_contact_task_member" class="form-input">
                 {% for member in all_members %}
                 <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
@@ -1485,7 +1530,7 @@
                 Creating...
               </span>
             </button>
-            <button type="button" class="btn btn-secondary" onclick="closeMainContactSidebar()">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="closeMainContactSidebar()">{% trans "Cancel" %}</button>
           </div>
         </form>
       </div>
@@ -1528,7 +1573,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-user"></i>
-          <h2>Add a Contact</h2>
+          <h2>{% trans "Add a Contact" %}</h2>
         </div>
       </div>
       <div class="sidebar-content">
@@ -1543,30 +1588,30 @@
           </div>
 
           <div class="form-group">
-            <label>Email addresses</label>
+            <label>{% trans "Email addresses" %}</label>
             <div id="nested_contact_emails_container"></div>
             <input type="hidden" name="emails_data" id="nested_contact_emails_data">
           </div>
 
           <div class="form-group">
-            <label>Phone numbers</label>
+            <label>{% trans "Phone numbers" %}</label>
             <div id="nested_contact_phones_container"></div>
             <input type="hidden" name="phones_data" id="nested_contact_phones_data">
           </div>
 
           <div class="form-group">
-            <label for="id_contact_job">Job Title</label>
+            <label for="id_contact_job">{% trans "Job Title" %}</label>
             <input type="text" name="job_title" id="id_contact_job" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="id_contact_address">Address</label>
+            <label for="id_contact_address">{% trans "Address" %}</label>
             <textarea name="address" id="id_contact_address" class="form-textarea" rows="2"></textarea>
           </div>
 
           <div class="sidebar-footer">
-            <button type="submit" class="btn btn-primary">Add Contact</button>
-            <button type="button" class="btn btn-secondary" onclick="closeContactSidebar()">Cancel</button>
+            <button type="submit" class="btn btn-primary">{% trans "Add Contact" %}</button>
+            <button type="button" class="btn btn-secondary" onclick="closeContactSidebar()">{% trans "Cancel" %}</button>
           </div>
         </form>
       </div>
@@ -2902,7 +2947,7 @@
                 <i class="fas fa-exclamation-triangle" style="font-size: 28px; color: #f59e0b;"></i>
               </div>
               <h3 style="margin: 0 0 12px; font-size: 20px; font-weight: 700; color: #111827;">
-                You have unsaved data!
+                {% trans "You have unsaved data!" %}
               </h3>
               <p style="margin: 0; font-size: 15px; color: #6b7280; line-height: 1.6;">
                 The form you just closed had unsaved changes. Are you sure you want to close the form and discard the changes?
@@ -3052,7 +3097,7 @@
 
       optionCard.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <label style="margin: 0; font-weight: 500;">Option Name</label>
+            <label style="margin: 0; font-weight: 500;">{% trans "Option Name" %}</label>
             <button type="button" onclick="removeVariantOption(${optionId})" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px;">
               <i class="fas fa-trash"></i>
             </button>
@@ -3062,7 +3107,7 @@
                  placeholder="e.g. Color, Size" 
                  onchange="updateVariantOptionName(${optionId}, this.value)"
                  style="margin-bottom: 10px;">
-          <label style="margin-bottom: 5px; display: block; font-weight: 500;">Option Values</label>
+          <label style="margin-bottom: 5px; display: block; font-weight: 500;">{% trans "Option Values" %}</label>
           <div id="option_values_${optionId}"></div>
           <button type="button" 
                   class="btn btn-secondary" 
@@ -3150,13 +3195,13 @@
       });
 
       tableHTML += `
-                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Photo</th>
-                  <th style="padding: 6px 8px; text-align: center; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Primary</th>
-                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Price</th>
-                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Qty</th>
-                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">SKU</th>
-                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Barcode</th>
-                  <th style="padding: 6px 8px; text-align: center; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">Featured</th>
+                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">{% trans "Photo" %}</th>
+                  <th style="padding: 6px 8px; text-align: center; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">{% trans "Primary" %}</th>
+                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">{% trans "Price" %}</th>
+                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">{% trans "Qty" %}</th>
+                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">{% trans "SKU" %}</th>
+                  <th style="padding: 6px 8px; text-align: left; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">{% trans "Barcode" %}</th>
+                  <th style="padding: 6px 8px; text-align: center; border: 1px solid #e5e7eb; white-space: nowrap; font-weight: 600;">{% trans "Featured" %}</th>
                 </tr>
               </thead>
               <tbody>`;
@@ -3242,7 +3287,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-cube"></i>
-          <h2>Add Raw Material</h2>
+          <h2>{% trans "Add Raw Material" %}</h2>
         </div>
       </div>
       <div class="sidebar-content">
@@ -3256,38 +3301,38 @@
           </div>
 
           <div class="form-group">
-            <label for="id_rm_sku">SKU (Optional)</label>
+            <label for="id_rm_sku">{% trans "SKU (Optional)" %}</label>
             <input type="text" name="sku" id="id_rm_sku" class="form-input" placeholder="Leave empty to auto-generate">
             <small style="color: #6b7280; font-size: 12px; display: block; margin-top: 4px;">Will be auto-generated if
               left empty.</small>
           </div>
 
           <div class="form-group">
-            <label for="id_rm_supplier_sku">Supplier SKU</label>
+            <label for="id_rm_supplier_sku">{% trans "Supplier SKU" %}</label>
             <input type="text" name="supplier_sku" id="id_rm_supplier_sku" class="form-input">
           </div>
 
           <div class="form-group">
-            <label for="id_rm_type">Type</label>
+            <label for="id_rm_type">{% trans "Type" %}</label>
             <select name="raw_type" id="id_rm_type" class="form-input">
-              <option value="direct" selected>Direct (Production)</option>
-              <option value="indirect">Indirect (Overhead)</option>
+              <option value="direct" selected>{% trans "Direct (Production)" %}</option>
+              <option value="indirect">{% trans "Indirect (Overhead)" %}</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="id_rm_unit">Unit of Measurement</label>
+            <label for="id_rm_unit">{% trans "Unit of Measurement" %}</label>
             <select name="unit_of_measurement" id="id_rm_unit" class="form-input">
-              <option value="units" selected>Unit</option>
-              <option value="mt">Meter</option>
-              <option value="kg">Kilogram</option>
-              <option value="l">Liter</option>
-              <option value="bx">Box</option>
+              <option value="units" selected>{% trans "Unit" %}</option>
+              <option value="mt">{% trans "Meter" %}</option>
+              <option value="kg">{% trans "Kilogram" %}</option>
+              <option value="l">{% trans "Liter" %}</option>
+              <option value="bx">{% trans "Box" %}</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="id_rm_quantity">Initial Quantity</label>
+            <label for="id_rm_quantity">{% trans "Initial Quantity" %}</label>
             <input type="number" name="quantity" id="id_rm_quantity" class="form-input" step="0.01" value="0">
           </div>
 
@@ -3301,7 +3346,7 @@
                 Creating...
               </span>
             </button>
-            <button type="button" class="btn btn-secondary" onclick="closeRawMaterialSidebar()">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="closeRawMaterialSidebar()">{% trans "Cancel" %}</button>
           </div>
         </form>
       </div>
@@ -3317,7 +3362,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fa-solid fa-file-lines"></i>
-          <h2>Add Receipt</h2>
+          <h2>{% trans "Add Receipt" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="rawMaterialReceiptSidebarContent">
@@ -3337,7 +3382,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-plus-square"></i>
-          <h2>Add Item to Receipt</h2>
+          <h2>{% trans "Add Item to Receipt" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="rawMaterialItemSidebarContent">
@@ -3357,7 +3402,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-shopping-cart"></i>
-          <h2>Create Order</h2>
+          <h2>{% trans "Create Order" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="orderSidebarContent">
@@ -3375,7 +3420,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-book"></i>
-          <h2>Create Book</h2>
+          <h2>{% trans "Create Book" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="bookSidebarContent">
@@ -3393,7 +3438,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-coins text-success"></i>
-          <h2>Add Equity Capital</h2>
+          <h2>{% trans "Add Equity Capital" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="addCapitalSidebarContent">
@@ -3410,7 +3455,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-arrow-up text-success"></i>
-          <h2>Add Equity Revenue</h2>
+          <h2>{% trans "Add Equity Revenue" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="addRevenueSidebarContent">
@@ -3427,7 +3472,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-arrow-down text-danger"></i>
-          <h2>Add Equity Expense</h2>
+          <h2>{% trans "Add Equity Expense" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="addExpenseSidebarContent">
@@ -3444,7 +3489,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-hand-holding-usd text-primary"></i>
-          <h2>Pay Dividend</h2>
+          <h2>{% trans "Pay Dividend" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="addDividendSidebarContent">
@@ -3461,7 +3506,7 @@
         </button>
         <div class="sidebar-title">
           <i class="fas fa-truck text-primary"></i>
-          <h2>Add Supplier</h2>
+          <h2>{% trans "Add Supplier" %}</h2>
         </div>
       </div>
       <div class="sidebar-content" id="addSupplierSidebarContent">
@@ -3735,6 +3780,29 @@
           if (dropdown) {
             dropdown.classList.remove('active');
             notificationDropdownOpen = false;
+          }
+        }
+      });
+
+      // Favorites dropdown
+      let favoritesDropdownOpen = false;
+      function toggleFavorites() {
+        const dropdown = document.getElementById('favoritesDropdown');
+        if (!dropdown) return;
+        favoritesDropdownOpen = !favoritesDropdownOpen;
+        dropdown.classList.toggle('show', favoritesDropdownOpen);
+        if (favoritesDropdownOpen) {
+          const notif = document.getElementById('notificationDropdown');
+          if (notif) { notif.classList.remove('active'); notificationDropdownOpen = false; }
+        }
+      }
+      document.addEventListener('click', function (e) {
+        const container = document.querySelector('.favorites-container');
+        if (container && !container.contains(e.target)) {
+          const dropdown = document.getElementById('favoritesDropdown');
+          if (dropdown && favoritesDropdownOpen) {
+            dropdown.classList.remove('show');
+            favoritesDropdownOpen = false;
           }
         }
       });

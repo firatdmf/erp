@@ -1,5 +1,6 @@
 {% comment %} {% extends 'base.html' %} {% endcomment %}
 {% load static %}
+{% load i18n %}
 {% load accounting_tags %}
 {% block css %}
 <style>
@@ -154,12 +155,12 @@
     <table class="kpi-table">
       <thead>
         <tr>
-          <th>CURRENCY</th>
-          <th>BALANCE</th>
-          <th>MONEY IN</th>
-          <th>MONEY OUT</th>
-          <th>RUNWAY</th>
-          <th>DEFAULT ALIVE?</th>
+          <th>{% trans "CURRENCY" %}</th>
+          <th>{% trans "BALANCE" %}</th>
+          <th>{% trans "MONEY IN" %}</th>
+          <th>{% trans "MONEY OUT" %}</th>
+          <th>{% trans "RUNWAY" %}</th>
+          <th>{% trans "DEFAULT ALIVE?" %}</th>
         </tr>
       </thead>
       <tbody>

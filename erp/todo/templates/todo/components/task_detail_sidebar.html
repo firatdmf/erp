@@ -1,12 +1,13 @@
 {% load static %}
 
+{% load i18n %}
 <!-- Sidebar Overlay -->
 <div id="taskDetailOverlay" class="task-detail-overlay" onclick="closeTaskDetailSidebar()"></div>
 
 <!-- Task Detail Sidebar -->
 <div id="taskDetailSidebar" class="task-detail-sidebar">
     <div class="sidebar-header">
-        <h5 class="mb-0">Task Details</h5>
+        <h5 class="mb-0">{% trans "Task Details" %}</h5>
         <button type="button" class="btn-close" onclick="closeTaskDetailSidebar()"></button>
     </div>
 

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -331,7 +332,7 @@
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="id_slug">URL Slug *</label>
+                    <label for="id_slug">{% trans "URL Slug *" %}</label>
                     {{ form.slug }}
                     {% if form.slug.errors %}
                     <div class="error">{{ form.slug.errors }}</div>
@@ -339,19 +340,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="id_author">Author</label>
+                    <label for="id_author">{% trans "Author" %}</label>
                     {{ form.author }}
                 </div>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="id_published_at">Publish Date *</label>
+                    <label for="id_published_at">{% trans "Publish Date *" %}</label>
                     {{ form.published_at }}
                 </div>
 
                 <div class="form-group">
-                    <label>Category (Turkish) *</label>
+                    <label>{% trans "Category (Turkish) *" %}</label>
                     {{ form.category_tr }}
                 </div>
             </div>
@@ -359,7 +360,7 @@
             <div class="form-group">
                 <div class="checkbox-wrapper">
                     {{ form.is_published }}
-                    <label for="id_is_published">Publish</label>
+                    <label for="id_is_published">{% trans "Publish" %}</label>
                 </div>
             </div>
         </div>
@@ -370,7 +371,7 @@
 
             <div class="form-row">
                 <div class="form-group">
-                    <label>Cover Image (for list view)</label>
+                    <label>{% trans "Cover Image (for list view)" %}</label>
                     <div class="image-upload-container" id="coverContainer">
                         <div class="image-upload-section" id="coverUpload" onclick="triggerUpload('cover')"
                             style="{% if object.cover_image %}display: none;{% endif %}">
@@ -396,7 +397,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Hero Image (for detail page)</label>
+                    <label>{% trans "Hero Image (for detail page)" %}</label>
                     <div class="image-upload-container" id="heroContainer">
                         <div class="image-upload-section" id="heroUpload" onclick="triggerUpload('hero')"
                             style="{% if object.hero_image %}display: none;{% endif %}">
@@ -456,15 +457,15 @@
             <!-- Turkish Content -->
             <div class="tab-content active" id="tab-tr">
                 <div class="form-group">
-                    <label>Title (TR) *</label>
+                    <label>{% trans "Title (TR) *" %}</label>
                     {{ form.title_tr }}
                 </div>
                 <div class="form-group">
-                    <label>Excerpt (TR) *</label>
+                    <label>{% trans "Excerpt (TR) *" %}</label>
                     {{ form.excerpt_tr }}
                 </div>
                 <div class="form-group">
-                    <label>Content (TR) * - Markdown supported</label>
+                    <label>{% trans "Content (TR) * - Markdown supported" %}</label>
                     {{ form.content_tr }}
                 </div>
             </div>
@@ -472,19 +473,19 @@
             <!-- English Content -->
             <div class="tab-content" id="tab-en">
                 <div class="form-group">
-                    <label>Title (EN)</label>
+                    <label>{% trans "Title (EN)" %}</label>
                     {{ form.title_en }}
                 </div>
                 <div class="form-group">
-                    <label>Excerpt (EN)</label>
+                    <label>{% trans "Excerpt (EN)" %}</label>
                     {{ form.excerpt_en }}
                 </div>
                 <div class="form-group">
-                    <label>Content (EN) - Markdown supported</label>
+                    <label>{% trans "Content (EN) - Markdown supported" %}</label>
                     {{ form.content_en }}
                 </div>
                 <div class="form-group">
-                    <label>Category (EN)</label>
+                    <label>{% trans "Category (EN)" %}</label>
                     {{ form.category_en }}
                 </div>
             </div>
@@ -492,19 +493,19 @@
             <!-- Russian Content -->
             <div class="tab-content" id="tab-ru">
                 <div class="form-group">
-                    <label>Title (RU)</label>
+                    <label>{% trans "Title (RU)" %}</label>
                     {{ form.title_ru }}
                 </div>
                 <div class="form-group">
-                    <label>Excerpt (RU)</label>
+                    <label>{% trans "Excerpt (RU)" %}</label>
                     {{ form.excerpt_ru }}
                 </div>
                 <div class="form-group">
-                    <label>Content (RU) - Markdown supported</label>
+                    <label>{% trans "Content (RU) - Markdown supported" %}</label>
                     {{ form.content_ru }}
                 </div>
                 <div class="form-group">
-                    <label>Category (RU)</label>
+                    <label>{% trans "Category (RU)" %}</label>
                     {{ form.category_ru }}
                 </div>
             </div>
@@ -512,19 +513,19 @@
             <!-- Polish Content -->
             <div class="tab-content" id="tab-pl">
                 <div class="form-group">
-                    <label>Title (PL)</label>
+                    <label>{% trans "Title (PL)" %}</label>
                     {{ form.title_pl }}
                 </div>
                 <div class="form-group">
-                    <label>Excerpt (PL)</label>
+                    <label>{% trans "Excerpt (PL)" %}</label>
                     {{ form.excerpt_pl }}
                 </div>
                 <div class="form-group">
-                    <label>Content (PL) - Markdown supported</label>
+                    <label>{% trans "Content (PL) - Markdown supported" %}</label>
                     {{ form.content_pl }}
                 </div>
                 <div class="form-group">
-                    <label>Category (PL)</label>
+                    <label>{% trans "Category (PL)" %}</label>
                     {{ form.category_pl }}
                 </div>
             </div>
@@ -534,7 +535,7 @@
         <div class="form-section">
             <h2><i class="fas fa-code"></i> Advanced Options (Code Injection)</h2>
             <div class="form-group">
-                <label for="id_header_content">Extra Header Content (CSS/Styles/Meta)</label>
+                <label for="id_header_content">{% trans "Extra Header Content (CSS/Styles/Meta)" %}</label>
                 {{ form.header_content }}
                 <p class="help-text" style="font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem;">
                     Use this for <code>&lt;style&gt;</code>, <code>&lt;link&gt;</code>, or <code>&lt;meta&gt;</code>
@@ -542,7 +543,7 @@
                 </p>
             </div>
             <div class="form-group">
-                <label for="id_footer_content">Extra Footer Content (Scripts)</label>
+                <label for="id_footer_content">{% trans "Extra Footer Content (Scripts)" %}</label>
                 {{ form.footer_content }}
                 <p class="help-text" style="font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem;">
                     Use this for <code>&lt;script&gt;</code> tags. These will be executed on the frontend.

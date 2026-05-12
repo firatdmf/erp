@@ -48,24 +48,38 @@ class LazyList:
         return True
 
 def last_ten_entities(request):
-    """Lazy loading of last 10 entities - only executes when accessed in template"""
-    def _get_entities():
-        contacts = Contact.objects.order_by('-created_at')[:10].annotate(
+    """Last 10 entities — evaluated eagerly inside the request so the
+    queryset doesn't outlive the DB connection (lazy querysets were
+    triggering 'connection already closed' on multi-tenant pages)."""
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return {'last_ten_entities': []}
+    try:
+        contacts = list(Contact.objects.order_by('-created_at')[:10].annotate(
             entry_type=Value("Contact", output_field=CharField())
-        )
-        companies = Company.objects.order_by('-created_at')[:10].annotate(
+        ))
+        companies = list(Company.objects.order_by('-created_at')[:10].annotate(
             entry_type=Value("Company", output_field=CharField())
-        )
+        ))
         combined_list = sorted(
             chain(contacts, companies), key=attrgetter("created_at"), reverse=True
         )[:10]
-        return combined_list
-    
-    return {'last_ten_entities': LazyList(_get_entities)}
+    except Exception:
+        combined_list = []
+    return {'last_ten_entities': combined_list}
 
 def client_groups(request):
-    """Lazy loading of client groups - only executes when accessed in template"""
-    return {'client_groups': LazyList(lambda: ClientGroup.objects.all())}
+    """Cached client groups — 5 min TTL. Evaluated eagerly so template
+    rendering can't outlive the DB connection."""
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return {'client_groups': []}
+    cached = cache.get('client_groups_list')
+    if cached is None:
+        try:
+            cached = list(ClientGroup.objects.all())
+            cache.set('client_groups_list', cached, 300)
+        except Exception:
+            cached = []
+    return {'client_groups': cached}
 
 def product_categories(request):
     """Cached product categories - 5 minute cache"""
@@ -84,5 +98,15 @@ def suppliers(request):
     return {'suppliers': suppliers_list}
 
 def all_members(request):
-    """Lazy loading of all members for task assignment"""
-    return {'all_members': LazyList(lambda: Member.objects.select_related('user').all())}
+    """Cached members for task assignment — 5 min TTL. Evaluated eagerly
+    to avoid lazy queryset surviving past the DB connection."""
+    if not getattr(request, 'user', None) or not request.user.is_authenticated:
+        return {'all_members': []}
+    members = cache.get('all_members_list')
+    if members is None:
+        try:
+            members = list(Member.objects.select_related('user').all())
+            cache.set('all_members_list', members, 300)
+        except Exception:
+            members = []
+    return {'all_members': members}

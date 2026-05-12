@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -10,7 +11,7 @@
     <!-- Header Section -->
     <div class="page-header">
         <div class="header-left">
-            <h1>Suppliers</h1>
+            <h1>{% trans "Suppliers" %}</h1>
             <span class="product-count">{{ paginator.count|default:suppliers.count }} supplier{{ paginator.count|default:suppliers.count|pluralize }}</span>
         </div>
         <div class="header-right">
@@ -39,12 +40,12 @@
         <table class="products-table">
             <thead>
                 <tr>
-                    <th style="width: 60px;">Icon</th>
-                    <th>Company / Contact</th>
-                    <th style="width: 200px;">Email</th>
-                    <th style="width: 150px;">Phone</th>
-                    <th style="width: 150px;">Location</th>
-                    <th style="width: 120px;">Actions</th>
+                    <th style="width: 60px;">{% trans "Icon" %}</th>
+                    <th>{% trans "Company / Contact" %}</th>
+                    <th style="width: 200px;">{% trans "Email" %}</th>
+                    <th style="width: 150px;">{% trans "Phone" %}</th>
+                    <th style="width: 150px;">{% trans "Location" %}</th>
+                    <th style="width: 120px;">{% trans "Actions" %}</th>
                 </tr>
             </thead>
             <tbody id="suppliersTableBody">

@@ -1,0 +1,617 @@
+/* ============================================================
+   GENERIC RESPONSIVE OVERLAYS — pages that lack mobile CSS.
+   Activates at <= 1024px alongside the mobile shell.
+   ============================================================ */
+
+@media (max-width: 1024px) {
+
+  /* ============================================================
+     COMMON PATTERNS
+     ============================================================ */
+
+  /* Any page-level container with horizontal padding */
+  .tasks-page-container,
+  .pl,
+  .meetings-container,
+  .mm-container {
+    padding: 14px !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  /* ============================================================
+     TODO TASKS LIST (/todo/tasks/)
+     ============================================================ */
+  .tasks-page-container .page-header {
+    margin-bottom: 14px !important;
+    padding: 16px 18px !important;
+    background: white;
+    border: 1px solid #EAEFF1;
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .tasks-page-container .page-header h1 {
+    font: 700 19px 'Plus Jakarta Sans', sans-serif !important;
+    letter-spacing: -0.012em !important;
+    color: #0F172A !important;
+    margin-bottom: 3px !important;
+  }
+  .tasks-page-container .page-header p {
+    font: 500 12.5px 'Plus Jakarta Sans', sans-serif !important;
+    color: #6B7480 !important;
+  }
+
+  /* Tabs row — pill switcher (overflow scroll) */
+  .tasks-page-container .tabs-container {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none;
+    border-bottom: 0 !important;
+    margin-bottom: 14px !important;
+    gap: 6px !important;
+    padding: 5px !important;
+    background: white !important;
+    border: 1px solid #EAEFF1 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04) !important;
+  }
+  .tasks-page-container .tabs-container::-webkit-scrollbar { display: none; }
+  .tasks-page-container .tab {
+    flex-shrink: 0 !important;
+    padding: 9px 14px !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    color: #6B7480 !important;
+    font: 600 12.5px 'Plus Jakarta Sans', sans-serif !important;
+    border-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  .tasks-page-container .tab.active {
+    background: linear-gradient(135deg, #0F766E 0%, #0B5650 100%) !important;
+    color: white !important;
+    border-bottom: 0 !important;
+    margin-bottom: 0 !important;
+    box-shadow: 0 1px 2px rgba(11, 86, 80, 0.20), 0 4px 10px rgba(15, 118, 110, 0.18) !important;
+  }
+  .tasks-page-container .tab .count-badge {
+    background: rgba(15,23,31,0.06) !important;
+    color: #4D5760 !important;
+    padding: 1px 7px !important;
+    font: 700 10px 'Plus Jakarta Sans', sans-serif !important;
+    border-radius: 999px !important;
+  }
+  .tasks-page-container .tab.active .count-badge {
+    background: rgba(255, 255, 255, 0.22) !important;
+    color: white !important;
+  }
+
+  /* Tasks grid → single column */
+  .tasks-page-container .tasks-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Task card mobile-friendly */
+  .tasks-page-container .task-card {
+    border-radius: 14px !important;
+    padding: 14px !important;
+    border-color: #EAEFF1 !important;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03) !important;
+  }
+  .tasks-page-container .task-card:hover { transform: none !important; }
+  .tasks-page-container .task-card:active { transform: scale(0.99); }
+  .tasks-page-container .task-title {
+    font: 600 14.5px 'Plus Jakarta Sans', sans-serif !important;
+    letter-spacing: -0.005em !important;
+    line-height: 1.4 !important;
+  }
+  .tasks-page-container .task-meta {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .tasks-page-container .task-meta > * { font-size: 11.5px !important; }
+
+  /* Empty state */
+  .tasks-page-container .empty-state {
+    padding: 44px 20px !important;
+    border-radius: 16px !important;
+    background: linear-gradient(180deg, #FAFBFC 0%, white 100%) !important;
+    border: 1px dashed #D7DFE2 !important;
+  }
+
+  /* ============================================================
+     PRODUCT LIST (/marketing/products/)
+     Layout: 8-col grid table → mobile card-stack
+     ============================================================ */
+  .pl {
+    padding: 14px 12px 80px !important;
+  }
+
+  /* ─── Header ─── */
+  .pl-head {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 14px 16px !important;
+    background: white !important;
+    border: 1px solid #EAEFF1 !important;
+    border-radius: 14px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04) !important;
+  }
+  .pl-head-l {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    width: 100%;
+  }
+  .pl-eyebrow {
+    font: 700 9.5px 'Plus Jakarta Sans', sans-serif !important;
+    letter-spacing: 0.14em !important;
+    color: #0F766E !important;
+    text-transform: uppercase;
+  }
+  .pl-title {
+    font: 700 20px 'Plus Jakarta Sans', sans-serif !important;
+    letter-spacing: -0.014em !important;
+    line-height: 1.15 !important;
+    margin: 2px 0 0 !important;
+  }
+  .pl-meta-pill {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px 14px !important;
+    padding: 8px 12px !important;
+    background: #FAFBFC !important;
+    border: 1px solid #EAEFF1 !important;
+    border-radius: 999px !important;
+    font: 500 11.5px 'Plus Jakarta Sans', sans-serif !important;
+  }
+  .pl-meta-pill .dot-sep { display: none !important; }
+
+  /* Action buttons — full row, even split */
+  .pl-head-r {
+    display: flex !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  .pl-btn {
+    flex: 1 !important;
+    height: 44px !important;
+    padding: 0 14px !important;
+    font: 600 13px 'Plus Jakarta Sans', sans-serif !important;
+    border-radius: 12px !important;
+    justify-content: center !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  .pl-btn.primary {
+    background: linear-gradient(180deg, #0F766E 0%, #0B5650 100%) !important;
+    border: 1px solid #0B5650 !important;
+    color: white !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.16),
+      0 1px 2px rgba(11, 86, 80, 0.22),
+      0 6px 14px rgba(15, 118, 110, 0.22) !important;
+  }
+  .pl-btn.ghost {
+    background: white !important;
+    border: 1px solid #EAEFF1 !important;
+    color: #475569 !important;
+  }
+
+  /* ─── Category tabs ─── horizontal scroll
+     Wrap tabs in a card-like container that scrolls horizontally.
+     Use max-width: calc(100vw - …) so it never expands to fit content. */
+  #productListRoot .pl-tabs,
+  #productListRoot #categoryChips {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 4px !important;
+    padding: 4px !important;
+    margin-bottom: 12px !important;
+    background: white !important;
+    border: 1px solid #EAEFF1 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04) !important;
+    /* Critical: limit width so flex children can overflow */
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    box-sizing: border-box !important;
+    scroll-snap-type: x proximity;
+    /* Subtle visible scrollbar so user knows it scrolls */
+    scrollbar-width: thin;
+    scrollbar-color: #C5CDD3 transparent;
+  }
+  #productListRoot .pl-tabs::-webkit-scrollbar,
+  #productListRoot #categoryChips::-webkit-scrollbar {
+    height: 4px !important;
+    background: transparent;
+  }
+  #productListRoot .pl-tabs::-webkit-scrollbar-thumb,
+  #productListRoot #categoryChips::-webkit-scrollbar-thumb {
+    background: #C5CDD3;
+    border-radius: 999px;
+  }
+  /* Right-edge fade hint that more tabs are scrollable */
+  #productListRoot .pl-tabs::after,
+  #productListRoot #categoryChips::after {
+    content: '';
+    position: sticky;
+    right: 0;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 100%;
+    margin-left: -28px;
+    background: linear-gradient(to right, transparent, white 70%);
+    pointer-events: none;
+  }
+
+  #productListRoot .pl-tab {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 8px 14px !important;
+    font: 600 12.5px 'Plus Jakarta Sans', sans-serif !important;
+    color: #6B7480 !important;
+    border-radius: 10px !important;
+    border-bottom: 0 !important;
+    background: transparent !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    scroll-snap-align: start;
+  }
+  #productListRoot .pl-tab::after { display: none !important; }
+  #productListRoot .pl-tab.active {
+    background: linear-gradient(135deg, #0F766E, #0B5650) !important;
+    color: white !important;
+    border-bottom: 0 !important;
+    box-shadow: 0 1px 2px rgba(11, 86, 80, 0.20) !important;
+  }
+  #productListRoot .pl-tab-count {
+    background: rgba(15,23,31,0.06) !important;
+    color: #4D5760 !important;
+    padding: 1px 7px !important;
+    font: 700 10px 'Plus Jakarta Sans', sans-serif !important;
+    border-radius: 999px !important;
+  }
+  #productListRoot .pl-tab.active .pl-tab-count {
+    background: rgba(255,255,255,0.22) !important;
+    color: white !important;
+  }
+
+  /* ─── Toolbar (search + sort) ─── */
+  .pl-toolbar {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+  .pl-search {
+    flex: 1 1 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    background: white !important;
+    border: 1px solid #EAEFF1 !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 2px rgba(15,23,31,0.03) !important;
+  }
+  .pl-search input {
+    font: 500 14px 'Plus Jakarta Sans', sans-serif !important;
+    padding: 0 10px !important;
+  }
+  .pl-search .pl-kbd { display: none !important; }
+  .pl-toolbar-r {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  .pl-sort {
+    width: 100%;
+    height: 44px;
+    background: white;
+    border: 1px solid #EAEFF1;
+    border-radius: 12px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pl-sort select {
+    flex: 1;
+    border: 0 !important;
+    background: transparent !important;
+    outline: 0 !important;
+    font: 600 13px 'Plus Jakarta Sans', sans-serif !important;
+    color: #0F172A !important;
+  }
+
+  /* ─── Result meta + Select all ─── */
+  .pl-meta {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0 4px 8px !important;
+    font: 500 12px 'Plus Jakarta Sans', sans-serif !important;
+    color: #6B7480 !important;
+  }
+
+  /* ─── Product list → card stack ─── */
+  .pl-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  .pr-wrap {
+    background: white !important;
+    border: 1px solid #EAEFF1 !important;
+    border-radius: 14px !important;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03) !important;
+  }
+  .pr-wrap:last-child { border-bottom: 1px solid #EAEFF1 !important; }
+  .pr-wrap.open { background: #FAFBFD !important; }
+  .pr-wrap.sel {
+    background: rgba(0,128,128,0.04) !important;
+    border-color: #B8DCDC !important;
+  }
+
+  /* 8-col desktop grid → 2-row flex card */
+  .pr-wrap > .pr,
+  .pr-wrap .pr {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px 12px !important;
+    padding: 12px !important;
+    grid-template-columns: none !important;
+    position: relative;
+  }
+
+  /* Hide checkbox on small screens to save space */
+  .pr-wrap .pr > .pr-check {
+    order: -1;
+    position: absolute !important;
+    top: 8px; right: 50px;
+    z-index: 2;
+    margin: 0;
+  }
+
+  /* Image — left */
+  .pr-wrap .pr > .pr-img {
+    order: 0 !important;
+    width: 56px !important;
+    height: 56px !important;
+    flex: 0 0 56px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Text block (name + sub) — fills remaining space in row 1 */
+  .pr-wrap .pr > .pr-text {
+    order: 1 !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding-right: 38px;
+  }
+  .pr-name {
+    font: 600 14px 'Plus Jakarta Sans', sans-serif !important;
+    line-height: 1.3 !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+  .pr-sub {
+    margin-top: 4px !important;
+    gap: 6px !important;
+  }
+  .pr-sku { font-size: 10.5px !important; }
+  .pr-cat,
+  .pr-vars { padding: 1px 7px !important; font-size: 10px !important; }
+
+  /* Actions: pinned to top-right of card */
+  .pr-wrap .pr > .pr-actions {
+    order: 2 !important;
+    position: absolute !important;
+    top: 8px; right: 8px;
+    margin: 0 !important;
+  }
+  .pr-expand {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  /* Hide updated-date on mobile to save room */
+  .pr-wrap .pr > .pr-up { display: none !important; }
+
+  /* Stats row (full width below the image+text row) */
+  .pr-wrap .pr > .pr-stock {
+    order: 3 !important;
+    flex: 0 0 auto !important;
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px solid #F1F4F6;
+    width: 100%;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    flex-wrap: wrap !important;
+  }
+  .pr-stock-num { font-size: 14px !important; }
+  .pr-stock-l { font-size: 9.5px !important; }
+
+  /* Price + status appear inline after stock — pull them up via order */
+  .pr-wrap .pr > .pr-price {
+    order: 4 !important;
+    margin-left: auto !important;
+    margin-top: 4px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid #F1F4F6;
+    /* Place inline next to stock by giving same top border */
+    flex: 0 0 auto !important;
+    font-size: 15px !important;
+  }
+  .pr-wrap .pr > .pr-status {
+    order: 5 !important;
+    margin-top: 4px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid #F1F4F6;
+    flex: 0 0 auto !important;
+    font-size: 9.5px !important;
+    padding: 3px 9px !important;
+    align-self: center !important;
+  }
+
+  /* The trick: items 3,4,5 share top border but should appear on same row.
+     flex-wrap: wrap will keep them on same row if they fit, drop to next if not. */
+
+  /* Variant box on expand */
+  .pr-wrap .pr-variants {
+    padding: 0 12px 12px !important;
+  }
+  .pr-wrap .variant-box {
+    padding: 10px !important;
+  }
+
+  /* Bulk action bar (sticky bottom) */
+  .pl-bulk {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 12px !important;
+    right: 12px !important;
+    border-radius: 14px !important;
+    padding: 10px 12px !important;
+  }
+  .pl-bulk-btn {
+    padding: 0 10px !important;
+    height: 34px !important;
+    font-size: 11.5px !important;
+  }
+
+  /* CSV / modal cards */
+  .modal-card {
+    max-width: calc(100vw - 32px) !important;
+    padding: 22px 18px 18px !important;
+  }
+
+  /* Mid-size tablet refinement */
+  @media (min-width: 600px) {
+    .pl-head-l > div { display: flex; align-items: center; gap: 14px; }
+  }
+
+  /* ============================================================
+     GENERIC TABLE → CARD STACK
+     For pages with raw <table> (legacy admin-ish pages)
+     ============================================================ */
+  .responsive-table table,
+  table.data-table {
+    display: block !important;
+    width: 100% !important;
+  }
+  .responsive-table thead,
+  table.data-table thead { display: none !important; }
+  .responsive-table tbody tr,
+  table.data-table tbody tr {
+    display: block !important;
+    background: white !important;
+    border: 1px solid #EAEFF1 !important;
+    border-radius: 12px !important;
+    margin-bottom: 10px !important;
+    padding: 10px 12px !important;
+  }
+  .responsive-table tbody td,
+  table.data-table tbody td {
+    display: flex !important;
+    justify-content: space-between !important;
+    padding: 6px 0 !important;
+    border: 0 !important;
+    font-size: 12.5px !important;
+  }
+
+  /* ============================================================
+     MEETINGS PAGE — quick fixes
+     ============================================================ */
+  .meetings-container .page-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 14px 16px !important;
+    background: white;
+    border: 1px solid #EAEFF1;
+    border-radius: 14px;
+    margin-bottom: 14px !important;
+  }
+  .meetings-container .page-title h1 {
+    font: 700 19px 'Plus Jakarta Sans', sans-serif !important;
+  }
+  .meetings-container .meetings-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .meetings-container .meeting-card {
+    border-radius: 14px !important;
+  }
+  .meetings-container .tabs-nav {
+    overflow-x: auto !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+  }
+  .meetings-container .tabs-nav::-webkit-scrollbar { display: none; }
+  .meetings-container .tab-btn { flex-shrink: 0 !important; }
+
+  /* Right side schedule sidebar — full screen on mobile */
+  .right-sidebar {
+    width: 100vw !important;
+    max-width: none !important;
+    right: -100vw !important;
+  }
+  .right-sidebar.active { right: 0 !important; }
+
+  /* ============================================================
+     GENERIC: any wide form / two-col → stack
+     ============================================================ */
+  .form-row,
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Modals — make them more mobile-friendly by default */
+  .modal-overlay .modal-content {
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px !important;
+    border-radius: 18px !important;
+  }
+}
+
+/* ============================================================
+   DARK THEME generic
+   ============================================================ */
+@media (max-width: 1024px) {
+  [data-theme="dark"] .tasks-page-container .page-header,
+  [data-theme="dark"] .tasks-page-container .tabs-container,
+  [data-theme="dark"] .meetings-container .page-header {
+    background: #161B21 !important;
+    border-color: #2A3038 !important;
+  }
+  [data-theme="dark"] .tasks-page-container .page-header h1,
+  [data-theme="dark"] .pl-title,
+  [data-theme="dark"] .meetings-container .page-title h1 {
+    color: #F1F5F8 !important;
+  }
+  [data-theme="dark"] .tasks-page-container .task-card,
+  [data-theme="dark"] .pl-card,
+  [data-theme="dark"] .meetings-container .meeting-card {
+    background: #1A1F26 !important;
+    border-color: #2A3038 !important;
+  }
+}

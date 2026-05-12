@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% block css %}
@@ -10,7 +11,7 @@
     </p>
     <h1>Create {{ model_type }}</h1>
     {% comment %} {% if model_type == 'contact' %}
-      <label for="company_name">Company Name</label>
+      <label for="company_name">{% trans "Company Name" %}</label>
       <input type="text" id="company_name" name="company_name" autocomplete="off" hx-get="{% url 'crm:company_search' %}" hx-trigger="keyup changed delay:300ms" hx-target="#company-suggestions" hx-params="*" />
       <div id="company-suggestions"></div>
     {% endif %} {% endcomment %}
@@ -24,7 +25,7 @@
           {{ field }}
           {% if model_type == 'company' %}
           <div class="contact-selector-container">
-            <label>Attach Contact</label>
+            <label>{% trans "Attach Contact" %}</label>
             <div class="contact-selector-wrapper">
               <div class="contact-search-box">
                 <input 

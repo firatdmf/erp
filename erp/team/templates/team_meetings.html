@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 
+{% load i18n %}
 {% block title %}Team Meetings | Nejum ERP{% endblock %}
 
 {% block css %}
@@ -619,7 +620,7 @@
   <!-- Header -->
   <div class="page-header">
     <div class="page-title">
-      <h1>Team Meetings</h1>
+      <h1>{% trans "Team Meetings" %}</h1>
       <p>Schedule and manage your team's upcoming video calls and events.</p>
     </div>
     <button onclick="openSidebar()" class="btn-primary">
@@ -629,8 +630,8 @@
 
   <!-- Tabs Navigation -->
   <div class="tabs-nav">
-    <button class="tab-btn active" onclick="switchTab('upcoming')">Upcoming Meetings</button>
-    <button class="tab-btn" onclick="switchTab('history')">Meeting History</button>
+    <button class="tab-btn active" onclick="switchTab('upcoming')">{% trans "Upcoming Meetings" %}</button>
+    <button class="tab-btn" onclick="switchTab('history')">{% trans "Meeting History" %}</button>
   </div>
 
   <!-- Upcoming Content -->
@@ -701,7 +702,7 @@
       {% empty %}
       <div class="empty-state" style="grid-column: 1/-1;">
         <div class="empty-icon"><i class="far fa-calendar-times"></i></div>
-        <h3>No upcoming meetings</h3>
+        <h3>{% trans "No upcoming meetings" %}</h3>
         <p style="color: #64748b;">Schedule a new meeting to get started.</p>
       </div>
       {% endfor %}
@@ -716,12 +717,12 @@
         <table>
           <thead>
             <tr>
-              <th>Title</th>
-              <th>Team</th>
-              <th>Date & Time</th>
-              <th>Organizer</th>
-              <th>Status</th>
-              <th>Action</th>
+              <th>{% trans "Title" %}</th>
+              <th>{% trans "Team" %}</th>
+              <th>{% trans "Date & Time" %}</th>
+              <th>{% trans "Organizer" %}</th>
+              <th>{% trans "Status" %}</th>
+              <th>{% trans "Action" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -758,7 +759,7 @@
     {% else %}
     <div class="empty-state">
       <div class="empty-icon"><i class="fas fa-history"></i></div>
-      <h3>No meeting history</h3>
+      <h3>{% trans "No meeting history" %}</h3>
       <p style="color: #64748b;">Past meetings will appear here.</p>
     </div>
     {% endif %}
@@ -770,7 +771,7 @@
 <div id="sidebarOverlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
 <div id="scheduleSidebar" class="right-sidebar">
   <div class="sidebar-header">
-    <h2>Schedule Meeting</h2>
+    <h2>{% trans "Schedule Meeting" %}</h2>
     <button onclick="closeSidebar()" class="close-sidebar-btn"><i class="fas fa-times"></i></button>
   </div>
 
@@ -779,7 +780,7 @@
     <div class="sidebar-body">
       <!-- Meeting Type -->
       <div class="form-group">
-        <label>Meeting Type</label>
+        <label>{% trans "Meeting Type" %}</label>
         <div style="display: flex; gap: 0.5rem; background: #f1f5f9; padding: 4px; border-radius: 8px;">
           <label class="type-option"
             style="flex: 1; text-align: center; padding: 8px; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin: 0; font-size: 0.9rem;">
@@ -798,7 +799,7 @@
 
       <!-- Team Selector -->
       <div id="team_selector_group" class="form-group">
-        <label>Select Team</label>
+        <label>{% trans "Select Team" %}</label>
         <select name="team_id" id="team_id_select" class="form-control" onchange="loadTeamMembers(this.value)">
           {% for t in teams %}
           <option value="{{ t.id }}">{{ t.name }}</option>
@@ -807,17 +808,17 @@
       </div>
 
       <div class="form-group">
-        <label>Title *</label>
+        <label>{% trans "Title *" %}</label>
         <input type="text" name="title" class="form-control" placeholder="e.g. Sprint Planning" required>
       </div>
 
       <div class="form-group">
-        <label>Description</label>
+        <label>{% trans "Description" %}</label>
         <textarea name="description" class="form-control" rows="3" placeholder="Agenda or notes..."></textarea>
       </div>
 
       <div class="form-group">
-        <label>Date & Time *</label>
+        <label>{% trans "Date & Time *" %}</label>
         <div class="date-input-wrapper">
           <input type="datetime-local" name="scheduled_at" class="form-control" required style="font-family: inherit;">
           <i class="far fa-calendar-alt date-input-icon"></i>
@@ -825,13 +826,13 @@
       </div>
 
       <div class="form-group">
-        <label>Duration (min)</label>
+        <label>{% trans "Duration (min)" %}</label>
         <input type="number" name="duration_minutes" value="60" class="form-control">
       </div>
 
       <!-- Participants Selection -->
       <div class="form-group">
-        <label>Participants</label>
+        <label>{% trans "Participants" %}</label>
 
         <!-- Team Members List -->
         <div id="team_participants_container"
@@ -881,7 +882,7 @@
       {% endif %}
 
       <div class="form-group">
-        <label>Location / Link</label>
+        <label>{% trans "Location / Link" %}</label>
         <input type="text" name="location" class="form-control" placeholder="Physical location or external link">
       </div>
     </div>

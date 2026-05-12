@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% load accounting_tags %}
@@ -7,20 +8,20 @@
   {% endblock %}
 
   <div class="cash_transaction_entry_list_page">
-    <h1>Transaction Table</h1>
+    <h1>{% trans "Transaction Table" %}</h1>
     <table>
       <tr>
-        <th>Transaction #</th>
-        {% comment %} <th>Transaction #</th> {% endcomment %}
-        <th>Date</th>
-        {% comment %} <th>Currency</th> {% endcomment %}
-        <th>Amount</th>
-        <th>Content Type</th>
-        <th>Content Type #</th>
-        <th>Account</th>
-        <th>Account Balance</th>
+        <th>{% trans "Transaction #" %}</th>
+        {% comment %} <th>{% trans "Transaction #" %}</th> {% endcomment %}
+        <th>{% trans "Date" %}</th>
+        {% comment %} <th>{% trans "Currency" %}</th> {% endcomment %}
+        <th>{% trans "Amount" %}</th>
+        <th>{% trans "Content Type" %}</th>
+        <th>{% trans "Content Type #" %}</th>
+        <th>{% trans "Account" %}</th>
+        <th>{% trans "Account Balance" %}</th>
         <th>Total Balance in {{base_currency_symbol}} </th>
-        {% comment %} <th>Total Balance</th> {% endcomment %}
+        {% comment %} <th>{% trans "Total Balance" %}</th> {% endcomment %}
       </tr>
 
       {% for transaction in object_list|dictsortreversed:'pk'|dictsortreversed:'created_at' %}

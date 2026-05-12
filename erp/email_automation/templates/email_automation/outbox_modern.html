@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -570,7 +571,7 @@
         {% else %}
           <div class="empty-state">
             <i class="fa fa-paper-plane"></i>
-            <h3>No sent emails yet</h3>
+            <h3>{% trans "No sent emails yet" %}</h3>
             <p>Emails sent through your campaigns will appear here</p>
           </div>
         {% endif %}
@@ -581,7 +582,7 @@
     <div class="email-reading-pane" id="readingPane">
       <div class="empty-state">
         <i class="fa fa-envelope-open-o"></i>
-        <h3>Select an email</h3>
+        <h3>{% trans "Select an email" %}</h3>
         <p>Click on an email to view its contents</p>
       </div>
     </div>

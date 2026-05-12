@@ -12,6 +12,8 @@ register = template.Library()
 
 @register.simple_tag
 def dashboard_component(csrf_token,path,member):
+    import os as _osc, sys as _sysc
+    print(f"\n>>> [TAG dashboard_component CALLED] PID={_osc.getpid()} member={member} __file__={__file__}", flush=True)
 
     # Below two lines result in the same thing but they give naive time warning so we fix it by setting the timezone
     # today = timezone.localtime(timezone.now()).date()
@@ -141,8 +143,29 @@ def dashboard_component(csrf_token,path,member):
             qs = (
                 Task.objects
                 .filter(member=member, completed=False)
+                .select_related('company', 'contact', 'member__user')
                 .order_by('-due_date', 'priority', 'id')[:200]
             )
+
+            # ─── DEBUG: log per-task contact/company so we can compare 8000 vs 8001 ───
+            import sys as _sys, socket as _sock, os as _os
+            from django.conf import settings as _set
+            from django import get_version as _gv
+            _LOG = lambda m: print(m, flush=True)
+            _LOG(f"\n{'='*60}")
+            _LOG(f"🐍 [HOME DASHBOARD] PID={_os.getpid()} Python={_sys.version.split()[0]} Django={_gv()}")
+            _LOG(f"   __file__={__file__}")
+            _LOG(f"   THEME={_theme} BRAND={getattr(_set, 'BRAND', '?')} SCHEMA={getattr(_set, 'DB_SCHEMA', '?')}")
+            _LOG(f"   DB.NAME={_set.DATABASES['default'].get('NAME')} HOST={_set.DATABASES['default'].get('HOST')}")
+            _LOG(f"   Member={member} (id={getattr(member, 'id', '?')})")
+            tasks_eval = list(qs)
+            _LOG(f"   My open tasks: {len(tasks_eval)}")
+            for _t in tasks_eval[:30]:
+                cn = getattr(getattr(_t, 'contact', None), 'name', None) if _t.contact_id else None
+                co = getattr(getattr(_t, 'company', None), 'name', None) if _t.company_id else None
+                _LOG(f"   • Task#{_t.id} {_t.name!r} contact_id={_t.contact_id}({cn!r}) company_id={_t.company_id}({co!r})")
+            _LOG(f"{'='*60}\n")
+            qs = tasks_eval  # use the already-evaluated list for the loop below
 
             # Delegated = tasks where the user is in `assignees` but not
             # the owner (`member`). Captures "tasks others assigned to me".
@@ -154,6 +177,7 @@ def dashboard_component(csrf_token,path,member):
                 Task.objects
                 .filter(assignees=member, completed=False)
                 .exclude(member=member)
+                .select_related('company', 'contact', 'member__user')
                 .distinct()
                 .order_by('-due_date', 'priority', 'id')[:200]
             )
@@ -170,6 +194,15 @@ def dashboard_component(csrf_token,path,member):
                 else:
                     aging = {'label': f'in {abs(age_days)}d', 'tone': 'amber'}
                 assignee = t.member.user.first_name if (t.member and t.member.user and t.member.user.first_name) else (t.member.user.username if (t.member and t.member.user) else '?')
+                # Linked entity (company / contact) — show whichever is set
+                entity_name = ''
+                entity_type = ''
+                if t.company_id and t.company:
+                    entity_name = getattr(t.company, 'name', '') or str(t.company)
+                    entity_type = 'company'
+                elif t.contact_id and t.contact:
+                    entity_name = getattr(t.contact, 'name', '') or str(t.contact)
+                    entity_type = 'contact'
                 payload = {
                     'id': t.id,
                     'name': t.name,
@@ -182,6 +215,8 @@ def dashboard_component(csrf_token,path,member):
                     'assignee': assignee,
                     'avatar_letter': (assignee[:1] or '?').upper(),
                     'completed': bool(t.completed),
+                    'entity_name': entity_name,
+                    'entity_type': entity_type,
                 }
                 key = t.due_date.isoformat()  # YYYY-MM-DD
                 all_tasks_by_date.setdefault(key, []).append(payload)
@@ -221,6 +256,14 @@ def dashboard_component(csrf_token,path,member):
                     aging = {'label': f'in {abs(age_days)}d', 'tone': 'amber'}
                 # Show the original owner as the "from" person on the card
                 owner = t.member.user.first_name if (t.member and t.member.user and t.member.user.first_name) else (t.member.user.username if (t.member and t.member.user) else '?')
+                entity_name = ''
+                entity_type = ''
+                if t.company_id and t.company:
+                    entity_name = getattr(t.company, 'name', '') or str(t.company)
+                    entity_type = 'company'
+                elif t.contact_id and t.contact:
+                    entity_name = getattr(t.contact, 'name', '') or str(t.contact)
+                    entity_type = 'contact'
                 delegated_tasks_data.append({
                     'id': t.id,
                     'name': t.name,
@@ -232,6 +275,8 @@ def dashboard_component(csrf_token,path,member):
                     'assignee': owner,  # who delegated it to me
                     'avatar_letter': (owner[:1] or '?').upper(),
                     'completed': bool(t.completed),
+                    'entity_name': entity_name,
+                    'entity_type': entity_type,
                 })
         except Exception as _e:
             # Surface the cause instead of silently swallowing it —

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -260,7 +261,7 @@
     {% else %}
       <div class="empty-state">
         <i class="fa fa-inbox"></i>
-        <h3>No replies yet</h3>
+        <h3>{% trans "No replies yet" %}</h3>
         <p>Replies to your campaign emails will appear here</p>
       </div>
     {% endif %}

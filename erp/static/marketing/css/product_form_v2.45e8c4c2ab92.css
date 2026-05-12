@@ -1,0 +1,413 @@
+/* ====================================================================
+   PRODUCT FORM — Premium overlay (Nejum design language)
+   --------------------------------------------------------------------
+   Layered on top of product_form.css. Owns visual look only:
+   spacing, typography, colors, shadows, micro-interactions. The
+   underlying HTML structure + JS hooks (Quill, image uploader,
+   variant editor, BOM) are untouched so behaviour stays intact.
+   ==================================================================== */
+
+#Product_Form_Page {
+  --pf-radius: 14px;
+  --pf-radius-sm: 10px;
+  --pf-radius-xs: 8px;
+  --pf-border: #EAEFF1;
+  --pf-border-strong: #D7DFE2;
+  --pf-bg: #F7F9FA;
+  --pf-bg-soft: #FAFBFC;
+  --pf-ink: #0F172A;
+  --pf-ink-2: #475569;
+  --pf-ink-3: #64748B;
+  --pf-ink-4: #94A3B8;
+  --pf-teal: var(--nejum-teal-500, #008080);
+  --pf-teal-deep: var(--nejum-teal-700, #005354);
+  --pf-teal-bg: var(--nejum-teal-50, #E6F3F3);
+
+  background: linear-gradient(180deg, var(--pf-bg) 0%, #F0F3F5 100%) !important;
+  padding: 24px 28px 80px !important;
+  min-height: calc(100vh - var(--topbar-h, 64px));
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+}
+
+/* ───────── HEADER ───────── */
+.form-header {
+  background: white;
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius);
+  padding: 16px 22px !important;
+  margin-bottom: 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  position: sticky; top: 12px; z-index: 30;
+  backdrop-filter: blur(8px);
+}
+.form-header .header-left { display: flex; align-items: center; gap: 14px; }
+.form-header h1 {
+  font: 700 22px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: var(--pf-ink) !important;
+  letter-spacing: -0.012em;
+  margin: 0;
+}
+.form-header .back-button {
+  width: 38px; height: 38px;
+  background: var(--pf-bg-soft);
+  border: 1px solid var(--pf-border);
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--pf-ink-2);
+  text-decoration: none;
+  transition: border-color 160ms, color 160ms, background 160ms, transform 200ms cubic-bezier(.22,1,.36,1);
+}
+.form-header .back-button:hover {
+  border-color: var(--pf-teal);
+  color: var(--pf-teal-deep);
+  background: var(--pf-teal-bg);
+  transform: translateX(-2px);
+}
+.form-header .status-badge {
+  font: 700 9.5px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+.form-header .header-right { display: flex; gap: 10px; align-items: center; }
+
+/* Layout — tighter sidebar, equal gap */
+.product-form-layout {
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr) !important;
+  gap: 22px !important;
+}
+.form-main-column, .form-sidebar-column { gap: 22px !important; }
+.form-sidebar-column { top: 100px !important; }
+
+/* ───────── CARDS ───────── */
+.form-card {
+  background: white !important;
+  border: 1px solid var(--pf-border) !important;
+  border-radius: var(--pf-radius) !important;
+  padding: 0 !important;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.03) !important;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+  overflow: hidden;
+}
+.form-card:hover {
+  border-color: var(--pf-border-strong) !important;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.04), 0 12px 28px -10px rgba(15,23,31,0.08) !important;
+}
+.form-card-title,
+.form-card > .form-card-header {
+  background: linear-gradient(180deg, var(--pf-bg-soft) 0%, white 100%);
+  border-bottom: 1px solid #EEF2F3;
+  padding: 14px 22px !important;
+  margin: 0 0 0 0 !important;
+  display: flex !important;
+  align-items: center;
+  gap: 11px;
+  font: 700 13.5px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: var(--pf-ink) !important;
+  letter-spacing: -0.005em !important;
+}
+.form-card-header .form-card-title {
+  background: transparent;
+  border: 0;
+  padding: 0 !important;
+}
+
+/* Section icon box — gradient teal pill on left of each title */
+.form-card-ico {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.form-card-ico svg, .form-card-ico i { width: 13px; height: 13px; stroke-width: 2; }
+.form-card-ico .fa { font-size: 12px; }
+.form-card > *:not(.form-card-title):not(.form-card-header) {
+  padding-left: 22px;
+  padding-right: 22px;
+}
+.form-card > *:not(.form-card-title):not(.form-card-header):first-of-type { padding-top: 18px; }
+.form-card > *:not(.form-card-title):not(.form-card-header):last-of-type { padding-bottom: 22px; }
+
+/* ───────── FORM CONTROLS ───────── */
+.form-group label {
+  font: 700 10.5px 'Plus Jakarta Sans', sans-serif !important;
+  color: var(--pf-ink-2) !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  margin-bottom: 7px !important;
+}
+
+#Product_Form_Page .form-input,
+#Product_Form_Page .form-select,
+#Product_Form_Page .form-textarea,
+#Product_Form_Page input[type="text"],
+#Product_Form_Page input[type="number"],
+#Product_Form_Page input[type="email"],
+#Product_Form_Page input[type="url"],
+#Product_Form_Page select,
+#Product_Form_Page textarea {
+  padding: 10px 12px !important;
+  background: var(--pf-bg-soft) !important;
+  border: 1px solid #DDE3E5 !important;
+  border-radius: var(--pf-radius-xs) !important;
+  font: 500 13px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  color: var(--pf-ink) !important;
+  outline: 0 !important;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms !important;
+  box-sizing: border-box !important;
+}
+#Product_Form_Page .form-input:hover,
+#Product_Form_Page select:hover,
+#Product_Form_Page textarea:hover {
+  border-color: #C5CDD3 !important;
+  background: white !important;
+}
+#Product_Form_Page .form-input:focus,
+#Product_Form_Page .form-select:focus,
+#Product_Form_Page .form-textarea:focus,
+#Product_Form_Page input:focus,
+#Product_Form_Page select:focus,
+#Product_Form_Page textarea:focus {
+  border-color: var(--pf-teal) !important;
+  box-shadow: 0 0 0 3px rgba(0,128,128,0.10) !important;
+  background: white !important;
+}
+
+#Product_Form_Page select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 11px center !important;
+  padding-right: 32px !important;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+/* Toggle/checkbox in sidebar (Sales Channels, Sold as a pack) */
+.toggle-item {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--pf-bg-soft);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-sm);
+  margin-bottom: 10px;
+}
+.toggle-item:last-child { margin-bottom: 0; }
+.toggle-info { display: flex; flex-direction: column; gap: 2px; }
+.toggle-label {
+  font: 600 12px 'Plus Jakarta Sans', sans-serif;
+  color: var(--pf-ink);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.toggle-desc {
+  font: 500 11px 'Plus Jakarta Sans', sans-serif;
+  color: var(--pf-ink-3);
+}
+/* Override existing toggle: reuse original DOM hooks, premium colors.
+   Note: original CSS already moves the dot via translateX(20px); we
+   keep that and only restyle background + sizing — otherwise the dot
+   ends up doubly translated and floats outside the pill. */
+.switch-container {
+  width: 40px !important;
+  height: 22px !important;
+  flex-shrink: 0;
+}
+.switch-slider {
+  background-color: #CBD5DD !important;
+  border-radius: 999px !important;
+}
+.switch-slider:before,
+.switch-slider::before {
+  height: 18px !important;
+  width: 18px !important;
+  left: 2px !important;
+  bottom: 2px !important;
+  border-radius: 50% !important;
+  background: white !important;
+  box-shadow: 0 1px 3px rgba(15,23,31,0.20) !important;
+  transition: transform 220ms cubic-bezier(.34,1.56,.64,1) !important;
+}
+.switch-container input[type="checkbox"]:checked + .switch-slider,
+.switch-container input[type="checkbox"]:checked ~ .switch-slider {
+  background: linear-gradient(135deg, #00A0A0, #008080) !important;
+  background-color: #008080 !important;
+}
+.switch-container input[type="checkbox"]:checked + .switch-slider:before,
+.switch-container input[type="checkbox"]:checked + .switch-slider::before,
+.switch-container input[type="checkbox"]:checked ~ .switch-slider:before,
+.switch-container input[type="checkbox"]:checked ~ .switch-slider::before {
+  transform: translateX(18px) !important;
+}
+.channel-divider { height: 1px; background: var(--pf-border); margin: 12px 0; }
+
+/* ───────── BUTTONS — restrained luxury (Linear / Vercel level) ───────── */
+#Product_Form_Page .btn-primary,
+.form-header .btn-primary,
+.form-actions .btn-primary,
+#Product_Form_Page .btn-secondary,
+.form-header .btn-secondary,
+.form-actions .btn-secondary {
+  height: 36px;
+  padding: 0 18px !important;
+  font: 600 13px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  letter-spacing: -0.005em !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center; justify-content: center;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  user-select: none;
+}
+
+/* PRIMARY — single solid teal, no gradient, no glow, no shine */
+#Product_Form_Page .btn-primary,
+.form-header .btn-primary,
+.form-actions .btn-primary {
+  background: #0F766E !important;     /* deep, calm teal */
+  border: 1px solid #0F766E !important;
+  color: white !important;
+}
+#Product_Form_Page .btn-primary:hover,
+.form-header .btn-primary:hover {
+  background: #115E59 !important;
+  border-color: #115E59 !important;
+}
+#Product_Form_Page .btn-primary:active,
+.form-header .btn-primary:active {
+  background: #0F4C4C !important;
+}
+#Product_Form_Page .btn-primary:focus-visible,
+.form-header .btn-primary:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.22) !important;
+}
+
+/* SECONDARY — true ghost, transparent, restraint */
+#Product_Form_Page .btn-secondary,
+.form-header .btn-secondary {
+  background: transparent !important;
+  border: 1px solid #DDE3E5 !important;
+  color: var(--pf-ink-2) !important;
+  box-shadow: none !important;
+}
+#Product_Form_Page .btn-secondary:hover,
+.form-header .btn-secondary:hover {
+  background: var(--pf-bg-soft) !important;
+  border-color: #C5CDD3 !important;
+  color: var(--pf-ink) !important;
+}
+#Product_Form_Page .btn-secondary:active,
+.form-header .btn-secondary:active {
+  background: #F0F3F5 !important;
+}
+#Product_Form_Page .btn-secondary:focus-visible,
+.form-header .btn-secondary:focus-visible {
+  outline: none !important;
+  border-color: var(--pf-ink-2) !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 31, 0.08) !important;
+}
+
+/* ───────── ATTRIBUTES / TAGS / PILLS ───────── */
+.attr-row, .attribute-row {
+  display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--pf-bg-soft);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-sm);
+  margin-bottom: 8px;
+}
+
+/* Quill editor wrapper polish */
+.quill-wrap {
+  border: 1px solid #DDE3E5 !important;
+  border-radius: var(--pf-radius-xs) !important;
+  background: var(--pf-bg-soft) !important;
+  overflow: hidden;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms;
+}
+.quill-wrap:focus-within {
+  border-color: var(--pf-teal) !important;
+  box-shadow: 0 0 0 3px rgba(0,128,128,0.10) !important;
+  background: white !important;
+}
+.quill-wrap .ql-toolbar {
+  background: white !important;
+  border-bottom: 1px solid #EEF2F3 !important;
+}
+.quill-wrap .ql-container {
+  font: 500 13.5px 'Plus Jakarta Sans', system-ui, sans-serif !important;
+}
+
+/* ───────── LANGUAGE TABS (TR / EN) ───────── */
+.lang-tabs, .translation-tabs {
+  display: inline-flex;
+  background: var(--pf-bg-soft);
+  border: 1px solid var(--pf-border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.lang-tab, .translation-tabs button {
+  background: transparent;
+  border: 0;
+  padding: 6px 14px;
+  font: 700 11px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.10em;
+  color: var(--pf-ink-3);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 160ms;
+}
+.lang-tab.active, .translation-tabs button.active {
+  background: white;
+  color: var(--pf-ink);
+  box-shadow: 0 1px 2px rgba(15,23,31,0.08);
+}
+
+/* Form actions bottom bar */
+.form-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 18px 0 !important;
+  border-top: 1px dashed var(--pf-border);
+  margin-top: 22px;
+}
+
+/* ───────── MOBILE ───────── */
+@media (max-width: 1024px) {
+  .product-form-layout { grid-template-columns: 1fr !important; }
+  .form-sidebar-column { position: static !important; }
+}
+@media (max-width: 768px) {
+  #Product_Form_Page { padding: 14px !important; }
+  .form-header {
+    padding: 12px 14px !important;
+    flex-direction: row;
+    flex-wrap: wrap;
+    position: static;
+  }
+  .form-header h1 { font-size: 16px !important; }
+  .form-header .back-button { width: 32px; height: 32px; }
+  .form-header .header-right { width: 100%; }
+  .form-header .header-right .btn-primary,
+  .form-header .header-right .btn-secondary { flex: 1; justify-content: center; }
+  .form-card-title, .form-card-header { padding: 12px 16px !important; }
+  .form-card > *:not(.form-card-title):not(.form-card-header) {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

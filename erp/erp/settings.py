@@ -215,6 +215,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # CORS - must be before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",  # i18n: detect/activate user language
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -320,16 +321,21 @@ DATABASES = {
         "HOST": config("DB_HOST"),  # an empty string means localhost
         "PORT": config("DB_PORT"),
         # Connection pooling for better performance
-        "CONN_MAX_AGE": 60,  # 60 seconds persistence (Safe for cloud)
+        "CONN_MAX_AGE": 0,  # Must be 0 when using PgBouncer/Railway poolers to prevent InterfaceError
+        "CONN_HEALTH_CHECKS": True,  # Prevent InterfaceError when connection drops
         "OPTIONS": {
             # PostgreSQL specific optimizations
             "connect_timeout": 10,
-            # When DB_SCHEMA is set on the active env profile, scope
-            # this connection to that schema (per-brand isolation).
-            # If unset (e.g. demfirat's .env), default search_path is
-            # `public` — i.e. existing behaviour.
+            # Per-brand schema isolation. Uses the already-resolved
+            # DB_SCHEMA constant (line ~258) which honours BRAND_DEFAULTS,
+            # so `BRAND=belino` correctly scopes the connection to the
+            # BELINO schema even when .env has no explicit DB_SCHEMA.
+            # NOTE: Re-calling config("DB_SCHEMA", default="public") here
+            # ignores BRAND_DEFAULTS and silently fell back to public —
+            # exactly the bug that hid Belino data behind the demfirat
+            # connection.
             "options": (
-                f'-c search_path="{config("DB_SCHEMA", default="public")}",public'
+                f'-c search_path="{DB_SCHEMA}",public'
             ),
         },
         "TEST": {
@@ -360,15 +366,24 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
 
-# TIME_ZONE = 'UTC'
-# TIME_ZONE = "US/Pacific"
 TIME_ZONE = "Europe/Istanbul"
 
 USE_I18N = True
-
+USE_L10N = True
 USE_TZ = True
+
+from django.utils.translation import gettext_lazy as _i18n_lazy
+
+LANGUAGES = [
+    ("en", _i18n_lazy("English")),
+    ("tr", _i18n_lazy("Türkçe")),
+]
+
+LOCALE_PATHS = [
+    BASE_DIR / "locale",
+]
 
 
 # Static files (CSS, JavaScript, Images)
@@ -378,7 +393,15 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# In DEBUG: serve directly from app dirs without manifest hashing so newly
+# added static files are picked up without collectstatic / restart.
+# In production: use WhiteNoise's hashed/compressed manifest storage.
+if DEBUG:
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    WHITENOISE_USE_FINDERS = True
+    WHITENOISE_AUTOREFRESH = True
+else:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
 # Media Files (For user uploaded files (dynamic not static))

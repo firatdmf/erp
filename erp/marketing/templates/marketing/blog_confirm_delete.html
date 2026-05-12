@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 
+{% load i18n %}
 {% block css %}
 <style>
     .delete-confirm-page {
@@ -87,7 +88,7 @@
         <div class="delete-icon">
             <i class="fas fa-exclamation-triangle"></i>
         </div>
-        <h1>Blog Yazısını Sil</h1>
+        <h1>{% trans "Blog Yazısını Sil" %}</h1>
         <p>Bu blog yazısını silmek istediğinizden emin misiniz?</p>
 
         <div class="blog-title">"{{ object.title_tr }}"</div>

@@ -363,8 +363,73 @@ class BaseProductView(ModelFormMixin):
     def get_success_url(self):
         return reverse("marketing:product_detail", kwargs={"pk": self.object.pk})
 
+    def _save_campaign(self):
+        """Persist campaign data submitted alongside the product form.
+        One product → one campaign (OneToOne). Selecting 'none' deletes
+        any existing campaign + tiers."""
+        from .models import ProductCampaign, ProductCampaignTier
+        import json as _json
+        product = self.object
+        ctype = (self.request.POST.get('campaign_type') or 'none').strip().lower()
+
+        # 'none' wipes the campaign for this product
+        if ctype == 'none' or ctype not in ('percentage', 'volume'):
+            ProductCampaign.objects.filter(product=product).delete()
+            return
+
+        camp, _ = ProductCampaign.objects.update_or_create(
+            product=product,
+            defaults={'campaign_type': ctype, 'is_active': True},
+        )
+        # Reset type-specific fields then fill the active ones
+        if ctype == 'percentage':
+            pct_raw = (self.request.POST.get('campaign_discount_percent') or '').strip()
+            end_raw = (self.request.POST.get('campaign_end_date') or '').strip()
+            try:
+                camp.discount_percent = float(pct_raw) if pct_raw else None
+            except (TypeError, ValueError):
+                camp.discount_percent = None
+            camp.end_date = end_raw or None
+            camp.save()
+            camp.tiers.all().delete()
+        else:  # volume
+            camp.discount_percent = None
+            camp.end_date = None
+            camp.save()
+            camp.tiers.all().delete()
+            try:
+                tiers = _json.loads(self.request.POST.get('campaign_tiers_json') or '[]')
+            except Exception:
+                tiers = []
+            for t in tiers or []:
+                try:
+                    min_q = int(t.get('min_qty') or 0)
+                    max_q = t.get('max_qty')
+                    max_q = int(max_q) if max_q not in (None, '', 'null') else None
+                    pct   = float(t.get('discount_percent') or 0)
+                except (TypeError, ValueError):
+                    continue
+                if pct <= 0:
+                    continue
+                ProductCampaignTier.objects.create(
+                    campaign=camp,
+                    min_qty=min_q,
+                    max_qty=max_q,
+                    discount_percent=pct,
+                )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Provide the existing campaign (if any) to the template
+        try:
+            obj = getattr(self, 'object', None)
+            if obj and obj.pk:
+                from .models import ProductCampaign
+                context['campaign'] = ProductCampaign.objects.filter(product=obj).first()
+            else:
+                context['campaign'] = None
+        except Exception:
+            context['campaign'] = None
         if self.request.POST:
             context["productfile_formset"] = ProductFileFormSet(
                 self.request.POST, self.request.FILES, instance=self.object
@@ -1340,6 +1405,9 @@ class ProductCreate(BaseProductView, generic.CreateView):
             # Handle Manufacturing Recipe (BOM)
             self.handle_bom(self.object)
 
+            # Persist campaign / discount selection for this product
+            self._save_campaign()
+
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -1556,6 +1624,9 @@ class ProductEdit(BaseProductView, generic.UpdateView):
 
             print(f"⏱️  Primary image update: {time.time() - primary_update_start:.3f}s")
         
+        # Persist campaign / discount selection for this product (Update path)
+        self._save_campaign()
+
         redirect_start = time.time()
         # Skip super().form_valid() which would call form.save() again
         # and overwrite our primary_image. Just redirect directly.

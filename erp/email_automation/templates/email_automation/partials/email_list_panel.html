@@ -1,3 +1,4 @@
+{% load i18n %}
 <!-- Email List Header -->
 <div class="email-list-header">
     <div class="email-list-title-row">
@@ -14,17 +15,17 @@
 <!-- Filter Bar – Spacious with Labels -->
 <div class="email-filter-bar" id="emailFilterBar">
     <div class="filter-group">
-        <label for="filterCompany">Company</label>
+        <label for="filterCompany">{% trans "Company" %}</label>
         <input type="text" class="filter-input" id="filterCompany" placeholder="Filter by company..."
             value="{{ filter_company|default:'' }}" autocomplete="off">
     </div>
     <div class="filter-group">
-        <label for="filterContact">Contact</label>
+        <label for="filterContact">{% trans "Contact" %}</label>
         <input type="text" class="filter-input" id="filterContact" placeholder="Filter by contact..."
             value="{{ filter_contact|default:'' }}" autocomplete="off">
     </div>
     <div class="filter-group">
-        <label for="filterEmail">Email</label>
+        <label for="filterEmail">{% trans "Email" %}</label>
         <input type="text" class="filter-input" id="filterEmail" placeholder="Filter by email..."
             value="{{ filter_email|default:'' }}" autocomplete="off">
     </div>
@@ -118,7 +119,7 @@
     {% else %}
     <div class="email-empty-state" style="padding:60px 30px; text-align:center;">
         <i class="fas fa-inbox" style="font-size:40px; margin-bottom:16px; color:#d1d5db;"></i>
-        <h3 style="margin:0 0 6px; color:#6b7280; font-size:15px; font-weight:600;">Folder is empty</h3>
+        <h3 style="margin:0 0 6px; color:#6b7280; font-size:15px; font-weight:600;">{% trans "Folder is empty" %}</h3>
         <p style="margin:0; color:#9ca3af; font-size:13px;">No emails in this folder yet.</p>
     </div>
     {% endif %}

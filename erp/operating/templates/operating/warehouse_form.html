@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block content %}
@@ -117,7 +118,7 @@
         <input type="text" name="name" required autofocus placeholder="Main Warehouse, Branch A..." value="{{ warehouse.name|default:'' }}">
       </div>
       <div class="wh-form-field">
-        <label>Location</label>
+        <label>{% trans "Location" %}</label>
         <input type="text" name="location" placeholder="Istanbul, Turkey" value="{{ warehouse.location|default:'' }}">
       </div>
       <div class="wh-form-field">
@@ -131,7 +132,7 @@
         <div class="hint">Link this warehouse's net worth to a specific accounting book.</div>
       </div>
       <div class="wh-form-field">
-        <label>Description</label>
+        <label>{% trans "Description" %}</label>
         <textarea name="description" rows="3" placeholder="Optional notes about this warehouse">{{ warehouse.description|default:'' }}</textarea>
       </div>
       <div class="wh-form-actions">

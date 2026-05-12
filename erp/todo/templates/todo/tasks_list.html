@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 {% load erp_tags %}
 {% block css %}
@@ -333,7 +334,7 @@
     {% else %}
     <div class="empty-state">
       <i class="fa fa-check-circle"></i>
-      <h3>No tasks yet</h3>
+      <h3>{% trans "No tasks yet" %}</h3>
       <p>You don't have any tasks assigned to you.</p>
     </div>
     {% endif %}
@@ -394,7 +395,7 @@
     {% else %}
     <div class="empty-state">
       <i class="fa fa-user-plus"></i>
-      <h3>No assigned tasks</h3>
+      <h3>{% trans "No assigned tasks" %}</h3>
       <p>You haven't assigned any tasks to others yet.</p>
     </div>
     {% endif %}

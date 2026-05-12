@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
 
@@ -6,7 +7,7 @@
   {% block css %}
     <link rel="stylesheet" href="{% static 'operating/css/index.css' %}" />
   {% endblock %}
-  <h1>Operating Index</h1>
+  <h1>{% trans "Operating Index" %}</h1>
   <p class="OperatingMessage">{{ message }}</p>
   <ul>
     <li>

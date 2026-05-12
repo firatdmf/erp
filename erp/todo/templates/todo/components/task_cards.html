@@ -1,4 +1,5 @@
 {% load static %}
+{% load i18n %}
 <style>
 .tasks-grid {
   display: grid;
@@ -222,7 +223,7 @@
 {% else %}
 <div class="empty-state">
   <i class="fa fa-check-circle"></i>
-  <h3>No tasks found</h3>
+  <h3>{% trans "No tasks found" %}</h3>
   <p>{% if is_assigned_view %}You haven't assigned any tasks yet.{% else %}You don't have any pending tasks.{% endif %}</p>
 </div>
 {% endif %}

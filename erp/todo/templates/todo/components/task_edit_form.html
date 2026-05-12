@@ -1,3 +1,4 @@
+{% load i18n %}
 <!-- Task Edit Form Content -->
 <form id="taskEditForm" method="post" action="{% url 'todo:update_task_ajax' task.id %}"
   onsubmit="handleTaskEditFormSubmit(event); return false;">
@@ -28,13 +29,13 @@
 
   <!-- Task Name -->
   <div class="form-group">
-    <label for="id_name">Task Name *</label>
+    <label for="id_name">{% trans "Task Name *" %}</label>
     {{ form.name }}
   </div>
 
   <!-- Due Date -->
   <div class="form-group">
-    <label for="id_due_date">Due Date *</label>
+    <label for="id_due_date">{% trans "Due Date *" %}</label>
     {{ form.due_date }}
   </div>
 
@@ -42,22 +43,22 @@
   <div class="form-group">
     <label for="id_priority"><i class="fa fa-flag"></i> Priority *</label>
     <select name="priority" id="id_priority" class="form-control" required>
-      <option value="low" {% if task.priority == 'low' %}selected{% endif %}>Low</option>
-      <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>Medium</option>
-      <option value="high" {% if task.priority == 'high' %}selected{% endif %}>High</option>
-      <option value="urgent" {% if task.priority ==  'urgent' %}selected{% endif %}>Urgent</option>
+      <option value="low" {% if task.priority == 'low' %}selected{% endif %}>{% trans "Low" %}</option>
+      <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
+      <option value="high" {% if task.priority == 'high' %}selected{% endif %}>{% trans "High" %}</option>
+      <option value="urgent" {% if task.priority ==  'urgent' %}selected{% endif %}>{% trans "Urgent" %}</option>
     </select>
   </div>
 
   <!-- Description -->
   <div class="form-group">
-    <label for="id_description">Description</label>
+    <label for="id_description">{% trans "Description" %}</label>
     {{ form.description }}
   </div>
 
   <!-- Assignees Management -->
   <div class="form-group" style="position: relative;">
-    <label>Assignees</label>
+    <label>{% trans "Assignees" %}</label>
     <div id="editSelectedUsersList" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
       {% for u in task.assignees.all %}
       <div class="user-chip" data-id="{{ u.id }}">
@@ -101,7 +102,7 @@
 
   <!-- Attachments Management -->
   <div class="form-group">
-    <label>Attachments</label>
+    <label>{% trans "Attachments" %}</label>
 
     <!-- Existing List -->
     {% if task.attachments.all %}

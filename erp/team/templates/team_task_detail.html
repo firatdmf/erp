@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -376,8 +377,8 @@
                 <div class="activity-heading">Activity</div>
                 <!-- Pill Toggle -->
                 <div class="pill-switcher">
-                    <button class="pill-btn active" onclick="switchTab('comments')">Comments</button>
-                    <button class="pill-btn" onclick="switchTab('history')">History</button>
+                    <button class="pill-btn active" onclick="switchTab('comments')">{% trans "Comments" %}</button>
+                    <button class="pill-btn" onclick="switchTab('history')">{% trans "History" %}</button>
                 </div>
             </div>
 
@@ -496,7 +497,7 @@
         <div class="sidebar-widget">
             <!-- Status (Clickable) -->
             <div class="form-group">
-                <label class="form-label">Status</label>
+                <label class="form-label">{% trans "Status" %}</label>
                 <div class="select-box" onclick="toggleModal('statusModal')">
                     <div style="display:flex; align-items:center;">
                         <span id="current-status-dot" class="status-dot"
@@ -509,7 +510,7 @@
 
             <!-- Priority -->
             <div class="form-group">
-                <label class="form-label">Priority</label>
+                <label class="form-label">{% trans "Priority" %}</label>
                 <div class="static-box">
                     <i class="fa fa-flag"
                         style="color: {% if task.priority == 'urgent' or task.priority == 'high' %}#EF4444{% else %}#6B7280{% endif %}; margin-right:0.5rem;"></i>
@@ -519,7 +520,7 @@
 
             <!-- Assignees -->
             <div class="form-group">
-                <label class="form-label">Assignees</label>
+                <label class="form-label">{% trans "Assignees" %}</label>
                 <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap;">
                     {% if task.assignees.all %}
                     {% for u in task.assignees.all|slice:":4" %}
@@ -543,7 +544,7 @@
 
             <!-- Due Date -->
             <div class="form-group">
-                <label class="form-label">Due Date</label>
+                <label class="form-label">{% trans "Due Date" %}</label>
                 <div class="static-box">
                     <i class="far fa-calendar" style="color:#6B7280; margin-right:0.5rem;"></i>
                     {{ task.due_date|date:"F j, Y" }}

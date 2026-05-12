@@ -1149,10 +1149,16 @@ def get_user_orders(request, user_id):
         orders_list = []
         for order in orders:
             items_count = order.items.count()
-            
+            order_status_display = (
+                dict(order._meta.get_field('order_status').choices).get(order.order_status)
+                if order.order_status else None
+            )
             orders_list.append({
                 'id': order.id,
                 'status': order.status,
+                'order_status': order.order_status,
+                'order_status_display': order_status_display,
+                'order_number': order.order_number,
                 'payment_status': order.payment_status,
                 'original_currency': order.original_currency,
                 'original_price': str(order.original_price) if order.original_price else None,
@@ -1160,6 +1166,9 @@ def get_user_orders(request, user_id):
                 'paid_amount': str(order.paid_amount) if order.paid_amount else None,
                 'items_count': items_count,
                 'tracking_number': order.tracking_number,
+                'carrier': order.carrier,
+                'shipped_at': order.shipped_at.isoformat() if order.shipped_at else None,
+                'delivered_at': order.delivered_at.isoformat() if order.delivered_at else None,
                 'created_at': order.created_at.isoformat(),
             })
             
@@ -1240,9 +1249,16 @@ def get_order_detail(request, user_id, order_id):
         except:
             total_value = str(order.original_price) if order.original_price else '0'
         
+        order_status_display = (
+            dict(order._meta.get_field('order_status').choices).get(order.order_status)
+            if order.order_status else None
+        )
         order_data = {
             'id': order.id,
+            'order_number': order.order_number,
             'status': order.status,
+            'order_status': order.order_status,
+            'order_status_display': order_status_display,
             'payment_status': order.payment_status,
             'payment_method': order.payment_method,
             'original_currency': order.original_currency,
@@ -1256,6 +1272,12 @@ def get_order_detail(request, user_id, order_id):
             'delivery_city': order.delivery_city,
             'delivery_country': order.delivery_country,
             'delivery_phone': order.delivery_phone,
+            'billing_address_title': order.billing_address_title,
+            'billing_address': order.billing_address,
+            'billing_city': order.billing_city,
+            'billing_country': order.billing_country,
+            'billing_phone': order.billing_phone,
+            'carrier': order.carrier,
             'tracking_number': order.tracking_number,
             'shipped_at': order.shipped_at.isoformat() if order.shipped_at else None,
             'delivered_at': order.delivered_at.isoformat() if order.delivered_at else None,

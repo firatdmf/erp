@@ -1,10 +1,11 @@
+{% load i18n %}
 <div class="sidebar-header">
     <button class="sidebar-close" onclick="closeAddSupplierSidebar()">
         <i class="fas fa-times"></i> Close
     </button>
     <div class="sidebar-title">
         <i class="fas fa-truck text-primary"></i>
-        <h2>Add Supplier</h2>
+        <h2>{% trans "Add Supplier" %}</h2>
     </div>
 </div>
 
@@ -22,46 +23,46 @@
         </div>
 
         <div class="form-group">
-            <label for="id_contact_name">Contact Name</label>
+            <label for="id_contact_name">{% trans "Contact Name" %}</label>
             <input type="text" name="contact_name" id="id_contact_name" class="form-input" placeholder="e.g. John Doe">
         </div>
 
         <div class="form-group">
-            <label for="id_email">Email</label>
+            <label for="id_email">{% trans "Email" %}</label>
             <input type="email" name="email" id="id_email" class="form-input" placeholder="e.g. contact@acme.com">
         </div>
 
         <div class="form-group">
-            <label for="id_phone">Phone</label>
+            <label for="id_phone">{% trans "Phone" %}</label>
             <input type="text" name="phone" id="id_phone" class="form-input" placeholder="e.g. +1 555 0123">
         </div>
 
         <div class="form-group">
-            <label for="id_website">Website</label>
+            <label for="id_website">{% trans "Website" %}</label>
             <input type="url" name="website" id="id_website" class="form-input" placeholder="https://example.com">
         </div>
 
         <div class="form-group">
-            <label for="id_address">Address</label>
+            <label for="id_address">{% trans "Address" %}</label>
             <textarea name="address" id="id_address" class="form-textarea" rows="3"
                 placeholder="Street address, city, etc."></textarea>
         </div>
 
         <div class="form-row" style="display: flex; gap: 15px;">
             <div class="form-group" style="flex: 1;">
-                <label for="id_status">Status</label>
+                <label for="id_status">{% trans "Status" %}</label>
                 <select name="status" id="id_status" class="form-input">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
+                    <option value="active">{% trans "Active" %}</option>
+                    <option value="inactive">{% trans "Inactive" %}</option>
                 </select>
             </div>
             <div class="form-group" style="flex: 1;">
-                <label for="id_currency">Currency</label>
+                <label for="id_currency">{% trans "Currency" %}</label>
                 <select name="currency" id="id_currency" class="form-input">
-                    <option value="USD">USD ($)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="TRY">TRY (₺)</option>
-                    <option value="GBP">GBP (£)</option>
+                    <option value="USD">{% trans "USD ($)" %}</option>
+                    <option value="EUR">{% trans "EUR (€)" %}</option>
+                    <option value="TRY">{% trans "TRY (₺)" %}</option>
+                    <option value="GBP">{% trans "GBP (£)" %}</option>
                 </select>
             </div>
         </div>
@@ -71,7 +72,7 @@
                 <span class="btn-text">Save Supplier</span>
                 <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
             </button>
-            <button type="button" class="btn btn-secondary" onclick="closeAddSupplierSidebar()">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="closeAddSupplierSidebar()">{% trans "Cancel" %}</button>
         </div>
     </form>
 </div>

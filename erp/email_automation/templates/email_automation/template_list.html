@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -234,7 +235,7 @@
   {% else %}
   <div class="empty-state">
     <i class="fa fa-file-text"></i>
-    <h3>No email templates yet</h3>
+    <h3>{% trans "No email templates yet" %}</h3>
     <p>Create email templates for your automated campaigns. You can create up to 6 sequential emails.</p>
     <a href="{% url 'email_automation:template_create' %}" class="btn btn-primary">
       <i class="fa fa-plus"></i>

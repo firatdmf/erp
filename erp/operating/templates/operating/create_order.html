@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
 {% load static %}
 {% block css %}
@@ -13,7 +14,7 @@
     {% endfor %}
   </ul>
   {% endif %}
-  <h1>Create Order</h1>
+  <h1>{% trans "Create Order" %}</h1>
 
   <form method="post">
     {% csrf_token %}
@@ -21,7 +22,7 @@
     {{ formset.management_form }} {# ✅ MOVE THIS HERE #}
 
     <div id="customer-fields">
-      <label for="customer">Customer</label>
+      <label for="customer">{% trans "Customer" %}</label>
       <input id="customer-input" name="customer" type="text" hx-get="{% url 'crm:customer_autocomplete' %}"
         hx-trigger="keyup changed delay:300ms" hx-target="#customer-search-results" hx-swap="innerHTML"
         autocomplete="off" placeholder="Search by contact or company name" />
@@ -33,7 +34,7 @@
     <br />
 
     <div id="product-fields">
-      <label for="product">Product</label>
+      <label for="product">{% trans "Product" %}</label>
       <input class="border px-2 py-1 rounded w-full" id="product-input" name="product" type="text" autocomplete="off"
         placeholder="Search by name, SKU, or variant SKU..." hx-get="{% url 'operating:product_autocomplete' %}"
         hx-trigger="keyup changed delay:200ms" hx-target="#product-search-results" hx-swap="innerHTML" />
@@ -45,7 +46,7 @@
     {{ form.as_p }}
     <table class="hidden" id="order_items_table"></table>
     <input type="hidden" id="product_json_input" name="product_json_input" />
-    <button type="submit" id="submit_order_button">Submit Order</button>
+    <button type="submit" id="submit_order_button">{% trans "Submit Order" %}</button>
     {% comment %} <div id="generate_order_list_button">Generate order list</div> {% endcomment %}
   </form>
 </div>

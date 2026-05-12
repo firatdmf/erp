@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block content %}
@@ -460,13 +461,13 @@
     <table class="wh-table">
       <thead>
         <tr>
-          <th>NAME</th>
-          <th>SKU</th>
-          <th>BARCODE</th>
-          <th>QTY</th>
-          <th>UNIT COST</th>
-          <th>TOTAL (USD)</th>
-          <th>TOTAL (TRY)</th>
+          <th>{% trans "NAME" %}</th>
+          <th>{% trans "SKU" %}</th>
+          <th>{% trans "BARCODE" %}</th>
+          <th>{% trans "QTY" %}</th>
+          <th>{% trans "UNIT COST" %}</th>
+          <th>{% trans "TOTAL (USD)" %}</th>
+          <th>{% trans "TOTAL (TRY)" %}</th>
         </tr>
       </thead>
       <tbody id="wh-rows">
@@ -479,7 +480,7 @@
 <!-- Import Modal -->
 <div class="wh-modal" id="whImportModal">
   <div class="wh-modal-card">
-    <h3>Import Products from Excel</h3>
+    <h3>{% trans "Import Products from Excel" %}</h3>
     <p>Upload an .xlsx file with columns: Name (Adı), Code (Kodu), Quantity (Miktar), Purchase Price (Alış Fiyatı), Currency.</p>
 
     <div class="wh-drop" id="whDrop" onclick="document.getElementById('whFile').click()">
@@ -492,7 +493,7 @@
     <div id="whImportResult" style="display:none;"></div>
 
     <div style="display:flex; gap:10px; justify-content:flex-end;">
-      <button type="button" class="wh-action-btn" onclick="closeWhImportModal()">Cancel</button>
+      <button type="button" class="wh-action-btn" onclick="closeWhImportModal()">{% trans "Cancel" %}</button>
       <button type="button" class="wh-import-btn" id="whUploadBtn" onclick="uploadWhFile()" disabled style="opacity:0.5;">
         <i class="fa fa-upload"></i> Upload &amp; Import
       </button>

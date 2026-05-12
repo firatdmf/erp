@@ -1,0 +1,601 @@
+/* ====================================================================
+   SETTINGS — Premium overlay (Nejum design language)
+   --------------------------------------------------------------------
+   Mirrors product_form_v2 + nejum sidebar visual conventions:
+   gradient page bg, sticky header card, gradient card headers with
+   teal icon pills, deep teal buttons, soft borders & shadows.
+   ==================================================================== */
+
+#Settings_Page {
+  --st-radius: 14px;
+  --st-radius-sm: 10px;
+  --st-radius-xs: 8px;
+  --st-border: #EAEFF1;
+  --st-border-strong: #D7DFE2;
+  --st-bg: #F7F9FA;
+  --st-bg-soft: #FAFBFC;
+  --st-ink: #0F172A;
+  --st-ink-2: #475569;
+  --st-ink-3: #64748B;
+  --st-ink-4: #94A3B8;
+  --st-teal: var(--nejum-teal-500, #008080);
+  --st-teal-deep: var(--nejum-teal-700, #005354);
+  --st-teal-bg: var(--nejum-teal-50, #E6F3F3);
+
+  background: linear-gradient(180deg, var(--st-bg) 0%, #F0F3F5 100%);
+  padding: 24px 28px 80px;
+  min-height: calc(100vh - var(--topbar-h, 64px));
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: var(--st-ink);
+}
+
+/* ───────── HEADER (sticky card) ───────── */
+#Settings_Page .st-header {
+  background: white;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius);
+  padding: 16px 22px;
+  margin-bottom: 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  position: sticky; top: 12px; z-index: 30;
+  backdrop-filter: blur(8px);
+}
+#Settings_Page .st-header-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+#Settings_Page .st-header-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Settings_Page .st-header-icon i { font-size: 14px; }
+#Settings_Page .st-header-text { min-width: 0; }
+#Settings_Page .st-header h1 {
+  font: 700 22px 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: var(--st-ink);
+  letter-spacing: -0.012em;
+  margin: 0 0 2px;
+  line-height: 1.15;
+}
+#Settings_Page .st-header-sub {
+  margin: 0;
+  font: 500 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-3);
+}
+#Settings_Page .st-header-right {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 700 9.5px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--st-teal-bg);
+  color: var(--st-teal-deep);
+  border: 1px solid #B8DCDC;
+}
+#Settings_Page .st-header-right i { font-size: 9px; }
+
+/* ───────── LAYOUT ───────── */
+#Settings_Page .st-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+/* ───────── SIDEBAR NAV (matches nejum sidebar fly-item) ───────── */
+#Settings_Page .st-nav {
+  position: sticky; top: 100px;
+  background: white;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius);
+  padding: 8px;
+  box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+}
+#Settings_Page .st-nav-group {
+  font: 700 10px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--st-ink-4);
+  padding: 10px 12px 6px;
+}
+#Settings_Page .st-nav-group + .st-nav-group { margin-top: 4px; }
+#Settings_Page .st-nav-link {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 10px;
+  margin: 0 2px;
+  border-radius: 9px;
+  cursor: pointer;
+  font: 500 13.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-2);
+  text-decoration: none;
+  transition:
+    background 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+#Settings_Page .st-nav-ico {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: white;
+  border: 1px solid #E6ECEE;
+  color: var(--st-ink-3);
+  flex-shrink: 0;
+  font-size: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1);
+  transition: border-color 140ms, color 140ms, background 140ms;
+}
+#Settings_Page .st-nav-link:hover {
+  background: var(--st-teal-bg);
+  color: var(--st-teal-deep);
+}
+#Settings_Page .st-nav-link:hover .st-nav-ico {
+  border-color: var(--nejum-teal-300, #66B5B5);
+  color: var(--st-teal-deep);
+}
+#Settings_Page .st-nav-link.is-active {
+  background: var(--st-teal-bg);
+  color: var(--st-teal-deep);
+  font-weight: 600;
+}
+#Settings_Page .st-nav-link.is-active .st-nav-ico {
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border-color: #B8DCDC;
+  color: var(--st-teal-deep);
+}
+#Settings_Page .st-nav-link.is-disabled {
+  color: var(--st-ink-4);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+#Settings_Page .st-nav-link.is-disabled .st-nav-ico {
+  background: var(--st-bg-soft);
+  border-color: var(--st-border);
+  color: var(--st-ink-4);
+}
+#Settings_Page .st-nav-soon {
+  margin-left: auto;
+  padding: 2px 7px;
+  background: var(--st-bg-soft);
+  color: var(--st-ink-4);
+  font: 700 9px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--st-border);
+  border-radius: 999px;
+}
+
+/* ───────── CONTENT ───────── */
+#Settings_Page .st-content { display: flex; flex-direction: column; gap: 22px; }
+
+/* ───────── CARDS ───────── */
+#Settings_Page .st-card {
+  background: white;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius);
+  box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+  overflow: hidden;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+#Settings_Page .st-card:hover {
+  border-color: var(--st-border-strong);
+  box-shadow: 0 1px 2px rgba(15,23,31,0.04), 0 12px 28px -10px rgba(15,23,31,0.08);
+}
+#Settings_Page .st-card-header {
+  background: linear-gradient(180deg, var(--st-bg-soft) 0%, white 100%);
+  border-bottom: 1px solid #EEF2F3;
+  padding: 14px 22px;
+  display: flex; align-items: center; gap: 11px;
+}
+#Settings_Page .st-card-ico {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  font-size: 12px;
+}
+#Settings_Page .st-card-title {
+  font: 700 13.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink);
+  letter-spacing: -0.005em;
+  margin: 0;
+  line-height: 1.2;
+}
+#Settings_Page .st-card-sub {
+  font: 500 11.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-3);
+  margin: 1px 0 0;
+}
+#Settings_Page .st-card-titles { min-width: 0; }
+#Settings_Page .st-card-body { padding: 6px 22px 18px; }
+
+/* ───────── INTEGRATION ROW ───────── */
+#Settings_Page .st-row {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid #F1F5F6;
+}
+#Settings_Page .st-row:last-child { border-bottom: 0; }
+#Settings_Page .st-row-info { display: flex; gap: 14px; min-width: 0; flex: 1; }
+
+#Settings_Page .st-row-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  flex: 0 0 48px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--st-bg-soft);
+  border: 1px solid var(--st-border);
+  font-size: 20px;
+  color: var(--st-ink-2);
+}
+#Settings_Page .st-row-icon.is-google { background: #FEF2F2; color: #DB4437; border-color: #FEE2E2; }
+#Settings_Page .st-row-icon.is-gmail  { background: #FEF6F5; color: #EA4335; border-color: #FECACA; }
+#Settings_Page .st-row-icon.is-meta   { background: #EFF6FF; color: #1877F2; border-color: #DBEAFE; }
+#Settings_Page .st-row-icon.is-stripe { background: #F3F0FF; color: #635BFF; border-color: #E4DEFF; }
+
+#Settings_Page .st-row-text { min-width: 0; padding-top: 2px; }
+#Settings_Page .st-row-name {
+  font: 700 14px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.005em;
+  color: var(--st-ink);
+  margin: 0 0 4px;
+}
+#Settings_Page .st-row-desc {
+  font: 500 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-3);
+  line-height: 1.5;
+  margin: 0;
+}
+#Settings_Page .st-row-meta {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 10px;
+}
+#Settings_Page .st-account-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 10px 4px 4px;
+  background: var(--st-bg-soft);
+  border: 1px solid var(--st-border);
+  border-radius: 999px;
+  font: 600 11.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink);
+}
+#Settings_Page .st-account-chip img {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 18px;
+}
+#Settings_Page .st-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  font: 700 10px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+#Settings_Page .st-status i { font-size: 7px; }
+#Settings_Page .st-status.is-active   { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+#Settings_Page .st-status.is-inactive { background: var(--st-bg-soft); color: var(--st-ink-3); border: 1px solid var(--st-border); }
+
+#Settings_Page .st-row-actions { flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
+
+/* ───────── BUTTONS ───────── */
+#Settings_Page .st-btn {
+  height: 36px;
+  padding: 0 16px;
+  font: 600 13px 'Plus Jakarta Sans', system-ui, sans-serif;
+  letter-spacing: -0.005em;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  user-select: none;
+}
+#Settings_Page .st-btn i { font-size: 12px; }
+#Settings_Page .st-btn--primary {
+  background: #0F766E;
+  border-color: #0F766E;
+  color: white;
+}
+#Settings_Page .st-btn--primary:hover { background: #115E59; border-color: #115E59; }
+#Settings_Page .st-btn--primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.22);
+}
+#Settings_Page .st-btn--secondary {
+  background: transparent;
+  border-color: #DDE3E5;
+  color: var(--st-ink-2);
+}
+#Settings_Page .st-btn--secondary:hover {
+  background: var(--st-bg-soft);
+  border-color: #C5CDD3;
+  color: var(--st-ink);
+}
+#Settings_Page .st-btn--danger {
+  background: #FEF2F2;
+  border-color: #FECACA;
+  color: #B91C1C;
+}
+#Settings_Page .st-btn--danger:hover { background: #FEE2E2; border-color: #FCA5A5; }
+#Settings_Page .st-btn--ghost-success {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #047857;
+  cursor: default;
+}
+
+/* ───────── EMPTY STATE ───────── */
+#Settings_Page .st-empty {
+  padding: 36px 24px 32px;
+  text-align: center;
+  color: var(--st-ink-3);
+}
+#Settings_Page .st-empty-ico {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  margin: 0 auto 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  font-size: 17px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Settings_Page .st-empty p {
+  margin: 0;
+  font: 500 13px 'Plus Jakarta Sans', sans-serif;
+}
+
+/* ───────── SECTION SWITCHER ───────── */
+#Settings_Page .st-section { display: none; animation: stFadeIn 280ms cubic-bezier(0.22, 1, 0.36, 1); }
+#Settings_Page .st-section.is-active { display: block; }
+@keyframes stFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ───────── PROFILE CARD ───────── */
+#Settings_Page .st-profile-card {
+  display: flex; align-items: center; gap: 22px;
+  padding: 22px;
+  background: linear-gradient(180deg, var(--st-bg-soft) 0%, white 100%);
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  margin-bottom: 22px;
+}
+#Settings_Page .st-profile-avatar {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 700 26px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.01em;
+  color: white;
+  background: linear-gradient(135deg, var(--nejum-teal-500, #008080) 0%, var(--st-teal-deep) 100%);
+  border: 3px solid white;
+  box-shadow: 0 4px 14px rgba(0, 107, 107, 0.18);
+  flex-shrink: 0;
+}
+#Settings_Page .st-profile-info { min-width: 0; }
+#Settings_Page .st-profile-name {
+  margin: 0 0 2px;
+  font: 700 17px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.01em;
+  color: var(--st-ink);
+}
+#Settings_Page .st-profile-email {
+  margin: 0 0 8px;
+  font: 500 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-3);
+}
+#Settings_Page .st-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font: 700 10px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  background: var(--st-teal-bg);
+  color: var(--st-teal-deep);
+  border: 1px solid #B8DCDC;
+}
+
+/* ───────── FORM ───────── */
+#Settings_Page .st-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+#Settings_Page .st-form-group { display: flex; flex-direction: column; gap: 7px; }
+#Settings_Page .st-form-group.is-full { grid-column: 1 / -1; }
+#Settings_Page .st-form-label {
+  font: 700 10.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+#Settings_Page .st-input,
+#Settings_Page .st-select {
+  padding: 10px 12px;
+  background: var(--st-bg-soft);
+  border: 1px solid #DDE3E5;
+  border-radius: var(--st-radius-xs);
+  font: 500 13px 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: var(--st-ink);
+  outline: 0;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms;
+  box-sizing: border-box;
+  width: 100%;
+}
+#Settings_Page .st-input:hover,
+#Settings_Page .st-select:hover {
+  border-color: #C5CDD3;
+  background: white;
+}
+#Settings_Page .st-input:focus,
+#Settings_Page .st-select:focus {
+  border-color: var(--st-teal);
+  box-shadow: 0 0 0 3px rgba(0,128,128,0.10);
+  background: white;
+}
+#Settings_Page .st-input:disabled,
+#Settings_Page .st-select:disabled {
+  background: var(--st-bg-soft);
+  color: var(--st-ink-3);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+#Settings_Page .st-help {
+  font: 500 11.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-4);
+  margin: 6px 0 0;
+}
+
+/* Form actions row */
+#Settings_Page .st-form-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--st-border);
+}
+
+/* ───────── INFO PANEL (Password requirements etc) ───────── */
+#Settings_Page .st-info-panel {
+  display: flex; gap: 14px;
+  padding: 16px 18px;
+  background: var(--st-bg-soft);
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  margin-bottom: 18px;
+}
+#Settings_Page .st-info-ico {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  flex-shrink: 0;
+  font-size: 13px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Settings_Page .st-info-text { min-width: 0; }
+#Settings_Page .st-info-title {
+  margin: 0 0 4px;
+  font: 700 12.5px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink);
+  letter-spacing: -0.005em;
+}
+#Settings_Page .st-info-text ul {
+  margin: 0;
+  padding-left: 18px;
+  font: 500 12px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-3);
+  line-height: 1.65;
+}
+
+/* ───────── THEME SWITCHER (pill) ───────── */
+#Settings_Page .st-theme-switcher {
+  display: inline-flex;
+  background: var(--st-bg-soft);
+  border: 1px solid var(--st-border);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+}
+#Settings_Page .st-theme-option {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 600 12.5px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.005em;
+  color: var(--st-ink-3);
+  transition: background 160ms cubic-bezier(0.22, 1, 0.36, 1),
+              color 160ms,
+              box-shadow 160ms;
+}
+#Settings_Page .st-theme-option i { font-size: 11px; }
+#Settings_Page .st-theme-option:hover { color: var(--st-ink); }
+#Settings_Page .st-theme-option.is-active {
+  background: white;
+  color: var(--st-ink);
+  box-shadow: 0 1px 2px rgba(15,23,31,0.10), 0 0 0 1px rgba(15,23,31,0.04);
+}
+#Settings_Page .st-theme-option.is-active i { color: var(--st-teal-deep); }
+
+/* Workspace chip in profile-card */
+#Settings_Page .st-workspace-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-left: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font: 700 10px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  color: var(--st-teal-deep);
+  border: 1px solid #B8DCDC;
+}
+#Settings_Page .st-workspace-chip i { font-size: 8px; }
+
+/* ───────── COMING SOON CARD ───────── */
+#Settings_Page .st-soon-card {
+  text-align: center;
+  padding: 44px 24px;
+  background: linear-gradient(180deg, var(--st-bg-soft) 0%, white 100%);
+  border: 1px dashed var(--st-border-strong);
+  border-radius: var(--st-radius-sm);
+}
+#Settings_Page .st-soon-ico {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  margin: 0 auto 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
+  border: 1px solid #B8DCDC;
+  color: #006B6C;
+  font-size: 22px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+#Settings_Page .st-soon-card h3 {
+  margin: 0 0 6px;
+  font: 700 15px 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.005em;
+  color: var(--st-ink);
+}
+#Settings_Page .st-soon-card p {
+  margin: 0 auto;
+  max-width: 420px;
+  font: 500 13px 'Plus Jakarta Sans', sans-serif;
+  color: var(--st-ink-3);
+  line-height: 1.55;
+}
+
+/* ───────── MOBILE ───────── */
+@media (max-width: 1024px) {
+  #Settings_Page .st-layout { grid-template-columns: 1fr; }
+  #Settings_Page .st-nav { position: static; }
+  #Settings_Page .st-form-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  #Settings_Page { padding: 14px; }
+  #Settings_Page .st-header { padding: 12px 14px; flex-wrap: wrap; }
+  #Settings_Page .st-row { flex-direction: column; align-items: stretch; }
+  #Settings_Page .st-row-actions { justify-content: flex-end; }
+}

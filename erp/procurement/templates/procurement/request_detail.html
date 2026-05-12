@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 
+{% load i18n %}
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <div class="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -34,14 +35,14 @@
         </div>
 
         <div class="px-4 py-5 sm:px-6">
-            <h4 class="text-lg font-medium text-gray-900 mb-4">Items</h4>
+            <h4 class="text-lg font-medium text-gray-900 mb-4">{% trans "Items" %}</h4>
             <table class="min-w-full divide-y divide-gray-200 border">
                 <thead>
                     <tr>
-                        <th class="px-4 py-2 text-left">Item</th>
-                        <th class="px-4 py-2 text-left">Quantity</th>
-                        <th class="px-4 py-2 text-left">Unit</th>
-                        <th class="px-4 py-2 text-left">Est. Price</th>
+                        <th class="px-4 py-2 text-left">{% trans "Item" %}</th>
+                        <th class="px-4 py-2 text-left">{% trans "Quantity" %}</th>
+                        <th class="px-4 py-2 text-left">{% trans "Unit" %}</th>
+                        <th class="px-4 py-2 text-left">{% trans "Est. Price" %}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">

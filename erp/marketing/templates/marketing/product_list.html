@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -24,9 +25,10 @@
 .pl-list .pr-img { background: #F4F7FB; padding: 0; overflow: hidden; }
 .pl-list .pr-img::after { display: none; }
 
-/* Tab line animation + kill scrollbar arrows */
+/* Tab line animation + kill scrollbar arrows.
+   On <= 1024px the mobile responsive overlay turns this into a
+   horizontal scroller; we no longer force overflow-x: visible here. */
 .pl-tabs {
-  overflow-x: visible !important;
   scrollbar-width: none;
   position: relative;
 }
@@ -159,26 +161,26 @@
   <header class="pl-head">
     <div class="pl-head-l">
       <div>
-        <div class="pl-eyebrow">CATALOG</div>
-        <h1 class="pl-title">Products</h1>
+        <div class="pl-eyebrow">{% trans "CATALOG" %}</div>
+        <h1 class="pl-title">{% trans "Products" %}</h1>
       </div>
       <span class="pl-meta-pill">
         <i data-lucide="package"></i>
-        <span><b>{{ total_products_count|default:0 }}</b> products</span>
+        <span><b>{{ total_products_count|default:0 }}</b> {% trans "products" %}</span>
         <span class="dot-sep"></span>
-        <span><b>{{ total_variants_count|default:0 }}</b> variants</span>
+        <span><b>{{ total_variants_count|default:0 }}</b> {% trans "variants" %}</span>
         <span class="dot-sep"></span>
-        <span><b>{{ low_stock_count|default:0 }}</b> low stock</span>
+        <span><b>{{ low_stock_count|default:0 }}</b> {% trans "low stock" %}</span>
         <span class="dot-sep"></span>
-        <span><b>{{ out_of_stock_count|default:0 }}</b> out of stock</span>
+        <span><b>{{ out_of_stock_count|default:0 }}</b> {% trans "out of stock" %}</span>
       </span>
     </div>
     <div class="pl-head-r">
       <button class="pl-btn ghost" type="button" onclick="document.getElementById('csvModal').classList.add('show')">
-        <i data-lucide="upload"></i><span>Import</span>
+        <i data-lucide="upload"></i><span>{% trans "Import" %}</span>
       </button>
       <a class="pl-btn primary" href="{% url 'marketing:product_create' %}">
-        <i data-lucide="plus"></i><span>Add product</span>
+        <i data-lucide="plus"></i><span>{% trans "Add product" %}</span>
       </a>
     </div>
   </header>
@@ -190,7 +192,7 @@
             class="pl-tab {% if active_category == 'all' or not active_category %}active{% endif %}"
             data-cat="all"
             onclick="filterByCategory('all', event)">
-      All
+      {% trans "All" %}
       <span class="pl-tab-count">{{ total_products_count }}</span>
     </button>
     {% for cat in category_filters %}
@@ -209,7 +211,7 @@
     <div class="pl-search">
       <i data-lucide="search"></i>
       <input type="text" id="instantSearch" name="search"
-             placeholder="Search by product name, SKU or barcode…"
+             placeholder="{% trans 'Search by product name, SKU or barcode…' %}"
              value="{{ request.GET.search }}"
              autocomplete="off"
              hx-get="{% url 'marketing:product_list' %}"
@@ -224,13 +226,13 @@
 
     <div class="pl-toolbar-r">
       <div class="pl-sort">
-        <span class="pl-sort-l">Sort</span>
+        <span class="pl-sort-l">{% trans "Sort" %}</span>
         <select name="sort" onchange="this.form && this.form.submit()">
-          <option value="updated">Recently updated</option>
-          <option value="name">By name</option>
-          <option value="price-asc">Price ↑</option>
-          <option value="price-desc">Price ↓</option>
-          <option value="stock">Stock</option>
+          <option value="updated">{% trans "Recently updated" %}</option>
+          <option value="name">{% trans "By name" %}</option>
+          <option value="price-asc">{% trans "Price ↑" %}</option>
+          <option value="price-desc">{% trans "Price ↓" %}</option>
+          <option value="stock">{% trans "Stock" %}</option>
         </select>
       </div>
     </div>
@@ -239,11 +241,11 @@
   {# ==================== RESULT META ==================== #}
   <div class="pl-meta">
     <span class="pl-result">
-      <b id="plResultCount">{{ products|length }}</b> products shown
+      <b id="plResultCount">{{ products|length }}</b> {% trans "products shown" %}
     </span>
     <label class="pl-checkall">
       <input type="checkbox" id="selectAllCheckbox" onclick="toggleAllProductCheckboxes(this)">
-      <span>Select all</span>
+      <span>{% trans "Select all" %}</span>
     </label>
   </div>
 
@@ -258,10 +260,10 @@
 {# ==================== BULK ACTION BAR (sticky bottom) ==================== #}
 <div class="pl-bulk" id="bulkActions" style="display: none;">
   <span class="pl-bulk-l">
-    <button class="pl-bulk-x" type="button" onclick="clearSelection()" title="Clear selection">
+    <button class="pl-bulk-x" type="button" onclick="clearSelection()" title="{% trans 'Clear selection' %}">
       <i data-lucide="x"></i>
     </button>
-    <span><b id="selectedCount">0</b> products selected</span>
+    <span><b id="selectedCount">0</b> {% trans "products selected" %}</span>
   </span>
   <div class="pl-bulk-r">
     <button class="pl-bulk-btn" type="button" onclick="alert('Publish — coming soon')">
@@ -281,7 +283,7 @@
 <div class="modal-backdrop" id="csvModal">
   <div class="modal-card" style="max-width: 520px;">
     <div class="modal-icon info"><i class="fas fa-file-import"></i></div>
-    <h3 class="modal-title">Import stock update</h3>
+    <h3 class="modal-title">{% trans "Import stock update" %}</h3>
     <p class="modal-desc">Upload a CSV or Excel file with SKU + Quantity columns to bulk-update variant stock.</p>
 
     <div id="importDropZone"
@@ -314,7 +316,7 @@
     <div id="importResults" style="display: none; margin-bottom: 18px;"></div>
 
     <div class="modal-actions" style="justify-content: space-between;">
-      <button class="btn-secondary" type="button" onclick="closeImportModal()">Cancel</button>
+      <button class="btn-secondary" type="button" onclick="closeImportModal()">{% trans "Cancel" %}</button>
       <button id="importBtn" class="btn-primary" type="button" disabled onclick="uploadImportFile()">
         <i class="fas fa-upload"></i> Upload &amp; update
       </button>
@@ -326,22 +328,20 @@
 <div class="modal-backdrop" id="bulkDeleteModal">
   <div class="modal-card">
     <div class="modal-icon danger"><i class="fa fa-exclamation-triangle"></i></div>
-    <h3 class="modal-title">Delete products</h3>
+    <h3 class="modal-title">{% trans "Delete products" %}</h3>
     <p class="modal-desc">
       Are you sure you want to delete <strong id="bulkDelCount">0</strong> selected products?
       This action cannot be undone.
     </p>
     <div class="modal-actions">
       <button class="btn-secondary" type="button"
-              onclick="document.getElementById('bulkDeleteModal').classList.remove('show')">
-        Cancel
-      </button>
+              onclick="document.getElementById('bulkDeleteModal').classList.remove('show')">{% trans "Cancel" %}</button>
       <button class="btn-danger" type="button"
               hx-post="{% url 'marketing:product_bulk_delete' %}"
               hx-trigger="click"
               hx-include="#bulkForm input[name='product_ids']:checked"
               hx-target="body">
-        Yes, delete all
+        {% trans "Yes, delete all" %}
       </button>
     </div>
   </div>

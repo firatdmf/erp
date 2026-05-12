@@ -325,17 +325,21 @@ function renderCmdResults(menuResults, dbResults) {
                 <div class="result-group-title">
                     <i class="fas ${icon}"></i> ${type}s
                 </div>
-                ${items.map(item => `
+                ${items.map(item => {
+                    const useThumb = item.image && type === 'Product';
+                    const leading = useThumb
+                        ? `<div class="result-item-thumb"><img src="${item.image}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\\'fas fa-box\\'></i>'"></div>`
+                        : `<div class="result-item-icon ${cssClass}"><i class="fas ${item.icon}"></i></div>`;
+                    return `
                     <div class="result-item" onclick="window.location.href='${item.url}'">
-                        <div class="result-item-icon ${cssClass}">
-                            <i class="fas ${item.icon}"></i>
-                        </div>
+                        ${leading}
                         <div class="result-item-info">
                             <div class="result-item-name">${item.name}</div>
                             <div class="result-item-meta">${item.detail || ''}</div>
                         </div>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         `;
     }

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -528,7 +529,7 @@
                 <button type="button" class="date-tab {% if days_filter == '9999' %}active{% endif %}"
                     hx-get="{% url 'accounting:sales_dashboard' %}?days=9999{% if search_query %}&search={{ search_query }}{% endif %}"
                     hx-target="#dashboard-content" hx-swap="innerHTML" hx-indicator="#dashboard-content"
-                    onclick="updateActiveTab(this)">All Time</button>
+                    onclick="updateActiveTab(this)">{% trans "All Time" %}</button>
             </div>
         </div>
         <div class="search-box">

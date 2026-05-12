@@ -1,4 +1,5 @@
 {% load humanize %}
+{% load i18n %}
 {# Single note card - used for both display and edit modes #}
 {# Context: note, editing (bool), active_tab #}
 
@@ -28,30 +29,30 @@
 
             <div class="edit-row">
                 <div>
-                    <label class="edit-label">Category</label>
+                    <label class="edit-label">{% trans "Category" %}</label>
                     <select name="category" class="edit-select">
-                        <option value="work" {% if note.category == 'work' %}selected{% endif %}>Work</option>
-                        <option value="personal" {% if note.category == 'personal' %}selected{% endif %}>Personal</option>
-                        <option value="important" {% if note.category == 'important' %}selected{% endif %}>Important
+                        <option value="work" {% if note.category == 'work' %}selected{% endif %}>{% trans "Work" %}</option>
+                        <option value="personal" {% if note.category == 'personal' %}selected{% endif %}>{% trans "Personal" %}</option>
+                        <option value="important" {% if note.category == 'important' %}selected{% endif %}>{% trans "Important" %}
                         </option>
-                        <option value="ideas" {% if note.category == 'ideas' %}selected{% endif %}>Ideas</option>
-                        <option value="meeting" {% if note.category == 'meeting' %}selected{% endif %}>Meeting</option>
+                        <option value="ideas" {% if note.category == 'ideas' %}selected{% endif %}>{% trans "Ideas" %}</option>
+                        <option value="meeting" {% if note.category == 'meeting' %}selected{% endif %}>{% trans "Meeting" %}</option>
                     </select>
                 </div>
                 <div>
-                    <label class="edit-label">Priority</label>
+                    <label class="edit-label">{% trans "Priority" %}</label>
                     <select name="priority" class="edit-select">
-                        <option value="high" {% if note.priority == 'high' %}selected{% endif %}>High Priority</option>
-                        <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>Medium Priority
+                        <option value="high" {% if note.priority == 'high' %}selected{% endif %}>{% trans "High Priority" %}</option>
+                        <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>{% trans "Medium Priority" %}
                         </option>
-                        <option value="low" {% if note.priority == 'low' %}selected{% endif %}>Low Priority</option>
+                        <option value="low" {% if note.priority == 'low' %}selected{% endif %}>{% trans "Low Priority" %}</option>
                     </select>
                 </div>
             </div>
 
             <!-- File Management -->
             <div class="edit-file-row">
-                <label class="edit-label" style="margin-bottom:0;">Add File</label>
+                <label class="edit-label" style="margin-bottom:0;">{% trans "Add File" %}</label>
                 <button type="button" class="edit-upload-btn"
                     onclick="this.closest('form').querySelector('.edit-file-hidden').click()">
                     <i class="fas fa-cloud-upload-alt"></i> Choose File

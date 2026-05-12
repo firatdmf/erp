@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
   {% load static %}
   {% block css %}
@@ -16,9 +17,9 @@
       <table class="packing-list-table">
         <thead>
           <tr>
-            <th>Pack Number</th>
-            {% comment %} <th>Created At</th> {% endcomment %}
-            <th>Items in Pack</th>
+            <th>{% trans "Pack Number" %}</th>
+            {% comment %} <th>{% trans "Created At" %}</th> {% endcomment %}
+            <th>{% trans "Items in Pack" %}</th>
           </tr>
         </thead>
         <tbody>

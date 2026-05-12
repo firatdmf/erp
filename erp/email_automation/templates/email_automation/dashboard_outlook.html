@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -114,10 +115,10 @@
           <h2><i class="fa fa-paper-plane"></i> Sent Emails</h2>
           <div class="view-actions">
             <select class="form-select" id="dateFilter">
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="all" selected>All Time</option>
+              <option value="today">{% trans "Today" %}</option>
+              <option value="week">{% trans "This Week" %}</option>
+              <option value="month">{% trans "This Month" %}</option>
+              <option value="all" selected>{% trans "All Time" %}</option>
             </select>
           </div>
         </div>

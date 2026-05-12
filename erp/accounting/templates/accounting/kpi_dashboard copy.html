@@ -1,10 +1,11 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 {% block css %}
   {% comment %} <link rel="stylesheet" href="{% static 'accounting/index.css' %}" /> {% endcomment %}
 {% endblock %}
 {% block content %}
-  <h1>KPI Dashboard</h1>
+  <h1>{% trans "KPI Dashboard" %}</h1>
   <ul>
     <li>Balance: ${{ balance }}</li>
     <li>In: ${{ money_in }}</li>

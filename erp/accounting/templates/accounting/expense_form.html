@@ -1,11 +1,12 @@
 <!-- templates/expense_form.html -->
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
-  <h1>Report Expense</h1>
+  <h1>{% trans "Report Expense" %}</h1>
   <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit">Submit</button>
+    <button type="submit">{% trans "Submit" %}</button>
   </form>
 
   <script>

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
 {% load static %}
 {% comment %} {% load custom_tags %} {% endcomment %}
@@ -13,11 +14,11 @@
   <p>
     <a href="{% url 'todo:task_report' %}">See Task Report</a>
   </p>
-  <h1>Create Task</h1>
+  <h1>{% trans "Create Task" %}</h1>
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {{ form.as_p }}
-    <button type="submit" onclick="">Create Task</button>
+    <button type="submit" onclick="">{% trans "Create Task" %}</button>
   </form>
 </div>
 {% endblock %}

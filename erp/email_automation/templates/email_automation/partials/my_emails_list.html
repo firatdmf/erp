@@ -1,3 +1,4 @@
+{% load i18n %}
 <!-- List Header -->
 <div class="em-list-header">
     <label><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"> Select all</label>
@@ -81,7 +82,7 @@
 {% empty %}
 <div class="em-empty-state">
     <div class="em-empty-icon"><i class="fas fa-inbox"></i></div>
-    <h3>No emails here</h3>
+    <h3>{% trans "No emails here" %}</h3>
     <p>This folder is empty. Emails will appear here once received.</p>
 </div>
 {% endfor %}

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 
 {% block css %}
@@ -319,7 +320,7 @@
 
   <!-- Header (Compact & Clean) -->
   <div class="email-dashboard-header">
-    <h1>Email Automation</h1>
+    <h1>{% trans "Email Automation" %}</h1>
     <p>Manage your automated outreach campaigns and track results.</p>
   </div>
 
@@ -341,13 +342,13 @@
       </div>
       <div class="status-details">
         {% if email_account %}
-        <h2>Gmail Connected</h2>
+        <h2>{% trans "Gmail Connected" %}</h2>
         <div class="status-badge">
           <span class="status-dot" style="background: #10b981;"></span>
           {{ email_account.email_address }}
         </div>
         {% else %}
-        <h2>Gmail Not Connected</h2>
+        <h2>{% trans "Gmail Not Connected" %}</h2>
         <div class="status-badge">
           <span class="status-dot" style="background: #94a3b8;"></span>
           System Offline
@@ -416,7 +417,7 @@
           <i class="fa-solid fa-file-lines"></i>
         </div>
         <div class="action-content">
-          <h3>Manage Templates</h3>
+          <h3>{% trans "Manage Templates" %}</h3>
           <p>Create and edit email templates.</p>
         </div>
       </a>
@@ -426,7 +427,7 @@
           <i class="fa-solid fa-list-check"></i>
         </div>
         <div class="action-content">
-          <h3>View Campaigns</h3>
+          <h3>{% trans "View Campaigns" %}</h3>
           <p>Monitor active campaigns.</p>
         </div>
       </a>
@@ -436,7 +437,7 @@
           <i class="fa-solid fa-inbox"></i>
         </div>
         <div class="action-content">
-          <h3>Check Inbox</h3>
+          <h3>{% trans "Check Inbox" %}</h3>
           <p>View prospect replies.</p>
         </div>
       </a>
@@ -446,7 +447,7 @@
           <i class="fa-solid fa-envelope"></i>
         </div>
         <div class="action-content">
-          <h3>My Emails</h3>
+          <h3>{% trans "My Emails" %}</h3>
           <p>Access work emails.</p>
         </div>
       </a>

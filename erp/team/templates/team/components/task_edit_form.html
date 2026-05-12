@@ -1,38 +1,39 @@
+{% load i18n %}
 <form id="teamTaskEditForm" method="post" action="{% url 'team:edit_task' task.id %}"
     onsubmit="handleTeamTaskEditFormSubmit(event)" enctype="multipart/form-data">
     {% csrf_token %}
 
     <div class="form-group">
-        <label for="id_name">Task name</label>
+        <label for="id_name">{% trans "Task name" %}</label>
         <input type="text" name="name" id="id_name" class="form-input" value="{{ task.title }}" {% if not can_edit
             %}disabled{% else %}required{% endif %}>
     </div>
 
     <div class="form-group">
-        <label for="id_due_date">Due date</label>
+        <label for="id_due_date">{% trans "Due date" %}</label>
         <input type="date" name="due_date" id="id_due_date" class="form-input" value="{{ task.due_date|date:'Y-m-d' }}"
             {% if not can_edit %}disabled{% endif %}>
     </div>
 
     <div class="form-group">
-        <label for="id_priority">Priority</label>
+        <label for="id_priority">{% trans "Priority" %}</label>
         <select name="priority" id="id_priority" class="form-input" {% if not can_edit %}disabled{% endif %}>
-            <option value="low" {% if task.priority=='low' %}selected{% endif %}>Low</option>
-            <option value="medium" {% if task.priority=='medium' %}selected{% endif %}>Medium</option>
-            <option value="high" {% if task.priority=='high' %}selected{% endif %}>High</option>
-            <option value="urgent" {% if task.priority=='urgent' %}selected{% endif %}>Urgent</option>
+            <option value="low" {% if task.priority=='low' %}selected{% endif %}>{% trans "Low" %}</option>
+            <option value="medium" {% if task.priority=='medium' %}selected{% endif %}>{% trans "Medium" %}</option>
+            <option value="high" {% if task.priority=='high' %}selected{% endif %}>{% trans "High" %}</option>
+            <option value="urgent" {% if task.priority=='urgent' %}selected{% endif %}>{% trans "Urgent" %}</option>
         </select>
     </div>
 
     <div class="form-group">
-        <label for="id_description">Description</label>
+        <label for="id_description">{% trans "Description" %}</label>
         <textarea name="description" id="id_description" class="form-textarea" rows="3" {% if not can_edit %}disabled{%
             else %}placeholder="Enter a description..." {% endif %}>{{ task.description }}</textarea>
     </div>
 
     <!-- Assign To Section -->
     <div class="form-group">
-        <label>Assign To</label>
+        <label>{% trans "Assign To" %}</label>
 
         <!-- Assign to Team Toggle -->
         <div style="margin-bottom: 0.5rem;">
@@ -105,7 +106,7 @@
     {% if can_edit %}
     <!-- New Attachments (Temporarily Disabled by User Request)
     <div class="form-group" style="margin-top: 1rem;">
-        <label for="id_task_files">Attachments (Google Drive)</label>
+        <label for="id_task_files">{% trans "Attachments (Google Drive)" %}</label>
         <input type="file" name="task_files" id="id_task_files" class="form-input" multiple>
         <small style="color: #64748b; font-size: 0.8rem;">Selected files will be uploaded to Google Drive</small>
     </div>
@@ -114,11 +115,11 @@
 
     <div class="sidebar-footer">
         {% if can_edit %}
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <button type="button" class="btn btn-secondary" onclick="closeTaskEditSidebar()">Cancel</button>
+        <button type="submit" class="btn btn-primary">{% trans "Save Changes" %}</button>
+        <button type="button" class="btn btn-secondary" onclick="closeTaskEditSidebar()">{% trans "Cancel" %}</button>
         {% else %}
         <button type="button" class="btn btn-secondary" onclick="closeTaskEditSidebar()"
-            style="width: 100%;">Close</button>
+            style="width: 100%;">{% trans "Close" %}</button>
         {% endif %}
     </div>
 </form>

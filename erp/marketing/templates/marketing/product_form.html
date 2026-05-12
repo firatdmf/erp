@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% load static %}
 {% load marketing_tags %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/product_form.css' %}">
+<link rel="stylesheet" href="{% static 'marketing/css/product_form_v2.css' %}?v=5">
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
 <style>
   .quill-wrap { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: #fff; }
@@ -112,7 +114,7 @@
   <div class="alert alert-danger"
     style="background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
     <h4 style="margin-top: 0; display: flex; align-items: center; gap: 10px;">
-      <i class="fa fa-exclamation-circle"></i> Please fix the following errors:
+      <i class="fa fa-exclamation-circle"></i> {% trans "Please fix the following errors:" %}
     </h4>
     <ul style="margin-bottom: 0; padding-left: 20px;">
       {% for field in form %}
@@ -136,16 +138,16 @@
         {% if not is_update %}
         Add Product
         {% else %}
-        Edit Product
+        {% trans "Edit Product" %}
         {% endif %}
       </h1>
       {% if not is_update %}
-      <span class="status-badge unsaved">Unsaved</span>
+      <span class="status-badge unsaved">{% trans "Unsaved" %}</span>
       {% endif %}
     </div>
     <div class="header-right">
-      <a href="javascript:void(0)" class="btn btn-secondary" onclick="handleDiscard(event)">Discard</a>
-      <button type="submit" form="product_form" id="save_product_btn" class="btn btn-primary save-product-btn" data-save-product>Save Product</button>
+      <a href="javascript:void(0)" class="btn btn-secondary" onclick="handleDiscard(event)">{% trans "Discard" %}</a>
+      <button type="submit" form="product_form" id="save_product_btn" class="btn btn-primary save-product-btn" data-save-product>{% trans "Save Product" %}</button>
     </div>
   </div>
 
@@ -157,9 +159,9 @@
 
       <!-- 1. General Information -->
       <div class="form-card">
-        <div class="form-card-title">General Information</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="info"></i></span>{% trans "General Information" %}</div>
         <div class="form-group">
-          <label for="id_title">Title</label>
+          <label for="id_title">{% trans "Title" %}</label>
           {{ form.title }}
         </div>
         <!-- Hidden original description field -->
@@ -171,82 +173,82 @@
             <div class="trans-tab-bar">
               <button type="button" class="trans-tab active" data-lang="en">
                 <span class="trans-tab-flag">EN</span>
-                <span class="trans-tab-name">English</span>
+                <span class="trans-tab-name">{% trans "English" %}</span>
               </button>
               <button type="button" class="trans-tab" data-lang="tr">
                 <span class="trans-tab-flag">TR</span>
-                <span class="trans-tab-name">Turkish</span>
+                <span class="trans-tab-name">{% trans "Turkish" %}</span>
               </button>
               <button type="button" class="trans-tab" data-lang="ru">
                 <span class="trans-tab-flag">RU</span>
-                <span class="trans-tab-name">Russian</span>
+                <span class="trans-tab-name">{% trans "Russian" %}</span>
               </button>
               <button type="button" class="trans-tab" data-lang="pl">
                 <span class="trans-tab-flag">PL</span>
-                <span class="trans-tab-name">Polish</span>
+                <span class="trans-tab-name">{% trans "Polish" %}</span>
               </button>
             </div>
             <div class="trans-panel active" data-lang="en">
-              <label class="trans-label">Product Name</label>
-              <input type="text" class="trans-input trans-title" data-lang="en" placeholder="Enter product name...">
-              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label">{% trans "Product Name" %}</label>
+              <input type="text" class="trans-input trans-title" data-lang="en" placeholder="{% trans 'Enter product name...' %}">
+              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-en" class="trans-desc" data-lang="en"></div>
                 <textarea id="html-source-en" class="html-source-area" data-lang="en"></textarea>
               </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Care Instructions <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Care Instructions" %} <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-care-en" class="trans-care" data-lang="en"></div>
                 <textarea id="html-care-source-en" class="html-source-area" data-lang="en"></textarea>
               </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Additional Info <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Additional Info" %} <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('en')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-extra-en" class="trans-extra" data-lang="en"></div>
                 <textarea id="html-extra-source-en" class="html-source-area" data-lang="en"></textarea>
               </div>
             </div>
             <div class="trans-panel" data-lang="tr">
-              <label class="trans-label">Product Name</label>
-              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="Urun adi giriniz...">
-              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label">{% trans "Product Name" %}</label>
+              <input type="text" class="trans-input trans-title" data-lang="tr" placeholder="{% trans 'Urun adi giriniz...' %}">
+              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-tr" class="trans-desc" data-lang="tr"></div>
                 <textarea id="html-source-tr" class="html-source-area" data-lang="tr"></textarea>
               </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Bakım Talimatları <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Care Instructions" %} <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-care-tr" class="trans-care" data-lang="tr"></div>
                 <textarea id="html-care-source-tr" class="html-source-area" data-lang="tr"></textarea>
               </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Ek Bilgi <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Additional Info" %} <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('tr')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-extra-tr" class="trans-extra" data-lang="tr"></div>
                 <textarea id="html-extra-source-tr" class="html-source-area" data-lang="tr"></textarea>
               </div>
             </div>
             <div class="trans-panel" data-lang="ru">
-              <label class="trans-label">Product Name</label>
+              <label class="trans-label">{% trans "Product Name" %}</label>
               <input type="text" class="trans-input trans-title" data-lang="ru" placeholder="Введите название продукта...">
-              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-ru" class="trans-desc" data-lang="ru"></div>
                 <textarea id="html-source-ru" class="html-source-area" data-lang="ru"></textarea>
               </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Инструкции по уходу <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Care Instructions" %} <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-care-ru" class="trans-care" data-lang="ru"></div>
                 <textarea id="html-care-source-ru" class="html-source-area" data-lang="ru"></textarea>
               </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Дополнительная информация <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Additional Info" %} <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-extra-ru" class="trans-extra" data-lang="ru"></div>
                 <textarea id="html-extra-source-ru" class="html-source-area" data-lang="ru"></textarea>
               </div>
             </div>
             <div class="trans-panel" data-lang="pl">
-              <label class="trans-label">Product Name</label>
-              <input type="text" class="trans-input trans-title" data-lang="pl" placeholder="Wprowadz nazwe produktu...">
-              <label class="trans-label" style="display:flex;align-items:center;">Description <button type="button" class="html-source-btn" onclick="toggleHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
+              <label class="trans-label">{% trans "Product Name" %}</label>
+              <input type="text" class="trans-input trans-title" data-lang="pl" placeholder="{% trans 'Wprowadz nazwe produktu...' %}">
+              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
               <div class="quill-wrap">
                 <div id="quill-pl" class="trans-desc" data-lang="pl"></div>
                 <textarea id="html-source-pl" class="html-source-area" data-lang="pl"></textarea>
@@ -269,10 +271,10 @@
       <!-- 2. Media -->
       <div class="form-card" id="product_images_section">
         <div class="form-card-header">
-          <div class="form-card-title">Media</div>
+          <div class="form-card-title"><span class="form-card-ico"><i data-lucide="image"></i></span>{% trans "Media" %}</div>
           {% if product %}
           <button type="button" id="openFileManagerBtn" class="btn-link">
-            <i class="fa fa-plus"></i> Add from URL
+            <i class="fa fa-plus"></i> {% trans "Add from URL" %}
           </button>
           {% endif %}
         </div>
@@ -280,18 +282,18 @@
         {% if product %}
         <div id="variants_image_notice" class="info-notice" style="display: none;">
           <i class="fa fa-info-circle"></i>
-          <span>Product images are synced from the first variant.</span>
+          <span>{% trans "Product images are synced from the first variant." %}</span>
         </div>
 
         <!-- Bulk Actions Toolbar (hidden until selection mode) -->
         <div id="media_bulk_toolbar" class="media-bulk-toolbar" style="display: none;">
           <label class="bulk-select-all">
             <input type="checkbox" id="select_all_images" onchange="toggleSelectAllImages(this)">
-            <span>Select All</span>
+            <span>{% trans "Select All" %}</span>
           </label>
-          <span id="selected_count" class="selected-count">0 selected</span>
+          <span id="selected_count" class="selected-count">{% trans "0 selected" %}</span>
           <button type="button" class="btn-bulk-delete" id="delete_selected_btn" onclick="deleteSelectedImages()">
-            <i class="fa fa-trash"></i> Delete Selected
+            <i class="fa fa-trash"></i> {% trans "Delete Selected" %}
           </button>
         </div>
 
@@ -320,11 +322,11 @@
                 <div class="drag-handle"><i class="fa fa-grip-vertical"></i></div>
               </div>
               {% if not file.is_video %}
-              <button type="button" class="set-primary-btn" data-file-id="{{ file.pk }}" onclick="event.stopPropagation(); setPrimaryImage({{ file.pk }});" title="Set as primary image">
+              <button type="button" class="set-primary-btn" data-file-id="{{ file.pk }}" onclick="event.stopPropagation(); setPrimaryImage({{ file.pk }});" title="{% trans 'Set as primary image' %}">
                 <i class="fa fa-star"></i>
               </button>
               {% endif %}
-              <div class="primary-tag" {% if product.primary_image_id != file.pk %}style="display:none"{% endif %}>Primary</div>
+              <div class="primary-tag" {% if product.primary_image_id != file.pk %}style="display:none"{% endif %}>{% trans "Primary" %}</div>
             </div>
             {% endif %}
             {% endfor %}
@@ -333,7 +335,7 @@
             <div class="media-upload-placeholder" onclick="document.getElementById('openFileManagerBtn').click()">
               <div class="placeholder-content">
                 <i class="fa fa-images"></i>
-                <span>Add Media</span>
+                <span>{% trans "Add Media" %}</span>
               </div>
             </div>
           </div>
@@ -356,19 +358,19 @@
             </div>
             <div class="primary-picker-info">
               <div class="primary-picker-label">
-                <i class="fa fa-star" style="color: #f59e0b;"></i> Primary Image
+                <i class="fa fa-star" style="color: #f59e0b;"></i> {% trans "Primary Image" %}
               </div>
-              <span class="primary-picker-hint">Displayed on the product card</span>
+              <span class="primary-picker-hint">{% trans "Displayed on the product card" %}</span>
             </div>
             <button type="button" class="btn-change-primary" onclick="togglePrimaryPicker()">
-              <i class="fa fa-pen"></i> Change
+              <i class="fa fa-pen"></i> {% trans "Change" %}
             </button>
           </div>
 
           <!-- Expandable selection grid -->
           <div class="primary-picker-selection" id="primary_picker_selection" style="display: none;">
             <div class="primary-picker-selection-header">
-              <span>Select an image</span>
+              <span>{% trans "Select an image" %}</span>
               <button type="button" class="primary-picker-close" onclick="togglePrimaryPicker()">
                 <i class="fa fa-times"></i>
               </button>
@@ -393,10 +395,8 @@
         <div class="media-empty-state">
           <div class="empty-content">
             <i class="fa fa-image"></i>
-            <button type="button" id="openFileManagerBtnCreate" class="btn btn-secondary">
-              Upload New
-            </button>
-            <span class="help-text">Accepts images, videos, or 3D models</span>
+            <button type="button" id="openFileManagerBtnCreate" class="btn btn-secondary">{% trans "Upload New" %}</button>
+            <span class="help-text">{% trans "Accepts images, videos, or 3D models" %}</span>
           </div>
 
           <div id="sortable_images" class="media-grid mt-3">
@@ -413,8 +413,8 @@
 
       <!-- 6. Variants (PRESERVED) -->
       <div class="form-card">
-        <div class="form-card-title">Variants</div>
-        <div class="form-description">Add options like size or color to create variants for this product.</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="layers"></i></span>{% trans "Variants" %}</div>
+        <div class="form-description">{% trans "Add options like size or color to create variants for this product." %}</div>
         {% variant_form current_url=request.path product=product variants=variants %}
       </div>
 
@@ -422,10 +422,10 @@
       <div class="form-card" id="manufacturing_section">
         <div class="form-card-header">
           <div class="form-card-title">
-            <i class="fa fa-industry"></i> Manufacturing Recipe (BOM)
+            <span class="form-card-ico"><i data-lucide="factory"></i></span>Manufacturing Recipe (BOM)
           </div>
           <div class="toggle-item" style="margin: 0; gap: 10px;">
-            <span class="toggle-label" style="font-size: 0.9rem; font-weight: 500;">Track Manufacturing</span>
+            <span class="toggle-label" style="font-size: 0.9rem; font-weight: 500;">{% trans "Track Manufacturing" %}</span>
             <label class="switch-container">
               <input type="checkbox" id="track_manufacturing_toggle" name="track_manufacturing" {% if product and product.bill_of_materials and product.bill_of_materials.track_manufacturing %}checked{% endif %}>
               <span class="switch-slider"></span>
@@ -440,7 +440,7 @@
               <i class="fa fa-search input-icon"
                 style="left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; position: absolute;"></i>
               <input type="text" id="bom_material_search" class="form-input"
-                placeholder="Search raw materials to add..." style="padding-left: 2.5rem;">
+                placeholder="{% trans 'Search raw materials to add...' %}" style="padding-left: 2.5rem;">
             </div>
             <div id="bom_search_results" class="dropdown-menu"
               style="display: none; position: absolute; width: 100%; max-height: 200px; overflow-y: auto; z-index: 100; border: 1px solid #e5e7eb; border-radius: 6px; background: white; margin-top: 5px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
@@ -452,10 +452,10 @@
             <table class="modern-table" id="bom_table">
               <thead>
                 <tr>
-                  <th style="width: 40%;">Raw Material</th>
-                  <th style="width: 20%;">Qty Used</th>
-                  <th style="width: 20%;">Unit Cost</th>
-                  <th style="width: 15%;">Total Cost</th>
+                  <th style="width: 40%;">{% trans "Raw Material" %}</th>
+                  <th style="width: 20%;">{% trans "Qty Used" %}</th>
+                  <th style="width: 20%;">{% trans "Unit Cost" %}</th>
+                  <th style="width: 15%;">{% trans "Total Cost" %}</th>
                   <th style="width: 5%;"></th>
                 </tr>
               </thead>
@@ -498,7 +498,7 @@
               <tfoot>
                 <tr style="background-color: #f9fafb;">
                   <td colspan="3" class="text-right" style="text-align: right; padding-right: 1rem; font-weight: 600;">
-                    Total Material Cost per Unit:</td>
+                    {% trans "Total Material Cost per Unit:" %}</td>
                   <td colspan="2" style="font-size: 1.1rem; font-weight: 700; color: #111827;" id="bom_grand_total">
                     $0.00</td>
                 </tr>
@@ -509,7 +509,7 @@
           <!-- Empty State -->
           <div id="bom_empty_state" style="text-align: center; padding: 2rem; color: #6b7280; display: none;">
             <i class="fa fa-flask" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
-            <p>No materials added. Search above to create a recipe.</p>
+            <p>{% trans "No materials added. Search above to create a recipe." %}</p>
           </div>
         </div>
       </div>
@@ -525,12 +525,12 @@
 
       <!-- Sales Channels -->
       <div class="form-card sidebar-card">
-        <div class="form-card-title">Sales Channels</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="radio-tower"></i></span>{% trans "Sales Channels" %}</div>
 
         <div class="toggle-item">
           <div class="toggle-info">
-            <span class="toggle-label">Online Store</span>
-            <span class="toggle-desc">Listed on website</span>
+            <span class="toggle-label">{% trans "Online Store" %}</span>
+            <span class="toggle-desc">{% trans "Listed on website" %}</span>
           </div>
           <label class="switch-container">
             {{ form.featured }}
@@ -542,8 +542,8 @@
 
         <div class="toggle-item">
           <div class="toggle-info">
-            <span class="toggle-label">Point of Sale</span>
-            <span class="toggle-desc">Selling policy enabled</span>
+            <span class="toggle-label">{% trans "Point of Sale" %}</span>
+            <span class="toggle-desc">{% trans "Selling policy enabled" %}</span>
           </div>
           <label class="switch-container">
             {{ form.selling_while_out_of_stock }}
@@ -554,26 +554,105 @@
 
       <!-- Pricing (Moved to Sidebar) -->
       <div class="form-card sidebar-card">
-        <div class="form-card-title">Pricing</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="tag"></i></span>{% trans "Pricing" %}</div>
         <div class="form-row">
           <div class="form-group">
-            <label for="id_price">Price</label>
+            <label for="id_price">{% trans "Price" %}</label>
             {{ form.price }}
           </div>
           <div class="form-group">
-            <label for="id_cost">Cost per item</label>
+            <label for="id_cost">{% trans "Cost per item" %}</label>
             {{ form.cost }}
           </div>
         </div>
       </div>
 
+      {# ============ CAMPAIGN / DISCOUNT ============ #}
+      <div class="form-card sidebar-card" id="campaign_card">
+        <div class="form-card-title">
+          <span class="form-card-ico"><i data-lucide="badge-percent"></i></span>
+          {% trans "Campaign / Discount" %}
+        </div>
+        <p class="cmp-help">
+          {% blocktrans %}Add <b>one</b> kind of campaign to this product. Either a flat percentage discount with an end date, OR volume-tier (bulk) pricing where the price drops as the buyer orders more.{% endblocktrans %}
+        </p>
+
+        <!-- Hidden state holders submitted with the form -->
+        <input type="hidden" name="campaign_type" id="cmp_type"
+               value="{{ campaign.campaign_type|default:'none' }}">
+        <input type="hidden" name="campaign_tiers_json" id="cmp_tiers_json" value="">
+
+        <!-- Type picker -->
+        <div class="cmp-types" role="tablist" aria-label="Campaign type">
+          <button type="button" class="cmp-type" data-type="none">
+            <i data-lucide="ban"></i><span>{% trans "None" %}</span>
+            <small>{% trans "No discount" %}</small>
+          </button>
+          <button type="button" class="cmp-type" data-type="percentage">
+            <i data-lucide="percent"></i><span>{% trans "Flat % off" %}</span>
+            <small>{% trans "Until a date" %}</small>
+          </button>
+          <button type="button" class="cmp-type" data-type="volume">
+            <i data-lucide="layers"></i><span>{% trans "Volume tiers" %}</span>
+            <small>{% trans "By quantity" %}</small>
+          </button>
+        </div>
+
+        <!-- Percentage panel -->
+        <div class="cmp-panel" data-panel="percentage" hidden>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cmp_percent">{% trans "Discount (%)" %}</label>
+              <input type="number" name="campaign_discount_percent"
+                     id="cmp_percent" class="form-control"
+                     min="0" max="100" step="0.01"
+                     placeholder="{% trans 'e.g. 15' %}"
+                     value="{% if campaign.campaign_type == 'percentage' %}{{ campaign.discount_percent|stringformat:'g' }}{% endif %}">
+            </div>
+            <div class="form-group">
+              <label for="cmp_end_date">{% trans "Ends on" %}</label>
+              <input type="date" name="campaign_end_date"
+                     id="cmp_end_date" class="form-control"
+                     value="{% if campaign.campaign_type == 'percentage' and campaign.end_date %}{{ campaign.end_date|date:'Y-m-d' }}{% endif %}">
+            </div>
+          </div>
+          <p class="cmp-hint">
+            <i data-lucide="info"></i>
+            Whole catalog price will drop by this % until the chosen
+            end date (inclusive).
+          </p>
+        </div>
+
+        <!-- Volume tiers panel -->
+        <div class="cmp-panel" data-panel="volume" hidden>
+          <div class="cmp-tier-list" id="cmp_tier_list">
+            <!-- rows injected by JS -->
+          </div>
+          <button type="button" class="cmp-add-tier" id="cmp_add_tier">
+            <i data-lucide="plus"></i> {% trans "Add tier" %}
+          </button>
+          <p class="cmp-hint">
+            <i data-lucide="info"></i>
+            Each tier is "from X units → %Y off". Leave the top tier's
+            <b>Max</b> empty to mean "X+ and above".
+          </p>
+        </div>
+
+        <!-- Existing volume tiers JSON for JS bootstrap -->
+        {% if campaign.campaign_type == 'volume' %}
+        <script id="cmp_tiers_initial" type="application/json">
+          [{% for t in campaign.tiers.all %}{"min_qty": {{ t.min_qty }}, "max_qty": {{ t.max_qty|default_if_none:'null' }}, "discount_percent": "{{ t.discount_percent }}"}{% if not forloop.last %},{% endif %}{% endfor %}]
+        </script>
+        {% endif %}
+      </div>
+
       <!-- Packaging (B2B wholesale) -->
       <div class="form-card sidebar-card">
-        <div class="form-card-title">Packaging</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="package"></i></span>{% trans "Packaging" %}</div>
         <div class="toggle-item">
           <div class="toggle-info">
-            <span class="toggle-label">Sold as a pack</span>
-            <span class="toggle-desc">e.g. pack of 12, pack of 5</span>
+            <span class="toggle-label">{% trans "Sold as a pack" %}</span>
+            <span class="toggle-desc">{% trans "e.g. pack of 12, pack of 5" %}</span>
           </div>
           <label class="switch-container">
             {{ form.is_packaged }}
@@ -582,7 +661,7 @@
         </div>
         <div class="form-row" id="pack_count_row" style="margin-top: 12px;">
           <div class="form-group" style="width: 100%;">
-            <label for="id_pack_count">Items per pack</label>
+            <label for="id_pack_count">{% trans "Items per pack" %}</label>
             {{ form.pack_count }}
           </div>
         </div>
@@ -600,10 +679,10 @@
 
       <!-- Inventory (Moved to Sidebar) -->
       <div class="form-card sidebar-card">
-        <div class="form-card-title">Inventory</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="boxes"></i></span>{% trans "Inventory" %}</div>
         <div class="form-row">
           <div class="form-group">
-            <label for="id_sku">SKU (Stock Keeping Unit)</label>
+            <label for="id_sku">{% trans "SKU (Stock Keeping Unit)" %}</label>
             {{ form.sku }}
             {% if product and product.sku %}
               {% with cat=product.category.name|default:'fabric'|lower %}
@@ -611,28 +690,28 @@
                  target="_blank" rel="noopener"
                  style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:#3b82f6;text-decoration:none;font-weight:500;">
                 <i class="fas fa-external-link-alt" style="font-size:10px;"></i>
-                View on demfirat.com
+                {% trans "View on demfirat.com" %}
               </a>
               {% endwith %}
             {% endif %}
           </div>
           <div class="form-group">
-            <label for="id_barcode">Barcode (ISBN, UPC, GTIN, etc.)</label>
+            <label for="id_barcode">{% trans "Barcode (ISBN, UPC, GTIN, etc.)" %}</label>
             {{ form.barcode }}
           </div>
         </div>
         <div style="height: 15px;"></div>
         <div class="form-row">
           <div class="form-group">
-            <label for="id_quantity">Quantity</label>
+            <label for="id_quantity">{% trans "Quantity" %}</label>
             {{ form.quantity }}
           </div>
           <div class="form-group">
-            <label for="id_unit_of_measurement">Unit</label>
+            <label for="id_unit_of_measurement">{% trans "Unit" %}</label>
             {{ form.unit_of_measurement }}
           </div>
           <div class="form-group">
-            <label for="id_minimum_inventory_level">Min. Inventory Level</label>
+            <label for="id_minimum_inventory_level">{% trans "Min. Inventory Level" %}</label>
             {{ form.minimum_inventory_level }}
           </div>
         </div>
@@ -640,14 +719,14 @@
 
       <!-- Shipping (Moved to Sidebar) -->
       <div class="form-card sidebar-card">
-        <div class="form-card-title">Shipping</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="truck"></i></span>{% trans "Shipping" %}</div>
         <div class="form-row">
           <div class="form-group">
-            <label for="id_weight">Weight</label>
+            <label for="id_weight">{% trans "Weight" %}</label>
             {{ form.weight }}
           </div>
           <div class="form-group">
-            <label for="id_unit_of_weight">Unit</label>
+            <label for="id_unit_of_weight">{% trans "Unit" %}</label>
             {{ form.unit_of_weight }}
           </div>
         </div>
@@ -656,9 +735,9 @@
       <!-- Product Attributes (Moved to Sidebar) -->
       <div class="form-card sidebar-card" id="product_attributes_section">
         <div class="form-card-header">
-          <div class="form-card-title">Product Attributes</div>
+          <div class="form-card-title"><span class="form-card-ico"><i data-lucide="list"></i></span>{% trans "Product Attributes" %}</div>
           <button type="button" class="btn-link" onclick="addProductAttribute()">
-            <i class="fa fa-plus"></i> Add Attribute
+            <i class="fa fa-plus"></i> {% trans "Add Attribute" %}
           </button>
         </div>
 
@@ -668,15 +747,15 @@
           <div class="attribute-card">
             <div class="attribute-inputs">
               <div class="attribute-input-wrapper">
-                <input type="text" class="attribute-input" name="attribute_names[]" placeholder="Name (e.g. Color)"
+                <input type="text" class="attribute-input" name="attribute_names[]" placeholder="{% trans 'Name (e.g. Color)' %}"
                   value="{{ attr.name }}" oninput="scheduleAttributeSave()" required>
               </div>
               <div class="attribute-input-wrapper">
-                <input type="text" class="attribute-input" name="attribute_values[]" placeholder="Value (e.g. Red)"
+                <input type="text" class="attribute-input" name="attribute_values[]" placeholder="{% trans 'Value (e.g. Red)' %}"
                   value="{{ attr.value }}" oninput="scheduleAttributeSave()" required>
               </div>
             </div>
-            <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
+            <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="{% trans 'Delete' %}">
               <i class="fa fa-trash"></i>
             </button>
           </div>
@@ -686,7 +765,7 @@
 
         {% if not product.attributes.all %}
         <div id="empty_attributes_placeholder" class="empty-placeholder">
-          <p>No attributes yet.</p>
+          <p>{% trans "No attributes yet." %}</p>
         </div>
         {% endif %}
 
@@ -695,12 +774,12 @@
 
       <!-- Product Organization -->
       <div class="form-card sidebar-card">
-        <div class="form-card-title">Product Organization</div>
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="folder-tree"></i></span>{% trans "Product Organization" %}</div>
 
         <div class="form-group">
           <label for="id_category" style="display:flex;align-items:center;justify-content:space-between;">
             Category
-            <button type="button" onclick="openCategoryModal()" title="Add new category"
+            <button type="button" onclick="openCategoryModal()" title="{% trans 'Add new category' %}"
               style="background:none;border:1px solid var(--border-color);border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary);font-size:14px;padding:0;line-height:1;">
               <i class="fa fa-plus"></i>
             </button>
@@ -712,14 +791,14 @@
         <div id="newCategoryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10050;align-items:center;justify-content:center;">
           <div style="background:#fff;border-radius:12px;width:90%;max-width:420px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.2);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-              <h3 style="margin:0;font-size:16px;font-weight:600;color:#111827;">New Category</h3>
+              <h3 style="margin:0;font-size:16px;font-weight:600;color:#111827;">{% trans "New Category" %}</h3>
               <button type="button" onclick="closeCategoryModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#6b7280;">&times;</button>
             </div>
-            <label style="display:block;font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px;">Name</label>
-            <input type="text" id="newCategoryName" class="form-input" placeholder="e.g. Fabric" style="margin-bottom:12px;" autofocus>
+            <label style="display:block;font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px;">{% trans "Name" %}</label>
+            <input type="text" id="newCategoryName" class="form-input" placeholder="{% trans 'e.g. Fabric' %}" style="margin-bottom:12px;" autofocus>
             <div id="newCategoryError" style="color:#ef4444;font-size:12px;margin-bottom:10px;display:none;"></div>
             <div style="display:flex;justify-content:flex-end;gap:8px;">
-              <button type="button" onclick="closeCategoryModal()" class="btn btn-secondary">Cancel</button>
+              <button type="button" onclick="closeCategoryModal()" class="btn btn-secondary">{% trans "Cancel" %}</button>
               <button type="button" id="newCategorySubmitBtn" onclick="submitNewCategory()" class="btn btn-primary">
                 <i class="fa fa-plus"></i> Create
               </button>
@@ -784,23 +863,23 @@
         </script>
 
         <div class="form-group">
-          <label for="id_type">Product Type</label>
+          <label for="id_type">{% trans "Product Type" %}</label>
           {{ form.type }}
         </div>
 
         <div class="form-group">
-          <label for="id_supplier">Vendor</label>
+          <label for="id_supplier">{% trans "Vendor" %}</label>
           {{ form.supplier }}
         </div>
 
         <div class="form-group">
-          <label>Collections</label>
-          <input type="text" class="form-input" placeholder="Search collections...">
+          <label>{% trans "Collections" %}</label>
+          <input type="text" class="form-input" placeholder="{% trans 'Search collections...' %}">
         </div>
 
         <div class="form-group">
-          <label>Tags</label>
-          <input type="text" class="form-input" placeholder="Vintage, Summer, Cotton">
+          <label>{% trans "Tags" %}</label>
+          <input type="text" class="form-input" placeholder="{% trans 'Vintage, Summer, Cotton' %}">
         </div>
       </div>
 
@@ -837,18 +916,18 @@
       <div class="attribute-inputs">
         <div class="attribute-input-wrapper">
           <input type="text" class="attribute-input attr-name-input" name="attribute_names[]" 
-                 placeholder="Name (e.g. Material)" 
+                 placeholder="{% trans 'Name (e.g. Material)' %}" 
                  oninput="scheduleAttributeSave()"
                  required>
         </div>
         <div class="attribute-input-wrapper">
           <input type="text" class="attribute-input attr-value-input" name="attribute_values[]" 
-                 placeholder="Value (e.g. Wool)" 
+                 placeholder="{% trans 'Value (e.g. Wool)' %}" 
                  oninput="scheduleAttributeSave()"
                  required>
         </div>
       </div>
-      <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="Delete">
+      <button type="button" class="attribute-delete-btn" onclick="removeProductAttribute(this)" title="{% trans 'Delete' %}">
         <i class="fa fa-trash"></i>
       </button>
     `;
@@ -1748,7 +1827,7 @@
   <div class="variant-modal-overlay" onclick="closeVariantDetailModal()"></div>
   <div class="variant-modal-content">
     <div class="variant-modal-header">
-      <h3 id="variant_modal_title">Edit Variant</h3>
+      <h3 id="variant_modal_title">{% trans "Edit Variant" %}</h3>
       <button type="button" class="modal-close-btn" onclick="closeVariantDetailModal()">
         <i class="fa fa-times"></i>
       </button>
@@ -1769,7 +1848,7 @@
       <!-- Cost & Price -->
       <div class="form-row">
         <div class="form-group">
-          <label for="modal_variant_cost">Cost per item</label>
+          <label for="modal_variant_cost">{% trans "Cost per item" %}</label>
           <div class="input-with-icon">
             <span class="currency-symbol">$</span>
             <input type="number" id="modal_variant_cost" class="form-input" step="0.01" placeholder="0.00" oninput="calcSuggestedPrice()">
@@ -1798,16 +1877,16 @@
       <hr class="modal-divider">
 
       <!-- Inventory Section -->
-      <h4 class="section-title">Inventory</h4>
+      <h4 class="section-title">{% trans "Inventory" %}</h4>
 
       <div class="form-row">
         <div class="form-group">
-          <label for="modal_variant_sku">SKU (Stock Keeping Unit)</label>
+          <label for="modal_variant_sku">{% trans "SKU (Stock Keeping Unit)" %}</label>
           <input type="text" id="modal_variant_sku" class="form-input">
         </div>
 
         <div class="form-group">
-          <label for="modal_variant_barcode">Barcode (ISBN, UPC, GTIN, etc.)</label>
+          <label for="modal_variant_barcode">{% trans "Barcode (ISBN, UPC, GTIN, etc.)" %}</label>
           <input type="text" id="modal_variant_barcode" class="form-input">
         </div>
       </div>
@@ -1819,8 +1898,8 @@
     </div>
 
     <div class="variant-modal-footer">
-      <button type="button" class="btn btn-secondary" onclick="closeVariantDetailModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" onclick="saveVariantDetailModal()">Done</button>
+      <button type="button" class="btn btn-secondary" onclick="closeVariantDetailModal()">{% trans "Cancel" %}</button>
+      <button type="button" class="btn btn-primary" onclick="saveVariantDetailModal()">{% trans "Done" %}</button>
     </div>
   </div>
 </div>
@@ -1840,22 +1919,22 @@
         <h4 class="info-panel-title"><i class="fa fa-info-circle"></i> Information</h4>
       </div>
       <div class="info-panel-section">
-        <label class="info-label">File name</label>
+        <label class="info-label">{% trans "File name" %}</label>
         <input type="text" id="lightbox_filename" class="info-input" readonly>
       </div>
       <div class="info-panel-section">
-        <label class="info-label">Alt text</label>
-        <input type="text" id="lightbox_alt_text" class="info-input" maxlength="255" placeholder="Describe this image for SEO">
+        <label class="info-label">{% trans "Alt text" %}</label>
+        <input type="text" id="lightbox_alt_text" class="info-input" maxlength="255" placeholder="{% trans 'Describe this image for SEO' %}">
         <button type="button" id="lightbox_save_alt" class="info-save-btn" onclick="saveLightboxAltText()">
           <i class="fa fa-check"></i> Save
         </button>
       </div>
       <div class="info-panel-section">
-        <h4 class="info-panel-subtitle">Details</h4>
+        <h4 class="info-panel-subtitle">{% trans "Details" %}</h4>
         <div id="lightbox_details" class="info-details"></div>
       </div>
       <div class="info-panel-section">
-        <h4 class="info-panel-subtitle">Used in</h4>
+        <h4 class="info-panel-subtitle">{% trans "Used in" %}</h4>
         <div id="lightbox_usage" class="info-usage"></div>
       </div>
     </div>
@@ -2462,6 +2541,97 @@
 
   // ── Initialize ──
   loadFromDescription();
+})();
+</script>
+
+<script>
+/* ============================================================
+   CAMPAIGN / DISCOUNT PANEL — type switcher + dynamic tiers
+   ============================================================ */
+(function () {
+  const root      = document.getElementById('campaign_card');
+  if (!root) return;
+  const typeInput = document.getElementById('cmp_type');
+  const tiersJson = document.getElementById('cmp_tiers_json');
+  const typeBtns  = root.querySelectorAll('.cmp-type');
+  const panels    = root.querySelectorAll('.cmp-panel');
+  const list      = document.getElementById('cmp_tier_list');
+  const addBtn    = document.getElementById('cmp_add_tier');
+
+  function setType(type) {
+    typeInput.value = type;
+    typeBtns.forEach(btn => btn.classList.toggle('is-active', btn.dataset.type === type));
+    panels.forEach(p => p.hidden = (p.dataset.panel !== type));
+    if (type === 'volume' && list && !list.children.length) {
+      // Seed with one starter row so user sees the shape
+      addTier({ min_qty: 0, max_qty: 1000, discount_percent: '5' });
+    }
+    syncTiersJson();
+  }
+
+  function tierRow({ min_qty = '', max_qty = '', discount_percent = '' } = {}) {
+    const row = document.createElement('div');
+    row.className = 'cmp-tier';
+    row.innerHTML = `
+      <div>
+        <div class="cmp-tier-label">Min units</div>
+        <input type="number" min="0" step="1" placeholder="0" data-k="min_qty" value="${min_qty ?? ''}">
+      </div>
+      <div>
+        <div class="cmp-tier-label">Max units</div>
+        <input type="number" min="0" step="1" placeholder="{% trans '∞ (open)' %}" data-k="max_qty" value="${max_qty ?? ''}">
+      </div>
+      <div class="cmp-tier-input-pct">
+        <div class="cmp-tier-label">Off</div>
+        <input type="number" min="0" max="100" step="0.01" placeholder="5" data-k="discount_percent" value="${discount_percent ?? ''}">
+      </div>
+      <button type="button" class="cmp-tier-rm" aria-label="Remove tier">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </button>`;
+    row.querySelectorAll('input').forEach(i => i.addEventListener('input', syncTiersJson));
+    row.querySelector('.cmp-tier-rm').addEventListener('click', () => {
+      row.remove();
+      syncTiersJson();
+    });
+    return row;
+  }
+  function addTier(seed) {
+    if (!list) return;
+    list.appendChild(tierRow(seed || {}));
+    syncTiersJson();
+  }
+  function syncTiersJson() {
+    if (!list) return;
+    const tiers = [...list.querySelectorAll('.cmp-tier')].map(r => {
+      const get = k => r.querySelector(`[data-k="${k}"]`).value;
+      const min = get('min_qty');
+      const max = get('max_qty');
+      const pct = get('discount_percent');
+      return {
+        min_qty: min === '' ? null : parseInt(min, 10),
+        max_qty: max === '' ? null : parseInt(max, 10),
+        discount_percent: pct === '' ? null : pct,
+      };
+    });
+    tiersJson.value = JSON.stringify(tiers);
+  }
+
+  // Wire type pickers
+  typeBtns.forEach(btn => {
+    btn.addEventListener('click', () => setType(btn.dataset.type));
+  });
+  if (addBtn) addBtn.addEventListener('click', () => addTier());
+
+  // Bootstrap from existing campaign
+  const initialType = typeInput.value || 'none';
+  const initialTiersEl = document.getElementById('cmp_tiers_initial');
+  if (initialType === 'volume' && initialTiersEl) {
+    try {
+      const seeded = JSON.parse(initialTiersEl.textContent || '[]');
+      seeded.forEach(t => addTier(t));
+    } catch (e) {}
+  }
+  setType(initialType);
 })();
 </script>
 

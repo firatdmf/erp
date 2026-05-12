@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
 {% load todo_filters %}
 {% load crm_tags %}
@@ -50,8 +51,8 @@
   <!-- Main Content Grid -->
   <!-- Tab Navigation -->
   <div class="company-tabs">
-    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
-    <button class="tab-btn" onclick="switchTab('communication')">Communication</button>
+    <button class="tab-btn active" onclick="switchTab('overview')">{% trans "Overview" %}</button>
+    <button class="tab-btn" onclick="switchTab('communication')">{% trans "Communication" %}</button>
   </div>
 
   <div id="tab-overview" class="tab-content active">
@@ -245,7 +246,7 @@
         {% csrf_token %}
         {{ note_form.as_p }}
         <div class="form-actions">
-          <button type="submit" class="btn-action btn-action-primary">Add Note</button>
+          <button type="submit" class="btn-action btn-action-primary">{% trans "Add Note" %}</button>
         </div>
       </form>
     </div>
@@ -264,7 +265,7 @@
         {% csrf_token %}
         {{ task_form.as_p }}
         <div class="form-actions">
-          <button type="submit" class="btn-action btn-action-primary">Add Task</button>
+          <button type="submit" class="btn-action btn-action-primary">{% trans "Add Task" %}</button>
         </div>
       </form>
     </div>
@@ -519,15 +520,15 @@
     contentDiv.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:0.75rem;">
           <div>
-            <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">Task Name</label>
+            <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">{% trans "Task Name" %}</label>
             <input type="text" id="edit-task-name-${taskId}" style="width:100%;padding:0.5rem;border:2px solid #3b82f6;border-radius:6px;font-size:0.875rem;font-weight:600;" />
           </div>
           <div>
-            <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">Description (optional)</label>
+            <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">{% trans "Description (optional)" %}</label>
             <textarea id="edit-task-desc-${taskId}" style="width:100%;min-height:60px;padding:0.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.8125rem;resize:vertical;">${description || ''}</textarea>
           </div>
           <div>
-            <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">Due Date</label>
+            <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">{% trans "Due Date" %}</label>
             <input type="date" id="edit-task-date-${taskId}" value="${dueDate}" style="padding:0.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;" />
           </div>
           <div style="display:flex;gap:0.5rem;">
@@ -718,7 +719,7 @@
         container.innerHTML = `
         <div class="compose-modal" style="position:relative; bottom:auto; right:auto; width:800px; height:80vh;">
           <div class="compose-header">
-            <h3>E-posta Detayı</h3>
+            <h3>{% trans "E-posta Detayı" %}</h3>
             <button class="close-btn" onclick="closeEmailDetailModal()"><i class="fas fa-times"></i></button>
           </div>
           <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">

@@ -1,14 +1,15 @@
+{% load i18n %}
 {% load static %}
 {% block css %}
 <link rel="stylesheet" href="{% static 'marketing/css/components/variant_form.css' %}?v=3" />
 {% endblock css %}
 
-<div class="loading" id="loading">Loading&#8230;</div>
+<div class="loading" id="loading">{% trans "Loading…" %}</div>
 
 <!-- Initial: Show only Add Variants button -->
 <div id="add_variant_trigger" style="margin: 20px 0;">
   <button type="button" class="add_another_option" onclick="showVariantSection()" style="border: 1.5px dashed #667eea;">
-    <i class="fa fa-plus"></i> Add Product Variants
+    <i class="fa fa-plus"></i> {% trans "Add Product Variants" %}
   </button>
 </div>
 
@@ -17,7 +18,7 @@
   <div class="variant_options_wrapper">
     <div id="variant_options_list"></div>
     <button type="button" class="add_option_button" onclick="addNewOption()">
-      <i class="fa fa-plus-circle"></i> Add another option
+      <i class="fa fa-plus-circle"></i> {% trans "Add another option" %}
     </button>
   </div>
 
@@ -26,7 +27,7 @@
 
   <!-- Shopify-style grouping popover -->
   <div class="grp" id="grp_container" style="display: none;">
-    <span class="grp_label">Grouping by</span>
+    <span class="grp_label">{% trans "Grouping by" %}</span>
     <div class="grp_trigger_wrap">
       <button type="button" class="grp_trigger" id="grp_trigger" onclick="toggleGroupingPopover()">
         <span id="grp_selected_text">—</span>
@@ -40,7 +41,7 @@
 
   <!-- Bulk Price Update -->
   <button type="button" id="bulk_price_btn" onclick="bulkUpdatePricesFromCost()" style="display:none;margin:8px 0;padding:6px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;font-weight:600;color:#166534;cursor:pointer;">
-    <i class="fas fa-calculator"></i> Update All Prices from Cost (cost &times; 2 / 0.7)
+    <i class="fas fa-calculator"></i> {% trans "Update All Prices from Cost (cost x 2 / 0.7)" %}
   </button>
 
   <!-- Scrollable Table Wrapper for Mobile -->
@@ -54,6 +55,48 @@
 
   {% comment %} <p>{{message}}</p> {% endcomment %}
   <script>
+    // i18n strings for the dynamically-generated variant UI
+    window.VARIANT_T = window.VARIANT_T || {
+      // table headers
+      photo:           '{% trans "PHOTO"|escapejs %}',
+      price:           '{% trans "PRICE"|escapejs %}',
+      stock:           '{% trans "STOCK"|escapejs %}',
+      featured:        '{% trans "FEATURED"|escapejs %}',
+      attributes:      '{% trans "ATTRIBUTES"|escapejs %}',
+      // option editor
+      option_name:     '{% trans "Option name"|escapejs %}',
+      option_values:   '{% trans "Option values"|escapejs %}',
+      option_placeholder: '{% trans "e.g. Size, Color"|escapejs %}',
+      add_value:       '{% trans "Add another value"|escapejs %}',
+      delete:          '{% trans "Delete"|escapejs %}',
+      // table row
+      edit_hint:       '{% trans "Edit"|escapejs %}',
+      // variant attributes modal
+      m_title:         '{% trans "Variant Attributes"|escapejs %}',
+      m_help:          '{% trans "Customize attributes for this specific variant. Leave empty to use product-level defaults."|escapejs %}',
+      m_variant_label: '{% trans "Variant"|escapejs %}',
+      m_attribute:     '{% trans "Attribute"|escapejs %}',
+      m_default:       '{% trans "Default"|escapejs %}',
+      m_variant_value: '{% trans "Variant value"|escapejs %}',
+      m_empty:         '{% trans "No product-level attributes defined. Add attributes in the Product Attributes section above."|escapejs %}',
+      m_cancel:        '{% trans "Cancel"|escapejs %}',
+      m_save:          '{% trans "Save"|escapejs %}',
+      m_saved:         '{% trans "Attributes saved for variant"|escapejs %}',
+      // common option-name translations (lowercase keys, uppercased on render)
+      opt_labels: {
+        'color':   '{% trans "COLOR"|escapejs %}',
+        'colour':  '{% trans "COLOR"|escapejs %}',
+        'size':    '{% trans "SIZE"|escapejs %}',
+        'material':'{% trans "MATERIAL"|escapejs %}',
+        'style':   '{% trans "STYLE"|escapejs %}',
+        'pattern': '{% trans "PATTERN"|escapejs %}',
+        'length':  '{% trans "LENGTH"|escapejs %}',
+        'width':   '{% trans "WIDTH"|escapejs %}',
+        'height':  '{% trans "HEIGHT"|escapejs %}',
+        'weight':  '{% trans "WEIGHT"|escapejs %}',
+      },
+    };
+
     // Show variant section when button is clicked
     function showVariantSection() {
       document.getElementById('add_variant_trigger').style.display = 'none';

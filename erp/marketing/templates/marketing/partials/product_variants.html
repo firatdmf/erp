@@ -1,16 +1,17 @@
+{% load i18n %}
 <div class="variant-header">
-    <div class="variant-title">Variants ({{ variants|length }})</div>
+    <div class="variant-title">{% trans "Variants" %} ({{ variants|length }})</div>
 </div>
 
 {% if variants %}
 <table class="v-table">
     <thead>
         <tr>
-            <th style="text-align: left; padding-left: 16px; color: #94a3b8; font-size: 11px; font-weight: 600;">VARIANT
+            <th style="text-align: left; padding-left: 16px; color: #94a3b8; font-size: 11px; font-weight: 600;">{% trans "VARIANT" %}
             </th>
-            <th style="text-align: left; color: #94a3b8; font-size: 11px; font-weight: 600;">ATTRIBUTES</th>
-            <th style="text-align: center; color: #94a3b8; font-size: 11px; font-weight: 600;">STOCK</th>
-            <th style="text-align: right; color: #94a3b8; font-size: 11px; font-weight: 600;">PRICE</th>
+            <th style="text-align: left; color: #94a3b8; font-size: 11px; font-weight: 600;">{% trans "ATTRIBUTES" %}</th>
+            <th style="text-align: center; color: #94a3b8; font-size: 11px; font-weight: 600;">{% trans "STOCK" %}</th>
+            <th style="text-align: right; color: #94a3b8; font-size: 11px; font-weight: 600;">{% trans "PRICE" %}</th>
         </tr>
     </thead>
     <tbody>
@@ -55,6 +56,6 @@
 </table>
 {% else %}
 <div style="text-align: center; padding: 20px; color: #64748b;">
-    <p>No active variants found for this product.</p>
+    <p>{% trans "No active variants found for this product." %}</p>
 </div>
 {% endif %}

@@ -1,5 +1,6 @@
 {% load accounting_tags %}
 
+{% load i18n %}
 <!-- Assets List -->
 {% if assets_list %}
 <div class="assets-list">
@@ -7,9 +8,9 @@
   <table class="assets-table">
     <thead>
       <tr>
-        <th>NAME</th>
-        <th>CATEGORY</th>
-        <th>VALUE</th>
+        <th>{% trans "NAME" %}</th>
+        <th>{% trans "CATEGORY" %}</th>
+        <th>{% trans "VALUE" %}</th>
         <th>VALUE ({{ base_currency.code }})</th>
       </tr>
     </thead>

@@ -1,8 +1,9 @@
 <!-- templates/scan.html -->
 {% extends 'base.html' %}
+{% load i18n %}
 {% block content %}
-  <h2>Scan Order Item QR</h2>
-  <label for="status">Choose a status</label>
+  <h2>{% trans "Scan Order Item QR" %}</h2>
+  <label for="status">{% trans "Choose a status" %}</label>
   <select name="status" id="select_status">
     {% for choice in choices %}
       <option value="{{ choice.0 }}">{{ choice.1 }}</option>

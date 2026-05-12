@@ -75,24 +75,24 @@ function loadExistingVariants() {
                         <div class="option_header">
                             <span class="drag_handle"><i class="fa fa-grip-vertical"></i></span>
                             <div class="option_name_input">
-                                <label>Option Name</label>
-                                <input type="text" 
-                                       placeholder="e.g. Size, Color" 
+                                <label>${(window.VARIANT_T && window.VARIANT_T.option_name) || 'Option Name'}</label>
+                                <input type="text"
+                                       placeholder="${(window.VARIANT_T && window.VARIANT_T.option_placeholder) || 'e.g. Size, Color'}"
                                        value="${option.name}"
                                        oninput="updateOptionName('${optionId}', this.value)"
                                        class="option_name_field">
                             </div>
                         </div>
                         <div class="option_values_section">
-                            <label>Option Values</label>
+                            <label>${(window.VARIANT_T && window.VARIANT_T.option_values) || 'Option Values'}</label>
                             <div class="option_values_list" id="${optionId}_values"></div>
                             <button type="button" class="btn_add_value" onclick="addValueField('${optionId}')">
-                                <i class="fa fa-plus"></i> Add another value
+                                <i class="fa fa-plus"></i> ${(window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value'}
                             </button>
                         </div>
                         <div class="option_actions">
                             <button type="button" class="btn_remove_option" onclick="removeOption('${optionId}')">
-                                Delete
+                                ${(window.VARIANT_T && window.VARIANT_T.delete) || 'Delete'}
                             </button>
                         </div>
                     </div>
@@ -307,23 +307,23 @@ function addNewOption() {
             <div class="option_header">
                 <span class="drag_handle"><i class="fa fa-grip-vertical"></i></span>
                 <div class="option_name_input">
-                    <label>Option Name</label>
-                    <input type="text" 
-                           placeholder="e.g. Size, Color" 
+                    <label>${(window.VARIANT_T && window.VARIANT_T.option_name) || 'Option Name'}</label>
+                    <input type="text"
+                           placeholder="${(window.VARIANT_T && window.VARIANT_T.option_placeholder) || 'e.g. Size, Color'}"
                            oninput="updateOptionName('${optionId}', this.value)"
                            class="option_name_field">
                 </div>
             </div>
             <div class="option_values_section">
-                <label>Option Values</label>
+                <label>${(window.VARIANT_T && window.VARIANT_T.option_values) || 'Option Values'}</label>
                 <div class="option_values_list" id="${optionId}_values"></div>
                 <button type="button" class="btn_add_value" onclick="addValueField('${optionId}')">
-                    <i class="fa fa-plus"></i> Add another value
+                    <i class="fa fa-plus"></i> ${(window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value'}
                 </button>
             </div>
             <div class="option_actions">
                 <button type="button" class="btn_remove_option" onclick="removeOption('${optionId}')">
-                    Delete
+                    ${(window.VARIANT_T && window.VARIANT_T.delete) || 'Delete'}
                 </button>
             </div>
         </div>
@@ -344,7 +344,7 @@ function addValueField(optionId, value = '') {
         <div class="value_field_wrapper" data-value-index="${valueIndex}">
             <span class="drag_handle_small"><i class="fa fa-grip-vertical"></i></span>
             <input type="text"
-                   placeholder="${valueIndex === 0 ? '' : 'Add another value'}"
+                   placeholder="${valueIndex === 0 ? '' : ((window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value')}"
                    value="${value}"
                    oninput="updateOptionValue('${optionId}', ${valueIndex}, this.value)"
                    class="value_input">
@@ -1108,11 +1108,16 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         .map(d => d.name);
 
     // Build table HTML - Cost, SKU, Barcode columns are removed from view
-    let tableHTML = '<thead><tr><th style="width: 50px;"></th><th style="width: 60px;">PHOTO</th>';
+    const VT = (window.VARIANT_T || { photo:'PHOTO', price:'PRICE', stock:'STOCK', featured:'FEATURED', attributes:'ATTRIBUTES', opt_labels: {} });
+    const labelOf = (name) => {
+        const k = (name || '').toLowerCase().trim();
+        return (VT.opt_labels && VT.opt_labels[k]) || (name || '').toUpperCase();
+    };
+    let tableHTML = `<thead><tr><th style="width: 50px;"></th><th style="width: 60px;">${VT.photo}</th>`;
     displayOptions.forEach(name => {
-        tableHTML += `<th>${name.toUpperCase()}</th>`;
+        tableHTML += `<th>${labelOf(name)}</th>`;
     });
-    tableHTML += '<th>PRICE</th><th>STOCK</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
+    tableHTML += `<th>${VT.price}</th><th>${VT.stock}</th><th>${VT.featured}</th><th style="text-align: center;">${VT.attributes}</th></tr></thead><tbody>`;
 
     // Helper to generate row HTML (avoids duplication between grouped/ungrouped)
     const generateRowHTML = (combo, originalIndex, displayOptions, groupId = '') => {
@@ -1195,7 +1200,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         displayOptions.forEach((optionName, optIdx) => {
             const value = combo[optionName] || '';
             if (optIdx === 0) {
-                rowHTML += `<td><span style="font-weight: 500;">${value}</span><br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> Edit</span></td>`;
+                rowHTML += `<td><span style="font-weight: 500;">${value}</span><br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> ${(window.VARIANT_T && window.VARIANT_T.edit_hint) || 'Edit'}</span></td>`;
             } else {
                 rowHTML += `<td><span style="font-weight: 500;">${value}</span></td>`;
             }

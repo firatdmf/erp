@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}{% if is_create %}Yeni başlık{% else %}{{ item.label_tr }}{% endif %} · Mağazam{% endblock %}
+{% load i18n %}
+{% block title %}{% if is_create %}{% trans "New menu item" %}{% else %}{{ item.label_tr }}{% endif %} · {% trans "My Store" %}{% endblock %}
 
 {% block content %}
 <style>
@@ -340,26 +341,26 @@ body > main:has(.cms2) {
   <div class="cms2-top">
     <div class="cms2-bread">
       <a class="bc" href="{% url 'storefront:dashboard' %}">
-        <i data-lucide="store"></i>Mağazam
+        <i data-lucide="store"></i>{% trans "My Store" %}
       </a>
       <i data-lucide="chevron-right" class="bc-sep"></i>
-      <a class="bc" href="{% url 'storefront:edit_menu' %}">Menü</a>
+      <a class="bc" href="{% url 'storefront:edit_menu' %}">{% trans "Menu" %}</a>
       <i data-lucide="chevron-right" class="bc-sep"></i>
-      <span class="bc">{% if is_create %}Yeni başlık{% else %}{{ item.label_tr }}{% endif %}</span>
+      <span class="bc">{% if is_create %}{% trans "New menu item" %}{% else %}{{ item.label_tr }}{% endif %}</span>
       {% if not is_create %}
         <span class="bc-status {% if item.is_active %}published{% else %}draft{% endif %}">
-          <span class="dot"></span>{% if item.is_active %}Yayında{% else %}Taslak{% endif %}
+          <span class="dot"></span>{% if item.is_active %}{% trans "Published" %}{% else %}{% trans "Draft" %}{% endif %}
         </span>
       {% endif %}
     </div>
     <div class="cms2-actions">
       {% if not is_create %}
         <a class="cms2-btn ghost danger" href="{% url 'storefront:delete_menu_item' item.pk %}">
-          <i data-lucide="trash-2"></i><span>Sil</span>
+          <i data-lucide="trash-2"></i><span>{% trans "Delete" %}</span>
         </a>
       {% endif %}
       <button class="cms2-btn primary" type="submit" form="sf-edit-form">
-        <i data-lucide="check"></i><span>Kaydet</span>
+        <i data-lucide="check"></i><span>{% trans "Save" %}</span>
       </button>
     </div>
   </div>
@@ -374,7 +375,7 @@ body > main:has(.cms2) {
         <div class="fs open">
           <div class="fs-head">
             <span class="fs-ico"><i data-lucide="type"></i></span>
-            <span class="fs-t">Etiket &amp; Ayarlar</span>
+            <span class="fs-t">{% trans "Label & Settings" %}</span>
           </div>
           <div class="fs-body">
             {% for f in form %}{% if f.name == 'label_tr' or f.name == 'label_en' or f.name == 'order' or f.name == 'is_active' %}
@@ -390,7 +391,7 @@ body > main:has(.cms2) {
         <div class="fs open">
           <div class="fs-head">
             <span class="fs-ico"><i data-lucide="link"></i></span>
-            <span class="fs-t">Bağlantı &amp; Hiyerarşi</span>
+            <span class="fs-t">{% trans "Link & Hierarchy" %}</span>
           </div>
           <div class="fs-body">
             {% for f in form %}{% if f.name == 'href' or f.name == 'parent' or f.name == 'category' or f.name == 'swatch' %}
@@ -406,7 +407,7 @@ body > main:has(.cms2) {
         <div class="fs open">
           <div class="fs-head">
             <span class="fs-ico"><i data-lucide="layout-grid"></i></span>
-            <span class="fs-t">Vitrin Kartı</span>
+            <span class="fs-t">{% trans "Showcase Card" %}</span>
           </div>
           <div class="fs-body">
             {% for f in form %}{% if f.name == 'image_upload' or f.name == 'feature_image_url' or f.name == 'feature_title' or f.name == 'feature_meta' %}
@@ -424,13 +425,13 @@ body > main:has(.cms2) {
     {# BOTTOM: canvas — site önizleme, item href varsa o sayfa açılır #}
     <main class="canvas canvas-stack">
       <div class="canvas-rule">
-        <span>{{ item.label_tr|default:"Önizleme" }} · <span class="mono">{{ item.href|default:"/" }}</span></span>
-        <span class="canvas-w">canlı önizleme</span>
+        <span>{{ item.label_tr|default:_("Preview") }} · <span class="mono">{{ item.href|default:"/" }}</span></span>
+        <span class="canvas-w">{% trans "live preview" %}</span>
       </div>
       <div class="frame frame-desktop">
         <iframe src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"
                 class="canvas-iframe"
-                title="Belino önizleme"
+                title="{% trans 'Belino preview' %}"
                 loading="lazy"
                 data-preview-iframe
                 data-base-src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"></iframe>

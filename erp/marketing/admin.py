@@ -197,9 +197,9 @@ class DiscountCodeAdmin(admin.ModelAdmin):
     ordering = ('-created_at',)
 
 
-# Web Subscription Admin
-@admin.register(WebSubscription)
-class WebSubscriptionAdmin(admin.ModelAdmin):
+# Newsletter Subscription Admin
+@admin.register(NewsletterSubscription)
+class NewsletterSubscriptionAdmin(admin.ModelAdmin):
     list_display = ('email', 'phone', 'discount_code', 'is_active', 'created_at')
     list_filter = ('is_active', 'created_at')
     search_fields = ('email', 'phone')

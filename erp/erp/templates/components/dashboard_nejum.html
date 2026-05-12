@@ -115,7 +115,7 @@
       <div class="task-list" id="njTaskList">
         {% if today_tasks %}
           {% for t in today_tasks %}
-            <div class="task-card prio-{{ t.priority }}{% if t.completed %} done{% endif %}" data-task-id="{{ t.id }}">
+            <div class="task-card prio-{{ t.priority }}{% if t.completed %} done{% endif %}" data-task-id="{{ t.id }}"{% if t.can_edit %} onclick="openTaskEditSidebar('{{ t.id }}')" style="cursor: pointer;"{% endif %}>
               <div class="task-stripe"></div>
               <div class="task-body">
                 <div class="task-top">
@@ -143,7 +143,7 @@
                   </span>
                 </div>
               </div>
-              <div class="task-actions">
+              <div class="task-actions" onclick="event.stopPropagation();">
                 <button type="button"
                         class="btn-complete{% if t.completed %} completed{% endif %}"
                         data-task-id="{{ t.id }}"
@@ -172,6 +172,12 @@
 
   </div>
 </div>
+
+{# Task edit sidebar — opens when a task card is clicked.
+   `can_edit` is computed server-side in erp_tags.py: creator, assignee,
+   or superuser. The onclick handler is only attached on editable cards
+   so non-editable cards stay non-interactive. #}
+{% include 'todo/components/task_edit_modal.html' %}
 
 <script>
   (function() {
@@ -427,7 +433,8 @@
       var done = t.completed ? ' done' : '';
       var doneCls = t.completed ? ' completed' : '';
       var doneLabel = t.completed ? 'Completed' : 'Complete';
-      return '<div class="task-card prio-' + escapeHtml(t.priority) + done + '" data-task-id="' + t.id + '">' +
+      var editAttrs = t.can_edit ? (' onclick="openTaskEditSidebar(\'' + t.id + '\')" style="cursor: pointer;"') : '';
+      return '<div class="task-card prio-' + escapeHtml(t.priority) + done + '" data-task-id="' + t.id + '"' + editAttrs + '>' +
         '<div class="task-stripe"></div>' +
         '<div class="task-body">' +
         '<div class="task-top">' +
@@ -451,7 +458,7 @@
         '</span>' +
         '</div>' +
         '</div>' +
-        '<div class="task-actions">' +
+        '<div class="task-actions" onclick="event.stopPropagation();">' +
         '<button type="button" class="btn-complete' + doneCls + '" data-task-id="' + t.id + '" data-action="complete">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
         doneLabel +

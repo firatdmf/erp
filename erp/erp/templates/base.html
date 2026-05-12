@@ -1064,8 +1064,7 @@
             <!-- Global Team Selector -->
             <div id="globalTeamSelectContainer" style="display:none; margin-bottom: 0.5rem;">
               <label class="form-label"
-                style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem; display:block;">{% trans "Select Team
-                (Optional)" %}</label>
+                style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.25rem; display:block;">{% trans "Select Team (Optional)" %}</label>
               <select id="globalTeamSelect" class="form-input" style="width: 100%;"
                 onchange="handleGlobalTeamSelect(this.value)">
                 <option value="">-- Personal Task --</option>
@@ -1090,7 +1089,7 @@
               <div style="position: relative;">
                 <button type="button" id="addUserBtn" onclick="toggleUserSearch()" class="btn btn-sm btn-secondary"
                   style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
-                  <i class="fas fa-plus"></i> Add User
+                  <i class="fas fa-plus"></i> {% trans "Add User" %}
                 </button>
 
                 <div id="userSearchContainer" style="display: none; margin-top: 0.5rem;">

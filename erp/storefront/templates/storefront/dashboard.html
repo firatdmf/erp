@@ -1,23 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Mağazam · {{ storefront.name }}{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "My Store" %} · {{ storefront.name }}{% endblock %}
 
 {% block content %}
 <div class="cms2">
   <div class="cms2-top">
     <div class="cms2-bread">
-      <span class="bc"><i data-lucide="store"></i>Mağazam</span>
+      <span class="bc"><i data-lucide="store"></i>{% trans "My Store" %}</span>
       <i data-lucide="chevron-right" class="bc-sep"></i>
-      <span class="bc">Genel bakış</span>
+      <span class="bc">{% trans "Overview" %}</span>
       <span class="bc-status published">
         <span class="dot"></span>{{ storefront.name }}
       </span>
       {% if last_changed %}
-        <span class="bc-time">son kayıt {{ last_changed|timesince }} önce</span>
+        <span class="bc-time">{% blocktrans with t=last_changed|timesince %}saved {{ t }} ago{% endblocktrans %}</span>
       {% endif %}
     </div>
     <div class="cms2-actions">
       <a class="cms2-btn ghost" href="{{ STOREFRONT_PREVIEW_URL }}" target="_blank" rel="noreferrer noopener">
-        <i data-lucide="external-link"></i><span>Siteyi aç</span>
+        <i data-lucide="external-link"></i><span>{% trans "Open site" %}</span>
       </a>
     </div>
   </div>
@@ -27,9 +28,9 @@
       <div class="menu-shell">
         <div class="menu-head">
           <div>
-            <div class="menu-eyebrow">{{ storefront.name|upper }} · GENEL BAKIŞ</div>
-            <h1>Mağaza paneli</h1>
-            <p>Anasayfa bölümlerini, header menüsünü ve ürünleri tek bir yerden yönet. Değişiklikler anında siteye yansır.</p>
+            <div class="menu-eyebrow">{{ storefront.name|upper }} · {% trans "OVERVIEW" %}</div>
+            <h1>{% trans "Store panel" %}</h1>
+            <p>{% trans "Manage home sections, header menu and products from one place. Changes go live instantly." %}</p>
           </div>
         </div>
 
@@ -37,10 +38,10 @@
           <a class="dash-card" href="{% url 'storefront:edit_home' %}">
             <div class="dash-card-ico"><i data-lucide="layout-template"></i></div>
             <div class="dash-card-body">
-              <div class="dash-card-title">Anasayfa bölümleri</div>
-              <div class="dash-card-sub">Hero · Sezon kartları · Vitrin · Güven bandı</div>
+              <div class="dash-card-title">{% trans "Home sections" %}</div>
+              <div class="dash-card-sub">{% trans "Hero · Season cards · Showcase · Trust strip" %}</div>
               <div class="dash-card-foot">
-                <span class="dash-card-stat">{{ home_count }} bölüm</span>
+                <span class="dash-card-stat">{{ home_count }} {% trans "sections" %}</span>
                 <span class="dash-card-arrow"><i data-lucide="arrow-right"></i></span>
               </div>
             </div>
@@ -48,10 +49,10 @@
           <a class="dash-card" href="{% url 'storefront:edit_menu' %}">
             <div class="dash-card-ico"><i data-lucide="menu"></i></div>
             <div class="dash-card-body">
-              <div class="dash-card-title">Menü &amp; Navigasyon</div>
-              <div class="dash-card-sub">Header başlıkları ve flyout vitrinleri</div>
+              <div class="dash-card-title">{% trans "Menu & Navigation" %}</div>
+              <div class="dash-card-sub">{% trans "Header titles and flyout showcases" %}</div>
               <div class="dash-card-foot">
-                <span class="dash-card-stat">{{ nav_count }} ana başlık</span>
+                <span class="dash-card-stat">{{ nav_count }} {% trans "main entries" %}</span>
                 <span class="dash-card-arrow"><i data-lucide="arrow-right"></i></span>
               </div>
             </div>
@@ -59,10 +60,10 @@
           <a class="dash-card" href="{% url 'marketing:product_list' %}">
             <div class="dash-card-ico"><i data-lucide="tag"></i></div>
             <div class="dash-card-body">
-              <div class="dash-card-title">Ürünler</div>
-              <div class="dash-card-sub">Fiyat, varyant, görsel ve stok yönetimi</div>
+              <div class="dash-card-title">{% trans "Products" %}</div>
+              <div class="dash-card-sub">{% trans "Price, variants, images and stock management" %}</div>
               <div class="dash-card-foot">
-                <span class="dash-card-stat">Marketing modülü</span>
+                <span class="dash-card-stat">{% trans "Marketing module" %}</span>
                 <span class="dash-card-arrow"><i data-lucide="arrow-right"></i></span>
               </div>
             </div>

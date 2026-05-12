@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Mağazam · {{ storefront.name }}{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "My Store" %} · {{ storefront.name }}{% endblock %}
 
 {% block content %}
 <style>
@@ -101,13 +102,13 @@
   {# ==================== TOP BAR ==================== #}
   <div class="cms2-top">
     <div class="cms2-bread">
-      <span class="bc"><i data-lucide="store"></i>Mağazam</span>
+      <span class="bc"><i data-lucide="store"></i>{% trans "My Store" %}</span>
       <i data-lucide="chevron-right" class="bc-sep"></i>
 
       <div class="page-pick" data-page-pick>
         <button class="page-pick-btn" type="button" data-page-pick-toggle>
           <i data-lucide="home"></i>
-          <span class="ppb-name">Anasayfa</span>
+          <span class="ppb-name">{% trans "Home" %}</span>
           <span class="ppb-slug">/</span>
           <i data-lucide="chevron-down" class="ppb-chev"></i>
         </button>
@@ -116,7 +117,7 @@
             <button class="ppm-row active" type="button">
               <span class="ppm-icon"><i data-lucide="home"></i></span>
               <span class="ppm-text">
-                <span class="ppm-n">Anasayfa</span>
+                <span class="ppm-n">{% trans "Home" %}</span>
                 <span class="ppm-s">/</span>
               </span>
               <span class="ppm-st published"><span></span></span>
@@ -124,7 +125,7 @@
             <a class="ppm-row" href="{% url 'storefront:edit_menu' %}">
               <span class="ppm-icon"><i data-lucide="menu"></i></span>
               <span class="ppm-text">
-                <span class="ppm-n">Menü navigasyon</span>
+                <span class="ppm-n">{% trans "Menu & Navigation" %}</span>
                 <span class="ppm-s">/header</span>
               </span>
               <span class="ppm-st published"><span></span></span>
@@ -132,28 +133,28 @@
           </div>
           <div class="ppm-foot">
             <a class="ppm-link" href="{% url 'storefront:create_home_section' %}">
-              <i data-lucide="plus"></i>Yeni bölüm
+              <i data-lucide="plus"></i>{% trans "New section" %}
             </a>
           </div>
         </div>
       </div>
 
       <span class="bc-status published">
-        <span class="dot"></span>Yayında
+        <span class="dot"></span>{% trans "Published" %}
       </span>
     </div>
 
     <div class="cms2-actions">
       <button class="cms2-btn ghost" type="button" data-sections-toggle>
         <i data-lucide="layout-list"></i>
-        <span>Bölümler</span>
+        <span>{% trans "Sections" %}</span>
         <span class="cms2-pill">{{ sections|length }}</span>
       </button>
       <a class="cms2-btn ghost" href="{{ STOREFRONT_PREVIEW_URL }}" target="_blank" rel="noreferrer noopener">
-        <i data-lucide="eye"></i><span>Önizle</span>
+        <i data-lucide="eye"></i><span>{% trans "Preview" %}</span>
       </a>
       <a class="cms2-btn primary" href="{% url 'storefront:create_home_section' %}">
-        <i data-lucide="plus"></i><span>Yeni bölüm</span>
+        <i data-lucide="plus"></i><span>{% trans "New section" %}</span>
       </a>
     </div>
   </div>
@@ -163,8 +164,8 @@
     <aside class="drawer" hidden data-sections-drawer>
       <div class="drawer-head">
         <div>
-          <div class="rail-eyebrow">ANASAYFA · BÖLÜMLER</div>
-          <div class="rail-title">Sayfa bölümleri</div>
+          <div class="rail-eyebrow">{% trans "HOME · SECTIONS" %}</div>
+          <div class="rail-title">{% trans "Page sections" %}</div>
         </div>
         <button class="drawer-x" type="button" data-sections-close>
           <i data-lucide="x"></i>
@@ -172,7 +173,7 @@
       </div>
       <div class="rail-help">
         <i data-lucide="info"></i>
-        <span>Sürükleyerek sırala · ada tıklayıp düzenle</span>
+        <span>{% trans "Drag to reorder · click name to edit" %}</span>
       </div>
       <div class="sec-list" data-sortable data-sortable-model="homesection">
         {% for s in sections %}
@@ -200,7 +201,7 @@
               <button type="button"
                       class="sa-toggle {% if s.is_active %}on{% endif %}"
                       data-toggle-active="homesection" data-id="{{ s.pk }}"
-                      title="{% if s.is_active %}Yayında — kapat{% else %}Taslak — yayınla{% endif %}">
+                      title="{% if s.is_active %}{% trans "Published — turn off" %}{% else %}{% trans "Draft — publish" %}{% endif %}">
                 <span></span>
               </button>
             </span>
@@ -208,19 +209,19 @@
         {% endfor %}
       </div>
       <a class="sec-add" href="{% url 'storefront:create_home_section' %}">
-        <i data-lucide="plus"></i> Yeni bölüm ekle
+        <i data-lucide="plus"></i> {% trans "Add new section" %}
       </a>
     </aside>
 
     <main class="canvas">
       <div class="canvas-rule">
-        <span>Anasayfa · <span class="mono">/</span></span>
-        <span class="canvas-w">canlı önizleme</span>
+        <span>{% trans "Home" %} · <span class="mono">/</span></span>
+        <span class="canvas-w">{% trans "live preview" %}</span>
       </div>
       <div class="frame frame-desktop">
         <iframe src="{{ STOREFRONT_PREVIEW_URL }}?edit=1"
                 class="canvas-iframe"
-                title="Belino önizleme"
+                title="{% trans 'Belino preview' %}"
                 loading="lazy"></iframe>
       </div>
     </main>

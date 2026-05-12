@@ -1676,7 +1676,7 @@ msgid "Organizer"
 msgstr "Organizer"
 
 msgid "Overview"
-msgstr "Genel Bakış"
+msgstr "Genel bakış"
 
 msgid "Pack Count"
 msgstr "Pack Count"
@@ -1754,7 +1754,7 @@ msgid "Publish Date *"
 msgstr "Publish Date *"
 
 msgid "Published"
-msgstr "Yayımlandı"
+msgstr "Yayında"
 
 msgid "Purchasing"
 msgstr "Purchasing"
@@ -2252,7 +2252,7 @@ msgid "Groups"
 msgstr "Gruplar"
 
 msgid "Home"
-msgstr "Ana Sayfa"
+msgstr "Anasayfa"
 
 msgid "Logout"
 msgstr "Çıkış Yap"
@@ -4177,3 +4177,151 @@ msgstr ""
 
 msgid "Attributes saved for variant"
 msgstr "Varyant özellikleri kaydedildi"
+
+msgid "My Store"
+msgstr "Mağazam"
+
+msgid "OVERVIEW"
+msgstr "GENEL BAKIŞ"
+
+msgid "saved {{ t }} ago"
+msgstr "son kayıt {{ t }} önce"
+
+msgid "Open site"
+msgstr "Siteyi aç"
+
+msgid "Store panel"
+msgstr "Mağaza paneli"
+
+msgid ""
+"Manage home sections, header menu and products from one place. Changes go "
+"live instantly."
+msgstr ""
+"Anasayfa bölümlerini, header menüsünü ve ürünleri tek bir yerden yönet. "
+"Değişiklikler anında siteye yansır."
+
+msgid "Home sections"
+msgstr "Anasayfa bölümleri"
+
+msgid "Hero · Season cards · Showcase · Trust strip"
+msgstr "Hero · Sezon kartları · Vitrin · Güven bandı"
+
+msgid "sections"
+msgstr "bölüm"
+
+msgid "Menu & Navigation"
+msgstr "Menü & Navigasyon"
+
+msgid "Header titles and flyout showcases"
+msgstr "Header başlıkları ve flyout vitrinleri"
+
+msgid "main entries"
+msgstr "ana başlık"
+
+msgid "Price, variants, images and stock management"
+msgstr "Fiyat, varyant, görsel ve stok yönetimi"
+
+msgid "Marketing module"
+msgstr "Marketing modülü"
+
+msgid "New section"
+msgstr "Yeni bölüm"
+
+msgid "Sections"
+msgstr "Bölümler"
+
+msgid "HOME · SECTIONS"
+msgstr "ANASAYFA · BÖLÜMLER"
+
+msgid "Page sections"
+msgstr "Sayfa bölümleri"
+
+msgid "Drag to reorder · click name to edit"
+msgstr "Sürükleyerek sırala · ada tıklayıp düzenle"
+
+msgid "Published — turn off"
+msgstr "Yayında — kapat"
+
+msgid "Draft — publish"
+msgstr "Taslak — yayınla"
+
+msgid "Add new section"
+msgstr "Yeni bölüm ekle"
+
+msgid "live preview"
+msgstr "canlı önizleme"
+
+msgid "Belino preview"
+msgstr "Belino önizleme"
+
+msgid "Basics"
+msgstr "Temel"
+
+msgid "Content"
+msgstr "İçerik"
+
+msgid "Image & CTA"
+msgstr "Görsel & CTA"
+
+msgid "Cards"
+msgstr "Kartlar"
+
+msgid "Featured Products"
+msgstr "Vitrin Ürünleri"
+
+msgid "Trust Badges"
+msgstr "Güven Rozetleri"
+
+msgid "Item %(counter)s"
+msgstr "Öğe %(counter)s"
+
+msgid "New menu item"
+msgstr "Yeni başlık"
+
+msgid "MENU · ITEMS"
+msgstr "MENÜ · BAŞLIKLAR"
+
+msgid "Top menu items"
+msgstr "Üst menü öğeleri"
+
+msgid "%(counter)s sub"
+msgstr "%(counter)s alt"
+
+msgid "Add new menu item"
+msgstr "Yeni başlık ekle"
+
+msgid "Header"
+msgstr "Header"
+
+msgid "Menu"
+msgstr "Menü"
+
+msgid "Label & Settings"
+msgstr "Etiket & Ayarlar"
+
+msgid "Link & Hierarchy"
+msgstr "Bağlantı & Hiyerarşi"
+
+msgid "Showcase Card"
+msgstr "Vitrin Kartı"
+
+msgid "Delete this?"
+msgstr "Silinsin mi?"
+
+msgid "Yes, delete"
+msgstr "Evet, sil"
+
+msgid "Edit homepage"
+msgstr "Anasayfa düzenle"
+
+msgid "Menu & navigation"
+msgstr "Menü & navigasyon"
+
+msgid "STOREFRONT CMS"
+msgstr "MAĞAZA CMS"
+
+msgid "Select Team (Optional)"
+msgstr "Takım seç (opsiyonel)"
+
+msgid "Add User"
+msgstr "Kullanıcı ekle"

@@ -1,14 +1,15 @@
 {% extends "base.html" %}
+{% load i18n %}
 {% block content %}
 <div class="sf-page sf-page-narrow">
   <div class="sf-confirm">
     <div class="sf-confirm-icon"><i data-lucide="alert-triangle"></i></div>
-    <h1 class="sf-h1">Silinsin mi?</h1>
+    <h1 class="sf-h1">{% trans "Delete this?" %}</h1>
     <p class="sf-meta">{{ object }}</p>
     <form method="post" class="sf-confirm-actions">
       {% csrf_token %}
-      <a class="sf-btn-ghost" href="{{ back_url }}">Vazgeç</a>
-      <button class="sf-btn-danger" type="submit"><i data-lucide="trash-2"></i> Evet, sil</button>
+      <a class="sf-btn-ghost" href="{{ back_url }}">{% trans "Cancel" %}</a>
+      <button class="sf-btn-danger" type="submit"><i data-lucide="trash-2"></i> {% trans "Yes, delete" %}</button>
     </form>
   </div>
 </div>

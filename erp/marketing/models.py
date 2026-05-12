@@ -726,53 +726,53 @@ class GuestReviewImage(models.Model):
 
 # ============================================================
 # DISCOUNT CODES
-# İndirim kodları - fenomenler için
+# Promo codes given to influencers / newsletter subscribers
 # ============================================================
 class DiscountCode(models.Model):
-    """İndirim kodları - influencerlara verilecek kodlar"""
+    """Promo codes (e.g. influencer codes, newsletter signup rewards)."""
     code = models.CharField(
-        max_length=50, 
-        unique=True, 
-        verbose_name="İndirim Kodu",
-        help_text="Fenomene verilecek benzersiz kod (örn: KARVEN10)"
+        max_length=50,
+        unique=True,
+        verbose_name="Code",
+        help_text="Unique promo code (e.g. KARVEN10)"
     )
     discount_percentage = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        verbose_name="İndirim Yüzdesi",
-        help_text="Yüzde olarak indirim miktarı (örn: 10.00 için %10)"
+        max_digits=5,
+        decimal_places=2,
+        verbose_name="Discount Percentage",
+        help_text="Discount as a percent (e.g. 10.00 for 10%)"
     )
     is_active = models.BooleanField(
-        default=True, 
-        verbose_name="Aktif",
-        help_text="Kod aktif mi?"
+        default=True,
+        verbose_name="Active",
+        help_text="Whether the code can currently be redeemed"
     )
     usage_count = models.PositiveIntegerField(
-        default=0, 
-        verbose_name="Kullanım Sayısı",
-        help_text="Bu kodla kaç başarılı sipariş oluşturuldu"
+        default=0,
+        verbose_name="Usage Count",
+        help_text="Number of successful orders that used this code"
     )
     max_uses = models.PositiveIntegerField(
-        default=0, 
-        verbose_name="Maksimum Kullanım",
-        help_text="0 = sınırsız, 1 = tek kullanımlık"
+        default=0,
+        verbose_name="Max Uses",
+        help_text="0 = unlimited, 1 = single-use"
     )
     influencer_name = models.CharField(
-        max_length=100, 
-        blank=True, 
-        verbose_name="Fenomen Adı",
-        help_text="Bu kodu kullanacak fenomenin adı (opsiyonel)"
+        max_length=100,
+        blank=True,
+        verbose_name="Influencer Name",
+        help_text="Optional — name of the influencer using this code"
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
-        verbose_name = "İndirim Kodu"
-        verbose_name_plural = "İndirim Kodları"
+        verbose_name = "Discount Code"
+        verbose_name_plural = "Discount Codes"
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"{self.code} ({self.discount_percentage}%)"
-    
+
     def is_valid(self):
         """Check if code is active and under usage limit"""
         if not self.is_active:
@@ -783,21 +783,21 @@ class DiscountCode(models.Model):
 
 
 # ============================================================
-# WEB SUBSCRIPTIONS
-# Bülten abonelikleri - email ve telefon ile
+# NEWSLETTER SUBSCRIPTIONS
+# Email + phone subscribers (newsletter / discount code signups)
 # ============================================================
-class WebSubscription(models.Model):
-    """Newsletter subscriptions - email and phone are unique"""
+class NewsletterSubscription(models.Model):
+    """Newsletter subscribers — uniquely identified by email and phone."""
     email = models.EmailField(
         unique=True,
-        verbose_name="E-posta",
-        help_text="Abone e-posta adresi"
+        verbose_name="Email",
+        help_text="Subscriber email address"
     )
     phone = models.CharField(
         max_length=20,
         unique=True,
-        verbose_name="Telefon",
-        help_text="Abone telefon numarası"
+        verbose_name="Phone",
+        help_text="Subscriber phone number"
     )
     discount_code = models.ForeignKey(
         DiscountCode,
@@ -805,19 +805,19 @@ class WebSubscription(models.Model):
         null=True,
         blank=True,
         related_name='subscriptions',
-        verbose_name="İndirim Kodu"
+        verbose_name="Discount Code"
     )
     is_active = models.BooleanField(
         default=True,
-        verbose_name="Aktif"
+        verbose_name="Active"
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
-        verbose_name = "Bülten Aboneliği"
-        verbose_name_plural = "Bülten Abonelikleri"
+        verbose_name = "Newsletter Subscription"
+        verbose_name_plural = "Newsletter Subscriptions"
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"{self.email} - {self.phone}"
 

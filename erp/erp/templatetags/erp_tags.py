@@ -203,6 +203,14 @@ def dashboard_component(csrf_token,path,member):
                 elif t.contact_id and t.contact:
                     entity_name = getattr(t.contact, 'name', '') or str(t.contact)
                     entity_type = 'contact'
+                # User can edit the task if they're the creator, assignee,
+                # or a superuser. Tasks with no creator (legacy) are editable.
+                _can_edit = bool(
+                    (not t.created_by)
+                    or (member and t.created_by == member)
+                    or (member and t.member == member)
+                    or (getattr(member, 'user', None) and getattr(member.user, 'is_superuser', False))
+                )
                 payload = {
                     'id': t.id,
                     'name': t.name,
@@ -217,6 +225,7 @@ def dashboard_component(csrf_token,path,member):
                     'completed': bool(t.completed),
                     'entity_name': entity_name,
                     'entity_type': entity_type,
+                    'can_edit': _can_edit,
                 }
                 key = t.due_date.isoformat()  # YYYY-MM-DD
                 all_tasks_by_date.setdefault(key, []).append(payload)
@@ -264,9 +273,16 @@ def dashboard_component(csrf_token,path,member):
                 elif t.contact_id and t.contact:
                     entity_name = getattr(t.contact, 'name', '') or str(t.contact)
                     entity_type = 'contact'
+                _can_edit_d = bool(
+                    (not t.created_by)
+                    or (member and t.created_by == member)
+                    or (member and t.member == member)
+                    or (getattr(member, 'user', None) and getattr(member.user, 'is_superuser', False))
+                )
                 delegated_tasks_data.append({
                     'id': t.id,
                     'name': t.name,
+                    'can_edit': _can_edit_d,
                     'priority': (t.priority or 'medium'),
                     'date_label': t.due_date.strftime('%d.%m.%Y'),
                     'date_iso': t.due_date.isoformat(),

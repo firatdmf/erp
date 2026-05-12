@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}{% if is_create %}Yeni bölüm{% else %}{{ section }}{% endif %} · Mağazam{% endblock %}
+{% load i18n %}
+{% block title %}{% if is_create %}{% trans "New section" %}{% else %}{{ section }}{% endif %} · {% trans "My Store" %}{% endblock %}
 
 {% block content %}
 <style>
@@ -354,26 +355,26 @@ body > main:has(.cms2) {
   <div class="cms2-top">
     <div class="cms2-bread">
       <a class="bc" href="{% url 'storefront:dashboard' %}">
-        <i data-lucide="store"></i>Mağazam
+        <i data-lucide="store"></i>{% trans "My Store" %}
       </a>
       <i data-lucide="chevron-right" class="bc-sep"></i>
-      <a class="bc" href="{% url 'storefront:edit_home' %}">Anasayfa</a>
+      <a class="bc" href="{% url 'storefront:edit_home' %}">{% trans "Home" %}</a>
       <i data-lucide="chevron-right" class="bc-sep"></i>
-      <span class="bc">{% if is_create %}Yeni bölüm{% else %}{{ section.get_kind_display }}{% endif %}</span>
+      <span class="bc">{% if is_create %}{% trans "New section" %}{% else %}{{ section.get_kind_display }}{% endif %}</span>
       {% if not is_create %}
         <span class="bc-status {% if section.is_active %}published{% else %}draft{% endif %}">
-          <span class="dot"></span>{% if section.is_active %}Yayında{% else %}Taslak{% endif %}
+          <span class="dot"></span>{% if section.is_active %}{% trans "Published" %}{% else %}{% trans "Draft" %}{% endif %}
         </span>
       {% endif %}
     </div>
     <div class="cms2-actions">
       {% if not is_create %}
         <a class="cms2-btn ghost danger" href="{% url 'storefront:delete_home_section' section.pk %}">
-          <i data-lucide="trash-2"></i><span>Sil</span>
+          <i data-lucide="trash-2"></i><span>{% trans "Delete" %}</span>
         </a>
       {% endif %}
       <button class="cms2-btn primary" type="submit" form="sf-edit-form">
-        <i data-lucide="check"></i><span>Kaydet</span>
+        <i data-lucide="check"></i><span>{% trans "Save" %}</span>
       </button>
     </div>
   </div>
@@ -386,7 +387,7 @@ body > main:has(.cms2) {
         <div class="fs open">
           <div class="fs-head">
             <span class="fs-ico"><i data-lucide="settings-2"></i></span>
-            <span class="fs-t">Temel</span>
+            <span class="fs-t">{% trans "Basics" %}</span>
           </div>
           <div class="fs-body">
             {% for f in form %}{% if f.name == 'kind' or f.name == 'order' or f.name == 'is_active' %}
@@ -402,7 +403,7 @@ body > main:has(.cms2) {
         <div class="fs open">
           <div class="fs-head">
             <span class="fs-ico"><i data-lucide="type"></i></span>
-            <span class="fs-t">İçerik</span>
+            <span class="fs-t">{% trans "Content" %}</span>
           </div>
           <div class="fs-body">
             {% for f in form %}{% if f.name == 'eyebrow_tr' or f.name == 'eyebrow_en' or f.name == 'title_tr' or f.name == 'title_en' or f.name == 'body_tr' or f.name == 'body_en' %}
@@ -418,7 +419,7 @@ body > main:has(.cms2) {
         <div class="fs open">
           <div class="fs-head">
             <span class="fs-ico"><i data-lucide="image"></i></span>
-            <span class="fs-t">Görsel &amp; CTA</span>
+            <span class="fs-t">{% trans "Image & CTA" %}</span>
           </div>
           <div class="fs-body">
             {% for f in form %}{% if f.name == 'image_upload' or f.name == 'image_url' or f.name == 'cta_label_tr' or f.name == 'cta_label_en' or f.name == 'cta_href' %}
@@ -436,9 +437,9 @@ body > main:has(.cms2) {
             <div class="fs-head">
               <span class="fs-ico"><i data-lucide="layers"></i></span>
               <span class="fs-t">
-                {% if formset_attr == 'cards' %}Kartlar
-                {% elif formset_attr == 'featured_products' %}Vitrin Ürünleri
-                {% elif formset_attr == 'badges' %}Güven Rozetleri
+                {% if formset_attr == 'cards' %}{% trans "Cards" %}
+                {% elif formset_attr == 'featured_products' %}{% trans "Featured Products" %}
+                {% elif formset_attr == 'badges' %}{% trans "Trust Badges" %}
                 {% endif %}
               </span>
             </div>
@@ -447,7 +448,7 @@ body > main:has(.cms2) {
               {% for sub in formset %}
                 <div class="feat-edit">
                   <div class="feat-edit-head">
-                    <span>Öğe {{ forloop.counter }}</span>
+                    <span>{% blocktrans with counter=forloop.counter %}Item {{ counter }}{% endblocktrans %}</span>
                   </div>
                   {% for field in sub.visible_fields %}
                     <div class="f">
@@ -467,13 +468,13 @@ body > main:has(.cms2) {
 
     <main class="canvas canvas-stack">
       <div class="canvas-rule">
-        <span>Anasayfa · <span class="mono">/</span></span>
-        <span class="canvas-w">canlı önizleme</span>
+        <span>{% trans "Home" %} · <span class="mono">/</span></span>
+        <span class="canvas-w">{% trans "live preview" %}</span>
       </div>
       <div class="frame frame-desktop">
         <iframe src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"
                 class="canvas-iframe"
-                title="Belino önizleme"
+                title="{% trans 'Belino preview' %}"
                 loading="lazy"
                 data-preview-iframe
                 data-base-src="{{ iframe_src|default:STOREFRONT_PREVIEW_URL_WITH_EDIT }}"></iframe>

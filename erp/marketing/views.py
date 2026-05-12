@@ -3388,7 +3388,7 @@ def newsletter_subscribe(request):
     - Sends email with the discount code
     - Saves subscription to database
     """
-    from marketing.models import DiscountCode, WebSubscription
+    from marketing.models import DiscountCode, NewsletterSubscription
     
     try:
         data = json.loads(request.body)
@@ -3412,7 +3412,7 @@ def newsletter_subscribe(request):
             return JsonResponse({'success': False, 'error': 'Geçersiz telefon numarası'})
         
         # Check if email already exists
-        if WebSubscription.objects.filter(email=email).exists():
+        if NewsletterSubscription.objects.filter(email=email).exists():
             return JsonResponse({
                 'success': False, 
                 'error': 'Bu e-posta adresi zaten kayıtlı'
@@ -3420,7 +3420,7 @@ def newsletter_subscribe(request):
         
         # Check if phone already exists (skip for footer/no-phone subscriptions)
         skip_discount = data.get('skip_discount', False)
-        if not skip_discount and WebSubscription.objects.filter(phone=phone_normalized).exists():
+        if not skip_discount and NewsletterSubscription.objects.filter(phone=phone_normalized).exists():
             return JsonResponse({
                 'success': False,
                 'error': 'Bu telefon numarası zaten kayıtlı'
@@ -3430,7 +3430,7 @@ def newsletter_subscribe(request):
         if skip_discount:
             # Footer subscription: no discount code
             try:
-                subscription = WebSubscription.objects.create(
+                subscription = NewsletterSubscription.objects.create(
                     email=email,
                     phone=phone_normalized,
                     is_active=True
@@ -3459,7 +3459,7 @@ def newsletter_subscribe(request):
         )
         
         # Create the subscription
-        subscription = WebSubscription.objects.create(
+        subscription = NewsletterSubscription.objects.create(
             email=email,
             phone=phone_normalized,
             discount_code=discount_code,
@@ -3526,7 +3526,7 @@ def file_info_api(request, file_id):
 @csrf_exempt
 def newsletter_unsubscribe(request):
     """Unsubscribe from newsletter by email."""
-    from marketing.models import WebSubscription
+    from marketing.models import NewsletterSubscription
 
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required'}, status=405)
@@ -3539,11 +3539,11 @@ def newsletter_unsubscribe(request):
             return JsonResponse({'success': False, 'error': 'Email required'})
 
         try:
-            sub = WebSubscription.objects.get(email=email)
+            sub = NewsletterSubscription.objects.get(email=email)
             sub.is_active = False
             sub.save(update_fields=['is_active'])
             return JsonResponse({'success': True, 'message': 'Unsubscribed'})
-        except WebSubscription.DoesNotExist:
+        except NewsletterSubscription.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Not found'}, status=404)
 
     except Exception as e:

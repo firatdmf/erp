@@ -171,6 +171,7 @@ INSTALLED_APPS = [
     "team",  # Team management system
     "notes", # My Notes system
     "procurement", # Procurement system
+    "current_account",  # Cari Hesap (current account / customer-supplier ledger)
     "storefront",  # Online store CMS (header menu, home sections, featured products)
     "django_htmx",
     "crispy_forms",

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load humanize %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .rx { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
+  .rx, .rx * { box-sizing: border-box; }
+
+  .rx-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom: 22px; gap: 16px; flex-wrap: wrap; }
+  .rx-head-l { max-width: 760px; }
+  .rx-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .rx-title { font: 800 30px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0 0 8px; }
+  .rx-sub { font: 500 13.5px var(--font-sans); color: var(--gray-500); margin: 0; line-height: 1.55; }
+
+  .rx-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+  .rx-card {
+    background: white; border:1px solid #E2E8EE; border-radius: 12px;
+    padding: 22px 22px 18px; text-decoration: none; color: inherit;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+    transition: all 160ms; display: flex; flex-direction: column; min-height: 200px;
+  }
+  .rx-card:hover { border-color: var(--nejum-teal-500); box-shadow: 0 4px 16px rgba(15,23,31,0.06); transform: translateY(-2px); color: inherit; }
+
+  .rx-ico {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--nejum-teal-50); color: var(--nejum-teal-700);
+    display:inline-flex; align-items:center; justify-content:center;
+    margin-bottom: 14px;
+  }
+  .rx-ico i { width: 20px; height: 20px; }
+
+  .rx-card h3 { font: 700 16px var(--font-sans); color: var(--ink); margin: 0 0 6px; letter-spacing: -0.01em; }
+  .rx-card p  { font: 500 12.5px var(--font-sans); color: var(--gray-500); margin: 0; line-height: 1.55; }
+
+  .rx-badge {
+    display:inline-flex; align-items:center; gap: 6px; margin-top: auto;
+    padding: 4px 10px 4px 8px; border-radius: 999px;
+    font: 600 11px var(--font-sans); letter-spacing: 0.02em;
+    background: #EEF1F5; color: var(--gray-600); width: fit-content;
+    align-self: flex-start;
+  }
+  .rx-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--gray-500); }
+  .rx-badge.alert { background: #FEE4E2; color: #B23B12; }
+  .rx-badge.alert::before { background: #DC2626; }
+  .rx-badge.warn  { background: #FEF3C7; color: #92400E; }
+  .rx-badge.warn::before  { background: #F59E0B; }
+  .rx-badge.info  { background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+  .rx-badge.info::before  { background: var(--nejum-teal-500); }
+  .rx-badge.ok    { background: #D1FAE5; color: #0E6E4A; }
+  .rx-badge.ok::before    { background: #10B981; }
+
+  .rx-card-foot { margin-top: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rx">
+
+  <div class="rx-head">
+    <div class="rx-head-l">
+      <div class="rx-eyebrow">{% trans "Account Reports" %}</div>
+      <h1 class="rx-title">{% trans "Report Center" %}</h1>
+      <p class="rx-sub">{% trans "Aging analysis, trial balance, credit limit monitoring and due-date calendar — every signal you need to keep receivables and payables under control." %}</p>
+    </div>
+  </div>
+
+  <div class="rx-grid">
+    <a class="rx-card" href="{% url 'current_account:report_aging' %}">
+      <div class="rx-ico"><i data-lucide="clock"></i></div>
+      <h3>{% trans "Aging Report" %}</h3>
+      <p>{% trans "Aging analysis of open receivables and payables: 0-30, 30-60, 60-90, 90+ days" %}</p>
+      <div class="rx-card-foot">
+        {% if overdue_count %}
+          <span class="rx-badge alert">{% blocktrans with count=overdue_count|intcomma %}{{ count }} invoices overdue{% endblocktrans %}</span>
+        {% else %}
+          <span class="rx-badge ok">{% trans "No overdue invoices" %}</span>
+        {% endif %}
+      </div>
+    </a>
+
+    <a class="rx-card" href="{% url 'current_account:report_trial_balance' %}">
+      <div class="rx-ico"><i data-lucide="layout-grid"></i></div>
+      <h3>{% trans "Trial Balance" %}</h3>
+      <p>{% trans "Opening, debit, credit and closing balances of all accounts by book" %}</p>
+      <div class="rx-card-foot">
+        <span class="rx-badge info">{% trans "Period filter available" %}</span>
+      </div>
+    </a>
+
+    <a class="rx-card" href="{% url 'current_account:report_credit_limit' %}">
+      <div class="rx-ico"><i data-lucide="shield-alert"></i></div>
+      <h3>{% trans "Credit Limit Report" %}</h3>
+      <p>{% trans "Customers reaching or exceeding their credit limit — accounts at risk" %}</p>
+      <div class="rx-card-foot">
+        {% if over_limit_count %}
+          <span class="rx-badge alert">{% blocktrans with count=over_limit_count|intcomma %}{{ count }} accounts exceed the limit{% endblocktrans %}</span>
+        {% else %}
+          <span class="rx-badge ok">{% trans "No accounts exceeding the limit" %}</span>
+        {% endif %}
+      </div>
+    </a>
+
+    <a class="rx-card" href="{% url 'current_account:report_due_calendar' %}">
+      <div class="rx-ico"><i data-lucide="calendar-clock"></i></div>
+      <h3>{% trans "Due Date Calendar" %}</h3>
+      <p>{% trans "Upcoming due dates — this week, next week, month-end and overdue" %}</p>
+      <div class="rx-card-foot">
+        {% if upcoming_due_count %}
+          <span class="rx-badge warn">{% blocktrans with count=upcoming_due_count|intcomma %}{{ count }} invoices within 7 days{% endblocktrans %}</span>
+        {% else %}
+          <span class="rx-badge ok">{% trans "No upcoming due dates" %}</span>
+        {% endif %}
+      </div>
+    </a>
+
+    <a class="rx-card" href="{% url 'current_account:help' %}">
+      <div class="rx-ico"><i data-lucide="book-open"></i></div>
+      <h3>{% trans "User Guide" %}</h3>
+      <p>{% trans "Step-by-step guide on how to use the module — scenarios, concepts, FAQ" %}</p>
+      <div class="rx-card-foot">
+        <span class="rx-badge info">{% trans "User Guide" %}</span>
+      </div>
+    </a>
+  </div>
+</div>
+
+<script>if (window.lucide) lucide.createIcons();</script>
+{% endblock %}

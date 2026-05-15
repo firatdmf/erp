@@ -23,10 +23,10 @@ msgid "ADD SINGLE RECORD"
 msgstr "TEKİL KAYIT EKLE"
 
 msgid "Contact"
-msgstr "Kişi"
+msgstr "İletişim"
 
 msgid "Company"
-msgstr "Şirket"
+msgstr "Firma"
 
 msgid "Task"
 msgstr "Görev"
@@ -254,7 +254,7 @@ msgid "Sales & CRM"
 msgstr "Satış & CRM"
 
 msgid "Account"
-msgstr "Hesap"
+msgstr "Cari"
 
 msgid "Workspace"
 msgstr "Çalışma Alanı"
@@ -453,7 +453,7 @@ msgid "Min. Inventory Level"
 msgstr "Min. Stok Seviyesi"
 
 msgid "Name"
-msgstr "Ad"
+msgstr "İsim"
 
 msgid "New Category"
 msgstr "Yeni Kategori"
@@ -468,7 +468,7 @@ msgid "Qty Used"
 msgstr "Kullanılan Miktar"
 
 msgid "Quantity"
-msgstr "Adet"
+msgstr "Miktar"
 
 msgid "Raw Material"
 msgstr "Hammadde"
@@ -771,7 +771,7 @@ msgid "Edit"
 msgstr "Düzenle"
 
 msgid "View"
-msgstr "Görüntüle"
+msgstr "Görünüm"
 
 msgid "Back"
 msgstr "Geri"
@@ -1202,7 +1202,7 @@ msgid "Created At"
 msgstr "Created At"
 
 msgid "Currency"
-msgstr "Para birimi"
+msgstr "Para Birimi"
 
 msgid "Current Quantity"
 msgstr "Current Quantity"
@@ -1277,7 +1277,7 @@ msgid "Double"
 msgstr "Double"
 
 msgid "Due Date"
-msgstr "Vade Tarihi"
+msgstr "Vade"
 
 msgid "Due Date *"
 msgstr "Due Date *"
@@ -1430,7 +1430,7 @@ msgid "Item Status"
 msgstr "Item Status"
 
 msgid "Items"
-msgstr "Items"
+msgstr "Kalemler"
 
 msgid "Items in Pack"
 msgstr "Items in Pack"
@@ -1691,10 +1691,10 @@ msgid "Pay Dividend"
 msgstr "Pay Dividend"
 
 msgid "Payment"
-msgstr "Ödeme"
+msgstr "Tahsilat / Ödeme"
 
 msgid "Payment Information"
-msgstr "Payment Information"
+msgstr "Tahsilat Bilgisi"
 
 msgid "Payment Method"
 msgstr "Ödeme Yöntemi"
@@ -1778,7 +1778,7 @@ msgid "RUNWAY"
 msgstr "RUNWAY"
 
 msgid "Remaining"
-msgstr "Remaining"
+msgstr "Kalan Limit"
 
 msgid "Report Expense"
 msgstr "Report Expense"
@@ -1851,9 +1851,6 @@ msgstr "Bölüm Başlığı"
 
 msgid "Select"
 msgstr "Seç"
-
-msgid "Select Team"
-msgstr "Takım Seç"
 
 msgid "Select Team"
 msgstr "Takım Seç"
@@ -1976,7 +1973,7 @@ msgid "Today"
 msgstr "Bugün"
 
 msgid "Total"
-msgstr "Tutar"
+msgstr "Toplam"
 
 msgid "Total Balance"
 msgstr "Total Balance"
@@ -1997,7 +1994,7 @@ msgid "Trash is empty"
 msgstr "Trash is empty"
 
 msgid "Type"
-msgstr "Tür"
+msgstr "Tip"
 
 msgid "UNIT COST"
 msgstr "UNIT COST"
@@ -2225,13 +2222,13 @@ msgid "Other"
 msgstr "Diğer"
 
 msgid "Subtotal"
-msgstr "Ara toplam"
+msgstr "Ara Toplam"
 
 msgid "Tax"
 msgstr "Vergi"
 
 msgid "Discount"
-msgstr "İndirim"
+msgstr "İskonto"
 
 msgid "Dimensions"
 msgstr "Boyutlar"
@@ -2513,7 +2510,7 @@ msgid "Chat"
 msgstr "Sohbet"
 
 msgid "Check"
-msgstr "Kontrol Et"
+msgstr "Çek"
 
 msgid "Checked"
 msgstr "İşaretli"
@@ -2663,7 +2660,7 @@ msgid "Forgot password?"
 msgstr "Parolanı mı unuttun?"
 
 msgid "From"
-msgstr "Kimden"
+msgstr "Başlangıç"
 
 msgid "Full"
 msgstr "Tam"
@@ -2843,7 +2840,7 @@ msgid "Organization"
 msgstr "Organizasyon"
 
 msgid "Overdue"
-msgstr "Gecikti"
+msgstr "Vadesi Geçmiş"
 
 msgid "Page"
 msgstr "Sayfa"
@@ -2852,7 +2849,7 @@ msgid "Past Due"
 msgstr "Vadesi Geçti"
 
 msgid "Payments"
-msgstr "Ödemeler"
+msgstr "Tahsilatlar"
 
 msgid "Period"
 msgstr "Dönem"
@@ -2915,7 +2912,7 @@ msgid "Receive"
 msgstr "Al"
 
 msgid "Recent"
-msgstr "Son"
+msgstr "Son Hareket"
 
 msgid "Recent Activity"
 msgstr "Son Etkinlikler"
@@ -3092,7 +3089,7 @@ msgid "Tip"
 msgstr "İpucu"
 
 msgid "To"
-msgstr "Kime"
+msgstr "Bitiş"
 
 msgid "Today's Tasks"
 msgstr "Bugünkü Görevler"
@@ -3428,7 +3425,7 @@ msgid "NOTES"
 msgstr "NOTLAR"
 
 msgid "New Account"
-msgstr "Yeni Hesap"
+msgstr "Yeni Cari"
 
 msgid "New Activity"
 msgstr "Yeni Etkinlik"
@@ -3917,7 +3914,7 @@ msgid "Delivered"
 msgstr "Teslim edildi"
 
 msgid "Returned"
-msgstr "İade"
+msgstr "İade Edildi"
 
 msgid "Order received"
 msgstr "Sipariş alındı"
@@ -4184,8 +4181,8 @@ msgstr "Mağazam"
 msgid "OVERVIEW"
 msgstr "GENEL BAKIŞ"
 
-msgid "saved {{ t }} ago"
-msgstr "son kayıt {{ t }} önce"
+msgid "saved %(t)s ago"
+msgstr "son kayıt %(t)s önce"
 
 msgid "Open site"
 msgstr "Siteyi aç"
@@ -4325,3 +4322,2256 @@ msgstr "Takım seç (opsiyonel)"
 
 msgid "Add User"
 msgstr "Kullanıcı ekle"
+
+msgid ""
+"\"Delete\" button — if the account has movements, it is not deleted, it is "
+"<strong>deactivated</strong> (<code>is_active=False</code>). To completely "
+"delete, you must first delete the movements (not recommended)."
+msgstr ""
+"\"Sil\" butonu — eğer carinin hareketleri varsa silinmez, "
+"<strong>pasifleştirilir</strong> (<code>is_active=False</code>). Tamamen "
+"silmek için önce hareketleri silmen gerekir (önerilmez)."
+
+msgid "%(instrument)s added to portfolio: #%(serial)s"
+msgstr "%(instrument)s portföye eklendi: #%(serial)s"
+
+msgid "(%(count)s invoices)"
+msgstr "(%(count)s fatura)"
+
+msgid "+ : in our favor / − : against us"
+msgstr "+ : lehte / − : aleyhte"
+
+msgid "+ owes us / − we owe"
+msgstr "+ bize borçlu / − bizden alacaklı"
+
+msgid "+Total"
+msgstr "+Total"
+
+msgid "0-30 Days"
+msgstr "0-30 Gün"
+
+msgid "30-60 Days"
+msgstr "30-60 Gün"
+
+msgid "4 types"
+msgstr "4 tip"
+
+msgid "60-90 Days"
+msgstr "60-90 Gün"
+
+msgid "90+ Days"
+msgstr "90+ Gün"
+
+msgid ""
+"<a href=\"%(aging_url)s\">Aging Report</a> → All open receivables are split "
+"into <code>0-30 / 30-60 / 60-90 / 90+ days</code> buckets."
+msgstr ""
+"<a href=\"%(aging_url)s\">Gecikme Analizi Raporu</a> → Tüm açık alacaklar "
+"<code>0-30 / 30-60 / 60-90 / 90+ gün</code> dilimlerine ayrılır."
+
+msgid ""
+"<a href=\"%(credit_limit_url)s\">Credit Limit Report</a> → all customers "
+"with a limit usage percentage"
+msgstr ""
+"<a href=\"%(credit_limit_url)s\">Kredi Limiti Raporu</a> → limit kullanım "
+"yüzdesi olan tüm müşteriler"
+
+msgid ""
+"<a href=\"%(due_calendar_url)s\">Due Calendar</a> → Lists in groups: Overdue"
+" / This Week / Next Week / This Month / Later."
+msgstr ""
+"<a href=\"%(due_calendar_url)s\">Vade Takvimi</a> → Gruplara göre listeler: "
+"Vadesi Geçti / Bu Hafta / Gelecek Hafta / Bu Ay / Daha Sonra."
+
+msgid "<a href=\"%(report_index_url)s\">Report Center</a> → 4 major reports:"
+msgstr "<a href=\"%(report_index_url)s\">Rapor Merkezi</a> → 4 ana rapor:"
+
+msgid ""
+"<code>CARI-001</code>, <code>CARI-002</code>, ... are assigned automatically"
+msgstr ""
+"<code>CARI-001</code>, <code>CARI-002</code>, ... otomatik olarak atanır"
+
+msgid ""
+"<strong>\"Cancel\"</strong> (if issued): A reverse movement is written, the "
+"original is not deleted"
+msgstr ""
+"<strong>\"İptal\"</strong> (kesildiyse): Ters hareket yazılır, orijinali "
+"silinmez"
+
+msgid ""
+"<strong>\"Issue\"</strong>: Status becomes <em>issued</em>, "
+"<code>CariMovement</code> is created automatically"
+msgstr ""
+"<strong>\"Kes\"</strong>: Durum <em>kesildi</em> olur, "
+"<code>CariMovement</code> otomatik oluşturulur"
+
+msgid ""
+"<strong>+X CariMovement</strong> is written to the customer's current "
+"account (the receivable reopens)"
+msgstr ""
+"Müşterinin cari hesabına <strong>+X CariMovement</strong> yazılır (alacak "
+"yeniden açılır)"
+
+msgid ""
+"<strong>Advance</strong>: The unmatched portion automatically becomes an "
+"advance (can be used on a future invoice)"
+msgstr ""
+"<strong>Avans</strong>: Eşleşmeyen kısım otomatik avansa dönüşür (ileride "
+"bir faturada kullanılabilir)"
+
+msgid ""
+"<strong>Auto Match (FIFO)</strong>: closes the oldest invoices as long as "
+"the amount covers them"
+msgstr ""
+"<strong>Otomatik Eşleştir (FIFO)</strong>: tutar yettiği sürece en eski "
+"faturaları kapatır"
+
+msgid ""
+"<strong>Automatic effect</strong>: The account balance decreases (as if you "
+"had taken a collection)."
+msgstr ""
+"<strong>Otomatik etki</strong>: Cari bakiyesi düşer (tahsilat almışsın "
+"gibi)."
+
+msgid "<strong>Balance</strong> — the sum of movements, updated automatically"
+msgstr "<strong>Bakiye</strong> — hareketlerin toplamı, otomatik güncellenir"
+
+msgid "<strong>Carry-over</strong> (start-of-period balance)"
+msgstr "<strong>Devir</strong> (dönem başı bakiye)"
+
+msgid ""
+"<strong>Check entry</strong>: <code>/cari/cek-senet/yeni/</code> → "
+"Direction: <em>Received</em>"
+msgstr ""
+"<strong>Çek girişi</strong>: <code>/cari/cek-senet/yeni/</code> → Yön: "
+"<em>Alınan</em>"
+
+msgid ""
+"<strong>Checks / Promissory Notes</strong> — negotiable instruments waiting "
+"in the portfolio"
+msgstr ""
+"<strong>Çekler / Senetler</strong> — portföyde bekleyen kıymetli evraklar"
+
+msgid "<strong>Clear</strong> → select cash account → money comes in"
+msgstr "<strong>Tahsil Et</strong> → kasa hesabını seç → para gelir"
+
+msgid "<strong>Closing</strong> (end-of-period balance)"
+msgstr "<strong>Kapanış</strong> (dönem sonu bakiye)"
+
+msgid ""
+"<strong>Collections / Payments</strong> — transactions where money changed "
+"hands"
+msgstr ""
+"<strong>Tahsilatlar / Ödemeler</strong> — paranın el değiştirdiği işlemler"
+
+msgid ""
+"<strong>Create a draft</strong>: You add line items, VAT is calculated per "
+"row"
+msgstr ""
+"<strong>Taslak oluştur</strong>: Kalemleri eklersin, KDV her satır için "
+"hesaplanır"
+
+msgid "<strong>Credit</strong> (negative movements during the period)"
+msgstr "<strong>Alacak</strong> (dönem içindeki negatif hareketler)"
+
+msgid "<strong>Debit</strong> (positive movements during the period)"
+msgstr "<strong>Borç</strong> (dönem içindeki pozitif hareketler)"
+
+msgid "<strong>Deposit</strong> → status: <em>Deposited</em>"
+msgstr "<strong>Bankaya Ver</strong> → durum: <em>Bankaya Verildi</em>"
+
+msgid ""
+"<strong>Discount %</strong>: applied first (deducted from the line total)"
+msgstr "<strong>İskonto %</strong>: önce uygulanır (satır tutarından düşülür)"
+
+msgid "<strong>Endorse</strong> → transfer to another account"
+msgstr "<strong>Ciro Et</strong> → başka bir cariye devret"
+
+msgid ""
+"<strong>Given</strong>: Given to the supplier — you closed your debt with a "
+"negotiable instrument"
+msgstr ""
+"<strong>Verilen</strong>: Tedarikçiye verildi — borcunu kıymetli evrakla "
+"kapattın"
+
+msgid ""
+"<strong>If it bounces</strong>: \"Mark as Bounced\" → a reverse movement is "
+"written to the account, and the receivable is reopened."
+msgstr ""
+"<strong>Karşılıksız çıkarsa</strong>: \"Karşılıksız İşaretle\" → cariye ters"
+" hareket yazılır ve alacak yeniden açılır."
+
+msgid ""
+"<strong>If it's a draft</strong>: \"Delete\" button — cleanly deleted.<br>\n"
+"      <strong>If it's issued</strong>: \"Cancel\" — a reverse account movement is written automatically, the original record remains (audit-safe). Then issue the correct one as a new invoice."
+msgstr ""
+"<strong>Taslak ise</strong>: \"Sil\" butonu — temiz şekilde silinir.<br>\n"
+"      <strong>Kesildiyse</strong>: \"İptal\" — otomatik olarak ters cari hareketi yazılır, orijinal kayıt kalır (denetime uygun). Sonra doğru olanı yeni bir fatura olarak kes."
+
+msgid ""
+"<strong>Invoices</strong> — all sales/purchase invoices issued for this "
+"account"
+msgstr ""
+"<strong>Faturalar</strong> — bu cari için kesilmiş tüm satış/alış faturaları"
+
+msgid ""
+"<strong>Issue a sales invoice</strong>: On the account detail page, \"Issue "
+"Invoice\" → Type: <em>Sales Invoice</em>"
+msgstr ""
+"<strong>Satış faturası kes</strong>: Cari detay sayfasında, \"Fatura Kes\" →"
+" Tip: <em>Satış Faturası</em>"
+
+msgid ""
+"<strong>Issue an invoice:</strong> On the account page, <strong>\"Issue "
+"Invoice\"</strong> purple button → add line items → <strong>\"Save & "
+"Issue\"</strong>."
+msgstr ""
+"<strong>Fatura kes:</strong> Cari sayfasında, <strong>\"Fatura "
+"Kes\"</strong> mor butona bas → kalemleri ekle → <strong>\"Kaydet ve "
+"Kes\"</strong>."
+
+msgid ""
+"<strong>Manual</strong>: You write how much will be applied to each invoice"
+msgstr ""
+"<strong>Manuel</strong>: Her faturaya ne kadar uygulanacağını sen yazarsın"
+
+msgid ""
+"<strong>Movements</strong> — each financial effect is a row (invoice, "
+"collection, endorsement, etc.)"
+msgstr ""
+"<strong>Hareketler</strong> — her finansal etki bir satır (fatura, tahsilat,"
+" ciro vs.)"
+
+msgid ""
+"<strong>Open an account card:</strong> <a href=\"%(cari_create_url)s\">New "
+"Account</a> → select customer or supplier, enter the previous opening "
+"balance if any."
+msgstr ""
+"<strong>Cari kartı aç:</strong> <a href=\"%(cari_create_url)s\">Yeni "
+"Cari</a> → müşteri veya tedarikçi seç, varsa önceki açılış bakiyesini gir."
+
+msgid ""
+"<strong>Open an account</strong> (skip if it already exists): "
+"<code>/cari/yeni/</code>"
+msgstr "<strong>Cari aç</strong> (zaten varsa atla): <code>/cari/yeni/</code>"
+
+msgid "<strong>Open an account</strong>: Type = <em>Supplier</em>"
+msgstr "<strong>Cari aç</strong>: Tip = <em>Tedarikçi</em>"
+
+msgid ""
+"<strong>Payment</strong>: Account → \"Take Collection\" → Type: <em>Payment "
+"(to supplier)</em>"
+msgstr ""
+"<strong>Ödeme</strong>: Cari → \"Tahsilat Al\" → Tip: <em>Ödeme "
+"(tedarikçiye)</em>"
+
+msgid ""
+"<strong>Purchase invoice</strong>: Type: <em>Purchase Invoice</em> → the "
+"account balance becomes negative"
+msgstr ""
+"<strong>Alış faturası</strong>: Tip: <em>Alış Faturası</em> → cari bakiyesi "
+"negatife döner"
+
+msgid ""
+"<strong>Received</strong>: Came from the customer — you keep it in the "
+"portfolio"
+msgstr "<strong>Alınan</strong>: Müşteriden geldi — portföyde tutuyorsun"
+
+msgid "<strong>Recommended (tax & risk):</strong>"
+msgstr "<strong>Önerilen (vergi ve risk):</strong>"
+
+msgid "<strong>Required:</strong> Name, Type, Book, Currency."
+msgstr "<strong>Zorunlu:</strong> İsim, Tip, Defter, Para Birimi."
+
+msgid ""
+"<strong>Result</strong>: Invoice status becomes <code>Paid</code>, the "
+"account balance closes, the cash account increases."
+msgstr ""
+"<strong>Sonuç</strong>: Fatura durumu <code>Ödendi</code> olur, cari "
+"bakiyesi kapanır, kasa hesabı artar."
+
+msgid ""
+"<strong>Result</strong>: The account balance returns to zero, the cash "
+"account decreases."
+msgstr ""
+"<strong>Sonuç</strong>: Cari bakiyesi sıfıra döner, kasa hesabı azalır."
+
+msgid ""
+"<strong>Take a collection:</strong> On the account page, <strong>\"Take "
+"Collection\"</strong> green button → open invoices are listed automatically,"
+" match them."
+msgstr ""
+"<strong>Tahsilat al:</strong> Cari sayfasında, <strong>\"Tahsilat "
+"Al\"</strong> yeşil butona bas → açık faturalar otomatik listelenir, "
+"eşleştir."
+
+msgid "<strong>VAT %</strong>: added on top of the net after discount"
+msgstr "<strong>KDV %</strong>: iskonto sonrası net tutarın üzerine eklenir"
+
+msgid "<strong>We owe the account</strong> / the account paid us"
+msgstr "<strong>Cariye borçluyuz</strong> / cari bize ödeme yaptı"
+
+msgid "<strong>When the customer pays</strong>: Account → \"Take Collection\""
+msgstr "<strong>Müşteri ödeme yapınca</strong>: Cari → \"Tahsilat Al\""
+
+msgid "<strong>When the due date arrives, 3 options</strong>:"
+msgstr "<strong>Vade tarihi geldiğinde 3 seçenek</strong>:"
+
+msgid "A cash account must be selected."
+msgstr "Kasa hesabı seçilmelidir."
+
+msgid ""
+"A draft invoice does not affect the current account. It only takes effect "
+"the moment you issue it."
+msgstr "Taslak fatura cariyi etkilemez. Sadece kestiğin anda etkili olur."
+
+msgid "A — I make a sale to a customer, then I receive the money"
+msgstr "A — Müşteriye satış yapıyorum, sonra parayı alıyorum"
+
+msgid "A: Sale + Collection"
+msgstr "A: Satış + Tahsilat"
+
+msgid "ADVANCE (to account)"
+msgstr "AVANS (cari hesabına)"
+
+msgid "Account %(code)s deleted."
+msgstr "Cari %(code)s silindi."
+
+msgid ""
+"Account %(code)s was deactivated (not deleted because it has movements)."
+msgstr "Cari %(code)s pasifleştirildi (hareketleri olduğu için silinmedi)."
+
+msgid "Account & Direction"
+msgstr "Cari & Yön"
+
+msgid "Account Info"
+msgstr "Cari Bilgisi"
+
+msgid "Account List"
+msgstr "Cari Listesi"
+
+msgid "Account Movement"
+msgstr "Cari Hareketi"
+
+msgid "Account Movements"
+msgstr "Cari Hareketleri"
+
+msgid "Account No"
+msgstr "Hesap No"
+
+msgid "Account Reports"
+msgstr "Cari Raporları"
+
+msgid "Account code"
+msgstr "Cari kodu"
+
+msgid "Account created: %(code)s"
+msgstr "Cari oluşturuldu: %(code)s"
+
+msgid ""
+"Account detail → <strong>\"Statement\"</strong> button → Select date range →"
+" <strong>\"Print\"</strong>."
+msgstr ""
+"Cari detayı → <strong>\"Ekstre\"</strong> butonu → Tarih aralığı seç → "
+"<strong>\"Yazdır\"</strong>."
+
+msgid "Account is closed"
+msgstr "Cari kapanır"
+
+msgid "Account movement"
+msgstr "Cari hareketi"
+
+msgid "Account now owes us"
+msgstr "Cari bize borçlandı"
+
+msgid "Account paid / refunded"
+msgstr "Cari ödedi / iade aldı"
+
+msgid "Account updated."
+msgstr "Cari kartı güncellendi."
+
+msgid "Add Item"
+msgstr "Kalem Ekle"
+
+msgid "Add Movement"
+msgstr "Hareket Ekle"
+
+msgid "Add line items (each row has a VAT rate)"
+msgstr "Kalemleri ekle (her satırın bir KDV oranı var)"
+
+msgid "Add the first movement"
+msgstr "İlk hareketi ekle"
+
+msgid "Add to Portfolio"
+msgstr "Portföye Ekle"
+
+msgid "Adjust date range or book filter."
+msgstr "Tarih aralığını ya da defter filtresini değiştir."
+
+msgid "Adjust filters or create a new invoice."
+msgstr "Filtreleri değiştir ya da yeni bir fatura kes."
+
+msgid "Adjust filters or create a new payment."
+msgstr "Filtreleri değiştir ya da yeni bir tahsilat oluştur."
+
+msgid "Adjust filters or open a new account."
+msgstr "Filtreleri değiştir ya da yeni bir cari aç."
+
+msgid "Advance"
+msgstr "Avans"
+
+msgid "Advance Given"
+msgstr "Verilen Avans"
+
+msgid "Advance Received"
+msgstr "Alınan Avans"
+
+msgid "Aging"
+msgstr "Gecikme Analizi"
+
+msgid "Aging Report"
+msgstr "Gecikme Analizi Raporu"
+
+msgid ""
+"Aging analysis of open receivables and payables: 0-30, 30-60, 60-90, 90+ "
+"days"
+msgstr ""
+"Açık alacakların ve borçların gecikme analizi: 0-30, 30-60, 60-90, 90+ gün"
+
+msgid "Aging, trial balance, credit limit and due date calendar reports"
+msgstr "Gecikme Analizi, mizan, risk limiti ve vade takvimi raporları"
+
+msgid "All Balances"
+msgstr "Tüm Bakiyeler"
+
+msgid "All Books"
+msgstr "Tüm Defterler"
+
+msgid "All Directions"
+msgstr "Tüm Yönler"
+
+msgid "All Limited Accounts"
+msgstr "Tüm Limitli Cariler"
+
+msgid "All Statuses"
+msgstr "Tüm Durumlar"
+
+msgid "All Types"
+msgstr "Tüm Tipler"
+
+msgid "All accounts"
+msgstr "Tüm cariler"
+
+msgid "All invoices are paid."
+msgstr "Tüm faturalar ödendi."
+
+msgid ""
+"All of them were <strong>automatically</strong> migrated to Account cards "
+"(Phase 1 migration). The old tables still exist and new account movements "
+"are automatically written to them as well. We didn't break the old "
+"dashboards."
+msgstr ""
+"Hepsi <strong>otomatik olarak</strong> Cari kartlarına taşındı (Faz 1 "
+"migrasyonu). Eski tablolar hâlâ duruyor ve yeni cari hareketleri onlara da "
+"otomatik yazılıyor. Eski panoları bozmadık."
+
+msgid "All sales / purchase / return / proforma invoices"
+msgstr "Tüm satış / alış / iade / proforma faturaları"
+
+msgid "Allocated:"
+msgstr "Eşleştirilen:"
+
+msgid ""
+"Allocation total (%(total)s) cannot exceed payment amount (%(amount)s)."
+msgstr "Eşleştirme toplamı (%(total)s) tahsilat tutarını (%(amount)s) aşamaz."
+
+msgid "Allocations must be a list."
+msgstr "Eşleştirmeler bir liste olmalı."
+
+msgid "Amount & Dates"
+msgstr "Tutar & Tarihler"
+
+msgid "Amount Distribution"
+msgstr "Tutar Dağılımı"
+
+msgid "Amount cannot be zero."
+msgstr "Tutar sıfır olamaz."
+
+msgid "Amount must be greater than zero."
+msgstr "Tutar sıfırdan büyük olmalı."
+
+msgid "An account must be selected."
+msgstr "Cari seçilmelidir."
+
+msgid "An account to endorse to must be selected."
+msgstr "Ciro edilecek cari seçilmelidir."
+
+msgid "Applied"
+msgstr "Uygulanan"
+
+msgid "Applied to Invoices"
+msgstr "Faturalara Uygulanan"
+
+msgid ""
+"Are you sure you want to cancel this invoice? A reverse movement will be "
+"created."
+msgstr ""
+"Faturayı iptal etmek istediğine emin misin? Ters hareket oluşturulacak."
+
+msgid "Are you sure you want to delete/deactivate this account?"
+msgstr "Bu cari kartını silmek/pasifleştirmek istediğine emin misin?"
+
+msgid "As of"
+msgstr "Şu tarih itibariyle"
+
+msgid "Auto Match (FIFO)"
+msgstr "Otomatik Eşleştir (FIFO)"
+
+msgid "Available actions"
+msgstr "Kullanılabilir aksiyonlar"
+
+msgid "B — I bought goods from a supplier, I will make a payment"
+msgstr "B — Tedarikçiden mal aldım, ödeme yapacağım"
+
+msgid "B: Purchase + Payment"
+msgstr "B: Alış + Ödeme"
+
+msgid "Balance (high→low)"
+msgstr "Bakiye (büyük→küçük)"
+
+msgid "Balance (low→high)"
+msgstr "Bakiye (küçük→büyük)"
+
+msgid "Balance is not a stored field, it is the sum of movements:"
+msgstr "Bakiye saklanan bir alan değildir, hareketlerin toplamıdır:"
+
+msgid "Balance:"
+msgstr "Bakiye:"
+
+msgid "Bank"
+msgstr "Banka"
+
+msgid "Bank / Drawer"
+msgstr "Banka / Keşideci"
+
+msgid "Bank Transfer / EFT"
+msgstr "Banka Havalesi / EFT"
+
+msgid "Bank name (for checks)"
+msgstr "Çek için banka adı"
+
+msgid "Billing Address"
+msgstr "Fatura Adresi"
+
+msgid "Book"
+msgstr "Defter"
+
+msgid "Book and currency are required."
+msgstr "Defter ve para birimi zorunludur."
+
+msgid "Bounce"
+msgstr "Karşılıksız"
+
+msgid "Bounced"
+msgstr "Karşılıksız"
+
+msgid "Branch"
+msgstr "Şube"
+
+msgid ""
+"ByteEntegre/Logo-style classic current account module. Customer-supplier "
+"cards, invoices, collections-payments, checks-promissory notes, and reports "
+"— all in one place, without the headache."
+msgstr ""
+"ByteEntegre/Logo tarzı klasik cari hesap modülü. Müşteri-tedarikçi kartları,"
+" faturalar, tahsilat-ödemeler, çek-senetler ve raporlar — hepsi tek yerde, "
+"baş ağrısız."
+
+msgid "C — The customer brought a check"
+msgstr "C — Müşteri çek getirdi"
+
+msgid "C: Received a Check"
+msgstr "C: Çek Alındı"
+
+msgid "CRM Link"
+msgstr "CRM Bağlantısı"
+
+msgid "CRM link"
+msgstr "CRM bağlantısı"
+
+msgid "Came from customer"
+msgstr "Müşteriden geldi"
+
+msgid "Can I change the opening balance later?"
+msgstr "Açılış bakiyesini sonradan değiştirebilir miyim?"
+
+msgid "Can I get the statement as a PDF?"
+msgstr "Ekstreyi PDF olarak alabilir miyim?"
+
+msgid "Can I split a collection across multiple invoices?"
+msgstr "Bir tahsilatı birden fazla faturaya bölebilir miyim?"
+
+msgid "Can a portion of the collection remain as an advance?"
+msgstr "Tahsilatın bir kısmı avans olarak kalabilir mi?"
+
+msgid "Cash"
+msgstr "Nakit"
+
+msgid "Cash Account"
+msgstr "Kasa Hesabı"
+
+msgid "Cash Movement"
+msgstr "Kasa Hareketi"
+
+msgid "Check + Note"
+msgstr "Çek + Senet"
+
+msgid "Check / Note Portfolio"
+msgstr "Çek / Senet Portföyü"
+
+msgid "Check / Promissory Note"
+msgstr "Çek / Senet"
+
+msgid "Check / Promissory Note Portfolio"
+msgstr "Çek / Senet Portföyü"
+
+msgid "Check Portfolio"
+msgstr "Çek Portföyü"
+
+msgid "Check cancelled."
+msgstr "Çek iptal edildi."
+
+msgid "Check cleared: %(name)s"
+msgstr "Çek tahsil edildi: %(name)s"
+
+msgid "Check endorsed to %(name)s."
+msgstr "Çek %(name)s cariye ciro edildi."
+
+msgid "Check marked as bounced."
+msgstr "Çek karşılıksız olarak işaretlendi."
+
+msgid "Check marked as deposited to bank."
+msgstr "Çek bankaya verildi olarak işaretlendi."
+
+msgid ""
+"Check will be cancelled. All account movements will be reversed. Are you "
+"sure?"
+msgstr ""
+"Çek iptal edilecek. Tüm cari hareketleri tersine alınacak. Emin misin?"
+
+msgid ""
+"Check will be marked as bounced. A reverse movement will be written on the "
+"account. Are you sure?"
+msgstr ""
+"Çek karşılıksız olarak işaretlenecek. Cari hesaba ters hareket yazılacak. "
+"Emin misin?"
+
+msgid "Check/Note"
+msgstr "Çek/Senet"
+
+msgid "Check/Note Given"
+msgstr "Çek/Senet Verildi"
+
+msgid "Check/Note Received"
+msgstr "Çek/Senet Alındı"
+
+msgid "Check/Promissory Note (received):"
+msgstr "Çek/Senet (alınan):"
+
+msgid "Checks / Promissory Notes"
+msgstr "Çekler / Senetler"
+
+msgid "Classic trial balance table:"
+msgstr "Klasik cari mizan tablosu:"
+
+msgid ""
+"Clean PDF-like, professional output with carry-over, debit, credit, and "
+"closing columns."
+msgstr ""
+"Devir, borç, alacak ve kapanış sütunlarıyla temiz, PDF benzeri profesyonel "
+"çıktı."
+
+msgid "Clear / Bounced / Cancel"
+msgstr "Tahsil Et / Karşılıksız / İptal"
+
+msgid "Clear / Cancel"
+msgstr "Tahsil Et / İptal"
+
+msgid "Cleared"
+msgstr "Tahsil Edildi"
+
+msgid "Cleared Cash Account"
+msgstr "Tahsil Edildiği Kasa"
+
+msgid "Cleared/Endorsed/Bounced/Cancelled"
+msgstr "Tahsil Edildi/Ciro Edildi/Karşılıksız/İptal"
+
+msgid "Closing"
+msgstr "Kapanış"
+
+msgid "Closing Balance"
+msgstr "Kapanış Bakiyesi"
+
+msgid "Code (ascending)"
+msgstr "Kod (artan)"
+
+msgid "Collection"
+msgstr "Tahsilat"
+
+msgid "Collection (from customer)"
+msgstr "Tahsilat (müşteriden)"
+
+msgid "Collection / Payment"
+msgstr "Tahsilat / Ödeme"
+
+msgid "Collection/payment will come in Phase 3."
+msgstr "Tahsilat/ödeme Faz 3'te gelecek."
+
+msgid "Collections / Payments"
+msgstr "Tahsilatlar / Ödemeler"
+
+msgid "Commercial Terms"
+msgstr "Ticari Koşullar"
+
+msgid "Confirmation failed: %(error)s"
+msgstr "Onay başarısız: %(error)s"
+
+msgid "Contact & Address"
+msgstr "İletişim & Adres"
+
+msgid "Contents"
+msgstr "İçindekiler"
+
+msgid "Could not clear: %(error)s"
+msgstr "Tahsil edilemedi: %(error)s"
+
+msgid "Could not parse allocations JSON: %(error)s"
+msgstr "Eşleştirme JSON ayrıştırılamadı: %(error)s"
+
+msgid "Could not parse items JSON: %(error)s"
+msgstr "Kalem JSON ayrıştırılamadı: %(error)s"
+
+msgid "Create Account"
+msgstr "Cari Oluştur"
+
+msgid "Credit"
+msgstr "Alacak"
+
+msgid "Credit (−)"
+msgstr "Alacak (−)"
+
+msgid "Credit Card (POS)"
+msgstr "Kredi Kartı (POS)"
+
+msgid "Credit Limit"
+msgstr "Kredi Limiti"
+
+msgid "Credit Limit Report"
+msgstr "Risk Limiti Raporu"
+
+msgid "Credit limit (0 = unlimited)"
+msgstr "Kredi limiti (0 = sınırsız)"
+
+msgid "Credit limit usage for customers with a defined limit"
+msgstr "Kredi limiti tanımlı olan müşterilerin limit kullanım durumu"
+
+msgid "Current Account"
+msgstr "Cari Hesap"
+
+msgid "Current Account — User Guide"
+msgstr "Cari Hesap — Kullanım Kılavuzu"
+
+msgid "Current Accounts"
+msgstr "Cari Hesaplar"
+
+msgid "Current Balance"
+msgstr "Mevcut Bakiye"
+
+msgid "Current balance:"
+msgstr "Mevcut bakiye:"
+
+msgid "Current status"
+msgstr "Mevcut durum"
+
+msgid "Customer & Supplier"
+msgstr "Müşteri & Tedarikçi"
+
+msgid "Customer collections and supplier payments"
+msgstr "Müşteri tahsilatları ve tedarikçi ödemeleri"
+
+msgid "Customers reaching or exceeding their credit limit — accounts at risk"
+msgstr "Kredi limiti dolan ya da aşan müşteriler — risk altındaki cariler"
+
+msgid "D — The customer asked for their statement"
+msgstr "D — Müşteri ekstresini istedi"
+
+msgid "D: Statement"
+msgstr "D: Ekstre"
+
+msgid "Days Overdue (max)"
+msgstr "En Geç Gün"
+
+msgid "Debit"
+msgstr "Borç"
+
+msgid "Debit (+)"
+msgstr "Borç (+)"
+
+msgid "Defined separately on each line:"
+msgstr "Her satırda ayrı tanımlanır:"
+
+msgid "Delete / Deactivate"
+msgstr "Sil / Pasifleştir"
+
+msgid "Delivery"
+msgstr "Teslimat"
+
+msgid "Delivery Date"
+msgstr "Teslimat Tarihi"
+
+msgid "Deposit / Clear / Endorse / Bounced / Cancel"
+msgstr "Bankaya Ver / Tahsil Et / Ciro Et / Karşılıksız / İptal"
+
+msgid "Deposit to Bank"
+msgstr "Bankaya Ver"
+
+msgid "Deposited"
+msgstr "Bankaya Verildi"
+
+msgid "Deposited to Bank"
+msgstr "Bankaya Verildi"
+
+msgid ""
+"Depositing is just a status change. When the money actually arrives, you "
+"select the cash account with <strong>\"Clear\"</strong>, and only then does "
+"the cash account balance increase."
+msgstr ""
+"Bankaya vermek sadece bir durum değişikliğidir. Para gerçekten geldiğinde "
+"<strong>\"Tahsil Et\"</strong> ile kasa hesabını seçersin ve ancak o zaman "
+"kasa bakiyesi artar."
+
+msgid ""
+"Different VAT rates can exist on the same invoice (e.g., some items at 20%, "
+"some at 10%)"
+msgstr ""
+"Aynı faturada farklı KDV oranları olabilir (örn. bazı kalemler %20, bazıları"
+" %10)"
+
+msgid "Direction"
+msgstr "Yön"
+
+msgid "Direction and status"
+msgstr "Yön ve durum"
+
+msgid "Disc %"
+msgstr "İsk %"
+
+msgid "Discount Rate (%)"
+msgstr "İskonto Oranı (%)"
+
+msgid "Document Details"
+msgstr "Belge Detayı"
+
+msgid "Document Info"
+msgstr "Belge Bilgisi"
+
+msgid "Draft invoice deleted: %(label)s"
+msgstr "Taslak fatura silindi: %(label)s"
+
+msgid "Draft invoice will be deleted. Are you sure?"
+msgstr "Taslak fatura silinecek. Emin misin?"
+
+msgid "Draft payment deleted: %(label)s"
+msgstr "Taslak tahsilat silindi: %(label)s"
+
+msgid "Draft payment will be deleted. Are you sure?"
+msgstr "Taslak tahsilat silinecek. Emin misin?"
+
+msgid "Drawer"
+msgstr "Keşideci"
+
+msgid "Due Calendar"
+msgstr "Vade Takvimi"
+
+msgid "Due Date (optional)"
+msgstr "Vade (opsiyonel)"
+
+msgid "Due Date Calendar"
+msgstr "Vade Takvimi"
+
+msgid "Due days count (default: 30)"
+msgstr "Vade gün sayısı (varsayılan: 30)"
+
+msgid "Due:"
+msgstr "Vade:"
+
+msgid "E: Overdue Receivables"
+msgstr "E: Vadesi Geçmiş Alacaklar"
+
+msgid "Each book (<code>Book</code>) keeps an independent counter"
+msgstr "Her defter (<code>Book</code>) bağımsız bir sayaç tutar"
+
+msgid "Edit Account · %(code)s"
+msgstr "Cari Düzenle · %(code)s"
+
+msgid "Edit Invoice · %(series)s-%(number)s"
+msgstr "Fatura Düzenle · %(series)s-%(number)s"
+
+msgid ""
+"Edit the account card → enter an amount in the <strong>Credit Limit</strong>"
+" field (e.g., 10,000)"
+msgstr ""
+"Cari kartını düzenle → <strong>Kredi Limiti</strong> alanına tutar gir (örn."
+" 10.000)"
+
+msgid "Edited but could not be issued: %(error)s"
+msgstr "Düzenlendi ama kesilemedi: %(error)s"
+
+msgid "Endorse"
+msgstr "Ciro Et"
+
+msgid "Endorsed"
+msgstr "Ciro Edildi"
+
+msgid "Endorsed To"
+msgstr "Ciro Edildi"
+
+msgid "Endorsement failed: %(error)s"
+msgstr "Ciro başarısız: %(error)s"
+
+msgid "Endorsing"
+msgstr "Ciro etme"
+
+msgid "F: Due Calendar"
+msgstr "F: Vade Takvimi"
+
+msgid "Filtered"
+msgstr "Filtrelenen"
+
+msgid "First 3 steps"
+msgstr "İlk 3 adım"
+
+msgid "G — Credit limit control for customers"
+msgstr "G — Müşteriler için kredi limiti kontrolü"
+
+msgid "G: Credit Limit"
+msgstr "G: Kredi Limiti"
+
+msgid "General Info"
+msgstr "Genel Bilgi"
+
+msgid "Given"
+msgstr "Verildi"
+
+msgid "Given in Portfolio"
+msgstr "Portföydeki Verilen"
+
+msgid "Given to Supplier"
+msgstr "Tedarikçiye Verilen"
+
+msgid "Given to supplier"
+msgstr "Tedarikçiye verildi"
+
+msgid "Go to account"
+msgstr "Cariye git"
+
+msgid "Grand Total"
+msgstr "Genel Toplam"
+
+msgid "Help"
+msgstr "Yardım"
+
+msgid "Hide inactive"
+msgstr "Hareketsizleri gizle"
+
+msgid "I deposited the check, when does it hit the cash account?"
+msgstr "Çeki bankaya verdim, kasa hesabına ne zaman düşer?"
+
+msgid "I entered a collection wrong?"
+msgstr "Tahsilatı yanlış girdim, ne yapmalıyım?"
+
+msgid "I issued the wrong invoice, what do I do?"
+msgstr "Yanlış fatura kestim, ne yapmalıyım?"
+
+msgid ""
+"I use my customer as a supplier too — should I open two separate accounts?"
+msgstr ""
+"Müşterimi aynı zamanda tedarikçi olarak da kullanıyorum — iki ayrı cari mi "
+"açmalıyım?"
+
+msgid "ID Number (TCKN)"
+msgstr "TCKN"
+
+msgid "Identity"
+msgstr "Kimlik"
+
+msgid "If no account exists, first"
+msgstr "Cari yoksa önce"
+
+msgid "In Portfolio"
+msgstr "Portföyde"
+
+msgid "In Portfolio (given)"
+msgstr "Portföyde (verilen)"
+
+msgid "In Portfolio (received)"
+msgstr "Portföyde (alınan)"
+
+msgid "Interest / Late Fee"
+msgstr "Vade Farkı / Faiz"
+
+msgid "Internal note about this check/note..."
+msgstr "Bu çek/senetle ilgili iç not..."
+
+msgid "Internal note about this payment..."
+msgstr "Bu tahsilatla ilgili iç not..."
+
+msgid "Internal notes about this account..."
+msgstr "Bu cariye dair iç notlar..."
+
+msgid "Invalid amount."
+msgstr "Geçersiz tutar."
+
+msgid "Invalid data: %(error)s"
+msgstr "Geçersiz veri: %(error)s"
+
+msgid "Invalid date."
+msgstr "Geçersiz tarih."
+
+msgid "Invoice Allocations"
+msgstr "Fatura Eşleştirmeleri"
+
+msgid "Invoice Info"
+msgstr "Fatura Bilgisi"
+
+msgid "Invoice Item"
+msgstr "Fatura Kalemi"
+
+msgid "Invoice Items"
+msgstr "Fatura Kalemleri"
+
+msgid "Invoice Total"
+msgstr "Fatura Toplamı"
+
+msgid "Invoice cancelled."
+msgstr "Fatura iptal edildi."
+
+msgid "Invoice created but could not be issued: %(error)s"
+msgstr "Fatura oluştu ama kesilemedi: %(error)s"
+
+msgid "Invoice created: %(series)s-%(number)s"
+msgstr "Fatura oluşturuldu: %(series)s-%(number)s"
+
+msgid "Invoice issued: %(series)s-%(number)s"
+msgstr "Fatura kesildi: %(series)s-%(number)s"
+
+msgid "Invoice no, check no, etc."
+msgstr "Fatura no, çek no, vs."
+
+msgid "Invoice updated."
+msgstr "Fatura güncellendi."
+
+msgid "Invoice:"
+msgstr "Fatura:"
+
+msgid "Issue Date"
+msgstr "Düzenleme Tarihi"
+
+msgid "Issue Invoice"
+msgstr "Fatura Kes"
+
+msgid "Issue failed: %(error)s"
+msgstr "Kesim başarısız: %(error)s"
+
+msgid "Issued"
+msgstr "Kesildi"
+
+msgid "Issued to the customer"
+msgstr "Müşteriye kesildi"
+
+msgid "Issuing flow"
+msgstr "Kesim akışı"
+
+msgid ""
+"It does. Each <code>Book</code> behaves like a separate business/brand. When"
+" ENV_PROFILE changes and the schema changes, all accounts/movements remain "
+"isolated."
+msgstr ""
+"Destekler. Her <code>Book</code> ayrı bir işletme/marka gibi davranır. "
+"ENV_PROFILE değişip şema değiştiğinde tüm cariler/hareketler izole kalır."
+
+msgid "Items must be a list."
+msgstr "Kalemler bir liste olmalı."
+
+msgid "Last Movement"
+msgstr "Son Hareket"
+
+msgid "Later"
+msgstr "Sonra"
+
+msgid "Legacy - Payable"
+msgstr "Eski Sistem - Borç"
+
+msgid "Legacy - Receivable"
+msgstr "Eski Sistem - Alacak"
+
+msgid "Limit Exceeded"
+msgstr "Limit Aşıldı"
+
+msgid "Linked Order"
+msgstr "Bağlı Sipariş"
+
+msgid "Mark Bounced"
+msgstr "Karşılıksız İşaretle"
+
+msgid "Meaning"
+msgstr "Anlamı"
+
+msgid "Most Recent Movement"
+msgstr "En Son Hareket"
+
+msgid "Movement Type"
+msgstr "Hareket Tipi"
+
+msgid "Movement added."
+msgstr "Hareket eklendi."
+
+msgid "Movement → Balance"
+msgstr "Hareket → Bakiye"
+
+msgid "Multi-tenant — does this module support it?"
+msgstr "Çoklu kiracı (multi-tenant) — bu modül destekliyor mu?"
+
+msgid "Name (A→Z)"
+msgstr "İsim (A→Z)"
+
+msgid "Name (Z→A)"
+msgstr "İsim (Z→A)"
+
+msgid "Near + Over Limit (80%+)"
+msgstr "Limit Yakın + Aşan (%80+)"
+
+msgid "Near Limit"
+msgstr "Limite Yaklaşıyor"
+
+msgid "Negative (−)"
+msgstr "Negatif (−)"
+
+msgid "Net Status"
+msgstr "Net Durum"
+
+msgid "New Check / Note"
+msgstr "Yeni Çek / Senet"
+
+msgid "New Collection"
+msgstr "Yeni Tahsilat"
+
+msgid "New Collection / Payment"
+msgstr "Yeni Tahsilat / Ödeme"
+
+msgid "New Invoice"
+msgstr "Yeni Fatura"
+
+msgid "New Movement"
+msgstr "Yeni Hareket"
+
+msgid "Next Week"
+msgstr "Gelecek Hafta"
+
+msgid "No accounts exceeding the limit"
+msgstr "Limit aşan cari yok"
+
+msgid "No accounts found"
+msgstr "Cari bulunamadı"
+
+msgid "No accounts match these criteria."
+msgstr "Bu kriterlere uyan cari yok."
+
+msgid "No allocations."
+msgstr "Eşleştirme yok."
+
+msgid "No checks / notes"
+msgstr "Çek/Senet yok"
+
+msgid "No customers exceeding limit."
+msgstr "Limit aşan müşteri yok."
+
+msgid "No instruments in the portfolio."
+msgstr "Portföyde herhangi bir kıymetli evrak yok."
+
+msgid "No invoices"
+msgstr "Fatura yok"
+
+msgid "No movement"
+msgstr "Hareket yok"
+
+msgid "No movements in the selected period"
+msgstr "Seçilen dönemde hareket yok"
+
+msgid "No movements in the selected range."
+msgstr "Seçilen aralıkta hareket yok."
+
+msgid "No movements yet."
+msgstr "Henüz hareket yok."
+
+msgid "No new action"
+msgstr "Yeni aksiyon yok"
+
+msgid "No open"
+msgstr "Açık yok"
+
+msgid "No open invoices — payment will be recorded as advance."
+msgstr "Açık fatura yok — tahsilat avans olarak girecek."
+
+msgid "No overdue invoices"
+msgstr "Vadesi geçen fatura yok"
+
+msgid "No payments"
+msgstr "Tahsilat yok"
+
+msgid "No risks"
+msgstr "Risk bulunmuyor"
+
+msgid "No upcoming due dates"
+msgstr "Yaklaşan vade yok"
+
+msgid ""
+"No. Mark the account type as <strong>\"Customer & Supplier\"</strong>. All "
+"movements are collected on a single card, the balance is automatically net."
+msgstr ""
+"Hayır. Cari tipini <strong>\"Müşteri ve Tedarikçi\"</strong> olarak "
+"işaretle. Tüm hareketler tek bir kartta toplanır, bakiye otomatik netleşir."
+
+msgid "Non-binding offer"
+msgstr "Bağlayıcı olmayan teklif"
+
+msgid "Not Due"
+msgstr "Vadesi Gelmedi"
+
+msgid ""
+"Not directly, but the equivalent: on the account card, use <strong>\"Add "
+"Movement\"</strong> to enter a positive/negative adjustment movement, and "
+"write \"Opening adjustment\" in the description."
+msgstr ""
+"Doğrudan değil, ama eşdeğeri var: cari kartında <strong>\"Hareket "
+"Ekle\"</strong> ile pozitif/negatif düzeltme hareketi gir ve açıklamaya "
+"\"Açılış düzeltmesi\" yaz."
+
+msgid "Note about this invoice..."
+msgstr "Bu faturayla ilgili not..."
+
+msgid "Offset"
+msgstr "Mahsup"
+
+msgid "Offset / Adjustment"
+msgstr "Mahsup / Düzeltme"
+
+msgid "Oldest Invoice"
+msgstr "En Eski Fatura"
+
+msgid ""
+"Only <strong>draft</strong> invoices can be edited. After issuing, the "
+"invoice \"freezes\" — to edit, you must cancel and re-issue it."
+msgstr ""
+"Sadece <strong>taslak</strong> faturalar düzenlenebilir. Kestikten sonra "
+"fatura \"donar\" — düzenlemek için iptal edip yeniden kesmen gerekir."
+
+msgid "Only Exceeded"
+msgstr "Sadece Limit Aşanlar"
+
+msgid "Only draft invoices can be deleted. Cancel issued invoices instead."
+msgstr "Yalnızca taslak faturalar silinebilir. Kesilmiş faturayı iptal et."
+
+msgid "Only draft invoices can be edited."
+msgstr "Yalnızca taslak faturalar düzenlenebilir."
+
+msgid "Only draft payments can be deleted. Cancel confirmed payments instead."
+msgstr "Yalnızca taslak tahsilatlar silinebilir. Onaylanmışsa iptal et."
+
+msgid "Open Balance"
+msgstr "Açık Bakiye"
+
+msgid "Open Invoices — Allocation"
+msgstr "Açık Faturalar — Eşleştirme"
+
+msgid "Open invoice matching"
+msgstr "Açık fatura eşleştirme"
+
+msgid "Open invoices are listed automatically"
+msgstr "Açık faturalar otomatik listelenir"
+
+msgid ""
+"Open invoices in these groups: 🔴 Overdue, 🟡 This Week, 🔵 Next Week, 🟣 This "
+"Month, ⚪ Later"
+msgstr ""
+"Açık faturalar şu gruplarda: 🔴 Vadesi Geçti, 🟡 Bu Hafta, 🔵 Gelecek Hafta, 🟣 "
+"Bu Ay, ⚪ Daha Sonra"
+
+msgid "Open invoices will load after selecting an account."
+msgstr "Cari seçilince açık faturalar yüklenir."
+
+msgid "Opened from the <a href=\"%(cari_create_url2)s\">New Account</a> page."
+msgstr "<a href=\"%(cari_create_url2)s\">Yeni Cari</a> sayfasından açılır."
+
+msgid "Opening"
+msgstr "Devir"
+
+msgid "Opening / debit / credit / closing for period"
+msgstr "Dönem için açılış / borç / alacak / kapanış"
+
+msgid "Opening Balance"
+msgstr "Açılış Bakiyesi"
+
+msgid "Opening Date"
+msgstr "Açılış Tarihi"
+
+msgid "Opening balance (+ : owes us / − : we owe)"
+msgstr "Açılış bakiyesi (+ : bize borçlu / − : bizden alacaklı)"
+
+msgid "Opening, debit, credit and closing balances of all accounts by book"
+msgstr "Defter bazlı tüm carilerin devir, borç, alacak, kapanış bakiyeleri"
+
+msgid "Operation Status"
+msgstr "İşlem Durumu"
+
+msgid "Operation failed: %(error)s"
+msgstr "İşlem başarısız: %(error)s"
+
+msgid "Other Charges"
+msgstr "Diğer Masraflar"
+
+msgid "Out of Bank"
+msgstr "Bankadan Çıktı"
+
+msgid "Overdue in Portfolio"
+msgstr "Vadesi Geçen Portföydeki"
+
+msgid "Owes Us"
+msgstr "Bize Borçlu"
+
+msgid "Partially Paid"
+msgstr "Kısmi Ödendi"
+
+msgid "Payables (purchases)"
+msgstr "Borçlar (alış)"
+
+msgid "Payment (to supplier)"
+msgstr "Ödeme (tedarikçiye)"
+
+msgid "Payment Allocation"
+msgstr "Ödeme Eşleştirmesi"
+
+msgid "Payment Allocations"
+msgstr "Ödeme Eşleştirmeleri"
+
+msgid "Payment Amount"
+msgstr "Tahsilat Tutarı"
+
+msgid "Payment Info"
+msgstr "Tahsilat Bilgisi"
+
+msgid "Payment Status"
+msgstr ""
+
+msgid "Payment Term"
+msgstr ""
+
+msgid "Payment Term (days)"
+msgstr "Vade (gün)"
+
+msgid "Payment cancelled."
+msgstr "Tahsilat iptal edildi."
+
+msgid "Payment confirmed: %(number)s"
+msgstr "Tahsilat onaylandı: %(number)s"
+
+msgid "Payment created: %(number)s"
+msgstr "Tahsilat oluşturuldu: %(number)s"
+
+msgid ""
+"Payment will be cancelled, a reverse movement will be created. Are you sure?"
+msgstr "Tahsilat iptal edilecek, ters hareket oluşturulacak. Emin misin?"
+
+msgid "Payment:"
+msgstr ""
+
+msgid "Per-account and total table"
+msgstr "Cari bazında ve toplam tablo"
+
+msgid "Period Credit"
+msgstr "Dönem Alacak"
+
+msgid "Period Debit"
+msgstr "Dönem Borç"
+
+msgid "Period filter available"
+msgstr "Dönem filtresi uygulanabilir"
+
+msgid "Person who issued the check/note"
+msgstr "Çeki/senedi düzenleyen kişi"
+
+msgid "Positive (+)"
+msgstr "Pozitif (+)"
+
+msgid "Proforma"
+msgstr "Proforma"
+
+msgid "Promissory Note"
+msgstr "Senet"
+
+msgid "Purchase Invoice"
+msgstr "Alış Faturası"
+
+msgid "Purchase Return"
+msgstr "Alış İadesi"
+
+msgid "Receivables (sales)"
+msgstr "Alacaklar (satış)"
+
+msgid "Receive Collection"
+msgstr "Tahsilat Al"
+
+msgid "Received"
+msgstr "Alındı"
+
+msgid "Received from Customer"
+msgstr "Müşteriden Alınan"
+
+msgid "Received from customer"
+msgstr ""
+
+msgid "Received from the supplier"
+msgstr "Tedarikçiden alındı"
+
+msgid "Received in Portfolio"
+msgstr "Portföydeki Alınan"
+
+msgid "Recent Invoices"
+msgstr "Son Faturalar"
+
+msgid "Recent Movements"
+msgstr "Son Hareketler"
+
+msgid "Refund from Supplier"
+msgstr "Tedarikçiden İade"
+
+msgid "Refund to Customer"
+msgstr "Müşteriye İade"
+
+msgid "Remaining (advance):"
+msgstr ""
+
+msgid "Remaining as Advance"
+msgstr "Avans Olarak Kalan"
+
+msgid "Return given to the supplier"
+msgstr "Tedarikçiye verilen iade"
+
+msgid "Return received from the customer"
+msgstr "Müşteriden alınan iade"
+
+msgid "Sales Invoice"
+msgstr "Satış Faturası"
+
+msgid "Sales Return"
+msgstr "Satış İadesi"
+
+msgid ""
+"Same logic: if not confirmed, delete; if confirmed, cancel. Cancel reverses "
+"everything (account, invoice status, cash account)."
+msgstr ""
+"Aynı mantık: onaylanmadıysa sil; onaylandıysa iptal et. İptal her şeyi geri "
+"alır (cari, fatura durumu, kasa hesabı)."
+
+msgid "Save & Confirm"
+msgstr "Kaydet & Onayla"
+
+msgid "Save & Issue"
+msgstr "Kaydet & Kes"
+
+msgid "Save Movement"
+msgstr "Hareketi Kaydet"
+
+msgid "Save as Draft"
+msgstr "Taslak Kaydet"
+
+msgid "Saved but could not be confirmed: %(error)s"
+msgstr "Kaydedildi ama onaylanamadı: %(error)s"
+
+msgid "Search: code, name, tax number, email, phone..."
+msgstr ""
+
+msgid "Search: invoice no, account, note..."
+msgstr "Ara: fatura no, cari, not..."
+
+msgid "Search: payment no, account, description..."
+msgstr "Ara: tahsilat no, cari, açıklama..."
+
+msgid "Search: serial no, bank, account, drawer..."
+msgstr "Ara: seri no, banka, cari, keşideci..."
+
+msgid "Select Account"
+msgstr "Cari Seç"
+
+msgid "Select the account to deduct from the cash account, close the invoice"
+msgstr "Kasa hesabından düşülecek cariyi seç, faturayı kapat"
+
+msgid ""
+"Select which invoices to apply this payment to. Any unallocated amount is "
+"recorded as an"
+msgstr ""
+
+msgid "Serial No"
+msgstr "Seri No"
+
+msgid "Series"
+msgstr "Seri"
+
+msgid ""
+"Sets the check status to <em>Endorsed</em>, writes the target account in the"
+" <code>endorsed_to</code> field"
+msgstr ""
+"Çekin durumunu <em>Ciro Edildi</em> yapar, hedef cariyi "
+"<code>endorsed_to</code> alanına yazar"
+
+msgid ""
+"Shows the usage rate of all customers with a defined credit limit. With a "
+"visual <strong>progress bar</strong> (green/yellow/red)."
+msgstr ""
+"Kredi limiti tanımlı tüm müşterilerin kullanım oranını gösterir. Görsel "
+"<strong>ilerleme çubuğu</strong> ile (yeşil/sarı/kırmızı)."
+
+msgid "Sign convention"
+msgstr "İşaret kuralı"
+
+msgid ""
+"Splits open receivables / payables into <code>0-30 / 30-60 / 60-90 / 90+ "
+"days</code> buckets"
+msgstr ""
+"Açık alacakları / borçları <code>0-30 / 30-60 / 60-90 / 90+ gün</code> "
+"dilimlerine ayırır"
+
+msgid "Staff"
+msgstr "Personel"
+
+msgid "Statement"
+msgstr "Ekstre"
+
+msgid "Statement — %(name)s"
+msgstr ""
+
+msgid "Status Flow"
+msgstr "Durum Akışı"
+
+msgid "Status flows"
+msgstr "Durum akışları"
+
+msgid "Status → <em>Bounced</em>"
+msgstr "Durum → <em>Karşılıksız</em>"
+
+msgid "Step-by-step guide on how to use the module — scenarios, concepts, FAQ"
+msgstr ""
+
+msgid "Tax Info"
+msgstr "Vergi Bilgisi"
+
+msgid "Tax No"
+msgstr "VKN"
+
+msgid "Tax Number (VKN)"
+msgstr "VKN"
+
+msgid "Tax Office"
+msgstr "Vergi Dairesi"
+
+msgid "Tax office, Tax Number (VKN), ID Number (TCKN) (ready for e-Archive)"
+msgstr "Vergi dairesi, VKN, TCKN (e-Arşiv'e hazır)"
+
+msgid ""
+"That's why when you delete / change a movement, the balance auto-corrects. "
+"<strong>The cancel action does not delete the original row</strong>, it "
+"writes a reverse movement (audit-safe)."
+msgstr ""
+"Bu nedenle bir hareketi sildiğinde / değiştirdiğinde bakiye otomatik "
+"düzelir. <strong>İptal aksiyonu orijinal satırı silmez</strong>, ters bir "
+"hareket yazar (denetime uygun)."
+
+msgid ""
+"The <strong>VAT breakdown</strong> is automatically shown on the detail page"
+msgstr "Detay sayfasında <strong>KDV kırılımı</strong> otomatik gösterilir"
+
+msgid "The account <strong>owes us</strong> / we are the creditor"
+msgstr "Cari <strong>bize borçlu</strong> / biz alacaklıyız"
+
+msgid ""
+"The account can optionally be linked to one of <code>crm.Contact</code>, "
+"<code>crm.Company</code>, or <code>crm.Supplier</code>. Only one account can"
+" be opened for the same CRM record within the same book (DB-level "
+"constraint)."
+msgstr ""
+"Cari isteğe bağlı olarak <code>crm.Contact</code>, <code>crm.Company</code> "
+"veya <code>crm.Supplier</code> kayıtlarından birine bağlanabilir. Aynı "
+"defterde aynı CRM kaydı için yalnızca tek bir cari açılabilir (DB "
+"seviyesinde kısıt)."
+
+msgid "The heart of the system is built on a single rule:"
+msgstr "Sistemin kalbi tek bir kural üzerine kuruludur:"
+
+msgid ""
+"The original movement remains (the receipt from the customer is still valid)"
+msgstr "Orijinal hareket kalır (müşteriden alınan makbuz hâlâ geçerli)"
+
+msgid ""
+"The system opens <strong>one Current Account card for each customer and "
+"supplier</strong> (example code: <code>CARI-001</code>). Under this card:"
+msgstr ""
+"Sistem <strong>her müşteri ve tedarikçi için tek bir Cari Hesap "
+"kartı</strong> açar (örnek kod: <code>CARI-001</code>). Bu kartın altında:"
+
+msgid "This Month (end)"
+msgstr "Bu Ay (sonu)"
+
+msgid "This check/note is now"
+msgstr ""
+
+msgid ""
+"This guide is continuously updated. The moment you see something missing, <a"
+" href=\"https://github.com/anthropics/claude-code/issues\" target=\"_blank\""
+" style=\"color:#6366f1;\">report it</a> or check the Current Account module "
+"changes."
+msgstr ""
+"Bu kılavuz sürekli güncellenir. Eksik bir şey gördüğün an, <a "
+"href=\"https://github.com/anthropics/claude-code/issues\" target=\"_blank\" "
+"style=\"color:#6366f1;\">bildir</a> veya Cari Hesap modülü değişikliklerini "
+"kontrol et."
+
+msgid "To Invoices"
+msgstr "Faturalara"
+
+msgid "Total (%(count)s accounts)"
+msgstr ""
+
+msgid "Total Accounts"
+msgstr "Toplam Cari"
+
+msgid "Total Closing"
+msgstr "Toplam Kapanış"
+
+msgid "Total Collected"
+msgstr "Tahsilat Toplamı"
+
+msgid "Total Credit"
+msgstr "Alacak Toplamı"
+
+msgid "Total Debit"
+msgstr "Borç Toplamı"
+
+msgid "Total Opening"
+msgstr "Toplam Devir"
+
+msgid "Total Paid"
+msgstr "Ödeme Toplamı"
+
+msgid "Totals"
+msgstr "Toplamlar"
+
+msgid ""
+"Tracks the status of checks and promissory notes received from customers and"
+" given to suppliers"
+msgstr ""
+"Müşterilerden alınan ve tedarikçilere verilen çek/senetlerin durum takibi"
+
+msgid "Trial Balance"
+msgstr "Cari Mizan"
+
+msgid ""
+"Two different books can have the same code — unique as a (book, code) "
+"combination"
+msgstr ""
+"İki farklı defter aynı koda sahip olabilir — (defter, kod) kombinasyonu "
+"olarak tekil"
+
+msgid "Types"
+msgstr "Tipler"
+
+msgid "USD-based total"
+msgstr "USD tabanlı toplam"
+
+msgid ""
+"Unified view of customer and supplier accounts, balances, and movements"
+msgstr ""
+"Müşteri ve tedarikçilerin birleşik kart görünümü, bakiyeleri ve hareketleri"
+
+msgid "Upcoming due dates — this week, next week, month-end and overdue"
+msgstr "Yaklaşan vadeler — bu hafta, gelecek hafta, ay sonu ve geçmiş vadeler"
+
+msgid "Usage"
+msgstr "Kullanım"
+
+msgid ""
+"Use your browser's print function (Ctrl+P) → \"Save as PDF\". The page is "
+"optimized with <code>@media print</code>."
+msgstr ""
+"Tarayıcının yazdırma işlevini kullan (Ctrl+P) → \"PDF olarak kaydet\". Sayfa"
+" <code>@media print</code> ile optimize edilmiştir."
+
+msgid "User Guide"
+msgstr "Kullanım Kılavuzu"
+
+msgid "VAT %"
+msgstr "KDV %"
+
+msgid "VAT and discount"
+msgstr "KDV ve iskonto"
+
+msgid "We Owe"
+msgstr "Bizden Alacaklı"
+
+msgid "What can I do from the action panel?"
+msgstr "Aksiyon panelinden neler yapabilirim?"
+
+msgid "What happened to the Receivables/Payables in my old accounting module?"
+msgstr "Eski muhasebe modülümdeki Alacak/Borçlara ne oldu?"
+
+msgid "What is this movement about?"
+msgstr "Bu hareket neyle ilgili?"
+
+msgid "What is this payment / collection about?"
+msgstr "Bu tahsilat / ödeme neyle ilgili?"
+
+msgid "What to do next is up to you: legal action, agreement, etc."
+msgstr "Bundan sonra ne yapacağın sana kalmış: yasal işlem, anlaşma vs."
+
+msgid "When the check is returned:"
+msgstr "Çek iade edildiğinde:"
+
+msgid ""
+"While the collection is in <strong>draft</strong> status, the account and "
+"cash account are not affected. The real accounts are updated with \"Save & "
+"Confirm\"."
+msgstr ""
+"Tahsilat <strong>taslak</strong> durumdayken cari ve kasa hesabı etkilenmez."
+" Gerçek hesaplar \"Kaydet ve Onayla\" ile güncellenir."
+
+msgid "Will be cancelled. Are you sure?"
+msgstr "İptal edilecek. Emin misin?"
+
+msgid ""
+"Writes <strong>+X CariMovement</strong> to the target account (as if you had"
+" made a payment to them)"
+msgstr ""
+"Hedef cariye <strong>+X CariMovement</strong> yazar (ona ödeme yapmışsın "
+"gibi)"
+
+msgid ""
+"Yes. If the collection amount is greater than the sum of matches, the "
+"difference is automatically recorded as an <strong>advance</strong>."
+msgstr ""
+"Evet. Tahsilat tutarı eşleştirmelerin toplamından büyükse, fark otomatik "
+"olarak <strong>avans</strong> olarak kaydedilir."
+
+msgid ""
+"You give the check you received from your customer to your supplier. The "
+"system:"
+msgstr "Müşterinden aldığın çeki tedarikçine verirsin. Sistem:"
+
+msgid "You must add at least one invoice item."
+msgstr "En az bir fatura kalemi eklemelisin."
+
+msgid "advance"
+msgstr ""
+
+msgid "applied"
+msgstr ""
+
+msgid "change"
+msgstr "değiştir"
+
+msgid "days"
+msgstr "gün"
+
+msgid "filtered"
+msgstr ""
+
+msgid "on the account."
+msgstr ""
+
+msgid "open"
+msgstr ""
+
+msgid "open a new account"
+msgstr ""
+
+msgid "overdue"
+msgstr ""
+
+msgid "overdue and upcoming"
+msgstr ""
+
+msgid "payables"
+msgstr ""
+
+msgid "receivables"
+msgstr ""
+
+msgid "status — no further actions allowed."
+msgstr ""
+
+msgid "%(count)s accounts exceed the limit"
+msgstr ""
+
+msgid "%(count)s invoices overdue"
+msgstr ""
+
+msgid "%(count)s invoices within 7 days"
+msgstr ""
+
+msgid "%(d)s days from now"
+msgstr ""
+
+msgid "%(d)s days late"
+msgstr ""
+
+msgid "%(days)s days"
+msgstr ""
+
+msgid "— Select (optional) —"
+msgstr "— Seç (opsiyonel) —"
+
+msgid "— Select account —"
+msgstr "— Cari seç —"
+
+msgid "— Select cash account —"
+msgstr "— Kasa seç —"
+
+msgid "— Select —"
+msgstr "— Seç —"
+
+msgid "−Total"
+msgstr "−Total"
+
+msgid "⚠️ Credit limit exceeded"
+msgstr ""
+
+msgid "⚡ Quick Start"
+msgstr "⚡ Hızlı Başlangıç"
+
+msgid "⚡ Quick Start (in 5 minutes)"
+msgstr "⚡ Hızlı Başlangıç (5 dakikada)"
+
+msgid "❓ FAQ"
+msgstr "❓ SSS"
+
+msgid "❓ Frequently Asked Questions"
+msgstr "❓ Sıkça Sorulan Sorular"
+
+msgid "💰 Collection / Payment"
+msgstr "💰 Tahsilat / Ödeme"
+
+msgid "💰 Collection/Payment"
+msgstr "💰 Tahsilat/Ödeme"
+
+msgid "📇 Account Card"
+msgstr "📇 Cari Kartı"
+
+msgid "📇 Account cards"
+msgstr "📇 Cari kartları"
+
+msgid "📊 4 Reports"
+msgstr "📊 4 Rapor"
+
+msgid "📊 Reports"
+msgstr "📊 Raporlar"
+
+msgid "📋 Daily Scenarios"
+msgstr "📋 Günlük Senaryolar"
+
+msgid "📜 Check / Promissory Note"
+msgstr "📜 Çek / Senet"
+
+msgid "🧠 Core Concepts"
+msgstr "🧠 Temel Kavramlar"
+
+msgid "🧾 Invoices"
+msgstr "🧾 Faturalar"
+
+msgid "🧾 Invoices (VAT)"
+msgstr "🧾 Faturalar (KDV)"
+
+msgid "ACCOUNTS"
+msgstr "CARİ KARTLARI"
+
+msgid "Accounts"
+msgstr "Cari Kartları"
+
+msgid "All Accounts"
+msgstr "Tüm Cariler"
+
+msgid "All Invoices"
+msgstr "Tüm Faturalar"
+
+msgid "All Payments"
+msgstr "Tüm Tahsilatlar"
+
+msgid "CHECK / PROMISSORY NOTE"
+msgstr "ÇEK / SENET"
+
+msgid "COLLECTION / PAYMENT"
+msgstr "TAHSİLAT / ÖDEME"
+
+msgid "HELP"
+msgstr "YARDIM"
+
+msgid "INVOICES"
+msgstr "FATURALAR"
+
+msgid "Portfolio"
+msgstr "Portföy"
+
+msgid "Report Center"
+msgstr "Rapor Merkezi"
+
+msgid "Or match manually → \"Save & Confirm\""
+msgstr "Ya da manuel eşleştir → \"Kaydet & Onayla\""
+
+msgid "Enter bank, serial number, due date, amount → \"Add to Portfolio\""
+msgstr "Banka, seri no, vade tarihi, tutar gir → \"Portföye Ekle\""
+
+msgid "Customers exceeding 80%+ receive a \"Limit Exceeded\" / \"Approaching\" badge"
+msgstr "%80+ aşan müşteriler \"Limit Aşıldı\" / \"Yaklaşıyor\" rozeti alır"
+
+msgid "\"Oldest day\" badge on each row"
+msgstr "Her satırda \"En Geç Gün\" rozeti"
+
+msgid ""
+"Yes. In the matching table, you write whatever amount you want to each "
+"invoice, or \"Auto Match (FIFO)\" closes the oldest invoices in sequence."
+msgstr ""
+"Evet. Eşleştirme tablosunda her faturaya istediğin tutarı yazarsın, ya da "
+"\"Otomatik Eşleştir (FIFO)\" en eski faturaları sırayla kapatır."
+
+msgid "Click \"Save & Issue\" → the account balance increases automatically"
+msgstr "\"Kaydet & Kes\" tıkla → cari bakiyesi otomatik artar"
+
+msgid "\"Auto Match (FIFO)\" closes the oldest invoice(s)"
+msgstr "\"Otomatik Eşleştir (FIFO)\" en eski faturaları kapatır"
+
+msgid "E — \"Who owes me, how much is overdue?\""
+msgstr "E — \"Kim bana borçlu, ne kadar gecikti?\""
+
+msgid "F — \"Which invoice is due soon?\""
+msgstr "F — \"Hangi faturanın vadesi yakın?\""
+
+msgid "Customers over 80% usage receive a \"Limit Exceeded\" / \"Approaching\" badge"
+msgstr "%80'i aşan müşteriler \"Limit Aşıldı\" / \"Yaklaşıyor\" rozeti alır"
+
+msgid ""
+"Customers above 80 percent usage receive a \"Limit Exceeded\" / "
+"\"Approaching\" badge"
+msgstr ""
+"Kullanım oranı yüzde 80'in üzerindeki müşteriler \"Limit Aşıldı\" / "
+"\"Yaklaşıyor\" rozeti alır"
+
+msgid "in our favor"
+msgstr "lehte"
+
+msgid "against us"
+msgstr "aleyhte"
+
+msgid "Net"
+msgstr "Net"
+
+msgid "Search: code, name, tax no, email, phone…"
+msgstr "Ara: kod, isim, VKN, e-posta, telefon…"
+
+msgid "accounts"
+msgstr "cari"
+
+msgid "Back to All Accounts"
+msgstr "Tüm Carilere Dön"
+
+msgid "Create New"
+msgstr "Yeni Oluştur"
+
+msgid "Basic info & classification"
+msgstr "Temel bilgi & sınıflandırma"
+
+msgid "e.g., Acme Inc."
+msgstr "örn: Acme A.Ş."
+
+msgid "Credit, discount and payment terms"
+msgstr "Vade, iskonto ve ticari koşullar"
+
+msgid "0 = no limit"
+msgstr "0 = limitsiz"
+
+msgid "For e-Archive / invoice headers"
+msgstr "e-Arşiv / fatura başlıkları için"
+
+msgid "Account code stays the same."
+msgstr "Cari kodu değişmez."
+
+msgid "Account code is generated automatically (CARI-001…)."
+msgstr "Cari kodu otomatik atanır (CARI-001…)."
+
+msgid "Inactive accounts are hidden from default filters."
+msgstr "Pasif cariler varsayılan filtrede gizlenir."
+
+msgid "Street, building, district…"
+msgstr "Sokak, bina, mahalle…"
+
+msgid "Term"
+msgstr "Vade"
+
+msgid "Limit"
+msgstr "Limit"
+
+msgid "Take Payment"
+msgstr "Tahsilat Al"
+
+msgid "Invoice No"
+msgstr "Fatura No"
+
+msgid "Full Statement"
+msgstr "Tam Ekstre"
+
+msgid "Tax No (VKN)"
+msgstr "VKN"
+
+msgid "ID No (TCKN)"
+msgstr "TCKN"
+
+msgid "Delete Account"
+msgstr "Cari Sil"
+
+msgid "Accounts with movements are deactivated, not removed."
+msgstr "Hareketleri olan cariler silinmez, pasifleştirilir."
+
+msgid "({{ count }} invoices)"
+msgstr ""
+
+msgid ""
+"<a href=\"{{ aging_url }}\">Aging Report</a> → All open receivables are "
+"split into <code>0-30 / 30-60 / 60-90 / 90+ days</code> buckets."
+msgstr ""
+
+msgid ""
+"<a href=\"{{ credit_limit_url }}\">Credit Limit Report</a> → all customers "
+"with a limit usage percentage"
+msgstr ""
+
+msgid ""
+"<a href=\"{{ due_calendar_url }}\">Due Calendar</a> → Lists in groups: "
+"Overdue / This Week / Next Week / This Month / Later."
+msgstr ""
+
+msgid "<a href=\"{{ report_index_url }}\">Report Center</a> → 4 major reports:"
+msgstr ""
+
+msgid ""
+"<strong>Open an account card:</strong> <a href=\"{{ cari_create_url }}\">New"
+" Account</a> → select customer or supplier, enter the previous opening "
+"balance if any."
+msgstr ""
+
+msgid "Account Statement"
+msgstr ""
+
+msgid "Account, type, method & amount"
+msgstr ""
+
+msgid "Aging Analysis"
+msgstr "Gecikme Analizi"
+
+msgid ""
+"Aging analysis, trial balance, credit limit monitoring and due-date calendar"
+" — every signal you need to keep receivables and payables under control."
+msgstr ""
+"Gecikme analizi, cari mizan, risk limiti takibi ve vade takvimi — alacak ve "
+"borçları kontrol altında tutmak için gereken tüm sinyaller."
+
+msgid "Allocated"
+msgstr "Eşleştirilen"
+
+msgid "Back to Check / Note Portfolio"
+msgstr ""
+
+msgid "Bank / drawer details"
+msgstr ""
+
+msgid "Basic details"
+msgstr ""
+
+msgid "Cash Flow Calendar"
+msgstr ""
+
+msgid "Check / Note"
+msgstr ""
+
+msgid "Code (asc)"
+msgstr "Kod (artan)"
+
+msgid "Credit limit exceeded"
+msgstr ""
+
+msgid "Debit increases the balance owed to us. Credit reduces it."
+msgstr ""
+
+msgid "Discount Rate"
+msgstr ""
+
+msgid "Edit Invoice"
+msgstr "Fatura Düzenle"
+
+msgid "FIFO auto-match available"
+msgstr ""
+
+msgid "From customers"
+msgstr ""
+
+msgid "Internal notes about this account…"
+msgstr ""
+
+msgid "Lines and amounts"
+msgstr ""
+
+msgid "Matching records"
+msgstr ""
+
+msgid "Most Recent"
+msgstr "En Son Hareket"
+
+msgid "Movement"
+msgstr "Hareket"
+
+msgid "No movements"
+msgstr ""
+
+msgid "Opened from the <a href=\"{{ cari_create_url2 }}\">New Account</a> page."
+msgstr ""
+
+msgid "Past due date"
+msgstr ""
+
+msgid "Period Summary"
+msgstr ""
+
+msgid "Risk Monitoring"
+msgstr ""
+
+msgid "Search: invoice no, account, note…"
+msgstr ""
+
+msgid "Search: payment no, account, description…"
+msgstr ""
+
+msgid "Statement — {{ name }}"
+msgstr ""
+
+msgid "Sum of invoice totals"
+msgstr ""
+
+msgid "To suppliers"
+msgstr ""
+
+msgid "Total ({{ count }} accounts)"
+msgstr ""
+
+msgid "Total invoices"
+msgstr ""
+
+msgid "Unpaid balance"
+msgstr ""
+
+msgid "Welcome, {{ first }} {{ last }}!"
+msgstr ""
+
+msgid "Who is this instrument associated with"
+msgstr ""
+
+msgid "instruments"
+msgstr ""
+
+msgid "invoices"
+msgstr ""
+
+msgid "payments"
+msgstr ""
+
+msgid "{{ count }} accounts exceed the limit"
+msgstr ""
+
+msgid "{{ count }} invoices overdue"
+msgstr ""
+
+msgid "{{ count }} invoices within 7 days"
+msgstr ""
+
+msgid "{{ d }} days from now"
+msgstr ""
+
+msgid "{{ d }} days late"
+msgstr ""
+
+msgid "Account no, branch, etc."
+msgstr "Hesap no, şube, vs."
+
+msgid "Approaching"
+msgstr "Yaklaşıyor"
+
+msgid "Cash account is required."
+msgstr "Kasa hesabı zorunludur."
+
+msgid "Operations Status"
+msgstr "İşlem Durumu"
+
+msgid "All Currencies"
+msgstr "Tüm Para Birimleri"
+
+msgid "Cancel Invoice"
+msgstr "Faturayı İptal Et"
+
+msgid "Cancel Payment"
+msgstr "Tahsilatı İptal Et"
+
+msgid "Clear filters"
+msgstr "Filtreleri Temizle"
+
+msgid "Days"
+msgstr "Gün"
+
+msgid "Edit Check"
+msgstr "Çek Düzenle"
+
+msgid "All Methods"
+msgstr "Tüm Yöntemler"
+
+msgid "Customer Refund"
+msgstr "Müşteriye İade"
+
+msgid "Supplier Refund"
+msgstr "Tedarikçiden İade"
+
+msgid "Deposit"
+msgstr "Bankaya Ver"
+
+msgid "Endorsement → Account"
+msgstr "Ciro → Cari"
+
+msgid "Endorse to"
+msgstr "Ciro et"
+
+msgid "Endorse to account…"
+msgstr "Cariye ciro et…"
+
+msgid "Select destination account"
+msgstr "Hedef cari seç"
+
+msgid "Pick a cash account"
+msgstr "Kasa hesabı seç"
+
+msgid "Mark as deposited"
+msgstr "Bankaya verildi işaretle"
+
+msgid "Endorse Check"
+msgstr "Çeki Ciro Et"

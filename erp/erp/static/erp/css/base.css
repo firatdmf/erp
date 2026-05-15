@@ -701,6 +701,49 @@ a:hover {
   overflow: hidden;
 }
 
+/* Cari Hesap menüsü için stil (Accounting ile aynı yapı) */
+#cariButton {
+  position: relative;
+}
+
+#cariButton .nav-link {
+  position: relative;
+}
+
+/* Cari menüsü için hover bridge */
+#cariButton::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 10px;
+  height: 100%;
+  background: transparent;
+  z-index: 9998;
+}
+
+/* Cari menüsü hover durumu */
+#cariButton:hover #cariExpanded,
+#cariButton:hover::after,
+#cariExpanded:hover {
+  display: block;
+}
+
+#cariExpanded {
+  display: none;
+  position: fixed;
+  left: 6rem;
+  background-color: var(--bg-primary);
+  width: 340px;
+  padding: 0;
+  border-radius: var(--border-radius);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  z-index: 9999;
+  animation: slideIn 0.25s ease;
+  overflow: hidden;
+}
+
 /* Team menüsü için stil */
 #teamButton {
   position: relative;

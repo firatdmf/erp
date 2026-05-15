@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --ink: #0F1419;
+  }
+  .cf { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 980px; margin: 0 auto; }
+  .cf, .cf * { box-sizing: border-box; }
+
+  .cf-back { display:inline-flex; align-items:center; gap:6px; color: var(--gray-600); font: 500 12.5px var(--font-sans); text-decoration: none; margin-bottom: 14px; }
+  .cf-back i { width: 14px; height: 14px; }
+  .cf-back:hover { color: var(--nejum-teal-700); }
+
+  .cf-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom: 22px; gap: 16px; }
+  .cf-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .cf-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
+  .cf-title .code { font: 600 16px ui-monospace, Menlo, monospace; color: var(--gray-500); margin-left: 10px; }
+
+  .cf-btn { display:inline-flex; align-items:center; gap:7px; padding: 9px 16px; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms; white-space: nowrap; text-decoration: none; border: none; }
+  .cf-btn i { width: 14px; height: 14px; }
+  .cf-btn.ghost { background: white; border:1px solid #E0E6EE; color: var(--gray-700); box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  .cf-btn.ghost:hover { background:#F8FAFC; border-color:#C5CCD3; }
+  .cf-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18); }
+  .cf-btn.primary:hover { filter: brightness(1.04); color: white; }
+
+  .cf-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); margin-bottom: 14px; overflow: hidden; }
+  .cf-section { padding: 18px 22px; }
+  .cf-section + .cf-section { border-top: 1px solid #EEF1F5; }
+  .cf-section-h { display:flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .cf-section-h .ico { display:inline-flex; align-items:center; justify-content:center; width: 28px; height: 28px; border-radius: 8px; background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+  .cf-section-h .ico i { width: 14px; height: 14px; }
+  .cf-section-h h3 { font: 700 14px var(--font-sans); color: var(--ink); margin: 0; letter-spacing: -0.01em; }
+  .cf-section-h .sub { font: 500 12px var(--font-sans); color: var(--gray-500); margin-left: 4px; }
+
+  .cf-row { display:grid; grid-template-columns: repeat(2, 1fr); gap: 14px 16px; }
+  .cf-row.three { grid-template-columns: repeat(3, 1fr); }
+  .cf-row.four  { grid-template-columns: repeat(4, 1fr); }
+  .cf-row.wide  { grid-template-columns: 1fr; }
+  @media (max-width: 720px) {
+    .cf-row, .cf-row.three, .cf-row.four { grid-template-columns: 1fr; }
+  }
+
+  .cf-f { display:flex; flex-direction: column; gap: 6px; }
+  .cf-f.span-2 { grid-column: span 2; }
+  @media (max-width: 720px) { .cf-f.span-2 { grid-column: span 1; } }
+  .cf-f label { font: 600 11.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--gray-600); display: inline-flex; align-items: center; gap: 4px; }
+  .cf-f .req { color: #B23B12; font-size: 11px; margin-left: 2px; }
+  .cf-f .hint { font: 400 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .cf-f input, .cf-f select, .cf-f textarea {
+    width: 100%; padding: 10px 12px; background: white; border: 1px solid #E0E6EE; border-radius: 8px;
+    font: 500 13px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms;
+    font-family: var(--font-sans);
+  }
+  .cf-f input:focus, .cf-f select:focus, .cf-f textarea:focus {
+    border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); background: white;
+  }
+  .cf-f input::placeholder, .cf-f textarea::placeholder { color: var(--gray-500); }
+  .cf-f textarea { resize: vertical; min-height: 80px; font-family: var(--font-sans); }
+  .cf-f input[type=date] { font-variant-numeric: tabular-nums; }
+
+  .cf-f .ins { position: relative; }
+  .cf-f .ins .suffix { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font: 500 12.5px var(--font-sans); color: var(--gray-500); pointer-events: none; }
+  .cf-f .ins .prefix { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font: 500 12.5px var(--font-sans); color: var(--gray-500); pointer-events: none; }
+  .cf-f .ins.with-prefix input { padding-left: 28px; }
+  .cf-f .ins.with-suffix input { padding-right: 50px; }
+
+  .cf-toggle { display:flex; align-items:center; gap: 10px; padding: 10px 14px; background: #FAFBFD; border: 1px solid #E0E6EE; border-radius: 8px; cursor: pointer; user-select: none; }
+  .cf-toggle input { width: 18px; height: 18px; accent-color: var(--nejum-teal-500); }
+  .cf-toggle .lbl-w { display:flex; flex-direction: column; }
+  .cf-toggle .lbl-w b { font: 600 13px var(--font-sans); color: var(--ink); }
+  .cf-toggle .lbl-w span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+
+  .cf-foot { display:flex; align-items: center; gap: 10px; padding: 14px 22px; background: #FAFBFD; border-top: 1px solid #EEF1F5; }
+  .cf-foot-l { font: 500 12px var(--font-sans); color: var(--gray-500); display:flex; align-items:center; gap:6px; }
+  .cf-foot-l i { width: 14px; height: 14px; }
+  .cf-foot-r { margin-left: auto; display:flex; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cf">
+
+  <a class="cf-back" href="{% url 'current_account:cari_list' %}">
+    <i data-lucide="arrow-left"></i> {% trans "Back to All Accounts" %}
+  </a>
+
+  <div class="cf-head">
+    <div>
+      <div class="cf-eyebrow">{% if cari %}{% trans "Edit" %}{% else %}{% trans "Create New" %}{% endif %}</div>
+      <h1 class="cf-title">
+        {% if cari %}{{ cari.name }}<span class="code">{{ cari.code }}</span>{% else %}{% trans "New Account" %}{% endif %}
+      </h1>
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="cf-card">
+      <div class="cf-section">
+        <div class="cf-section-h">
+          <span class="ico"><i data-lucide="id-card"></i></span>
+          <h3>{% trans "Identity" %}</h3>
+          <span class="sub">{% trans "Basic info & classification" %}</span>
+        </div>
+
+        <div class="cf-row">
+          <div class="cf-f span-2">
+            <label>{% trans "Name" %}<span class="req">*</span></label>
+            <input type="text" name="name" required maxlength="200" value="{{ cari.name|default:'' }}" placeholder="{% trans 'e.g., Acme Inc.' %}">
+          </div>
+
+          <div class="cf-f">
+            <label>{% trans "Type" %}<span class="req">*</span></label>
+            <select name="type" required>
+              {% for val,label in type_choices %}
+                <option value="{{ val }}" {% if cari and cari.type == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if not cari %}
+          <div class="cf-f">
+            <label>{% trans "Book" %}<span class="req">*</span></label>
+            <select name="book" required>
+              <option value="">{% trans "— Select —" %}</option>
+              {% for b in books %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="cf-f {% if cari %}span-2{% endif %}">
+            <label>{% trans "Currency" %}<span class="req">*</span></label>
+            <select name="default_currency" required>
+              {% for c in currencies %}<option value="{{ c.id }}" {% if cari and cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cf-card">
+      <div class="cf-section">
+        <div class="cf-section-h">
+          <span class="ico"><i data-lucide="briefcase"></i></span>
+          <h3>{% trans "Commercial Terms" %}</h3>
+          <span class="sub">{% trans "Credit, discount and payment terms" %}</span>
+        </div>
+
+        <div class="cf-row three">
+          <div class="cf-f">
+            <label>{% trans "Payment Term (days)" %}</label>
+            <div class="ins with-suffix">
+              <input type="number" name="payment_term_days" min="0" value="{{ cari.payment_term_days|default:30 }}">
+              <span class="suffix">{% trans "days" %}</span>
+            </div>
+          </div>
+          <div class="cf-f">
+            <label>{% trans "Credit Limit" %}</label>
+            <div class="ins with-prefix">
+              <span class="prefix">$</span>
+              <input type="number" step="0.01" name="credit_limit" value="{{ cari.credit_limit|default:'0.00' }}" placeholder="0.00">
+            </div>
+            <span class="hint">{% trans "0 = no limit" %}</span>
+          </div>
+          <div class="cf-f">
+            <label>{% trans "Discount Rate" %}</label>
+            <div class="ins with-suffix">
+              <input type="number" step="0.01" name="discount_rate" value="{{ cari.discount_rate|default:'0.00' }}" placeholder="0.00">
+              <span class="suffix">%</span>
+            </div>
+          </div>
+
+          {% if not cari %}
+          <div class="cf-f">
+            <label>{% trans "Opening Balance" %}</label>
+            <div class="ins with-prefix">
+              <span class="prefix">$</span>
+              <input type="number" step="0.01" name="opening_balance" value="0.00" placeholder="0.00">
+            </div>
+            <span class="hint">+ {% trans "Owes Us" %} / − {% trans "We Owe" %}</span>
+          </div>
+          <div class="cf-f">
+            <label>{% trans "Opening Date" %}</label>
+            <input type="date" name="opening_balance_date">
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="cf-card">
+      <div class="cf-section">
+        <div class="cf-section-h">
+          <span class="ico"><i data-lucide="file-text"></i></span>
+          <h3>{% trans "Tax Info" %}</h3>
+          <span class="sub">{% trans "For e-Archive / invoice headers" %}</span>
+        </div>
+
+        <div class="cf-row three">
+          <div class="cf-f">
+            <label>{% trans "Tax Office" %}</label>
+            <input type="text" name="tax_office" maxlength="100" value="{{ cari.tax_office|default:'' }}">
+          </div>
+          <div class="cf-f">
+            <label>{% trans "Tax Number (VKN)" %}</label>
+            <input type="text" name="tax_number" maxlength="11" value="{{ cari.tax_number|default:'' }}" placeholder="1234567890">
+          </div>
+          <div class="cf-f">
+            <label>{% trans "ID Number (TCKN)" %}</label>
+            <input type="text" name="identity_number" maxlength="11" value="{{ cari.identity_number|default:'' }}" placeholder="12345678901">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cf-card">
+      <div class="cf-section">
+        <div class="cf-section-h">
+          <span class="ico"><i data-lucide="contact"></i></span>
+          <h3>{% trans "Contact & Address" %}</h3>
+        </div>
+
+        <div class="cf-row">
+          <div class="cf-f">
+            <label>{% trans "Email" %}</label>
+            <input type="email" name="email" value="{{ cari.email|default:'' }}" placeholder="contact@example.com">
+          </div>
+          <div class="cf-f">
+            <label>{% trans "Phone" %}</label>
+            <input type="text" name="phone" maxlength="30" value="{{ cari.phone|default:'' }}" placeholder="+90 555 555 5555">
+          </div>
+        </div>
+
+        <div class="cf-row wide" style="margin-top: 14px;">
+          <div class="cf-f">
+            <label>{% trans "Billing Address" %}</label>
+            <textarea name="billing_address" placeholder="{% trans 'Street, building, district…' %}">{{ cari.billing_address|default:'' }}</textarea>
+          </div>
+        </div>
+
+        <div class="cf-row" style="margin-top: 14px;">
+          <div class="cf-f">
+            <label>{% trans "City" %}</label>
+            <input type="text" name="billing_city" maxlength="100" value="{{ cari.billing_city|default:'' }}">
+          </div>
+          <div class="cf-f">
+            <label>{% trans "Country" %}</label>
+            <input type="text" name="billing_country" maxlength="50" value="{{ cari.billing_country|default:'TR' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cf-card">
+      <div class="cf-section">
+        <div class="cf-section-h">
+          <span class="ico"><i data-lucide="sticky-note"></i></span>
+          <h3>{% trans "Notes" %}</h3>
+        </div>
+        <div class="cf-row wide">
+          <div class="cf-f">
+            <textarea name="notes" placeholder="{% trans 'Internal notes about this account…' %}">{{ cari.notes|default:'' }}</textarea>
+          </div>
+        </div>
+
+        {% if cari %}
+        <div style="margin-top: 14px;">
+          <label class="cf-toggle">
+            <input type="checkbox" name="is_active" {% if cari.is_active %}checked{% endif %}>
+            <div class="lbl-w">
+              <b>{% trans "Active" %}</b>
+              <span>{% trans "Inactive accounts are hidden from default filters." %}</span>
+            </div>
+          </label>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="cf-foot">
+        <div class="cf-foot-l">
+          <i data-lucide="info"></i>
+          {% if cari %}
+            {% trans "Account code stays the same." %}
+          {% else %}
+            {% trans "Account code is generated automatically (CARI-001…)." %}
+          {% endif %}
+        </div>
+        <div class="cf-foot-r">
+          <a href="{% if cari %}{% url 'current_account:cari_detail' cari.pk %}{% else %}{% url 'current_account:cari_list' %}{% endif %}" class="cf-btn ghost">{% trans "Cancel" %}</a>
+          <button type="submit" class="cf-btn primary">
+            <i data-lucide="check"></i>
+            {% if cari %}{% trans "Save Changes" %}{% else %}{% trans "Create Account" %}{% endif %}
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>if (window.lucide) lucide.createIcons();</script>
+{% endblock %}

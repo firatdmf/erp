@@ -128,10 +128,24 @@ class BookDetail(generic.DetailView):
     template_name = "accounting/book_detail.html"
     context_object_name = "book"
 
-    # def get_context_data(self, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     context[""] =
-    #     return context
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        book = self.object
+        # Legacy Asset Accounts Receivable + Liability Accounts Payable for this book
+        context["accounts_receivable"] = (
+            AssetAccountsReceivable.objects
+            .filter(book=book)
+            .select_related("currency", "contact", "company", "supplier",
+                            "paid_to_cash_account")
+            .order_by("-created_at")
+        )
+        context["accounts_payable"] = (
+            LiabilityAccountsPayable.objects
+            .filter(book=book)
+            .select_related("currency", "supplier", "paid_with_cash_account")
+            .order_by("-created_at")
+        )
+        return context
 
     def get_object(self):
         # Get the primary key from the URL

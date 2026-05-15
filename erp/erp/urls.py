@@ -43,6 +43,7 @@ urlpatterns = [
     path("team/", include("team.urls")),
     path("notes/", include("notes.urls")),
     path("procurement/", include("procurement.urls")),
+    path("cari/", include("current_account.urls")),
     path("storefront/", include("storefront.urls")),
     path("reports/",views.reports.as_view(),name="reports"),
     path("reports/task_report",views.task_report.as_view(),name="task_report"),

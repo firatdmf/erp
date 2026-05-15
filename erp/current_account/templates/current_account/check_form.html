@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load humanize %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .chk-f { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 980px; margin: 0 auto; }
+  .chk-f, .chk-f * { box-sizing: border-box; }
+
+  .chk-f-back { display:inline-flex; align-items:center; gap:6px; color: var(--gray-600); font: 500 12.5px var(--font-sans); text-decoration: none; margin-bottom: 14px; }
+  .chk-f-back i { width: 14px; height: 14px; }
+  .chk-f-back:hover { color: var(--nejum-teal-700); }
+
+  .chk-f-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom: 22px; gap: 16px; }
+  .chk-f-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .chk-f-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
+
+  .chk-f-btn { display:inline-flex; align-items:center; gap:7px; padding: 9px 16px; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms; white-space: nowrap; text-decoration: none; border: none; }
+  .chk-f-btn i { width: 14px; height: 14px; }
+  .chk-f-btn.ghost { background: white; border:1px solid #E0E6EE; color: var(--gray-700); box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  .chk-f-btn.ghost:hover { background:#F8FAFC; border-color:#C5CCD3; }
+  .chk-f-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18); }
+  .chk-f-btn.primary:hover { filter: brightness(1.04); color: white; }
+
+  .chk-f-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); margin-bottom: 14px; overflow: hidden; }
+  .chk-f-section { padding: 18px 22px; }
+  .chk-f-section + .chk-f-section { border-top: 1px solid #EEF1F5; }
+  .chk-f-section-h { display:flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .chk-f-section-h .ico { display:inline-flex; align-items:center; justify-content:center; width: 28px; height: 28px; border-radius: 8px; background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+  .chk-f-section-h .ico i { width: 14px; height: 14px; }
+  .chk-f-section-h h3 { font: 700 14px var(--font-sans); color: var(--ink); margin: 0; letter-spacing: -0.01em; }
+  .chk-f-section-h .sub { font: 500 12px var(--font-sans); color: var(--gray-500); margin-left: 4px; }
+
+  .chk-f-row { display:grid; grid-template-columns: repeat(2, 1fr); gap: 14px 16px; }
+  .chk-f-row.three { grid-template-columns: repeat(3, 1fr); }
+  .chk-f-row.four  { grid-template-columns: repeat(4, 1fr); }
+  .chk-f-row.wide  { grid-template-columns: 1fr; }
+  @media (max-width: 720px) {
+    .chk-f-row, .chk-f-row.three, .chk-f-row.four { grid-template-columns: 1fr; }
+  }
+
+  .chk-f-f { display:flex; flex-direction: column; gap: 6px; }
+  .chk-f-f.span-2 { grid-column: span 2; }
+  @media (max-width: 720px) { .chk-f-f.span-2 { grid-column: span 1; } }
+  .chk-f-f label { font: 600 11.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--gray-600); display: inline-flex; align-items: center; gap: 4px; }
+  .chk-f-f .req { color: #B23B12; font-size: 11px; margin-left: 2px; }
+  .chk-f-f .hint { font: 400 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .chk-f-f input, .chk-f-f select, .chk-f-f textarea {
+    width: 100%; padding: 10px 12px; background: white; border: 1px solid #E0E6EE; border-radius: 8px;
+    font: 500 13px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms;
+    font-family: var(--font-sans);
+  }
+  .chk-f-f input:focus, .chk-f-f select:focus, .chk-f-f textarea:focus {
+    border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); background: white;
+  }
+  .chk-f-f input::placeholder, .chk-f-f textarea::placeholder { color: var(--gray-500); }
+  .chk-f-f textarea { resize: vertical; min-height: 80px; font-family: var(--font-sans); }
+  .chk-f-f input[type=date] { font-variant-numeric: tabular-nums; }
+
+  /* Cari chip when prefilled */
+  .chk-f-cari-chip { display:inline-flex; align-items:center; gap:8px; background: var(--nejum-teal-50); border: 1px solid rgba(20,127,116,0.20); padding: 10px 14px; border-radius: 10px; font: 600 13px var(--font-sans); color: var(--ink); }
+  .chk-f-cari-chip i { width: 14px; height: 14px; color: var(--nejum-teal-700); }
+  .chk-f-cari-chip .code { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); padding: 2px 8px; background: white; border-radius: 6px; }
+  .chk-f-cari-chip .change-link { margin-left: 8px; color: var(--gray-500); text-decoration: none; font: 500 12px var(--font-sans); }
+  .chk-f-cari-chip .change-link:hover { color: var(--nejum-teal-700); }
+
+  /* Direction radios */
+  .chk-f-dir-radios { display:flex; gap: 10px; }
+  .chk-f-dir-radios label {
+    flex: 1; padding: 12px 14px; border: 1px solid #E0E6EE; border-radius: 10px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; font: 600 13px var(--font-sans); color: var(--gray-700);
+    background: white; transition: all 140ms; text-transform: none; letter-spacing: 0;
+  }
+  .chk-f-dir-radios label:hover { border-color: var(--nejum-teal-500); }
+  .chk-f-dir-radios input[type=radio] { width: 16px; height: 16px; accent-color: var(--nejum-teal-500); margin: 0; }
+  .chk-f-dir-radios .opt-w { display: flex; flex-direction: column; gap: 2px; }
+  .chk-f-dir-radios .opt-w b { font: 700 13px var(--font-sans); }
+  .chk-f-dir-radios .opt-w span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .chk-f-dir-radios label.received .opt-w b { color: #0E6E4A; }
+  .chk-f-dir-radios label.given    .opt-w b { color: #B23B12; }
+  .chk-f-dir-radios label:has(input:checked) { border-color: var(--nejum-teal-500); background: var(--nejum-teal-50); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+
+  .chk-f-foot { display:flex; align-items: center; gap: 10px; padding: 14px 22px; background: #FAFBFD; border-top: 1px solid #EEF1F5; }
+  .chk-f-foot-l { font: 500 12px var(--font-sans); color: var(--gray-500); display:flex; align-items:center; gap:6px; }
+  .chk-f-foot-l i { width: 14px; height: 14px; }
+  .chk-f-foot-r { margin-left: auto; display:flex; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chk-f">
+
+  <a class="chk-f-back" href="{% url 'current_account:check_list' %}">
+    <i data-lucide="arrow-left"></i> {% trans "Back to Check / Note Portfolio" %}
+  </a>
+
+  <div class="chk-f-head">
+    <div>
+      <div class="chk-f-eyebrow">{% trans "Create New" %}</div>
+      <h1 class="chk-f-title">{% trans "New Check / Note" %}</h1>
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <!-- Account & Direction -->
+    <div class="chk-f-card">
+      <div class="chk-f-section">
+        <div class="chk-f-section-h">
+          <span class="ico"><i data-lucide="user"></i></span>
+          <h3>{% trans "Account & Direction" %}</h3>
+          <span class="sub">{% trans "Who is this instrument associated with" %}</span>
+        </div>
+
+        {% if prefilled_cari %}
+        <input type="hidden" name="cari" value="{{ prefilled_cari.id }}">
+        <div style="margin-bottom: 14px;">
+          <div class="chk-f-cari-chip">
+            <i data-lucide="user"></i>
+            <span class="code">{{ prefilled_cari.code }}</span>
+            <span>{{ prefilled_cari.name }}</span>
+            <a href="{% url 'current_account:check_create' %}" class="change-link">{% trans "change" %}</a>
+          </div>
+        </div>
+        {% else %}
+        <div class="chk-f-row wide" style="margin-bottom: 14px;">
+          <div class="chk-f-f">
+            <label>{% trans "Account" %}<span class="req">*</span></label>
+            <select name="cari" required>
+              <option value="">{% trans "— Select account —" %}</option>
+              {% for c in cari_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="chk-f-row">
+          <div class="chk-f-f">
+            <label>{% trans "Type" %}</label>
+            <select name="instrument">
+              {% for v,l in instrument_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="chk-f-f">
+            <label>{% trans "Direction" %}<span class="req">*</span></label>
+            <div class="chk-f-dir-radios">
+              <label class="received">
+                <input type="radio" name="direction" value="received" checked>
+                <div class="opt-w">
+                  <b>↓ {% trans "Received" %}</b>
+                  <span>{% trans "Came from customer" %}</span>
+                </div>
+              </label>
+              <label class="given">
+                <input type="radio" name="direction" value="given">
+                <div class="opt-w">
+                  <b>↑ {% trans "Given" %}</b>
+                  <span>{% trans "Given to supplier" %}</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document Info -->
+    <div class="chk-f-card">
+      <div class="chk-f-section">
+        <div class="chk-f-section-h">
+          <span class="ico"><i data-lucide="file-text"></i></span>
+          <h3>{% trans "Document Info" %}</h3>
+          <span class="sub">{% trans "Bank / drawer details" %}</span>
+        </div>
+        <div class="chk-f-row">
+          <div class="chk-f-f">
+            <label>{% trans "Serial No" %}<span class="req">*</span></label>
+            <input type="text" name="serial_no" required maxlength="50">
+          </div>
+          <div class="chk-f-f">
+            <label>{% trans "Drawer" %}</label>
+            <input type="text" name="drawer" maxlength="200" placeholder="{% trans 'Person who issued the check/note' %}">
+          </div>
+          <div class="chk-f-f">
+            <label>{% trans "Bank" %}</label>
+            <input type="text" name="bank" maxlength="100" placeholder="{% trans 'Bank name (for checks)' %}">
+          </div>
+          <div class="chk-f-f">
+            <label>{% trans "Branch" %}</label>
+            <input type="text" name="branch" maxlength="100">
+          </div>
+          <div class="chk-f-f span-2">
+            <label>{% trans "Account No" %}</label>
+            <input type="text" name="account_no" maxlength="50">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Amount & Dates -->
+    <div class="chk-f-card">
+      <div class="chk-f-section">
+        <div class="chk-f-section-h">
+          <span class="ico"><i data-lucide="calendar"></i></span>
+          <h3>{% trans "Amount & Dates" %}</h3>
+        </div>
+        <div class="chk-f-row four">
+          <div class="chk-f-f">
+            <label>{% trans "Amount" %}<span class="req">*</span></label>
+            <input type="number" step="0.01" name="amount" required min="0.01" placeholder="0.00">
+          </div>
+          <div class="chk-f-f">
+            <label>{% trans "Currency" %}<span class="req">*</span></label>
+            <select name="currency" required>
+              {% for c in currencies %}<option value="{{ c.id }}" {% if prefilled_cari and prefilled_cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="chk-f-f">
+            <label>{% trans "Issue Date" %}<span class="req">*</span></label>
+            <input type="date" name="issue_date" required>
+          </div>
+          <div class="chk-f-f">
+            <label>{% trans "Due Date" %}<span class="req">*</span></label>
+            <input type="date" name="due_date" required>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="chk-f-card">
+      <div class="chk-f-section">
+        <div class="chk-f-section-h">
+          <span class="ico"><i data-lucide="sticky-note"></i></span>
+          <h3>{% trans "Notes" %}</h3>
+        </div>
+        <div class="chk-f-row wide">
+          <div class="chk-f-f">
+            <textarea name="notes" placeholder="{% trans 'Internal note about this check/note...' %}"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="chk-f-foot">
+        <div class="chk-f-foot-l">
+          <i data-lucide="info"></i>
+          {% trans "Instrument enters portfolio as 'In Portfolio' status." %}
+        </div>
+        <div class="chk-f-foot-r">
+          <a href="{% url 'current_account:check_list' %}" class="chk-f-btn ghost">{% trans "Cancel" %}</a>
+          <button type="submit" class="chk-f-btn primary">
+            <i data-lucide="check"></i>{% trans "Add to Portfolio" %}
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+  // Default issue date today, due date today+30
+  (function() {
+    const today = new Date();
+    const issueEl = document.querySelector('input[name="issue_date"]');
+    const dueEl = document.querySelector('input[name="due_date"]');
+    if (issueEl) issueEl.valueAsDate = today;
+    if (dueEl) {
+      const due = new Date(today);
+      due.setDate(due.getDate() + 30);
+      dueEl.valueAsDate = due;
+    }
+  })();
+</script>
+{% endblock %}

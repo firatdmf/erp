@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load humanize %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .mf { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 880px; margin: 0 auto; }
+  .mf, .mf * { box-sizing: border-box; }
+
+  .mf-back { display:inline-flex; align-items:center; gap:6px; color: var(--gray-600); font: 500 12.5px var(--font-sans); text-decoration: none; margin-bottom: 14px; }
+  .mf-back i { width: 14px; height: 14px; }
+  .mf-back:hover { color: var(--nejum-teal-700); }
+
+  .mf-head { margin-bottom: 22px; }
+  .mf-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .mf-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
+
+  .mf-btn { display:inline-flex; align-items:center; gap:7px; padding: 9px 16px; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms; white-space: nowrap; text-decoration: none; border: none; }
+  .mf-btn i { width: 14px; height: 14px; }
+  .mf-btn.ghost { background: white; border:1px solid #E0E6EE; color: var(--gray-700); box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  .mf-btn.ghost:hover { background:#F8FAFC; border-color:#C5CCD3; }
+  .mf-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18); }
+  .mf-btn.primary:hover { filter: brightness(1.04); color: white; }
+
+  .mf-card { background: white; border:1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); overflow: hidden; }
+
+  /* Account chip */
+  .mf-chip {
+    display:flex; justify-content:space-between; align-items: center; gap: 14px;
+    padding: 14px 20px; background: linear-gradient(180deg, #FAFCFB, white);
+    border-bottom: 1px solid #EEF1F5; flex-wrap: wrap;
+  }
+  .mf-chip-l { display:flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .mf-chip .code { font: 600 11.5px var(--font-mono); color: var(--nejum-teal-700); letter-spacing: 0.02em; padding: 2px 7px; background: var(--nejum-teal-50); border-radius: 6px; width: fit-content; }
+  .mf-chip .name { font: 700 15px var(--font-sans); color: var(--ink); }
+  .mf-chip-r { display:flex; flex-direction: column; gap: 2px; text-align: right; }
+  .mf-chip-r .lbl { font: 600 10.5px var(--font-sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray-500); }
+  .mf-chip-r .val { font: 700 16px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .mf-chip-r .sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+
+  .mf-section { padding: 18px 22px; }
+
+  .mf-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .mf-grid .span-2 { grid-column: span 2; }
+  @media (max-width: 640px) {
+    .mf-grid { grid-template-columns: 1fr; }
+    .mf-grid .span-2 { grid-column: span 1; }
+  }
+
+  .mf-f { display:flex; flex-direction: column; gap: 6px; }
+  .mf-f label { font: 600 11.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--gray-600); display: inline-flex; align-items: center; gap: 4px; }
+  .mf-f .req { color: #B23B12; font-size: 11px; margin-left: 2px; }
+  .mf-f input, .mf-f select, .mf-f textarea {
+    width: 100%; padding: 10px 12px; background: white; border: 1px solid #E0E6EE; border-radius: 8px;
+    font: 500 13px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms;
+    font-family: var(--font-sans);
+  }
+  .mf-f input:focus, .mf-f select:focus, .mf-f textarea:focus {
+    border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .mf-f input::placeholder, .mf-f textarea::placeholder { color: var(--gray-500); }
+  .mf-f input[type=date] { font-variant-numeric: tabular-nums; }
+
+  /* Direction radio cards */
+  .mf-dir { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mf-dir label {
+    cursor: pointer; padding: 14px 16px; border-radius: 10px;
+    background: white; border: 1.5px solid #E0E6EE;
+    display: flex; align-items: center; gap: 12px;
+    transition: all 140ms;
+  }
+  .mf-dir label:hover { border-color: #C5CCD3; background: #FAFBFD; }
+  .mf-dir input[type=radio] { width: 18px; height: 18px; accent-color: currentColor; margin: 0; }
+  .mf-dir .lbl-w { display: flex; flex-direction: column; gap: 1px; }
+  .mf-dir .lbl-w b { font: 700 13.5px var(--font-sans); }
+  .mf-dir .lbl-w span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .mf-dir label.debit { color: #B23B12; }
+  .mf-dir label.credit { color: #0E6E4A; }
+  .mf-dir label:has(input:checked) {
+    border-color: currentColor;
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(248,250,251,1));
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.10);
+  }
+  .mf-dir label.debit:has(input:checked) { box-shadow: 0 0 0 3px rgba(178,59,18,0.10); }
+  .mf-dir label.credit:has(input:checked) { box-shadow: 0 0 0 3px rgba(14,110,74,0.10); }
+
+  .mf-foot { display:flex; align-items: center; gap: 10px; padding: 14px 22px; background: #FAFBFD; border-top: 1px solid #EEF1F5; }
+  .mf-foot-l { font: 500 12px var(--font-sans); color: var(--gray-500); display:flex; align-items:center; gap:6px; }
+  .mf-foot-l i { width: 14px; height: 14px; }
+  .mf-foot-r { margin-left: auto; display:flex; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mf">
+
+  <a class="mf-back" href="{% url 'current_account:cari_detail' cari.pk %}">
+    <i data-lucide="arrow-left"></i> {{ cari.name }}
+  </a>
+
+  <div class="mf-head">
+    <div class="mf-eyebrow">{% trans "Add Movement" %}</div>
+    <h1 class="mf-title">{% trans "New Movement" %}</h1>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mf-card">
+
+      <div class="mf-chip">
+        <div class="mf-chip-l">
+          <span class="code">{{ cari.code }}</span>
+          <span class="name">{{ cari.name }}</span>
+        </div>
+        <div class="mf-chip-r">
+          <span class="lbl">{% trans "Current Balance" %}</span>
+          <span class="val">{{ cari.display_currency_symbol }}{{ cari.absolute_balance|floatformat:2|intcomma }}</span>
+          <span class="sub">{{ cari.balance_label }}</span>
+        </div>
+      </div>
+
+      <div class="mf-section">
+        <div class="mf-grid">
+
+          <div class="mf-f">
+            <label>{% trans "Date" %}<span class="req">*</span></label>
+            <input type="date" name="date" required value="{{ today|date:'Y-m-d' }}">
+          </div>
+
+          <div class="mf-f">
+            <label>{% trans "Due Date (optional)" %}</label>
+            <input type="date" name="due_date">
+          </div>
+
+          <div class="mf-f">
+            <label>{% trans "Movement Type" %}<span class="req">*</span></label>
+            <select name="movement_type" required>
+              {% for val,label in movement_type_choices %}
+                <option value="{{ val }}" {% if val == 'adjustment' %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mf-f">
+            <label>{% trans "Currency" %}</label>
+            <select name="currency">
+              {% for c in currencies %}
+                <option value="{{ c.id }}" {% if c.id == cari.default_currency_id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mf-f span-2">
+            <label>{% trans "Direction" %}<span class="req">*</span></label>
+            <div class="mf-dir">
+              <label class="debit">
+                <input type="radio" name="direction" value="debit" checked>
+                <div class="lbl-w">
+                  <b>{% trans "Debit (+)" %}</b>
+                  <span>{% trans "Account now owes us" %}</span>
+                </div>
+              </label>
+              <label class="credit">
+                <input type="radio" name="direction" value="credit">
+                <div class="lbl-w">
+                  <b>{% trans "Credit (−)" %}</b>
+                  <span>{% trans "Account paid / refunded" %}</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="mf-f">
+            <label>{% trans "Amount" %}<span class="req">*</span></label>
+            <input type="number" step="0.01" name="amount" required min="0.01" placeholder="0.00">
+          </div>
+
+          <div class="mf-f">
+            <label>{% trans "Reference" %}</label>
+            <input type="text" name="reference" maxlength="50" placeholder="{% trans 'Invoice no, check no, etc.' %}">
+          </div>
+
+          <div class="mf-f span-2">
+            <label>{% trans "Description" %}</label>
+            <input type="text" name="description" maxlength="300" placeholder="{% trans 'What is this movement about?' %}">
+          </div>
+
+        </div>
+      </div>
+
+      <div class="mf-foot">
+        <div class="mf-foot-l">
+          <i data-lucide="info"></i>
+          {% trans "Debit increases the balance owed to us. Credit reduces it." %}
+        </div>
+        <div class="mf-foot-r">
+          <a href="{% url 'current_account:cari_detail' cari.pk %}" class="mf-btn ghost">{% trans "Cancel" %}</a>
+          <button type="submit" class="mf-btn primary">
+            <i data-lucide="check"></i>{% trans "Save Movement" %}
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+  // Default date to today if empty
+  (function(){
+    var d = document.querySelector('input[name="date"]');
+    if (d && !d.value) { d.valueAsDate = new Date(); }
+  })();
+</script>
+{% endblock %}

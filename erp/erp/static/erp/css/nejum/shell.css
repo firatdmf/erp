@@ -204,6 +204,53 @@ body > main {
   text-align: left;
   cursor: default;
 }
+/* ------------------------------------------------------------------------
+   Compact mode for the Cari (Current Account) flyout — it has 6 sections
+   so we tighten spacing globally inside this specific flyout to fit on
+   typical viewports without scroll.
+   ------------------------------------------------------------------------ */
+[data-flyout="cari"] > .nj-flyout {
+  padding: 8px 0 6px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fly-head {
+  padding: 2px 16px 8px;
+  margin-bottom: 4px;
+  gap: 10px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fly-icon {
+  width: 32px;
+  height: 32px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fly-title {
+  font-size: 15px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fly-body {
+  padding: 0 6px 4px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fly-group + .nj-fly-group {
+  margin-top: 2px;
+  padding-top: 2px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fly-group-title {
+  padding: 6px 10px 2px;
+  font-size: 9.5px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fly-item {
+  padding: 5px 8px;
+  gap: 10px;
+  font-size: 13px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fi-icon {
+  width: 22px;
+  height: 22px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fi-icon svg {
+  width: 12px;
+  height: 12px;
+}
+[data-flyout="cari"] > .nj-flyout .nj-fi-label {
+  font-size: 13px;
+}
 .nj-nav-item.nj-open > .nj-flyout,
 .nj-nav-item.nj-pinned > .nj-flyout {
   opacity: 1;

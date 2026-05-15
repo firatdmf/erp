@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<style>
+  .hp-page { background:#f8fafc; min-height:100vh; padding: 16px 16px 32px; font-family:'Inter', system-ui, sans-serif; }
+  .hp-hero { max-width: 1100px; margin: 0 auto 24px; padding: 32px; border-radius: 20px;
+             background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+             color: #fff; box-shadow: 0 20px 50px rgba(99,102,241,0.25); }
+  .hp-hero h1 { margin: 0 0 8px; font-size: 32px; font-weight: 800; letter-spacing: -0.5px; }
+  .hp-hero p  { margin: 0; font-size: 15px; opacity: 0.92; line-height: 1.5; }
+  .hp-hero .chips { display:flex; gap:8px; margin-top: 16px; flex-wrap: wrap; }
+  .hp-hero .chip {
+    background: rgba(255,255,255,0.18); color:#fff; padding: 6px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; backdrop-filter: blur(8px);
+  }
+
+  .hp-layout { display: grid; grid-template-columns: 260px 1fr; gap: 24px; max-width: 1100px; margin: 0 auto; }
+  @media (max-width: 900px) { .hp-layout { grid-template-columns: 1fr; } .hp-toc { position: static !important; } }
+
+  .hp-toc {
+    background: #fff; border:1px solid #e2e8f0; border-radius: 14px; padding: 18px;
+    position: sticky; top: 16px; align-self: flex-start; max-height: calc(100vh - 32px); overflow-y: auto;
+  }
+  .hp-toc h3 { font-size: 11px; font-weight: 700; color:#64748b; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 12px; }
+  .hp-toc a { display:block; padding: 7px 10px; color: #475569; font-size: 13px; font-weight: 600; text-decoration: none; border-radius: 8px; }
+  .hp-toc a:hover { background: #f1f5f9; color: #6366f1; }
+  .hp-toc a.depth-2 { padding-left: 22px; font-size: 12.5px; font-weight: 500; color: #64748b; }
+
+  .hp-content {
+    background: #fff; border:1px solid #e2e8f0; border-radius: 16px; padding: 36px 40px;
+  }
+  .hp-content h2 {
+    font-size: 22px; font-weight: 800; color: #0f172a; margin: 32px 0 14px;
+    padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; scroll-margin-top: 16px;
+  }
+  .hp-content h2:first-child { margin-top: 0; }
+  .hp-content h3 { font-size: 16px; font-weight: 800; color: #0f172a; margin: 24px 0 10px; scroll-margin-top: 16px; }
+  .hp-content h4 { font-size: 14px; font-weight: 700; color: #475569; margin: 18px 0 8px; }
+  .hp-content p  { font-size: 14.5px; line-height: 1.65; color: #334155; margin: 0 0 12px; }
+  .hp-content ul, .hp-content ol { font-size: 14.5px; line-height: 1.65; color: #334155; padding-left: 22px; margin: 0 0 14px; }
+  .hp-content li { margin: 6px 0; }
+  .hp-content strong { color: #0f172a; font-weight: 700; }
+  .hp-content code {
+    background: #f1f5f9; padding: 2px 6px; border-radius: 5px; font-size: 13px;
+    color: #be185d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .hp-content pre {
+    background: #0f172a; color: #e2e8f0; padding: 16px 20px; border-radius: 12px;
+    font-size: 13px; line-height: 1.5; overflow-x: auto; margin: 12px 0;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .hp-content pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+  .hp-content blockquote {
+    margin: 14px 0; padding: 12px 16px; border-left: 4px solid #6366f1;
+    background: linear-gradient(135deg, #f5f3ff, #eff6ff); color: #475569;
+    font-size: 13.5px; border-radius: 0 8px 8px 0;
+  }
+  .hp-content table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+  .hp-content th, .hp-content td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: left; }
+  .hp-content th { background: #f8fafc; font-weight: 700; color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .hp-content tr:hover { background: #f8fafc; }
+  .hp-content hr { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+
+  /* Scenario boxes */
+  .scenario {
+    background: linear-gradient(135deg, #fefce8, #fef9c3); border-left: 4px solid #eab308;
+    padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 16px 0;
+  }
+  .scenario h4 { margin: 0 0 8px; color: #713f12; font-size: 14px; }
+  .scenario p, .scenario ol, .scenario ul { color: #713f12; }
+  .scenario code { background: rgba(255,255,255,0.6); color: #92400e; }
+
+  .tip {
+    background: linear-gradient(135deg, #ecfdf5, #f0fdf4); border-left: 4px solid #10b981;
+    padding: 14px 18px; border-radius: 0 12px 12px 0; margin: 14px 0;
+    font-size: 13.5px; color: #065f46;
+  }
+  .warn {
+    background: linear-gradient(135deg, #fef2f2, #fef7f0); border-left: 4px solid #ef4444;
+    padding: 14px 18px; border-radius: 0 12px 12px 0; margin: 14px 0;
+    font-size: 13.5px; color: #7f1d1d;
+  }
+
+  .btn-cta {
+    display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #3b82f6); color: #fff; text-decoration: none;
+    font-weight: 700; font-size: 13.5px; margin: 6px 6px 6px 0; transition: all .15s;
+  }
+  .btn-cta:hover { transform: translateY(-1px); color: #fff; box-shadow: 0 8px 20px rgba(99,102,241,0.35); }
+  .btn-cta.green { background: linear-gradient(135deg, #10b981, #22c55e); }
+  .btn-cta.purple { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+  .btn-cta.ghost { background: #fff; color: #0f172a; border: 1px solid #e2e8f0; }
+</style>
+
+<div class="hp-page">
+
+  <!-- HERO -->
+  <div class="hp-hero">
+    <h1>{% trans "Current Account — User Guide" %}</h1>
+    <p>{% trans "ByteEntegre/Logo-style classic current account module. Customer-supplier cards, invoices, collections-payments, checks-promissory notes, and reports — all in one place, without the headache." %}</p>
+    <div class="chips">
+      <span class="chip">{% trans "📇 Account cards" %}</span>
+      <span class="chip">{% trans "🧾 Invoices (VAT)" %}</span>
+      <span class="chip">{% trans "💰 Collection / Payment" %}</span>
+      <span class="chip">{% trans "📜 Check / Promissory Note" %}</span>
+      <span class="chip">{% trans "📊 4 Reports" %}</span>
+    </div>
+  </div>
+
+  <div class="hp-layout">
+
+    <!-- TOC -->
+    <nav class="hp-toc">
+      <h3>{% trans "Contents" %}</h3>
+      <a href="#hizli">{% trans "⚡ Quick Start" %}</a>
+      <a href="#senaryolar">{% trans "📋 Daily Scenarios" %}</a>
+      <a href="#sen-a"  class="depth-2">{% trans "A: Sale + Collection" %}</a>
+      <a href="#sen-b"  class="depth-2">{% trans "B: Purchase + Payment" %}</a>
+      <a href="#sen-c"  class="depth-2">{% trans "C: Received a Check" %}</a>
+      <a href="#sen-d"  class="depth-2">{% trans "D: Statement" %}</a>
+      <a href="#sen-e"  class="depth-2">{% trans "E: Overdue Receivables" %}</a>
+      <a href="#sen-f"  class="depth-2">{% trans "F: Due Calendar" %}</a>
+      <a href="#sen-g"  class="depth-2">{% trans "G: Credit Limit" %}</a>
+      <a href="#kavramlar">{% trans "🧠 Core Concepts" %}</a>
+      <a href="#kart">{% trans "📇 Account Card" %}</a>
+      <a href="#fatura">{% trans "🧾 Invoices" %}</a>
+      <a href="#tahsilat">{% trans "💰 Collection/Payment" %}</a>
+      <a href="#cek">{% trans "📜 Check / Promissory Note" %}</a>
+      <a href="#rapor">{% trans "📊 Reports" %}</a>
+      <a href="#sss">{% trans "❓ FAQ" %}</a>
+    </nav>
+
+    <!-- CONTENT -->
+    <article class="hp-content">
+
+      <h2 id="hizli">{% trans "⚡ Quick Start (in 5 minutes)" %}</h2>
+
+      <p>{% blocktrans %}The system opens <strong>one Current Account card for each customer and supplier</strong> (example code: <code>CARI-001</code>). Under this card:{% endblocktrans %}</p>
+      <ul>
+        <li>{% blocktrans %}<strong>Movements</strong> — each financial effect is a row (invoice, collection, endorsement, etc.){% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Balance</strong> — the sum of movements, updated automatically{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Invoices</strong> — all sales/purchase invoices issued for this account{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Collections / Payments</strong> — transactions where money changed hands{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Checks / Promissory Notes</strong> — negotiable instruments waiting in the portfolio{% endblocktrans %}</li>
+      </ul>
+
+      <h3>{% trans "First 3 steps" %}</h3>
+      <ol>
+        <li>{% url 'current_account:cari_create' as cari_create_url %}{% blocktrans %}<strong>Open an account card:</strong> <a href="{{ cari_create_url }}">New Account</a> → select customer or supplier, enter the previous opening balance if any.{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Issue an invoice:</strong> On the account page, <strong>"Issue Invoice"</strong> purple button → add line items → <strong>"Save & Issue"</strong>.{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Take a collection:</strong> On the account page, <strong>"Take Collection"</strong> green button → open invoices are listed automatically, match them.{% endblocktrans %}</li>
+      </ol>
+      <p>{% trans "That's all. Balance, statement, and status update automatically." %}</p>
+
+      <div>
+        <a class="btn-cta" href="{% url 'current_account:cari_list' %}"><i data-lucide="users" style="width:14px; height:14px;"></i> {% trans "Account List" %}</a>
+        <a class="btn-cta green" href="{% url 'current_account:invoice_create' %}"><i data-lucide="file-plus" style="width:14px; height:14px;"></i> {% trans "New Invoice" %}</a>
+        <a class="btn-cta purple" href="{% url 'current_account:check_list' %}"><i data-lucide="scroll-text" style="width:14px; height:14px;"></i> {% trans "Check Portfolio" %}</a>
+      </div>
+
+      <hr>
+
+      <h2 id="senaryolar">{% trans "📋 Daily Scenarios" %}</h2>
+
+      <div class="scenario" id="sen-a">
+        <h4>{% trans "A — I make a sale to a customer, then I receive the money" %}</h4>
+        <ol>
+          <li>{% blocktrans %}<strong>Open an account</strong> (skip if it already exists): <code>/cari/yeni/</code>{% endblocktrans %}</li>
+          <li>{% blocktrans %}<strong>Issue a sales invoice</strong>: On the account detail page, "Issue Invoice" → Type: <em>Sales Invoice</em>{% endblocktrans %}
+            <ul>
+              <li>{% trans "Add line items (each row has a VAT rate)" %}</li>
+              <li>{% trans 'Click "Save & Issue" → the account balance increases automatically' %}</li>
+            </ul>
+          </li>
+          <li>{% blocktrans %}<strong>When the customer pays</strong>: Account → "Take Collection"{% endblocktrans %}
+            <ul>
+              <li>{% trans "Open invoices are listed automatically" %}</li>
+              <li>{% trans '"Auto Match (FIFO)" closes the oldest invoice(s)' %}</li>
+              <li>{% trans 'Or match manually → "Save & Confirm"' %}</li>
+            </ul>
+          </li>
+          <li>{% blocktrans %}<strong>Result</strong>: Invoice status becomes <code>Paid</code>, the account balance closes, the cash account increases.{% endblocktrans %}</li>
+        </ol>
+      </div>
+
+      <div class="scenario" id="sen-b">
+        <h4>{% trans "B — I bought goods from a supplier, I will make a payment" %}</h4>
+        <ol>
+          <li>{% blocktrans %}<strong>Open an account</strong>: Type = <em>Supplier</em>{% endblocktrans %}</li>
+          <li>{% blocktrans %}<strong>Purchase invoice</strong>: Type: <em>Purchase Invoice</em> → the account balance becomes negative{% endblocktrans %}</li>
+          <li>{% blocktrans %}<strong>Payment</strong>: Account → "Take Collection" → Type: <em>Payment (to supplier)</em>{% endblocktrans %}
+            <ul><li>{% trans "Select the account to deduct from the cash account, close the invoice" %}</li></ul>
+          </li>
+          <li>{% blocktrans %}<strong>Result</strong>: The account balance returns to zero, the cash account decreases.{% endblocktrans %}</li>
+        </ol>
+      </div>
+
+      <div class="scenario" id="sen-c">
+        <h4>{% trans "C — The customer brought a check" %}</h4>
+        <ol>
+          <li>{% blocktrans %}<strong>Check entry</strong>: <code>/cari/cek-senet/yeni/</code> → Direction: <em>Received</em>{% endblocktrans %}
+            <ul><li>{% trans 'Enter bank, serial number, due date, amount → "Add to Portfolio"' %}</li></ul>
+          </li>
+          <li>{% blocktrans %}<strong>Automatic effect</strong>: The account balance decreases (as if you had taken a collection).{% endblocktrans %}</li>
+          <li>{% blocktrans %}<strong>When the due date arrives, 3 options</strong>:{% endblocktrans %}
+            <ul>
+              <li>{% blocktrans %}<strong>Deposit</strong> → status: <em>Deposited</em>{% endblocktrans %}</li>
+              <li>{% blocktrans %}<strong>Clear</strong> → select cash account → money comes in{% endblocktrans %}</li>
+              <li>{% blocktrans %}<strong>Endorse</strong> → transfer to another account{% endblocktrans %}</li>
+            </ul>
+          </li>
+          <li>{% blocktrans %}<strong>If it bounces</strong>: "Mark as Bounced" → a reverse movement is written to the account, and the receivable is reopened.{% endblocktrans %}</li>
+        </ol>
+      </div>
+
+      <div class="scenario" id="sen-d">
+        <h4>{% trans "D — The customer asked for their statement" %}</h4>
+        <p>{% blocktrans %}Account detail → <strong>"Statement"</strong> button → Select date range → <strong>"Print"</strong>.{% endblocktrans %}</p>
+        <p>{% trans "Clean PDF-like, professional output with carry-over, debit, credit, and closing columns." %}</p>
+      </div>
+
+      <div class="scenario" id="sen-e">
+        <h4>{% trans 'E — "Who owes me, how much is overdue?"' %}</h4>
+        <p>{% url 'current_account:report_aging' as aging_url %}{% blocktrans %}<a href="{{ aging_url }}">Aging Report</a> → All open receivables are split into <code>0-30 / 30-60 / 60-90 / 90+ days</code> buckets.{% endblocktrans %}</p>
+      </div>
+
+      <div class="scenario" id="sen-f">
+        <h4>{% trans 'F — "Which invoice is due soon?"' %}</h4>
+        <p>{% url 'current_account:report_due_calendar' as due_calendar_url %}{% blocktrans %}<a href="{{ due_calendar_url }}">Due Calendar</a> → Lists in groups: Overdue / This Week / Next Week / This Month / Later.{% endblocktrans %}</p>
+      </div>
+
+      <div class="scenario" id="sen-g">
+        <h4>{% trans "G — Credit limit control for customers" %}</h4>
+        <ol>
+          <li>{% blocktrans %}Edit the account card → enter an amount in the <strong>Credit Limit</strong> field (e.g., 10,000){% endblocktrans %}</li>
+          <li>{% url 'current_account:report_credit_limit' as credit_limit_url %}{% blocktrans %}<a href="{{ credit_limit_url }}">Credit Limit Report</a> → all customers with a limit usage percentage{% endblocktrans %}</li>
+          <li>{% blocktrans %}Customers above 80 percent usage receive a "Limit Exceeded" / "Approaching" badge{% endblocktrans %}</li>
+        </ol>
+      </div>
+
+      <hr>
+
+      <h2 id="kavramlar">{% trans "🧠 Core Concepts" %}</h2>
+
+      <h3>{% trans "Sign convention" %}</h3>
+      <p>{% trans "The heart of the system is built on a single rule:" %}</p>
+      <table>
+        <thead><tr><th><code>amount</code></th><th>{% trans "Meaning" %}</th></tr></thead>
+        <tbody>
+          <tr><td><strong style="color:#dc2626;">{% trans "Positive (+)" %}</strong></td><td>{% blocktrans %}The account <strong>owes us</strong> / we are the creditor{% endblocktrans %}</td></tr>
+          <tr><td><strong style="color:#059669;">{% trans "Negative (−)" %}</strong></td><td>{% blocktrans %}<strong>We owe the account</strong> / the account paid us{% endblocktrans %}</td></tr>
+          <tr><td><strong style="color:#94a3b8;">0</strong></td><td>{% trans "Account is closed" %}</td></tr>
+        </tbody>
+      </table>
+
+      <h3>{% trans "Movement → Balance" %}</h3>
+      <p>{% trans "Balance is not a stored field, it is the sum of movements:" %}</p>
+      <pre><code>Balance = SUM(CariMovement.amount) WHERE cari = X</code></pre>
+      <p>{% blocktrans %}That's why when you delete / change a movement, the balance auto-corrects. <strong>The cancel action does not delete the original row</strong>, it writes a reverse movement (audit-safe).{% endblocktrans %}</p>
+
+      <h3>{% trans "Status flows" %}</h3>
+      <h4>{% trans "Invoice:" %}</h4>
+      <pre><code>draft → issued → partially paid → paid
+                 └─→ cancelled</code></pre>
+      <h4>{% trans "Check/Promissory Note (received):" %}</h4>
+      <pre><code>in portfolio ──┬─► deposited ──► cleared
+               ├─► cleared
+               ├─► endorsed
+               └─► bounced / cancelled</code></pre>
+
+      <h3>{% trans "Account code" %}</h3>
+      <ul>
+        <li>{% blocktrans %}Each book (<code>Book</code>) keeps an independent counter{% endblocktrans %}</li>
+        <li>{% blocktrans %}<code>CARI-001</code>, <code>CARI-002</code>, ... are assigned automatically{% endblocktrans %}</li>
+        <li>{% trans "Two different books can have the same code — unique as a (book, code) combination" %}</li>
+      </ul>
+
+      <hr>
+
+      <h2 id="kart">{% trans "📇 Account Card" %}</h2>
+
+      <h3>{% trans "Opening" %}</h3>
+      <p>{% url 'current_account:cari_create' as cari_create_url2 %}{% blocktrans %}Opened from the <a href="{{ cari_create_url2 }}">New Account</a> page.{% endblocktrans %}</p>
+      <p>{% blocktrans %}<strong>Required:</strong> Name, Type, Book, Currency.{% endblocktrans %}</p>
+      <p>{% blocktrans %}<strong>Recommended (tax & risk):</strong>{% endblocktrans %}</p>
+      <ul>
+        <li>{% trans "Tax office, Tax Number (VKN), ID Number (TCKN) (ready for e-Archive)" %}</li>
+        <li>{% trans "Due days count (default: 30)" %}</li>
+        <li>{% trans "Credit limit (0 = unlimited)" %}</li>
+        <li>{% trans "Opening balance (+ : owes us / − : we owe)" %}</li>
+      </ul>
+
+      <h3>{% trans "CRM link" %}</h3>
+      <p>{% blocktrans %}The account can optionally be linked to one of <code>crm.Contact</code>, <code>crm.Company</code>, or <code>crm.Supplier</code>. Only one account can be opened for the same CRM record within the same book (DB-level constraint).{% endblocktrans %}</p>
+
+      <h3>{% trans "Delete / Deactivate" %}</h3>
+      <div class="tip">{% blocktrans %}"Delete" button — if the account has movements, it is not deleted, it is <strong>deactivated</strong> (<code>is_active=False</code>). To completely delete, you must first delete the movements (not recommended).{% endblocktrans %}</div>
+
+      <hr>
+
+      <h2 id="fatura">{% trans "🧾 Invoices" %}</h2>
+
+      <h3>{% trans "Types" %}</h3>
+      <table>
+        <thead><tr><th>{% trans "Type" %}</th><th>{% trans "Meaning" %}</th><th>{% trans "Account movement" %}</th></tr></thead>
+        <tbody>
+          <tr><td><strong>{% trans "Sales Invoice" %}</strong></td><td>{% trans "Issued to the customer" %}</td><td>{% trans "+Total" %}</td></tr>
+          <tr><td><strong>{% trans "Purchase Invoice" %}</strong></td><td>{% trans "Received from the supplier" %}</td><td>{% trans "−Total" %}</td></tr>
+          <tr><td><strong>{% trans "Sales Return" %}</strong></td><td>{% trans "Return received from the customer" %}</td><td>{% trans "−Total" %}</td></tr>
+          <tr><td><strong>{% trans "Purchase Return" %}</strong></td><td>{% trans "Return given to the supplier" %}</td><td>{% trans "+Total" %}</td></tr>
+          <tr><td><strong>{% trans "Proforma" %}</strong></td><td>{% trans "Non-binding offer" %}</td><td>{% trans "No movement" %}</td></tr>
+        </tbody>
+      </table>
+
+      <h3>{% trans "Issuing flow" %}</h3>
+      <ol>
+        <li>{% blocktrans %}<strong>Create a draft</strong>: You add line items, VAT is calculated per row{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>"Issue"</strong>: Status becomes <em>issued</em>, <code>CariMovement</code> is created automatically{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>"Cancel"</strong> (if issued): A reverse movement is written, the original is not deleted{% endblocktrans %}</li>
+      </ol>
+      <blockquote>{% trans "A draft invoice does not affect the current account. It only takes effect the moment you issue it." %}</blockquote>
+
+      <h3>{% trans "VAT and discount" %}</h3>
+      <p>{% trans "Defined separately on each line:" %}</p>
+      <ul>
+        <li>{% blocktrans %}<strong>Discount %</strong>: applied first (deducted from the line total){% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>VAT %</strong>: added on top of the net after discount{% endblocktrans %}</li>
+        <li>{% trans "Different VAT rates can exist on the same invoice (e.g., some items at 20%, some at 10%)" %}</li>
+        <li>{% blocktrans %}The <strong>VAT breakdown</strong> is automatically shown on the detail page{% endblocktrans %}</li>
+      </ul>
+
+      <div class="warn">{% blocktrans %}Only <strong>draft</strong> invoices can be edited. After issuing, the invoice "freezes" — to edit, you must cancel and re-issue it.{% endblocktrans %}</div>
+
+      <hr>
+
+      <h2 id="tahsilat">{% trans "💰 Collection / Payment" %}</h2>
+
+      <h3>{% trans "4 types" %}</h3>
+      <table>
+        <thead><tr><th>{% trans "Type" %}</th><th>{% trans "Account" %}</th><th>{% trans "Cash Account" %}</th></tr></thead>
+        <tbody>
+          <tr><td><strong>{% trans "Collection (from customer)" %}</strong></td><td style="color:#059669;">−</td><td style="color:#dc2626;">+</td></tr>
+          <tr><td><strong>{% trans "Payment (to supplier)" %}</strong></td><td style="color:#dc2626;">+</td><td style="color:#059669;">−</td></tr>
+          <tr><td><strong>{% trans "Refund to Customer" %}</strong></td><td style="color:#dc2626;">+</td><td style="color:#059669;">−</td></tr>
+          <tr><td><strong>{% trans "Refund from Supplier" %}</strong></td><td style="color:#059669;">−</td><td style="color:#dc2626;">+</td></tr>
+        </tbody>
+      </table>
+
+      <h3>{% trans "Open invoice matching" %}</h3>
+      <ul>
+        <li>{% blocktrans %}<strong>Auto Match (FIFO)</strong>: closes the oldest invoices as long as the amount covers them{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Manual</strong>: You write how much will be applied to each invoice{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Advance</strong>: The unmatched portion automatically becomes an advance (can be used on a future invoice){% endblocktrans %}</li>
+      </ul>
+
+      <div class="tip">{% blocktrans %}While the collection is in <strong>draft</strong> status, the account and cash account are not affected. The real accounts are updated with "Save & Confirm".{% endblocktrans %}</div>
+
+      <hr>
+
+      <h2 id="cek">{% trans "📜 Check / Promissory Note" %}</h2>
+
+      <h3>{% trans "Direction and status" %}</h3>
+      <ul>
+        <li>{% blocktrans %}<strong>Received</strong>: Came from the customer — you keep it in the portfolio{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Given</strong>: Given to the supplier — you closed your debt with a negotiable instrument{% endblocktrans %}</li>
+      </ul>
+
+      <h3>{% trans "What can I do from the action panel?" %}</h3>
+      <table>
+        <thead><tr><th>{% trans "Current status" %}</th><th>{% trans "Available actions" %}</th></tr></thead>
+        <tbody>
+          <tr><td>{% trans "In Portfolio (received)" %}</td><td>{% trans "Deposit / Clear / Endorse / Bounced / Cancel" %}</td></tr>
+          <tr><td>{% trans "In Portfolio (given)" %}</td><td>{% trans "Clear / Cancel" %}</td></tr>
+          <tr><td>{% trans "Deposited" %}</td><td>{% trans "Clear / Bounced / Cancel" %}</td></tr>
+          <tr><td>{% trans "Cleared/Endorsed/Bounced/Cancelled" %}</td><td>{% trans "No new action" %}</td></tr>
+        </tbody>
+      </table>
+
+      <h3>{% trans "Endorsing" %}</h3>
+      <p>{% trans "You give the check you received from your customer to your supplier. The system:" %}</p>
+      <ol>
+        <li>{% blocktrans %}Sets the check status to <em>Endorsed</em>, writes the target account in the <code>endorsed_to</code> field{% endblocktrans %}</li>
+        <li>{% blocktrans %}Writes <strong>+X CariMovement</strong> to the target account (as if you had made a payment to them){% endblocktrans %}</li>
+        <li>{% trans "The original movement remains (the receipt from the customer is still valid)" %}</li>
+      </ol>
+
+      <h3>{% trans "Bounce" %}</h3>
+      <p>{% trans "When the check is returned:" %}</p>
+      <ul>
+        <li>{% blocktrans %}Status → <em>Bounced</em>{% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>+X CariMovement</strong> is written to the customer's current account (the receivable reopens){% endblocktrans %}</li>
+        <li>{% trans "What to do next is up to you: legal action, agreement, etc." %}</li>
+      </ul>
+
+      <hr>
+
+      <h2 id="rapor">{% trans "📊 Reports" %}</h2>
+      <p>{% url 'current_account:report_index' as report_index_url %}{% blocktrans %}<a href="{{ report_index_url }}">Report Center</a> → 4 major reports:{% endblocktrans %}</p>
+
+      <h3>{% trans "Aging" %}</h3>
+      <ul>
+        <li>{% blocktrans %}Splits open receivables / payables into <code>0-30 / 30-60 / 60-90 / 90+ days</code> buckets{% endblocktrans %}</li>
+        <li>{% trans "Per-account and total table" %}</li>
+        <li>{% trans '"Oldest day" badge on each row' %}</li>
+      </ul>
+
+      <h3>{% trans "Trial Balance" %}</h3>
+      <p>{% trans "Classic trial balance table:" %}</p>
+      <ul>
+        <li>{% blocktrans %}<strong>Carry-over</strong> (start-of-period balance){% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Debit</strong> (positive movements during the period){% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Credit</strong> (negative movements during the period){% endblocktrans %}</li>
+        <li>{% blocktrans %}<strong>Closing</strong> (end-of-period balance){% endblocktrans %}</li>
+      </ul>
+
+      <h3>{% trans "Credit Limit" %}</h3>
+      <p>{% blocktrans %}Shows the usage rate of all customers with a defined credit limit. With a visual <strong>progress bar</strong> (green/yellow/red).{% endblocktrans %}</p>
+
+      <h3>{% trans "Due Calendar" %}</h3>
+      <p>{% trans "Open invoices in these groups: 🔴 Overdue, 🟡 This Week, 🔵 Next Week, 🟣 This Month, ⚪ Later" %}</p>
+
+      <hr>
+
+      <h2 id="sss">{% trans "❓ Frequently Asked Questions" %}</h2>
+
+      <h3>{% trans "I issued the wrong invoice, what do I do?" %}</h3>
+      <p>{% blocktrans %}<strong>If it's a draft</strong>: "Delete" button — cleanly deleted.<br>
+      <strong>If it's issued</strong>: "Cancel" — a reverse account movement is written automatically, the original record remains (audit-safe). Then issue the correct one as a new invoice.{% endblocktrans %}</p>
+
+      <h3>{% trans "I entered a collection wrong?" %}</h3>
+      <p>{% trans "Same logic: if not confirmed, delete; if confirmed, cancel. Cancel reverses everything (account, invoice status, cash account)." %}</p>
+
+      <h3>{% trans "I use my customer as a supplier too — should I open two separate accounts?" %}</h3>
+      <p>{% blocktrans %}No. Mark the account type as <strong>"Customer & Supplier"</strong>. All movements are collected on a single card, the balance is automatically net.{% endblocktrans %}</p>
+
+      <h3>{% trans "Can I change the opening balance later?" %}</h3>
+      <p>{% blocktrans %}Not directly, but the equivalent: on the account card, use <strong>"Add Movement"</strong> to enter a positive/negative adjustment movement, and write "Opening adjustment" in the description.{% endblocktrans %}</p>
+
+      <h3>{% trans "What happened to the Receivables/Payables in my old accounting module?" %}</h3>
+      <p>{% blocktrans %}All of them were <strong>automatically</strong> migrated to Account cards (Phase 1 migration). The old tables still exist and new account movements are automatically written to them as well. We didn't break the old dashboards.{% endblocktrans %}</p>
+
+      <h3>{% trans "Can I get the statement as a PDF?" %}</h3>
+      <p>{% blocktrans %}Use your browser's print function (Ctrl+P) → "Save as PDF". The page is optimized with <code>@media print</code>.{% endblocktrans %}</p>
+
+      <h3>{% trans "Can I split a collection across multiple invoices?" %}</h3>
+      <p>{% trans 'Yes. In the matching table, you write whatever amount you want to each invoice, or "Auto Match (FIFO)" closes the oldest invoices in sequence.' %}</p>
+
+      <h3>{% trans "Can a portion of the collection remain as an advance?" %}</h3>
+      <p>{% blocktrans %}Yes. If the collection amount is greater than the sum of matches, the difference is automatically recorded as an <strong>advance</strong>.{% endblocktrans %}</p>
+
+      <h3>{% trans "I deposited the check, when does it hit the cash account?" %}</h3>
+      <p>{% blocktrans %}Depositing is just a status change. When the money actually arrives, you select the cash account with <strong>"Clear"</strong>, and only then does the cash account balance increase.{% endblocktrans %}</p>
+
+      <h3>{% trans "Multi-tenant — does this module support it?" %}</h3>
+      <p>{% blocktrans %}It does. Each <code>Book</code> behaves like a separate business/brand. When ENV_PROFILE changes and the schema changes, all accounts/movements remain isolated.{% endblocktrans %}</p>
+
+      <hr>
+
+      <p style="text-align: center; color: #94a3b8; font-size: 12px; margin-top: 30px;">
+        {% blocktrans %}This guide is continuously updated. The moment you see something missing, <a href="https://github.com/anthropics/claude-code/issues" target="_blank" style="color:#6366f1;">report it</a> or check the Current Account module changes.{% endblocktrans %}
+      </p>
+
+    </article>
+  </div>
+</div>
+
+<script>
+  if (window.lucide) lucide.createIcons();
+  // Smooth scroll on TOC click
+  document.querySelectorAll('.hp-toc a').forEach(a => {
+    a.addEventListener('click', e => {
+      const id = a.getAttribute('href').slice(1);
+      const el = document.getElementById(id);
+      if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth' }); history.replaceState(null, '', '#' + id); }
+    });
+  });
+</script>
+{% endblock %}

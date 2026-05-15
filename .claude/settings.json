@@ -3,7 +3,16 @@
     "allow": [
       "Bash(python -c \":*)",
       "Bash(python manage.py collectstatic --noinput)",
-      "Bash(python manage.py migrate marketing 0064)"
+      "Bash(python manage.py migrate marketing 0064)",
+      "Bash(../vir_env/Scripts/pip.exe install *)",
+      "Bash(../vir_env/Scripts/python.exe -c \"import polib; print\\('polib:', polib.__version__\\)\")",
+      "Bash(../vir_env/Scripts/python.exe current_account/_i18n_build.py)",
+      "Bash(../vir_env/Scripts/python.exe -c ' *)",
+      "Bash(../vir_env/Scripts/python.exe manage.py shell -c ' *)",
+      "Bash(python -c \"import json; data=json.load\\(open\\('c:/Users/enes3/erp/erp/current_account/_help_translations.json', encoding='utf-8'\\)\\); src=json.load\\(open\\('c:/Users/enes3/erp/erp/current_account/_help_strings.json', encoding='utf-8'\\)\\); print\\('Translation count:', len\\(data\\)\\); print\\('Source count:', len\\(src\\)\\); missing=[s for s in src if s not in data]; print\\('Missing count:', len\\(missing\\)\\); print\\('Missing:', missing[:5] if missing else 'None'\\)\")",
+      "Bash(grep -n '{% trans \".*\\\\\\\\\".*\" %}' current_account/templates/current_account/help.html)",
+      "Bash(../vir_env/Scripts/python.exe current_account/_fix_help_quotes.py)",
+      "Bash(../vir_env/Scripts/python.exe current_account/_add_redesign_translations.py)"
     ]
   }
 }

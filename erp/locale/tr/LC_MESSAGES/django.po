@@ -6575,3 +6575,7 @@ msgstr "Bankaya verildi işaretle"
 
 msgid "Endorse Check"
 msgstr "Çeki Ciro Et"
+
+msgctxt "sidebar"
+msgid "Accounts"
+msgstr "Cari Hesap"

@@ -736,10 +736,73 @@
       <div class="form-card sidebar-card" id="product_attributes_section">
         <div class="form-card-header">
           <div class="form-card-title"><span class="form-card-ico"><i data-lucide="list"></i></span>{% trans "Product Attributes" %}</div>
-          <button type="button" class="btn-link" onclick="addProductAttribute()">
-            <i class="fa fa-plus"></i> {% trans "Add Attribute" %}
+        </div>
+
+        {# Quick-add preset chips — click to insert an attribute with that name pre-filled #}
+        <div class="attr-presets" role="group" aria-label="{% trans 'Quick-add attribute presets' %}">
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Color" %}')" title="{% trans 'Color' %}">
+            <i data-lucide="palette"></i><span>{% trans "Color" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Size" %}')" title="{% trans 'Size' %}">
+            <i data-lucide="ruler"></i><span>{% trans "Size" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Material" %}')" title="{% trans 'Material' %}">
+            <i data-lucide="layers-3"></i><span>{% trans "Material" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Weight" %}')" title="{% trans 'Weight' %}">
+            <i data-lucide="weight"></i><span>{% trans "Weight" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Dimensions" %}')" title="{% trans 'Dimensions' %}">
+            <i data-lucide="box"></i><span>{% trans "Dimensions" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Brand" %}')" title="{% trans 'Brand' %}">
+            <i data-lucide="badge"></i><span>{% trans "Brand" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Style" %}')" title="{% trans 'Style' %}">
+            <i data-lucide="sparkles"></i><span>{% trans "Style" %}</span>
+          </button>
+          <button type="button" class="attr-preset" onclick="addProductAttribute('{% trans "Pattern" %}')" title="{% trans 'Pattern' %}">
+            <i data-lucide="grip"></i><span>{% trans "Pattern" %}</span>
+          </button>
+          <button type="button" class="attr-preset attr-preset-plus" onclick="addProductAttribute()" title="{% trans 'Custom attribute' %}">
+            <i data-lucide="plus"></i>
           </button>
         </div>
+
+        <style>
+          .attr-presets {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            margin: 4px 0 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px dashed #E5E7EB;
+          }
+          .attr-preset {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 10px;
+            background: #F4F7FB;
+            border: 1px solid #E0E6EE;
+            border-radius: 999px;
+            font: 600 11.5px 'Plus Jakarta Sans', system-ui, sans-serif;
+            color: #4D5760;
+            cursor: pointer;
+            transition: all 140ms;
+          }
+          .attr-preset i { width: 13px; height: 13px; stroke-width: 1.8; }
+          .attr-preset:hover {
+            background: #E5F1F0;
+            border-color: #008080;
+            color: #005354;
+            transform: translateY(-1px);
+          }
+          .attr-preset:active { transform: translateY(0); }
+          .attr-preset-plus {
+            padding: 5px 8px;
+            background: white;
+            border-style: dashed;
+            color: #008080;
+          }
+          .attr-preset-plus span { display: none; }
+        </style>
 
         <div id="product_attributes_container" class="attributes-container">
           {% if product %}
@@ -901,7 +964,7 @@
   let attributeSaveTimeout = null;
 
 
-  function addProductAttribute() {
+  function addProductAttribute(prefilledName) {
     const container = document.getElementById('product_attributes_container');
     if (!container) return;
 
@@ -909,20 +972,35 @@
     const placeholder = document.getElementById('empty_attributes_placeholder');
     if (placeholder) placeholder.style.display = 'none';
 
+    // If an attribute card already exists with this name and no value, focus its value input instead
+    if (prefilledName) {
+      const existing = [...container.querySelectorAll('.attribute-card')].find(c => {
+        const n = c.querySelector('.attr-name-input, input[name="attribute_names[]"]');
+        return n && n.value.trim().toLowerCase() === prefilledName.toLowerCase();
+      });
+      if (existing) {
+        const v = existing.querySelector('.attr-value-input, input[name="attribute_values[]"]');
+        if (v) { v.focus(); v.scrollIntoView({block:'center', behavior:'smooth'}); }
+        return;
+      }
+    }
+
+    const safeName = (prefilledName || '').replace(/"/g, '&quot;');
     const card = document.createElement('div');
     card.className = 'attribute-card';
     card.style.cssText = 'opacity: 0; transform: translateY(-5px); transition: all 0.2s ease;';
     card.innerHTML = `
       <div class="attribute-inputs">
         <div class="attribute-input-wrapper">
-          <input type="text" class="attribute-input attr-name-input" name="attribute_names[]" 
-                 placeholder="{% trans 'Name (e.g. Material)' %}" 
+          <input type="text" class="attribute-input attr-name-input" name="attribute_names[]"
+                 placeholder="{% trans 'Name (e.g. Material)' %}"
+                 value="${safeName}"
                  oninput="scheduleAttributeSave()"
                  required>
         </div>
         <div class="attribute-input-wrapper">
-          <input type="text" class="attribute-input attr-value-input" name="attribute_values[]" 
-                 placeholder="{% trans 'Value (e.g. Wool)' %}" 
+          <input type="text" class="attribute-input attr-value-input" name="attribute_values[]"
+                 placeholder="{% trans 'Value (e.g. Wool)' %}"
                  oninput="scheduleAttributeSave()"
                  required>
         </div>
@@ -933,7 +1011,7 @@
     `;
     container.appendChild(card);
     attributeCounter++;
-    console.log('✅ Added attribute card');
+    console.log('✅ Added attribute card' + (prefilledName ? ' [' + prefilledName + ']' : ''));
 
     // Animate the card to appear
     requestAnimationFrame(() => {
@@ -941,9 +1019,11 @@
       card.style.transform = 'translateY(0)';
     });
 
-    // Focus on the new name input
-    const nameInput = card.querySelector('.attr-name-input');
-    if (nameInput) nameInput.focus();
+    // Focus: if name was pre-filled jump to value, else focus name
+    const target = prefilledName
+      ? card.querySelector('.attr-value-input')
+      : card.querySelector('.attr-name-input');
+    if (target) target.focus();
   }
 
   function removeProductAttribute(button) {

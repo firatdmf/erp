@@ -182,11 +182,32 @@ class ContactUpdate(generic.edit.UpdateView):
     form_class = ContactUpdateForm  # Your form class for editing the entry
     template_name = "crm/update_contact.html"  # Template for editing an entry
 
-    # success_url = "/crm/"  # URL to redirect after successfully editing an entry
+    def _is_ajax(self):
+        return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def get_template_names(self):
+        # When loaded into the edit sidebar, return just the form partial
+        # (no base.html chrome) so the sidebar wraps it.
+        if self._is_ajax():
+            return ["crm/_contact_edit_form.html"]
+        return [self.template_name]
+
     def form_valid(self, form):
-        # next_url = self.request.POST.get("next_url")
-        # self.success_url = next_url
+        if self._is_ajax():
+            from django.http import JsonResponse
+            self.object = form.save()
+            return JsonResponse({
+                "success": True,
+                "redirect_url": self.get_success_url(),
+            })
         return super().form_valid(form)
+
+    def form_invalid(self, form):
+        if self._is_ajax():
+            from django.http import JsonResponse
+            errors = {field: errs.get_json_data() for field, errs in form.errors.items()}
+            return JsonResponse({"success": False, "errors": errors}, status=400)
+        return super().form_invalid(form)
 
     def get_success_url(self) -> str:
         return reverse_lazy("crm:contact_detail", kwargs={"pk": self.object.pk})
@@ -301,20 +322,40 @@ class EditCompanyView(generic.edit.UpdateView):
     form_class = CompanyForm
     template_name = "crm/update_company.html"
 
+    def _is_ajax(self):
+        return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def get_template_names(self):
+        if self._is_ajax():
+            return ["crm/_company_edit_form.html"]
+        return [self.template_name]
+
     # pass data to the form
     def get_initial(self):
         initial = super().get_initial()
         initial["member"] = self.request.user.member
         return initial
 
-    # success_url = "/crm/"  # URL to redirect after successfully editing an entry
     def form_valid(self, form):
+        if self._is_ajax():
+            from django.http import JsonResponse
+            self.object = form.save()
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("crm:company_detail", args=[self.object.pk]),
+            })
         # Save the company
         self.object = form.save()
-        
         next_url = self.request.POST.get("next_url")
         self.success_url = next_url
         return HttpResponseRedirect(self.success_url)
+
+    def form_invalid(self, form):
+        if self._is_ajax():
+            from django.http import JsonResponse
+            errors = {field: errs.get_json_data() for field, errs in form.errors.items()}
+            return JsonResponse({"success": False, "errors": errors}, status=400)
+        return super().form_invalid(form)
 
 
 class ContactDetail(generic.DetailView):
@@ -339,6 +380,16 @@ class ContactDetail(generic.DetailView):
         context["task_form"] = TaskForm(
             initial=initial_task_data, hide_fields=True, current_member=current_member
         )  # Add task form to context
+
+        # ── Order history for this contact ────────────────────
+        # Most recent first. Show only fields needed by the card —
+        # the row template links to operating:order_detail for the
+        # full picture.
+        from operating.models import Order
+        context["orders"] = (
+            Order.objects.filter(contact=contact)
+            .order_by("-created_at")[:25]
+        )
         return context
 
     # Normally detail pages do not have post requests, but in here the client can add notes or tasks to the contact.
@@ -469,7 +520,14 @@ class CompanyDetail(generic.DetailView):
         except EmailCampaign.DoesNotExist:
             context["email_campaign"] = None
             context["has_campaign"] = False
-        
+
+        # ── Order history for this company ────────────────────
+        from operating.models import Order
+        context["orders"] = (
+            Order.objects.filter(company=company)
+            .order_by("-created_at")[:25]
+        )
+
         # print(context["tasks"])
         return context
 
@@ -1024,40 +1082,42 @@ def company_search(request):
 
 # returns a list of customers (contacts or clients) that match the query
 def customer_autocomplete(request):
+    """Returns an inline list of contacts + companies matching the
+    typed query. Each row carries data-attrs (type/pk/name) so a
+    single delegated listener on the parent can apply the selection
+    safely — no inline onclick string interpolation that breaks on
+    apostrophes or HTML entities in names."""
+    from django.utils.html import escape
+
     query = request.GET.get("customer", "")
     if query == "":
         return HttpResponse("")
     contacts = Contact.objects.filter(name__icontains=query)[:5]
     companies = Company.objects.filter(name__icontains=query)[:5]
 
-    html = "<ul class='customer-autocomplete-list'>"
+    parts = ["<ul class='customer-autocomplete-list'>"]
     for contact in contacts:
-        html += (
-            f"<li style='cursor:pointer;' onclick=\""
-            f"document.getElementById('customer-input').value = '{contact.name}'; "
-            f"document.getElementById('customer-search-results').innerHTML = ''; "
-            f"document.getElementById('customer-type').value = 'contact'; "
-            f"document.getElementById('customer-pk').value = '{contact.pk}';"
-            f'">'
-            f"<i class='fa fa-user'></i> {contact.name}"
-            f"</li>"
+        parts.append(
+            "<li class='customer-ac-item' "
+            f"data-type='contact' data-pk='{contact.pk}' "
+            f"data-name=\"{escape(contact.name)}\" "
+            "style='cursor:pointer;'>"
+            f"<i class='fa fa-user'></i> {escape(contact.name)}"
+            "</li>"
         )
     for company in companies:
-        html += (
-            f"<li style='cursor:pointer;' onclick=\""
-            f"document.getElementById('customer-input').value = '{company.name}'; "
-            f"document.getElementById('customer-search-results').innerHTML = ''; "
-            f"document.getElementById('customer-type').value = 'company'; "
-            f"document.getElementById('customer-pk').value = '{company.pk}';"
-            f'">'
-            f"<i class='fa fa-briefcase'></i> {company.name}"
-            f"</li>"
+        parts.append(
+            "<li class='customer-ac-item' "
+            f"data-type='company' data-pk='{company.pk}' "
+            f"data-name=\"{escape(company.name)}\" "
+            "style='cursor:pointer;'>"
+            f"<i class='fa fa-briefcase'></i> {escape(company.name)}"
+            "</li>"
         )
     if not contacts and not companies:
-        html += "<li>No results found.</li>"
-    html += "</ul>"
-
-    return HttpResponse(html)
+        parts.append("<li class='customer-ac-empty'>No results found.</li>")
+    parts.append("</ul>")
+    return HttpResponse("".join(parts))
 
 
 @login_required
@@ -1301,8 +1361,221 @@ def create_supplier_partial(request):
             })
     else:
         form = SupplierForm()
-    
+
     return render(request, 'crm/supplier_form_partial.html', {'form': form})
 
+
+class SupplierDetail(generic.DetailView):
+    """Detail page for a single Supplier — mirrors Contact/Company
+    detail: title, meta, tasks (filtered to current member), notes
+    history, plus inline add/edit/delete actions."""
+    model = Supplier
+    template_name = "crm/supplier_detail.html"
+    context_object_name = "supplier"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        supplier = self.get_object()
+        current_member = self.request.user.member if hasattr(self.request.user, "member") else None
+        context["notes"] = Note.objects.filter(supplier=supplier).order_by("-created_at")
+        context["note_form"] = NoteForm()
+        context["tasks"] = Task.objects.filter(supplier=supplier, member=current_member)
+        # Combined history: notes + completed tasks for this supplier
+        completed_tasks = Task.objects.filter(completed=True, supplier=supplier).order_by("-completed_at")
+        history = list(context["notes"]) + list(completed_tasks)
+        history.sort(
+            key=lambda x: x.created_at if hasattr(x, "created_at") and x.created_at else x.completed_at,
+            reverse=True,
+        )
+        context["history_entries"] = history
+        context["task_form"] = TaskForm(
+            initial={"supplier": supplier.pk},
+            hide_fields=True,
+            current_member=current_member,
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        """Mirrors ContactDetail.post — supports `?action=add_note` and
+        `?action=add_task` via HTMX so the supplier detail page can
+        attach notes/tasks just like the other CRM detail pages."""
+        self.object = self.get_object()
+        supplier = self.object
+        action = request.GET.get("action", "")
+        is_htmx = request.headers.get("HX-Request") == "true"
+
+        if action == "add_note":
+            note_form = NoteForm(request.POST)
+            if note_form.is_valid():
+                note = note_form.save(commit=False)
+                note.supplier = supplier
+                note.save()
+                if is_htmx:
+                    return HttpResponse(status=200)
+                return redirect("crm:supplier_detail", pk=supplier.pk)
+
+        if action == "add_task":
+            task_form = TaskForm(request.POST)
+            if task_form.is_valid():
+                task = task_form.save(commit=False)
+                task.supplier = supplier
+                task.created_by = request.user.member if hasattr(request.user, "member") else None
+                if not task.member:
+                    task.member = request.user.member
+                task.save()
+                if is_htmx:
+                    current_member = request.user.member if hasattr(request.user, "member") else None
+                    tasks = Task.objects.filter(supplier=supplier, member=current_member, completed=False).order_by("-due_date")
+                    html = ""
+                    for t in tasks:
+                        delta = (t.due_date - date.today()).days
+                        if delta < 0:
+                            days_display = f"{abs(delta)}d"
+                        elif delta == 0:
+                            days_display = "today"
+                        else:
+                            days_display = None
+                        overdue_html = f'<span class="task-overdue">{days_display}</span>' if days_display else ""
+                        html += f'''<div class="task-item od-task-row" id="task-{t.id}">
+                            <div class="task-content" id="task-content-{t.id}">
+                                <h3 class="task-name">{t.name}</h3>
+                                {f'<p class="task-description">{t.description}</p>' if t.description else ''}
+                                <div class="task-meta">
+                                    <span class="task-due">Due: {t.due_date.strftime("%b %d, %Y")}</span>
+                                    {overdue_html}
+                                    {f'<span class="task-member"><i class="fa fa-user"></i> {t.member}</span>' if t.member else ''}
+                                </div>
+                            </div>
+                            <div class="task-actions">
+                                <button type="button" class="od-icon-btn btn-icon-minimal ok" title="Complete" onclick="confirmDelete('complete_task', {t.id})"><i class="fa fa-check"></i></button>
+                                <button type="button" class="od-icon-btn btn-icon-minimal" title="Edit" onclick="editTask({t.id}, '{t.name}', '{t.description or ""}', '{t.due_date.strftime("%Y-%m-%d")}')"><i class="fa fa-edit"></i></button>
+                                <button type="button" class="od-icon-btn btn-icon-minimal del" title="Delete" onclick="confirmDelete('delete_task', {t.id})"><i class="fa fa-trash"></i></button>
+                            </div>
+                        </div>'''
+                    if not tasks:
+                        html = '<p class="empty-state">No tasks available.</p>'
+                    return HttpResponse(html)
+                return redirect("crm:supplier_detail", pk=supplier.pk)
+
+        # Fallback: re-render with errors
+        context = self.get_context_data()
+        return self.render_to_response(context)
+
+
+def get_supplier_notes_partial(request, pk):
+    """Return just the notes/history block for a supplier — used by
+    the HTMX refresh after add-note in the supplier detail page."""
+    from django.template.loader import render_to_string
+    from django.middleware.csrf import get_token
+
+    supplier = get_object_or_404(Supplier, pk=pk)
+    notes = Note.objects.filter(supplier=supplier).order_by("-created_at")
+    completed_tasks = Task.objects.filter(completed=True, supplier=supplier).order_by("-completed_at")
+    history_entries = list(notes) + list(completed_tasks)
+    history_entries.sort(
+        key=lambda x: x.created_at if hasattr(x, "created_at") and x.created_at else x.completed_at,
+        reverse=True,
+    )
+    history_html = render_to_string(
+        "crm/components/history.html",
+        {
+            "company": None,
+            "contact": None,
+            "supplier": supplier,
+            "note_form": NoteForm(),
+            "csrf_token": get_token(request),
+            "history_entries": history_entries,
+            "current_url": request.path,
+        },
+    )
+    return HttpResponse(f'<div id="notesSection">{history_html}</div>')
+
+
+def quick_create_contact_for_company(request, company_pk):
+    """Inline create-and-link a new contact from the company detail
+    page. Accepts POST with name (required), email (optional),
+    phone (optional), job_title (optional). Returns JSON with the
+    new contact so the front-end can splice a row into the list."""
+    from django.http import JsonResponse
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST only"}, status=405)
+    company = get_object_or_404(Company, pk=company_pk)
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"success": False, "error": "Name is required"}, status=400)
+    email = (request.POST.get("email") or "").strip()
+    phone = (request.POST.get("phone") or "").strip()
+    job_title = (request.POST.get("job_title") or "").strip()
+    try:
+        contact = Contact.objects.create(
+            name=name,
+            company=company,
+            job_title=job_title or "",
+            email=[email] if email else [],
+            phone=[phone] if phone else [],
+        )
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
+    return JsonResponse({
+        "success": True,
+        "contact": {
+            "id": contact.pk,
+            "name": contact.name,
+            "job_title": contact.job_title or "",
+            "email": contact.email[0] if contact.email else "",
+            "initials": (contact.name[:2] or "?").upper(),
+            "detail_url": reverse("crm:contact_detail", args=[contact.pk]),
+        },
+    })
+
+
+def supplier_search_companies(request):
+    """JSON autocomplete for the linked_company picker on the
+    supplier form. Returns up to 12 companies matching the query.
+    Empty `q` returns no results — the front-end only opens the
+    dropdown after the user starts typing."""
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+    qs = Company.objects.filter(name__icontains=q).order_by("name")[:12]
+    results = [
+        {
+            "id": c.pk,
+            "name": c.name,
+            "subtitle": (c.get_status_display() if hasattr(c, "get_status_display") else "") or "",
+        }
+        for c in qs
+    ]
+    return JsonResponse({"results": results})
+
+
+def supplier_search_contacts(request):
+    """JSON autocomplete for the linked_contact picker on the
+    supplier form. Returns up to 12 contacts matching the query."""
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+    qs = (
+        Contact.objects.select_related("company")
+        .filter(
+            Q(name__icontains=q)
+            | Q(job_title__icontains=q)
+            | Q(company__name__icontains=q)
+        )
+        .order_by("name")[:12]
+    )
+    results = []
+    for c in qs:
+        bits = []
+        if getattr(c, "job_title", None):
+            bits.append(c.job_title)
+        if getattr(c, "company_id", None) and c.company:
+            bits.append(c.company.name)
+        results.append({
+            "id": c.pk,
+            "name": c.name,
+            "subtitle": " · ".join(bits),
+        })
+    return JsonResponse({"results": results})
 
 

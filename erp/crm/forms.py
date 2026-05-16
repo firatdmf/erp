@@ -59,6 +59,70 @@ class ContactCreateForm(ModelForm):
         widget=forms.HiddenInput(attrs={"id": "task_member_id"})
     )
 
+    # Multi-item payloads from the Add-Contact sidebar (JSON arrays).
+    # notes_data: list of strings.
+    # tasks_data: list of {name, due_date, description, member}.
+    # Legacy single-task / single-note inputs above remain so older
+    # surfaces (create_form.html) keep working unchanged.
+    notes_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "mainContactNotesData"})
+    )
+    tasks_data = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(attrs={"id": "mainContactTasksData"})
+    )
+
+    def clean_notes_data(self):
+        import json
+        raw = self.cleaned_data.get("notes_data", "")
+        if not raw:
+            return []
+        try:
+            items = json.loads(raw)
+            if not isinstance(items, list):
+                return []
+            return [str(s).strip() for s in items if str(s).strip()]
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def clean_tasks_data(self):
+        import json
+        from datetime import datetime
+        raw = self.cleaned_data.get("tasks_data", "")
+        if not raw:
+            return []
+        try:
+            items = json.loads(raw)
+            if not isinstance(items, list):
+                return []
+        except (json.JSONDecodeError, TypeError):
+            return []
+        cleaned = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            name = (it.get("name") or "").strip()
+            due = (it.get("due_date") or "").strip()
+            if not name or not due:
+                continue
+            try:
+                due_date = datetime.strptime(due, "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            member_raw = it.get("member")
+            try:
+                member_id = int(member_raw) if member_raw else None
+            except (TypeError, ValueError):
+                member_id = None
+            cleaned.append({
+                "name": name[:200],
+                "due_date": due_date,
+                "description": (it.get("description") or "").strip(),
+                "member": member_id,
+            })
+        return cleaned
+
     def clean_emails_data(self):
         import json
         emails_str = self.cleaned_data.get("emails_data", "")
@@ -113,28 +177,66 @@ class ContactCreateForm(ModelForm):
 
     # when the form is submitted (Saved), do this.
     def save(self, commit=True, request=None):
+        from authentication.models import Member
         instance = super().save(commit=False)
         # Set email and phone arrays
         instance.email = self.cleaned_data.get("emails_data", [])
         instance.phone = self.cleaned_data.get("phones_data", [])
         if commit:
             instance.save()
-            if self.cleaned_data["note_content"]:
+
+            # ── Multi-note payload from the Add-Contact sidebar ────
+            notes_list = self.cleaned_data.get("notes_data", []) or []
+            for content in notes_list:
+                Note.objects.create(contact=instance, content=content)
+
+            # ── Legacy single-note input (still used by other surfaces).
+            #    Skip if multi-list already supplied something so we
+            #    don't duplicate.
+            if not notes_list and self.cleaned_data.get("note_content"):
                 Note.objects.create(
                     contact=instance, content=self.cleaned_data["note_content"]
                 )
-            if self.cleaned_data["task_name"] and self.cleaned_data["task_due_date"]:
-                # Get task member - use request.user if available
+
+            # Default member fallback for tasks that didn't ship one.
+            default_member = None
+            if request and hasattr(request.user, "member"):
+                default_member = request.user.member
+
+            # ── Multi-task payload from the sidebar ────────────────
+            tasks_list = self.cleaned_data.get("tasks_data", []) or []
+            for t in tasks_list:
+                member = default_member
+                if t.get("member"):
+                    try:
+                        member = Member.objects.get(pk=t["member"])
+                    except Member.DoesNotExist:
+                        pass
+                if not member:
+                    # No member available — skip rather than crash.
+                    continue
+                Task.objects.create(
+                    contact=instance,
+                    name=t["name"],
+                    due_date=t["due_date"],
+                    description=t["description"],
+                    member=member,
+                )
+
+            # ── Legacy single-task input ───────────────────────────
+            if (
+                not tasks_list
+                and self.cleaned_data.get("task_name")
+                and self.cleaned_data.get("task_due_date")
+            ):
                 task_member_id = self.cleaned_data.get("task_member")
                 if task_member_id:
-                    from authentication.models import Member
                     task_member = Member.objects.get(pk=task_member_id)
-                elif request and hasattr(request.user, 'member'):
-                    task_member = request.user.member
+                elif default_member:
+                    task_member = default_member
                 else:
-                    # Skip task creation if no member available
                     return instance
-                
+
                 Task.objects.create(
                     contact=instance,
                     name=self.cleaned_data["task_name"],

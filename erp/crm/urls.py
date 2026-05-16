@@ -24,9 +24,14 @@ urlpatterns = [
     # Supplier URLs
     path("supplier/list/", views.SupplierList.as_view(), name="supplier_list"),
     path("supplier/create/", views.SupplierCreate.as_view(), name="supplier_create"),
+    path("supplier/detail/<int:pk>/", views.SupplierDetail.as_view(), name="supplier_detail"),
     path("supplier/update/<int:pk>/", views.SupplierUpdate.as_view(), name="supplier_update"),
     path("supplier/delete/<int:pk>/", views.SupplierDelete.as_view(), name="supplier_delete"),
     path("supplier/create/partial/", views.create_supplier_partial, name="create_supplier_partial"),
+    path("supplier/<int:pk>/notes_partial/", views.get_supplier_notes_partial, name="get_supplier_notes_partial"),
+    path("supplier/search/companies/", views.supplier_search_companies, name="supplier_search_companies"),
+    path("supplier/search/contacts/", views.supplier_search_contacts, name="supplier_search_contacts"),
+    path("company/<int:company_pk>/quick_create_contact/", views.quick_create_contact_for_company, name="quick_create_contact_for_company"),
 ]
 
 htmx_urlpatterns = [

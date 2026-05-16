@@ -2231,7 +2231,7 @@ msgid "Discount"
 msgstr "İskonto"
 
 msgid "Dimensions"
-msgstr "Boyutlar"
+msgstr "Ölçüler"
 
 msgid "Members"
 msgstr "Üyeler"
@@ -6579,3 +6579,21 @@ msgstr "Çeki Ciro Et"
 msgctxt "sidebar"
 msgid "Accounts"
 msgstr "Cari Hesap"
+
+msgid "Size"
+msgstr "Beden"
+
+msgid "Brand"
+msgstr "Marka"
+
+msgid "Style"
+msgstr "Stil"
+
+msgid "Pattern"
+msgstr "Desen"
+
+msgid "Quick-add attribute presets"
+msgstr "Hızlı özellik ekle"
+
+msgid "Custom attribute"
+msgstr "Özel özellik"

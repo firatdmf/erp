@@ -1,0 +1,244 @@
+{% load i18n %}{% load humanize %}<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Order #{{ order.pk }}</title>
+  <style>
+    /* xhtml2pdf supports a subset of CSS — keep it simple and inline-friendly.
+       @page handles the actual PDF page size + margins. */
+    @page {
+      size: a4 portrait;
+      margin: 14mm 14mm 16mm 14mm;
+    }
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 11pt;
+      color: #0F1419;
+      line-height: 1.35;
+    }
+    /* Header */
+    .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 10pt; margin-bottom: 14pt; }
+    .hdr td { vertical-align: top; }
+    .hdr .brand { font-size: 18pt; font-weight: bold; color: #0F1419; }
+    .hdr .doc-type { font-size: 9pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
+    .hdr .num { font-size: 20pt; font-weight: bold; text-align: right; }
+    .hdr .date { font-size: 9pt; color: #4B5563; text-align: right; }
+    .hdr .status { background: #F4F7FB; color: #374151; padding: 2pt 8pt; border-radius: 12pt; font-size: 9pt; font-weight: bold; }
+    .hdr .kind { padding: 2pt 6pt; font-size: 8pt; font-weight: bold; letter-spacing: 1pt; margin-left: 4pt; }
+    .hdr .kind.b2b { background: #FEF3C7; color: #8B5A00; }
+    .hdr .kind.b2c { background: #E0F2F1; color: #0B5F60; }
+    .hdr .kind.web { background: #DBEAFE; color: #1E40AF; }
+
+    h3 { font-size: 9pt; color: #6B7280; letter-spacing: 1.2pt; text-transform: uppercase; margin: 12pt 0 6pt; font-weight: bold; }
+
+    /* Meta row */
+    .meta-row { width: 100%; margin-bottom: 8pt; }
+    .meta-row td { padding-right: 24pt; vertical-align: top; }
+    .meta-row .lbl { font-size: 8pt; color: #6B7280; font-weight: bold; letter-spacing: 0.6pt; text-transform: uppercase; margin-bottom: 1pt; }
+    .meta-row .val { font-size: 11pt; color: #0F1419; font-weight: bold; }
+
+    /* Customer / Delivery cards */
+    .twocol { width: 100%; }
+    .twocol td { width: 50%; vertical-align: top; padding-right: 8pt; }
+    .twocol td:last-child { padding-right: 0; padding-left: 8pt; }
+    .card { background: #FAFBFD; border: 1px solid #E2E8EE; padding: 10pt 12pt; }
+    .card .name { font-size: 12pt; font-weight: bold; color: #0F1419; }
+    .card .role { font-size: 8pt; color: #147F74; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-top: 2pt; }
+    .card .line { font-size: 10pt; color: #374151; margin-top: 4pt; }
+    .card .line b { color: #6B7280; font-weight: bold; }
+
+    /* Items table */
+    table.items { width: 100%; border-collapse: collapse; margin-top: 4pt; }
+    table.items thead th {
+      background: #FAFBFD;
+      border-top: 1px solid #E2E8EE;
+      border-bottom: 1px solid #E2E8EE;
+      padding: 6pt 8pt;
+      font-size: 8pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8pt;
+      color: #6B7280;
+      text-align: left;
+    }
+    table.items thead th.num { text-align: right; }
+    table.items tbody td {
+      padding: 6pt 8pt;
+      border-bottom: 1px solid #EEF1F5;
+      vertical-align: top;
+      font-size: 10pt;
+    }
+    table.items tbody td.num { text-align: right; font-weight: bold; }
+    table.items .pname { font-weight: bold; color: #0F1419; }
+    table.items .pdesc { color: #4B5563; font-size: 9pt; margin-top: 2pt; }
+    table.items .sku, table.items .variant { font-family: "Courier", monospace; font-size: 9pt; color: #4B5563; }
+    table.items tfoot td { padding: 6pt 8pt; font-size: 11pt; font-weight: bold; }
+    table.items tfoot td.lbl { text-align: right; color: #374151; }
+    table.items tfoot td.val { text-align: right; color: #0F1419; }
+    table.items tfoot tr.grand td { border-top: 2px solid #0F1419; padding-top: 8pt; font-size: 13pt; }
+
+    /* Notes */
+    .notes { padding: 10pt 12pt; border-left: 3pt solid #147F74; background: #F8FAFA; font-size: 10pt; color: #374151; }
+
+    /* Footer */
+    .foot { margin-top: 18pt; padding-top: 8pt; border-top: 1px solid #E2E8EE; font-size: 8pt; color: #6B7280; width: 100%; }
+    .foot td { vertical-align: top; }
+    .foot .right { text-align: right; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <table class="hdr" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <div class="brand">{{ BRAND_NAME|default:"Nejum ERP" }}</div>
+        <div class="doc-type">{% trans "Order" %}</div>
+      </td>
+      <td align="right">
+        <div class="num">#{{ order.pk }}</div>
+        <div class="date">{{ order.created_at|date:"d M Y · H:i" }}</div>
+        <div style="margin-top: 4pt;">
+          <span class="status">{{ order.get_status_display|default:order.status }}</span>
+          {% if order.contact %}<span class="kind b2b">B2B</span>
+          {% elif order.company %}<span class="kind b2b">B2B</span>
+          {% elif order.web_client %}<span class="kind web">WEB</span>{% endif %}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- META -->
+  <table class="meta-row" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <div class="lbl">{% trans "Order Date" %}</div>
+        <div class="val">{{ order.created_at|date:"d M Y · H:i" }}</div>
+      </td>
+      <td>
+        <div class="lbl">{% trans "Updated" %}</div>
+        <div class="val">{{ order.updated_at|date:"d M Y · H:i" }}</div>
+      </td>
+      <td>
+        <div class="lbl">{% trans "Status" %}</div>
+        <div class="val">{{ order.get_status_display|default:order.status }}</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- CUSTOMER + DELIVERY -->
+  <h3>{% trans "Customer" %} &amp; {% trans "Delivery" %}</h3>
+  <table class="twocol" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>
+        <div class="card">
+          {% if order.contact %}
+            <div class="name">{{ order.contact.name|default:"—"|capfirst }}</div>
+            <div class="role">{% trans "Contact" %}</div>
+            {% if order.contact.email %}<div class="line"><b>Email:</b> {{ order.contact.email.0|default:order.contact.email }}</div>{% endif %}
+            {% if order.contact.phone %}<div class="line"><b>Phone:</b> {{ order.contact.phone.0|default:order.contact.phone }}</div>{% endif %}
+            {% if order.contact.address %}<div class="line"><b>Address:</b> {{ order.contact.address }}</div>{% endif %}
+            {% if order.contact.company %}<div class="line"><b>Company:</b> {{ order.contact.company }}</div>{% endif %}
+          {% elif order.company %}
+            <div class="name">{{ order.company.name|default:"—"|capfirst }}</div>
+            <div class="role">{% trans "Company" %}</div>
+            {% if order.company.email %}<div class="line"><b>Email:</b> {{ order.company.email }}</div>{% endif %}
+            {% if order.company.phone %}<div class="line"><b>Phone:</b> {{ order.company.phone }}</div>{% endif %}
+            {% if order.company.address %}<div class="line"><b>Address:</b> {{ order.company.address }}</div>{% endif %}
+            {% if order.company.tax_office %}<div class="line"><b>{% trans "Tax Office" %}:</b> {{ order.company.tax_office }}</div>{% endif %}
+            {% if order.company.tax_number %}<div class="line"><b>{% trans "Tax No" %}:</b> {{ order.company.tax_number }}</div>{% endif %}
+          {% elif order.web_client %}
+            <div class="name">{{ order.web_client.name|default:order.web_client.username|capfirst }}</div>
+            <div class="role">{% trans "Web Customer" %}</div>
+            {% if order.web_client.email %}<div class="line"><b>Email:</b> {{ order.web_client.email }}</div>{% endif %}
+            {% if order.web_client.phone %}<div class="line"><b>Phone:</b> {{ order.web_client.phone }}</div>{% endif %}
+          {% else %}
+            <div class="name">—</div>
+            <div class="line" style="color: #6B7280;">{% trans "No customer attached" %}</div>
+          {% endif %}
+        </div>
+      </td>
+      <td>
+        <div class="card">
+          {% if order.delivery_address or order.delivery_city %}
+            {% if order.delivery_address_title %}<div class="name">{{ order.delivery_address_title }}</div>{% endif %}
+            <div class="role">{% trans "Delivery" %}</div>
+            {% if order.delivery_address %}<div class="line">{{ order.delivery_address }}</div>{% endif %}
+            {% if order.delivery_city or order.delivery_country %}<div class="line">{{ order.delivery_city|default:"" }}{% if order.delivery_city and order.delivery_country %}, {% endif %}{{ order.delivery_country|default:"" }}</div>{% endif %}
+            {% if order.delivery_phone %}<div class="line"><b>Phone:</b> {{ order.delivery_phone }}</div>{% endif %}
+          {% elif order.billing_address %}
+            {% if order.billing_address_title %}<div class="name">{{ order.billing_address_title }}</div>{% endif %}
+            <div class="role">{% trans "Billing" %}</div>
+            <div class="line">{{ order.billing_address }}</div>
+          {% else %}
+            <div class="name">—</div>
+            <div class="line" style="color: #6B7280;">{% trans "No delivery address" %}</div>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ITEMS -->
+  <h3>{% trans "Products" %} ({{ order_items|length }})</h3>
+  <table class="items" cellspacing="0" cellpadding="0">
+    <thead>
+      <tr>
+        <th>{% trans "Product" %}</th>
+        <th>{% trans "SKU" %}</th>
+        <th>{% trans "Variant" %}</th>
+        <th class="num">{% trans "Qty" %}</th>
+        <th class="num">{% trans "Unit" %}</th>
+        <th class="num">{% trans "Amount" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order_items %}
+      <tr>
+        <td>
+          <div class="pname">{{ item.product.title|default:item.product }}</div>
+          {% if item.is_custom_curtain %}
+            <div class="pdesc">
+              {% trans "Custom curtain" %}
+              {% if item.custom_width %} · {{ item.custom_width|floatformat:0 }}{% if item.custom_height %}×{{ item.custom_height|floatformat:0 }}{% endif %} cm{% endif %}
+              {% if item.custom_pleat_type %} · {{ item.custom_pleat_type }}{% endif %}
+            </div>
+          {% endif %}
+          {% if item.description %}<div class="pdesc">{{ item.description|truncatechars:80 }}</div>{% endif %}
+        </td>
+        <td><span class="sku">{{ item.product.sku|default:"—" }}</span></td>
+        <td><span class="variant">{{ item.product_variant.variant_sku|default:"—" }}</span></td>
+        <td class="num">{{ item.quantity|default:0|floatformat:2 }}</td>
+        <td class="num">${{ item.price|default:0|floatformat:2 }}</td>
+        <td class="num">${{ item.line_total_calc|floatformat:2 }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align: center; color: #6B7280; padding: 18pt;">{% trans "No items." %}</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if order_items %}
+    <tfoot>
+      <tr class="grand">
+        <td colspan="5" class="lbl">{% trans "Total" %}</td>
+        <td class="val">${{ order_total|floatformat:2 }}</td>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+
+  <!-- NOTES -->
+  {% if order.notes %}
+  <h3>{% trans "Notes" %}</h3>
+  <div class="notes">{{ order.notes }}</div>
+  {% endif %}
+
+  <!-- FOOTER -->
+  <table class="foot" cellspacing="0" cellpadding="0">
+    <tr>
+      <td>{{ BRAND_NAME|default:"Nejum ERP" }} · {% trans "Order" %} #{{ order.pk }}</td>
+      <td class="right">{% now "d M Y · H:i" %}</td>
+    </tr>
+  </table>
+
+</body>
+</html>

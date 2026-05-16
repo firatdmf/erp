@@ -130,10 +130,15 @@ class Dashboard(View):
                 
                 # Apply tab filter - only show myTasks for calendar
                 if task_tab == 'myTasks':
-                    # Include tasks where user is the member OR is in assignees
+                    # Include tasks where user is the member, in assignees, OR is the creator
                     tasks = list(base_query.filter(
-                        Q(member=current_member) | Q(assignees=current_member)
+                        Q(member=current_member) | Q(assignees=current_member) | Q(created_by=current_member)
                     ).distinct().select_related('contact', 'company', 'member', 'member__user', 'created_by', 'created_by__user').order_by('-due_date'))
+                    # Annotate deletion permission so the template can hide
+                    # the trash icon on tasks the current user isn't allowed to
+                    # remove (e.g. someone else assigned the task to me).
+                    for _t in tasks:
+                        _t.can_be_deleted_by_user = _t.can_be_deleted_by(current_user)
 
                     # ─── DEBUG: log Python/Django/server info + each task's contact/company ───
                     import sys, socket, os
@@ -161,17 +166,17 @@ class Dashboard(View):
                         user=current_user
                     ).values('role')[:1]
 
-                    # TeamTask filtering using Range for DatetimeField
+                    # TeamTask filtering using Range for DatetimeField.
+                    # Show tasks assigned TO me OR ones I assigned myself,
+                    # so the calendar/list reflects what I'm involved in.
                     if date_obj == today:
-                         # For today, we want everything up to end of today
                         team_tasks_query = TeamTask.objects.filter(
-                            assignees=current_user,
-                            due_date__lte=day_end # Use range/lte on datetime index
+                            Q(assignees=current_user) | Q(assigned_by=current_user),
+                            due_date__lte=day_end
                         ).exclude(status='done')
                     else:
-                        # For specific day: Use RANGE to hit the index
                         team_tasks_query = TeamTask.objects.filter(
-                            assignees=current_user,
+                            Q(assignees=current_user) | Q(assigned_by=current_user),
                             due_date__range=(day_start, day_end)
                         ).exclude(status='done')
                     
@@ -194,6 +199,8 @@ class Dashboard(View):
 
                 else:  # assignedTasks
                     tasks = list(base_query.filter(created_by=current_member).exclude(member=current_member).select_related('contact', 'company', 'member', 'member__user', 'created_by', 'created_by__user').order_by('-due_date'))
+                    for _t in tasks:
+                        _t.can_be_deleted_by_user = _t.can_be_deleted_by(current_user)
                     team_tasks = []
                     meetings = []
                     print(f"Assigned Tasks count: {len(tasks)}")

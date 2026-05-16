@@ -31,6 +31,23 @@
     </div>
     <div id="customer-search-results"></div>
 
+    <script>
+      /* Delegated click on the autocomplete results — safer than the
+         old inline onclick because data attributes survive any name
+         with apostrophes, quotes, ampersands, etc. */
+      document.getElementById('customer-search-results').addEventListener('click', function (e) {
+        var item = e.target.closest('.customer-ac-item');
+        if (!item) return;
+        var name = item.dataset.name || '';
+        var type = item.dataset.type || '';
+        var pk = item.dataset.pk || '';
+        document.getElementById('customer-input').value = name;
+        document.getElementById('customer-type').value = type;
+        document.getElementById('customer-pk').value = pk;
+        document.getElementById('customer-search-results').innerHTML = '';
+      });
+    </script>
+
     <br />
 
     <div id="product-fields">
@@ -51,6 +68,6 @@
   </form>
 </div>
 {% block js %}
-
+<script src="{% static 'operating/js/create_edit_order.js' %}"></script>
 {% endblock %}
 {% endblock %}

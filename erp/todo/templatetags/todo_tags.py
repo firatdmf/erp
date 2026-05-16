@@ -43,6 +43,13 @@ def tasks_component(sort_type, csrf_token, page_type, contact, company, path, me
         else:
             tasks = base_query.all()
 
+    # Annotate each task with delete permission so the template can hide the
+    # trash icon for tasks the current user isn't allowed to remove.
+    user = getattr(member, "user", None) if member else None
+    tasks = list(tasks)
+    for _t in tasks:
+        _t.can_be_deleted_by_user = _t.can_be_deleted_by(user) if user else False
+
     # if page_type=="report":
     #     print("report")
     # elif page_type=="dashboard":

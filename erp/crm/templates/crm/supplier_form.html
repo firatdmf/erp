@@ -1,25 +1,608 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% load crispy_forms_tags %}
+{% load static %}
+
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+
+  .ord { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
+
+  /* CRUMBS */
+  .od-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; background: white; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); cursor: pointer; transition: all 140ms;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04); text-decoration: none;
+  }
+  .od-back i { width: 14px; height: 14px; }
+  .od-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-sep { color: var(--gray-400); }
+  .od-crumb-here { font: 600 12.5px var(--font-sans); color: var(--gray-700); }
+
+  /* HEAD */
+  .od-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 24px; margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px solid #E2E8EE;
+  }
+  .od-eyebrow {
+    font: 700 10.5px var(--font-sans);
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--nejum-teal-600);
+    margin-bottom: 6px;
+  }
+  .od-title { font: 800 28px var(--font-sans); letter-spacing: -0.01em; color: #0F1419; margin: 0; }
+  .od-sub { font: 500 13px var(--font-sans); color: var(--gray-500); margin-top: 6px; }
+
+  /* BUTTONS */
+  .ord-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 10px;
+    font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms;
+    white-space: nowrap; text-decoration: none; border: 1px solid transparent;
+  }
+  .ord-btn i { width: 14px; height: 14px; }
+  .ord-btn.ghost {
+    background: white; border-color: #E0E6EE; color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .ord-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border-color: var(--nejum-teal-700); color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .ord-btn.lg { padding: 10px 18px; font-size: 13.5px; }
+
+  /* CARD */
+  .od-card {
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    padding: 22px 24px; box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+    max-width: 880px;
+  }
+  .od-card + .od-card { margin-top: 16px; }
+  .od-card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .od-card-h h3 { font: 700 14px var(--font-sans); color: #0F1419; margin: 0; letter-spacing: -0.005em; }
+  .od-card-h i { color: var(--nejum-teal-600); width: 14px; height: 14px; }
+  .od-card-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; }
+
+  /* FORM */
+  .sf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 18px;
+  }
+  .sf-grid .sf-full { grid-column: 1 / -1; }
+
+  .sf-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .sf-field label {
+    font: 600 12px var(--font-sans);
+    color: var(--gray-700);
+    letter-spacing: 0.01em;
+  }
+  .sf-field .required { color: #DC2626; margin-left: 2px; }
+  .sf-field input[type="text"],
+  .sf-field input[type="email"],
+  .sf-field input[type="url"],
+  .sf-field input[type="tel"],
+  .sf-field input[type="number"],
+  .sf-field input[type="date"],
+  .sf-field textarea,
+  .sf-field select {
+    width: 100%;
+    padding: 9px 12px;
+    background: white;
+    border: 1px solid #E0E6EE;
+    border-radius: 9px;
+    font: 500 13.5px var(--font-sans);
+    color: var(--ink);
+    transition: border-color 140ms, box-shadow 140ms, background 140ms;
+    outline: none;
+    box-sizing: border-box;
+  }
+  .sf-field input::placeholder, .sf-field textarea::placeholder { color: var(--gray-400); }
+  .sf-field input:hover,
+  .sf-field textarea:hover,
+  .sf-field select:hover { border-color: #C5CCD3; }
+  .sf-field input:focus,
+  .sf-field textarea:focus,
+  .sf-field select:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+    background: #FAFBFD;
+  }
+  .sf-field textarea { resize: vertical; min-height: 84px; }
+  .sf-field select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  .sf-help { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .sf-errors { font: 600 11.5px var(--font-sans); color: #DC2626; margin-top: 2px; }
+  .sf-errors ul { list-style: none; padding: 0; margin: 0; }
+
+  /* FOOTER */
+  .sf-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    margin-top: 22px; padding-top: 18px;
+    border-top: 1px solid #EEF1F5;
+  }
+  .sf-footer .left { margin-right: auto; font: 500 12px var(--font-sans); color: var(--gray-500); }
+
+  /* ICON RAIL — quick-jump links above the card on wider screens */
+  .sf-rail {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .sf-rail .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; background: var(--nejum-teal-50); color: var(--nejum-teal-700);
+    border-radius: 999px; font: 600 11.5px var(--font-sans);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,0.20);
+  }
+  .sf-rail .pill i { width: 11px; height: 11px; }
+
+  /* ── Searchable comboboxes (linked_company / linked_contact) ── */
+  .sf-pickfield { position: relative; }
+  .sf-pick { position: relative; display: flex; flex-direction: column; gap: 6px; }
+  .sf-pick-input-wrap { position: relative; display: flex; align-items: center; }
+  .sf-pick-icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--gray-500); font-size: 12px; pointer-events: none;
+  }
+  .sf-pick-input {
+    width: 100%;
+    padding: 9px 36px 9px 34px !important;
+    background: white;
+    border: 1px solid #E0E6EE;
+    border-radius: 9px;
+    font: 500 13.5px var(--font-sans);
+    color: var(--ink);
+    outline: none;
+    transition: border-color 140ms, box-shadow 140ms;
+    box-sizing: border-box;
+  }
+  .sf-pick-input:hover { border-color: #C5CCD3; }
+  .sf-pick-input:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+    background: #FAFBFD;
+  }
+  .sf-pick-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #E2E8EE; color: var(--gray-700);
+    border: none; border-radius: 50%; cursor: pointer;
+    font-size: 10px; transition: all 140ms;
+  }
+  .sf-pick-clear:hover { background: #D1D8E0; color: #0F1419; }
+
+  .sf-pick-selected {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .sf-pick-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 6px 5px 10px;
+    background: var(--nejum-teal-50);
+    color: var(--nejum-teal-700);
+    border-radius: 999px;
+    font: 600 12px var(--font-sans);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,0.20);
+  }
+  .sf-pick-chip i { width: 11px; height: 11px; }
+  .sf-pick-chip-x {
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(20,127,116,0.18); color: var(--nejum-teal-700);
+    border: none; border-radius: 50%;
+    cursor: pointer; font-size: 9px;
+    transition: background 140ms, color 140ms;
+  }
+  .sf-pick-chip-x:hover { background: var(--nejum-teal-600); color: white; }
+
+  .sf-pick-results {
+    position: absolute;
+    top: calc(100% + 4px); left: 0; right: 0;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(15,23,31,0.10);
+    max-height: 280px; overflow-y: auto;
+    z-index: 50;
+    padding: 4px;
+  }
+  .sf-pick-result {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 100ms;
+  }
+  .sf-pick-result:hover, .sf-pick-result.active { background: var(--nejum-teal-50); }
+  .sf-pick-result-avatar {
+    width: 28px; height: 28px; flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600));
+    color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 11px var(--font-sans);
+  }
+  .sf-pick-result-body { flex: 1; min-width: 0; }
+  .sf-pick-result-name {
+    font: 600 13px var(--font-sans);
+    color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sf-pick-result-sub {
+    font: 500 11.5px var(--font-sans);
+    color: var(--gray-500);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sf-pick-empty {
+    padding: 14px 12px;
+    text-align: center;
+    font: 500 12.5px var(--font-sans);
+    color: var(--gray-500);
+  }
+
+  @media (max-width: 720px) {
+    .sf-grid { grid-template-columns: 1fr; }
+    .od-head { flex-direction: column; }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h4 class="card-title">{% if form.instance.pk %}Edit Supplier{% else %}Add Supplier{% endif %}</h4>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-                    <div class="form-group mt-3">
-                        <button type="submit" class="btn btn-primary">{% trans "Save Supplier" %}</button>
-                        <a href="{% url 'crm:supplier_list' %}" class="btn btn-secondary">Cancel</a>
-                    </div>
-                </form>
-            </div>
-        </div>
+<div class="ord">
+  {# Breadcrumbs #}
+  <div class="od-crumbs">
+    <a href="{% url 'crm:supplier_list' %}" class="od-back">
+      <i class="fa fa-arrow-left"></i>{% trans "Back to suppliers" %}
+    </a>
+    <span class="od-sep">/</span>
+    <span class="od-crumb-here">
+      {% if form.instance.pk %}{{ form.instance.company_name|default:form.instance.contact_name|default:"Supplier" }}{% else %}{% trans "New supplier" %}{% endif %}
+    </span>
+  </div>
+
+  {# Head #}
+  <div class="od-head">
+    <div>
+      <div class="od-eyebrow">{% trans "Supply chain" %}</div>
+      <h1 class="od-title">
+        {% if form.instance.pk %}{% trans "Edit supplier" %}{% else %}{% trans "Add supplier" %}{% endif %}
+      </h1>
+      <div class="od-sub">
+        {% if form.instance.pk %}{% trans "Update details for this supplier." %}{% else %}{% trans "Register a new supplier and optionally link it to an existing contact or company." %}{% endif %}
+      </div>
     </div>
+    <div style="display:flex;gap:8px;">
+      {% if form.instance.pk %}
+        <a href="{% url 'crm:supplier_detail' form.instance.pk %}" class="ord-btn ghost">
+          <i class="fa fa-eye"></i>{% trans "View" %}
+        </a>
+      {% endif %}
+      <a href="{% url 'crm:supplier_list' %}" class="ord-btn ghost">
+        <i class="fa fa-times"></i>{% trans "Cancel" %}
+      </a>
+    </div>
+  </div>
+
+  {# Form #}
+  <form method="post" class="sf-form" novalidate>
+    {% csrf_token %}
+
+    {# Identity card #}
+    <div class="od-card">
+      <div class="od-card-h">
+        <i class="fa fa-id-card"></i>
+        <h3>{% trans "Identity" %}</h3>
+        <span class="od-card-sub">{% trans "At least company or contact name is required." %}</span>
+      </div>
+      <div class="sf-grid">
+        <div class="sf-field">
+          <label for="{{ form.company_name.id_for_label }}">{% trans "Company name" %}</label>
+          {{ form.company_name }}
+          {% if form.company_name.errors %}<div class="sf-errors">{{ form.company_name.errors }}</div>{% endif %}
+        </div>
+        <div class="sf-field">
+          <label for="{{ form.contact_name.id_for_label }}">{% trans "Contact name" %}</label>
+          {{ form.contact_name }}
+          {% if form.contact_name.errors %}<div class="sf-errors">{{ form.contact_name.errors }}</div>{% endif %}
+        </div>
+        <div class="sf-field">
+          <label for="{{ form.email.id_for_label }}">{% trans "Email" %}</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="sf-errors">{{ form.email.errors }}</div>{% endif %}
+        </div>
+        <div class="sf-field">
+          <label for="{{ form.phone.id_for_label }}">{% trans "Phone" %}</label>
+          {{ form.phone }}
+          {% if form.phone.errors %}<div class="sf-errors">{{ form.phone.errors }}</div>{% endif %}
+        </div>
+        <div class="sf-field sf-full">
+          <label for="{{ form.website.id_for_label }}">{% trans "Website" %}</label>
+          {{ form.website }}
+          {% if form.website.errors %}<div class="sf-errors">{{ form.website.errors }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Location card #}
+    <div class="od-card">
+      <div class="od-card-h">
+        <i class="fa fa-map-pin"></i>
+        <h3>{% trans "Location" %}</h3>
+      </div>
+      <div class="sf-grid">
+        <div class="sf-field sf-full">
+          <label for="{{ form.address.id_for_label }}">{% trans "Address" %}</label>
+          {{ form.address }}
+          {% if form.address.errors %}<div class="sf-errors">{{ form.address.errors }}</div>{% endif %}
+        </div>
+        <div class="sf-field sf-full">
+          <label for="{{ form.country.id_for_label }}">{% trans "Country" %}</label>
+          {{ form.country }}
+          {% if form.country.errors %}<div class="sf-errors">{{ form.country.errors }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# Linked CRM entities card — type-to-search comboboxes #}
+    {% if form.linked_contact or form.linked_company %}
+    <div class="od-card">
+      <div class="od-card-h">
+        <i class="fa fa-link"></i>
+        <h3>{% trans "Link to CRM" %}</h3>
+        <span class="od-card-sub">{% trans "Optional — connect this supplier to an existing record." %}</span>
+      </div>
+      <div class="sf-grid">
+        {% if form.linked_company %}
+        <div class="sf-field sf-pickfield">
+          <label>{% trans "Linked company" %}</label>
+          <div class="sf-pick" data-search-url="{% url 'crm:supplier_search_companies' %}" data-name="linked_company"
+               data-icon="building"
+               data-placeholder="{% trans 'Search companies…' %}">
+            <input type="hidden" name="linked_company" value="{{ form.instance.linked_company_id|default:'' }}">
+            <div class="sf-pick-input-wrap">
+              <i class="fa fa-search sf-pick-icon"></i>
+              <input type="text" class="sf-pick-input" placeholder="{% trans 'Search companies…' %}"
+                     autocomplete="off">
+              <button type="button" class="sf-pick-clear" style="display:none;" title="{% trans 'Clear' %}">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+            {% if form.instance.linked_company %}
+            <div class="sf-pick-selected" style="display:flex;">
+              <span class="sf-pick-chip">
+                <i class="fa fa-building"></i>
+                <span class="sf-pick-chip-name">{{ form.instance.linked_company.name }}</span>
+                <button type="button" class="sf-pick-chip-x" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button>
+              </span>
+            </div>
+            {% else %}
+            <div class="sf-pick-selected" style="display:none;"></div>
+            {% endif %}
+            <div class="sf-pick-results" style="display:none;"></div>
+          </div>
+          {% if form.linked_company.errors %}<div class="sf-errors">{{ form.linked_company.errors }}</div>{% endif %}
+        </div>
+        {% endif %}
+        {% if form.linked_contact %}
+        <div class="sf-field sf-pickfield">
+          <label>{% trans "Linked contact" %}</label>
+          <div class="sf-pick" data-search-url="{% url 'crm:supplier_search_contacts' %}" data-name="linked_contact"
+               data-icon="user"
+               data-placeholder="{% trans 'Search contacts…' %}">
+            <input type="hidden" name="linked_contact" value="{{ form.instance.linked_contact_id|default:'' }}">
+            <div class="sf-pick-input-wrap">
+              <i class="fa fa-search sf-pick-icon"></i>
+              <input type="text" class="sf-pick-input" placeholder="{% trans 'Search contacts…' %}"
+                     autocomplete="off">
+              <button type="button" class="sf-pick-clear" style="display:none;" title="{% trans 'Clear' %}">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+            {% if form.instance.linked_contact %}
+            <div class="sf-pick-selected" style="display:flex;">
+              <span class="sf-pick-chip">
+                <i class="fa fa-user"></i>
+                <span class="sf-pick-chip-name">{{ form.instance.linked_contact.name }}</span>
+                <button type="button" class="sf-pick-chip-x" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button>
+              </span>
+            </div>
+            {% else %}
+            <div class="sf-pick-selected" style="display:none;"></div>
+            {% endif %}
+            <div class="sf-pick-results" style="display:none;"></div>
+          </div>
+          {% if form.linked_contact.errors %}<div class="sf-errors">{{ form.linked_contact.errors }}</div>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Non-field errors (form-level) #}
+    {% if form.non_field_errors %}
+    <div class="od-card" style="border-color:#FECACA;background:#FEF2F2;">
+      <div class="sf-errors">{{ form.non_field_errors }}</div>
+    </div>
+    {% endif %}
+
+    {# Footer #}
+    <div class="od-card" style="padding:14px 20px;">
+      <div class="sf-footer" style="border-top:none;margin-top:0;padding-top:0;">
+        {% if form.instance.pk %}
+        <div class="left">
+          <i class="fa fa-clock-o"></i>
+          {% trans "Created" %} {{ form.instance.created_at|date:"M d, Y" }}
+        </div>
+        {% endif %}
+        <a href="{% url 'crm:supplier_list' %}" class="ord-btn ghost">{% trans "Cancel" %}</a>
+        <button type="submit" class="ord-btn primary lg">
+          <i class="fa fa-save"></i>
+          {% if form.instance.pk %}{% trans "Save changes" %}{% else %}{% trans "Create supplier" %}{% endif %}
+        </button>
+      </div>
+    </div>
+  </form>
 </div>
+
+<script>
+  /* ─── Linked-entity comboboxes ────────────────────────────────
+     Each .sf-pick has a search input, a hidden FK input, a chip
+     row (shown when something is picked), and a results dropdown.
+     We fetch JSON from the picker's data-search-url, render
+     results, and on click write the chosen id into the hidden
+     input while displaying the chip. The Clear/X button resets. */
+  (function () {
+    document.querySelectorAll('.sf-pick').forEach(initPicker);
+
+    function initPicker(root) {
+      var url        = root.dataset.searchUrl;
+      var iconName   = root.dataset.icon || 'tag';
+      var hidden     = root.querySelector('input[type="hidden"]');
+      var input      = root.querySelector('.sf-pick-input');
+      var clearBtn   = root.querySelector('.sf-pick-clear');
+      var selected   = root.querySelector('.sf-pick-selected');
+      var results    = root.querySelector('.sf-pick-results');
+      var existingChipX = root.querySelector('.sf-pick-chip-x');
+      var timer = null;
+      var lastQuery = '';
+
+      // Hide input if a chip is already shown on initial render
+      if (hidden && hidden.value && selected.children.length > 0) {
+        input.style.display = 'none';
+        root.querySelector('.sf-pick-icon').style.display = 'none';
+        clearBtn.style.display = 'none';
+      }
+
+      function clearSelection() {
+        hidden.value = '';
+        selected.style.display = 'none';
+        selected.innerHTML = '';
+        input.style.display = '';
+        root.querySelector('.sf-pick-icon').style.display = '';
+        input.value = '';
+        clearBtn.style.display = 'none';
+        results.style.display = 'none';
+        input.focus();
+      }
+
+      if (existingChipX) existingChipX.addEventListener('click', clearSelection);
+      clearBtn.addEventListener('click', clearSelection);
+
+      function pick(item) {
+        hidden.value = item.id;
+        var iconHtml = '<i class="fa fa-' + iconName + '"></i>';
+        selected.innerHTML =
+          '<span class="sf-pick-chip">' +
+          iconHtml +
+          '<span class="sf-pick-chip-name"></span>' +
+          '<button type="button" class="sf-pick-chip-x" title="Remove"><i class="fa fa-times"></i></button>' +
+          '</span>';
+        selected.querySelector('.sf-pick-chip-name').textContent = item.name;
+        selected.style.display = 'flex';
+        selected.querySelector('.sf-pick-chip-x').addEventListener('click', clearSelection);
+        input.value = '';
+        input.style.display = 'none';
+        root.querySelector('.sf-pick-icon').style.display = 'none';
+        clearBtn.style.display = 'none';
+        results.style.display = 'none';
+      }
+
+      function renderResults(items) {
+        if (!items.length) {
+          results.innerHTML = '<div class="sf-pick-empty">No matches.</div>';
+          results.style.display = 'block';
+          return;
+        }
+        results.innerHTML = '';
+        items.forEach(function (it) {
+          var row = document.createElement('div');
+          row.className = 'sf-pick-result';
+          var initials = (it.name || '?').trim().slice(0, 2).toUpperCase();
+          row.innerHTML =
+            '<div class="sf-pick-result-avatar"></div>' +
+            '<div class="sf-pick-result-body">' +
+            '  <div class="sf-pick-result-name"></div>' +
+            '  <div class="sf-pick-result-sub"></div>' +
+            '</div>';
+          row.querySelector('.sf-pick-result-avatar').textContent = initials;
+          row.querySelector('.sf-pick-result-name').textContent = it.name;
+          var sub = row.querySelector('.sf-pick-result-sub');
+          if (it.subtitle) { sub.textContent = it.subtitle; }
+          else { sub.remove(); }
+          row.addEventListener('mousedown', function (e) {
+            // mousedown so the click fires before blur hides the panel
+            e.preventDefault();
+            pick(it);
+          });
+          results.appendChild(row);
+        });
+        results.style.display = 'block';
+      }
+
+      function fetchResults(q) {
+        if (timer) clearTimeout(timer);
+        // Don't fetch on empty input — only search once the user types.
+        if (!q || !q.trim()) {
+          results.style.display = 'none';
+          results.innerHTML = '';
+          return;
+        }
+        timer = setTimeout(function () {
+          var sep = url.indexOf('?') >= 0 ? '&' : '?';
+          fetch(url + sep + 'q=' + encodeURIComponent(q), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) { renderResults(data.results || []); })
+            .catch(function () {
+              results.innerHTML = '<div class="sf-pick-empty">Search failed.</div>';
+              results.style.display = 'block';
+            });
+        }, 200);
+      }
+
+      input.addEventListener('focus', function () {
+        if (input.style.display === 'none') return;
+        clearBtn.style.display = input.value ? 'inline-flex' : 'none';
+        // Only re-open the dropdown if the user has already typed something.
+        if (input.value.trim()) fetchResults(input.value);
+      });
+
+      input.addEventListener('input', function () {
+        var q = input.value;
+        clearBtn.style.display = q ? 'inline-flex' : 'none';
+        if (q === lastQuery) return;
+        lastQuery = q;
+        fetchResults(q);
+      });
+
+      input.addEventListener('blur', function () {
+        // Delay so a result-click can register first
+        setTimeout(function () { results.style.display = 'none'; }, 150);
+      });
+    }
+  })();
+</script>
 {% endblock %}

@@ -28,7 +28,17 @@
 </div>
 
 <script>
-  function openTaskEditSidebar(taskId) {
+  function openTaskEditSidebar(taskId, kind) {
+    // Team tasks have their own edit form endpoint — route there so the
+    // form fields (assignees, status column, etc.) match the model.
+    // Personal tasks keep the original /todo/.../edit_form endpoint.
+    kind = kind || 'personal';
+    if (kind === 'team') {
+      // Navigate to the team task detail page rather than overlay,
+      // since the team UI has its own kanban/timeline context.
+      window.location.href = '/team/task/' + taskId + '/';
+      return;
+    }
     const sidebar = document.getElementById('taskEditSidebar');
     const content = document.getElementById('taskEditContent');
 

@@ -1,4 +1,5 @@
 {% load marketing_tags %}
+{% load i18n %}
 {% for product in products %}
 {% with stock=product.total_stock %}
 <div class="pr-wrap" id="prod-{{ product.id }}"
@@ -87,3 +88,92 @@
   <p>Try changing the filters or running a different search.</p>
 </div>
 {% endfor %}
+
+{# ==================== PAGINATION ==================== #}
+{% if is_paginated %}
+<style>
+  .pl-pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 16px 4px 4px;
+    font: 500 13px 'Plus Jakarta Sans', system-ui, sans-serif;
+    color: #4D5760;
+    flex-wrap: wrap;
+  }
+  .pl-pagination-info { color: #6B7280; font-size: 12.5px; }
+  .pl-pagination-info b { color: #0F1419; font-weight: 700; }
+  .pl-pagination-nav { display: flex; gap: 4px; align-items: center; }
+  .pl-page-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 34px; padding: 0 10px;
+    background: #fff; border: 1px solid #E0E6EE; border-radius: 8px;
+    color: #4D5760; font: 600 13px 'Plus Jakarta Sans', sans-serif;
+    text-decoration: none; cursor: pointer; transition: all 140ms;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+  }
+  .pl-page-btn:hover { border-color: #147F74; color: #005354; background: #F0FAF9; }
+  .pl-page-btn.active {
+    background: linear-gradient(180deg, #147F74, #00696A);
+    color: #fff; border-color: #005354;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .pl-page-btn.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+  .pl-page-btn i { width: 14px; height: 14px; }
+  .pl-page-ellipsis { padding: 0 6px; color: #94A3B8; }
+</style>
+<div class="pl-pagination">
+  <div class="pl-pagination-info">
+    {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+    Showing <b>{{ start }}–{{ end }}</b> of <b>{{ total }}</b> products
+    {% endblocktrans %}
+  </div>
+  <nav class="pl-pagination-nav" aria-label="Pagination">
+    {# Build a base querystring that preserves all current filters except 'page' #}
+    {% with qs=request.GET.urlencode %}
+    {% if page_obj.has_previous %}
+      <a class="pl-page-btn"
+         hx-get="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+         hx-target="#product-table-body" hx-swap="innerHTML" hx-push-url="true"
+         href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+         title="{% trans 'Previous' %}">
+        <i data-lucide="chevron-left"></i>
+      </a>
+    {% else %}
+      <span class="pl-page-btn disabled"><i data-lucide="chevron-left"></i></span>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="pl-page-btn active">{{ num }}</span>
+      {% elif num == 1 or num == page_obj.paginator.num_pages or num >= page_obj.number|add:'-2' and num <= page_obj.number|add:'2' %}
+        <a class="pl-page-btn"
+           hx-get="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ num }}"
+           hx-target="#product-table-body" hx-swap="innerHTML" hx-push-url="true"
+           href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ num }}">
+          {{ num }}
+        </a>
+      {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
+        <span class="pl-page-ellipsis">…</span>
+      {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+      <a class="pl-page-btn"
+         hx-get="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+         hx-target="#product-table-body" hx-swap="innerHTML" hx-push-url="true"
+         href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+         title="{% trans 'Next' %}">
+        <i data-lucide="chevron-right"></i>
+      </a>
+    {% else %}
+      <span class="pl-page-btn disabled"><i data-lucide="chevron-right"></i></span>
+    {% endif %}
+    {% endwith %}
+  </nav>
+</div>
+<script>
+  // Re-initialize lucide icons after HTMX swap
+  if (window.lucide) lucide.createIcons();
+  // Scroll list back to top on page change
+  document.getElementById('product-table-body')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+</script>
+{% endif %}

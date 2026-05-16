@@ -41,7 +41,7 @@
     <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=20" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=42" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=5" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=20" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=27" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=5" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/responsive-content.css' %}?v=4" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dark.css' %}?v=9" />
@@ -1303,7 +1303,7 @@
           <div id="taskCompanySection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
               <span><i class="fas fa-building"></i> Attach to company</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskCompany')">
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskCompany', {clear: true})">
                 Remove
               </button>
             </div>
@@ -1321,7 +1321,7 @@
           <div id="taskContactSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
               <span><i class="fas fa-user"></i> Attach to contact</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskContact')">
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('taskContact', {clear: true})">
                 Remove
               </button>
             </div>
@@ -1459,7 +1459,7 @@
           <div id="companyContactSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
               <span><i class="fas fa-user"></i> Attach a contact</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyContact')">
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyContact', {clear: true})">
                 Remove this contact
               </button>
             </div>
@@ -1482,7 +1482,7 @@
           <div id="companyNoteSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
               <span><i class="fas fa-file-text"></i> Attach a note</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyNote')">
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyNote', {clear: true})">
                 Remove this note
               </button>
             </div>
@@ -1496,7 +1496,7 @@
           <div id="companyTaskSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
               <span><i class="fas fa-check-circle"></i> Attach a task</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyTask')">
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('companyTask', {clear: true})">
                 Remove this task
               </button>
             </div>
@@ -1603,52 +1603,39 @@
             </div>
           </div>
 
-          <!-- Note attachment -->
+          <!-- Note attachment (multi-row) -->
           <div id="mainContactNoteSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fas fa-file-text"></i> Attach a note</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactNote')">
-                Remove this note
+              <span><i class="fas fa-file-text"></i> {% trans "Attach notes" %}</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactNote', {clear: true})">
+                {% trans "Remove all notes" %}
               </button>
             </div>
-            <div class="form-group">
-              <label for="id_main_contact_note">{% trans "Note" %}</label>
-              <textarea name="note_content" id="id_main_contact_note" class="form-textarea" rows="3"></textarea>
-            </div>
+            <div id="mainContactNotesList" class="multi-item-list"></div>
+            <button type="button" class="multi-add-btn" onclick="addNoteRow('mainContactNotesList', 'mainContactNotesData')">
+              <i class="fas fa-plus"></i> {% trans "Add another note" %}
+            </button>
+            <input type="hidden" name="notes_data" id="mainContactNotesData" value="[]">
           </div>
 
-          <!-- Task attachment -->
+          <!-- Task attachment (multi-row) -->
           <div id="mainContactTaskSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fas fa-check-circle"></i> Attach a task</span>
-              <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactTask')">
-                Remove this task
+              <span><i class="fas fa-check-circle"></i> {% trans "Attach tasks" %}</span>
+              <button type="button" class="remove-attachment" onclick="toggleAttachment('mainContactTask', {clear: true})">
+                {% trans "Remove all tasks" %}
               </button>
             </div>
-            <div class="form-row">
-              <div class="form-group" style="flex: 1;">
-                <label for="id_main_contact_task_name">{% trans "Task name" %}</label>
-                <input type="text" name="task_name" id="id_main_contact_task_name" class="form-input">
-              </div>
-              <div class="form-group" style="flex: 1;">
-                <label for="id_main_contact_task_due">{% trans "Due date" %}</label>
-                <input type="date" name="task_due_date" id="id_main_contact_task_due" class="form-input">
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="id_main_contact_task_desc">{% trans "Description" %}</label>
-              <textarea name="task_description" id="id_main_contact_task_desc" class="form-textarea"
-                rows="3"></textarea>
-            </div>
-            <div class="form-group">
-              <label for="id_main_contact_task_member">{% trans "Assign to" %}</label>
-              <select name="task_member" id="id_main_contact_task_member" class="form-input">
-                {% for member in all_members %}
-                <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}
-                </option>
-                {% endfor %}
-              </select>
-            </div>
+            <div id="mainContactTasksList" class="multi-item-list"></div>
+            <button type="button" class="multi-add-btn" onclick="addTaskRow('mainContactTasksList', 'mainContactTasksData')">
+              <i class="fas fa-plus"></i> {% trans "Add another task" %}
+            </button>
+            <input type="hidden" name="tasks_data" id="mainContactTasksData" value="[]">
+            <template id="mainContactTaskMemberOptions">
+              {% for member in all_members %}
+              <option value="{{ member.id }}" {% if member.user == request.user %}selected{% endif %}>{{ member }}</option>
+              {% endfor %}
+            </template>
           </div>
 
           <div class="sidebar-footer">
@@ -2347,72 +2334,103 @@
       document.getElementById('id_assigned_users').value = ids;
     }
 
-    // Intercept Form Submission for Team Tasks
+    // Intercept Form Submission — ALWAYS submit via fetch so the user
+    // stays on the dashboard (or wherever they triggered the sidebar from)
+    // instead of being navigated to the new task's detail page.
     document.addEventListener('DOMContentLoaded', function () {
       const taskForm = document.getElementById('taskForm');
-      if (taskForm) {
-        taskForm.onsubmit = function (e) {
-          const teamId = document.getElementById('id_task_team_id').value;
-          if (teamId) {
-            e.preventDefault(); // Stop default generic todo submit
+      if (!taskForm) return;
 
-            const formData = new FormData(taskForm);
+      taskForm.onsubmit = function (e) {
+        e.preventDefault();
 
-            // Add selected users manually if needed, though hidden input is there
-            if (selectedUsers.length > 0) {
-              // Safety: If users are selected, we definitely don't want 'Assign to Team'
-              const assignTeamCheckbox = document.getElementById('id_assign_to_team');
-              if (assignTeamCheckbox) assignTeamCheckbox.checked = false;
-            }
+        const teamId = document.getElementById('id_task_team_id').value;
+        const formData = new FormData(taskForm);
 
-            const ids = selectedUsers.map(u => u.id).join(',');
-            // Add selected users to formData if not already handled by hidden input
-            // formData.append('assigned_users', ids); // This is handled by the hidden input 'id_assigned_users'
+        if (selectedUsers.length > 0) {
+          const assignTeamCheckbox = document.getElementById('id_assign_to_team');
+          if (assignTeamCheckbox) assignTeamCheckbox.checked = false;
+        }
 
-            const submitBtn = taskForm.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Creating...';
+        const submitBtn = taskForm.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
 
-            fetch(taskForm.action, { // Use dynamic action set by openTaskSidebar
-              method: 'POST',
-              body: formData,
-              headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': '{{ csrf_token }}'
-              }
-            })
-              .then(r => r.json())
-              .then(data => {
-                if (data.success) {
-                  closeTaskSidebar();
-                  // If we are on team page, reload
-                  if (window.location.href.includes('team/tasks')) {
-                    window.location.reload();
-                  } else {
-                    // Show success toast
-                    const toast = document.getElementById('toastNotification');
-                    if (toast) {
-                      toast.querySelector('.toast-message-global').textContent = 'Task created successfully';
-                      toast.classList.add('show');
-                      setTimeout(() => toast.classList.remove('show'), 3000);
-                    }
-                  }
-                } else {
-                  alert(data.error || 'Error creating task');
-                }
-              })
-              .catch(err => {
-                alert('Network error occurred');
-                console.error(err);
-              })
-              .finally(() => {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-              });
+        fetch(taskForm.action, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': '{{ csrf_token }}'
           }
-        };
-      }
+        })
+          .then(r => {
+            // Both endpoints (todo:create_task, team:create_task) now return JSON
+            // for AJAX. If a non-JSON response slips through, fall back to a soft reload.
+            const ct = r.headers.get('Content-Type') || '';
+            if (!ct.includes('application/json')) {
+              return { success: r.ok, _fallback: true };
+            }
+            return r.json();
+          })
+          .then(data => {
+            if (data.success) {
+              closeTaskSidebar();
+
+              // If we're on a list that should reflect the new task, refresh it
+              const onTeamTasks = window.location.href.includes('team/tasks');
+              const onDashboard = ['/dashboard', '/', '/home'].some(p => window.location.pathname.startsWith(p));
+
+              if (onTeamTasks || data._fallback) {
+                window.location.reload();
+              } else if (onDashboard) {
+                // Reload the dashboard task list inline without full navigation
+                try {
+                  const dateStr = window.selectedDate
+                    ? `${window.selectedDate.getFullYear()}-${String(window.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(window.selectedDate.getDate()).padStart(2, '0')}`
+                    : new Date().toISOString().slice(0, 10);
+                  const currentTab = window.currentTaskTab || 'myTasks';
+                  fetch(`/dashboard/?date=${dateStr}&tab=${currentTab}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                  })
+                    .then(r => r.text())
+                    .then(html => {
+                      // Replace just the task panel — selector chosen to be robust
+                      const parser = new DOMParser();
+                      const doc = parser.parseFromString(html, 'text/html');
+                      const newPanel = doc.querySelector('.tasks-section, #taskListContainer, .task-list-wrap');
+                      const existingPanel = document.querySelector('.tasks-section, #taskListContainer, .task-list-wrap');
+                      if (newPanel && existingPanel) {
+                        existingPanel.innerHTML = newPanel.innerHTML;
+                      }
+                    });
+                } catch (err) { /* ignore — toast is enough */ }
+              }
+
+              // Success toast
+              const toast = document.getElementById('toastNotification');
+              if (toast) {
+                toast.querySelector('.toast-message-global').textContent = 'Task created successfully';
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+              }
+            } else {
+              const msg = data.errors
+                ? Object.entries(data.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n')
+                : (data.error || 'Error creating task');
+              alert(msg);
+            }
+          })
+          .catch(err => {
+            alert('Network error occurred');
+            console.error(err);
+          })
+          .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          });
+      };
     });
 
 
@@ -2782,7 +2800,26 @@
     }
 
     // Toggle attachment sections
-    function toggleAttachment(type) {
+    /* Groups of sections that should be mutually exclusive — opening
+       one in the group hides any others but PRESERVES their field
+       values so a user who flips between Note and Task doesn't lose
+       what they typed. The "Remove this note/task" buttons (with the
+       explicit `clear:true` arg) are the only path that wipes data. */
+    const ATTACH_GROUPS = {
+      mainContact: ['mainContactNote', 'mainContactTask'],
+      company:     ['companyContact', 'companyNote', 'companyTask'],
+      task:        ['taskCompany', 'taskContact']
+    };
+    function _attachGroupFor(type) {
+      for (const key in ATTACH_GROUPS) {
+        if (ATTACH_GROUPS[key].indexOf(type) !== -1) return ATTACH_GROUPS[key];
+      }
+      return [type];
+    }
+
+    function toggleAttachment(type, opts) {
+      opts = opts || {};
+      const clearOnClose = !!opts.clear;
       const sections = {
         'mainContactNote': 'mainContactNoteSection',
         'mainContactTask': 'mainContactTaskSection',
@@ -2795,26 +2832,158 @@
 
       const sectionId = sections[type];
       const section = document.getElementById(sectionId);
+      if (!section) return;
 
-      if (section.style.display === 'none') {
+      const isCurrentlyClosed = section.style.display === 'none' || section.style.display === '';
+
+      if (isCurrentlyClosed) {
+        // Close sibling sections in the same group (but keep their values).
+        _attachGroupFor(type).forEach(otherType => {
+          if (otherType === type) return;
+          const otherSection = document.getElementById(sections[otherType]);
+          if (otherSection) otherSection.style.display = 'none';
+        });
         section.style.display = 'block';
-        // Set focus to first input in the section
         setTimeout(() => {
           const firstInput = section.querySelector('input, textarea');
           if (firstInput) firstInput.focus();
         }, 100);
       } else {
         section.style.display = 'none';
-        // Clear fields
-        section.querySelectorAll('input, textarea').forEach(input => {
-          input.value = '';
-        });
-        // Clear contact selection
-        if (type === 'companyContact') {
-          removeCompanyContact();
+        // Only wipe field data when the caller explicitly asked for it
+        // (the "Remove this note/task" affordance). Toggling the same
+        // tab off or switching tabs must keep what the user typed.
+        if (clearOnClose) {
+          section.querySelectorAll('input, textarea').forEach(input => {
+            input.value = '';
+          });
+          // For multi-item lists, also wipe out the dynamic rows.
+          section.querySelectorAll('.multi-item-list').forEach(list => {
+            list.innerHTML = '';
+            const hidden = section.querySelector('input[type="hidden"][name="notes_data"], input[type="hidden"][name="tasks_data"]');
+            if (hidden) hidden.value = '[]';
+          });
+          if (type === 'companyContact') {
+            removeCompanyContact();
+          }
         }
       }
     }
+
+    /* ─── Multi-note / multi-task rows ─────────────────────────────
+       The Add-Contact sidebar lets users attach an unbounded number
+       of notes and tasks to a new contact. Each Add button appends a
+       row; the hidden notes_data / tasks_data JSON inputs are kept
+       in sync on every keystroke so the form post carries them as
+       JSON arrays. The backend ContactCreateForm parses these into
+       Note + Task records inside save(). */
+    function _serializeNotes(listId, hiddenId) {
+      const list = document.getElementById(listId);
+      const hidden = document.getElementById(hiddenId);
+      if (!list || !hidden) return;
+      const items = [];
+      list.querySelectorAll('.note-row textarea').forEach(t => {
+        const v = (t.value || '').trim();
+        if (v) items.push(v);
+      });
+      hidden.value = JSON.stringify(items);
+    }
+
+    function _serializeTasks(listId, hiddenId) {
+      const list = document.getElementById(listId);
+      const hidden = document.getElementById(hiddenId);
+      if (!list || !hidden) return;
+      const items = [];
+      list.querySelectorAll('.task-row').forEach(row => {
+        const name = (row.querySelector('[data-tk="name"]').value || '').trim();
+        const due  = (row.querySelector('[data-tk="due"]').value || '').trim();
+        const desc = (row.querySelector('[data-tk="desc"]').value || '').trim();
+        const memberSel = row.querySelector('[data-tk="member"]');
+        const member = memberSel ? memberSel.value : '';
+        // Only include rows with at least a name + due date so we
+        // don't push empty placeholder entries to the server.
+        if (name && due) items.push({ name, due_date: due, description: desc, member: member });
+      });
+      hidden.value = JSON.stringify(items);
+    }
+
+    function addNoteRow(listId, hiddenId) {
+      const list = document.getElementById(listId);
+      if (!list) return;
+      const row = document.createElement('div');
+      row.className = 'note-row multi-item-row';
+      row.innerHTML = `
+        <textarea class="form-textarea" rows="3" placeholder="Type your note…"
+                  oninput="_serializeNotes('${listId}', '${hiddenId}')"></textarea>
+        <button type="button" class="multi-remove-btn" title="Remove note"
+                onclick="this.parentNode.remove(); _serializeNotes('${listId}', '${hiddenId}');">
+          <i class="fas fa-times"></i>
+        </button>
+      `;
+      list.appendChild(row);
+      const ta = row.querySelector('textarea');
+      if (ta) ta.focus();
+    }
+
+    function addTaskRow(listId, hiddenId) {
+      const list = document.getElementById(listId);
+      if (!list) return;
+      // Pull the per-sidebar template of <option> tags so each task
+      // row gets the same Assign-To choices the user had before.
+      const tplId = listId.replace('TasksList', 'TaskMemberOptions');
+      const tpl = document.getElementById(tplId);
+      const memberOptions = tpl ? tpl.innerHTML : '';
+      const today = new Date().toISOString().slice(0, 10);
+      const row = document.createElement('div');
+      row.className = 'task-row multi-item-row';
+      row.innerHTML = `
+        <div class="task-row-grid">
+          <input type="text" class="form-input" data-tk="name" placeholder="Task name"
+                 oninput="_serializeTasks('${listId}', '${hiddenId}')">
+          <input type="date" class="form-input" data-tk="due" value="${today}"
+                 onchange="_serializeTasks('${listId}', '${hiddenId}')">
+        </div>
+        <textarea class="form-textarea" data-tk="desc" rows="2" placeholder="Description (optional)"
+                  oninput="_serializeTasks('${listId}', '${hiddenId}')"></textarea>
+        <div class="task-row-foot">
+          <select class="form-input" data-tk="member"
+                  onchange="_serializeTasks('${listId}', '${hiddenId}')">${memberOptions}</select>
+          <button type="button" class="multi-remove-btn" title="Remove task"
+                  onclick="this.closest('.task-row').remove(); _serializeTasks('${listId}', '${hiddenId}');">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `;
+      list.appendChild(row);
+      const nameInput = row.querySelector('[data-tk="name"]');
+      if (nameInput) nameInput.focus();
+      // Re-serialize so the (empty) row is reflected in the hidden
+      // input — addRows shouldn't push to JSON until user types,
+      // but this keeps the JSON valid.
+      _serializeTasks(listId, hiddenId);
+    }
+
+    // Bootstrap an initial empty row whenever the Note/Task panel
+    // opens for the first time, so users see something to type into.
+    function _ensureFirstRow(sectionId, addFn, listId, hiddenId) {
+      const section = document.getElementById(sectionId);
+      const list = document.getElementById(listId);
+      if (!section || !list) return;
+      if (list.children.length === 0) addFn(listId, hiddenId);
+    }
+    // Hook the toggle so opening a multi-row section seeds a row.
+    (function() {
+      const origToggle = window.toggleAttachment;
+      window.toggleAttachment = function(type, opts) {
+        const result = origToggle(type, opts);
+        if (type === 'mainContactNote') {
+          _ensureFirstRow('mainContactNoteSection', addNoteRow, 'mainContactNotesList', 'mainContactNotesData');
+        } else if (type === 'mainContactTask') {
+          _ensureFirstRow('mainContactTaskSection', addTaskRow, 'mainContactTasksList', 'mainContactTasksData');
+        }
+        return result;
+      };
+    })();
 
     // Company Contact Selector
     let companyContactSearchTimeout = null;
@@ -3542,6 +3711,24 @@
     </div>
   </div>
 
+  <!-- Edit Order Sidebar -->
+  <div id="editOrderSidebarOverlay" class="sidebar-overlay" onclick="closeEditOrderSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div class="sidebar-header">
+        <button class="sidebar-close" onclick="closeEditOrderSidebar()">
+          <i class="fas fa-times"></i> {% trans "Close" %}
+        </button>
+        <div class="sidebar-title">
+          <i class="fas fa-pen-to-square"></i>
+          <h2>{% trans "Edit Order" %}</h2>
+        </div>
+      </div>
+      <div class="sidebar-content" id="editOrderSidebarContent">
+        <!-- AJAX loading target -->
+      </div>
+    </div>
+  </div>
+
   <!-- Book Sidebar Modal -->
   <div id="bookSidebarOverlay" class="sidebar-overlay" onclick="closeBookSidebar()">
     <div class="sidebar-modal" onclick="event.stopPropagation();">
@@ -4153,6 +4340,51 @@
         document.getElementById('orderSidebarOverlay').classList.remove('active');
         document.body.style.overflow = '';
       }
+
+      // Edit Order Sidebar — uses htmx.ajax (same as the Create
+      // sidebar) so HTMX automatically processes the injected form's
+      // hx-* attributes and re-runs <script> tags. Plain fetch +
+      // innerHTML didn't, which made the product autocomplete dead.
+      function openEditOrderSidebar(orderId) {
+        const overlay = document.getElementById('editOrderSidebarOverlay');
+        const content = document.getElementById('editOrderSidebarContent');
+        if (!overlay || !content) return;
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        content.innerHTML = '<div style="text-align:center; padding: 40px; color: #6b7280;"><i class="fas fa-spinner fa-spin fa-2x"></i><div style="margin-top:12px;">Loading…</div></div>';
+        var editUrl = '{% url "operating:edit_order" 0 %}'.replace('/0/', '/' + orderId + '/');
+        if (window.htmx) {
+          htmx.ajax('GET', editUrl, {
+            target: '#editOrderSidebarContent',
+            swap: 'innerHTML',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+        } else {
+          // Fallback: plain fetch with manual script re-execution.
+          fetch(editUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+              content.innerHTML = html;
+              content.querySelectorAll('script').forEach(function (oldScript) {
+                const s = document.createElement('script');
+                if (oldScript.src) s.src = oldScript.src;
+                else s.textContent = oldScript.textContent;
+                document.body.appendChild(s).parentNode.removeChild(s);
+              });
+            })
+            .catch(function () {
+              content.innerHTML = '<div style="padding:40px;color:#ef4444;text-align:center;">Failed to load edit form.</div>';
+            });
+        }
+      }
+      function closeEditOrderSidebar() {
+        const overlay = document.getElementById('editOrderSidebarOverlay');
+        if (overlay) overlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeEditOrderSidebar();
+      });
 
       // Book Sidebar Functions
       function openBookSidebar() {

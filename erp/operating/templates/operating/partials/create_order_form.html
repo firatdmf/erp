@@ -30,17 +30,74 @@
 .co-selected-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:13px;color:#166534;margin-top:8px}
 .co-total-row{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#f8fafc;border:1.5px solid var(--border-color);border-radius:6px;margin-bottom:12px;font-weight:600;font-size:14px}
 .co-total-amount{font-size:18px;font-weight:800;color:#059669}
-.co-autocomplete-results .product_autocomplete_list ul{list-style:none;margin:4px 0 0;padding:0;background:#fff;border:1.5px solid var(--border-color);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.08);max-height:200px;overflow-y:auto}
-.co-autocomplete-results .product_autocomplete_list ul li{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f3f4f6;transition:background .15s;border:none;width:auto;margin:0}
-.co-autocomplete-results .product_autocomplete_list ul li:hover{background:#f1f5f9;color:#1e293b}
+.co-autocomplete-results .product_autocomplete_list ul,
+.co-autocomplete-results .customer-autocomplete-list{
+  list-style:none;margin:4px 0 0;padding:4px;
+  background:#fff;border:1px solid #E2E8EE;border-radius:10px;
+  box-shadow:0 10px 30px rgba(15,23,31,.10);
+  max-height:260px;overflow-y:auto;
+}
+.co-autocomplete-results .product_autocomplete_list ul li,
+.co-autocomplete-results .customer-ac-item,
+.co-autocomplete-results .customer-ac-empty{
+  padding:9px 12px;cursor:pointer;
+  font:500 13px var(--font-sans,sans-serif);color:#0F1419;
+  border-radius:7px;
+  display:flex;align-items:center;gap:10px;
+  border:none;margin:0;
+  transition:background .12s;
+}
+.co-autocomplete-results .product_autocomplete_list ul li:hover,
+.co-autocomplete-results .customer-ac-item:hover{
+  background:#E5F1F0;color:#005354;
+}
+.co-autocomplete-results .customer-ac-item i{
+  width:24px;height:24px;border-radius:50%;
+  background:#E5F1F0;color:#00696A;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;flex-shrink:0;
+}
+.co-autocomplete-results .customer-ac-item:hover i{
+  background:#00696A;color:#fff;
+}
+.co-autocomplete-results .customer-ac-empty{
+  cursor:default;color:#6B7280;justify-content:center;font-style:italic;
+}
+.co-autocomplete-results .customer-ac-empty:hover{background:transparent;color:#6B7280;}
+/* "Selected" badge under the search input */
+.co-selected-badge{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:8px 10px 8px 12px;
+  background:#E5F1F0;border:1px solid rgba(20,127,116,0.25);
+  color:#005354;border-radius:10px;font:600 12.5px var(--font-sans,sans-serif);
+  margin-top:8px;
+}
+.co-selected-badge .co-badge-clear{
+  background:rgba(20,127,116,0.15);border:none;border-radius:50%;
+  width:20px;height:20px;color:#005354;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:10px;transition:background .12s;
+}
+.co-selected-badge .co-badge-clear:hover{background:#00696A;color:#fff;}
 .co-toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:6px;font-size:13px;font-weight:500;z-index:100000;opacity:0;transform:translateY(8px);transition:all .3s}
 .co-toast.show{opacity:1;transform:translateY(0)}
 .co-toast-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
 .co-toast-warning{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
 </style>
 
-<form method="post" id="createOrderForm" action="{% url 'operating:create_order' %}">
+<form method="post" id="createOrderForm"
+      action="{% if order %}{% url 'operating:edit_order' order.pk %}{% else %}{% url 'operating:create_order' %}{% endif %}"
+      data-mode="{% if order %}edit{% else %}create{% endif %}"
+      data-order-id="{% if order %}{{ order.pk }}{% endif %}">
   {% csrf_token %}
+  {% if order %}
+    {# Hydration payload for edit mode — read by the script below. #}
+    {{ order_items_payload|json_script:"existing-order-items" }}
+    <div style="padding:10px 12px;margin-bottom:14px;background:#FEF3C7;color:#8B5A00;border:1px solid #F5D78B;border-radius:9px;font:600 12px var(--font-sans,sans-serif);display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-pen-to-square"></i>
+      {% trans "Editing order" %} #{{ order.pk }}{% if order.order_number %} — {{ order.order_number }}{% endif %}
+    </div>
+  {% endif %}
 
   <!-- Step 1: Order Type -->
   <div class="co-section active" id="co-step-1">
@@ -97,6 +154,21 @@
       <i class="fas fa-chevron-down co-chev"></i>
     </div>
     <div class="co-section-body">
+      {% if order %}
+        {# Hidden anchor with preset customer info — read by the
+           edit-mode bootstrap script above to prefill the picker. #}
+        {% if order.contact %}
+          <span id="co-customer-preset" hidden
+                data-type="contact"
+                data-pk="{{ order.contact.pk }}"
+                data-name="{{ order.contact.name|capfirst }}"></span>
+        {% elif order.company %}
+          <span id="co-customer-preset" hidden
+                data-type="company"
+                data-pk="{{ order.company.pk }}"
+                data-name="{{ order.company.name|capfirst }}"></span>
+        {% endif %}
+      {% endif %}
       <!-- Customer Source -->
       <div class="form-group">
         <label>{% trans "Customer Source" %}</label>
@@ -242,7 +314,7 @@
 
   <div class="sidebar-footer" style="padding:0;border:none;margin-top:4px;">
     <button type="submit" id="submit_order_button" class="btn btn-primary w-full" style="flex:1;justify-content:center;">
-      <i class="fas fa-check"></i> Place Order
+      <i class="fas fa-check"></i> {% if order %}{% trans "Save changes" %}{% else %}{% trans "Place Order" %}{% endif %}
     </button>
   </div>
 
@@ -251,6 +323,35 @@
 <script>
 (function() {
   let orderItems = [], itemIndex = 0;
+
+  // ── Edit-mode hydration: prefill the orderItems array from the
+  //    server payload so existing line items render and the user
+  //    can add/remove/edit on top of them. ──
+  var editPayloadNode = document.getElementById('existing-order-items');
+  if (editPayloadNode) {
+    try {
+      var existing = JSON.parse(editPayloadNode.textContent || '[]');
+      existing.forEach(function (it) {
+        itemIndex++;
+        orderItems.push({
+          index: itemIndex,
+          sku: it.sku || '',
+          variant: it.variant === true || it.variant === 'true',
+          title: it.title || it.sku || '',
+          price: parseFloat(it.price) || 0,
+          quantity: parseFloat(it.quantity) || 1,
+          description: it.description || '',
+          categoryName: '',
+          is_custom_curtain: false,
+          custom_width: '', custom_height: '',
+          custom_pleat_type: '', custom_pleat_density: '',
+          custom_mounting_type: '', custom_wing_type: '',
+          custom_fabric_used_meters: '',
+          existing_item_id: it.item_id || null
+        });
+      });
+    } catch (e) { /* ignore — render empty */ }
+  }
 
   window.coToggle = function(s) { document.getElementById('co-step-'+s).classList.toggle('active'); };
 
@@ -346,7 +447,65 @@
     document.getElementById('co-webclient-search').value = name;
   };
 
-  window.coRemove = function(i) { orderItems.splice(i,1); renderProducts(); updateTotal(); document.getElementById('co-sum-2').textContent = orderItems.length ? orderItems.length+' items' : ''; };
+  /* CRM customer picker: delegated click handler on the results
+     container. The autocomplete view writes <li class="customer-ac-item"
+     data-type data-pk data-name>; we read those, fill the hidden
+     inputs, and show a confirmation badge. */
+  (function() {
+    var results = document.getElementById('co-customer-results');
+    var selected = document.getElementById('co-customer-selected');
+    var searchInput = document.getElementById('co-customer-search');
+    var typeInput = document.getElementById('customer-type');
+    var pkInput = document.getElementById('customer-pk');
+    if (!results) return;
+
+    results.addEventListener('click', function(e) {
+      var item = e.target.closest('.customer-ac-item');
+      if (!item) return;
+      var name = item.dataset.name || '';
+      var type = item.dataset.type || '';
+      var pk = item.dataset.pk || '';
+      typeInput.value = type;
+      pkInput.value = pk;
+      searchInput.value = name;
+      results.innerHTML = '';
+      var icon = type === 'company' ? 'fa-building' : 'fa-user';
+      selected.style.display = 'inline-flex';
+      selected.innerHTML =
+        '<i class="fas ' + icon + '"></i>' +
+        '<span></span>' +
+        '<button type="button" class="co-badge-clear" title="Clear" aria-label="Clear">' +
+        '  <i class="fas fa-times"></i>' +
+        '</button>';
+      selected.querySelector('span').textContent = name;
+      selected.querySelector('.co-badge-clear').addEventListener('click', function() {
+        typeInput.value = '';
+        pkInput.value = '';
+        searchInput.value = '';
+        selected.style.display = 'none';
+        selected.innerHTML = '';
+        searchInput.focus();
+      });
+      // Update the step summary.
+      var sum3 = document.getElementById('co-sum-3');
+      if (sum3) sum3.textContent = name;
+    });
+  })();
+
+  // Track removed existing items so the backend can delete them.
+  // (New, never-saved items just vanish silently.)
+  var deletedExistingItemIds = [];
+
+  window.coRemove = function(i) {
+    var gone = orderItems[i];
+    if (gone && gone.existing_item_id) {
+      deletedExistingItemIds.push(gone.existing_item_id);
+    }
+    orderItems.splice(i,1);
+    renderProducts();
+    updateTotal();
+    document.getElementById('co-sum-2').textContent = orderItems.length ? orderItems.length+' items' : '';
+  };
 
   window.coUpd = function(i, f, v) {
     if (!orderItems[i]) return;
@@ -380,15 +539,39 @@
   document.getElementById('createOrderForm').addEventListener('submit', function(e) {
     e.preventDefault();
     if (!orderItems.length) { showToast('Add at least one product','error'); return; }
-    document.getElementById('product_json_input').value = JSON.stringify(orderItems.map(it => ({
-      item_no:it.index, product:{sku:it.sku,variant:it.variant},
-      description:it.description, quantity:it.quantity, price:it.price,
-      is_custom_curtain:it.is_custom_curtain,
-      custom_width:it.custom_width||null, custom_height:it.custom_height||null,
-      custom_pleat_type:it.custom_pleat_type||null, custom_pleat_density:it.custom_pleat_density||null,
-      custom_mounting_type:it.custom_mounting_type||null, custom_wing_type:it.custom_wing_type||null,
-      custom_fabric_used_meters:it.custom_fabric_used_meters||null
-    })));
+    // Include `item_id` for items that came from the server (edit
+    // mode) so the backend updates them instead of creating dupes.
+    // New items (no existing_item_id) get added as fresh OrderItems.
+    document.getElementById('product_json_input').value = JSON.stringify(orderItems.map(function(it){
+      var payload = {
+        item_no: it.index,
+        product: { sku: it.sku, variant: it.variant },
+        description: it.description,
+        quantity: it.quantity,
+        price: it.price,
+        is_custom_curtain: it.is_custom_curtain,
+        custom_width: it.custom_width || null,
+        custom_height: it.custom_height || null,
+        custom_pleat_type: it.custom_pleat_type || null,
+        custom_pleat_density: it.custom_pleat_density || null,
+        custom_mounting_type: it.custom_mounting_type || null,
+        custom_wing_type: it.custom_wing_type || null,
+        custom_fabric_used_meters: it.custom_fabric_used_meters || null
+      };
+      if (it.existing_item_id) payload.item_id = it.existing_item_id;
+      return payload;
+    }));
+    // Tell the backend which existing items were removed so it can
+    // delete them. Field is hidden — append it if not already there.
+    var delField = document.getElementById('co-deleted-items');
+    if (!delField) {
+      delField = document.createElement('input');
+      delField.type = 'hidden';
+      delField.name = 'deleted_items';
+      delField.id = 'co-deleted-items';
+      this.appendChild(delField);
+    }
+    delField.value = JSON.stringify(deletedExistingItemIds);
     this.submit();
   });
 
@@ -400,5 +583,47 @@
   }
 
   renderProducts();
+
+  // Edit-mode finishing touches: prefill the customer chip + open
+  // the Customer step so the user sees it immediately, and tag the
+  // Products step summary with the seeded item count.
+  (function () {
+    var form = document.getElementById('createOrderForm');
+    if (!form || form.dataset.mode !== 'edit') return;
+    var sum2 = document.getElementById('co-sum-2');
+    if (sum2 && orderItems.length) sum2.textContent = orderItems.length + ' items';
+
+    // Existing customer prefill from data attrs printed below.
+    var preset = document.getElementById('co-customer-preset');
+    if (preset) {
+      var type = preset.dataset.type;
+      var pk = preset.dataset.pk;
+      var name = preset.dataset.name || '';
+      if (type && pk) {
+        var typeInput = document.getElementById('customer-type');
+        var pkInput = document.getElementById('customer-pk');
+        var searchInput = document.getElementById('co-customer-search');
+        var selected = document.getElementById('co-customer-selected');
+        if (typeInput) typeInput.value = type;
+        if (pkInput) pkInput.value = pk;
+        if (searchInput) searchInput.value = name;
+        if (selected) {
+          var icon = type === 'company' ? 'fa-building' : 'fa-user';
+          selected.style.display = 'inline-flex';
+          selected.innerHTML =
+            '<i class="fas ' + icon + '"></i>' +
+            '<span></span>' +
+            '<button type="button" class="co-badge-clear" title="Clear"><i class="fas fa-times"></i></button>';
+          selected.querySelector('span').textContent = name;
+          var sum3 = document.getElementById('co-sum-3');
+          if (sum3) sum3.textContent = name;
+        }
+      }
+    }
+
+    // In edit mode the form already posts to /operating/orders/edit/<id>/
+    // (set on the form action via the template), so the existing submit
+    // handler works without changes.
+  })();
 })();
 </script>

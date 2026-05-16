@@ -3,254 +3,717 @@
 {% load static %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+
+  .ord {
+    padding: 22px 28px 100px;
+    font: 400 13.5px var(--font-sans);
+    color: var(--ink);
+  }
+
+  /* ─── LIST HEAD ──────────────────────────────────────── */
+  .ord-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .ord-eyebrow {
+    font: 700 10.5px var(--font-sans);
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--nejum-teal-600);
+    margin-bottom: 4px;
+  }
+  .ord-title {
+    font: 800 30px var(--font-sans);
+    letter-spacing: -0.02em;
+    color: #0F1419; margin: 0;
+  }
+  .ord-head-r { display: flex; gap: 8px; }
+  .ord-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font: 600 13px var(--font-sans);
+    cursor: pointer;
+    transition: all 140ms;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .ord-btn i { width: 14px; height: 14px; }
+  .ord-btn.ghost {
+    background: white;
+    border: 1px solid #E0E6EE;
+    color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .ord-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border: 1px solid var(--nejum-teal-700);
+    color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+
+  /* ─── TABS / SEARCH BAR ──────────────────────────────── */
+  .ord-tabs {
+    display: flex; align-items: center; gap: 4px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 12px;
+    padding: 6px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+  }
+  .ord-tab {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    font: 600 13px var(--font-sans);
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 140ms;
+  }
+  .ord-tab i { width: 14px; height: 14px; }
+  .ord-tab:hover { color: #0F1419; background: #F4F7FB; }
+  .ord-tab.active {
+    background: var(--nejum-teal-50);
+    color: var(--nejum-teal-700);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,0.20);
+  }
+  .ord-tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 1px 8px;
+    background: #EEF1F5;
+    border-radius: 999px;
+    font: 600 11px var(--font-mono);
+    color: var(--gray-600);
+  }
+  .ord-tab.active .ord-tab-count {
+    background: var(--nejum-teal-600);
+    color: white;
+  }
+  .ord-tabs-r { margin-left: auto; position: relative; display: flex; align-items: center; }
+  .ord-search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-500);
+    font-size: 13px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .ord-search-input {
+    width: 360px;
+    padding: 9px 38px 9px 38px;
+    background: #F4F7FB;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font: 500 13px var(--font-sans);
+    color: #0F1419;
+    outline: none;
+    transition: all 140ms;
+    box-sizing: border-box;
+  }
+  .ord-search-input::placeholder { color: var(--gray-500); }
+  .ord-search-input:focus {
+    background: white;
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .ord-search-clear {
+    position: absolute;
+    right: 10px;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border: none;
+    background: #E2E8EE;
+    color: var(--gray-600);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 10px;
+    transition: all 140ms;
+  }
+  .ord-search-clear:hover { background: #D1D8E0; color: #0F1419; }
+
+  /* ─── META ───────────────────────────────────────────── */
+  .ord-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 6px;
+    margin-bottom: 12px;
+  }
+  .ord-result { font: 500 12.5px var(--font-sans); color: var(--gray-600); }
+  .ord-result b { color: #0F1419; font-weight: 700; }
+
+  /* ─── LIST ──────────────────────────────────────────── */
+  .ord-list {
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-list-head, .ord-row {
+    display: grid;
+    grid-template-columns: 56px 1.6fr 1.4fr 140px 1.1fr 110px 24px;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 18px;
+  }
+  .ord-list-head {
+    background: #FAFBFD;
+    border-bottom: 1px solid #E2E8EE;
+    font: 600 10.5px var(--font-sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  .ord-row {
+    border-bottom: 1px solid #EEF1F5;
+    cursor: pointer;
+    transition: background 120ms, transform 300ms, opacity 300ms;
+    text-decoration: none;
+    color: inherit;
+  }
+  .ord-row:last-child { border-bottom: none; }
+  .ord-row:hover { background: #FAFBFD; }
+  .ord-cust-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 13px var(--font-sans);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.20);
+    position: relative;
+  }
+  .ord-cust-avatar .av-truck {
+    font-size: 14px;
+    line-height: 1;
+  }
+  .ord-cust-avatar .av-letter {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 18px; height: 18px;
+    background: white;
+    color: var(--ink);
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 10px var(--font-sans);
+    box-shadow: 0 0 0 1.5px rgba(15,23,31,0.06);
+  }
+  .ord-name {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  }
+  .ord-name-main {
+    font: 600 13.5px var(--font-sans);
+    color: #0F1419;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ord-name-sub {
+    font: 500 11.5px var(--font-sans);
+    color: var(--gray-500);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ord-cell {
+    font: 500 12.5px var(--font-sans);
+    color: var(--gray-700);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .ord-cell.muted { color: var(--gray-400); }
+  .ord-cell i { color: var(--gray-500); margin-right: 6px; font-size: 11.5px; }
+  .ord-company-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    background: var(--nejum-teal-50);
+    color: var(--nejum-teal-700);
+    border-radius: 999px;
+    font: 600 11.5px var(--font-sans);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,0.20);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .ord-actions {
+    display: flex; align-items: center; gap: 4px;
+    justify-self: end;
+  }
+  .ord-action {
+    width: 30px; height: 30px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--gray-500);
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12.5px;
+    text-decoration: none;
+    transition: all 140ms;
+  }
+  .ord-action:hover {
+    background: #F4F7FB;
+    border-color: #E2E8EE;
+    color: var(--nejum-teal-700);
+  }
+  .ord-action.danger:hover {
+    background: #FEF2F2;
+    border-color: #FECACA;
+    color: #DC2626;
+  }
+  .ord-chev { width: 16px; height: 16px; color: var(--gray-400); justify-self: end; }
+  .ord-row:hover .ord-chev { color: var(--nejum-teal-700); }
+
+  .ord-empty {
+    padding: 80px 24px;
+    text-align: center;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 12px;
+  }
+  .ord-empty .ico {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--nejum-teal-50);
+    color: var(--nejum-teal-700);
+    margin-bottom: 20px;
+    font-size: 28px;
+  }
+  .ord-empty h3 { font: 700 18px var(--font-sans); color: #0F1419; margin: 0 0 8px; }
+  .ord-empty p { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0 0 20px; }
+
+  /* ─── PAGINATION ─────────────────────────────────────── */
+  .ord-pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 18px;
+    padding: 4px 6px;
+  }
+  .ord-pagination-info {
+    font: 500 12.5px var(--font-sans);
+    color: var(--gray-600);
+  }
+  .ord-pagination-info b { color: #0F1419; font-weight: 700; }
+  .ord-page-btns { display: flex; gap: 6px; align-items: center; }
+  .ord-page-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 32px; height: 32px;
+    padding: 0 9px;
+    background: white;
+    border: 1px solid #E0E6EE;
+    color: var(--gray-700);
+    border-radius: 8px;
+    font: 600 12.5px var(--font-sans);
+    text-decoration: none;
+    transition: all 140ms;
+    cursor: pointer;
+  }
+  .ord-page-btn:hover:not(.disabled):not(.active) {
+    background: #F4F7FB;
+    border-color: var(--nejum-teal-500);
+    color: var(--nejum-teal-700);
+  }
+  .ord-page-btn.active {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border-color: var(--nejum-teal-700);
+    color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-page-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #FAFBFD;
+  }
+
+  /* ─── DELETE MODAL ───────────────────────────────────── */
+  .delete-modal {
+    position: fixed; inset: 0;
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .delete-modal.show { opacity: 1; pointer-events: all; }
+  .delete-modal-overlay {
+    position: absolute; inset: 0;
+    background: rgba(15, 20, 25, 0.45);
+    backdrop-filter: blur(3px);
+  }
+  .delete-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 14px;
+    max-width: 440px; width: 90%;
+    padding: 28px;
+    border: 1px solid #E2E8EE;
+    box-shadow: 0 18px 48px rgba(15,23,31,0.22);
+    transform: scale(0.94);
+    transition: transform 220ms ease;
+    font: 400 13.5px var(--font-sans);
+    color: var(--ink);
+  }
+  .delete-modal.show .delete-modal-content { transform: scale(1); }
+  .delete-modal-header { text-align: center; margin-bottom: 22px; }
+  .delete-icon-wrapper {
+    width: 56px; height: 56px;
+    margin: 0 auto 16px;
+    background: #FEF2F2;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 0 0 1px rgba(220,38,38,0.18);
+  }
+  .delete-icon-wrapper i { font-size: 24px; color: #DC2626; }
+  .delete-modal-header h3 {
+    font: 800 20px var(--font-sans);
+    letter-spacing: -0.01em;
+    color: #0F1419;
+    margin: 0 0 10px;
+  }
+  .delete-modal-header p {
+    font: 500 13.5px var(--font-sans);
+    color: var(--gray-600);
+    margin: 6px 0;
+    line-height: 1.5;
+  }
+  .delete-modal-header p span { font-weight: 700; color: #0F1419; }
+  .warning-text {
+    font: 600 12px var(--font-sans) !important;
+    color: #DC2626 !important;
+    background: #FEF2F2;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 14px !important;
+    box-shadow: inset 0 0 0 1px rgba(220,38,38,0.12);
+  }
+  .delete-modal-footer {
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+  .delete-modal-footer .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font: 600 13px var(--font-sans);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 140ms;
+    text-decoration: none;
+  }
+  .delete-modal-footer .btn-cancel {
+    background: white;
+    border-color: #E0E6EE;
+    color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .delete-modal-footer .btn-cancel:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .delete-modal-footer .btn-danger {
+    background: linear-gradient(180deg, #EF4444 0%, #DC2626 100%);
+    border-color: #B91C1C;
+    color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .delete-modal-footer .btn-danger:hover { filter: brightness(1.04); color: white; }
+
+  @media (max-width: 1100px) {
+    .ord-list-head, .ord-row {
+      grid-template-columns: 56px 1.4fr 1.2fr 130px 1fr 90px 20px;
+    }
+  }
+  @media (max-width: 900px) {
+    .ord-search-input { width: 220px; }
+    .ord-list-head { display: none; }
+    .ord-row {
+      grid-template-columns: 56px 1fr auto;
+      gap: 10px;
+      padding: 14px;
+    }
+    .ord-row > .ord-cell, .ord-row > .ord-cell.company { grid-column: 2 / -2; }
+    .ord-row > .ord-actions { grid-column: 1 / -1; justify-self: start; }
+    .ord-chev { display: none; }
+    .ord-pagination { flex-direction: column; gap: 12px; align-items: flex-start; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="product-list-container">
-    <!-- Header Section -->
-    <div class="page-header">
-        <div class="header-left">
-            <h1>{% trans "Suppliers" %}</h1>
-            <span class="product-count">{{ paginator.count|default:suppliers.count }} supplier{{ paginator.count|default:suppliers.count|pluralize }}</span>
-        </div>
-        <div class="header-right">
-            <a href="#" onclick="openAddSupplierSidebar(); return false;" class="btn btn-primary">
-                <i class="fa fa-plus"></i>
-                Add Supplier
-            </a>
-        </div>
+<div class="ord">
+  <!-- HEAD -->
+  <div class="ord-head">
+    <div>
+      <div class="ord-eyebrow">{% trans "Supply chain" %}</div>
+      <h1 class="ord-title">{% trans "Suppliers" %}</h1>
     </div>
-
-    <!-- Search Section -->
-    <div class="search-section">
-        <div class="search-box-modern">
-            <i class="fa fa-search search-icon"></i>
-            <input type="text" id="instantSearch" placeholder="Search suppliers by name, email, phone, or country..."
-                class="search-input-modern" autocomplete="off" value="{{ search_query }}">
-            <button type="button" class="search-clear" id="searchClear"
-                style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
-                <i class="fa fa-times"></i>
-            </button>
-        </div>
+    <div class="ord-head-r">
+      <button type="button" class="ord-btn ghost"><i class="fa fa-filter"></i>{% trans "Filter" %}</button>
+      <a href="#" onclick="openAddSupplierSidebar(); return false;" class="ord-btn primary">
+        <i class="fa fa-plus"></i>{% trans "Add Supplier" %}
+      </a>
     </div>
+  </div>
 
-    <!-- Suppliers Table -->
-    <div class="table-container">
-        <table class="products-table">
-            <thead>
-                <tr>
-                    <th style="width: 60px;">{% trans "Icon" %}</th>
-                    <th>{% trans "Company / Contact" %}</th>
-                    <th style="width: 200px;">{% trans "Email" %}</th>
-                    <th style="width: 150px;">{% trans "Phone" %}</th>
-                    <th style="width: 150px;">{% trans "Location" %}</th>
-                    <th style="width: 120px;">{% trans "Actions" %}</th>
-                </tr>
-            </thead>
-            <tbody id="suppliersTableBody">
-                {% for supplier in suppliers %}
-                <tr class="product-row" id="supplier-row-{{ supplier.id }}"
-                    onclick="window.location='{% url 'crm:supplier_update' supplier.id %}'" style="cursor: pointer;">
-                    <td>
-                        <div class="product-image-placeholder" style="background: #eff6ff; color: #3b82f6;">
-                            <i class="fas fa-truck"></i>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="product-info">
-                            <div class="product-title">{{ supplier.company_name|default:supplier.contact_name }}</div>
-                            {% if supplier.company_name and supplier.contact_name %}
-                            <div class="product-description">{{ supplier.contact_name }}</div>
-                            {% endif %}
-                        </div>
-                    </td>
-                    <td>
-                        {% if supplier.email %}
-                        <span class="text-muted" style="font-size: 0.875rem;">{{ supplier.email }}</span>
-                        {% else %}
-                        <span class="text-muted">-</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if supplier.phone %}
-                        <span class="text-muted" style="font-size: 0.875rem;">{{ supplier.phone }}</span>
-                        {% else %}
-                        <span class="text-muted">-</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if supplier.country or supplier.address %}
-                        <span class="text-muted" style="font-size: 0.875rem;">
-                            {{ supplier.country|default:"" }}
-                            {% if supplier.country and supplier.address %}, {% endif %}
-                            <small>{{ supplier.address|truncatechars:20 }}</small>
-                        </span>
-                        {% else %}
-                        <span class="text-muted">-</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <div class="action-buttons" onclick="event.stopPropagation();">
-                            <a href="{% url 'crm:supplier_update' supplier.id %}" class="btn-icon" title="Edit">
-                                <i class="fa fa-edit"></i>
-                            </a>
-                            <a href="{% url 'crm:supplier_delete' supplier.id %}" class="btn-icon btn-delete"
-                                title="Delete">
-                                <i class="fa fa-trash"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="empty-state">
-                        <div class="empty-state-content">
-                            <i class="fas fa-truck" style="font-size: 48px; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                            <p>No suppliers found</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+  <!-- TAB + SEARCH -->
+  <div class="ord-tabs">
+    <button type="button" class="ord-tab active">
+      <i class="fa fa-truck"></i>
+      <span>{% trans "All Suppliers" %}</span>
+      <span class="ord-tab-count">{{ paginator.count|default:suppliers.count }}</span>
+    </button>
+    <div class="ord-tabs-r">
+      <i class="fa fa-search ord-search-icon"></i>
+      <input type="text" id="instantSearch" class="ord-search-input"
+             placeholder="{% trans 'Search suppliers…' %}"
+             autocomplete="off" value="{{ search_query }}"/>
+      <button type="button" class="ord-search-clear" id="searchClear"
+              style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}"
+              onclick="clearSearch()">
+        <i class="fa fa-times"></i>
+      </button>
     </div>
+  </div>
 
-    <!-- Pagination -->
-    {% if is_paginated %}
-    <div class="pagination-container">
-        <div class="pagination-info">
-            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} suppliers
-        </div>
-        <div class="pagination">
-            {% if page_obj.has_previous %}
-            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn"
-                title="First"><i class="fa fa-angles-left"></i></a>
-            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
-                class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
-            {% else %}
-            <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
-            <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
-            {% endif %}
-
-            {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-            <span class="pagination-btn active">{{ num }}</span>
-            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
-                href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">
-                {{ num
-                }}</a>
-                {% endif %}
-                {% endfor %}
-
-                {% if page_obj.has_next %}
-                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}"
-                    class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
-                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}"
-                    class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
-                {% else %}
-                <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
-                <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
-                {% endif %}
-        </div>
+  <!-- META -->
+  <div class="ord-meta">
+    <div class="ord-result">
+      {% if is_paginated %}
+        {% trans "Showing" %}
+        <b>{{ page_obj.start_index }}-{{ page_obj.end_index }}</b>
+        {% trans "of" %}
+        <b>{{ paginator.count }}</b>
+        {% trans "suppliers" %}
+      {% else %}
+        <b>{{ suppliers.count }}</b> {% trans "suppliers" %}
+      {% endif %}
     </div>
-    {% endif %}
+  </div>
+
+  <!-- LIST -->
+  {% if suppliers %}
+  <div class="ord-list">
+    <div class="ord-list-head">
+      <span></span>
+      <span>{% trans "Company / Contact" %}</span>
+      <span>{% trans "Email" %}</span>
+      <span>{% trans "Phone" %}</span>
+      <span>{% trans "Location" %}</span>
+      <span>{% trans "Actions" %}</span>
+      <span></span>
+    </div>
+    <div id="suppliersTableBody">
+      {% for supplier in suppliers %}
+      {% with display_name=supplier.company_name|default:supplier.contact_name %}
+      {% with name_first=display_name|first|upper %}
+      <div class="ord-row" id="supplier-row-{{ supplier.id }}"
+           data-href="{% url 'crm:supplier_detail' supplier.id %}"
+           onclick="if(!event.target.closest('.ord-actions')){window.location=this.dataset.href;}">
+        {% if name_first == "A" or name_first == "F" or name_first == "K" or name_first == "P" or name_first == "U" or name_first == "Z" %}
+          <div class="ord-cust-avatar" style="background: #147F74;"><i class="fa fa-truck av-truck"></i><span class="av-letter">{{ name_first }}</span></div>
+        {% elif name_first == "B" or name_first == "G" or name_first == "L" or name_first == "Q" or name_first == "V" %}
+          <div class="ord-cust-avatar" style="background: #0A5F70;"><i class="fa fa-truck av-truck"></i><span class="av-letter">{{ name_first }}</span></div>
+        {% elif name_first == "C" or name_first == "H" or name_first == "M" or name_first == "R" or name_first == "W" %}
+          <div class="ord-cust-avatar" style="background: #C2A45A;"><i class="fa fa-truck av-truck"></i><span class="av-letter">{{ name_first }}</span></div>
+        {% elif name_first == "D" or name_first == "I" or name_first == "N" or name_first == "S" or name_first == "X" %}
+          <div class="ord-cust-avatar" style="background: #7E22CE;"><i class="fa fa-truck av-truck"></i><span class="av-letter">{{ name_first }}</span></div>
+        {% elif name_first == "E" or name_first == "J" or name_first == "O" or name_first == "T" or name_first == "Y" %}
+          <div class="ord-cust-avatar" style="background: #B27500;"><i class="fa fa-truck av-truck"></i><span class="av-letter">{{ name_first }}</span></div>
+        {% else %}
+          <div class="ord-cust-avatar" style="background: #6B7280;"><i class="fa fa-truck av-truck"></i><span class="av-letter">{{ name_first|default:"?" }}</span></div>
+        {% endif %}
+
+        <div class="ord-name">
+          <div class="ord-name-main">{{ display_name|default:"—" }}</div>
+          {% if supplier.company_name and supplier.contact_name %}
+            <div class="ord-name-sub">{{ supplier.contact_name }}</div>
+          {% endif %}
+        </div>
+
+        <div class="ord-cell{% if not supplier.email %} muted{% endif %}">
+          {% if supplier.email %}
+            <i class="fa fa-envelope"></i>{{ supplier.email }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+
+        <div class="ord-cell{% if not supplier.phone %} muted{% endif %}">
+          {% if supplier.phone %}
+            <i class="fa fa-phone"></i>{{ supplier.phone }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+
+        <div class="ord-cell company">
+          {% if supplier.country %}
+            <span class="ord-company-pill">
+              <i class="fa fa-map-pin" style="color: inherit; margin: 0;"></i>
+              {{ supplier.country }}
+            </span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </div>
+
+        <div class="ord-actions">
+          <a href="{% url 'crm:supplier_detail' supplier.id %}" class="ord-action" title="{% trans 'View' %}">
+            <i class="fa fa-eye"></i>
+          </a>
+          <a href="{% url 'crm:supplier_update' supplier.id %}" class="ord-action" title="{% trans 'Edit' %}">
+            <i class="fa fa-edit"></i>
+          </a>
+          <button type="button" class="ord-action danger" title="{% trans 'Delete' %}"
+                  onclick="openDeleteModal({{ supplier.id }}, '{{ display_name|escapejs }}');">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+
+        <i class="fa fa-chevron-right ord-chev"></i>
+      </div>
+      {% endwith %}
+      {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="ord-empty">
+    <div class="ico"><i class="fa fa-truck"></i></div>
+    <h3>{% trans "No suppliers found" %}</h3>
+    <p>{% trans "Add your first supplier to start managing your supply chain" %}</p>
+    <a href="#" onclick="openAddSupplierSidebar(); return false;" class="ord-btn primary">
+      <i class="fa fa-plus"></i>{% trans "Add Supplier" %}
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- PAGINATION -->
+  {% if is_paginated %}
+  <div class="ord-pagination">
+    <div class="ord-pagination-info">
+      {% trans "Showing" %}
+      <b>{{ page_obj.start_index }}-{{ page_obj.end_index }}</b>
+      {% trans "of" %}
+      <b>{{ paginator.count }}</b>
+      {% trans "suppliers" %}
+    </div>
+    <div class="ord-page-btns">
+      {% if page_obj.has_previous %}
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="ord-page-btn" title="{% trans 'First' %}"><i class="fa fa-angles-left"></i></a>
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="ord-page-btn" title="{% trans 'Previous' %}"><i class="fa fa-angle-left"></i></a>
+      {% else %}
+        <span class="ord-page-btn disabled"><i class="fa fa-angles-left"></i></span>
+        <span class="ord-page-btn disabled"><i class="fa fa-angle-left"></i></span>
+      {% endif %}
+
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+          <span class="ord-page-btn active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="ord-page-btn">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="ord-page-btn" title="{% trans 'Next' %}"><i class="fa fa-angle-right"></i></a>
+        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}" class="ord-page-btn" title="{% trans 'Last' %}"><i class="fa fa-angles-right"></i></a>
+      {% else %}
+        <span class="ord-page-btn disabled"><i class="fa fa-angle-right"></i></span>
+        <span class="ord-page-btn disabled"><i class="fa fa-angles-right"></i></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 
-<style>
-    .pagination-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.5rem 0;
-        margin-top: 1rem;
-    }
-
-    .pagination-info {
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-    }
-
-    .pagination {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-    }
-
-    .pagination-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 36px;
-        height: 36px;
-        padding: 0 0.75rem;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        background: var(--bg-primary);
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-        font-weight: 500;
-        text-decoration: none;
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-
-    .pagination-btn:hover:not(.disabled):not(.active) {
-        background: var(--bg-hover);
-        border-color: var(--accent-primary);
-        color: var(--accent-primary);
-    }
-
-    .pagination-btn.active {
-        background: var(--accent-primary);
-        border-color: var(--accent-primary);
-        color: white;
-        font-weight: 600;
-    }
-
-    .pagination-btn.disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-    }
-
-    .btn-delete {
-        color: #dc2626 !important;
-        transition: all 0.2s;
-    }
-
-    .btn-delete:hover {
-        background: #fef2f2 !important;
-        transform: scale(1.1);
-    }
-</style>
+<!-- Delete Modal -->
+<div id="deleteModal" class="delete-modal">
+  <div class="delete-modal-overlay" onclick="closeDeleteModal()"></div>
+  <div class="delete-modal-content">
+    <div class="delete-modal-header">
+      <div class="delete-icon-wrapper">
+        <i class="fa fa-exclamation-triangle"></i>
+      </div>
+      <h3>{% trans "Delete Supplier" %}</h3>
+      <p>{% trans "Are you sure you want to delete" %} "<span id="deleteSupplierName"></span>"?</p>
+      <p class="warning-text">{% trans "This action cannot be undone." %}</p>
+    </div>
+    <div class="delete-modal-footer">
+      <button type="button" class="btn btn-cancel" onclick="closeDeleteModal()">
+        {% trans "Cancel" %}
+      </button>
+      <a href="#" id="deleteConfirmLink" class="btn btn-danger">
+        <i class="fa fa-trash"></i>
+        {% trans "Delete Supplier" %}
+      </a>
+    </div>
+  </div>
+</div>
 
 <script>
-    // Backend search functionality
-    const searchInput = document.getElementById('instantSearch');
-    const searchClear = document.getElementById('searchClear');
+  // Backend search functionality (debounced redirect)
+  const searchInput = document.getElementById('instantSearch');
+  const searchClear = document.getElementById('searchClear');
 
-    if (searchInput) {
-        // Navigate to search URL with debounce
-        let searchTimeout;
-        searchInput.addEventListener('input', function (e) {
-            const query = e.target.value.trim();
-            searchClear.style.display = query ? 'flex' : 'none';
+  if (searchInput) {
+    let searchTimeout;
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.trim();
+      searchClear.style.display = query ? 'flex' : 'none';
 
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (query) {
-                    window.location.href = '{% url "crm:supplier_list" %}?search=' + encodeURIComponent(query);
-                } else {
-                    window.location.href = '{% url "crm:supplier_list" %}';
-                }
-            }, 500); // 500ms debounce
-        });
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        if (query) {
+          window.location.href = '{% url "crm:supplier_list" %}?search=' + encodeURIComponent(query);
+        } else {
+          window.location.href = '{% url "crm:supplier_list" %}';
+        }
+      }, 500);
+    });
+  }
+
+  function clearSearch() {
+    searchInput.value = '';
+    searchClear.style.display = 'none';
+    window.location.href = '{% url "crm:supplier_list" %}';
+  }
+
+  // Delete Modal Functions — supplier delete is a GET endpoint that renders a
+  // confirm template, so the confirm button simply navigates to that URL.
+  function openDeleteModal(supplierId, supplierName) {
+    document.getElementById('deleteSupplierName').textContent = supplierName;
+    const link = document.getElementById('deleteConfirmLink');
+    link.setAttribute('href', '/crm/supplier/delete/' + supplierId + '/');
+    document.getElementById('deleteModal').classList.add('show');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    const link = document.getElementById('deleteConfirmLink');
+    if (link) link.setAttribute('href', '#');
+  }
+
+  // Close modal on ESC key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      closeDeleteModal();
     }
-
-    function clearSearch() {
-        searchInput.value = '';
-        searchClear.style.display = 'none';
-        window.location.href = '{% url "crm:supplier_list" %}';
-    }
+  });
 </script>
 {% endblock %}

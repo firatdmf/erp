@@ -47,12 +47,12 @@
       <div class="note-content">
         <div class="note-meta">
           <span class="note-date">
-            {% if company %}{{ company.created_at|date:"M d, Y - g:i A" }}{% elif contact %}{{ contact.created_at|date:"M d, Y - g:i A" }}{% endif %}
+            {% if company %}{{ company.created_at|date:"M d, Y - g:i A" }}{% elif contact %}{{ contact.created_at|date:"M d, Y - g:i A" }}{% elif supplier %}{{ supplier.created_at|date:"M d, Y - g:i A" }}{% endif %}
           </span>
           <span class="note-badge created-badge"><i class="fa fa-plus-circle"></i> Created</span>
         </div>
         <p class="note-text">
-          {% if company %}<strong>{{ company.name }}</strong> was added to the CRM{% elif contact %}<strong>{{ contact.name }}</strong> was added to the CRM{% endif %}
+          {% if company %}<strong>{{ company.name }}</strong> was added to the CRM{% elif contact %}<strong>{{ contact.name }}</strong> was added to the CRM{% elif supplier %}<strong>{{ supplier.company_name|default:supplier.contact_name }}</strong> was added as a supplier{% endif %}
         </p>
       </div>
     </div>

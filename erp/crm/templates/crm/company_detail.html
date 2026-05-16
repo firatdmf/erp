@@ -1,374 +1,919 @@
 {% extends 'base.html' %}
 {% load i18n %}
-{% block content %}
 {% load todo_filters %}
+{% load todo_tags %}
 {% load crm_tags %}
 {% load static %}
 
-{% comment %}Below is to use unique css for each file as in this case here{% endcomment %}
 {% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'crm/css/company_detail.css' %}" />
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+
+  .ord { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
+
+  /* CRUMBS */
+  .od-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; background: white; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); cursor: pointer; transition: all 140ms;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04); text-decoration: none;
+  }
+  .od-back i { width: 14px; height: 14px; }
+  .od-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-sep { color: var(--gray-400); }
+  .od-crumb-here { font: 600 12.5px var(--font-sans); color: var(--gray-700); }
+
+  /* HEAD */
+  .od-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 24px; margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px solid #E2E8EE;
+  }
+  .od-head-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .od-title { font: 800 28px var(--font-sans); letter-spacing: -0.005em; color: #0F1419; margin: 0; }
+  .od-meta { display: flex; align-items: center; gap: 10px; font: 500 12.5px var(--font-sans); color: var(--gray-600); flex-wrap: wrap; }
+  .od-meta i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; color: var(--gray-500); }
+  .od-meta a { color: inherit; text-decoration: none; }
+  .od-meta a:hover { color: var(--nejum-teal-700); text-decoration: underline; }
+  .od-dot { width: 3px; height: 3px; background: #C5CCD3; border-radius: 50%; display: inline-block; }
+  .od-head-r { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* BUTTONS */
+  .ord-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 10px;
+    font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms;
+    white-space: nowrap; text-decoration: none; border: 1px solid transparent;
+  }
+  .ord-btn i { width: 14px; height: 14px; }
+  .ord-btn.ghost {
+    background: white; border: 1px solid #E0E6EE; color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .ord-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border: 1px solid var(--nejum-teal-700); color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .ord-btn.danger {
+    background: white; border: 1px solid #FBD2D2; color: #B23B3B;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.danger:hover { background: #FEF2F2; border-color: #EF4444; color: #B23B3B; }
+
+  /* KIND + STATUS PILLS */
+  .ord-kind {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 5px 11px; border-radius: 6px;
+    font: 700 11.5px var(--font-sans); letter-spacing: 0.08em;
+    background: #EEF1F5; color: var(--gray-700); box-shadow: inset 0 0 0 1px #D6DDE5;
+  }
+  .ord-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px 6px 12px; border-radius: 999px;
+    font: 600 12.5px var(--font-sans); white-space: nowrap; width: fit-content;
+  }
+  .ord-status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .ord-status.prospect   { color: #B27500; background: #FEF3C7; }
+  .ord-status.prospect   .ord-status-dot { background: #F59E0B; }
+  .ord-status.qualified  { color: #1565C0; background: #DBEAFE; }
+  .ord-status.qualified  .ord-status-dot { background: #3B82F6; }
+  .ord-status.customer   { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.customer   .ord-status-dot { background: #10B981; }
+  .ord-status.active     { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.active     .ord-status-dot { background: #10B981; }
+  .ord-status.inactive   { color: #4B5563; background: #E5E7EB; }
+  .ord-status.inactive   .ord-status-dot { background: #6B7280; }
+
+  /* TABS — matches contact_detail pill-bar style */
+  .ord-tabs {
+    display: inline-flex; gap: 6px; padding: 5px; background: #F1F5F9;
+    border: 1px solid #E2E8EE; border-radius: 12px; margin-bottom: 20px;
+  }
+  .ord-tab {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px; border-radius: 8px; background: transparent;
+    border: 1px solid transparent;
+    font: 600 12.5px var(--font-sans); color: var(--gray-600);
+    cursor: pointer; transition: all 140ms;
+  }
+  .ord-tab i { width: 13px; height: 13px; }
+  .ord-tab:hover { color: var(--ink); }
+  .ord-tab.active {
+    background: white; color: var(--nejum-teal-700);
+    border-color: #E0E6EE;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.05);
+  }
+
+  /* GRID */
+  .od-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; }
+  .od-left, .od-right { display: flex; flex-direction: column; gap: 16px; }
+
+  /* CARDS */
+  .od-card {
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .od-card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-card-h h3 { font: 700 14px var(--font-sans); color: #0F1419; margin: 0; letter-spacing: -0.005em; }
+  .od-card-h i { color: var(--gray-500); width: 14px; height: 14px; }
+  .od-card-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; }
+
+  /* RIGHT COLUMN — COMPANY SUMMARY */
+  .od-detail-list { display: flex; flex-direction: column; gap: 10px; }
+  .od-dt { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .od-dt span { font: 500 11.5px var(--font-sans); color: var(--gray-500); flex-shrink: 0; }
+  .od-dt b { font: 600 12.5px var(--font-sans); color: #0F1419; text-align: right; word-break: break-word; }
+  .od-dt b.mono { font-family: var(--font-mono); font-weight: 500; }
+  .od-dt b a { color: var(--nejum-teal-700); text-decoration: none; }
+  .od-dt b a:hover { text-decoration: underline; }
+  .od-dt-stack b { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+  .od-empty-mute { font: 500 12.5px var(--font-sans); color: var(--gray-400); }
+
+  /* LINKED CONTACTS LIST */
+  .od-contact-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border: 1px solid #EEF1F5; border-radius: 10px;
+    transition: all 140ms; text-decoration: none; color: inherit;
+    margin-bottom: 8px; background: white;
+  }
+  .od-contact-row:last-child { margin-bottom: 0; }
+  .od-contact-row:hover { border-color: var(--nejum-teal-500); background: #FAFCFC; color: inherit; }
+  .od-contact-avatar {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--nejum-teal-500), var(--nejum-teal-700));
+    color: white; display: inline-flex; align-items: center; justify-content: center;
+    font: 700 12px var(--font-sans); letter-spacing: 0.04em;
+  }
+  .od-contact-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .od-contact-name { font: 700 13px var(--font-sans); color: #0F1419; }
+  .od-contact-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-contact-remove {
+    background: white; border: 1px solid #E0E6EE; color: var(--gray-500);
+    width: 28px; height: 28px; border-radius: 7px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 140ms; flex-shrink: 0;
+  }
+  .od-contact-remove:hover { border-color: #EF4444; color: #EF4444; }
+
+  /* ATTACH-ITEM BUTTONS */
+  .od-attach-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  }
+  .od-attach-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 14px 10px; background: white; border: 1px dashed #D6DDE5;
+    border-radius: 10px; font: 600 12.5px var(--font-sans); color: var(--gray-700);
+    cursor: pointer; transition: all 140ms;
+  }
+  .od-attach-btn:hover {
+    border-color: var(--nejum-teal-500); border-style: solid;
+    color: var(--nejum-teal-700); background: var(--nejum-teal-50);
+  }
+  .od-attach-btn i { font-size: 16px; color: var(--gray-500); }
+  .od-attach-btn:hover i { color: var(--nejum-teal-600); }
+
+  /* INLINE ATTACH FORMS */
+  .od-attach-form {
+    margin-top: 14px; padding: 14px; background: #F8FAFC;
+    border: 1px solid #E2E8EE; border-radius: 10px;
+  }
+  .od-attach-form-h {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .od-attach-form-h > span { font: 700 12.5px var(--font-sans); color: var(--gray-700); }
+  .od-attach-form-h > span i { margin-right: 6px; color: var(--gray-500); }
+  .od-btn-text {
+    background: none; border: none; color: var(--gray-500); cursor: pointer;
+    font: 600 12px var(--font-sans); padding: 4px 8px;
+  }
+  .od-btn-text:hover { color: var(--gray-700); }
+
+  /* Sub-tabs to switch between "Find existing" and "Create new" inside the attach-contact panel */
+  .od-contact-mode {
+    display: inline-flex; gap: 4px;
+    padding: 4px;
+    background: #F1F5F9;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .od-contact-mode-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    background: transparent; border: 1px solid transparent;
+    border-radius: 7px;
+    font: 600 11.5px var(--font-sans);
+    color: var(--gray-600); cursor: pointer;
+    transition: all 140ms;
+  }
+  .od-contact-mode-btn i { font-size: 11px; }
+  .od-contact-mode-btn:hover { color: var(--ink); }
+  .od-contact-mode-btn.active {
+    background: white; color: var(--nejum-teal-700);
+    border-color: #E0E6EE;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.05);
+  }
+
+  /* Quick-create contact form grid */
+  .qc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+  }
+  .qc-grid .qc-full { grid-column: 1 / -1; }
+  .qc-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .qc-field label {
+    font: 600 11px var(--font-sans);
+    color: var(--gray-700);
+    letter-spacing: 0.01em;
+  }
+  @media (max-width: 720px) {
+    .qc-grid { grid-template-columns: 1fr; }
+  }
+
+  .od-attach-form p { margin: 0 0 10px 0; }
+  .od-attach-form label { font: 600 11.5px var(--font-sans); color: var(--gray-700); }
+  .od-attach-form input[type="text"],
+  .od-attach-form input[type="date"],
+  .od-attach-form textarea,
+  .od-attach-form select {
+    width: 100%; padding: 9px 11px; background: white; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 500 13px var(--font-sans); color: #0F1419;
+    outline: none; transition: all 140ms; box-sizing: border-box;
+    margin-top: 4px;
+  }
+  .od-attach-form input:focus, .od-attach-form textarea:focus, .od-attach-form select:focus {
+    border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .od-attach-form textarea { min-height: 70px; resize: vertical; }
+  .od-attach-form .form-actions { margin-top: 12px; }
+  .od-search-results {
+    max-height: 280px; overflow-y: auto; margin-top: 10px;
+    background: white; border-radius: 8px;
+  }
+
+  /* TASKS LIST */
+  .od-task-row {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px 14px; border: 1px solid #EEF1F5; border-radius: 10px;
+    margin-bottom: 8px; background: white; transition: border-color 140ms;
+  }
+  .od-task-row:last-child { margin-bottom: 0; }
+  .od-task-row:hover { border-color: #C5CCD3; }
+  .od-task-content { flex: 1; min-width: 0; }
+  .od-task-name { font: 700 13.5px var(--font-sans); color: #0F1419; margin: 0 0 4px 0; }
+  .od-task-desc { font: 500 12.5px var(--font-sans); color: var(--gray-600); margin: 0 0 6px 0; line-height: 1.45; }
+  .od-task-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-task-meta i { width: 12px; height: 12px; margin-right: 3px; }
+  .od-task-due {
+    background: #EEF1F5; color: var(--gray-700);
+    padding: 3px 8px; border-radius: 6px; font-weight: 600;
+  }
+  .od-task-overdue {
+    background: #FEE2E2; color: #B23B3B;
+    padding: 3px 8px; border-radius: 6px; font-weight: 700;
+  }
+  .od-task-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .od-icon-btn {
+    width: 30px; height: 30px; border-radius: 7px;
+    background: white; border: 1px solid #E0E6EE;
+    color: var(--gray-500); cursor: pointer; transition: all 140ms;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .od-icon-btn:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-icon-btn.danger:hover { border-color: #EF4444; color: #EF4444; }
+  .od-icon-btn.success:hover { border-color: #10B981; color: #10B981; }
+
+  /* EMAIL CAMPAIGN ROW */
+  .od-camp-grid { display: flex; flex-direction: column; gap: 10px; }
+  .od-camp-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .od-camp-row > span:first-child { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-camp-row > span:last-child { font: 600 12.5px var(--font-sans); color: #0F1419; }
+  .od-camp-toggle { display: flex; align-items: center; gap: 10px; }
+  .od-camp-toggle input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
+  .od-camp-toggle label { font: 600 12.5px var(--font-sans); color: var(--gray-700); cursor: pointer; }
+  .od-camp-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 6px;
+    font: 600 11px var(--font-sans);
+  }
+  .od-camp-pill.active    { background: #D1FAE5; color: #0E6E4A; }
+  .od-camp-pill.paused    { background: #FEF3C7; color: #B27500; }
+  .od-camp-pill.completed { background: #E5E7EB; color: #4B5563; }
+  .od-camp-pill.stopped   { background: #FEE2E2; color: #B23B3B; }
+
+  /* COMMUNICATION TAB */
+  .od-comm-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .od-comm-toggle { display: inline-flex; background: #EEF1F5; padding: 3px; border-radius: 9px; }
+  .od-comm-toggle-btn {
+    padding: 6px 14px; background: transparent; border: none;
+    border-radius: 7px; font: 600 12.5px var(--font-sans); color: var(--gray-600);
+    cursor: pointer; transition: all 140ms;
+  }
+  .od-comm-toggle-btn.active {
+    background: white; color: var(--nejum-teal-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.08);
+  }
+
+  /* EMPTY STATE */
+  .od-empty {
+    text-align: center; padding: 24px 12px;
+    font: 500 12.5px var(--font-sans); color: var(--gray-500);
+  }
+  .od-empty i { font-size: 22px; color: var(--gray-400); margin-bottom: 8px; display: block; }
+
+  /* Order history rows — clickable, link to operating:order_detail */
+  .od-order-list { display: flex; flex-direction: column; gap: 8px; }
+  .od-order-row {
+    display: grid;
+    grid-template-columns: 1.4fr 130px 1fr 18px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 140ms;
+  }
+  .od-order-row:hover {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 2px 6px rgba(15,23,31,0.05);
+    color: inherit;
+  }
+  .od-order-row:hover .od-order-chev { color: var(--nejum-teal-700); }
+  .od-order-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .od-order-num { font: 700 12.5px var(--font-mono); color: #0F1419; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .od-order-date { font: 500 11px var(--font-sans); color: var(--gray-500); }
+  .od-order-total { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; text-align: right; }
+  .od-order-total span { font-weight: 500; color: var(--gray-500); font-size: 11px; }
+  .od-order-chev { color: var(--gray-400); font-size: 13px; justify-self: end; }
+
+  /* Status pill (shared with order_list/order_detail color map) */
+  .ord-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px 3px 8px;
+    border-radius: 999px;
+    font: 600 11px var(--font-sans);
+    white-space: nowrap; width: fit-content;
+  }
+  .ord-status-dot { width: 5px; height: 5px; border-radius: 50%; }
+  .ord-status.pending       { color: #B27500; background: #FEF3C7; }
+  .ord-status.pending       .ord-status-dot { background: #F59E0B; }
+  .ord-status.scheduled, .ord-status.preparing { color: #1565C0; background: #DBEAFE; }
+  .ord-status.scheduled .ord-status-dot, .ord-status.preparing .ord-status-dot { background: #3B82F6; }
+  .ord-status.in_production { color: #7E22CE; background: #F3E8FF; }
+  .ord-status.in_production .ord-status-dot { background: #A855F7; }
+  .ord-status.confirmed, .ord-status.delivered, .ord-status.shipped { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.confirmed .ord-status-dot, .ord-status.delivered .ord-status-dot, .ord-status.shipped .ord-status-dot { background: #10B981; }
+  .ord-status.completed     { color: #0F1419; background: #E5E7EB; }
+  .ord-status.completed     .ord-status-dot { background: #374151; }
+  .ord-status.cancelled, .ord-status.returned { color: #B23B3B; background: #FEE2E2; }
+  .ord-status.cancelled .ord-status-dot, .ord-status.returned .ord-status-dot { background: #EF4444; }
+
+  @media (max-width: 1100px) {
+    .od-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 700px) {
+    .od-head { flex-direction: column; align-items: stretch; }
+    .od-attach-grid { grid-template-columns: 1fr; }
+    .od-order-row { grid-template-columns: 1fr auto; gap: 8px; }
+    .od-order-row > .ord-status { grid-column: 1 / -1; }
+    .od-order-chev { display: none; }
+  }
+</style>
 {% endblock %}
+
 {% block js %}
 <script src="{% static 'crm/js/detailPages.js' %}" defer></script>
 {% endblock %}
-<div class="company-detail-container">
-  <!-- Header Section -->
-  <div class="detail-header">
-    <div class="detail-header-left">
-      <a href="{% url 'crm:company_list' %}" class="back-link">
-        <i class="fa fa-arrow-left"></i> Back to Companies
-      </a>
-      <div class="company-title-section">
-        <div class="company-icon">
-          <i class="fa fa-building"></i>
-        </div>
-        <div>
-          <h1 class="company-title">{{ company.name|capfirst }}</h1>
-          {% if company.group %}
-          <span class="company-group-badge">{{ company.group.name }}</span>
-          {% endif %}
-          <span class="status-badge status-{{ company.status }}">{{ company.get_status_display }}</span>
-        </div>
+
+{% block content %}
+<div class="ord company-detail-container">
+
+  <!-- CRUMBS -->
+  <div class="od-crumbs">
+    <a href="{% url 'crm:company_list' %}" class="od-back">
+      <i class="fa fa-arrow-left"></i> {% trans "Back to companies" %}
+    </a>
+    <span class="od-sep">/</span>
+    <span class="od-crumb-here">{{ company.name|capfirst }}</span>
+  </div>
+
+  <!-- HEAD -->
+  <div class="od-head">
+    <div>
+      <div class="od-head-row">
+        <h1 class="od-title">{{ company.name|capfirst }}</h1>
+
+        {% if company.group %}
+          <span class="ord-kind">{{ company.group.name }}</span>
+        {% endif %}
+
+        {% if company.status %}
+          <span class="ord-status {{ company.status }}">
+            <span class="ord-status-dot"></span>
+            {{ company.get_status_display }}
+          </span>
+        {% endif %}
+      </div>
+      <div class="od-meta">
+        {% if company.website %}
+          <span><i class="fa fa-globe"></i><a href="{{ company.website }}" target="_blank" rel="noopener">{{ company.website }}</a></span>
+        {% endif %}
+        {% if company.email %}
+          {% if company.website %}<span class="od-dot"></span>{% endif %}
+          <span><i class="fa fa-envelope"></i><a href="mailto:{{ company.email.0 }}">{{ company.email.0 }}</a></span>
+        {% endif %}
+        {% if company.phone %}
+          {% if company.website or company.email %}<span class="od-dot"></span>{% endif %}
+          <span><i class="fa fa-phone"></i>{{ company.phone.0 }}</span>
+        {% endif %}
+        {% if company.address or company.country %}
+          {% if company.website or company.email or company.phone %}<span class="od-dot"></span>{% endif %}
+          <span><i class="fa fa-map-pin"></i>{{ company.address }}{% if company.address and company.country %} · {% endif %}{{ company.country }}</span>
+        {% endif %}
+        {% if not company.website and not company.email and not company.phone and not company.address and not company.country %}
+          <span class="od-empty-mute">{% trans "No contact details yet" %}</span>
+        {% endif %}
       </div>
     </div>
-    <div class="detail-header-right">
-      <a href="{% url 'crm:update_company' company.id %}?next_url={{ request.path|urlencode }}"
-        class="btn-action btn-action-secondary">
-        <i class="fa fa-edit"></i> Edit
+    <div class="od-head-r">
+      <a href="#" onclick="openEditCompanySidebar(); return false;" class="ord-btn ghost">
+        <i class="fa fa-edit"></i>{% trans "Edit" %}
       </a>
       <form action="{% url 'crm:delete_company' company.id %}" method="post"
-        style="display: inline; margin: 0; vertical-align: top;"
+        style="display: inline; margin: 0;"
         onsubmit="return confirm('Are you sure you want to delete this company?');">
         {% csrf_token %}
-        <button type="submit" class="btn-action btn-action-danger" style="display: inline-flex;">
-          <i class="fa fa-trash"></i> Delete
+        <button type="submit" class="ord-btn danger">
+          <i class="fa fa-trash"></i>{% trans "Delete" %}
         </button>
       </form>
     </div>
   </div>
 
-  <!-- Main Content Grid -->
-  <!-- Tab Navigation -->
-  <div class="company-tabs">
-    <button class="tab-btn active" onclick="switchTab('overview')">{% trans "Overview" %}</button>
-    <button class="tab-btn" onclick="switchTab('communication')">{% trans "Communication" %}</button>
+  <!-- TABS -->
+  <div class="ord-tabs" role="tablist">
+    <button type="button" class="ord-tab tab-btn active" onclick="switchTab('overview')">
+      <i class="fa fa-th-large"></i>{% trans "Overview" %}
+    </button>
+    <button type="button" class="ord-tab tab-btn" onclick="switchTab('communication')">
+      <i class="fa fa-envelope"></i>{% trans "Communication" %}
+    </button>
   </div>
 
+  <!-- ============================= OVERVIEW ============================= -->
   <div id="tab-overview" class="tab-content active">
-    <div class="detail-grid">
-      <!-- Company Information Card -->
-      <div class="detail-card">
-        <div class="card-header">
-          <h2><i class="fa fa-info-circle"></i> Company Information</h2>
-        </div>
-        <div class="info-grid">
-          {% if company.email %}
-          <div class="info-item">
-            <span class="info-label">Email{{ company.email|length|pluralize:"s" }}</span>
-            <span class="info-value">
-              {% for email in company.email %}
-              <a href="mailto:{{ email }}" style="display: block; margin-bottom: 4px;">{{ email }}</a>
-              {% endfor %}
-            </span>
-          </div>
-          {% endif %}
-          {% if company.phone %}
-          <div class="info-item">
-            <span class="info-label">Phone{{ company.phone|length|pluralize:"s" }}</span>
-            <span class="info-value">
-              {% for phone in company.phone %}
-              <span style="display: block; margin-bottom: 4px;">{{ phone }}</span>
-              {% endfor %}
-            </span>
-          </div>
-          {% endif %}
-          {% if company.website %}
-          <div class="info-item">
-            <span class="info-label">Website</span>
-            <span class="info-value"><a href="{{ company.website }}" target="_blank">{{ company.website }}</a></span>
-          </div>
-          {% endif %}
-          {% if company.address %}
-          <div class="info-item">
-            <span class="info-label">Address</span>
-            <span class="info-value">{{ company.address }}</span>
-          </div>
-          {% endif %}
-          {% if company.country %}
-          <div class="info-item">
-            <span class="info-label">Country</span>
-            <span class="info-value">{{ company.country }}</span>
-          </div>
-          {% endif %}
-          {% if company.backgroundInfo %}
-          <div class="info-item info-full-width">
-            <span class="info-label">Background</span>
-            <span class="info-value">{{ company.backgroundInfo }}</span>
-          </div>
-          {% endif %}
-        </div>
-      </div>
+    <div class="od-grid">
 
-      <!-- Email Campaign Card (Only for Prospects) -->
-      {% if company.status == 'prospect' %}
-      <div class="detail-card" id="email-campaign-card">
-        <div class="card-header">
-          <h2><i class="fa fa-envelope"></i> Email Follow-up Campaign</h2>
-        </div>
-        {% if has_campaign %}
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">
-              <input type="checkbox" id="email-campaign-toggle" {% if email_campaign.status == 'active' %}checked{% endif
-                %} hx-post="{% url 'crm:toggle_email_campaign' company.pk %}"
-                hx-vals='{% if email_campaign.status == "active" %}{"enable": "false"}{% else %}{"enable": "true"}{% endif %}'
-                hx-target="#email-campaign-card" hx-swap="innerHTML" style="margin-right: 8px; cursor: pointer;">
-              Enable Follow-up Emails
-            </span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Campaign Status</span>
-            <span class="info-value">
-              {% if email_campaign.status == 'active' %}
-              <span style="color: #10b981; font-weight: 600;">✓ Active</span>
-              {% elif email_campaign.status == 'paused' %}
-              <span style="color: #f59e0b; font-weight: 600;">⏸ Paused</span>
-              {% elif email_campaign.status == 'completed' %}
-              <span style="color: #6b7280; font-weight: 600;">✓ Completed</span>
-              {% else %}
-              <span style="color: #ef4444; font-weight: 600;">⊘ Stopped</span>
-              {% endif %}
-            </span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Emails Progress</span>
-            <span class="info-value" style="font-weight: 600; font-size: 1.1em;">
-              {{ email_campaign.emails_sent }} / 6 emails sent
-            </span>
-          </div>
-          {% if email_campaign.next_email_scheduled_at and email_campaign.status == 'active' and
-          email_campaign.emails_sent < 6 %} <div class="info-item">
-            <span class="info-label">Next Email</span>
-            <span class="info-value">
-              Email #{{ email_campaign.emails_sent|add:1 }} - {{ email_campaign.next_email_scheduled_at|date:"M d, Y
-              H:i" }}
-            </span>
-        </div>
-        {% endif %}
-        <div class="info-item">
-          <span class="info-label">Campaign Started</span>
-          <span class="info-value">{{ email_campaign.created_at|date:"M d, Y H:i" }}</span>
-        </div>
-      </div>
-      {% else %}
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">
-            <input type="checkbox" id="email-campaign-toggle" hx-post="{% url 'crm:toggle_email_campaign' company.pk %}"
-              hx-vals='{"enable": "true"}' hx-target="#email-campaign-card" hx-swap="innerHTML"
-              style="margin-right: 8px; cursor: pointer;">
-            Enable Follow-up Emails
-          </span>
-        </div>
-      </div>
-      <p class="empty-state" style="margin: 16px 0 0 0;">
-        <i class="fa fa-info-circle"></i> Check the box above to start automated email follow-ups for this prospect.
-      </p>
-      {% endif %}
-    </div>
-    {% endif %}
+      {# ============== LEFT ============== #}
+      <div class="od-left">
 
-    <!-- Contacts Card -->
-    <div class="detail-card" id="contactsCard">
-      <div class="card-header">
-        <h2><i class="fa fa-users"></i> Contacts</h2>
-      </div>
-      <div id="contactsList">
-        {% if contacts %}
-        <div class="contacts-list">
-          {% for contact in contacts %}
-          <a href="{% url 'crm:contact_detail' contact.id %}" >
-          <div class="contact-item" id="contact-item-{{ contact.id }}">
-            <div class="contact-info">
-              <i class="fa fa-user contact-icon"></i>
-              <div>
-                
-                  <span class="contact-name">{{ contact.name }}</span>
-                {% if contact.job_title %}<span class="contact-job">{{ contact.job_title }}</span>{% endif %}
+        <!-- LINKED CONTACTS -->
+        <section class="od-card" id="contactsCard">
+          <div class="od-card-h">
+            <i class="fa fa-users"></i>
+            <h3>{% trans "Linked contacts" %}</h3>
+            <span class="od-card-sub">{{ contacts|length }} {% trans "linked" %}</span>
+          </div>
+          <div id="contactsList">
+            {% if contacts %}
+              {% for contact in contacts %}
+                <div class="od-contact-row" id="contact-item-{{ contact.id }}">
+                  <a href="{% url 'crm:contact_detail' contact.id %}" style="display: flex; align-items: center; gap: 12px; flex: 1; text-decoration: none; color: inherit; min-width: 0;">
+                    <div class="od-contact-avatar">{{ contact.name|slice:":2"|upper }}</div>
+                    <div class="od-contact-body">
+                      <span class="od-contact-name">{{ contact.name|capfirst }}</span>
+                      <span class="od-contact-sub">
+                        {% if contact.job_title %}{{ contact.job_title }}{% endif %}
+                        {% if contact.job_title and contact.email %} · {% endif %}
+                        {% if contact.email %}{{ contact.email.0 }}{% endif %}
+                      </span>
+                    </div>
+                  </a>
+                  <button type="button" class="od-contact-remove" title="{% trans 'Remove contact' %}"
+                    onclick="confirmRemoveContact({{ contact.id }}, '{{ contact.name|escapejs }}')">
+                    <i class="fa fa-times"></i>
+                  </button>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="od-empty">
+                <i class="fa fa-user-plus"></i>
+                {% trans "No contacts are linked to this company yet." %}
               </div>
-            </div>
-            <button type="button" class="btn-icon-minimal" title="Remove contact"
-              onclick="confirmRemoveContact({{ contact.id }}, '{{ contact.name|escapejs }}')">
-              <i class="fa fa-times"></i>
+            {% endif %}
+          </div>
+        </section>
+
+        <!-- TASKS -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-check-circle"></i>
+            <h3>{% trans "Tasks" %}</h3>
+          </div>
+          <div id="tasksList" class="tasks-list">
+            {% for task in tasks|dictsortreversed:'due_date' %}
+              {% if not task.completed %}
+              <div class="od-task-row task-item" id="task-{{ task.id }}">
+                <div class="od-task-content task-content" id="task-content-{{ task.id }}">
+                  <h3 class="od-task-name task-name">{{ task.name }}</h3>
+                  {% if task.description %}
+                  <p class="od-task-desc task-description">{{ task.description }}</p>
+                  {% endif %}
+                  <div class="od-task-meta task-meta">
+                    <span class="od-task-due task-due">{% trans "Due" %}: {{ task.due_date|date:"M d, Y" }}</span>
+                    {% if task.due_date|days_since %}
+                    <span class="od-task-overdue task-overdue">{{ task.due_date|days_since }}</span>
+                    {% endif %}
+                    {% if task.member %}
+                    <span class="task-member"><i class="fa fa-user"></i>{{ task.member }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="od-task-actions task-actions">
+                  <button type="button" class="od-icon-btn btn-icon-minimal success" title="{% trans 'Complete' %}"
+                    onclick="confirmDelete('complete_task', {{ task.id }})">
+                    <i class="fa fa-check"></i>
+                  </button>
+                  <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
+                    onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"Y-m-d" }}')">
+                    <i class="fa fa-edit"></i>
+                  </button>
+                  <button type="button" class="od-icon-btn btn-icon-minimal danger" title="{% trans 'Delete' %}"
+                    onclick="confirmDelete('delete_task', {{ task.id }})">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+              {% endif %}
+            {% empty %}
+              <div class="od-empty">
+                <i class="fa fa-clipboard-list"></i>
+                {% trans "No tasks available." %}
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- ORDER HISTORY -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-shopping-bag"></i>
+            <h3>{% trans "Order history" %}</h3>
+            <span class="od-card-sub">{{ orders|length }} {% blocktrans count counter=orders|length %}order{% plural %}orders{% endblocktrans %}</span>
+          </div>
+          <div class="od-order-list">
+            {% for o in orders %}
+              <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
+                <div class="od-order-id">
+                  <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
+                  <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
+                </div>
+                {% with disp_status=o.order_status|default:o.status %}
+                <span class="ord-status {{ disp_status }}">
+                  <span class="ord-status-dot"></span>
+                  {# Prefer production STATUS_CHOICES (English, translatable);
+                     ORDER_STATUS_CHOICES labels are hardcoded Turkish. #}
+                  {% if o.get_status_display %}{{ o.get_status_display }}{% else %}{{ disp_status|capfirst }}{% endif %}
+                </span>
+                {% endwith %}
+                <div class="od-order-total">
+                  {% if o.paid_amount %}
+                    {{ o.paid_amount }} <span>{{ o.paid_currency|default:"" }}</span>
+                  {% elif o.original_price %}
+                    {{ o.original_price }} <span>{{ o.original_currency|default:"" }}</span>
+                  {% else %}
+                    <span class="od-empty-mute">—</span>
+                  {% endif %}
+                </div>
+                <i class="fa fa-chevron-right od-order-chev"></i>
+              </a>
+            {% empty %}
+              <div class="od-empty"><i class="fa fa-shopping-bag"></i>{% trans "No orders yet for this company." %}</div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- ATTACH AN ITEM -->
+        <section class="od-card attach-card">
+          <div class="od-card-h">
+            <i class="fa fa-paperclip"></i>
+            <h3>{% trans "Attach an item" %}</h3>
+          </div>
+          <div class="od-attach-grid">
+            <button type="button" class="od-attach-btn attach-option-btn" onclick="toggleAttachSection('note')">
+              <i class="fa fa-file-text"></i>
+              <span>{% trans "Note" %}</span>
+            </button>
+            <button type="button" class="od-attach-btn attach-option-btn" onclick="toggleAttachSection('task')">
+              <i class="fa fa-check-circle"></i>
+              <span>{% trans "Task" %}</span>
+            </button>
+            <button type="button" class="od-attach-btn attach-option-btn" onclick="toggleAttachSection('contact')">
+              <i class="fa fa-user"></i>
+              <span>{% trans "Contact" %}</span>
             </button>
           </div>
-          </a>
-          {% endfor %}
+
+          <!-- Note Attach Section -->
+          <div id="attachNoteSection" class="od-attach-form attach-form-section" style="display: none;">
+            <div class="od-attach-form-h attach-form-header">
+              <span><i class="fa fa-file-text"></i>{% trans "Add a note" %}</span>
+              <button type="button" class="od-btn-text btn-text" onclick="toggleAttachSection('note')">
+                {% trans "Cancel" %}
+              </button>
+            </div>
+            <form hx-post="{% url 'crm:company_detail' company.id %}?action=add_note" hx-swap="none" class="attach-form"
+              hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('note'); htmx.ajax('GET', '/crm/company/{{ company.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'}); }">
+              {% csrf_token %}
+              {{ note_form.as_p }}
+              <div class="form-actions">
+                <button type="submit" class="ord-btn primary btn-action btn-action-primary">{% trans "Add Note" %}</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Task Attach Section -->
+          <div id="attachTaskSection" class="od-attach-form attach-form-section" style="display: none;">
+            <div class="od-attach-form-h attach-form-header">
+              <span><i class="fa fa-check-circle"></i>{% trans "Add a task" %}</span>
+              <button type="button" class="od-btn-text btn-text" onclick="toggleAttachSection('task')">
+                {% trans "Cancel" %}
+              </button>
+            </div>
+            <form hx-post="{% url 'crm:company_detail' company.id %}?action=add_task" hx-target=".tasks-list"
+              hx-swap="innerHTML" class="attach-form"
+              hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); }">
+              {% csrf_token %}
+              {{ task_form.as_p }}
+              <div class="form-actions">
+                <button type="submit" class="ord-btn primary btn-action btn-action-primary">{% trans "Add Task" %}</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Contact Attach Section: link existing OR create new -->
+          <div id="attachContactSection" class="od-attach-form attach-form-section" style="display: none;">
+            <div class="od-attach-form-h attach-form-header">
+              <span><i class="fa fa-user"></i>{% trans "Add a contact" %}</span>
+              <button type="button" class="od-btn-text btn-text" onclick="toggleAttachSection('contact')">
+                {% trans "Cancel" %}
+              </button>
+            </div>
+
+            <!-- Sub-tabs: link existing vs create new -->
+            <div class="od-contact-mode">
+              <button type="button" class="od-contact-mode-btn active" data-mode="link"
+                      onclick="switchContactMode('link')">
+                <i class="fa fa-search"></i> {% trans "Find existing" %}
+              </button>
+              <button type="button" class="od-contact-mode-btn" data-mode="create"
+                      onclick="switchContactMode('create')">
+                <i class="fa fa-user-plus"></i> {% trans "Create new" %}
+              </button>
+            </div>
+
+            <!-- Mode: link existing -->
+            <div class="attach-form od-contact-mode-pane" data-pane="link">
+              <input type="text" id="contactSearchInput" hx-get="{% url 'crm:search_contacts_only' %}"
+                hx-target="#contactSearchResults" hx-trigger="keyup changed delay:500ms" name="search_term"
+                placeholder="{% trans 'Search and add existing contact...' %}" class="form-input" autocomplete="off" />
+              <div id="contactSearchResults" class="searchResults od-search-results"></div>
+            </div>
+
+            <!-- Mode: create new -->
+            <div class="attach-form od-contact-mode-pane" data-pane="create" style="display:none;">
+              <form id="quickCreateContactForm"
+                    onsubmit="quickCreateContact(event, {{ company.id }}); return false;">
+                {% csrf_token %}
+                <div class="qc-grid">
+                  <div class="qc-field qc-full">
+                    <label for="qc_name">{% trans "Name" %} <span style="color:#DC2626;">*</span></label>
+                    <input type="text" id="qc_name" name="name" class="form-input" required
+                           placeholder="{% trans 'Full name' %}">
+                  </div>
+                  <div class="qc-field">
+                    <label for="qc_job">{% trans "Job title" %}</label>
+                    <input type="text" id="qc_job" name="job_title" class="form-input"
+                           placeholder="{% trans 'e.g. Purchasing manager' %}">
+                  </div>
+                  <div class="qc-field">
+                    <label for="qc_email">{% trans "Email" %}</label>
+                    <input type="email" id="qc_email" name="email" class="form-input"
+                           placeholder="name@example.com">
+                  </div>
+                  <div class="qc-field qc-full">
+                    <label for="qc_phone">{% trans "Phone" %}</label>
+                    <input type="text" id="qc_phone" name="phone" class="form-input"
+                           placeholder="+90 555 000 0000">
+                  </div>
+                </div>
+                <div class="form-actions" style="margin-top:12px;">
+                  <button type="submit" id="qcSubmit" class="ord-btn primary btn-action btn-action-primary">
+                    <i class="fa fa-user-plus"></i>
+                    <span class="qc-text">{% trans "Create &amp; attach" %}</span>
+                    <span class="qc-spinner" style="display:none;"><i class="fa fa-spinner fa-spin"></i></span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- NOTES HISTORY -->
+        <div id="notesSection">
+          {% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
         </div>
-        {% else %}
-        <p class="empty-state">No contacts found for this company.</p>
+      </div>
+
+      {# ============== RIGHT ============== #}
+      <div class="od-right">
+
+        <!-- COMPANY INFO -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-info-circle"></i>
+            <h3>{% trans "Company information" %}</h3>
+          </div>
+          <div class="od-detail-list">
+            {% if company.email %}
+              <div class="od-dt od-dt-stack">
+                <span>{% trans "Email" %}{{ company.email|length|pluralize:"s" }}</span>
+                <b>
+                  {% for email in company.email %}
+                    <a href="mailto:{{ email }}">{{ email }}</a>
+                  {% endfor %}
+                </b>
+              </div>
+            {% endif %}
+            {% if company.phone %}
+              <div class="od-dt od-dt-stack">
+                <span>{% trans "Phone" %}{{ company.phone|length|pluralize:"s" }}</span>
+                <b>
+                  {% for phone in company.phone %}
+                    <span>{{ phone }}</span>
+                  {% endfor %}
+                </b>
+              </div>
+            {% endif %}
+            {% if company.website %}
+              <div class="od-dt">
+                <span>{% trans "Website" %}</span>
+                <b><a href="{{ company.website }}" target="_blank" rel="noopener">{{ company.website }}</a></b>
+              </div>
+            {% endif %}
+            {% if company.group %}
+              <div class="od-dt">
+                <span>{% trans "Group" %}</span>
+                <b>{{ company.group.name }}</b>
+              </div>
+            {% endif %}
+            {% if company.status %}
+              <div class="od-dt">
+                <span>{% trans "Status" %}</span>
+                <b>{{ company.get_status_display }}</b>
+              </div>
+            {% endif %}
+            {% if company.address %}
+              <div class="od-dt">
+                <span>{% trans "Address" %}</span>
+                <b>{{ company.address }}</b>
+              </div>
+            {% endif %}
+            {% if company.country %}
+              <div class="od-dt">
+                <span>{% trans "Country" %}</span>
+                <b>{{ company.country }}</b>
+              </div>
+            {% endif %}
+            {% if company.backgroundInfo %}
+              <div class="od-dt od-dt-stack">
+                <span>{% trans "Background" %}</span>
+                <b style="text-align: left; font-weight: 500; color: var(--gray-700);">{{ company.backgroundInfo }}</b>
+              </div>
+            {% endif %}
+          </div>
+        </section>
+
+        <!-- EMAIL CAMPAIGN (Only for Prospects) -->
+        {% if company.status == 'prospect' %}
+        <section class="od-card" id="email-campaign-card">
+          <div class="od-card-h">
+            <i class="fa fa-envelope"></i>
+            <h3>{% trans "Email follow-up campaign" %}</h3>
+          </div>
+          {% if has_campaign %}
+            <div class="od-camp-grid">
+              <div class="od-camp-toggle">
+                <input type="checkbox" id="email-campaign-toggle" {% if email_campaign.status == 'active' %}checked{% endif %}
+                  hx-post="{% url 'crm:toggle_email_campaign' company.pk %}"
+                  hx-vals='{% if email_campaign.status == "active" %}{"enable": "false"}{% else %}{"enable": "true"}{% endif %}'
+                  hx-target="#email-campaign-card" hx-swap="innerHTML" />
+                <label for="email-campaign-toggle">{% trans "Enable follow-up emails" %}</label>
+              </div>
+              <div class="od-camp-row">
+                <span>{% trans "Status" %}</span>
+                {% if email_campaign.status == 'active' %}
+                  <span class="od-camp-pill active"><i class="fa fa-check"></i>{% trans "Active" %}</span>
+                {% elif email_campaign.status == 'paused' %}
+                  <span class="od-camp-pill paused"><i class="fa fa-pause"></i>{% trans "Paused" %}</span>
+                {% elif email_campaign.status == 'completed' %}
+                  <span class="od-camp-pill completed"><i class="fa fa-check"></i>{% trans "Completed" %}</span>
+                {% else %}
+                  <span class="od-camp-pill stopped"><i class="fa fa-times"></i>{% trans "Stopped" %}</span>
+                {% endif %}
+              </div>
+              <div class="od-camp-row">
+                <span>{% trans "Progress" %}</span>
+                <span>{{ email_campaign.emails_sent }} / 6</span>
+              </div>
+              {% if email_campaign.next_email_scheduled_at and email_campaign.status == 'active' and email_campaign.emails_sent < 6 %}
+              <div class="od-camp-row">
+                <span>{% trans "Next email" %}</span>
+                <span>#{{ email_campaign.emails_sent|add:1 }} · {{ email_campaign.next_email_scheduled_at|date:"M d, H:i" }}</span>
+              </div>
+              {% endif %}
+              <div class="od-camp-row">
+                <span>{% trans "Started" %}</span>
+                <span>{{ email_campaign.created_at|date:"M d, Y" }}</span>
+              </div>
+            </div>
+          {% else %}
+            <div class="od-camp-grid">
+              <div class="od-camp-toggle">
+                <input type="checkbox" id="email-campaign-toggle"
+                  hx-post="{% url 'crm:toggle_email_campaign' company.pk %}"
+                  hx-vals='{"enable": "true"}' hx-target="#email-campaign-card" hx-swap="innerHTML" />
+                <label for="email-campaign-toggle">{% trans "Enable follow-up emails" %}</label>
+              </div>
+              <p class="od-empty-mute" style="margin: 4px 0 0 0;">
+                <i class="fa fa-info-circle"></i> {% trans "Check the box above to start automated follow-ups for this prospect." %}
+              </p>
+            </div>
+          {% endif %}
+        </section>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- Attach an Item Section -->
-  <div class="detail-card attach-card">
-    <div class="card-header">
-      <h2><i class="fa fa-paperclip"></i> Attach an item</h2>
-    </div>
-    <div class="attach-options">
-      <button type="button" class="attach-option-btn" onclick="toggleAttachSection('note')">
-        <i class="fa fa-file-text"></i>
-        <span>Note</span>
-      </button>
-      <button type="button" class="attach-option-btn" onclick="toggleAttachSection('task')">
-        <i class="fa fa-check-circle"></i>
-        <span>Task</span>
-      </button>
-      <button type="button" class="attach-option-btn" onclick="toggleAttachSection('contact')">
-        <i class="fa fa-user"></i>
-        <span>Contact</span>
-      </button>
-    </div>
-
-    <!-- Note Attach Section -->
-    <div id="attachNoteSection" class="attach-form-section" style="display: none;">
-      <div class="attach-form-header">
-        <span><i class="fa fa-file-text"></i> Add a note</span>
-        <button type="button" class="btn-text" onclick="toggleAttachSection('note')">
-          Cancel
-        </button>
-      </div>
-      <form hx-post="{% url 'crm:company_detail' company.id %}?action=add_note" hx-swap="none" class="attach-form"
-        hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('note'); htmx.ajax('GET', '/crm/company/{{ company.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'}); }">
-        {% csrf_token %}
-        {{ note_form.as_p }}
-        <div class="form-actions">
-          <button type="submit" class="btn-action btn-action-primary">{% trans "Add Note" %}</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Task Attach Section -->
-    <div id="attachTaskSection" class="attach-form-section" style="display: none;">
-      <div class="attach-form-header">
-        <span><i class="fa fa-check-circle"></i> Add a task</span>
-        <button type="button" class="btn-text" onclick="toggleAttachSection('task')">
-          Cancel
-        </button>
-      </div>
-      <form hx-post="{% url 'crm:company_detail' company.id %}?action=add_task" hx-target=".tasks-list"
-        hx-swap="innerHTML" class="attach-form"
-        hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); }">
-        {% csrf_token %}
-        {{ task_form.as_p }}
-        <div class="form-actions">
-          <button type="submit" class="btn-action btn-action-primary">{% trans "Add Task" %}</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Contact Attach Section -->
-    <div id="attachContactSection" class="attach-form-section" style="display: none;">
-      <div class="attach-form-header">
-        <span><i class="fa fa-user"></i> Link existing contact</span>
-        <button type="button" class="btn-text" onclick="toggleAttachSection('contact')">
-          Cancel
-        </button>
-      </div>
-      <div class="attach-form">
-        <input type="text" id="contactSearchInput" hx-get="{% url 'crm:search_contacts_only' %}"
-          hx-target="#contactSearchResults" hx-trigger="keyup changed delay:500ms" name="search_term"
-          placeholder="Search and add existing contact..." class="form-input" autocomplete="off" />
-        <div id="contactSearchResults" class="searchResults"
-          style="max-height: 300px; overflow-y: auto; margin-top: 10px;"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Tasks List -->
-  <div class="detail-card">
-    <div class="card-header">
-      <h2><i class="fa fa-check-circle"></i> Tasks</h2>
-    </div>
-    <div id="tasksList" class="tasks-list">
-      {% for task in tasks|dictsortreversed:'due_date' %}
-      {% if not task.completed %}
-      <div class="task-item" id="task-{{ task.id }}">
-        <div class="task-content" id="task-content-{{ task.id }}">
-          <h3 class="task-name">{{ task.name }}</h3>
-          {% if task.description %}
-          <p class="task-description">{{ task.description }}</p>
-          {% endif %}
-          <div class="task-meta">
-            <span class="task-due">Due: {{ task.due_date|date:"M d, Y" }}</span>
-            {% if task.due_date|days_since %}
-            <span class="task-overdue">{{ task.due_date|days_since }}</span>
-            {% endif %}
-            {% if task.member %}
-            <span class="task-member"><i class="fa fa-user"></i> {{ task.member }}</span>
-            {% endif %}
-          </div>
-        </div>
-        <div class="task-actions">
-          <button type="button" class="btn-icon-minimal" title="Complete"
-            onclick="confirmDelete('complete_task', {{ task.id }})">
-            <i class="fa fa-check"></i>
+  <!-- ============================= COMMUNICATION ============================= -->
+  <div id="tab-communication" class="tab-content" style="display: none;">
+    <section class="od-card comm-container">
+      <div class="od-comm-head comm-header">
+        <div class="od-comm-toggle comm-toggle">
+          <button class="od-comm-toggle-btn comm-toggle-btn active" onclick="switchCommTab('emails')">
+            <i class="fas fa-envelope"></i> {% trans "Emails" %}
           </button>
-          <button type="button" class="btn-icon-minimal" title="Edit"
-            onclick="editTask({{ task.id }}, '{{ task.name|escapejs }}', '{{ task.description|escapejs }}', '{{ task.due_date|date:"
-            Y-m-d" }}')">
-            <i class="fa fa-edit"></i>
-          </button>
-          <button type="button" class="btn-icon-minimal" title="Delete"
-            onclick="confirmDelete('delete_task', {{ task.id }})">
-            <i class="fa fa-trash"></i>
+          <button class="od-comm-toggle-btn comm-toggle-btn" onclick="switchCommTab('files')">
+            <i class="fas fa-paperclip"></i> {% trans "Files" %}
           </button>
         </div>
-      </div>
-      {% endif %}
-      {% empty %}
-      <p class="empty-state">No tasks available.</p>
-      {% endfor %}
-    </div>
-  </div>
-  <!-- Notes History -->
-  <div id="notesSection">
-    {% history_component company=company contact=None note_form=note_form csrf_token=csrf_token current_url=request.path %}
-  </div>
-</div> <!-- End tab-overview -->
-
-<!-- Communication Tab -->
-<div id="tab-communication" class="tab-content" style="display: none;">
-  <div class="detail-card comm-container">
-    <div class="comm-header">
-      <div class="comm-toggle">
-        <button class="comm-toggle-btn active" onclick="switchCommTab('emails')">
-          <i class="fas fa-envelope"></i> Emails
-        </button>
-        <button class="comm-toggle-btn" onclick="switchCommTab('files')">
-          <i class="fas fa-paperclip"></i> Files
+        <button class="ord-btn primary btn-action btn-action-primary" onclick="openComposeModal(null, '', '', {{ company.id }})">
+          <i class="fas fa-plus"></i> {% trans "Compose email" %}
         </button>
       </div>
 
-      <button class="btn-action btn-action-primary" onclick="openComposeModal(null, '', '', {{ company.id }})">
-        <i class="fas fa-plus"></i> Compose Email
-      </button>
-    </div>
-
-    <div id="comm-content" class="comm-content" hx-get="{% url 'email_automation:company_emails' company.id %}"
-      hx-trigger="load">
-      <div style="text-align: center; padding: 40px; color: #94a3b8;">
-        <i class="fas fa-spinner fa-spin fa-2x"></i>
+      <div id="comm-content" class="comm-content" hx-get="{% url 'email_automation:company_emails' company.id %}"
+        hx-trigger="load">
+        <div style="text-align: center; padding: 40px; color: var(--gray-400);">
+          <i class="fas fa-spinner fa-spin fa-2x"></i>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
+
+  <!-- Compose Modal Container -->
+  <div id="composeModalContainer"></div>
 </div>
-
-<!-- Compose Modal Container -->
-<div id="composeModalContainer"></div>
 
 <script>
   function toggleAttachSection(type) {
@@ -430,6 +975,113 @@
   // Store original HTML for cancel
   const taskOriginalHTML = {};
   const noteOriginalHTML = {};
+
+  /* ─── Attach-contact mode switch (Find existing / Create new) ─── */
+  function switchContactMode(mode) {
+    document.querySelectorAll('.od-contact-mode-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    document.querySelectorAll('.od-contact-mode-pane').forEach(function (p) {
+      p.style.display = p.dataset.pane === mode ? '' : 'none';
+    });
+    // Focus the first input in the active pane for instant typing.
+    var pane = document.querySelector('.od-contact-mode-pane[data-pane="' + mode + '"]');
+    if (pane) {
+      var first = pane.querySelector('input[type="text"], input[type="email"]');
+      if (first) setTimeout(function () { first.focus(); }, 50);
+    }
+  }
+
+  /* Quick-create a brand-new contact already linked to this company.
+     POSTs to /crm/company/<id>/quick_create_contact/, splices the
+     resulting row into #contactsList, and resets the form. */
+  function quickCreateContact(event, companyId) {
+    event.preventDefault();
+    var form = document.getElementById('quickCreateContactForm');
+    var btn = document.getElementById('qcSubmit');
+    var txt = btn.querySelector('.qc-text');
+    var spn = btn.querySelector('.qc-spinner');
+    btn.disabled = true;
+    if (txt) txt.style.opacity = '0.6';
+    if (spn) spn.style.display = 'inline-flex';
+
+    fetch('/crm/company/' + companyId + '/quick_create_contact/', {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+      .then(function (res) {
+        btn.disabled = false;
+        if (txt) txt.style.opacity = '1';
+        if (spn) spn.style.display = 'none';
+        if (!res.ok || !res.data.success) {
+          alert(res.data.error || '{% trans "Failed to create contact" %}');
+          return;
+        }
+        var c = res.data.contact;
+        // Build the new contact row matching the .od-contact-row markup.
+        var list = document.getElementById('contactsList');
+        if (list) {
+          // Remove the empty state if it's there.
+          var empty = list.querySelector('.od-empty');
+          if (empty) empty.remove();
+          var row = document.createElement('div');
+          row.className = 'od-contact-row';
+          row.id = 'contact-item-' + c.id;
+          row.style.opacity = '0';
+          row.style.transform = 'translateY(-6px)';
+          row.innerHTML =
+            '<a href="' + c.detail_url + '" style="display:flex;align-items:center;gap:12px;flex:1;text-decoration:none;color:inherit;min-width:0;">' +
+            '  <div class="od-contact-avatar"></div>' +
+            '  <div class="od-contact-body">' +
+            '    <span class="od-contact-name"></span>' +
+            '    <span class="od-contact-sub"></span>' +
+            '  </div>' +
+            '</a>' +
+            '<button type="button" class="od-contact-remove" title="{% trans "Remove contact" %}">' +
+            '  <i class="fa fa-times"></i>' +
+            '</button>';
+          row.querySelector('.od-contact-avatar').textContent = c.initials;
+          row.querySelector('.od-contact-name').textContent = c.name;
+          var sub = row.querySelector('.od-contact-sub');
+          var bits = [];
+          if (c.job_title) bits.push(c.job_title);
+          if (c.email) bits.push(c.email);
+          sub.textContent = bits.join(' · ');
+          // Wire the remove button to the existing confirm flow.
+          row.querySelector('.od-contact-remove').addEventListener('click', function () {
+            confirmRemoveContact(c.id, c.name);
+          });
+          list.insertBefore(row, list.firstChild);
+          // Fade in.
+          requestAnimationFrame(function () {
+            row.style.transition = 'opacity 220ms, transform 220ms';
+            row.style.opacity = '1';
+            row.style.transform = 'translateY(0)';
+          });
+        }
+        // Bump the count pill.
+        var sub = document.querySelector('#contactsCard .od-card-sub');
+        if (sub) {
+          var m = sub.textContent.match(/\d+/);
+          var n = m ? parseInt(m[0], 10) + 1 : 1;
+          sub.textContent = n + ' {% trans "linked" %}';
+        }
+        // Reset + close the attach panel.
+        form.reset();
+        if (typeof toggleAttachSection === 'function') toggleAttachSection('contact');
+        // Reset the sub-tab back to "Find existing" so the next open is clean.
+        switchContactMode('link');
+      })
+      .catch(function () {
+        btn.disabled = false;
+        if (txt) txt.style.opacity = '1';
+        if (spn) spn.style.display = 'none';
+        alert('{% trans "Network error — please try again" %}');
+      });
+  }
 
   // Confirm remove contact from company
   function confirmRemoveContact(contactId, contactName) {
@@ -496,9 +1148,9 @@
           setTimeout(() => {
             contactEl.remove();
             // Check if no contacts left
-            const contactsList = document.querySelector('#contactsList .contacts-list');
-            if (contactsList && contactsList.children.length === 0) {
-              document.getElementById('contactsList').innerHTML = '<p class="empty-state">No contacts found for this company.</p>';
+            const contactsList = document.getElementById('contactsList');
+            if (contactsList && contactsList.querySelectorAll('.od-contact-row').length === 0) {
+              contactsList.innerHTML = '<div class="od-empty"><i class="fa fa-user-plus"></i>No contacts are linked to this company yet.</div>';
             }
           }, 300);
         }
@@ -521,7 +1173,7 @@
         <div style="display:flex;flex-direction:column;gap:0.75rem;">
           <div>
             <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">{% trans "Task Name" %}</label>
-            <input type="text" id="edit-task-name-${taskId}" style="width:100%;padding:0.5rem;border:2px solid #3b82f6;border-radius:6px;font-size:0.875rem;font-weight:600;" />
+            <input type="text" id="edit-task-name-${taskId}" style="width:100%;padding:0.5rem;border:2px solid #147F74;border-radius:6px;font-size:0.875rem;font-weight:600;" />
           </div>
           <div>
             <label style="display:block;font-size:0.75rem;font-weight:600;color:#64748b;margin-bottom:0.25rem;">{% trans "Description (optional)" %}</label>
@@ -532,7 +1184,7 @@
             <input type="date" id="edit-task-date-${taskId}" value="${dueDate}" style="padding:0.5rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.875rem;" />
           </div>
           <div style="display:flex;gap:0.5rem;">
-            <button type="button" onclick="saveTask(${taskId})" style="padding:0.5rem 1rem;background:#22c55e;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">
+            <button type="button" onclick="saveTask(${taskId})" style="padding:0.5rem 1rem;background:#147F74;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">
               <i class="fa fa-check"></i> Save
             </button>
             <button type="button" onclick="cancelTaskEdit(${taskId})" style="padding:0.5rem 1rem;background:#ef4444;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">
@@ -584,10 +1236,10 @@
         if (data.success && data.task) {
           // Update the task content
           document.getElementById(`task-content-${taskId}`).innerHTML = `
-            <h3 class="task-name">${data.task.name}</h3>
-            ${data.task.description ? `<p class="task-description">${data.task.description}</p>` : ''}
-            <div class="task-meta">
-              <span class="task-due">Due: ${data.task.due_date}</span>
+            <h3 class="od-task-name task-name">${data.task.name}</h3>
+            ${data.task.description ? `<p class="od-task-desc task-description">${data.task.description}</p>` : ''}
+            <div class="od-task-meta task-meta">
+              <span class="od-task-due task-due">Due: ${data.task.due_date}</span>
               ${data.task.overdue_badge || ''}
             </div>
           `;
@@ -606,6 +1258,14 @@
     const companyId = '{{ company.id }}';
     const csrf = '{{ csrf_token }}';
 
+    // Prefer the live DOM text over the onclick-baked arg — saveNote
+    // rewrites the content but the edit button's onclick attribute
+    // still holds the original server-rendered string.
+    const liveTextEl = contentDiv.querySelector('.note-text');
+    if (liveTextEl) {
+      currentContent = liveTextEl.textContent;
+    }
+
     // Store original HTML
     noteOriginalHTML[noteId] = contentDiv.innerHTML;
 
@@ -613,9 +1273,9 @@
         <div class="note-meta">
           <span class="note-date" style="color:#64748b;font-size:0.75rem;font-weight:500;margin-bottom:0.5rem;display:block;">Editing...</span>
         </div>
-        <textarea id="edit-textarea-${noteId}" style="width:100%;min-height:80px;padding:0.5rem;border:2px solid #3b82f6;border-radius:6px;font-size:0.875rem;font-family:inherit;resize:vertical;">${currentContent}</textarea>
+        <textarea id="edit-textarea-${noteId}" style="width:100%;min-height:80px;padding:0.5rem;border:2px solid #147F74;border-radius:6px;font-size:0.875rem;font-family:inherit;resize:vertical;">${currentContent}</textarea>
         <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-          <button type="button" onclick="saveNote(${noteId})" style="padding:0.5rem 1rem;background:#22c55e;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">
+          <button type="button" onclick="saveNote(${noteId})" style="padding:0.5rem 1rem;background:#147F74;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">
             <i class="fa fa-check"></i> Save
           </button>
           <button type="button" onclick="cancelEdit(${noteId})" style="padding:0.5rem 1rem;background:#ef4444;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.8rem;">
@@ -640,7 +1300,7 @@
     // Buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.classList.remove('active');
-      if (btn.onclick.toString().includes(tabId)) {
+      if (btn.onclick && btn.onclick.toString().includes(tabId)) {
         btn.classList.add('active');
       }
     });
@@ -899,8 +1559,8 @@
               taskEl.remove();
               // Check if no tasks left, show empty state
               const tasksList = document.getElementById('tasksList');
-              if (tasksList && tasksList.children.length === 0) {
-                tasksList.innerHTML = '<p class="empty-state">No tasks available.</p>';
+              if (tasksList && tasksList.querySelectorAll('.od-task-row').length === 0) {
+                tasksList.innerHTML = '<div class="od-empty"><i class="fa fa-clipboard-list"></i>No tasks available.</div>';
               }
             }, 300);
           }
@@ -915,8 +1575,8 @@
               taskEl.remove();
               // Check if no tasks left, show empty state
               const tasksList = document.getElementById('tasksList');
-              if (tasksList && tasksList.children.length === 0) {
-                tasksList.innerHTML = '<p class="empty-state">No tasks available.</p>';
+              if (tasksList && tasksList.querySelectorAll('.od-task-row').length === 0) {
+                tasksList.innerHTML = '<div class="od-empty"><i class="fa fa-clipboard-list"></i>No tasks available.</div>';
               }
             }, 300);
           }
@@ -953,6 +1613,85 @@
       }).catch(() => overlay.remove());
     };
   }
+
+  /* ─── Edit-Company sidebar ───────────────────────────────────
+     Loads the edit form via AJAX into a slide-in panel, submits
+     via fetch, and reloads the page on success. */
+  function openEditCompanySidebar() {
+    var overlay = document.getElementById('editCompanySidebarOverlay');
+    var body = document.getElementById('editCompanySidebarBody');
+    if (!overlay || !body) return;
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-500);"><i class="fa fa-spinner fa-spin fa-2x"></i><div style="margin-top:12px;">Loading…</div></div>';
+    overlay.classList.add('active');
+    fetch('{% url "crm:update_company" company.id %}', {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        body.innerHTML = html;
+        body.querySelectorAll('script').forEach(function (s) {
+          var n = document.createElement('script');
+          if (s.src) n.src = s.src; else n.textContent = s.textContent;
+          document.body.appendChild(n).parentNode.removeChild(n);
+        });
+      })
+      .catch(function () {
+        body.innerHTML = '<div style="padding:40px;color:#ef4444;text-align:center;">Failed to load edit form.</div>';
+      });
+  }
+  function closeEditCompanySidebar() {
+    var overlay = document.getElementById('editCompanySidebarOverlay');
+    if (overlay) overlay.classList.remove('active');
+  }
+  function submitEditCompanyForm(event) {
+    event.preventDefault();
+    var form = document.getElementById('editCompanyForm');
+    var btn = document.getElementById('editCompanySubmitBtn');
+    var btnText = btn ? btn.querySelector('.btn-text') : null;
+    var btnSpinner = btn ? btn.querySelector('.btn-spinner') : null;
+    if (btnText) btnText.style.display = 'none';
+    if (btnSpinner) btnSpinner.style.display = 'inline-flex';
+    if (btn) btn.disabled = true;
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
+      .then(function (res) {
+        if (res.ok && res.body.success) {
+          window.location.href = res.body.redirect_url || window.location.pathname;
+        } else {
+          if (btnText) btnText.style.display = 'inline';
+          if (btnSpinner) btnSpinner.style.display = 'none';
+          if (btn) btn.disabled = false;
+          alert('Failed to save: ' + JSON.stringify(res.body.errors || res.body));
+        }
+      })
+      .catch(function () {
+        if (btnText) btnText.style.display = 'inline';
+        if (btnSpinner) btnSpinner.style.display = 'none';
+        if (btn) btn.disabled = false;
+      });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeEditCompanySidebar();
+  });
 </script>
+
+<!-- Edit Company Sidebar -->
+<div id="editCompanySidebarOverlay" class="sidebar-overlay" onclick="closeEditCompanySidebar()">
+  <div class="sidebar-modal" onclick="event.stopPropagation();">
+    <div class="sidebar-header">
+      <button class="sidebar-close" onclick="closeEditCompanySidebar()">
+        <i class="fas fa-times"></i> {% trans "Close" %}
+      </button>
+      <div class="sidebar-title">
+        <i class="fas fa-building"></i>
+        <h2>{% trans "Edit Company" %}</h2>
+      </div>
+    </div>
+    <div id="editCompanySidebarBody" class="sidebar-content"></div>
+  </div>
 </div>
 {% endblock %}

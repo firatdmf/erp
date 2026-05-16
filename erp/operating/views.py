@@ -199,6 +199,54 @@ class OrderDetail(DetailView):
     context_object_name = "order"
 
 
+class OrderPrint(DetailView):
+    """Standalone PDF view: renders the order as a real PDF file using
+    xhtml2pdf so the browser shows it without ANY user-agent URL/date
+    headers/footers. Inline disposition lets the browser open it in a tab
+    and the user can save/print/share it as-is."""
+    model = Order
+    template_name = "operating/order_print.html"
+    context_object_name = "order"
+
+    def get_context_data(self, **kwargs):
+        from decimal import Decimal
+        ctx = super().get_context_data(**kwargs)
+        order = self.object
+        items = []
+        total = Decimal("0.00")
+        for it in order.items.all().select_related("product", "product_variant"):
+            qty = it.quantity or Decimal("0")
+            price = it.price or Decimal("0")
+            line_total = (qty * price).quantize(Decimal("0.01"))
+            it.line_total_calc = line_total
+            items.append(it)
+            total += line_total
+        ctx["order_items"] = items
+        ctx["order_total"] = total
+        ctx["is_pdf"] = True   # template can strip JS auto-print when rendering for PDF
+        return ctx
+
+    def render_to_response(self, context, **response_kwargs):
+        from io import BytesIO
+        from django.template.loader import render_to_string
+        from django.http import HttpResponse
+        from xhtml2pdf import pisa
+
+        html = render_to_string(self.template_name, context, request=self.request)
+        buf = BytesIO()
+        result = pisa.CreatePDF(src=html, dest=buf, encoding="utf-8")
+
+        if result.err:
+            # Fallback: render the HTML directly so we don't 500 silently
+            return HttpResponse(html)
+
+        response = HttpResponse(buf.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'inline; filename="order-{self.object.pk}.pdf"'
+        )
+        return response
+
+
 class OrderCreate(View):
     def get(self, request):
         form = OrderForm()
@@ -336,6 +384,18 @@ class OrderEdit(UpdateView):
     form_class = OrderForm
     template_name = "operating/edit_order.html"
 
+    def _is_ajax(self):
+        return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+    def get_template_names(self):
+        # When opened in the side panel, reuse the SAME partial as the
+        # create-order sidebar so create and edit feel identical. The
+        # partial branches on `order` in context to switch action URL,
+        # submit label, and to hydrate existing items / customer.
+        if self._is_ajax():
+            return ["operating/partials/create_order_form.html"]
+        return [self.template_name]
+
     # prevent editing completed orders.
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -346,7 +406,26 @@ class OrderEdit(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["order_items"] = self.object.items.all()
+        items = self.object.items.all()
+        context["order_items"] = items
+        # JSON-safe payload for the JS to hydrate order_data with.
+        # Using a dedicated list keeps it parser-tolerant of any title
+        # containing apostrophes, quotes, or newlines.
+        context["order_items_payload"] = [
+            {
+                "item_id": it.pk,
+                "sku": (
+                    it.product_variant.variant_sku
+                    if it.product_variant
+                    else (it.product.sku if it.product else "")
+                ),
+                "variant": bool(it.product_variant),
+                "description": it.description or "",
+                "quantity": float(it.quantity) if it.quantity is not None else 0,
+                "price": float(it.price) if it.price is not None else 0,
+            }
+            for it in items
+        ]
         return context
 
     def post(self, request, *args, **kwargs):

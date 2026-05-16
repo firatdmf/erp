@@ -143,6 +143,9 @@ class CreateTask(generic.edit.CreateView):
             
         return super().post(request, *args, **kwargs)
 
+    def is_ajax(self):
+        return self.request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
     def form_valid(self, form):
         print("your member iss")
         print("your member is", self.request.user.member)
@@ -201,14 +204,35 @@ class CreateTask(generic.edit.CreateView):
             push_task_to_google(self.request.user, self.object)
         except Exception as e:
             print(f"Error pushing new task to Google Tasks: {e}")
-                    
+
+        # AJAX: return JSON instead of redirecting so the caller stays
+        # on the dashboard / current page.
+        if self.is_ajax():
+            from django.http import JsonResponse
+            return JsonResponse({
+                "success": True,
+                "task": {
+                    "id": self.object.pk,
+                    "name": self.object.name,
+                    "due_date": self.object.due_date.isoformat() if self.object.due_date else None,
+                    "status": getattr(self.object, "status", None),
+                    "detail_url": reverse("todo:task_detail", kwargs={"task_id": self.object.pk}),
+                },
+            })
+
         return response
 
     def form_invalid(self, form):
         print("Form Invalid!")
         print(form.errors)
+        if self.is_ajax():
+            from django.http import JsonResponse
+            return JsonResponse(
+                {"success": False, "errors": form.errors},
+                status=400,
+            )
         return super().form_invalid(form)
-    
+
     def get_success_url(self):
         # Redirect to task detail page after creation
         return reverse('todo:task_detail', kwargs={'task_id': self.object.pk})
@@ -301,6 +325,14 @@ class TaskReport(View):
         assigned_tasks_paginator = Paginator(assigned_tasks_query, 10)  # 10 tasks per page
         assigned_tasks_page = assigned_tasks_paginator.get_page(page_number if tab == 'assignedTasks' else 1)
         
+        # Annotate each task with deletion permission so the template can
+        # show/hide the trash icon per row without recomputing.
+        _user = request.user
+        for _t in my_tasks_page.object_list:
+            _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
+        for _t in assigned_tasks_page.object_list:
+            _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
+
         # AJAX için direkt döndür - statistics'i hesaplama (ÇOOK DAHA HIZLI)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             if tab == 'myTasks':
@@ -588,30 +620,31 @@ def complete_task(request, task_id):
     return redirect(request.META.get("HTTP_REFERER"))
 
 
-# @method_decorator(login_required, name="dispatch")
+@login_required
 def delete_task(request, task_id):
-    if request.method == "POST":
-        task = get_object_or_404(Task, pk=task_id)
-        
-        # Permission Check: Only creator can delete
-        current_member = request.user.member if hasattr(request.user, 'member') else None
-        if task.created_by != current_member:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'error': 'Permission denied. Only the creator can delete this task.'}, status=403)
-            return HttpResponse("Permission denied", status=403)
+    if request.method != "POST":
+        return HttpResponse("Method not allowed", status=405)
 
-        task.delete()
-        
-        # Check if it's an AJAX request (HTMX)
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('HX-Request'):
-            # Return empty response - HTMX will handle removal with hx-swap="outerHTML"
-            response = HttpResponse()
-            # Send custom header to trigger toast notification
-            response['HX-Trigger'] = '{"showToast": {"message": "Task deleted successfully", "type": "success"}}'
-            return response
-        
-        # Fallback for non-AJAX requests
-        return redirect(request.META.get("HTTP_REFERER"))
+    task = get_object_or_404(Task, pk=task_id)
+    is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+               or request.headers.get('HX-Request'))
+
+    # Permission Check — see Task.can_be_deleted_by()
+    if not task.can_be_deleted_by(request.user):
+        msg = "You don't have permission to delete this task."
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': msg}, status=403)
+        return HttpResponse(msg, status=403)
+
+    task.delete()
+
+    if is_ajax:
+        # Empty 200 — HTMX swap with hx-swap="outerHTML" removes the row.
+        response = HttpResponse()
+        response['HX-Trigger'] = '{"showToast": {"message": "Task deleted successfully", "type": "success"}}'
+        return response
+
+    return redirect(request.META.get("HTTP_REFERER") or "/")
 
 
 # Get task edit form (AJAX endpoint)

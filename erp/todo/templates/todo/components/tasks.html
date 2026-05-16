@@ -192,14 +192,15 @@
             onclick="event.stopPropagation(); window.location.href='{% url 'todo:task_detail' task.id %}'">
             <i class="fa fa-eye"></i> View
           </button>
-          {% if can_edit %}
+          {% if task.can_be_deleted_by_user %}
           <button type="button" class="btn-delete"
             onclick="event.stopPropagation(); confirmDeleteTask('{{ task.id }}', this)">
             <i class="fa fa-trash"></i>
           </button>
           {% else %}
           <button type="button" class="btn-delete" disabled
-            style="opacity: 0.4; cursor: not-allowed; pointer-events: none;">
+            style="opacity: 0.4; cursor: not-allowed; pointer-events: none;"
+            title="{% trans 'Only the creator, assignees or admins can delete this task' %}">
             <i class="fa fa-lock"></i>
           </button>
           {% endif %}

@@ -127,6 +127,23 @@ class Supplier(models.Model):
     address = models.CharField(max_length=255, blank=True)
     country = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Optional links to existing CRM contact / company records so a
+    # supplier can be associated with the same person/org you already
+    # track elsewhere. Both blank — supplier may stand alone.
+    linked_contact = models.ForeignKey(
+        "Contact",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="linked_suppliers",
+    )
+    linked_company = models.ForeignKey(
+        "Company",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="linked_suppliers",
+    )
 
     def clean(self):
         # Ensure that you call super().clean() to maintain the default validation behavior.
@@ -154,6 +171,9 @@ class Note(models.Model):
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True, related_name="notes"
     )
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.CASCADE, blank=True, null=True, related_name="notes"
+    )
     content = models.TextField()
 
     # below is for admin view
@@ -162,6 +182,8 @@ class Note(models.Model):
             return f"Note for {self.contact}"
         elif self.company:
             return f"Note for {self.company}"
+        elif self.supplier:
+            return f"Note for {self.supplier}"
         else:
             return "Unassociated Note"
 

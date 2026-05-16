@@ -1,0 +1,81 @@
+{% load i18n %}
+{# Edit form rendered into the side panel on the company detail page.
+   No base.html chrome — the parent page provides the sidebar shell. #}
+<form id="editCompanyForm" method="post"
+      action="{% url 'crm:update_company' company.id %}"
+      onsubmit="submitEditCompanyForm(event); return false;">
+  {% csrf_token %}
+
+  <div class="form-group">
+    <label for="id_edit_company_name">{% trans "Company name" %} <span style="color:#ef4444;">*</span></label>
+    <input type="text" name="name" id="id_edit_company_name" class="form-input"
+           value="{{ company.name|default:'' }}" required autofocus>
+  </div>
+
+  <div class="form-group">
+    <label>{% trans "Email addresses" %}</label>
+    <div id="edit_emails_container"></div>
+    <input type="hidden" name="emails_data" id="emails_data">
+  </div>
+
+  <div class="form-group">
+    <label>{% trans "Phone numbers" %}</label>
+    <div id="edit_phones_container"></div>
+    <input type="hidden" name="phones_data" id="phones_data">
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_company_website">{% trans "Website" %}</label>
+    <input type="text" name="website" id="id_edit_company_website" class="form-input"
+           value="{{ company.website|default:'' }}" placeholder="https://…">
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_company_status">{% trans "Status" %}</label>
+    <select name="status" id="id_edit_company_status" class="form-input">
+      {% for value, label in form.fields.status.choices %}
+        <option value="{{ value }}" {% if company.status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_company_address">{% trans "Address" %}</label>
+    <textarea name="address" id="id_edit_company_address" class="form-textarea" rows="2">{{ company.address|default:'' }}</textarea>
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_company_country">{% trans "Country" %}</label>
+    <input type="text" name="country" id="id_edit_company_country" class="form-input"
+           value="{{ company.country|default:'' }}">
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_company_bg">{% trans "Background info" %}</label>
+    <textarea name="backgroundInfo" id="id_edit_company_bg" class="form-textarea" rows="3">{{ company.backgroundInfo|default:'' }}</textarea>
+  </div>
+
+  <div class="sidebar-footer">
+    <button type="submit" id="editCompanySubmitBtn" class="btn btn-primary">
+      <span class="btn-text">{% trans "Save changes" %}</span>
+      <span class="btn-spinner" style="display:none;">
+        <svg class="spinner-icon" viewBox="0 0 50 50">
+          <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+        </svg>
+        {% trans "Saving…" %}
+      </span>
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="closeEditCompanySidebar()">{% trans "Cancel" %}</button>
+  </div>
+</form>
+
+<script>
+  (function() {
+    var emails = {{ company.email|default:"[]"|safe }};
+    var phones = {{ company.phone|default:"[]"|safe }};
+    if (typeof initDynamicFields === 'function') {
+      initDynamicFields('edit_emails_container', 'emails_data', 'email', emails);
+      initDynamicFields('edit_phones_container', 'phones_data', 'phone', phones);
+    }
+  })();
+</script>

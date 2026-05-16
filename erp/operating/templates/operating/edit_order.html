@@ -104,65 +104,40 @@
 </div>
 
 {% block js %}
+{# Server-side JSON payload for existing order items. Using a json_script
+   block keeps the page parseable regardless of weird chars in titles. #}
+{{ order_items_payload|json_script:"existing-order-items" }}
 
+<script src="{% static 'operating/js/create_edit_order.js' %}"></script>
 <script>
-  // Initialize order_data with existing items
-  order_data.order_items = [
-    {% for item in order_items %}
-  {
-    "item_id": { { item.pk } },
-    "sku": "{% if item.product_variant %}{{ item.product_variant.variant_sku }}{% else %}{{ item.product.sku }}{% endif %}",
-      "variant": {% if item.product_variant %} true{% else %} false{% endif %},
-    "description": "{{ item.description|default:''|escapejs }}",
-      "quantity": { { item.quantity } },
-    "price": { { item.price } }
-  } {% if not forloop.last %}, {% endif %}
-  {% endfor %}
-      ];
+  // Hydrate the existing items into order_data so the JS knows about
+  // them when computing duplicates / next index for new rows.
+  (function () {
+    var node = document.getElementById('existing-order-items');
+    if (node && window.order_data) {
+      try {
+        window.order_data.order_items = JSON.parse(node.textContent || '[]');
+      } catch (e) { /* leave order_data.order_items as default empty */ }
+    }
+  })();
 
-  // Track deleted items
-  let deletedItems = [];
+  // Track deleted items so the server can remove them on save.
+  var deletedItems = [];
 
-  // Override the delete row functionality to track deleted items
+  // Capture-phase listener so we record the item id BEFORE the JS
+  // file's own handler removes the row.
   document.addEventListener('click', function (e) {
     if (e.target.classList.contains('delete-row-btn')) {
-      const tr = e.target.closest('tr');
-      if (tr) {
-        const itemIdInput = tr.querySelector('input[name^="item_id_"]');
-        if (itemIdInput && itemIdInput.value) {
-          deletedItems.push(parseInt(itemIdInput.value));
-          document.getElementById('deleted_items').value = JSON.stringify(deletedItems);
-        }
-        tr.remove();
-
-        // Remove from order_data
-        const skuInput = tr.querySelector('input[readonly]');
-        if (skuInput) {
-          order_data.order_items = order_data.order_items.filter(item => item.sku !== skuInput.value);
-        }
-
-        // Remove table header if no more order items
-        const rows = document.getElementById('order_items_table').querySelectorAll('tr');
-        if (order_data.order_items.length === 0) {
-          const header = document.getElementById('order_items_table').querySelector('tr');
-          if (header) header.remove();
-        }
+      var tr = e.target.closest('tr');
+      if (!tr) return;
+      var itemIdInput = tr.querySelector('input[name^="item_id_"]');
+      if (itemIdInput && itemIdInput.value) {
+        deletedItems.push(parseInt(itemIdInput.value, 10));
+        var di = document.getElementById('deleted_items');
+        if (di) di.value = JSON.stringify(deletedItems);
       }
     }
-  });
-
-  // Override the submit button to include deleted items
-  document.getElementById('submit_order_button').addEventListener('click', function (e) {
-    e.preventDefault();
-    order_data.order_items = collectOrderItemsFromTable();
-    const product_json = JSON.stringify(order_data.order_items);
-    document.getElementById('product_json_input').value = product_json;
-    console.log("Final order data to submit:", order_data);
-    console.log("Deleted items:", deletedItems);
-
-    // Submit the form programmatically
-    this.form.submit();
-  });
+  }, true);
 </script>
 {% endblock %}
 {% endblock %}

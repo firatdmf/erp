@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 from django.utils import timezone
 from django.urls import reverse
-from crm.models import Contact, Company
+from crm.models import Contact, Company, Supplier
 
 # from authentication.models import Member
 from datetime import datetime, date
@@ -59,12 +59,15 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     google_task_id = models.CharField(max_length=255, blank=True, null=True, help_text="ID of the task in Google Tasks")
-    # make it either a company or contact
+    # make it either a company, contact, or supplier
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True
     )
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, blank=True, null=True
+    )
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.CASCADE, blank=True, null=True, related_name="tasks"
     )
     member = models.ForeignKey(Member, on_delete=models.CASCADE, blank=True, null=True, related_name='assigned_tasks')
     assignees = models.ManyToManyField(Member, related_name='tasks', blank=True)
@@ -75,6 +78,8 @@ class Task(models.Model):
             return f"{self.name} for | {self.company}"
         elif self.contact:
             return f"{self.name} for | {self.contact}"
+        elif self.supplier:
+            return f"{self.name} for | {self.supplier}"
         else:
             return self.name
 
@@ -119,6 +124,32 @@ class Task(models.Model):
             'urgent': 'fa-exclamation-triangle',
         }
         return icons.get(self.priority, 'fa-minus')
+
+    def can_be_deleted_by(self, user):
+        """
+        Return True if the given Django ``User`` is allowed to delete this task.
+
+        Rule of thumb:
+        - Superusers / staff can always delete.
+        - The creator (created_by) can delete.
+        - The single assigned member (member) can delete their own task.
+        - A user in the m2m assignees set can delete.
+        - Tasks someone else assigned to me that I'm NOT in any of those roles
+          for return False — I see the task but cannot remove it.
+        """
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+            return True
+        member = getattr(user, "member", None)
+        if not member:
+            return False
+        if self.created_by_id == member.id:
+            return True
+        if self.member_id == member.id:
+            return True
+        # m2m check
+        return self.assignees.filter(pk=member.id).exists()
 
 
 class TaskComment(models.Model):

@@ -1314,29 +1314,32 @@ tbody td {
 }
 
 .attach-btn {
-  padding: 0.5rem 0.875rem;
-  background-color: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 500;
+  padding: 0.5rem 0.9rem;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .attach-btn:hover {
-  background-color: var(--bg-hover);
-  border-color: var(--text-secondary);
-  color: var(--text-primary);
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .attach-btn i {
-  font-size: 1rem;
+  font-size: 0.9rem;
+  color: #94a3b8;
 }
+
+.attach-btn:hover i { color: #64748b; }
 
 .attachment-section {
   margin-top: 1rem;
@@ -1366,17 +1369,123 @@ tbody td {
 
 .remove-attachment {
   background: transparent;
-  border: none;
-  color: var(--text-secondary);
+  border: 1px solid transparent;
+  color: #64748b;
   font-size: 0.8125rem;
+  font-weight: 600;
   cursor: pointer;
-  padding: 0;
-  transition: color 0.2s ease;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 .remove-attachment:hover {
-  color: #ef4444;
+  color: #dc2626;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
+
+/* ─── Multi-item lists (multi-note / multi-task) ─────────────────
+   Kept intentionally quiet: no card borders by default, just a thin
+   row separator. Focus ring is the only color cue. Icons stay
+   neutral until the user actually hovers them. */
+.multi-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.multi-item-row {
+  position: relative;
+  padding: 0;
+  background: transparent;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.note-row {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.note-row textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 56px;
+}
+
+.task-row {
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.task-row:last-child { border-bottom: none; padding-bottom: 0; }
+
+.task-row .task-row-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.4rem;
+}
+
+.task-row .task-row-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.task-row .task-row-foot select {
+  flex: 1;
+}
+
+.multi-remove-btn {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.multi-remove-btn:hover {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.multi-add-btn {
+  width: 100%;
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.multi-add-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.multi-add-btn i { font-size: 0.7rem; color: #94a3b8; }
+.multi-add-btn:hover i { color: #64748b; }
 
 .form-row {
   display: flex;

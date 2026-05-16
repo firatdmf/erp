@@ -1,0 +1,68 @@
+{% load i18n %}
+{# Edit form rendered into the side panel on the contact detail page.
+   No base.html chrome — the parent page provides the sidebar shell. #}
+<form id="editContactForm" method="post"
+      action="{% url 'crm:update_contact' contact.id %}"
+      onsubmit="submitEditContactForm(event); return false;">
+  {% csrf_token %}
+
+  <div class="form-group">
+    <label for="id_edit_contact_name">{% trans "Name" %} <span style="color:#ef4444;">*</span></label>
+    <input type="text" name="name" id="id_edit_contact_name" class="form-input"
+           value="{{ contact.name|default:'' }}" required autofocus>
+  </div>
+
+  <div class="form-group">
+    <label>{% trans "Email addresses" %}</label>
+    <div id="edit_emails_container"></div>
+    <input type="hidden" name="emails_data" id="contact_emails_data">
+  </div>
+
+  <div class="form-group">
+    <label>{% trans "Phone numbers" %}</label>
+    <div id="edit_phones_container"></div>
+    <input type="hidden" name="phones_data" id="contact_phones_data">
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_contact_job">{% trans "Job Title" %}</label>
+    <input type="text" name="job_title" id="id_edit_contact_job" class="form-input"
+           value="{{ contact.job_title|default:'' }}">
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_contact_address">{% trans "Address" %}</label>
+    <textarea name="address" id="id_edit_contact_address" class="form-textarea" rows="2">{{ contact.address|default:'' }}</textarea>
+  </div>
+
+  <div class="form-group">
+    <label for="id_edit_contact_birthday">{% trans "Birthday" %}</label>
+    <input type="date" name="birthday" id="id_edit_contact_birthday" class="form-input"
+           value="{{ contact.birthday|date:'Y-m-d'|default:'' }}">
+  </div>
+
+  <div class="sidebar-footer">
+    <button type="submit" id="editContactSubmitBtn" class="btn btn-primary">
+      <span class="btn-text">{% trans "Save changes" %}</span>
+      <span class="btn-spinner" style="display:none;">
+        <svg class="spinner-icon" viewBox="0 0 50 50">
+          <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+        </svg>
+        {% trans "Saving…" %}
+      </span>
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="closeEditContactSidebar()">{% trans "Cancel" %}</button>
+  </div>
+</form>
+
+<script>
+  (function() {
+    // Hydrate the email/phone dynamic-field widgets with current values.
+    var emails = {{ contact.email|default:"[]"|safe }};
+    var phones = {{ contact.phone|default:"[]"|safe }};
+    if (typeof initDynamicFields === 'function') {
+      initDynamicFields('edit_emails_container', 'contact_emails_data', 'email', emails);
+      initDynamicFields('edit_phones_container', 'contact_phones_data', 'phone', phones);
+    }
+  })();
+</script>

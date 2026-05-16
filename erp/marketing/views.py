@@ -105,7 +105,7 @@ class ProductList(generic.ListView):
     model = Product
     template_name = "marketing/product_list.html"
     context_object_name = "products"
-    paginate_by = 25  # Show 25 products per page
+    paginate_by = 25
 
     def get_template_names(self):
         if self.request.headers.get("HX-Request"):
@@ -148,7 +148,7 @@ class ProductList(generic.ListView):
                 F('quantity'),
                 Value(0, output_field=DecimalField())
             )
-        ).order_by('title')[:50]
+        ).order_by('title')
 
     def get_context_data(self, **kwargs):
         from django.db.models import Count, Sum, F, DecimalField, Value
@@ -790,11 +790,17 @@ class BaseProductView(ModelFormMixin):
             existing_variants_dict[var.variant_sku] = var
             variant_files_cache[var.variant_sku] = {f.pk: f for f in var.files.all()}
         
-        # Create missing variants in bulk
+        # Create missing variants in bulk. Pass variant_featured=True
+        # explicitly so a new variant is "available" by default — the
+        # model default is True too, but being explicit guards against
+        # accidental skips later if the field gets renamed or if a
+        # save-path setter wipes the default.
         variants_to_create = []
         for sku in variant_skus:
             if sku not in existing_variants_dict:
-                variants_to_create.append(ProductVariant(product=self.object, variant_sku=sku))
+                variants_to_create.append(
+                    ProductVariant(product=self.object, variant_sku=sku, variant_featured=True)
+                )
         
         if variants_to_create:
             created = ProductVariant.objects.bulk_create(variants_to_create)
@@ -822,11 +828,13 @@ class BaseProductView(ModelFormMixin):
             for key, value in variant_data.items():
                 if key not in non_model_fields:
                     old_value = getattr(variant, key, None)
-                    # Debug: Log variant_cost and variant_featured specifically
-                    if key == "variant_cost":
-                        print(f"  🔍 DEBUG variant_cost: old={old_value}, new={value}, will_update={old_value != value}")
+                    # Boolean fields: never let a missing/None value
+                    # silently flip the flag — coerce to a real bool
+                    # and skip nullish writes so the model default wins.
                     if key == "variant_featured":
-                        print(f"  🔍 DEBUG variant_featured: sku={variant.variant_sku}, old={old_value} (type={type(old_value).__name__}), new={value} (type={type(value).__name__}), will_update={old_value != value}")
+                        if value is None:
+                            continue
+                        value = bool(value)
                     if old_value != value:
                         setattr(variant, key, value)
                         changed_fields.add(key)

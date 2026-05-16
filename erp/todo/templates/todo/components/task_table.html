@@ -543,9 +543,9 @@
   <table class="tasks-table" id="tasksTable">
     <thead>
       <tr>
-        {% if not is_assigned_view %}
         <th style="width: 40px;"></th>
-        {% endif %}
+        {# delete column header always present so column widths line up; #}
+        {# the body cell stays empty for tasks the user can't delete.    #}
         <th>{% if is_assigned_view %}TASK TITLE{% else %}TASK TITLE{% endif %}</th>
         <th>{% if is_assigned_view %}ASSIGNED TO{% else %}ASSIGNED TO{% endif %}</th>
         <th>{% if is_assigned_view %}STATUS{% else %}STATUS{% endif %}</th>
@@ -559,14 +559,15 @@
       <tr class="taskComponent" data-task-id="{{ task.id }}"
         onclick="if(!event.target.closest('.delete-task-btn') && !event.target.closest('input[type=checkbox]')) window.location.href='/todo/tasks/{{ task.id }}/detail/'"
         style="cursor: pointer;">
-        {% if not is_assigned_view %}
         <td class="delete-cell">
+          {% if task.can_be_deleted_by_user %}
           <button class="btn-icon delete-task-btn"
+            title="{% trans 'Delete' %}"
             onclick="event.stopPropagation(); confirmDeleteTask('{{ task.id }}', this)">
             <i class="fa fa-trash"></i>
           </button>
+          {% endif %}
         </td>
-        {% endif %}
         <td class="task-title-cell">{{ task.name }}</td>
         <td>
           <div class="assignee-cell">

@@ -1,0 +1,298 @@
+{% load i18n static %}
+{% comment %}
+  Edit Order — partial rendered into the editOrderSidebarContent
+  shell. No base chrome here; the parent page already provides CSS
+  via base.html, we add the small bits we need inline below.
+{% endcomment %}
+<style>
+  .eo-form { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 24px; }
+  .eo-section-title {
+    font: 700 11px var(--font-sans, system-ui);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6B7280;
+    margin: 4px 0 -4px;
+  }
+  .eo-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .eo-field label {
+    font: 600 12px var(--font-sans, system-ui);
+    color: #374151;
+  }
+  .eo-input {
+    width: 100%; padding: 9px 12px;
+    background: #fff;
+    border: 1px solid #E0E6EE; border-radius: 9px;
+    font: 500 13.5px var(--font-sans, system-ui);
+    color: #0F1419; outline: none;
+    transition: border-color 140ms, box-shadow 140ms;
+    box-sizing: border-box;
+  }
+  .eo-input:focus {
+    border-color: #147F74;
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  /* Customer / product autocomplete dropdowns: tighter list inside the panel */
+  #customer-search-results ul, #product-search-results ul {
+    list-style: none; margin: 4px 0 0; padding: 4px;
+    background: #fff; border: 1px solid #E2E8EE; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(15,23,31,0.10);
+    max-height: 260px; overflow-y: auto;
+  }
+  #customer-search-results ul li, #product-search-results ul li,
+  #customer-search-results .customer-ac-item, #customer-search-results .customer-ac-empty {
+    padding: 9px 12px; cursor: pointer; border-radius: 7px;
+    font: 500 13px var(--font-sans, system-ui); color: #0F1419;
+    display: flex; align-items: center; gap: 10px;
+    transition: background 120ms;
+    border: none; margin: 0;
+  }
+  #customer-search-results .customer-ac-item:hover,
+  #customer-search-results ul li:hover,
+  #product-search-results ul li:hover {
+    background: #E5F1F0; color: #005354;
+  }
+  #customer-search-results .customer-ac-item i {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #E5F1F0; color: #00696A;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; flex-shrink: 0;
+  }
+  /* Items table */
+  #order_items_table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    background: #fff; border: 1px solid #E2E8EE; border-radius: 10px;
+    overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  #order_items_table th {
+    text-align: left; padding: 10px 12px;
+    font: 700 10.5px var(--font-sans, system-ui);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: #6B7280; background: #FAFBFD;
+    border-bottom: 1px solid #E2E8EE;
+  }
+  #order_items_table td {
+    padding: 8px 10px; border-bottom: 1px solid #EEF1F5;
+    font: 500 12.5px var(--font-sans, system-ui); color: #0F1419;
+    vertical-align: middle;
+  }
+  #order_items_table tr:last-child td { border-bottom: none; }
+  #order_items_table input[type="text"],
+  #order_items_table input[type="number"] {
+    width: 100%; padding: 6px 8px;
+    border: 1px solid transparent; background: transparent;
+    border-radius: 6px;
+    font: 500 12.5px var(--font-sans, system-ui); color: #0F1419;
+    outline: none;
+  }
+  #order_items_table input:focus {
+    border-color: #147F74; background: #fff;
+    box-shadow: 0 0 0 2px rgba(20,127,116,0.10);
+  }
+  #order_items_table .delete-row-btn {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 6px; color: #DC2626;
+    transition: background 140ms;
+    font-size: 14px;
+  }
+  #order_items_table .delete-row-btn:hover { background: #FEF2F2; }
+  /* Footer actions */
+  .eo-foot {
+    display: flex; justify-content: flex-end; gap: 8px;
+    margin-top: 8px; padding-top: 14px;
+    border-top: 1px solid #EEF1F5;
+  }
+  .eo-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border-radius: 10px;
+    font: 600 13px var(--font-sans, system-ui);
+    cursor: pointer; border: 1px solid transparent;
+    transition: all 140ms;
+  }
+  .eo-btn.ghost { background: #fff; border-color: #E0E6EE; color: #374151; }
+  .eo-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .eo-btn.primary {
+    background: linear-gradient(180deg, #147F74 0%, #00696A 100%);
+    border-color: #005354; color: #fff;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .eo-btn.primary:hover { filter: brightness(1.04); }
+  /* Status banner */
+  .eo-banner {
+    padding: 9px 12px; border-radius: 9px;
+    background: #FEF3C7; color: #8B5A00;
+    font: 600 12px var(--font-sans, system-ui);
+    border: 1px solid #F5D78B;
+    display: flex; align-items: center; gap: 8px;
+  }
+</style>
+
+{# Existing items as JSON for the JS to hydrate order_data with. #}
+{{ order_items_payload|json_script:"existing-order-items" }}
+
+<form id="editOrderForm" method="post" action="{% url 'operating:edit_order' order.pk %}" class="eo-form">
+  {% csrf_token %}
+
+  <div class="eo-banner">
+    <i class="fas fa-pen-to-square"></i>
+    {% trans "Editing order" %} #{{ order.pk }}{% if order.order_number %} — {{ order.order_number }}{% endif %}
+  </div>
+
+  <div class="eo-section-title">{% trans "Customer" %}</div>
+  <div id="customer-fields" class="eo-field">
+    <label for="customer-input">{% trans "Search contact or company" %}</label>
+    <input id="customer-input" name="customer" type="text" class="eo-input"
+      value="{% if order.contact %}{{ order.contact.name|capfirst }}{% elif order.company %}{{ order.company.name|capfirst }}{% endif %}"
+      hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
+      hx-target="#customer-search-results" hx-swap="innerHTML"
+      placeholder="{% trans 'Type a name…' %}" autocomplete="off" />
+    <input type="hidden" id="customer-type" name="customer_type"
+      value="{% if order.contact %}contact{% elif order.company %}company{% endif %}" />
+    <input type="hidden" id="customer-pk" name="customer_pk"
+      value="{% if order.contact %}{{ order.contact.pk }}{% elif order.company %}{{ order.company.pk }}{% endif %}" />
+    <div id="customer-search-results" style="position:relative;"></div>
+  </div>
+
+  <div class="eo-section-title">{% trans "Add product" %}</div>
+  <div id="product-fields" class="eo-field">
+    <label for="product-input">{% trans "Search by name, SKU, or variant SKU" %}</label>
+    <input id="product-input" name="product" type="text" class="eo-input"
+      placeholder="{% trans 'Type to search…' %}" autocomplete="off"
+      hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
+      hx-target="#product-search-results" hx-swap="innerHTML" />
+    <div id="product-search-results" style="position:relative;"></div>
+    <div id="product_autocomplete_error"></div>
+  </div>
+
+  <div class="eo-section-title">{% trans "Order fields" %}</div>
+  <div class="eo-field">
+    {{ form.as_p }}
+  </div>
+
+  <div class="eo-section-title">{% trans "Items" %}</div>
+  <table id="order_items_table">
+    <tr>
+      <th style="width:42px;">#</th>
+      <th>{% trans "Product" %}</th>
+      <th>{% trans "Description" %}</th>
+      <th style="width:90px;">{% trans "Qty" %}</th>
+      <th style="width:110px;">{% trans "Unit price" %}</th>
+      <th style="width:110px;">{% trans "Total" %}</th>
+      <th style="width:48px;"></th>
+    </tr>
+    {% for item in order_items %}
+    <tr data-item-id="{{ item.pk }}">
+      <td>{{ forloop.counter }}</td>
+      <td>
+        <input type="text" readonly
+          value="{% if item.product_variant %}{{ item.product_variant.variant_sku }}{% else %}{{ item.product.sku }}{% endif %}"
+          id="sku_{{ forloop.counter }}" />
+        <input type="hidden" name="variant_{{ forloop.counter }}" id="variant_{{ forloop.counter }}"
+          value="{% if item.product_variant %}true{% else %}false{% endif %}" />
+        <input type="hidden" name="item_id_{{ forloop.counter }}" id="item_id_{{ forloop.counter }}"
+          value="{{ item.pk }}" />
+      </td>
+      <td>
+        <input type="text" name="description_{{ forloop.counter }}" id="description_{{ forloop.counter }}"
+          value="{{ item.description|default:'' }}" />
+      </td>
+      <td>
+        <input type="number" name="quantity_{{ forloop.counter }}" id="quantity_{{ forloop.counter }}"
+          class="quantity-input" data-index="{{ forloop.counter }}" value="{{ item.quantity }}" min="0" step="0.01" />
+      </td>
+      <td>
+        <input type="number" name="price_{{ forloop.counter }}" id="price_{{ forloop.counter }}" class="price-input"
+          data-index="{{ forloop.counter }}" value="{{ item.price }}" min="0" step="0.01" />
+      </td>
+      <td>
+        <input type="number" name="total_{{ forloop.counter }}" id="total_{{ forloop.counter }}" class="total-input"
+          data-index="{{ forloop.counter }}" value="{{ item.subtotal }}" readonly />
+      </td>
+      <td>
+        <div class="delete-row-btn" title="{% trans 'Remove' %}" style="cursor:pointer;">
+          <i class="fas fa-times"></i>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <input type="hidden" id="product_json_input" name="product_json_input" />
+  <input type="hidden" id="deleted_items" name="deleted_items" />
+
+  <div class="eo-foot">
+    <button type="button" class="eo-btn ghost" onclick="closeEditOrderSidebar()">{% trans "Cancel" %}</button>
+    <button type="submit" id="submit_order_button" class="eo-btn primary">
+      <i class="fas fa-check"></i> {% trans "Save changes" %}
+    </button>
+  </div>
+</form>
+
+<script src="{% static 'operating/js/create_edit_order.js' %}"></script>
+<script>
+  (function () {
+    // Hydrate order_data with the existing items so duplicate checks
+    // and submit serialization work.
+    var node = document.getElementById('existing-order-items');
+    if (node && window.order_data) {
+      try { window.order_data.order_items = JSON.parse(node.textContent || '[]'); }
+      catch (e) { /* ignore — leave empty */ }
+    }
+    // Initialize the order form bindings (the JS file's
+    // initOrderForm() normally runs on DOMContentLoaded — that already
+    // fired for this page, so call it directly).
+    if (typeof initOrderForm === 'function') initOrderForm();
+
+    // Deleted-items tracker — capture phase so the id is recorded
+    // BEFORE the JS file's bubble-phase handler removes the row.
+    var deletedItems = [];
+    document.getElementById('editOrderForm').addEventListener('click', function (e) {
+      var btn = e.target.closest('.delete-row-btn');
+      if (!btn) return;
+      var tr = btn.closest('tr');
+      if (!tr) return;
+      var idInput = tr.querySelector('input[name^="item_id_"]');
+      if (idInput && idInput.value) {
+        deletedItems.push(parseInt(idInput.value, 10));
+        var di = document.getElementById('deleted_items');
+        if (di) di.value = JSON.stringify(deletedItems);
+      }
+    }, true);
+
+    // AJAX submit — POST to the same edit URL, then refresh the
+    // outer page so the user sees the saved state.
+    document.getElementById('editOrderForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      // Make sure the latest table state is collected into the JSON input.
+      if (typeof collectOrderItemsFromTable === 'function' && window.order_data) {
+        window.order_data.order_items = collectOrderItemsFromTable();
+        document.getElementById('product_json_input').value =
+          JSON.stringify(window.order_data.order_items);
+      }
+      var form = this;
+      var btn = document.getElementById('submit_order_button');
+      var origLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> {% trans "Saving…" %}';
+      fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      }).then(function (r) {
+        if (r.redirected || r.ok) {
+          // Reload to pick up the saved order state.
+          window.location.reload();
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = origLabel;
+          alert('Save failed. Please try again.');
+        }
+      }).catch(function () {
+        btn.disabled = false;
+        btn.innerHTML = origLabel;
+        alert('Network error.');
+      });
+    });
+  })();
+</script>

@@ -74,7 +74,7 @@
   .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
   .ord-btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
 
-  /* TITLE BADGES (job title / company chips inline w/ title) */
+  /* TITLE BADGES */
   .od-chip {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 5px 11px; border-radius: 999px;
@@ -126,7 +126,7 @@
   .od-card-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; }
   .od-card-action { margin-left: auto; }
 
-  /* DETAIL LIST (right column info) */
+  /* DETAIL LIST */
   .od-detail-list { display: flex; flex-direction: column; gap: 10px; }
   .od-dt { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .od-dt span.k { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
@@ -160,7 +160,26 @@
   .od-cust-n { font: 700 14px var(--font-sans); color: #0F1419; }
   .od-cust-c { font: 500 12px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
 
-  /* ATTACH SECTION */
+  /* LINKED ENTITY ROW */
+  .od-linked-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; background: #F8FAFC;
+    border: 1px solid #E2E8EE; border-radius: 10px;
+    text-decoration: none; color: inherit; transition: all 140ms;
+  }
+  .od-linked-row + .od-linked-row { margin-top: 8px; }
+  .od-linked-row:hover { border-color: var(--nejum-teal-500); background: white; }
+  .od-linked-avatar {
+    width: 36px; height: 36px; border-radius: 50%; color: white; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 12.5px var(--font-sans); letter-spacing: 0.04em;
+    background: linear-gradient(135deg, var(--nejum-teal-500), var(--nejum-teal-700));
+  }
+  .od-linked-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .od-linked-n { font: 700 13px var(--font-sans); color: var(--ink); }
+  .od-linked-k { font: 600 10.5px var(--font-sans); color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ATTACH */
   .od-attach-bar { display: flex; gap: 8px; flex-wrap: wrap; }
   .od-attach-panel {
     margin-top: 14px; padding: 14px 16px;
@@ -182,7 +201,6 @@
   }
   .od-text-btn:hover { background: #E2E8EE; color: var(--ink); }
 
-  /* Style Django-rendered <p> fields inside the attach forms */
   .od-attach-panel form p { margin: 0 0 10px 0; }
   .od-attach-panel form p label {
     display: block; font: 600 11.5px var(--font-sans);
@@ -213,63 +231,7 @@
     margin-top: 12px; padding-top: 10px; border-top: 1px dashed #E2E8EE;
   }
 
-  /* TASKS LIST */
-  /* Order history — compact clickable rows linking to operating:order_detail */
-  .od-order-list { display: flex; flex-direction: column; gap: 8px; }
-  .od-order-row {
-    display: grid;
-    grid-template-columns: 1.4fr 130px 1fr 18px;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
-    background: white;
-    border: 1px solid #E2E8EE;
-    border-radius: 10px;
-    text-decoration: none;
-    color: inherit;
-    transition: all 140ms;
-  }
-  .od-order-row:hover {
-    border-color: var(--nejum-teal-500);
-    box-shadow: 0 2px 6px rgba(15,23,31,0.05);
-    color: inherit;
-  }
-  .od-order-row:hover .od-order-chev { color: var(--nejum-teal-700); }
-  .od-order-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .od-order-num { font: 700 12.5px var(--font-mono); color: #0F1419; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .od-order-date { font: 500 11px var(--font-sans); color: var(--gray-500); }
-  .od-order-total { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; text-align: right; }
-  .od-order-total span { font-weight: 500; color: var(--gray-500); font-size: 11px; }
-  .od-order-chev { color: var(--gray-400); font-size: 13px; justify-self: end; }
-
-  /* Order status pill — matches the order_list/order_detail color map */
-  .ord-status {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 3px 10px 3px 8px;
-    border-radius: 999px;
-    font: 600 11px var(--font-sans);
-    white-space: nowrap; width: fit-content;
-  }
-  .ord-status-dot { width: 5px; height: 5px; border-radius: 50%; }
-  .ord-status.pending       { color: #B27500; background: #FEF3C7; }
-  .ord-status.pending       .ord-status-dot { background: #F59E0B; }
-  .ord-status.scheduled, .ord-status.preparing { color: #1565C0; background: #DBEAFE; }
-  .ord-status.scheduled .ord-status-dot, .ord-status.preparing .ord-status-dot { background: #3B82F6; }
-  .ord-status.in_production { color: #7E22CE; background: #F3E8FF; }
-  .ord-status.in_production .ord-status-dot { background: #A855F7; }
-  .ord-status.confirmed, .ord-status.delivered, .ord-status.shipped { color: #0E6E4A; background: #D1FAE5; }
-  .ord-status.confirmed .ord-status-dot, .ord-status.delivered .ord-status-dot, .ord-status.shipped .ord-status-dot { background: #10B981; }
-  .ord-status.completed     { color: #0F1419; background: #E5E7EB; }
-  .ord-status.completed     .ord-status-dot { background: #374151; }
-  .ord-status.cancelled, .ord-status.returned { color: #B23B3B; background: #FEE2E2; }
-  .ord-status.cancelled .ord-status-dot, .ord-status.returned .ord-status-dot { background: #EF4444; }
-
-  @media (max-width: 700px) {
-    .od-order-row { grid-template-columns: 1fr auto; gap: 8px; }
-    .od-order-row > .ord-status { grid-column: 1 / -1; }
-    .od-order-chev { display: none; }
-  }
-
+  /* TASKS */
   .od-task-list { display: flex; flex-direction: column; gap: 10px; }
   .od-task {
     display: flex; align-items: flex-start; gap: 14px;
@@ -304,7 +266,7 @@
   .od-icon-btn.ok:hover { border-color: #10B981; color: #0E6E4A; background: #F0FDF4; }
   .od-icon-btn.del:hover { border-color: #EF4444; color: #B23B3B; background: #FEF2F2; }
 
-  /* NOTES HISTORY OVERRIDES (history.css renders here) */
+  /* NOTES HISTORY (inline render) */
   #notesSection { display: contents; }
   .od-section-title {
     display: flex; align-items: center; gap: 10px; margin: 8px 4px 4px;
@@ -314,27 +276,46 @@
     font: 700 11px var(--font-sans); color: var(--gray-600); margin: 0;
     letter-spacing: 0.10em; text-transform: uppercase;
   }
+  .od-history-list { display: flex; flex-direction: column; gap: 10px; }
+  .od-history-item {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 12px 14px; background: white;
+    border: 1px solid #E2E8EE; border-radius: 12px; transition: all 140ms;
+  }
+  .od-history-item:hover { border-color: #C5CCD3; box-shadow: 0 2px 6px rgba(15,23,31,0.05); }
+  .od-history-item.completed { background: #F0FDF4; border-color: #BBF7D0; }
+  .od-history-item.created  { background: #FEFCE8; border-color: #FDE047; opacity: 0.85; }
+  .od-history-content { flex: 1; min-width: 0; }
+  .od-history-meta {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;
+  }
+  .od-history-date { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-history-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px;
+    font: 700 10.5px var(--font-sans); letter-spacing: 0.04em;
+    background: #DCFCE7; color: #166534;
+  }
+  .od-history-badge i { width: 10px; height: 10px; }
+  .od-history-badge.created-badge { background: #E0E7FF; color: #3730A3; }
+  .od-history-text {
+    margin: 0; font: 500 13px var(--font-sans); color: var(--ink);
+    line-height: 1.55; word-break: break-word;
+  }
+  .od-history-desc {
+    margin: 6px 0 0 0; font: 500 12.5px var(--font-sans); color: var(--gray-600);
+    line-height: 1.5;
+  }
+  .od-history-actions { display: flex; gap: 4px; flex-shrink: 0; margin-left: 10px; }
 
   /* COMMUNICATION TAB */
-  .od-comm-head {
-    display: flex; justify-content: space-between; align-items: center;
-    gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+  .od-comm-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 60px 20px; color: var(--gray-500);
   }
-  .od-comm-toggle {
-    display: inline-flex; gap: 4px; padding: 4px; background: #F1F5F9;
-    border: 1px solid #E2E8EE; border-radius: 10px;
-  }
-  .comm-toggle-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; background: transparent; border: 1px solid transparent;
-    border-radius: 7px; font: 600 12px var(--font-sans);
-    color: var(--gray-600); cursor: pointer; transition: all 140ms;
-  }
-  .comm-toggle-btn:hover { color: var(--ink); }
-  .comm-toggle-btn.active {
-    background: white; color: var(--nejum-teal-700); border-color: #E0E6EE;
-    box-shadow: 0 1px 2px rgba(15,23,31,0.05);
-  }
+  .od-comm-empty i { font-size: 28px; color: var(--gray-400); }
+  .od-comm-empty .empty-title { font: 700 14px var(--font-sans); color: var(--gray-700); }
+  .od-comm-empty .empty-sub { font: 500 12.5px var(--font-sans); color: var(--gray-500); }
 
   /* TAB CONTENT VISIBILITY */
   .tab-content { display: none; }
@@ -351,62 +332,69 @@
 </style>
 {% endblock %}
 
-{% block js %}
-<script src="{% static 'crm/js/detailPages.js' %}" defer></script>
-{% endblock %}
-
 {% block content %}
 <div class="ord">
 
   <!-- CRUMBS -->
   <div class="od-crumbs">
-    <a href="{% url 'crm:contact_list' %}" class="od-back">
-      <i class="fa fa-arrow-left"></i> {% trans "Back to contacts" %}
+    <a href="{% url 'crm:supplier_list' %}" class="od-back">
+      <i class="fa fa-arrow-left"></i> {% trans "Back to suppliers" %}
     </a>
     <span class="od-sep">/</span>
-    <span class="od-crumb-here">{{ contact.name|capfirst }}</span>
+    <span class="od-crumb-here">{{ supplier.company_name|default:supplier.contact_name }}</span>
   </div>
 
   <!-- HEAD -->
   <div class="od-head">
     <div>
       <div class="od-head-row">
-        <h1 class="od-title">{{ contact.name|capfirst }}</h1>
-        {% if contact.job_title %}
-          <span class="od-chip teal"><i class="fa fa-briefcase"></i>{{ contact.job_title }}</span>
+        <h1 class="od-title">{{ supplier.company_name|default:supplier.contact_name }}</h1>
+        {% if supplier.company_name and supplier.contact_name %}
+          <span class="od-chip teal"><i class="fa fa-user"></i>{{ supplier.contact_name }}</span>
         {% endif %}
-        {% if contact.company %}
-          <a href="{% url 'crm:company_detail' contact.company.id %}" class="od-chip link">
-            <i class="fa fa-building"></i>{{ contact.company.name }}
+        {% if supplier.website %}
+          <a href="{{ supplier.website }}" target="_blank" rel="noopener" class="od-chip link">
+            <i class="fa fa-globe"></i>{{ supplier.website }}
+          </a>
+        {% endif %}
+        {% if supplier.linked_company %}
+          <a href="{% url 'crm:company_detail' supplier.linked_company.id %}" class="od-chip link">
+            <i class="fa fa-building"></i>{{ supplier.linked_company.name }}
+          </a>
+        {% endif %}
+        {% if supplier.linked_contact %}
+          <a href="{% url 'crm:contact_detail' supplier.linked_contact.id %}" class="od-chip link">
+            <i class="fa fa-user"></i>{{ supplier.linked_contact.name }}
           </a>
         {% endif %}
       </div>
       <div class="od-meta">
-        {% if contact.job_title %}
-          <span><i class="fa fa-briefcase"></i>{{ contact.job_title }}</span>
-          <span class="od-dot"></span>
-        {% endif %}
-        {% if contact.company %}
-          <span>
-            <i class="fa fa-building"></i>
-            <a href="{% url 'crm:company_detail' contact.company.id %}">{{ contact.company.name }}</a>
-          </span>
-          <span class="od-dot"></span>
-        {% endif %}
-        {% if contact.email %}
+        {% if supplier.email %}
           <span>
             <i class="fa fa-envelope"></i>
-            <a href="mailto:{{ contact.email.0 }}">{{ contact.email.0 }}</a>
+            <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
           </span>
+        {% endif %}
+        {% if supplier.phone %}
+          {% if supplier.email %}<span class="od-dot"></span>{% endif %}
+          <span><i class="fa fa-phone"></i>{{ supplier.phone }}</span>
+        {% endif %}
+        {% if supplier.country %}
+          {% if supplier.email or supplier.phone %}<span class="od-dot"></span>{% endif %}
+          <span><i class="fa fa-map-pin"></i>{{ supplier.country }}</span>
+        {% endif %}
+        {% if supplier.address %}
+          {% if supplier.email or supplier.phone or supplier.country %}<span class="od-dot"></span>{% endif %}
+          <span><i class="fa fa-map"></i>{{ supplier.address }}</span>
         {% endif %}
       </div>
     </div>
     <div class="od-head-r">
-      <a href="#" onclick="openEditContactSidebar(); return false;" class="ord-btn ghost">
+      <a href="{% url 'crm:supplier_update' supplier.id %}" class="ord-btn ghost">
         <i class="fa fa-edit"></i>{% trans "Edit" %}
       </a>
-      {% trans "Are you sure you want to delete this contact?" as confirm_delete_msg %}
-      <form action="{% url 'crm:delete_contact' contact.id %}" method="post"
+      {% trans "Are you sure you want to delete this supplier?" as confirm_delete_msg %}
+      <form action="{% url 'crm:supplier_delete' supplier.id %}" method="post"
             style="display: inline; margin: 0;"
             onsubmit='return confirm("{{ confirm_delete_msg|escapejs }}");'>
         {% csrf_token %}
@@ -483,49 +471,6 @@
           </div>
         </section>
 
-        <!-- ORDER HISTORY -->
-        <section class="od-card">
-          <div class="od-card-h">
-            <i class="fa fa-shopping-bag card-ico"></i>
-            <h3>{% trans "Order history" %}</h3>
-            <span class="od-card-sub">{{ orders|length }} {% blocktrans count counter=orders|length %}order{% plural %}orders{% endblocktrans %}</span>
-          </div>
-          <div class="od-order-list">
-            {% for o in orders %}
-              <a class="od-order-row" href="{% url 'operating:order_detail' o.pk %}">
-                <div class="od-order-id">
-                  <div class="od-order-num">{{ o.order_number|default:o.pk }}</div>
-                  <div class="od-order-date">{{ o.created_at|date:"M d, Y" }}</div>
-                </div>
-                {% with disp_status=o.order_status|default:o.status %}
-                <span class="ord-status {{ disp_status }}">
-                  <span class="ord-status-dot"></span>
-                  {# Prefer the production STATUS_CHOICES label (English
-                     and translatable). The customer-facing
-                     ORDER_STATUS_CHOICES labels are hardcoded Turkish
-                     in the model, so they'd leak into English mode. #}
-                  {% if o.get_status_display %}{{ o.get_status_display }}{% else %}{{ disp_status|capfirst }}{% endif %}
-                </span>
-                {% endwith %}
-                <div class="od-order-total">
-                  {% if o.paid_amount %}
-                    {{ o.paid_amount }} <span>{{ o.paid_currency|default:"" }}</span>
-                  {% elif o.original_price %}
-                    {{ o.original_price }} <span>{{ o.original_currency|default:"" }}</span>
-                  {% else %}
-                    <span class="od-empty-mute">—</span>
-                  {% endif %}
-                </div>
-                <i class="fa fa-chevron-right od-order-chev"></i>
-              </a>
-            {% empty %}
-              <p class="od-empty-mute empty-state" style="padding: 8px 2px;">
-                {% trans "No orders yet for this contact." %}
-              </p>
-            {% endfor %}
-          </div>
-        </section>
-
         <!-- ATTACH AN ITEM -->
         <section class="od-card attach-card">
           <div class="od-card-h">
@@ -549,8 +494,8 @@
                 {% trans "Cancel" %}
               </button>
             </div>
-            <form hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_note" hx-swap="none" class="attach-form"
-                  hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('note'); htmx.ajax('GET', '/crm/contact/{{ contact.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'}); }">
+            <form hx-post="{% url 'crm:supplier_detail' supplier.id %}?action=add_note" hx-swap="none" class="attach-form"
+                  hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('note'); htmx.ajax('GET', '/crm/supplier/{{ supplier.id }}/notes_partial/', {target: '#notesSection', swap: 'outerHTML'}); }">
               {% csrf_token %}
               {{ note_form.as_p }}
               <div class="form-actions">
@@ -569,7 +514,7 @@
                 {% trans "Cancel" %}
               </button>
             </div>
-            <form hx-post="{% url 'crm:contact_detail' contact.id %}?action=add_task" hx-target="#tasksList"
+            <form hx-post="{% url 'crm:supplier_detail' supplier.id %}?action=add_task" hx-target="#tasksList"
                   hx-swap="innerHTML" class="attach-form"
                   hx-on::after-request="if(event.detail.successful) { this.reset(); toggleAttachSection('task'); }">
               {% csrf_token %}
@@ -589,83 +534,183 @@
           <h3>{% trans "History" %}</h3>
         </div>
         <div id="notesSection">
-          {% history_component company=None contact=contact csrf_token=csrf_token note_form=note_form current_url=request.path %}
+          <div class="od-card">
+            <div class="od-history-list notes-list">
+              {% for entry in history_entries %}
+                {% if entry.content %}
+                  <!-- Note Item -->
+                  <div class="od-history-item note-item" id="note-{{ entry.id }}">
+                    <div class="od-history-content note-content" id="note-content-{{ entry.id }}">
+                      <div class="od-history-meta note-meta">
+                        <span class="od-history-date note-date">{{ entry.created_at|date:"M d, Y - g:i A" }}</span>
+                      </div>
+                      <p class="od-history-text note-text">{{ entry.content }}</p>
+                    </div>
+                    <div class="od-history-actions note-actions">
+                      <button type="button" class="od-icon-btn btn-icon-minimal" title="{% trans 'Edit' %}"
+                              onclick="editNote({{ entry.id }}, `{{ entry.content|escapejs }}`)">
+                        <i class="fa fa-edit"></i>
+                      </button>
+                      <button type="button" class="od-icon-btn del btn-icon-minimal" title="{% trans 'Delete' %}"
+                              onclick="confirmDelete('delete_note', {{ entry.id }})">
+                        <i class="fa fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                {% elif entry.name %}
+                  <!-- Completed Task Item -->
+                  <div class="od-history-item completed completed-task-item">
+                    <div class="od-history-content note-content">
+                      <div class="od-history-meta note-meta">
+                        <span class="od-history-date note-date">{{ entry.completed_at|date:"M d, Y - g:i A" }}</span>
+                        <span class="od-history-badge note-badge"><i class="fa fa-check-circle"></i> {% trans "Completed" %}</span>
+                      </div>
+                      <p class="od-history-text note-text"><strong>{{ entry.name }}</strong></p>
+                      {% if entry.description %}
+                        <p class="od-history-desc note-description">{{ entry.description }}</p>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endif %}
+              {% empty %}
+                <p class="od-empty-mute empty-state" style="padding: 8px 2px;">{% trans "No notes or history available." %}</p>
+              {% endfor %}
+
+              <!-- Created Entry -->
+              <div class="od-history-item created created-item">
+                <div class="od-history-content note-content">
+                  <div class="od-history-meta note-meta">
+                    <span class="od-history-date note-date">{{ supplier.created_at|date:"M d, Y - g:i A" }}</span>
+                    <span class="od-history-badge created-badge"><i class="fa fa-plus-circle"></i> {% trans "Created" %}</span>
+                  </div>
+                  <p class="od-history-text note-text">
+                    <strong>{{ supplier.company_name|default:supplier.contact_name }}</strong> {% trans "was added as a supplier" %}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {# ============== RIGHT ============== #}
       <div class="od-right">
-        <!-- CONTACT INFO -->
+
+        <!-- SUPPLIER INFO -->
         <section class="od-card">
           <div class="od-card-h">
-            <i class="fa fa-user card-ico"></i>
-            <h3>{% trans "Contact" %}</h3>
+            <i class="fa fa-truck card-ico"></i>
+            <h3>{% trans "Supplier" %}</h3>
           </div>
 
           <div class="od-cust">
-            <div class="od-cust-avatar">{{ contact.name|slice:":2"|upper }}</div>
+            <div class="od-cust-avatar">{{ supplier.company_name|default:supplier.contact_name|slice:":2"|upper }}</div>
             <div>
-              <div class="od-cust-n">{{ contact.name|capfirst }}</div>
-              {% if contact.job_title %}
-                <div class="od-cust-c">{{ contact.job_title }}</div>
-              {% elif contact.company %}
-                <div class="od-cust-c">{{ contact.company.name }}</div>
+              <div class="od-cust-n">{{ supplier.company_name|default:supplier.contact_name }}</div>
+              {% if supplier.company_name and supplier.contact_name %}
+                <div class="od-cust-c">{{ supplier.contact_name }}</div>
+              {% elif supplier.country %}
+                <div class="od-cust-c">{{ supplier.country }}</div>
               {% endif %}
             </div>
           </div>
 
           <div class="od-detail-list">
-            {% if contact.email %}
+            {% if supplier.company_name %}
               <div class="od-dt-block">
-                <span class="k">{% trans "Email" %}{{ contact.email|length|pluralize }}</span>
+                <span class="k">{% trans "Company name" %}</span>
+                <div class="od-dt-stack"><span class="v-line">{{ supplier.company_name }}</span></div>
+              </div>
+            {% endif %}
+
+            {% if supplier.contact_name %}
+              <div class="od-dt-block">
+                <span class="k">{% trans "Contact name" %}</span>
+                <div class="od-dt-stack"><span class="v-line">{{ supplier.contact_name }}</span></div>
+              </div>
+            {% endif %}
+
+            {% if supplier.email %}
+              <div class="od-dt-block">
+                <span class="k">{% trans "Email" %}</span>
+                <div class="od-dt-stack"><a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a></div>
+              </div>
+            {% endif %}
+
+            {% if supplier.phone %}
+              <div class="od-dt-block">
+                <span class="k">{% trans "Phone" %}</span>
+                <div class="od-dt-stack"><span class="v-line">{{ supplier.phone }}</span></div>
+              </div>
+            {% endif %}
+
+            {% if supplier.website %}
+              <div class="od-dt-block">
+                <span class="k">{% trans "Website" %}</span>
                 <div class="od-dt-stack">
-                  {% for email in contact.email %}
-                    <a href="mailto:{{ email }}">{{ email }}</a>
-                  {% endfor %}
+                  <a href="{{ supplier.website }}" target="_blank" rel="noopener">{{ supplier.website }}</a>
                 </div>
               </div>
             {% endif %}
 
-            {% if contact.phone %}
-              <div class="od-dt-block">
-                <span class="k">{% trans "Phone" %}{{ contact.phone|length|pluralize }}</span>
-                <div class="od-dt-stack">
-                  {% for phone in contact.phone %}
-                    <span class="v-line">{{ phone }}</span>
-                  {% endfor %}
-                </div>
-              </div>
-            {% endif %}
-
-            {% if contact.job_title %}
-              <div class="od-dt-block">
-                <span class="k">{% trans "Job title" %}</span>
-                <div class="od-dt-stack"><span class="v-line">{{ contact.job_title }}</span></div>
-              </div>
-            {% endif %}
-
-            {% if contact.company %}
-              <div class="od-dt-block">
-                <span class="k">{% trans "Company" %}</span>
-                <div class="od-dt-stack">
-                  <a href="{% url 'crm:company_detail' contact.company.id %}">
-                    <i class="fa fa-building"></i> {{ contact.company.name }}
-                  </a>
-                </div>
-              </div>
-            {% endif %}
-
-            {% if contact.address %}
+            {% if supplier.address %}
               <div class="od-dt-block">
                 <span class="k">{% trans "Address" %}</span>
-                <div class="od-addr" style="text-align: right;">{{ contact.address }}</div>
+                <div class="od-addr" style="text-align: right;">{{ supplier.address }}</div>
               </div>
             {% endif %}
 
-            {% if not contact.email and not contact.phone and not contact.job_title and not contact.company and not contact.address %}
+            {% if supplier.country %}
+              <div class="od-dt-block">
+                <span class="k">{% trans "Country" %}</span>
+                <div class="od-dt-stack"><span class="v-line">{{ supplier.country }}</span></div>
+              </div>
+            {% endif %}
+
+            {% if supplier.created_at %}
+              <div class="od-dt-block">
+                <span class="k">{% trans "Created at" %}</span>
+                <div class="od-dt-stack"><span class="v-line">{{ supplier.created_at|date:"M d, Y" }}</span></div>
+              </div>
+            {% endif %}
+
+            {% if not supplier.company_name and not supplier.contact_name and not supplier.email and not supplier.phone and not supplier.website and not supplier.address and not supplier.country %}
               <div class="od-empty-mute" style="padding: 4px 0;">{% trans "No additional information." %}</div>
             {% endif %}
           </div>
+        </section>
+
+        <!-- LINKED ENTITIES -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-link card-ico"></i>
+            <h3>{% trans "Linked entities" %}</h3>
+          </div>
+
+          {% if supplier.linked_company or supplier.linked_contact %}
+            {% if supplier.linked_company %}
+              <a href="{% url 'crm:company_detail' supplier.linked_company.id %}" class="od-linked-row">
+                <div class="od-linked-avatar">{{ supplier.linked_company.name|slice:":2"|upper }}</div>
+                <div class="od-linked-body">
+                  <span class="od-linked-k">{% trans "Company" %}</span>
+                  <span class="od-linked-n">{{ supplier.linked_company.name }}</span>
+                </div>
+              </a>
+            {% endif %}
+            {% if supplier.linked_contact %}
+              <a href="{% url 'crm:contact_detail' supplier.linked_contact.id %}" class="od-linked-row">
+                <div class="od-linked-avatar">{{ supplier.linked_contact.name|slice:":2"|upper }}</div>
+                <div class="od-linked-body">
+                  <span class="od-linked-k">{% trans "Contact" %}</span>
+                  <span class="od-linked-n">{{ supplier.linked_contact.name|capfirst }}</span>
+                </div>
+              </a>
+            {% endif %}
+          {% else %}
+            <div class="od-empty-mute" style="padding: 4px 0;">
+              {% trans "Not linked to any contact or company." %}
+            </div>
+          {% endif %}
         </section>
       </div>
     </div>
@@ -673,35 +718,14 @@
 
   <!-- COMMUNICATION TAB -->
   <div id="tab-communication" class="tab-content">
-    <section class="od-card comm-container">
-      <div class="od-comm-head comm-header">
-        <div class="od-comm-toggle comm-toggle">
-          <button type="button" class="comm-toggle-btn active" onclick="switchCommTab('emails')">
-            <i class="fa fa-envelope"></i>{% trans "Emails" %}
-          </button>
-          <button type="button" class="comm-toggle-btn" onclick="switchCommTab('files')">
-            <i class="fa fa-paperclip"></i>{% trans "Files" %}
-          </button>
-        </div>
-
-        <button type="button" class="ord-btn primary"
-                onclick="openComposeModal(null, '', '', null, {{ contact.id }})">
-          <i class="fa fa-plus"></i>{% trans "Compose Email" %}
-        </button>
-      </div>
-
-      <div id="comm-content" class="comm-content"
-           hx-get="{% url 'email_automation:contact_emails' contact.id %}"
-           hx-trigger="load">
-        <div style="text-align: center; padding: 40px; color: var(--gray-400);">
-          <i class="fa fa-spinner fa-spin fa-2x"></i>
-        </div>
+    <section class="od-card">
+      <div class="od-comm-empty">
+        <i class="fa fa-envelope-open"></i>
+        <div class="empty-title">{% trans "No communication history yet" %}</div>
+        <div class="empty-sub">{% trans "Email and file integration for suppliers is coming soon." %}</div>
       </div>
     </section>
   </div>
-
-  <!-- Compose Modal Container -->
-  <div id="composeModalContainer"></div>
 </div>
 
 <script>
@@ -709,11 +733,25 @@
   const taskOriginalHTML = {};
   const noteOriginalHTML = {};
 
+  // CSRF helper
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
   // Inline task editing
   function editTask(taskId, name, description, dueDate) {
     const contentDiv = document.getElementById(`task-content-${taskId}`);
-    const csrf = '{{ csrf_token }}';
-
     taskOriginalHTML[taskId] = contentDiv.innerHTML;
 
     contentDiv.innerHTML = `
@@ -803,17 +841,12 @@
   // Inline note editing
   function editNote(noteId, currentContent) {
     const contentDiv = document.getElementById(`note-content-${noteId}`);
-    const csrf = '{{ csrf_token }}';
-
-    // The onclick attribute that invoked us was rendered server-side
-    // and never updates after a save, so it carries the original
-    // content. Prefer the live DOM text — that always reflects the
-    // most recent saveNote() result.
+    // Prefer the live DOM text — the onclick-baked arg is stale after
+    // the first save.
     const liveTextEl = contentDiv.querySelector('.note-text');
     if (liveTextEl) {
       currentContent = liveTextEl.textContent;
     }
-
     noteOriginalHTML[noteId] = contentDiv.innerHTML;
 
     contentDiv.innerHTML = `
@@ -898,7 +931,7 @@
 
   // Custom confirm dialog for delete/complete actions
   function confirmDelete(action, id) {
-    const contactId = '{{ contact.id }}';
+    const supplierId = '{{ supplier.id }}';
     const csrf = '{{ csrf_token }}';
 
     let actionText = '{% trans "Delete" %}';
@@ -969,7 +1002,7 @@
         body = `note_id=${id}`;
       } else if (action === 'delete_task') {
         url = `/todo/tasks/${id}/delete_task`;
-        body = `contact_id=${contactId}`;
+        body = `supplier_id=${supplierId}`;
       } else if (action === 'complete_task') {
         url = `/todo/tasks/${id}/complete_task`;
         body = `task_id=${id}`;
@@ -1018,14 +1051,14 @@
           const notesList = document.querySelector('.notes-list');
           if (notesList && data.task) {
             const completedTaskHTML = `
-              <div class="note-item completed-task-item" style="opacity:0;transform:translateY(-10px);transition:all 0.3s ease;">
-                <div class="note-content">
-                  <div class="note-meta">
-                    <span class="note-date">${data.task.completed_at}</span>
-                    <span class="note-badge"><i class="fa fa-check-circle"></i> {% trans "Completed" %}</span>
+              <div class="od-history-item completed completed-task-item" style="opacity:0;transform:translateY(-10px);transition:all 0.3s ease;">
+                <div class="od-history-content note-content">
+                  <div class="od-history-meta note-meta">
+                    <span class="od-history-date note-date">${data.task.completed_at}</span>
+                    <span class="od-history-badge note-badge"><i class="fa fa-check-circle"></i> {% trans "Completed" %}</span>
                   </div>
-                  <p class="note-text"><strong>${data.task.name}</strong></p>
-                  ${data.task.description ? `<p class="note-description">${data.task.description}</p>` : ''}
+                  <p class="od-history-text note-text"><strong>${data.task.name}</strong></p>
+                  ${data.task.description ? `<p class="od-history-desc note-description">${data.task.description}</p>` : ''}
                 </div>
               </div>
             `;
@@ -1061,168 +1094,5 @@
       activeContent.classList.add('active');
     }
   }
-
-  // Communication Tab Toggle
-  function switchCommTab(type) {
-    const btns = document.querySelectorAll('.comm-toggle-btn');
-    btns.forEach(btn => btn.classList.remove('active'));
-
-    if (type === 'emails') {
-      btns[0].classList.add('active');
-      htmx.ajax('GET', "{% url 'email_automation:contact_emails' contact.id %}", { target: '#comm-content' });
-    } else {
-      btns[1].classList.add('active');
-      alert('{% trans "This feature is coming soon." %}');
-    }
-  }
-
-  // Open Compose Modal
-  function openComposeModal(toEmail, toName, subject, companyId, contactId) {
-    let url = "{% url 'email_automation:compose_email' %}?";
-    if (toEmail) url += `to=${encodeURIComponent(toEmail)}&`;
-    if (toName) url += `name=${encodeURIComponent(toName)}&`;
-    if (subject) url += `subject=${encodeURIComponent(subject)}&`;
-    if (companyId) url += `company=${companyId}&`;
-    if (contactId) url += `contact=${contactId}&`;
-
-    fetch(url, {
-      headers: { 'HX-Request': 'true' }
-    })
-      .then(res => res.text())
-      .then(html => {
-        document.getElementById('composeModalContainer').innerHTML = html;
-      });
-  }
-
-  // View Email Detail
-  function viewEmailDetail(emailId) {
-    openEmailDetailModal(emailId);
-  }
-
-  function openEmailDetailModal(emailId) {
-    let container = document.getElementById('emailDetailModal');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'emailDetailModal';
-      container.className = 'modal-backdrop';
-      container.onclick = (e) => {
-        if (e.target === container) closeEmailDetailModal();
-      };
-      document.body.appendChild(container);
-    }
-
-    container.style.display = 'flex';
-    container.innerHTML = '<div style="margin:auto; background:white; padding:20px; border-radius:12px;font-family:var(--font-sans);"><i class="fa fa-spinner fa-spin"></i> {% trans "Loading..." %}</div>';
-
-    fetch(`/email/email/${emailId}/`, {
-      headers: { 'HX-Request': 'true' }
-    })
-      .then(res => res.text())
-      .then(html => {
-        container.innerHTML = `
-          <div class="compose-modal" style="position:relative; bottom:auto; right:auto; width:800px; height:80vh;">
-            <div class="compose-header">
-              <h3>{% trans "Email Detail" %}</h3>
-              <button class="close-btn" onclick="closeEmailDetailModal()"><i class="fa fa-times"></i></button>
-            </div>
-            <div style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
-                ${html}
-            </div>
-          </div>
-        `;
-      });
-  }
-
-  function closeEmailDetailModal() {
-    const container = document.getElementById('emailDetailModal');
-    if (container) {
-      container.style.display = 'none';
-      container.innerHTML = '';
-    }
-  }
-
-  /* ─── Edit-Contact sidebar ───────────────────────────────────
-     Loads the edit form via AJAX into a slide-in panel, submits
-     via fetch, and reloads the page on success. Reuses the
-     existing dynamic-fields JS (initDynamicFields) from base.html
-     so email/phone arrays keep their UX. */
-  function openEditContactSidebar() {
-    var overlay = document.getElementById('editContactSidebarOverlay');
-    var body = document.getElementById('editContactSidebarBody');
-    if (!overlay || !body) return;
-    body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-500);"><i class="fa fa-spinner fa-spin fa-2x"></i><div style="margin-top:12px;">Loading…</div></div>';
-    overlay.classList.add('active');
-    fetch('{% url "crm:update_contact" contact.id %}', {
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-      .then(function (r) { return r.text(); })
-      .then(function (html) {
-        body.innerHTML = html;
-        // Run any <script> tags the partial brought in (browsers don't
-        // execute scripts inserted via innerHTML automatically).
-        body.querySelectorAll('script').forEach(function (s) {
-          var n = document.createElement('script');
-          if (s.src) n.src = s.src; else n.textContent = s.textContent;
-          document.body.appendChild(n).parentNode.removeChild(n);
-        });
-      })
-      .catch(function () {
-        body.innerHTML = '<div style="padding:40px;color:#ef4444;text-align:center;">Failed to load edit form.</div>';
-      });
-  }
-  function closeEditContactSidebar() {
-    var overlay = document.getElementById('editContactSidebarOverlay');
-    if (overlay) overlay.classList.remove('active');
-  }
-  function submitEditContactForm(event) {
-    event.preventDefault();
-    var form = document.getElementById('editContactForm');
-    var btn = document.getElementById('editContactSubmitBtn');
-    var btnText = btn ? btn.querySelector('.btn-text') : null;
-    var btnSpinner = btn ? btn.querySelector('.btn-spinner') : null;
-    if (btnText) btnText.style.display = 'none';
-    if (btnSpinner) btnSpinner.style.display = 'inline-flex';
-    if (btn) btn.disabled = true;
-    fetch(form.action, {
-      method: 'POST',
-      body: new FormData(form),
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
-      .then(function (res) {
-        if (res.ok && res.body.success) {
-          window.location.href = res.body.redirect_url || window.location.pathname;
-        } else {
-          if (btnText) btnText.style.display = 'inline';
-          if (btnSpinner) btnSpinner.style.display = 'none';
-          if (btn) btn.disabled = false;
-          alert('Failed to save: ' + JSON.stringify(res.body.errors || res.body));
-        }
-      })
-      .catch(function () {
-        if (btnText) btnText.style.display = 'inline';
-        if (btnSpinner) btnSpinner.style.display = 'none';
-        if (btn) btn.disabled = false;
-      });
-  }
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeEditContactSidebar();
-  });
 </script>
-
-<!-- Edit Contact Sidebar -->
-<div id="editContactSidebarOverlay" class="sidebar-overlay" onclick="closeEditContactSidebar()">
-  <div class="sidebar-modal" onclick="event.stopPropagation();">
-    <div class="sidebar-header">
-      <button class="sidebar-close" onclick="closeEditContactSidebar()">
-        <i class="fas fa-times"></i> {% trans "Close" %}
-      </button>
-      <div class="sidebar-title">
-        <i class="fas fa-user-edit"></i>
-        <h2>{% trans "Edit Contact" %}</h2>
-      </div>
-    </div>
-    <div id="editContactSidebarBody" class="sidebar-content"></div>
-  </div>
-</div>
 {% endblock %}

@@ -26,6 +26,10 @@
       <i data-lucide="user-check"></i> Assigned Tasks
       <span class="tab-count{% if assigned_tasks_count == 0 %} zero{% endif %}">{{ assigned_tasks_count|default:0 }}</span>
     </button>
+    <button class="home-tab" data-tab="completed">
+      <i data-lucide="check-circle"></i> Completed
+      <span class="tab-count{% if completed_tasks_count == 0 %} zero{% endif %}">{{ completed_tasks_count|default:0 }}</span>
+    </button>
 
     <div class="home-tabs-spacer"></div>
 
@@ -115,22 +119,29 @@
       <div class="task-list" id="njTaskList">
         {% if today_tasks %}
           {% for t in today_tasks %}
-            <div class="task-card prio-{{ t.priority }}{% if t.completed %} done{% endif %}" data-task-id="{{ t.id }}"{% if t.can_edit %} onclick="openTaskEditSidebar('{{ t.id }}')" style="cursor: pointer;"{% endif %}>
+            <div class="task-card prio-{{ t.priority }}{% if t.completed %} done{% endif %}{% if t.kind == 'team' %} team-card{% endif %}" data-task-id="{{ t.id }}" data-kind="{{ t.kind|default:'personal' }}"{% if t.can_edit %} onclick="openTaskEditSidebar('{{ t.id }}', '{{ t.kind|default:'personal' }}')" style="cursor: pointer;"{% endif %}>
               <div class="task-stripe"></div>
               <div class="task-body">
                 <div class="task-top">
-                  <div class="task-text">{{ t.name }}</div>
+                  <div class="task-text">
+                    {% if t.kind == 'team' %}<span class="kind-pill kind-team" title="Team task"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team</span>{% endif %}
+                    {{ t.name }}
+                  </div>
                   <span class="task-aging aging-{{ t.aging_tone }}">{{ t.aging_label }}</span>
                 </div>
                 <div class="task-meta">
                   <span class="task-assignee">
-                    <span class="avatar avatar-teal">{{ t.avatar_letter }}</span>
+                    <span class="avatar {% if t.kind == 'team' %}avatar-purple{% else %}avatar-teal{% endif %}">{{ t.avatar_letter }}</span>
                     <span>{{ t.assignee }}</span>
                   </span>
                   {% if t.entity_name %}
                   <span class="task-entity task-entity-{{ t.entity_type }}" title="{{ t.entity_name }}">
                     {% if t.entity_type == 'company' %}
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>
+                    {% elif t.entity_type == 'team' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    {% elif t.entity_type == 'supplier' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
                     {% else %}
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     {% endif %}
@@ -151,10 +162,20 @@
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   {% if t.completed %}Completed{% else %}Complete{% endif %}
                 </button>
-                <a class="btn-view" href="{% url 'todo:task_detail' task_id=t.id %}">
+                <a class="btn-view" href="{% if t.kind == 'team' %}/team/task/{{ t.id }}/{% else %}{% url 'todo:task_detail' task_id=t.id %}{% endif %}">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                   View
                 </a>
+                {% if t.can_delete %}
+                <button type="button"
+                        class="btn-delete"
+                        data-task-id="{{ t.id }}"
+                        data-action="delete"
+                        title="{% trans 'Delete task' %}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                  Delete
+                </button>
+                {% endif %}
               </div>
             </div>
           {% endfor %}
@@ -187,6 +208,8 @@
     var tasksData = {{ tasks_calendar_data|safe }};         // {date: count}
     var tasksByDate = {{ tasks_by_date_json|safe }};        // {date: [tasks]}
     var delegatedTasks = {{ delegated_tasks_json|safe }};   // [tasks] — assigned to me
+    var completedTasks = {{ completed_tasks_json|safe }};   // [tasks] — completed history
+    var completedSelection = new Set();                      // task IDs selected for bulk delete
     var current = new Date();
     var selected = new Date();
 
@@ -345,6 +368,10 @@
         // Already sorted server-side by date desc, priority asc
         return (delegatedTasks || []).slice();
       }
+      if (currentTab === 'completed') {
+        // Already sorted server-side by completed_at desc
+        return (completedTasks || []).slice();
+      }
       // Calendar tab (default)
       var today = new Date();
       var isToday = sameDay(selected, today);
@@ -382,6 +409,11 @@
         if (sub) sub.textContent = 'Tasks assigned to you by team members';
         return;
       }
+      if (currentTab === 'completed') {
+        if (title) title.textContent = 'Completed Tasks';
+        if (sub) sub.textContent = count + ' completed · check rows to bulk-delete';
+        return;
+      }
 
       // Calendar tab
       var today = new Date();
@@ -414,6 +446,9 @@
       if (currentTab === 'mine') {
         title = 'No tasks yet';
         sub = 'Create your first task with "+ New Task".';
+      } else if (currentTab === 'completed') {
+        title = 'No completed tasks yet';
+        sub = 'Tasks you mark as complete show up here.';
       } else if (currentTab === 'delegated') {
         title = 'No assigned tasks';
         sub = 'Tasks assigned to you by team members will appear here.';
@@ -433,22 +468,36 @@
       var done = t.completed ? ' done' : '';
       var doneCls = t.completed ? ' completed' : '';
       var doneLabel = t.completed ? 'Completed' : 'Complete';
-      var editAttrs = t.can_edit ? (' onclick="openTaskEditSidebar(\'' + t.id + '\')" style="cursor: pointer;"') : '';
-      return '<div class="task-card prio-' + escapeHtml(t.priority) + done + '" data-task-id="' + t.id + '"' + editAttrs + '>' +
+      var kind = t.kind || 'personal';
+      var kindCls = kind === 'team' ? ' team-card' : '';
+      var editAttrs = t.can_edit ? (' onclick="openTaskEditSidebar(\'' + t.id + '\', \'' + kind + '\')" style="cursor: pointer;"') : '';
+      var teamPill = kind === 'team'
+        ? '<span class="kind-pill kind-team" title="Team task"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Team</span>'
+        : '';
+      var avatarCls = kind === 'team' ? 'avatar-purple' : 'avatar-teal';
+      var viewHref = kind === 'team' ? ('/team/task/' + t.id + '/') : ('/todo/tasks/' + t.id + '/detail/');
+      var entityIcon = '';
+      if (t.entity_type === 'company') {
+        entityIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>';
+      } else if (t.entity_type === 'team') {
+        entityIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+      } else if (t.entity_type === 'supplier') {
+        entityIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>';
+      } else {
+        entityIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+      }
+      return '<div class="task-card prio-' + escapeHtml(t.priority) + done + kindCls + '" data-task-id="' + t.id + '" data-kind="' + kind + '"' + editAttrs + '>' +
         '<div class="task-stripe"></div>' +
         '<div class="task-body">' +
         '<div class="task-top">' +
-        '<div class="task-text">' + escapeHtml(t.name) + '</div>' +
+        '<div class="task-text">' + teamPill + escapeHtml(t.name) + '</div>' +
         '<span class="task-aging aging-' + escapeHtml(t.aging_tone) + '">' + escapeHtml(t.aging_label) + '</span>' +
         '</div>' +
         '<div class="task-meta">' +
-        '<span class="task-assignee"><span class="avatar avatar-teal">' + escapeHtml(t.avatar_letter) + '</span><span>' + escapeHtml(t.assignee) + '</span></span>' +
+        '<span class="task-assignee"><span class="avatar ' + avatarCls + '">' + escapeHtml(t.avatar_letter) + '</span><span>' + escapeHtml(t.assignee) + '</span></span>' +
         (t.entity_name
           ? '<span class="task-entity task-entity-' + escapeHtml(t.entity_type || '') + '" title="' + escapeHtml(t.entity_name) + '">' +
-            (t.entity_type === 'company'
-              ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/><path d="M9 18v.01"/></svg>'
-              : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
-            ) +
+            entityIcon +
             escapeHtml(truncate(t.entity_name, 24)) +
             '</span>'
           : '') +
@@ -463,10 +512,16 @@
         '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
         doneLabel +
         '</button>' +
-        '<a class="btn-view" href="/todo/tasks/' + t.id + '/detail/">' +
+        '<a class="btn-view" href="' + viewHref + '">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
         'View' +
         '</a>' +
+        (t.can_delete
+          ? '<button type="button" class="btn-delete" data-task-id="' + t.id + '" data-action="delete" title="Delete task">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>' +
+            'Delete' +
+            '</button>'
+          : '') +
         '</div>' +
         '</div>';
     }
@@ -474,9 +529,149 @@
       var list = document.getElementById('njTaskList');
       if (!list) return;
       var tasks = applySearchAndFilter(tasksForCurrentSelection());
+      if (currentTab === 'completed') {
+        list.innerHTML = renderCompletedListMarkup(tasks);
+        wireCompletedActions();
+        return;
+      }
       if (!tasks.length) { list.innerHTML = emptyMarkup(); return; }
       list.innerHTML = tasks.map(taskCardMarkup).join('');
       wireTaskActions();
+    }
+
+    /* Render the Completed tab as a card list. Each card has a small
+       checkbox for bulk-select, but the rest of the card is a link
+       that navigates to the task detail page. The sticky toolbar at
+       the top counts selected rows + the Delete-Selected button. */
+    function renderCompletedListMarkup(tasks) {
+      if (!tasks.length) return emptyMarkup();
+      // Drop any cached selections that are no longer in the list.
+      var validIds = new Set(tasks.map(function (t) { return String(t.id); }));
+      Array.from(completedSelection).forEach(function (id) {
+        if (!validIds.has(String(id))) completedSelection.delete(id);
+      });
+      var rows = tasks.map(function (t) {
+        var checked = completedSelection.has(String(t.id));
+        var canDelete = t.can_delete !== false;
+        var title = escapeHtml(t.name);
+        var doneAt = t.completed_at ? escapeHtml(t.completed_at) : '';
+        var due = t.date_label ? escapeHtml(t.date_label) : '';
+        var assigneeLetter = escapeHtml(t.avatar_letter || (t.assignee || '?').slice(0, 1).toUpperCase());
+        var assigneeName = escapeHtml(t.assignee || '');
+        var entity = '';
+        if (t.entity_name) {
+          var entIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+          if (t.entity_type === 'company') {
+            entIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>';
+          } else if (t.entity_type === 'supplier') {
+            entIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>';
+          }
+          entity = '<span class="nj-cmpl-entity">' + entIcon + escapeHtml(t.entity_name) + '</span>';
+        }
+        var detailHref = '/todo/tasks/' + t.id + '/detail/';
+        var lockMark = canDelete
+          ? ''
+          : '<span class="nj-cmpl-lock-mark" title="You can\'t delete this">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+            '</span>';
+        return (
+          '<div class="nj-cmpl-card' + (checked ? ' is-checked' : '') + (!canDelete ? ' is-locked' : '') + '">' +
+          '  <label class="nj-cmpl-checkwrap" title="Select for bulk action" onclick="event.stopPropagation()">' +
+          '    <input type="checkbox" class="nj-cmpl-check" data-task-id="' + t.id + '" ' + (checked ? 'checked' : '') + (canDelete ? '' : ' disabled') + '>' +
+          '    <span class="nj-cmpl-checkmark" aria-hidden="true"></span>' +
+          '  </label>' +
+          '  <a href="' + detailHref + '" class="nj-cmpl-body" data-task-id="' + t.id + '">' +
+          '    <div class="nj-cmpl-row1">' +
+          '      <span class="nj-cmpl-done-badge" title="Completed"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>' +
+          '      <span class="nj-cmpl-title">' + title + '</span>' +
+          (doneAt ? '      <span class="nj-cmpl-when">' + doneAt + '</span>' : '') +
+          '    </div>' +
+          '    <div class="nj-cmpl-row2">' +
+          '      <span class="nj-cmpl-pers"><span class="nj-cmpl-avatar">' + assigneeLetter + '</span>' + assigneeName + '</span>' +
+          (due ? '      <span class="nj-cmpl-due"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' + due + '</span>' : '') +
+          entity +
+          '    </div>' +
+          '  </a>' +
+          '  <div class="nj-cmpl-end">' +
+          lockMark +
+          '    <span class="nj-cmpl-chev" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>' +
+          '  </div>' +
+          '</div>'
+        );
+      }).join('');
+
+      return (
+        '<div class="nj-cmpl-toolbar" id="njCmplToolbar">' +
+        '  <label class="nj-cmpl-checkall">' +
+        '    <input type="checkbox" id="njCmplCheckAll"><span class="nj-cmpl-checkmark"></span>' +
+        '    <span>Select all</span>' +
+        '  </label>' +
+        '  <span class="nj-cmpl-count" id="njCmplCount">0 selected</span>' +
+        '  <button type="button" class="nj-cmpl-del" id="njCmplDel" disabled>' +
+        '    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>' +
+        '    Delete selected' +
+        '  </button>' +
+        '</div>' +
+        '<div class="nj-cmpl-list">' + rows + '</div>'
+      );
+    }
+
+    function _refreshCmplToolbar() {
+      var del = document.getElementById('njCmplDel');
+      var cnt = document.getElementById('njCmplCount');
+      var n = completedSelection.size;
+      if (cnt) cnt.textContent = (n === 1 ? '1 selected' : n + ' selected');
+      if (del) del.disabled = n === 0;
+      // Sync the "select all" master checkbox — exclude itself + the
+      // disabled (locked) rows from the population.
+      var all = document.getElementById('njCmplCheckAll');
+      if (all) {
+        var rows = document.querySelectorAll('.nj-cmpl-list .nj-cmpl-check:not([disabled])');
+        var checked = document.querySelectorAll('.nj-cmpl-list .nj-cmpl-check:checked');
+        all.checked = (rows.length > 0 && rows.length === checked.length);
+        all.indeterminate = (checked.length > 0 && checked.length < rows.length);
+      }
+    }
+
+    function wireCompletedActions() {
+      document.querySelectorAll('.nj-cmpl-check').forEach(function (cb) {
+        if (cb.disabled) return;
+        if (cb.__wired) return;
+        cb.__wired = true;
+        cb.addEventListener('change', function () {
+          var id = String(cb.getAttribute('data-task-id'));
+          if (cb.checked) completedSelection.add(id);
+          else completedSelection.delete(id);
+          var card = cb.closest('.nj-cmpl-card');
+          if (card) card.classList.toggle('is-checked', cb.checked);
+          _refreshCmplToolbar();
+        });
+      });
+      var all = document.getElementById('njCmplCheckAll');
+      if (all && !all.__wired) {
+        all.__wired = true;
+        all.addEventListener('change', function () {
+          var on = all.checked;
+          document.querySelectorAll('.nj-cmpl-list .nj-cmpl-check:not([disabled])').forEach(function (cb) {
+            cb.checked = on;
+            var id = String(cb.getAttribute('data-task-id'));
+            if (on) completedSelection.add(id);
+            else completedSelection.delete(id);
+            var card = cb.closest('.nj-cmpl-card');
+            if (card) card.classList.toggle('is-checked', on);
+          });
+          _refreshCmplToolbar();
+        });
+      }
+      var del = document.getElementById('njCmplDel');
+      if (del && !del.__wired) {
+        del.__wired = true;
+        del.addEventListener('click', function () {
+          if (completedSelection.size === 0) return;
+          openCompletedBulkDeleteConfirm(Array.from(completedSelection));
+        });
+      }
+      _refreshCmplToolbar();
     }
 
     window.njCalPrev = function() { current = new Date(current.getFullYear(), current.getMonth()-1, 1); render(); };
@@ -600,33 +795,400 @@
           if (btn.classList.contains('completed')) return;
           var taskId = btn.getAttribute('data-task-id');
           if (!taskId) return;
-          btn.disabled = true;
           var card = btn.closest('.task-card');
+          var kind = (card && card.getAttribute('data-kind')) || 'personal';
+
+          // ── Optimistic UI: animate + update caches FIRST, fire the
+          //    request in the background. Restore on failure. ──
+          btn.classList.add('completed');
+          btn.disabled = true;
+
+          // Snapshot the task in case the server rejects and we need
+          // to roll back.
+          var snapshot = null;
+          var snapshotKey = null;
+          Object.keys(tasksByDate).forEach(function(k) {
+            (tasksByDate[k] || []).some(function(t) {
+              if (String(t.id) === String(taskId) && (t.kind || 'personal') === kind) {
+                snapshot = t;
+                snapshotKey = k;
+                return true;
+              }
+              return false;
+            });
+          });
+
+          // Prune from the day-bucket cache so other tabs don't show
+          // it back. Calendar dots are recomputed off tasksData.
+          Object.keys(tasksByDate).forEach(function(k) {
+            var before = tasksByDate[k].length;
+            tasksByDate[k] = (tasksByDate[k] || []).filter(function(t) {
+              return !(String(t.id) === String(taskId) && (t.kind || 'personal') === kind);
+            });
+            var removed = before - tasksByDate[k].length;
+            if (removed > 0 && tasksData[k]) {
+              tasksData[k] = Math.max(0, tasksData[k] - removed);
+              if (tasksData[k] === 0) delete tasksData[k];
+            }
+          });
+
+          // Migrate to the Completed cache so the Completed tab shows
+          // it immediately on the next switch.
+          if (snapshot) {
+            var todayLocal = new Date();
+            var dd = String(todayLocal.getDate()).padStart(2, '0');
+            var mm = String(todayLocal.getMonth() + 1).padStart(2, '0');
+            var yyyy = todayLocal.getFullYear();
+            completedTasks.unshift(Object.assign({}, snapshot, {
+              completed: true,
+              completed_at: dd + '.' + mm + '.' + yyyy,
+              can_delete: snapshot.can_delete !== false
+            }));
+            var cTabCount = document.querySelector('.home-tab[data-tab="completed"] .tab-count');
+            if (cTabCount) {
+              cTabCount.textContent = completedTasks.length;
+              cTabCount.classList.toggle('zero', completedTasks.length === 0);
+            }
+          }
+
+          // Brief "done" pause, then a smooth slide-out. The hold
+          // gives the user a beat to register the checkmark state
+          // before the card flies away.
+          if (card) {
+            // Phase 1 — visually confirm completion in place (180ms hold)
+            card.style.transition = 'opacity 180ms ease, transform 180ms ease';
+            card.style.opacity = '0.85';
+            card.style.transform = 'scale(0.985)';
+            // Phase 2 — slide-out + collapse, starts ~200ms in
+            setTimeout(function() {
+              card.style.transformOrigin = 'left center';
+              card.style.transition = 'opacity 260ms ease, transform 320ms cubic-bezier(0.55,0.085,0.68,0.53), max-height 320ms ease, margin 320ms ease, padding 320ms ease';
+              card.style.maxHeight = card.offsetHeight + 'px';
+              void card.offsetHeight;
+              requestAnimationFrame(function() {
+                card.style.opacity = '0';
+                card.style.transform = 'translateX(28px) scale(0.97)';
+                card.style.maxHeight = '0px';
+                card.style.marginTop = '0px';
+                card.style.marginBottom = '0px';
+                card.style.paddingTop = '0px';
+                card.style.paddingBottom = '0px';
+              });
+              setTimeout(function() { card.remove(); }, 340);
+            }, 200);
+          }
+
+          // Repaint the calendar dots + summary so they stay in sync.
+          render();
+          updateTodayHeader();
+          showNjToast('Task completed', 'success');
+
+          // Fire the actual server call in the background.
           var fd = new FormData();
           fd.append('status', 'done');
           fd.append('csrfmiddlewaretoken', getCsrf());
-          fetch('/todo/tasks/' + taskId + '/complete_task', {
+          var url = (kind === 'team')
+            ? ('/team/task/' + taskId + '/status/')
+            : ('/todo/tasks/' + taskId + '/complete_task');
+          fetch(url, {
             method: 'POST',
             body: fd,
             credentials: 'same-origin',
             headers: { 'X-CSRFToken': getCsrf() }
           }).then(function(res) {
             if (!res.ok) throw new Error(res.status);
-            if (card) card.classList.add('done');
-            btn.classList.add('completed');
-            btn.innerHTML = btn.innerHTML.replace('Complete', 'Completed');
-            btn.disabled = false;
-            // Sync local cache so a re-render reflects completion
-            var key = ymd(selected);
-            (tasksByDate[key] || []).forEach(function(t) {
-              if (String(t.id) === String(taskId)) t.completed = true;
-            });
           }).catch(function() {
-            btn.disabled = false;
-            alert('Failed to update task. Please try again.');
+            // Roll back: put the task back where it was and rebuild
+            // the dot counts.
+            if (snapshot && snapshotKey) {
+              tasksByDate[snapshotKey] = tasksByDate[snapshotKey] || [];
+              tasksByDate[snapshotKey].push(snapshot);
+              tasksData[snapshotKey] = (tasksData[snapshotKey] || 0) + 1;
+              completedTasks = (completedTasks || []).filter(function(t) {
+                return !(String(t.id) === String(taskId) && (t.kind || 'personal') === kind);
+              });
+              var cTabCount2 = document.querySelector('.home-tab[data-tab="completed"] .tab-count');
+              if (cTabCount2) {
+                cTabCount2.textContent = completedTasks.length;
+                cTabCount2.classList.toggle('zero', completedTasks.length === 0);
+              }
+              render();
+              updateTodayHeader();
+              renderTasksForSelected();
+            }
+            showNjToast('Failed to complete — restored', 'error');
           });
         });
       });
+
+      // Delete button — only present on cards the server marked deletable
+      // (creator / single-assignee / m2m-assignee / superuser-staff). The
+      // permission re-checks server-side, so a stale DOM can't bypass it.
+      document.querySelectorAll('.njdash .btn-delete[data-action="delete"]').forEach(function(btn) {
+        if (btn.__wired) return;
+        btn.__wired = true;
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          var taskId = btn.getAttribute('data-task-id');
+          if (!taskId) return;
+          var card = btn.closest('.task-card');
+          var kind = (card && card.getAttribute('data-kind')) || 'personal';
+          openDeleteConfirmModal(taskId, kind, btn, card);
+        });
+      });
+    }
+
+    /* Bulk delete from the Completed tab. Confirms with the same
+       slide-up modal, then issues one DELETE per task in parallel,
+       reporting progress in a toast. Failed items stay selected. */
+    function openCompletedBulkDeleteConfirm(taskIds) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay nj-modal-overlay';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(2px); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: njFadeIn 180ms ease;';
+      var dialog = document.createElement('div');
+      dialog.className = 'modal-dialog nj-modal-dialog';
+      dialog.style.cssText = 'background: white; padding: 1.75rem; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(15,23,42,0.06); max-width: 460px; width: 90%; animation: njSlideUp 260ms cubic-bezier(0.22, 1, 0.36, 1);';
+      var n = taskIds.length;
+      dialog.innerHTML =
+        '<div style="display:flex; align-items:center; gap:0.85rem; margin-bottom:0.85rem;">' +
+        '  <div style="width:46px; height:46px; background:#FEE2E2; border-radius:50%; display:flex; align-items:center; justify-content:center;">' +
+        '    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>' +
+        '  </div>' +
+        '  <h3 style="margin:0; color:#0F172A; font-size:1.15rem; font-weight:700; letter-spacing:-0.01em;">Delete ' + n + ' completed task' + (n === 1 ? '' : 's') + '?</h3>' +
+        '</div>' +
+        '<p style="margin:0 0 1.5rem; color:#64748B; line-height:1.55; font-size:0.93rem;">This action cannot be undone. The selected tasks will be permanently removed.</p>' +
+        '<div style="display:flex; gap:0.6rem; justify-content:flex-end;">' +
+        '  <button type="button" class="nj-cancel-btn" style="padding:0.6rem 1.15rem; border:1px solid #E2E8F0; background:white; color:#334155; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">Cancel</button>' +
+        '  <button type="button" class="nj-confirm-btn" style="padding:0.6rem 1.25rem; border:none; background:linear-gradient(180deg, #EF4444 0%, #DC2626 100%); color:white; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.88rem; box-shadow:0 2px 4px rgba(220,38,38,0.25);">Delete ' + n + '</button>' +
+        '</div>';
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      function close() {
+        overlay.style.animation = 'njFadeOut 160ms ease forwards';
+        setTimeout(function () { overlay.remove(); }, 160);
+      }
+      dialog.querySelector('.nj-cancel-btn').addEventListener('click', close);
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
+      dialog.querySelector('.nj-confirm-btn').addEventListener('click', function () {
+        var confirmBtn = dialog.querySelector('.nj-confirm-btn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="nj-spinner"></span> Deleting…';
+        var csrf = getCsrf();
+        var requests = taskIds.map(function (id) {
+          return fetch('/todo/tasks/' + id + '/delete_task', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }
+          }).then(function (r) {
+            return { id: id, ok: r.ok };
+          }).catch(function () {
+            return { id: id, ok: false };
+          });
+        });
+        Promise.all(requests).then(function (results) {
+          var okIds = new Set(results.filter(function (r) { return r.ok; }).map(function (r) { return String(r.id); }));
+          var failed = results.filter(function (r) { return !r.ok; }).length;
+          // Prune deleted items from the local cache.
+          completedTasks = (completedTasks || []).filter(function (t) {
+            return !okIds.has(String(t.id));
+          });
+          // Drop them from the selection set.
+          okIds.forEach(function (id) { completedSelection.delete(id); });
+          // Tab count pill update.
+          var tabCount = document.querySelector('.home-tab[data-tab="completed"] .tab-count');
+          if (tabCount) {
+            tabCount.textContent = completedTasks.length;
+            tabCount.classList.toggle('zero', completedTasks.length === 0);
+          }
+          close();
+          if (currentTab === 'completed') {
+            renderTasksForSelected();
+            updateTodayHeader();
+          }
+          if (failed === 0) {
+            showNjToast(okIds.size === 1 ? 'Task deleted' : okIds.size + ' tasks deleted', 'success');
+          } else {
+            showNjToast(failed + ' could not be deleted (permission denied)', 'error');
+          }
+        });
+      });
+    }
+
+    /* Slide-up confirm dialog — replaces window.confirm with the same
+       polished modal pattern used in tasks.html. Animates in via the
+       fade-in / slide-up keyframes defined in CSS, fades out the card on
+       success, and shows a toast notification. */
+    function openDeleteConfirmModal(taskId, kind, triggerBtn, card) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay nj-modal-overlay';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(2px); z-index: 9999; display: flex; align-items: center; justify-content: center; animation: njFadeIn 180ms ease;';
+
+      var dialog = document.createElement('div');
+      dialog.className = 'modal-dialog nj-modal-dialog';
+      dialog.style.cssText = 'background: white; padding: 1.75rem; border-radius: 14px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(15,23,42,0.06); max-width: 420px; width: 90%; animation: njSlideUp 260ms cubic-bezier(0.22, 1, 0.36, 1);';
+
+      var typeLabel = kind === 'team' ? 'Team Task' : 'Task';
+      dialog.innerHTML =
+        '<div style="display:flex; align-items:center; gap:0.85rem; margin-bottom:0.85rem;">' +
+        '  <div style="width:46px; height:46px; background:#FEE2E2; border-radius:50%; display:flex; align-items:center; justify-content:center;">' +
+        '    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>' +
+        '  </div>' +
+        '  <h3 style="margin:0; color:#0F172A; font-size:1.15rem; font-weight:700; letter-spacing:-0.01em;">Delete ' + typeLabel + '?</h3>' +
+        '</div>' +
+        '<p style="margin:0 0 1.5rem; color:#64748B; line-height:1.55; font-size:0.93rem;">This action cannot be undone. The ' + (kind === 'team' ? 'team task' : 'task') + ' will be permanently removed.</p>' +
+        '<div style="display:flex; gap:0.6rem; justify-content:flex-end;">' +
+        '  <button type="button" class="nj-cancel-btn" style="padding:0.6rem 1.15rem; border:1px solid #E2E8F0; background:white; color:#334155; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.88rem; transition:all 0.15s;">Cancel</button>' +
+        '  <button type="button" class="nj-confirm-btn" style="padding:0.6rem 1.25rem; border:none; background:linear-gradient(180deg, #EF4444 0%, #DC2626 100%); color:white; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.88rem; box-shadow:0 2px 4px rgba(220,38,38,0.25); transition:all 0.15s;">Delete</button>' +
+        '</div>';
+
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+
+      var cancelBtn = dialog.querySelector('.nj-cancel-btn');
+      var confirmBtn = dialog.querySelector('.nj-confirm-btn');
+
+      function close() {
+        overlay.style.animation = 'njFadeOut 160ms ease forwards';
+        setTimeout(function() { overlay.remove(); }, 160);
+        if (triggerBtn) triggerBtn.disabled = false;
+      }
+      cancelBtn.addEventListener('click', close);
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+      document.addEventListener('keydown', function esc(ev) {
+        if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+      });
+
+      cancelBtn.addEventListener('mouseenter', function() { cancelBtn.style.background = '#F8FAFC'; cancelBtn.style.borderColor = '#CBD5E1'; });
+      cancelBtn.addEventListener('mouseleave', function() { cancelBtn.style.background = 'white'; cancelBtn.style.borderColor = '#E2E8F0'; });
+      confirmBtn.addEventListener('mouseenter', function() { confirmBtn.style.transform = 'translateY(-1px)'; confirmBtn.style.boxShadow = '0 6px 12px rgba(220,38,38,0.35)'; });
+      confirmBtn.addEventListener('mouseleave', function() { confirmBtn.style.transform = 'translateY(0)'; confirmBtn.style.boxShadow = '0 2px 4px rgba(220,38,38,0.25)'; });
+
+      confirmBtn.addEventListener('click', function() {
+        confirmBtn.disabled = true;
+        cancelBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="nj-spinner"></span> Deleting…';
+        confirmBtn.style.opacity = '0.85';
+        confirmBtn.style.cursor = 'wait';
+        performDelete(taskId, kind, card, overlay);
+      });
+    }
+
+    function performDelete(taskId, kind, card, overlay) {
+      var url = (kind === 'team')
+        ? ('/team/task/' + taskId + '/delete/')
+        : ('/todo/tasks/' + taskId + '/delete_task');
+      fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-CSRFToken': getCsrf(),
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      }).then(function(res) {
+        // Team endpoint returns JSON, personal returns empty 200
+        if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Permission denied'); }).catch(function() { throw new Error('Failed'); });
+        // Close modal first, then animate the card out
+        if (overlay) {
+          overlay.style.animation = 'njFadeOut 180ms ease forwards';
+          setTimeout(function() { overlay.remove(); }, 200);
+        }
+        if (card) {
+          card.style.transformOrigin = 'left center';
+          card.style.transition = 'opacity 320ms ease, transform 320ms cubic-bezier(0.55, 0.085, 0.68, 0.53), max-height 320ms ease, margin 320ms ease, padding 320ms ease';
+          card.style.opacity = '0';
+          card.style.transform = 'translateX(-40px) scale(0.96)';
+          // Collapse vertically so the list re-flows smoothly
+          card.style.maxHeight = card.offsetHeight + 'px';
+          requestAnimationFrame(function() {
+            card.style.maxHeight = '0px';
+            card.style.marginTop = '0px';
+            card.style.marginBottom = '0px';
+            card.style.paddingTop = '0px';
+            card.style.paddingBottom = '0px';
+          });
+          setTimeout(function() { card.remove(); checkEmpty(); }, 340);
+        }
+        // Prune from the local caches so any subsequent re-render drops it
+        Object.keys(tasksByDate).forEach(function(k) {
+          var before = tasksByDate[k].length;
+          tasksByDate[k] = (tasksByDate[k] || []).filter(function(t) {
+            return !(String(t.id) === String(taskId) && (t.kind || 'personal') === kind);
+          });
+          var removed = before - tasksByDate[k].length;
+          if (removed > 0 && tasksData[k]) {
+            tasksData[k] = Math.max(0, tasksData[k] - removed);
+            if (tasksData[k] === 0) delete tasksData[k];
+          }
+        });
+        if (window.delegatedTasks) {
+          window.delegatedTasks = window.delegatedTasks.filter(function(t) {
+            return !(String(t.id) === String(taskId) && (t.kind || 'personal') === kind);
+          });
+        }
+        if (typeof delegatedTasks !== 'undefined') {
+          delegatedTasks = (delegatedTasks || []).filter(function(t) {
+            return !(String(t.id) === String(taskId) && (t.kind || 'personal') === kind);
+          });
+        }
+        render();
+        updateTodayHeader();
+        showNjToast(kind === 'team' ? 'Team task deleted' : 'Task deleted', 'success');
+      }).catch(function(err) {
+        if (overlay) {
+          var confirmBtn = overlay.querySelector('.nj-confirm-btn');
+          if (confirmBtn) {
+            confirmBtn.innerHTML = 'Delete';
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+          }
+          var cancelBtn = overlay.querySelector('.nj-cancel-btn');
+          if (cancelBtn) cancelBtn.disabled = false;
+        }
+        showNjToast(err.message === 'Permission denied' ? 'You do not have permission to delete this' : 'Failed to delete. Try again.', 'error');
+      });
+    }
+
+    function checkEmpty() {
+      var list = document.getElementById('njTaskList');
+      if (list && list.children.length === 0) list.innerHTML = emptyMarkup();
+    }
+
+    /* Slide-in toast — top-right, auto dismisses after 3.2s. */
+    function showNjToast(message, type) {
+      type = type || 'success';
+      var existing = document.querySelector('.nj-toast');
+      if (existing) existing.remove();
+      var palette = type === 'error'
+        ? { bg: '#DC2626', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg>' }
+        : { bg: '#10B981', icon: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' };
+      var toast = document.createElement('div');
+      toast.className = 'nj-toast';
+      toast.style.cssText = 'position:fixed; top:24px; right:24px; background:white; padding:0.85rem 1.1rem; border-radius:10px; box-shadow:0 12px 24px -8px rgba(0,0,0,0.15), 0 0 0 1px rgba(15,23,42,0.04); display:flex; align-items:center; gap:0.75rem; z-index:10000; animation:njSlideInRight 260ms cubic-bezier(0.22,1,0.36,1); max-width:380px; font-family:var(--font-sans, system-ui);';
+      toast.innerHTML =
+        '<div style="width:34px; height:34px; background:' + palette.bg + '; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">' + palette.icon + '</div>' +
+        '<span style="color:#0F172A; font-weight:600; font-size:0.9rem;">' + message + '</span>';
+      document.body.appendChild(toast);
+      setTimeout(function() {
+        toast.style.animation = 'njSlideOutRight 220ms ease forwards';
+        setTimeout(function() { toast.remove(); }, 240);
+      }, 3200);
+    }
+
+    /* Inject the animation keyframes + spinner CSS once. */
+    if (!document.getElementById('nj-dash-anim')) {
+      var s = document.createElement('style');
+      s.id = 'nj-dash-anim';
+      s.textContent =
+        '@keyframes njFadeIn { from { opacity: 0; } to { opacity: 1; } }' +
+        '@keyframes njFadeOut { from { opacity: 1; } to { opacity: 0; } }' +
+        '@keyframes njSlideUp { from { transform: translateY(16px) scale(0.97); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }' +
+        '@keyframes njSlideInRight { from { transform: translateX(420px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }' +
+        '@keyframes njSlideOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(420px); opacity: 0; } }' +
+        '@keyframes njSpin { to { transform: rotate(360deg); } }' +
+        '.nj-spinner { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,0.45); border-top-color:white; border-radius:50%; animation:njSpin 700ms linear infinite; vertical-align:-2px; margin-right:4px; }';
+      document.head.appendChild(s);
     }
   })();
 </script>

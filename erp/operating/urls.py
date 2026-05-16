@@ -19,6 +19,7 @@ urlpatterns = [
     path("orders/edit/<int:pk>/", views.OrderEdit.as_view(), name="edit_order"),
     path("orders/web/<int:pk>/status/", views.WebOrderStatusEdit.as_view(), name="web_order_status"),
     path("orders/<int:pk>/", views.OrderDetail.as_view(), name="order_detail"),
+    path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),
     path("orders/delete/<int:pk>/", views.delete_order, name="delete_order"),

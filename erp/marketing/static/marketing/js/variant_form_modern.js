@@ -1167,7 +1167,18 @@ function renderVariantTable(combinations, selectedGrouping = null) {
 
         const price = priceInput?.value || existingData.price || '';
         const quantity = quantityInput?.value || existingData.quantity || '';
-        const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
+        // Featured: prefer the live DOM checkbox if rendered already;
+        // else respect server-loaded existingData; else default to true
+        // for brand-new variants. The model default is also True so this
+        // matches the server side.
+        let featured;
+        if (featuredInput) {
+            featured = featuredInput.checked;
+        } else if (Object.prototype.hasOwnProperty.call(existingData, 'featured')) {
+            featured = existingData.featured !== false;
+        } else {
+            featured = true;
+        }
         const cost = costInput?.value || existingData.cost || '';
         const sku = skuInput?.value || existingData.sku || existingData.item_code || ''; // fallback to item_code if sku missing
         const barcode = barcodeInput?.value || existingData.barcode || '';

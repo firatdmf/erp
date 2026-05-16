@@ -12,7 +12,18 @@
       "Bash(python -c \"import json; data=json.load\\(open\\('c:/Users/enes3/erp/erp/current_account/_help_translations.json', encoding='utf-8'\\)\\); src=json.load\\(open\\('c:/Users/enes3/erp/erp/current_account/_help_strings.json', encoding='utf-8'\\)\\); print\\('Translation count:', len\\(data\\)\\); print\\('Source count:', len\\(src\\)\\); missing=[s for s in src if s not in data]; print\\('Missing count:', len\\(missing\\)\\); print\\('Missing:', missing[:5] if missing else 'None'\\)\")",
       "Bash(grep -n '{% trans \".*\\\\\\\\\".*\" %}' current_account/templates/current_account/help.html)",
       "Bash(../vir_env/Scripts/python.exe current_account/_fix_help_quotes.py)",
-      "Bash(../vir_env/Scripts/python.exe current_account/_add_redesign_translations.py)"
+      "Bash(../vir_env/Scripts/python.exe current_account/_add_redesign_translations.py)",
+      "Bash(../vir_env/Scripts/python.exe _test_print.py)",
+      "Bash(../vir_env/Scripts/python.exe -c \"import weasyprint; print\\('WeasyPrint version:', weasyprint.__version__\\)\")",
+      "Bash(../vir_env/Scripts/python.exe -c \"import xhtml2pdf; from xhtml2pdf import pisa; print\\('xhtml2pdf OK'\\)\")",
+      "Bash(../vir_env/Scripts/python.exe _test_pdf.py)",
+      "Bash(../vir_env/Scripts/python.exe _test_create_task.py)",
+      "Bash(../vir_env/Scripts/python.exe _test_delete_perm.py)",
+      "Bash(../vir_env/Scripts/python.exe _test_calendar.py)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py makemigrations crm todo)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py migrate crm todo)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py migrate)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py check)"
     ]
   }
 }

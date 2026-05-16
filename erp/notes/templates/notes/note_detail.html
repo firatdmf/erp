@@ -2,884 +2,869 @@
 {% load i18n %}
 {% load static %}
 
-{% block title %}{{ note.title }} - My Notes{% endblock %}
+{% block title %}{{ note.title }} - {% trans "My Notes" %}{% endblock %}
 
 {% block css %}
 {{ block.super }}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-    :root {
-        --n-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        --n-text: #0f172a;
-        --n-text-sec: #475569;
-        --n-text-muted: #94a3b8;
-        --n-surface: #ffffff;
-        --n-surface-2: #f8fafc;
-        --n-border: #e2e8f0;
-        --n-primary: #1e293b;
-        --n-primary-hover: #334155;
-        --n-radius: 12px;
-        --n-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-        --n-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
-        --n-high: #ef4444;
-        --n-medium: #f97316;
-        --n-low: #22c55e;
-        --n-cat-work: #3b82f6;
-        --n-cat-personal: #22c55e;
-        --n-cat-important: #ef4444;
-        --n-cat-ideas: #a855f7;
-        --n-cat-meeting: #f97316;
-    }
-
-    body {
-        background-color: var(--n-surface-2);
-    }
-
-    .note-detail-page {
-        font-family: var(--n-font);
-        color: var(--n-text);
-    }
-
-    /* ============ TOP BAR ============ */
-    .note-top-bar {
-        background: var(--n-surface);
-        border-bottom: 1px solid var(--n-border);
-        padding: 0 40px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        height: 64px;
-    }
-
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 14px;
-        color: var(--n-text-muted);
-    }
-
-    .breadcrumb a {
-        color: var(--n-text-muted);
-        text-decoration: none;
-        transition: color 0.2s;
-        font-weight: 500;
-    }
-
-    .breadcrumb a:hover {
-        color: var(--n-text);
-    }
-
-    .breadcrumb i.fa-chevron-right {
-        font-size: 9px;
-        color: #cbd5e1;
-    }
-
-    .breadcrumb__current {
-        color: var(--n-text);
-        font-weight: 600;
-    }
-
-    .top-bar-actions {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-    }
-
-    .btn-top-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
-        border: 1px solid var(--n-border);
-        background: var(--n-surface);
-        color: var(--n-text-muted);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        font-size: 14px;
-    }
-
-    .btn-top-icon:hover {
-        background: #fef2f2;
-        border-color: #fecaca;
-        color: var(--n-high);
-    }
-
-    .btn-top-icon.fav-btn {
-        color: #cbd5e1;
-    }
-
-    .btn-top-icon.fav-btn:hover {
-        background: #fffbeb;
-        border-color: #fde68a;
-        color: #f59e0b;
-    }
-
-    .btn-top-icon.fav-btn.active {
-        color: #fbbf24;
-        background: #fffbeb;
-        border-color: #fde68a;
-    }
-
-    .btn-save-note {
-        background: var(--n-primary);
-        color: white;
-        border: none;
-        padding: 9px 20px;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-        font-family: var(--n-font);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-    }
-
-    .btn-save-note:hover {
-        background: var(--n-primary-hover);
-        transform: translateY(-1px);
-    }
-
-    /* ============ LAYOUT ============ */
-    .note-layout {
-        display: flex;
-        max-width: 1400px;
-        margin: 28px auto;
-        padding: 0 40px;
-        gap: 24px;
-        min-height: calc(100vh - 120px);
-    }
-
-    /* ============ EDITOR ============ */
-    .note-editor-card {
-        flex: 1;
-        background: var(--n-surface);
-        border-radius: var(--n-radius);
-        border: 1px solid var(--n-border);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        box-shadow: var(--n-shadow);
-    }
-
-    .note-title-wrapper {
-        padding: 28px 32px 20px 32px;
-    }
-
-    .note-title-input {
-        width: 100%;
-        font-size: 26px;
-        font-weight: 700;
-        color: var(--n-text);
-        border: none;
-        outline: none;
-        padding: 0;
-        font-family: var(--n-font);
-        background: transparent;
-        line-height: 1.3;
-    }
-
-    .note-title-input::placeholder {
-        color: #cbd5e1;
-    }
-
-    .quill-wrapper {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-
-    .ql-toolbar.ql-snow {
-        border: none !important;
-        border-top: 1px solid #f1f5f9 !important;
-        border-bottom: 1px solid #f1f5f9 !important;
-        padding: 10px 32px !important;
-        background: transparent;
-    }
-
-    .ql-container.ql-snow {
-        border: none !important;
-        font-family: var(--n-font);
-        font-size: 15px;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .ql-editor {
-        padding: 24px 32px !important;
-        color: #334155;
-        line-height: 1.75;
-        flex: 1;
-        overflow-y: auto;
-    }
-
-    .ql-editor:focus {
-        outline: none;
-    }
-
-    .editor-footer {
-        padding: 14px 32px;
-        border-top: 1px solid #f1f5f9;
-        color: var(--n-text-muted);
-        font-size: 12px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: transparent;
-    }
-
-    /* ============ SIDEBAR ============ */
-    .note-sidebar {
-        width: 320px;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        flex-shrink: 0;
-    }
-
-    .sidebar-card {
-        background: var(--n-surface);
-        border: 1px solid var(--n-border);
-        border-radius: var(--n-radius);
-        padding: 20px;
-        box-shadow: var(--n-shadow);
-    }
-
-    .sidebar-title {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--n-text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .sidebar-title i {
-        font-size: 12px;
-    }
-
-    .detail-row {
-        margin-bottom: 16px;
-    }
-
-    .detail-label {
-        display: block;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--n-text-sec);
-        margin-bottom: 6px;
-    }
-
-    .sidebar-select {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid var(--n-border);
-        border-radius: 8px;
-        font-size: 13px;
-        color: var(--n-text);
-        outline: none;
-        background: var(--n-surface-2);
-        font-family: var(--n-font);
-        cursor: pointer;
-    }
-
-    .sidebar-select:focus {
-        border-color: #93c5fd;
-        background: white;
-    }
-
-    /* Toggle Switch */
-    .toggle-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 0;
-    }
-
-    .toggle-label {
-        font-size: 13px;
-        color: var(--n-text-sec);
-        font-weight: 500;
-    }
-
-    .switch {
-        position: relative;
-        display: inline-block;
-        width: 42px;
-        height: 22px;
-    }
-
-    .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-
-    .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #cbd5e1;
-        transition: .3s;
-        border-radius: 34px;
-    }
-
-    .slider:before {
-        position: absolute;
-        content: "";
-        height: 16px;
-        width: 16px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        transition: .3s;
-        border-radius: 50%;
-    }
-
-    input:checked+.slider {
-        background-color: #3b82f6;
-    }
-
-    input:checked+.slider:before {
-        transform: translateX(20px);
-    }
-
-    /* Priority indicator */
-    .priority-indicator {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        padding: 5px 12px;
-        border-radius: 6px;
-    }
-
-    .priority-indicator.high {
-        background: #fef2f2;
-        color: var(--n-high);
-    }
-
-    .priority-indicator.medium {
-        background: #fff7ed;
-        color: var(--n-medium);
-    }
-
-    .priority-indicator.low {
-        background: #f0fdf4;
-        color: var(--n-low);
-    }
-
-    /* Category badge */
-    .detail-cat-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 700;
-        color: white;
-        letter-spacing: 0.3px;
-    }
-
-    .detail-cat-badge.cat-work {
-        background: var(--n-cat-work);
-    }
-
-    .detail-cat-badge.cat-personal {
-        background: var(--n-cat-personal);
-    }
-
-    .detail-cat-badge.cat-important {
-        background: var(--n-cat-important);
-    }
-
-    .detail-cat-badge.cat-ideas {
-        background: var(--n-cat-ideas);
-    }
-
-    .detail-cat-badge.cat-meeting {
-        background: var(--n-cat-meeting);
-    }
-
-    /* Attachments */
-    .attachment-item {
-        display: flex;
-        align-items: center;
-        padding: 10px 12px;
-        border: 1px solid var(--n-border);
-        border-radius: 8px;
-        margin-bottom: 8px;
-        background: var(--n-surface-2);
-        transition: all 0.15s;
-    }
-
-    .attachment-item:hover {
-        border-color: #93c5fd;
-    }
-
-    .file-icon-box {
-        width: 36px;
-        height: 36px;
-        background: #eff6ff;
-        color: #3b82f6;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 12px;
-        font-size: 16px;
-        flex-shrink: 0;
-    }
-
-    .file-icon-box.pdf {
-        background: #fef2f2;
-        color: #ef4444;
-    }
-
-    .file-icon-box.img {
-        background: #f0fdf4;
-        color: #22c55e;
-    }
-
-    .file-info {
-        flex: 1;
-        overflow: hidden;
-    }
-
-    .file-name-link {
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--n-text);
-        text-decoration: none;
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .file-name-link:hover {
-        color: #3b82f6;
-    }
-
-    .file-meta {
-        font-size: 11px;
-        color: var(--n-text-muted);
-    }
-
-    .file-remove-btn {
-        background: none;
-        border: none;
-        color: #cbd5e1;
-        cursor: pointer;
-        padding: 4px;
-        font-size: 13px;
-        transition: color 0.15s;
-    }
-
-    .file-remove-btn:hover {
-        color: var(--n-high);
-    }
-
-    .upload-dropzone {
-        border: 2px dashed var(--n-border);
-        border-radius: 10px;
-        padding: 20px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        margin-top: 12px;
-    }
-
-    .upload-dropzone:hover {
-        border-color: #93c5fd;
-        background: #eff6ff;
-    }
-
-    .upload-dropzone i {
-        font-size: 22px;
-        color: #3b82f6;
-        margin-bottom: 6px;
-    }
-
-    .upload-dropzone .upload-label {
-        font-size: 13px;
-        color: #3b82f6;
-        font-weight: 600;
-    }
-
-    .upload-dropzone .upload-hint {
-        font-size: 11px;
-        color: var(--n-text-muted);
-        margin-top: 2px;
-    }
-
-    /* Meta info */
-    .meta-info {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding-top: 12px;
-        border-top: 1px solid var(--n-border);
-    }
-
-    .meta-row {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-    }
-
-    .meta-label {
-        color: var(--n-text-muted);
-    }
-
-    .meta-value {
-        color: var(--n-text-sec);
-        font-weight: 500;
-    }
-
-    /* Toast */
-    .detail-toast {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background: var(--n-primary);
-        color: white;
-        padding: 14px 24px;
-        border-radius: 10px;
-        font-size: 14px;
-        font-weight: 500;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        transform: translateY(100px);
-        opacity: 0;
-        transition: all 0.3s ease;
-        z-index: 999;
-        font-family: var(--n-font);
-    }
-
-    .detail-toast.show {
-        transform: translateY(0);
-        opacity: 1;
-    }
-
-    .detail-toast i {
-        margin-right: 8px;
-    }
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+
+  .ord { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
+
+  /* CRUMBS */
+  .od-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; background: white; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); cursor: pointer; transition: all 140ms;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04); text-decoration: none;
+  }
+  .od-back i { width: 14px; height: 14px; }
+  .od-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-sep { color: var(--gray-400); }
+  .od-crumb-here { font: 600 12.5px var(--font-sans); color: var(--gray-700); max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* HEAD */
+  .od-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 24px; margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px solid #E2E8EE;
+  }
+  .od-head-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .od-title {
+    font: 800 28px var(--font-sans); letter-spacing: -0.01em;
+    color: var(--ink); margin: 0; line-height: 1.2;
+    word-break: break-word;
+  }
+  .od-title-input {
+    font: 800 28px var(--font-sans); letter-spacing: -0.01em;
+    color: var(--ink); margin: 0; line-height: 1.2;
+    background: transparent; border: none; outline: none;
+    width: 100%; padding: 2px 0;
+    border-bottom: 2px dashed transparent;
+    transition: border-color 140ms;
+  }
+  .od-title-input:focus { border-bottom-color: var(--nejum-teal-500); }
+  .od-meta {
+    display: flex; align-items: center; gap: 10px;
+    font: 500 12.5px var(--font-sans); color: var(--gray-600); flex-wrap: wrap;
+  }
+  .od-meta i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; color: var(--gray-500); }
+  .od-dot { width: 3px; height: 3px; background: #C5CCD3; border-radius: 50%; display: inline-block; }
+  .od-head-r { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* CHIPS */
+  .od-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: 999px;
+    font: 600 11.5px var(--font-sans); letter-spacing: 0.02em;
+    background: #EEF1F5; color: var(--gray-700);
+    box-shadow: inset 0 0 0 1px #D6DDE5;
+    text-decoration: none;
+  }
+  .od-chip i { width: 11px; height: 11px; }
+  .od-chip.teal { background: var(--nejum-teal-50); color: var(--nejum-teal-700); box-shadow: inset 0 0 0 1px rgba(20,127,116,0.30); }
+  .od-chip.cat-work     { background: #DBEAFE; color: #1565C0; box-shadow: inset 0 0 0 1px #BFDBFE; }
+  .od-chip.cat-personal { background: #D1FAE5; color: #0E6E4A; box-shadow: inset 0 0 0 1px #A7F3D0; }
+  .od-chip.cat-important { background: #FEE2E2; color: #B23B3B; box-shadow: inset 0 0 0 1px #FCA5A5; }
+  .od-chip.cat-ideas    { background: #F3E8FF; color: #7E22CE; box-shadow: inset 0 0 0 1px #E9D5FF; }
+  .od-chip.cat-meeting  { background: #FFEDD5; color: #B27500; box-shadow: inset 0 0 0 1px #FED7AA; }
+
+  /* PRIORITY / STATUS PILL */
+  .ord-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px 6px 12px; border-radius: 999px;
+    font: 600 12.5px var(--font-sans); white-space: nowrap; width: fit-content;
+  }
+  .ord-status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .ord-status.high   { color: #B23B3B; background: #FEE2E2; }
+  .ord-status.high   .ord-status-dot { background: #EF4444; }
+  .ord-status.medium { color: #B27500; background: #FEF3C7; }
+  .ord-status.medium .ord-status-dot { background: #F59E0B; }
+  .ord-status.low    { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.low    .ord-status-dot { background: #10B981; }
+
+  /* BUTTONS */
+  .ord-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 10px;
+    font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms;
+    white-space: nowrap; text-decoration: none;
+    border: 1px solid transparent;
+  }
+  .ord-btn i { width: 14px; height: 14px; }
+  .ord-btn.ghost {
+    background: white; border: 1px solid #E0E6EE; color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .ord-btn.ghost.danger { color: #B23B3B; }
+  .ord-btn.ghost.danger:hover { background: #FEF2F2; border-color: #FCA5A5; color: #B23B3B; }
+  .ord-btn.ghost.fav { color: var(--gray-500); }
+  .ord-btn.ghost.fav:hover { background: #FFFBEB; border-color: #FDE68A; color: #C2891F; }
+  .ord-btn.ghost.fav.active { background: #FFFBEB; border-color: #FDE68A; color: #C2891F; }
+  .ord-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border: 1px solid var(--nejum-teal-700); color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .ord-btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
+  .ord-btn-iconly { padding: 8px 10px; }
+
+  /* GRID */
+  .od-grid {
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 20px; align-items: flex-start;
+  }
+  .od-left, .od-right { display: flex; flex-direction: column; gap: 16px; }
+  .od-right { position: sticky; top: 16px; }
+
+  /* CARDS */
+  .od-card {
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .od-card.content-card { padding: 22px 26px; }
+  .od-card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-card-h i.card-ico { color: var(--nejum-teal-600); width: 14px; height: 14px; }
+  .od-card-h h3 {
+    font: 700 11px var(--font-sans); color: var(--gray-600); margin: 0;
+    letter-spacing: 0.10em; text-transform: uppercase;
+  }
+  .od-card-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; }
+  .od-card-count {
+    background: #F1F5F9; color: var(--gray-600); font: 700 11px var(--font-sans);
+    padding: 2px 8px; border-radius: 999px; margin-left: auto; letter-spacing: 0.02em;
+  }
+
+  /* CONTENT RENDERING */
+  .note-rendered {
+    font: 400 14.5px var(--font-sans);
+    color: var(--gray-700); line-height: 1.75;
+    word-break: break-word;
+  }
+  .note-rendered h1, .note-rendered h2, .note-rendered h3 {
+    font-family: var(--font-sans); color: var(--ink);
+    margin: 18px 0 8px; line-height: 1.3;
+  }
+  .note-rendered h1 { font: 700 22px var(--font-sans); }
+  .note-rendered h2 { font: 700 18px var(--font-sans); }
+  .note-rendered h3 { font: 700 15px var(--font-sans); }
+  .note-rendered p { margin: 0 0 12px; }
+  .note-rendered ul, .note-rendered ol { padding-left: 22px; margin: 0 0 12px; }
+  .note-rendered li { margin-bottom: 4px; }
+  .note-rendered blockquote {
+    margin: 12px 0; padding: 8px 14px;
+    border-left: 3px solid var(--nejum-teal-500);
+    background: var(--nejum-teal-50); color: var(--gray-700);
+    border-radius: 0 8px 8px 0;
+  }
+  .note-rendered code {
+    font: 500 12.5px var(--font-mono);
+    background: #F1F5F9; color: var(--ink);
+    padding: 2px 6px; border-radius: 4px;
+  }
+  .note-rendered pre {
+    background: #F8FAFC; border: 1px solid #E2E8EE;
+    padding: 12px 14px; border-radius: 8px; overflow-x: auto;
+    font: 500 12.5px var(--font-mono);
+  }
+  .note-rendered a { color: var(--nejum-teal-700); text-decoration: underline; }
+  .note-rendered img { max-width: 100%; height: auto; border-radius: 8px; }
+
+  /* QUILL OVERRIDES */
+  .quill-wrapper {
+    border: 1px solid #E0E6EE; border-radius: 10px; overflow: hidden;
+    background: white;
+  }
+  .ql-toolbar.ql-snow {
+    border: none !important;
+    border-bottom: 1px solid #EEF1F5 !important;
+    padding: 10px 14px !important;
+    background: #F8FAFC;
+    font-family: var(--font-sans) !important;
+  }
+  .ql-container.ql-snow {
+    border: none !important;
+    font-family: var(--font-sans) !important;
+    font-size: 14.5px;
+  }
+  .ql-editor {
+    padding: 16px 18px !important;
+    color: var(--gray-700);
+    line-height: 1.75;
+    min-height: 280px;
+  }
+  .ql-editor.ql-blank::before {
+    font-style: normal; color: var(--gray-400); font-family: var(--font-sans);
+  }
+  .ql-snow .ql-stroke { stroke: var(--gray-600); }
+  .ql-snow .ql-fill   { fill:   var(--gray-600); }
+  .ql-snow.ql-toolbar button:hover .ql-stroke,
+  .ql-snow.ql-toolbar button.ql-active .ql-stroke { stroke: var(--nejum-teal-700); }
+  .ql-snow.ql-toolbar button:hover .ql-fill,
+  .ql-snow.ql-toolbar button.ql-active .ql-fill { fill: var(--nejum-teal-700); }
+
+  /* DETAIL LIST (right column info) */
+  .od-detail-list { display: flex; flex-direction: column; gap: 12px; }
+  .od-dt {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; padding-bottom: 10px; border-bottom: 1px dashed #EEF1F5;
+  }
+  .od-dt:last-child { border-bottom: none; padding-bottom: 0; }
+  .od-dt span.k { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
+  .od-dt b.v {
+    font: 600 12.5px var(--font-sans); color: var(--ink);
+    text-align: right; word-break: break-word;
+  }
+  .od-dt b.v.mono { font-family: var(--font-mono); font-weight: 500; }
+  .od-empty-mute { font: 500 12.5px var(--font-sans); color: var(--gray-400); }
+
+  /* INLINE FORM (edit mode) */
+  .od-form-stack { display: flex; flex-direction: column; gap: 14px; }
+  .od-form-row { display: flex; flex-direction: column; gap: 6px; }
+  .od-form-row > span.label {
+    font: 600 11.5px var(--font-sans); color: var(--gray-700); letter-spacing: 0.02em;
+  }
+  .od-input, .od-select {
+    width: 100%; box-sizing: border-box;
+    padding: 10px 12px; background: white;
+    border: 1px solid #E0E6EE; border-radius: 8px;
+    font: 500 13px var(--font-sans); color: var(--ink); outline: none;
+    transition: all 140ms;
+  }
+  .od-input::placeholder { color: var(--gray-400); }
+  .od-input:focus, .od-select:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .od-select { cursor: pointer; }
+  .od-form-actions {
+    display: flex; gap: 8px; margin-top: 6px; padding-top: 14px;
+    border-top: 1px dashed #E2E8EE;
+  }
+
+  /* FILES LIST */
+  .od-file-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #E2E8EE; border-radius: 10px;
+    background: white;
+    transition: all 140ms;
+  }
+  .od-file-row + .od-file-row { margin-top: 8px; }
+  .od-file-row:hover { border-color: #C5CCD3; box-shadow: 0 2px 6px rgba(15,23,31,0.05); }
+  .od-file-icon {
+    width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--nejum-teal-50); color: var(--nejum-teal-700);
+    font-size: 15px;
+  }
+  .od-file-icon.pdf { background: #FEE2E2; color: #B23B3B; }
+  .od-file-icon.img { background: #D1FAE5; color: #0E6E4A; }
+  .od-file-body { flex: 1; min-width: 0; }
+  .od-file-name {
+    font: 600 13px var(--font-sans); color: var(--ink); text-decoration: none;
+    display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .od-file-name:hover { color: var(--nejum-teal-700); }
+  .od-file-meta { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .od-icon-btn {
+    width: 30px; height: 30px; border-radius: 7px;
+    background: white; border: 1px solid #E0E6EE; color: var(--gray-600);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 140ms; flex-shrink: 0;
+  }
+  .od-icon-btn i { width: 13px; height: 13px; }
+  .od-icon-btn:hover { border-color: #C5CCD3; color: var(--ink); }
+  .od-icon-btn.del:hover { border-color: #EF4444; color: #B23B3B; background: #FEF2F2; }
+
+  /* UPLOAD DROPZONE */
+  .od-upload {
+    margin-top: 12px;
+    border: 2px dashed #E0E6EE; border-radius: 12px;
+    padding: 18px 14px; text-align: center; cursor: pointer;
+    transition: all 140ms; background: #FBFCFD;
+  }
+  .od-upload:hover {
+    border-color: var(--nejum-teal-500); background: var(--nejum-teal-50);
+  }
+  .od-upload i {
+    color: var(--nejum-teal-600); font-size: 20px; margin-bottom: 6px;
+    display: inline-block;
+  }
+  .od-upload .lab {
+    font: 700 12.5px var(--font-sans); color: var(--nejum-teal-700); display: block;
+  }
+  .od-upload .hint {
+    font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 2px;
+  }
+
+  /* TOAST */
+  .od-toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--ink); color: white;
+    padding: 12px 18px; border-radius: 10px;
+    font: 600 13px var(--font-sans);
+    box-shadow: 0 12px 30px rgba(15,23,31,0.20);
+    transform: translateY(80px); opacity: 0;
+    transition: all 220ms ease; z-index: 9999;
+  }
+  .od-toast.show { transform: translateY(0); opacity: 1; }
+  .od-toast i { margin-right: 8px; color: #10B981; }
+
+  /* DELETE MODAL */
+  .od-modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,31,0.45);
+    display: none; align-items: center; justify-content: center;
+    z-index: 10000; font-family: var(--font-sans);
+  }
+  .od-modal-overlay.active { display: flex; }
+  .od-modal {
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    max-width: 420px; width: 90%; padding: 22px;
+    box-shadow: 0 20px 60px rgba(15,23,31,0.20);
+  }
+  .od-modal-head {
+    display: flex; gap: 12px; align-items: flex-start; margin-bottom: 18px;
+  }
+  .od-modal-ico {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #FEE2E2; color: #B23B3B;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .od-modal-q { font: 700 15px var(--font-sans); color: var(--ink); margin-bottom: 4px; }
+  .od-modal-sub { font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+  .od-modal-foot { display: flex; gap: 8px; justify-content: flex-end; }
+  /* Default: subtle red outline; hover: solid red fill — swapped per design. */
+  .ord-btn.danger {
+    background: white;
+    border: 1px solid #FECACA;
+    color: #DC2626;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.danger:hover {
+    background: #EF4444;
+    border-color: #B91C1C;
+    color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 1100px) {
+    .od-grid { grid-template-columns: 1fr; }
+    .od-right { position: static; }
+  }
+  @media (max-width: 700px) {
+    .od-head { flex-direction: column; align-items: stretch; }
+    .ord { padding: 16px 16px 80px; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="note-detail-page">
-    <form id="noteForm" method="post" action="{% url 'notes:note_detail' note.id %}">
-        {% csrf_token %}
+{% with editing=request.GET.edit %}
+<div class="ord">
+  <form id="noteForm" method="post" action="{% url 'notes:note_detail' note.id %}" enctype="multipart/form-data">
+    {% csrf_token %}
 
-        <!-- Top Bar -->
-        <div class="note-top-bar">
-            <div class="breadcrumb">
-                <a href="{% url 'notes:index' %}"><i class="fas fa-arrow-left" style="margin-right:4px;"></i> Back</a>
-                <i class="fas fa-chevron-right"></i>
-                <a href="{% url 'notes:index' %}">My Notes</a>
-                <i class="fas fa-chevron-right"></i>
-                <span class="breadcrumb__current">{{ note.title|truncatechars:35 }}</span>
-            </div>
-            <div class="top-bar-actions">
-                <button type="button" class="btn-top-icon fav-btn {% if note.is_favorite %}active{% endif %}"
-                    title="Add to favorites" onclick="toggleDetailFavorite(this)">
-                    <i class="fas fa-star"></i>
-                </button>
-                <button type="button" class="btn-top-icon" title="Delete note"
-                    onclick="if(confirm('Are you sure you want to delete this note?')) deleteNote()">
-                    <i class="far fa-trash-alt"></i>
-                </button>
-                <button type="button" class="btn-save-note" onclick="saveNote()">
-                    <i class="fas fa-check"></i> Save
-                </button>
-            </div>
-        </div>
-
-        <!-- Layout -->
-        <div class="note-layout">
-            <!-- Editor -->
-            <div class="note-editor-card">
-                <div class="note-title-wrapper">
-                    <input type="text" name="title" value="{{ note.title }}" class="note-title-input"
-                        placeholder="Note title...">
-                </div>
-
-                <div class="quill-wrapper">
-                    <textarea name="content" id="hiddenContent" style="display:none;">{{ note.content }}</textarea>
-                    <div id="editor-container"></div>
-                </div>
-
-                <div class="editor-footer">
-                    <span><i class="far fa-clock" style="margin-right:4px;"></i> Last saved: {{   note.updated_at|date:"d.m.Y H:i" }}</span>
-                    <span>{{ note.content|striptags|wordcount }} words</span>
-                </div>
-            </div>
-
-            <!-- Sidebar -->
-            <div class="note-sidebar">
-                <!-- Details -->
-                <div class="sidebar-card">
-                    <div class="sidebar-title"><i class="fas fa-sliders-h"></i> DETAILS</div>
-
-                    <div class="detail-row">
-                        <label class="detail-label">{% trans "Category" %}</label>
-                        <select name="category" class="sidebar-select">
-                            <option value="work" {% if note.category == 'work' %}selected{% endif %}>{% trans "Work" %}</option>
-                            <option value="personal" {% if note.category == 'personal' %}selected{% endif %}>{% trans "Personal" %}
-                            </option>
-                            <option value="important" {% if note.category == 'important' %}selected{% endif %}>{% trans "Important" %}
-                            </option>
-                            <option value="ideas" {% if note.category == 'ideas' %}selected{% endif %}>{% trans "Ideas" %}</option>
-                            <option value="meeting" {% if note.category == 'meeting' %}selected{% endif %}>{% trans "Meeting" %}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="detail-row">
-                        <label class="detail-label">{% trans "Priority" %}</label>
-                        <select name="priority" class="sidebar-select">
-                            <option value="high" {% if note.priority == 'high' %}selected{% endif %}>{% trans "High" %}</option>
-                            <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
-                            <option value="low" {% if note.priority == 'low' %}selected{% endif %}>{% trans "Low" %}</option>
-                        </select>
-                    </div>
-
-                    <div class="toggle-row">
-                        <span class="toggle-label"><i class="far fa-star" style="margin-right:4px; color:#fbbf24;"></i>
-                            Favorite</span>
-                        <label class="switch">
-                            <input type="checkbox" name="is_favorite" {% if note.is_favorite %}checked{% endif %}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div class="meta-info" style="margin-top:16px;">
-                        <div class="meta-row">
-                            <span class="meta-label">Created</span>
-                            <span class="meta-value">{{ note.created_at|date:"d.m.Y H:i" }}</span>
-                        </div>
-                        <div class="meta-row">
-                            <span class="meta-label">Updated</span>
-                            <span class="meta-value">{{ note.updated_at|date:"d.m.Y H:i" }}</span>
-                        </div>
-                        <div class="meta-row">
-                            <span class="meta-label">Status</span>
-                            <span class="meta-value">
-                                <span class="priority-indicator {{ note.priority }}">
-                                    <i class="fas fa-circle" style="font-size:6px;"></i>
-                                    {% if note.priority == 'high' %}High{% elif note.priority == 'medium' %}Medium{% else %}Low{% endif %}
-                                </span>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Attachments -->
-                <div class="sidebar-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                        <div class="sidebar-title" style="margin-bottom:0;"><i class="fas fa-paperclip"></i> FILES
-                        </div>
-                        <span
-                            style="background:var(--n-surface-2); color:var(--n-text-muted); font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600;">
-                            {{ note.attachments.count }}
-                        </span>
-                    </div>
-
-                    <div id="fileList">
-                        {% for file in note.attachments.all %}
-                        <div class="attachment-item" id="file-{{ file.id }}">
-                            <div
-                                class="file-icon-box {% if 'pdf' in file.file_name %}pdf{% elif 'png' in file.file_name or 'jpg' in file.file_name or 'jpeg' in file.file_name %}img{% endif %}">
-                                {% if 'pdf' in file.file_name %}
-                                <i class="fas fa-file-pdf"></i>
-                                {% elif 'png' in file.file_name or 'jpg' in file.file_name or 'jpeg' in file.file_name
-                                %}
-                                <i class="fas fa-image"></i>
-                                {% else %}
-                                <i class="fas fa-file"></i>
-                                {% endif %}
-                            </div>
-                            <div class="file-info">
-                                <a href="{{ file.drive_link }}" target="_blank" class="file-name-link">{{ file.file_name }}</a>
-                                <span class="file-meta">Google Drive</span>
-                            </div>
-                            <button type="button" class="file-remove-btn"
-                                onclick="deleteDetailFile({{ file.id }}, this)">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        {% endfor %}
-                    </div>
-
-                    <div class="upload-dropzone" id="uploadArea">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <div class="upload-label">Upload file</div>
-                        <div class="upload-hint">PDF, PNG, JPG or SVG</div>
-                        <input type="file" id="fileInput" style="display:none;" onchange="handleFileUpload(this.files)">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>
-
-    <div class="detail-toast" id="detailToast">
-        <i class="fas fa-check-circle"></i>
-        <span id="detailToastMsg"></span>
+    <!-- CRUMBS -->
+    <div class="od-crumbs">
+      <a href="{% url 'notes:index' %}" class="od-back">
+        <i class="fa fa-arrow-left"></i> {% trans "Back to notes" %}
+      </a>
+      <span class="od-sep">/</span>
+      <span class="od-crumb-here">{{ note.title|truncatechars:60 }}</span>
     </div>
+
+    <!-- HEAD -->
+    <div class="od-head">
+      <div style="flex: 1; min-width: 0;">
+        <div class="od-head-row">
+          {% if editing %}
+            <input type="text" name="title" value="{{ note.title }}" class="od-title-input"
+                   placeholder="{% trans 'Note title...' %}" required>
+          {% else %}
+            <h1 class="od-title">{{ note.title|truncatechars:80 }}</h1>
+          {% endif %}
+        </div>
+        <div class="od-head-row" style="margin-bottom: 8px;">
+          {% if note.category %}
+            <span class="od-chip cat-{{ note.category }}">
+              <i class="fa fa-folder"></i>
+              {% if note.category == 'work' %}{% trans "Work" %}
+              {% elif note.category == 'personal' %}{% trans "Personal" %}
+              {% elif note.category == 'important' %}{% trans "Important" %}
+              {% elif note.category == 'ideas' %}{% trans "Ideas" %}
+              {% elif note.category == 'meeting' %}{% trans "Meeting" %}
+              {% else %}{{ note.category|capfirst }}{% endif %}
+            </span>
+          {% endif %}
+          {% if note.priority %}
+            <span class="ord-status {{ note.priority }}">
+              <span class="ord-status-dot"></span>
+              {% if note.priority == 'high' %}{% trans "High" %}
+              {% elif note.priority == 'medium' %}{% trans "Medium" %}
+              {% elif note.priority == 'low' %}{% trans "Low" %}
+              {% else %}{{ note.priority|capfirst }}{% endif %}
+            </span>
+          {% endif %}
+        </div>
+        <div class="od-meta">
+          <span title="{{ note.created_at|date:'d M Y · H:i' }}">
+            <i class="fa fa-calendar-plus"></i>{% trans "Created" %} {{ note.created_at|date:"d M Y · H:i" }}
+          </span>
+          <span class="od-dot"></span>
+          <span title="{{ note.updated_at|date:'d M Y · H:i' }}">
+            <i class="fa fa-clock"></i>{% trans "Updated" %} {{ note.updated_at|date:"d M Y · H:i" }}
+          </span>
+        </div>
+      </div>
+      <div class="od-head-r">
+        <button type="button" id="favBtn"
+                class="ord-btn ghost fav ord-btn-iconly {% if note.is_favorite %}active{% endif %}"
+                title="{% trans 'Toggle favorite' %}"
+                onclick="toggleFavorite(this, {{ note.id }})">
+          <i class="fa fa-star"></i>
+        </button>
+        {% if editing %}
+          <a href="{% url 'notes:note_detail' note.id %}" class="ord-btn ghost">
+            <i class="fa fa-times"></i>{% trans "Cancel" %}
+          </a>
+          <button type="button" class="ord-btn primary" onclick="saveNote()">
+            <i class="fa fa-check"></i>{% trans "Save" %}
+          </button>
+        {% else %}
+          <a href="?edit=1" class="ord-btn ghost">
+            <i class="fa fa-edit"></i>{% trans "Edit" %}
+          </a>
+          <button type="button" class="ord-btn ghost danger" onclick="openDeleteModal()">
+            <i class="fa fa-trash"></i>{% trans "Delete" %}
+          </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="od-grid">
+
+      {# ============== LEFT ============== #}
+      <div class="od-left">
+
+        <!-- CONTENT CARD -->
+        <section class="od-card content-card">
+          <div class="od-card-h">
+            <i class="fa fa-file-alt card-ico"></i>
+            <h3>{% trans "Content" %}</h3>
+            {% if not editing %}
+              <span class="od-card-sub">{{ note.content|striptags|wordcount }} {% trans "words" %}</span>
+            {% endif %}
+          </div>
+
+          {% if editing %}
+            <div class="od-form-stack">
+              <div class="od-form-row">
+                <span class="label">{% trans "Body" %}</span>
+                <textarea name="content" id="hiddenContent" style="display:none;">{{ note.content }}</textarea>
+                <div class="quill-wrapper">
+                  <div id="editor-container"></div>
+                </div>
+              </div>
+            </div>
+          {% else %}
+            {% if note.content %}
+              <div class="note-rendered">{{ note.content|safe }}</div>
+            {% else %}
+              <div class="od-empty-mute" style="padding: 6px 0;">
+                {% trans "This note has no content yet." %}
+                <a href="?edit=1" style="color: var(--nejum-teal-700); font-weight: 600; margin-left: 6px; text-decoration: none;">
+                  {% trans "Start writing" %} <i class="fa fa-arrow-right" style="font-size: 11px;"></i>
+                </a>
+              </div>
+            {% endif %}
+          {% endif %}
+        </section>
+
+        <!-- ATTACHMENTS CARD -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-paperclip card-ico"></i>
+            <h3>{% trans "Attachments" %}</h3>
+            <span class="od-card-count">{{ note.attachments.count }}</span>
+          </div>
+
+          <div id="fileList">
+            {% for file in note.attachments.all %}
+              <div class="od-file-row" id="file-{{ file.id }}">
+                {% if 'pdf' in file.file_name|lower %}
+                  <span class="od-file-icon pdf"><i class="fa fa-file-pdf"></i></span>
+                {% elif 'png' in file.file_name|lower or 'jpg' in file.file_name|lower or 'jpeg' in file.file_name|lower or 'svg' in file.file_name|lower or 'gif' in file.file_name|lower %}
+                  <span class="od-file-icon img"><i class="fa fa-image"></i></span>
+                {% else %}
+                  <span class="od-file-icon"><i class="fa fa-file"></i></span>
+                {% endif %}
+                <div class="od-file-body">
+                  <a href="{{ file.drive_link }}" target="_blank" rel="noopener" class="od-file-name">
+                    {{ file.file_name }}
+                  </a>
+                  <div class="od-file-meta">
+                    <i class="fab fa-google-drive" style="margin-right:4px;"></i>{% trans "Google Drive" %}
+                    · {{ file.created_at|date:"d M Y" }}
+                  </div>
+                </div>
+                <a href="{{ file.drive_link }}" target="_blank" rel="noopener"
+                   class="od-icon-btn" title="{% trans 'Open' %}">
+                  <i class="fa fa-external-link-alt"></i>
+                </a>
+                <button type="button" class="od-icon-btn del" title="{% trans 'Remove' %}"
+                        onclick="deleteNoteFile({{ file.id }}, this)">
+                  <i class="fa fa-times"></i>
+                </button>
+              </div>
+            {% empty %}
+              <div class="od-empty-mute" style="padding: 6px 0;">
+                {% trans "No attachments yet." %}
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="od-upload" id="uploadArea" role="button" tabindex="0">
+            <i class="fa fa-cloud-upload-alt"></i>
+            <span class="lab">{% trans "Upload a file" %}</span>
+            <span class="hint">{% trans "PDF, PNG, JPG or SVG" %}</span>
+            <input type="file" id="fileInput" style="display:none;" onchange="handleFileUpload(this.files)">
+          </div>
+        </section>
+      </div>
+
+      {# ============== RIGHT ============== #}
+      <div class="od-right">
+
+        <!-- DETAILS CARD -->
+        <section class="od-card">
+          <div class="od-card-h">
+            <i class="fa fa-sliders-h card-ico"></i>
+            <h3>{% trans "Details" %}</h3>
+          </div>
+
+          {% if editing %}
+            <div class="od-form-stack">
+              <div class="od-form-row">
+                <span class="label">{% trans "Category" %}</span>
+                <select name="category" class="od-select">
+                  <option value="work"      {% if note.category == 'work' %}selected{% endif %}>{% trans "Work" %}</option>
+                  <option value="personal"  {% if note.category == 'personal' %}selected{% endif %}>{% trans "Personal" %}</option>
+                  <option value="important" {% if note.category == 'important' %}selected{% endif %}>{% trans "Important" %}</option>
+                  <option value="ideas"     {% if note.category == 'ideas' %}selected{% endif %}>{% trans "Ideas" %}</option>
+                  <option value="meeting"   {% if note.category == 'meeting' %}selected{% endif %}>{% trans "Meeting" %}</option>
+                </select>
+              </div>
+              <div class="od-form-row">
+                <span class="label">{% trans "Priority" %}</span>
+                <select name="priority" class="od-select">
+                  <option value="high"   {% if note.priority == 'high' %}selected{% endif %}>{% trans "High" %}</option>
+                  <option value="medium" {% if note.priority == 'medium' %}selected{% endif %}>{% trans "Medium" %}</option>
+                  <option value="low"    {% if note.priority == 'low' %}selected{% endif %}>{% trans "Low" %}</option>
+                </select>
+              </div>
+              <div class="od-form-row">
+                <span class="label">{% trans "Favorite" %}</span>
+                <label style="display:flex;align-items:center;gap:10px;font:600 12.5px var(--font-sans);color:var(--gray-700);cursor:pointer;">
+                  <input type="checkbox" name="is_favorite" {% if note.is_favorite %}checked{% endif %}
+                         style="width:16px;height:16px;accent-color:var(--nejum-teal-600);cursor:pointer;">
+                  {% trans "Mark as favorite" %}
+                </label>
+              </div>
+            </div>
+          {% else %}
+            <div class="od-detail-list">
+              <div class="od-dt">
+                <span class="k">{% trans "Category" %}</span>
+                <b class="v">
+                  {% if note.category == 'work' %}{% trans "Work" %}
+                  {% elif note.category == 'personal' %}{% trans "Personal" %}
+                  {% elif note.category == 'important' %}{% trans "Important" %}
+                  {% elif note.category == 'ideas' %}{% trans "Ideas" %}
+                  {% elif note.category == 'meeting' %}{% trans "Meeting" %}
+                  {% else %}—{% endif %}
+                </b>
+              </div>
+              <div class="od-dt">
+                <span class="k">{% trans "Priority" %}</span>
+                <b class="v">
+                  <span class="ord-status {{ note.priority }}">
+                    <span class="ord-status-dot"></span>
+                    {% if note.priority == 'high' %}{% trans "High" %}
+                    {% elif note.priority == 'medium' %}{% trans "Medium" %}
+                    {% elif note.priority == 'low' %}{% trans "Low" %}
+                    {% else %}—{% endif %}
+                  </span>
+                </b>
+              </div>
+              <div class="od-dt">
+                <span class="k">{% trans "Created" %}</span>
+                <b class="v mono">{{ note.created_at|date:"d M Y · H:i" }}</b>
+              </div>
+              <div class="od-dt">
+                <span class="k">{% trans "Updated" %}</span>
+                <b class="v mono">{{ note.updated_at|date:"d M Y · H:i" }}</b>
+              </div>
+              <div class="od-dt">
+                <span class="k">{% trans "Favorited" %}</span>
+                <b class="v">
+                  {% if note.is_favorite %}
+                    <i class="fa fa-star" style="color:#F59E0B;"></i> {% trans "Yes" %}
+                  {% else %}
+                    <span style="color: var(--gray-400);">{% trans "No" %}</span>
+                  {% endif %}
+                </b>
+              </div>
+            </div>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+  </form>
 </div>
 
+<!-- DELETE CONFIRM MODAL -->
+<div class="od-modal-overlay" id="deleteModal" onclick="if(event.target === this) closeDeleteModal()">
+  <div class="od-modal" role="dialog" aria-modal="true">
+    <div class="od-modal-head">
+      <div class="od-modal-ico"><i class="fa fa-trash"></i></div>
+      <div>
+        <div class="od-modal-q">{% trans "Delete this note?" %}</div>
+        <div class="od-modal-sub">{% trans "The note will be moved to the recycle bin." %}</div>
+      </div>
+    </div>
+    <div class="od-modal-foot">
+      <button type="button" class="ord-btn ghost" onclick="closeDeleteModal()">
+        {% trans "Cancel" %}
+      </button>
+      <button type="button" class="ord-btn danger" onclick="deleteNote()">
+        <i class="fa fa-trash"></i>{% trans "Delete" %}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="od-toast" id="detailToast">
+  <i class="fa fa-check-circle"></i>
+  <span id="detailToastMsg"></span>
+</div>
+
+{% if editing %}
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+{% endif %}
 <script>
-    // ---- Quill Editor ----
-    var quill = new Quill('#editor-container', {
-        theme: 'snow',
-        placeholder: 'Start writing...',
-        modules: {
-            toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-                ['blockquote', 'code-block'],
-                ['link', 'image'],
-                [{ 'color': [] }, { 'background': [] }],
-                ['clean']
-            ]
-        }
+  const NOTE_ID = {{ note.id }};
+  const NOTE_URL = "{% url 'notes:note_detail' note.id %}";
+  const TOGGLE_FAV_URL = "{% url 'notes:toggle_favorite' note.id %}";
+  const UPLOAD_FILE_URL = "{% url 'notes:upload_file' note.id %}";
+  const DELETE_NOTE_URL = "{% url 'notes:delete' note.id %}";
+  const INDEX_URL = "{% url 'notes:index' %}";
+  const CSRF = "{{ csrf_token }}";
+  const IS_EDITING = {% if editing %}true{% else %}false{% endif %};
+
+  // ---- Quill Editor (only in edit mode) ----
+  let quill = null;
+  if (IS_EDITING) {
+    quill = new Quill('#editor-container', {
+      theme: 'snow',
+      placeholder: '{% trans "Start writing..." %}',
+      modules: {
+        toolbar: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+          ['blockquote', 'code-block'],
+          ['link', 'image'],
+          [{ 'color': [] }, { 'background': [] }],
+          ['clean']
+        ]
+      }
     });
 
     try {
-        var delta = quill.clipboard.convert(document.getElementById('hiddenContent').value);
-        quill.setContents(delta, 'silent');
+      const initial = document.getElementById('hiddenContent').value;
+      const delta = quill.clipboard.convert(initial);
+      quill.setContents(delta, 'silent');
     } catch (e) {
-        quill.setText(document.getElementById('hiddenContent').value);
+      quill.setText(document.getElementById('hiddenContent').value || '');
     }
+  }
 
-    // ---- Save ----
-    function saveNote() {
-        document.getElementById('hiddenContent').value = quill.root.innerHTML;
-        const formData = new FormData(document.getElementById('noteForm'));
-
-        fetch("{% url 'notes:note_detail' note.id %}", {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                showDetailToast('Note saved successfully');
-                const btn = document.querySelector('.btn-save-note');
-                const orig = btn.innerHTML;
-                btn.innerHTML = '<i class="fas fa-check"></i> Saved';
-                setTimeout(() => btn.innerHTML = orig, 2000);
-            }
-        });
+  // ---- Save ----
+  function saveNote() {
+    if (quill) {
+      document.getElementById('hiddenContent').value = quill.root.innerHTML;
     }
+    const formData = new FormData(document.getElementById('noteForm'));
 
-    // ---- Favorite ----
-    function toggleDetailFavorite(btn) {
-        fetch("{% url 'notes:toggle_favorite' note.id %}", {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        }).then(r => r.json()).then(data => {
-            btn.classList.toggle('active', data.is_favorite);
-            // Also update the sidebar checkbox
-            const cb = document.querySelector('input[name="is_favorite"]');
-            if (cb) cb.checked = data.is_favorite;
-            showDetailToast(data.is_favorite ? 'Added to favorites' : 'Removed from favorites');
-        });
-    }
+    fetch(NOTE_URL, {
+      method: 'POST',
+      body: formData,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        showToast('{% trans "Note saved successfully" %}');
+        setTimeout(() => { window.location.href = NOTE_URL; }, 700);
+      } else {
+        showToast('{% trans "Save failed" %}', true);
+      }
+    }).catch(() => showToast('{% trans "Save failed" %}', true));
+  }
 
-    // ---- Delete Note ----
-    function deleteNote() {
-        fetch("{% url 'notes:delete' note.id %}", {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        }).then(r => {
-            if (r.ok) window.location.href = "{% url 'notes:index' %}";
-        });
-    }
+  // ---- Favorite ----
+  function toggleFavorite(btn, noteId) {
+    fetch(TOGGLE_FAV_URL, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': CSRF,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    }).then(r => r.json()).then(data => {
+      btn.classList.toggle('active', data.is_favorite);
+      const cb = document.querySelector('input[name="is_favorite"]');
+      if (cb) cb.checked = data.is_favorite;
+      showToast(data.is_favorite
+        ? '{% trans "Added to favorites" %}'
+        : '{% trans "Removed from favorites" %}');
+    });
+  }
 
-    // ---- File Upload ----
-    document.getElementById('uploadArea').addEventListener('click', () => {
+  // ---- Delete Modal ----
+  function openDeleteModal() {
+    document.getElementById('deleteModal').classList.add('active');
+  }
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('active');
+  }
+  function deleteNote() {
+    fetch(DELETE_NOTE_URL, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': CSRF,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    }).then(r => {
+      if (r.ok) {
+        showToast('{% trans "Note deleted" %}');
+        setTimeout(() => { window.location.href = INDEX_URL; }, 500);
+      }
+    });
+  }
+
+  // ---- File Upload ----
+  const uploadArea = document.getElementById('uploadArea');
+  if (uploadArea) {
+    uploadArea.addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+    uploadArea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
         document.getElementById('fileInput').click();
+      }
     });
+  }
 
-    function handleFileUpload(files) {
-        if (files.length === 0) return;
+  function handleFileUpload(files) {
+    if (!files || files.length === 0) return;
 
-        const formData = new FormData();
-        formData.append('file', files[0]);
-        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    const formData = new FormData();
+    formData.append('file', files[0]);
+    formData.append('csrfmiddlewaretoken', CSRF);
 
-        const uploadBox = document.getElementById('uploadArea');
-        const originalContent = uploadBox.innerHTML;
-        uploadBox.innerHTML = '<div style="padding:10px;"><i class="fas fa-spinner fa-spin" style="color:#3b82f6;"></i> Uploading...</div>';
+    const ua = document.getElementById('uploadArea');
+    const original = ua.innerHTML;
+    ua.innerHTML = '<i class="fa fa-spinner fa-spin"></i><span class="lab">{% trans "Uploading..." %}</span>';
 
-        fetch("{% url 'notes:upload_file' note.id %}", {
-            method: 'POST',
-            body: formData
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                showDetailToast('Upload failed');
-                uploadBox.innerHTML = originalContent;
-            }
-        });
-    }
+    fetch(UPLOAD_FILE_URL, {
+      method: 'POST',
+      body: formData
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        showToast('{% trans "File uploaded" %}');
+        setTimeout(() => location.reload(), 400);
+      } else {
+        showToast('{% trans "Upload failed" %}', true);
+        ua.innerHTML = original;
+      }
+    }).catch(() => {
+      showToast('{% trans "Upload failed" %}', true);
+      ua.innerHTML = original;
+    });
+  }
 
-    // ---- Delete File ----
-    function deleteDetailFile(fileId, el) {
-        fetch('/notes/file/' + fileId + '/delete/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        }).then(r => r.json()).then(data => {
-            if (data.success) {
-                el.closest('.attachment-item').remove();
-                showDetailToast('File removed');
-            }
-        });
-    }
-
-    // ---- Toast ----
-    function showDetailToast(msg) {
-        const t = document.getElementById('detailToast');
-        document.getElementById('detailToastMsg').textContent = msg;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3000);
-    }
-
-    // ---- Keyboard shortcut ----
-    document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-            e.preventDefault();
-            saveNote();
+  // ---- Delete File ----
+  function deleteNoteFile(fileId, el) {
+    fetch('/notes/file/' + fileId + '/delete/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': CSRF,
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        const row = el.closest('.od-file-row');
+        if (row) {
+          row.style.transition = 'all 0.25s ease';
+          row.style.opacity = '0';
+          row.style.transform = 'translateX(-12px)';
+          setTimeout(() => row.remove(), 250);
         }
+        showToast('{% trans "File removed" %}');
+      }
     });
+  }
+
+  // ---- Toast ----
+  function showToast(msg, isError) {
+    const t = document.getElementById('detailToast');
+    const ic = t.querySelector('i');
+    if (isError) {
+      ic.className = 'fa fa-exclamation-circle';
+      ic.style.color = '#EF4444';
+    } else {
+      ic.className = 'fa fa-check-circle';
+      ic.style.color = '#10B981';
+    }
+    document.getElementById('detailToastMsg').textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  // ---- Keyboard shortcut: Ctrl/Cmd+S = save ----
+  document.addEventListener('keydown', function (e) {
+    if (IS_EDITING && (e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      saveNote();
+    }
+    if (e.key === 'Escape') {
+      closeDeleteModal();
+    }
+  });
 </script>
+{% endwith %}
 {% endblock %}

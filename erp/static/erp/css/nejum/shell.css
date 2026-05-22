@@ -183,6 +183,13 @@ body > main {
   left: 102px;     /* JS recomputes this when an item opens */
   top: 80px;
   width: 308px;
+  /* Cap height to the visible viewport so long flyouts (Operations,
+     which has QR/Raw-material/Orders/Warehouse groups) don't get
+     clipped at the bottom. Scrolls inside the panel instead. */
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFC 100%);
   border: 1px solid #E2E8EB;
   border-radius: 14px;
@@ -203,6 +210,15 @@ body > main {
     visibility 0s linear 220ms;
   text-align: left;
   cursor: default;
+}
+/* Head stays compact, body grows to fit; only scrolls on very
+   short viewports where the compacted content still overflows. */
+.nj-flyout > .nj-fly-head { flex-shrink: 0; }
+.nj-flyout > .nj-fly-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .nj-nav-item.nj-open > .nj-flyout,
 .nj-nav-item.nj-pinned > .nj-flyout {
@@ -234,15 +250,15 @@ body > main {
 .nj-fly-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 18px 14px;
+  gap: 10px;
+  padding: 2px 16px 10px;
   border-bottom: 1px solid #EEF2F4;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .nj-fly-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -271,11 +287,12 @@ body > main {
   color: var(--gray-800, #1B2128);
 }
 
-/* Body */
-.nj-fly-body { padding: 0 8px 6px; }
+/* Body — compact spacing so big flyouts (Operations: 4 groups, 10 items)
+   fit on a typical laptop viewport without scrolling. */
+.nj-fly-body { padding: 0 8px 4px; }
 .nj-fly-group + .nj-fly-group {
-  margin-top: 6px;
-  padding-top: 4px;
+  margin-top: 2px;
+  padding-top: 2px;
   border-top: 1px solid #F1F4F6;
 }
 .nj-fly-group-title {
@@ -283,18 +300,18 @@ body > main {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--gray-400, #9AA5AD);
-  padding: 10px 12px 6px;
+  padding: 6px 12px 3px;
 }
 
 .nj-fly-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 10px;
+  gap: 10px;
+  padding: 6px 10px;
   margin: 0 2px;
   border-radius: 9px;
   cursor: pointer;
-  font: 500 13.5px var(--font-sans, 'Plus Jakarta Sans');
+  font: 500 13px var(--font-sans, 'Plus Jakarta Sans');
   color: var(--gray-700, #2F3740);
   text-decoration: none;
   transition:
@@ -306,9 +323,9 @@ body > main {
   color: var(--nejum-teal-700, #005354);
 }
 .nj-fi-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -319,8 +336,8 @@ body > main {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1);
 }
 .nj-fi-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
   stroke-width: 1.5 !important;
 }
 .nj-fly-item:hover .nj-fi-icon {

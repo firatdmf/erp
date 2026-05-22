@@ -175,6 +175,7 @@ function loadExistingVariantImages() {
                 variant_id: variant.variant_id,
                 price: variant.variant_price,
                 cost: variant.variant_cost,
+                b2b_price: variant.variant_b2b_price,
                 quantity: variant.variant_quantity,
                 sku: variant.variant_sku,
                 barcode: variant.variant_barcode,
@@ -1180,6 +1181,8 @@ function renderVariantTable(combinations, selectedGrouping = null) {
             featured = true;
         }
         const cost = costInput?.value || existingData.cost || '';
+        const b2bPriceInput = document.querySelector(`input[name="variant_b2b_price_${originalIndex + 1}"]`);
+        const b2bPrice = b2bPriceInput?.value || existingData.b2b_price || '';
         const sku = skuInput?.value || existingData.sku || existingData.item_code || ''; // fallback to item_code if sku missing
         const barcode = barcodeInput?.value || existingData.barcode || '';
         const active = activeInput ? (activeInput.value === 'true') : (existingData.is_active !== false);
@@ -1249,6 +1252,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         // HIDDEN INPUTS for Modal Fields (wrapped in td to avoid browser foster-parenting)
         rowHTML += `<td style="display:none;">`;
         rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
+        rowHTML += `<input type="hidden" name="variant_b2b_price_${originalIndex + 1}" value="${b2bPrice}">`;
         rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}">`;
         rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
         rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
@@ -2727,6 +2731,7 @@ function prepareVariantsForSubmission() {
         // Get form values for this variant
         const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
         const costInput = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
+        const b2bPriceInput = document.querySelector(`input[name="variant_b2b_price_${index + 1}"]`);
         const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
         const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
@@ -2738,6 +2743,9 @@ function prepareVariantsForSubmission() {
         }
         if (costInput && costInput.value) {
             costInput.value = costInput.value.replace(',', '.');
+        }
+        if (b2bPriceInput && b2bPriceInput.value) {
+            b2bPriceInput.value = b2bPriceInput.value.replace(',', '.');
         }
         if (quantityInput && quantityInput.value) {
             quantityInput.value = quantityInput.value.replace(',', '.');
@@ -2756,6 +2764,7 @@ function prepareVariantsForSubmission() {
             variant_attribute_values: combo,
             variant_price: priceInput ? parseFloat(priceInput.value) || 0 : 0,
             variant_cost: costInput && costInput.value !== '' ? parseFloat(costInput.value) : null,
+            variant_b2b_price: b2bPriceInput && b2bPriceInput.value !== '' ? parseFloat(b2bPriceInput.value) : null,
             variant_quantity: quantityInput ? parseFloat(quantityInput.value) || 0 : 0,
             variant_barcode: barcodeInput ? barcodeInput.value : '',
             variant_featured: featuredInput ? featuredInput.checked : true,
@@ -3621,6 +3630,7 @@ function openVariantDetailModal(variantIndex) {
     const idx = variantIndex + 1;
     const price = document.querySelector(`input[name="variant_price_${idx}"]`)?.value || '';
     const cost = document.querySelector(`input[name="variant_cost_${idx}"]`)?.value || '';
+    const b2bPrice = document.querySelector(`input[name="variant_b2b_price_${idx}"]`)?.value || '';
     const sku = document.querySelector(`input[name="variant_sku_${idx}"]`)?.value || '';
     const barcode = document.querySelector(`input[name="variant_barcode_${idx}"]`)?.value || '';
     const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
@@ -3629,12 +3639,14 @@ function openVariantDetailModal(variantIndex) {
     // Populate modal inputs
     const priceEl = document.getElementById('modal_variant_price');
     const costEl = document.getElementById('modal_variant_cost');
+    const b2bPriceEl = document.getElementById('modal_variant_b2b_price');
     const skuEl = document.getElementById('modal_variant_sku');
     const barcodeEl = document.getElementById('modal_variant_barcode');
     const activeEl = document.getElementById('modal_variant_active');
 
     if (priceEl) priceEl.value = price;
     if (costEl) costEl.value = cost;
+    if (b2bPriceEl) b2bPriceEl.value = b2bPrice;
     if (skuEl) skuEl.value = sku;
     if (barcodeEl) barcodeEl.value = barcode;
     if (activeEl) activeEl.checked = isActive;
@@ -3663,6 +3675,7 @@ function saveVariantDetailModal() {
     // Get values from modal
     const price = document.getElementById('modal_variant_price').value;
     const cost = document.getElementById('modal_variant_cost').value;
+    const b2bPrice = document.getElementById('modal_variant_b2b_price')?.value || '';
     const sku = document.getElementById('modal_variant_sku').value;
     const barcode = document.getElementById('modal_variant_barcode').value;
     const isActive = document.getElementById('modal_variant_active').checked;
@@ -3670,12 +3683,14 @@ function saveVariantDetailModal() {
     // Update DOM inputs (hidden and visible)
     const priceInput = document.querySelector(`input[name="variant_price_${idx}"]`);
     const costInput = document.querySelector(`input[name="variant_cost_${idx}"]`);
+    const b2bPriceInput = document.querySelector(`input[name="variant_b2b_price_${idx}"]`);
     const skuInput = document.querySelector(`input[name="variant_sku_${idx}"]`);
     const barcodeInput = document.querySelector(`input[name="variant_barcode_${idx}"]`);
     const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
 
     if (priceInput) priceInput.value = price;
     if (costInput) costInput.value = cost;
+    if (b2bPriceInput) b2bPriceInput.value = b2bPrice;
     if (skuInput) skuInput.value = sku;
     if (barcodeInput) barcodeInput.value = barcode;
     if (activeInput) activeInput.value = isActive;

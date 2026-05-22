@@ -1,13 +1,14 @@
+{% load i18n %}
 {% include "operating/partials/warehouse_product_rows.html" %}
 
 {% if paginator.num_pages > 1 %}
 <tr id="wh-pagination-row">
-  <td colspan="7" style="padding: 14px 18px; background:#fafbfc; border-top:1px solid #e2e8f0;">
+  <td colspan="7" style="padding: 14px 10px; background:#F8FAFC; border-top:1px solid #E2E8EE;">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-      <div style="font-size:12.5px; color:#64748b;">
-        Showing <b style="color:#0f172a;">{{ page.start_index }}–{{ page.end_index }}</b>
-        of <b style="color:#0f172a;">{{ paginator.count|default:0 }}</b>
-        {% if search %}<span style="color:#94a3b8;">· filtered from {{ product_count }} total</span>{% endif %}
+      <div style="font:500 12.5px var(--font-sans); color:var(--gray-600);">
+        {% trans "Showing" %} <b style="color:#0F1419;">{{ page.start_index }}–{{ page.end_index }}</b>
+        {% trans "of" %} <b style="color:#0F1419;">{{ paginator.count|default:0 }}</b>
+        {% if search %}<span style="color:var(--gray-400);">· {% trans "filtered from" %} {{ product_count }} {% trans "total" %}</span>{% endif %}
       </div>
 
       <div class="wh-pager">
@@ -15,10 +16,10 @@
           <button type="button" class="wh-pg-btn"
                   hx-get="?page={{ page.previous_page_number }}&search={{ search|urlencode }}&sort={{ sort }}"
                   hx-target="#wh-rows" hx-swap="innerHTML">
-            <i class="fa fa-chevron-left"></i> Prev
+            <i class="fa fa-chevron-left"></i> {% trans "Prev" %}
           </button>
         {% else %}
-          <button type="button" class="wh-pg-btn" disabled><i class="fa fa-chevron-left"></i> Prev</button>
+          <button type="button" class="wh-pg-btn" disabled><i class="fa fa-chevron-left"></i> {% trans "Prev" %}</button>
         {% endif %}
 
         {% for n in page.paginator.page_range %}
@@ -29,7 +30,7 @@
                     hx-get="?page={{ n }}&search={{ search|urlencode }}&sort={{ sort }}"
                     hx-target="#wh-rows" hx-swap="innerHTML">{{ n }}</button>
           {% elif n == page.number|add:'-3' or n == page.number|add:'3' %}
-            <span style="padding:0 4px; color:#94a3b8;">…</span>
+            <span style="padding:0 4px; color:var(--gray-400);">…</span>
           {% endif %}
         {% endfor %}
 
@@ -37,10 +38,10 @@
           <button type="button" class="wh-pg-btn"
                   hx-get="?page={{ page.next_page_number }}&search={{ search|urlencode }}&sort={{ sort }}"
                   hx-target="#wh-rows" hx-swap="innerHTML">
-            Next <i class="fa fa-chevron-right"></i>
+            {% trans "Next" %} <i class="fa fa-chevron-right"></i>
           </button>
         {% else %}
-          <button type="button" class="wh-pg-btn" disabled>Next <i class="fa fa-chevron-right"></i></button>
+          <button type="button" class="wh-pg-btn" disabled>{% trans "Next" %} <i class="fa fa-chevron-right"></i></button>
         {% endif %}
       </div>
     </div>

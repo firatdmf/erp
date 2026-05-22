@@ -23,7 +23,22 @@
       "Bash(./vir_env/Scripts/python.exe erp/manage.py makemigrations crm todo)",
       "Bash(./vir_env/Scripts/python.exe erp/manage.py migrate crm todo)",
       "Bash(./vir_env/Scripts/python.exe erp/manage.py migrate)",
-      "Bash(./vir_env/Scripts/python.exe erp/manage.py check)"
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py check)",
+      "Bash(./vir_env/Scripts/python.exe -c \"import pytesseract; print\\('pytesseract:', pytesseract.__version__\\)\")",
+      "Bash(./vir_env/Scripts/python.exe -m pip install pytesseract Pillow)",
+      "Bash(where tesseract *)",
+      "Bash(./vir_env/Scripts/python.exe erp/manage.py makemigrations operating)",
+      "Bash(tesseract --version)",
+      "Bash(ls \"/c/Program Files/Tesseract-OCR/\" 2>/dev/null | head -5 || echo \"not at default path\")",
+      "Read(//c/Program Files/Tesseract-OCR//**)",
+      "Bash(\"/c/Program Files/Tesseract-OCR/tesseract.exe\" --version)",
+      "Bash(\"/c/Program Files/Tesseract-OCR/tesseract.exe\" --list-langs)",
+      "Bash(./vir_env/Scripts/python.exe -c \"import anthropic; print\\('anthropic:', anthropic.__version__\\)\")",
+      "Bash(./vir_env/Scripts/python.exe -m pip install anthropic)",
+      "Bash(./vir_env/Scripts/python.exe -m pip install google-genai)",
+      "Bash(./vir_env/Scripts/python.exe -c \"from google import genai; print\\('genai ok'\\)\")",
+      "Bash(python manage.py check)",
+      "Bash(python -c ' *)"
     ]
   }
 }

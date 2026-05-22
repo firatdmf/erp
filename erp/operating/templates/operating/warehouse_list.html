@@ -2,199 +2,687 @@
 {% load i18n %}
 {% load static %}
 
-{% block content %}
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  .wh-page {
-    background: radial-gradient(ellipse 1200px 600px at 0% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse 900px 400px at 100% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-                #f8fafc;
-    min-height: 100vh;
-    padding: 16px 12px 24px;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-  .wh-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-  }
-  .wh-title h1 {
-    font-size: 28px;
-    font-weight: 800;
-    color: #0f172a;
-    margin: 0 0 4px 0;
-    letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #0f172a 0%, #6366f1 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .wh-title p {
-    font-size: 13px;
-    color: #64748b;
-    margin: 0;
-    font-weight: 500;
-  }
-  .wh-add-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 20px;
-    background: linear-gradient(135deg, #6366f1, #3b82f6);
-    color: #fff;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 700;
-    text-decoration: none;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
-    transition: all 0.2s;
-  }
-  .wh-add-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.45);
-    color: #fff;
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
   }
 
-  .wh-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
+  .ord {
+    padding: 22px 28px 100px;
+    font: 400 13.5px var(--font-sans);
+    color: var(--ink);
   }
-  .wh-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 22px;
-    text-decoration: none;
-    color: inherit;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: hidden;
-  }
-  .wh-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #6366f1, #3b82f6);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  .wh-card:hover {
-    border-color: transparent;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.15);
-    color: inherit;
-    text-decoration: none;
-  }
-  .wh-card:hover::before { opacity: 1; }
 
-  .wh-card-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #eef2ff, #e0e7ff);
-    color: #6366f1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
+  /* ─── LIST HEAD ──────────────────────────────────────── */
+  .ord-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .ord-eyebrow {
+    font: 700 10.5px var(--font-sans);
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--nejum-teal-600);
+    margin-bottom: 4px;
+  }
+  .ord-title {
+    font: 800 30px var(--font-sans);
+    letter-spacing: -0.02em;
+    color: #0F1419; margin: 0;
+  }
+  .ord-head-r { display: flex; gap: 8px; }
+  .ord-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font: 600 13px var(--font-sans);
+    cursor: pointer;
+    transition: all 140ms;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .ord-btn i { width: 14px; height: 14px; }
+  .ord-btn.ghost {
+    background: white;
+    border: 1px solid #E0E6EE;
+    color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .ord-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border: 1px solid var(--nejum-teal-700);
+    color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+
+  /* ─── TABS / SEARCH BAR ──────────────────────────────── */
+  .ord-tabs-wrap {
+    display: flex; align-items: center; gap: 12px;
     margin-bottom: 14px;
   }
-  .wh-card-name {
-    font-size: 17px;
-    font-weight: 700;
-    color: #0f172a;
-    margin-bottom: 4px;
-    letter-spacing: -0.3px;
+  .ord-tabs {
+    display: flex; align-items: center; gap: 4px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
   }
-  .wh-card-loc {
-    font-size: 12.5px;
-    color: #64748b;
-    margin-bottom: 16px;
-    display: flex;
+  .ord-tab {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    font: 600 13px var(--font-sans);
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 140ms;
+  }
+  .ord-tab i { width: 14px; height: 14px; }
+  .ord-tab:hover { color: #0F1419; background: #F4F7FB; }
+  .ord-tab.active {
+    background: var(--nejum-teal-50);
+    color: var(--nejum-teal-700);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,0.20);
+  }
+  .ord-tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 1px 8px;
+    background: #EEF1F5;
+    border-radius: 999px;
+    font: 600 11px var(--font-mono);
+    color: var(--gray-600);
+  }
+  .ord-tab.active .ord-tab-count {
+    background: var(--nejum-teal-600);
+    color: white;
+  }
+  .ord-tabs-r { margin-left: auto; position: relative; display: flex; align-items: center; }
+  .ord-search-wrap { position: relative; display: flex; align-items: center; margin-left: auto; }
+  .ord-search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-500);
+    font-size: 13px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  input.ord-search-input,
+  .ord-search-input {
+    width: 340px !important;
+    height: 36px !important;
+    padding: 0 38px 0 38px !important;
+    background: #F4F7FB !important;
+    border: 1px solid transparent !important;
+    border-radius: 8px !important;
+    font: 500 13px var(--font-sans);
+    color: #0F1419;
+    outline: none !important;
+    box-shadow: none !important;
+    transition: all 140ms;
+    box-sizing: border-box !important;
+  }
+  input.ord-search-input::placeholder,
+  .ord-search-input::placeholder { color: var(--gray-500); }
+  input.ord-search-input:focus,
+  .ord-search-input:focus {
+    background: white !important;
+    border-color: var(--nejum-teal-500) !important;
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12) !important;
+  }
+  .ord-search-clear {
+    position: absolute;
+    right: 10px;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border: none;
+    background: #E2E8EE;
+    color: var(--gray-600);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 10px;
+    transition: all 140ms;
+  }
+  .ord-search-clear:hover { background: #D1D8E0; color: #0F1419; }
+
+  /* ─── META ───────────────────────────────────────────── */
+  .ord-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 6px;
+    margin-bottom: 12px;
+  }
+  .ord-result { font: 500 12.5px var(--font-sans); color: var(--gray-600); }
+  .ord-result b { color: #0F1419; font-weight: 700; }
+
+  /* ─── LIST ──────────────────────────────────────────── */
+  .ord-list {
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-list-head, .ord-row {
+    display: grid;
+    grid-template-columns: 56px minmax(180px, 1.4fr) minmax(140px, 1fr) 130px 150px 160px 20px;
+    gap: 20px;
     align-items: center;
-    gap: 6px;
+    padding: 12px 18px;
   }
-  .wh-card-stats {
-    display: flex;
-    gap: 16px;
-    padding-top: 14px;
-    border-top: 1px solid #f1f5f9;
-  }
-  .wh-stat {
-    flex: 1;
-  }
-  .wh-stat-label {
-    font-size: 10.5px;
-    font-weight: 700;
-    color: #94a3b8;
+  .ord-list-head {
+    background: #FAFBFD;
+    border-bottom: 1px solid #E2E8EE;
+    font: 600 10.5px var(--font-sans);
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
+    color: var(--gray-500);
   }
-  .wh-stat-value {
+  .ord-list-head .num { text-align: right; }
+  .ord-row {
+    border-bottom: 1px solid #EEF1F5;
+    cursor: pointer;
+    transition: background 120ms, transform 300ms, opacity 300ms;
+    text-decoration: none;
+    color: inherit;
+  }
+  .ord-row:last-child { border-bottom: none; }
+  .ord-row:hover { background: #FAFBFD; }
+
+  .ord-avatar {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.20);
+  }
+  .ord-avatar i {
     font-size: 16px;
-    font-weight: 800;
-    color: #0f172a;
+    opacity: 0.95;
+  }
+  .ord-avatar .letter {
+    position: absolute;
+    bottom: -3px;
+    right: -3px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: white;
+    color: var(--ink);
+    font: 700 10px var(--font-sans);
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 3px rgba(15,23,31,0.18);
   }
 
-  .wh-empty {
-    grid-column: 1 / -1;
-    background: #fff;
-    border: 2px dashed #e2e8f0;
-    border-radius: 16px;
-    padding: 60px 20px;
-    text-align: center;
-    color: #64748b;
+  .ord-name {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
   }
-  .wh-empty i {
-    font-size: 44px;
-    color: #cbd5e1;
-    margin-bottom: 16px;
+  .ord-name-main {
+    font: 600 13.5px var(--font-sans);
+    color: #0F1419;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ord-name-sub {
+    font: 500 11.5px var(--font-sans);
+    color: var(--gray-500);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ord-cell {
+    font: 500 12.5px var(--font-sans);
+    color: var(--gray-700);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .ord-cell.muted { color: var(--gray-400); }
+  .ord-cell i { color: var(--gray-500); margin-right: 6px; font-size: 11.5px; }
+  .num { text-align: right; }
+  .ord-metric {
+    font: 700 14px var(--font-sans);
+    color: #0F1419;
+    font-variant-numeric: tabular-nums;
+  }
+  .ord-metric span {
+    font: 500 11px var(--font-sans);
+    color: var(--gray-500);
+    margin-left: 5px;
+  }
+  .ord-metric.money { color: #0E6E4A; }
+
+  .ord-actions {
+    display: flex; align-items: center; gap: 2px;
+    justify-self: end;
+    flex-shrink: 0;
+  }
+  .ord-action {
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--gray-500);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: none;
+    transition: all 140ms;
+    flex-shrink: 0;
+  }
+  .ord-action:hover {
+    background: #F4F7FB;
+    border-color: #E2E8EE;
+    color: var(--nejum-teal-700);
+  }
+  .ord-action.danger:hover {
+    background: #FEF2F2;
+    border-color: #FECACA;
+    color: #DC2626;
+  }
+  .ord-chev { width: 16px; height: 16px; color: var(--gray-400); justify-self: end; }
+  .ord-row:hover .ord-chev { color: var(--nejum-teal-700); }
+
+  .ord-empty {
+    padding: 80px 24px;
+    text-align: center;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 12px;
+  }
+  .ord-empty .ico {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--nejum-teal-50);
+    color: var(--nejum-teal-700);
+    margin-bottom: 20px;
+    font-size: 28px;
+  }
+  .ord-empty h3 { font: 700 18px var(--font-sans); color: #0F1419; margin: 0 0 8px; }
+  .ord-empty p { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0 0 20px; }
+
+  /* ─── DELETE MODAL ───────────────────────────────────── */
+  .delete-modal {
+    position: fixed; inset: 0;
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .delete-modal.show { opacity: 1; pointer-events: all; }
+  .delete-modal-overlay {
+    position: absolute; inset: 0;
+    background: rgba(15, 20, 25, 0.45);
+    backdrop-filter: blur(3px);
+  }
+  .delete-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 14px;
+    max-width: 440px; width: 90%;
+    padding: 28px;
+    border: 1px solid #E2E8EE;
+    box-shadow: 0 18px 48px rgba(15,23,31,0.22);
+    transform: scale(0.94);
+    transition: transform 220ms ease;
+    font: 400 13.5px var(--font-sans);
+    color: var(--ink);
+  }
+  .delete-modal.show .delete-modal-content { transform: scale(1); }
+  .delete-modal-header { text-align: center; margin-bottom: 22px; }
+  .delete-icon-wrapper {
+    width: 56px; height: 56px;
+    margin: 0 auto 16px;
+    background: #FEF2F2;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 0 0 1px rgba(220,38,38,0.18);
+  }
+  .delete-icon-wrapper i { font-size: 24px; color: #DC2626; }
+  .delete-modal-header h3 {
+    font: 800 20px var(--font-sans);
+    letter-spacing: -0.01em;
+    color: #0F1419;
+    margin: 0 0 10px;
+  }
+  .delete-modal-header p {
+    font: 500 13.5px var(--font-sans);
+    color: var(--gray-600);
+    margin: 6px 0;
+    line-height: 1.5;
+  }
+  .delete-modal-header p span { font-weight: 700; color: #0F1419; }
+  .warning-text {
+    font: 600 12px var(--font-sans) !important;
+    color: #DC2626 !important;
+    background: #FEF2F2;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 14px !important;
+    box-shadow: inset 0 0 0 1px rgba(220,38,38,0.12);
+  }
+  .delete-modal-footer {
+    display: flex; gap: 10px; justify-content: flex-end;
+  }
+  .delete-modal-footer .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font: 600 13px var(--font-sans);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 140ms;
+  }
+  .delete-modal-footer .btn-cancel {
+    background: white;
+    border-color: #E0E6EE;
+    color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .delete-modal-footer .btn-cancel:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .delete-modal-footer .btn-danger {
+    background: linear-gradient(180deg, #EF4444 0%, #DC2626 100%);
+    border-color: #B91C1C;
+    color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .delete-modal-footer .btn-danger:hover { filter: brightness(1.04); }
+
+  @media (max-width: 1200px) {
+    .ord-list-head, .ord-row {
+      grid-template-columns: 56px minmax(140px, 1.2fr) minmax(120px, 0.9fr) 110px 130px 150px 20px;
+      gap: 14px;
+    }
+    .ord-search-input { width: 240px; }
+  }
+  @media (max-width: 900px) {
+    .ord-search-input { width: 180px; }
+    .ord-list-head { display: none; }
+    .ord-row {
+      grid-template-columns: 56px 1fr auto;
+      gap: 10px;
+      padding: 14px;
+    }
+    .ord-row > .ord-cell, .ord-row > .num { grid-column: 2 / -2; }
+    .ord-row > .ord-actions { grid-column: 1 / -1; justify-self: start; }
+    .ord-chev { display: none; }
   }
 </style>
+{% endblock %}
 
-<div class="wh-page">
-  <div class="wh-header">
-    <div class="wh-title">
-      <h1>{% trans "My Warehouses" %}</h1>
-      <p>Manage your storage locations and inventory.</p>
+{% block content %}
+<div class="ord">
+  <!-- HEAD -->
+  <div class="ord-head">
+    <div>
+      <div class="ord-eyebrow">{% trans "Inventory" %}</div>
+      <h1 class="ord-title">{% trans "Warehouses" %}</h1>
     </div>
-    <a href="{% url 'operating:create_warehouse' %}" class="wh-add-btn">
-      <i class="fa fa-plus"></i> Add Warehouse
-    </a>
+    <div class="ord-head-r">
+      <button type="button" class="ord-btn ghost"><i class="fa fa-filter"></i>{% trans "Filter" %}</button>
+      <a href="{% url 'operating:create_warehouse' %}" class="ord-btn primary">
+        <i class="fa fa-plus"></i>{% trans "Add warehouse" %}
+      </a>
+    </div>
   </div>
 
-  <div class="wh-grid">
-    {% for wh in warehouses %}
-    <a href="{% url 'operating:warehouse_detail' wh.pk %}" class="wh-card">
-      <div class="wh-card-icon">
+  <!-- TAB + SEARCH -->
+  <div class="ord-tabs-wrap">
+    <div class="ord-tabs">
+      <button type="button" class="ord-tab active">
         <i class="fa fa-warehouse"></i>
-      </div>
-      <div class="wh-card-name">{{ wh.name }}</div>
-      <div class="wh-card-loc">
-        <i class="fa fa-map-marker-alt"></i>
-        {{ wh.location|default:"No location set" }}
-      </div>
-      <div class="wh-card-stats">
-        <div class="wh-stat">
-          <div class="wh-stat-label">Products</div>
-          <div class="wh-stat-value">{{ wh.n_products }}</div>
-        </div>
-        <div class="wh-stat">
-          <div class="wh-stat-label">Net Worth</div>
-          <div class="wh-stat-value" style="color:#059669;">${{ wh.total_value_usd|floatformat:0 }}</div>
-        </div>
-      </div>
-    </a>
-    {% empty %}
-    <div class="wh-empty">
-      <i class="fa fa-warehouse"></i>
-      <h3 style="margin: 0 0 6px; color:#475569;">{% trans "No warehouses yet" %}</h3>
-      <p style="margin: 0 0 18px;">Create your first warehouse to start tracking inventory.</p>
-      <a href="{% url 'operating:create_warehouse' %}" class="wh-add-btn"><i class="fa fa-plus"></i> Add Warehouse</a>
+        <span>{% trans "All warehouses" %}</span>
+        <span class="ord-tab-count" id="warehouseCount">{{ warehouses|length }}</span>
+      </button>
     </div>
-    {% endfor %}
+    <div class="ord-search-wrap">
+      <i class="fa fa-search ord-search-icon"></i>
+      <input type="text" id="instantSearch" class="ord-search-input"
+             placeholder="{% trans 'Search warehouses…' %}"
+             autocomplete="off"/>
+      <button type="button" class="ord-search-clear" id="searchClear"
+              style="display: none;"
+              onclick="clearSearch()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- META -->
+  <div class="ord-meta">
+    <div class="ord-result">
+      <b id="visibleCount">{{ warehouses|length }}</b> {% trans "warehouses" %}
+    </div>
+  </div>
+
+  <!-- LIST -->
+  {% if warehouses %}
+  <div class="ord-list">
+    <div class="ord-list-head">
+      <span></span>
+      <span>{% trans "Name" %}</span>
+      <span>{% trans "Location" %}</span>
+      <span class="num">{% trans "Products" %}</span>
+      <span class="num">{% trans "Net worth" %}</span>
+      <span>{% trans "Actions" %}</span>
+      <span></span>
+    </div>
+    <div id="warehousesTableBody">
+      {% for w in warehouses %}
+      {% with name_first=w.name|first|upper %}
+      <div class="ord-row" id="warehouse-row-{{ w.id }}"
+           data-href="{% url 'operating:warehouse_detail' w.pk %}"
+           data-search="{{ w.name|lower }} {{ w.location|default:''|lower }}"
+           onclick="if(!event.target.closest('.ord-actions')){window.location=this.dataset.href;}">
+        {% if name_first == "A" or name_first == "F" or name_first == "K" or name_first == "P" or name_first == "U" or name_first == "Z" %}
+          <div class="ord-avatar" style="background: #147F74;"><i class="fa fa-warehouse"></i><span class="letter">{{ name_first }}</span></div>
+        {% elif name_first == "B" or name_first == "G" or name_first == "L" or name_first == "Q" or name_first == "V" %}
+          <div class="ord-avatar" style="background: #0A5F70;"><i class="fa fa-warehouse"></i><span class="letter">{{ name_first }}</span></div>
+        {% elif name_first == "C" or name_first == "H" or name_first == "M" or name_first == "R" or name_first == "W" %}
+          <div class="ord-avatar" style="background: #C2A45A;"><i class="fa fa-warehouse"></i><span class="letter">{{ name_first }}</span></div>
+        {% elif name_first == "D" or name_first == "I" or name_first == "N" or name_first == "S" or name_first == "X" %}
+          <div class="ord-avatar" style="background: #7E22CE;"><i class="fa fa-warehouse"></i><span class="letter">{{ name_first }}</span></div>
+        {% elif name_first == "E" or name_first == "J" or name_first == "O" or name_first == "T" or name_first == "Y" %}
+          <div class="ord-avatar" style="background: #B27500;"><i class="fa fa-warehouse"></i><span class="letter">{{ name_first }}</span></div>
+        {% else %}
+          <div class="ord-avatar" style="background: #6B7280;"><i class="fa fa-warehouse"></i><span class="letter">{{ name_first|default:"?" }}</span></div>
+        {% endif %}
+
+        <div class="ord-name">
+          <div class="ord-name-main">{{ w.name }}</div>
+          {% if w.description %}
+            <div class="ord-name-sub">{{ w.description|truncatechars:48 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="ord-cell{% if not w.location %} muted{% endif %}">
+          {% if w.location %}
+            <i class="fa fa-map-marker-alt"></i>{{ w.location }}
+          {% else %}
+            {% trans "No location" %}
+          {% endif %}
+        </div>
+
+        <div class="num ord-metric">
+          {{ w.n_products|default:0 }}<span>{% trans "items" %}</span>
+        </div>
+
+        <div class="num ord-metric money">
+          ${{ w.total_value_usd|floatformat:0 }}
+        </div>
+
+        <div class="ord-actions">
+          <a href="{% url 'operating:warehouse_detail' w.pk %}" class="ord-action" title="{% trans 'View' %}">
+            <i class="fa fa-eye"></i>
+          </a>
+          <a href="{% url 'operating:warehouse_edit' w.pk %}" class="ord-action" title="{% trans 'Edit' %}">
+            <i class="fa fa-edit"></i>
+          </a>
+          <a href="{% url 'operating:warehouse_product_import' w.pk %}" class="ord-action" title="{% trans 'Import products' %}">
+            <i class="fa fa-upload"></i>
+          </a>
+          <button type="button" class="ord-action danger" title="{% trans 'Delete' %}"
+                  onclick="openDeleteModal({{ w.id }}, '{{ w.name|escapejs }}');">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+
+        <i class="fa fa-chevron-right ord-chev"></i>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="ord-empty">
+    <div class="ico"><i class="fa fa-warehouse"></i></div>
+    <h3>{% trans "No warehouses yet" %}</h3>
+    <p>{% trans "Create your first warehouse to start tracking inventory" %}</p>
+    <a href="{% url 'operating:create_warehouse' %}" class="ord-btn primary">
+      <i class="fa fa-plus"></i>{% trans "Add warehouse" %}
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Delete Modal -->
+<div id="deleteModal" class="delete-modal">
+  <div class="delete-modal-overlay" onclick="closeDeleteModal()"></div>
+  <div class="delete-modal-content">
+    <div class="delete-modal-header">
+      <div class="delete-icon-wrapper">
+        <i class="fa fa-exclamation-triangle"></i>
+      </div>
+      <h3>{% trans "Delete Warehouse" %}</h3>
+      <p>{% trans "Are you sure you want to delete" %} "<span id="deleteWarehouseName"></span>"?</p>
+      <p class="warning-text">{% trans "This action cannot be undone. All products in this warehouse will also be removed." %}</p>
+    </div>
+    <div class="delete-modal-footer">
+      <button type="button" class="btn btn-cancel" onclick="closeDeleteModal()">
+        {% trans "Cancel" %}
+      </button>
+      <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+        <i class="fa fa-trash"></i>
+        {% trans "Delete Warehouse" %}
+      </button>
+    </div>
   </div>
 </div>
+
+<script>
+  // Client-side instant filter (no backend search endpoint available)
+  const searchInput = document.getElementById('instantSearch');
+  const searchClear = document.getElementById('searchClear');
+  const visibleCount = document.getElementById('visibleCount');
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.toLowerCase().trim();
+      searchClear.style.display = query ? 'flex' : 'none';
+
+      let visible = 0;
+      document.querySelectorAll('#warehousesTableBody .ord-row').forEach(row => {
+        const txt = row.dataset.search || row.textContent.toLowerCase();
+        const show = !query || txt.includes(query);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+      if (visibleCount) visibleCount.textContent = visible;
+    });
+  }
+
+  function clearSearch() {
+    if (!searchInput) return;
+    searchInput.value = '';
+    searchClear.style.display = 'none';
+    let visible = 0;
+    document.querySelectorAll('#warehousesTableBody .ord-row').forEach(row => {
+      row.style.display = '';
+      visible++;
+    });
+    if (visibleCount) visibleCount.textContent = visible;
+  }
+
+  // Delete Modal Functions
+  let currentDeleteWarehouseId = null;
+
+  function openDeleteModal(warehouseId, warehouseName) {
+    currentDeleteWarehouseId = warehouseId;
+    document.getElementById('deleteWarehouseName').textContent = warehouseName;
+    document.getElementById('deleteModal').classList.add('show');
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    currentDeleteWarehouseId = null;
+  }
+
+  function confirmDelete() {
+    if (!currentDeleteWarehouseId) return;
+
+    const warehouseId = currentDeleteWarehouseId;
+    closeDeleteModal();
+
+    // Optimistic UI - animate row removal
+    const row = document.getElementById(`warehouse-row-${warehouseId}`);
+    if (row) {
+      row.style.transition = 'all 0.3s ease';
+      row.style.backgroundColor = '#FEE2E2';
+      row.style.transform = 'translateX(-20px)';
+      row.style.opacity = '0';
+    }
+
+    // Submit a real POST so server-side delete + redirect runs (and messages framework fires)
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/operating/warehouses/${warehouseId}/delete/`;
+
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = getCookie('csrftoken') || '';
+    form.appendChild(csrfInput);
+
+    document.body.appendChild(form);
+    setTimeout(() => form.submit(), 280);
+  }
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  // Close modal on ESC key
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      closeDeleteModal();
+    }
+  });
+</script>
 {% endblock %}

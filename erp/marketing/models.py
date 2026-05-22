@@ -212,6 +212,14 @@ class Product(models.Model):
     )
     # Set price of the product for online sale. (If the product has a variant this should be null maybe)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # B2B wholesale price — shown on the B2B storefront (demfirat-b2b) only.
+    # If set on the parent product, applies to every variant unless the
+    # variant overrides it with its own b2b_price.
+    b2b_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name="B2B Price",
+        help_text="Wholesale price shown on the B2B storefront. Leave blank to use the retail price."
+    )
     # Product cost for profit calculation
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
@@ -302,6 +310,13 @@ class ProductVariant(models.Model):
     # Set price of the product for online sale.
     variant_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    # B2B wholesale price — shown on the B2B storefront for this specific variant.
+    # Falls back to Product.b2b_price (or variant_price) if blank.
+    variant_b2b_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name="Variant B2B Price",
+        help_text="Wholesale price for this variant. Leave blank to inherit from product."
     )
     variant_cost = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True

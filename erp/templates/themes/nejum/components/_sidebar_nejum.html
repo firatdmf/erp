@@ -55,6 +55,10 @@
             <span class="nj-fi-icon"><i data-lucide="truck"></i></span>
             <span class="nj-fi-label">{% trans "Supplier" %}</span>
           </a>
+          <a class="nj-fly-item" href="#" onclick="openWarehouseSidebar(); return false;">
+            <span class="nj-fi-icon"><i data-lucide="warehouse"></i></span>
+            <span class="nj-fi-label">{% trans "Warehouse" %}</span>
+          </a>
         </div>
       </div>
     </div>
@@ -336,10 +340,6 @@
           <a class="nj-fly-item" href="{% url 'operating:warehouse_list' %}">
             <span class="nj-fi-icon"><i data-lucide="warehouse"></i></span>
             <span class="nj-fi-label">{% trans "My warehouses" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'operating:create_warehouse' %}">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Add warehouse" %}</span>
           </a>
         </div>
       </div>

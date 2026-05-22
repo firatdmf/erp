@@ -565,6 +565,18 @@
             {{ form.cost }}
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group" style="flex: 1;">
+            <label for="id_b2b_price">
+              {% trans "B2B Price" %}
+              <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "(wholesale storefront only)" %}</span>
+            </label>
+            {{ form.b2b_price }}
+            <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">
+              {% trans "Leave blank to fall back to the retail price." %}
+            </p>
+          </div>
+        </div>
       </div>
 
       {# ============ CAMPAIGN / DISCOUNT ============ #}
@@ -1951,6 +1963,23 @@
             <span class="currency-symbol">$</span>
             <input type="number" id="modal_variant_price" class="form-input" step="0.01" placeholder="0.00">
           </div>
+        </div>
+      </div>
+
+      <!-- B2B price (wholesale storefront only) -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="modal_variant_b2b_price">
+            {% trans "B2B Price" %}
+            <span style="margin-left:6px;font-weight:400;color:#9ca3af;font-size:11px;">{% trans "(wholesale storefront only)" %}</span>
+          </label>
+          <div class="input-with-icon">
+            <span class="currency-symbol">$</span>
+            <input type="number" id="modal_variant_b2b_price" class="form-input" step="0.01" placeholder="0.00">
+          </div>
+          <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">
+            {% trans "Leave blank to inherit from the product's B2B price (or retail)." %}
+          </p>
         </div>
       </div>
 

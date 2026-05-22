@@ -12,7 +12,21 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 
-from .models import Warehouse, WarehouseProduct
+from .models import Warehouse, WarehouseProduct, WarehouseProductRoll, StockMovement
+
+
+def _env(key, default=None):
+    """Read an env var that may live in either os.environ OR the
+    project's .env file (loaded by python-decouple in settings.py)."""
+    import os
+    val = os.environ.get(key)
+    if val:
+        return val
+    try:
+        from decouple import config as _cfg
+        return _cfg(key, default=default)
+    except Exception:
+        return default
 
 
 def _safe_decimal(value, default=None):
@@ -105,6 +119,59 @@ class WarehouseCreate(View):
         )
         messages.success(request, f"Warehouse '{wh.name}' created")
         return redirect(reverse('operating:warehouse_detail', args=[wh.pk]))
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseCreatePartial(View):
+    """Sidebar-mounted Add Warehouse form.
+
+    GET  → returns just the inner form HTML (loaded via HTMX into the
+           sidebar overlay in base.html).
+    POST → expects X-Requested-With:XMLHttpRequest and returns JSON
+           {success, warehouse_id, redirect_url} so the front-end can
+           show a toast and either close the sidebar or redirect.
+    """
+    template_name = "operating/_warehouse_form_partial.html"
+
+    def get(self, request):
+        return render(request, self.template_name, {
+            'books': _get_book_choices(),
+        })
+
+    def post(self, request):
+        name = (request.POST.get('name') or '').strip()
+        location = (request.POST.get('location') or '').strip()
+        description = (request.POST.get('description') or '').strip()
+        book_id = (request.POST.get('accounting_book') or '').strip()
+
+        if not name:
+            return JsonResponse({"success": False, "errors": {"name": "Name is required"}}, status=400)
+        if Warehouse.objects.filter(name__iexact=name).exists():
+            return JsonResponse({
+                "success": False,
+                "errors": {"name": "A warehouse with this name already exists"},
+            }, status=400)
+
+        book = None
+        if book_id:
+            try:
+                from accounting.models import Book
+                book = Book.objects.filter(pk=int(book_id)).first()
+            except (ValueError, TypeError):
+                pass
+
+        wh = Warehouse.objects.create(
+            name=name,
+            location=location or None,
+            description=description or None,
+            accounting_book=book,
+        )
+        return JsonResponse({
+            "success": True,
+            "warehouse_id": wh.pk,
+            "name": wh.name,
+            "redirect_url": reverse('operating:warehouse_detail', args=[wh.pk]),
+        })
 
 
 @method_decorator(login_required, name='dispatch')
@@ -207,28 +274,26 @@ class WarehouseDetail(View):
         except EmptyPage:
             page = paginator.page(paginator.num_pages or 1)
 
-        # Aggregate totals across the whole warehouse (independent of filter)
+        # Aggregate totals across the whole warehouse (independent of
+        # filter). Net-worth uses the model methods so products that
+        # have purchase_price but no explicit cost_usd still count.
         all_products = WarehouseProduct.objects.filter(warehouse=warehouse)
-        totals = all_products.aggregate(
-            total_usd=Coalesce(
-                Sum(F('quantity') * F('cost_usd'), output_field=DecimalField(max_digits=18, decimal_places=2)),
-                Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2)),
-            total_try=Coalesce(
-                Sum(F('quantity') * F('cost_try'), output_field=DecimalField(max_digits=18, decimal_places=2)),
-                Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2)),
+        counts = all_products.aggregate(
             n=Count('id'),
             qty=Coalesce(Sum('quantity'), Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2)),
         )
+        total_value_usd = warehouse.total_value_usd()
+        total_value_try = warehouse.total_value_try()
 
         ctx = {
             'warehouse': warehouse,
             'products': page.object_list,  # current page only
             'page': page,
             'paginator': paginator,
-            'total_value_usd': totals['total_usd'],
-            'total_value_try': totals['total_try'],
-            'product_count': totals['n'],
-            'total_quantity': totals['qty'],
+            'total_value_usd': total_value_usd,
+            'total_value_try': total_value_try,
+            'product_count': counts['n'],
+            'total_quantity': counts['qty'],
             'search': search,
             'sort': sort,
             'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
@@ -472,3 +537,1463 @@ class WarehouseDelete(View):
         warehouse.delete()
         messages.success(request, f"Warehouse '{name}' deleted")
         return redirect(reverse('operating:warehouse_list'))
+
+
+# ────────────────────────────────────────────────────────────────────
+# Roll scanning — camera-driven OCR of fabric roll labels
+# ────────────────────────────────────────────────────────────────────
+
+def _ocr_label_claude(image_file):
+    """Send the label image to Claude Vision and ask it to extract
+    {sku, name, meters} as structured JSON. Far more reliable than
+    Tesseract on real-world fabric labels (angles, lighting,
+    reflective surfaces, mixed fonts).
+
+    Returns (raw_text, parsed_dict). On error the parsed dict has an
+    "error" key.
+
+    Requires ANTHROPIC_API_KEY env var.
+    """
+    import base64
+    import json as _json
+
+    try:
+        import anthropic
+    except ImportError:
+        return "", {"error": "Anthropic SDK not installed (pip install anthropic)"}
+
+    api_key = _env("ANTHROPIC_API_KEY")
+    if not api_key:
+        return "", {"error": "ANTHROPIC_API_KEY env var not set"}
+
+    # Read + b64 the image.
+    try:
+        image_file.seek(0)
+    except Exception:
+        pass
+    raw_bytes = image_file.read()
+    if not raw_bytes:
+        return "", {"error": "Empty image"}
+
+    # Detect media type from the first few bytes.
+    media_type = "image/jpeg"
+    if raw_bytes[:3] == b"\x89PN" or raw_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        media_type = "image/png"
+    elif raw_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        media_type = "image/gif"
+    elif raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
+        media_type = "image/webp"
+
+    b64 = base64.b64encode(raw_bytes).decode("ascii")
+
+    prompt = (
+        "This is a photo of a Turkish fabric roll label. Extract these "
+        "fields and return ONLY a single JSON object — no commentary, "
+        "no markdown fences:\n\n"
+        '{"sku": "...", "name": "...", "meters": 48.5}\n\n'
+        "Field rules:\n"
+        "- sku: the product CODE. Usually an uppercase prefix + zeros + digits "
+        "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9'). It is printed on the "
+        "label, NOT the long number under the barcode. If the SKU starts "
+        "with a Turkish letter (İ, Ş, Ğ, etc.), preserve it exactly.\n"
+        "- name: the product/fabric name as printed — typically a model "
+        "name + colour (e.g. 'S-LINE 1106 EKRU', 'Kadife Krem'). Do NOT "
+        "include the brand name (KARVEN, etc.) here.\n"
+        "- meters: roll length as a decimal number. Turkish labels write "
+        "'25,00 Metre' or '48,5 m' — interpret comma as decimal point, so "
+        "'25,00' → 25.0, '48,5' → 48.5. Do not include the unit.\n\n"
+        "If a field is illegible or absent, set it to null. "
+        "Do not invent values."
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": b64,
+                            },
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+        )
+    except anthropic.APIError as e:
+        return "", {"error": f"Claude API error: {e}"}
+    except Exception as e:
+        return "", {"error": f"Claude call failed: {e}"}
+
+    # Pull the text content out of the response.
+    text_out = ""
+    for block in resp.content:
+        if getattr(block, "type", None) == "text":
+            text_out += block.text
+
+    # Parse the JSON — be tolerant of code fences or stray text.
+    json_str = text_out.strip()
+    if "```" in json_str:
+        # extract the first ``` block
+        parts = json_str.split("```")
+        for p in parts:
+            if "{" in p:
+                # strip optional language tag
+                if p.startswith("json"):
+                    p = p[4:]
+                json_str = p
+                break
+    start = json_str.find("{")
+    end = json_str.rfind("}")
+    if start == -1 or end == -1:
+        return text_out, {"error": "Claude did not return JSON", "sku": None, "name": None, "meters": None}
+    try:
+        data = _json.loads(json_str[start:end + 1])
+    except Exception:
+        return text_out, {"error": "Claude returned malformed JSON", "sku": None, "name": None, "meters": None}
+
+    sku = (data.get("sku") or None)
+    if sku:
+        sku = str(sku).strip().upper() or None
+    name = (data.get("name") or None)
+    if name:
+        name = str(name).strip() or None
+    meters = data.get("meters")
+    try:
+        meters = float(meters) if meters is not None else None
+    except (TypeError, ValueError):
+        meters = None
+    barcode = (data.get("barcode") or None)
+    if barcode:
+        # Digits only — strip whitespace / punctuation the LLM may add.
+        import re as _re
+        cleaned = _re.sub(r"\D", "", str(barcode))
+        barcode = cleaned or None
+
+    return text_out, {"sku": sku, "name": name, "meters": meters, "barcode": barcode}
+
+
+def _ocr_label_gemini(image_file):
+    """Send the label image to Gemini Vision and ask it to extract
+    {sku, name, meters} as structured JSON. Cheap + fast option.
+
+    Requires GEMINI_API_KEY (or GOOGLE_API_KEY) env var.
+    """
+    import json as _json
+
+    try:
+        from google import genai
+        from google.genai import types as genai_types
+    except ImportError:
+        return "", {"error": "google-genai SDK not installed (pip install google-genai)"}
+
+    api_key = _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
+    if not api_key:
+        return "", {"error": "GEMINI_API_KEY env var not set"}
+
+    try:
+        image_file.seek(0)
+    except Exception:
+        pass
+    raw_bytes = image_file.read()
+    if not raw_bytes:
+        return "", {"error": "Empty image"}
+
+    media_type = "image/jpeg"
+    if raw_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        media_type = "image/png"
+    elif raw_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        media_type = "image/gif"
+    elif raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
+        media_type = "image/webp"
+
+    prompt = (
+        "This is a photo of a Turkish fabric roll label. Read EXACTLY "
+        "what is printed in THIS image — do not invent, do not "
+        "remember anything from previous images. Return ONLY a single "
+        "JSON object — no commentary, no markdown fences:\n\n"
+        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "..."}\n\n'
+        "LABEL STRUCTURE (top → bottom):\n"
+        "  1. BRAND   (e.g. KARVEN, DEMFIRAT, BELINO)  ← IGNORE, never extract\n"
+        "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
+        "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
+        "  4. METERS  (length in metres)               → goes in 'meters'\n"
+        "  5. BARCODE (the code under the barcode bars) → goes in 'barcode'\n\n"
+        "Field rules:\n"
+        "- sku: the short product CODE on the second line (e.g. "
+        "'İPK0000174', 'K24614', 'RK48060RW9'). Preserve Turkish "
+        "letters (İ, Ş, Ğ, Ç, Ö, Ü). NOT the long barcode, NOT the "
+        "brand.\n"
+        "- name: the MODEL NAME printed DIRECTLY UNDER the sku. "
+        "Examples: 'S-LINE 1106 EKRU', 'KADİFE KREM', 'PANAMA 4500 "
+        "GRİ', 'YAĞMUR DAMLASI ANTRASİT', 'POLO-203 / KIRIK BEYAZ'. "
+        "Read VERBATIM, exactly as printed. INCLUDE special "
+        "characters (- / + & . ' Turkish letters İŞĞÇÖÜ) and any "
+        "numbers that are part of the name. DO NOT return the brand "
+        "(KARVEN/DEMFIRAT/BELINO etc.) here — the brand is the FIRST "
+        "line and must be skipped. Only return null if there really "
+        "is no model line between the sku and the metres/barcode.\n"
+        "- meters: roll length as a decimal number. Turkish labels "
+        "write '25,00 Metre' or '48,5 m' — interpret comma as decimal "
+        "point ('25,00' → 25.0). No unit.\n"
+        "- barcode: the code printed directly under the barcode strip. "
+        "ALPHANUMERIC — may have a letter prefix like 'KL055555' or be "
+        "all digits like '017400000228'. Copy EXACTLY what is printed, "
+        "including any letters at the start. Typically 8 to 16 chars.\n\n"
+        "If a field is illegible or absent in THIS image, set it to "
+        "null. Do not invent values."
+    )
+
+    # Allow overriding the model from env. Flash is the sweet spot.
+    model_name = _env("GEMINI_MODEL") or "gemini-2.5-flash"
+
+    # Build the config. Disable thinking mode for Gemini 2.5 — without
+    # this the model burns most of max_output_tokens on internal
+    # reasoning and the real JSON comes back truncated (we saw
+    # responses like '{"sku' or 'Here is the JSON requested:\n```').
+    cfg_kwargs = dict(
+        response_mime_type="application/json",
+        temperature=0,
+        # Output JSON is short (~120 chars). Keep this small to cut
+        # latency — Gemini 2.5 returns faster with a tight budget.
+        max_output_tokens=400,
+    )
+    try:
+        cfg_kwargs["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=0)
+    except Exception:
+        # Older SDKs without ThinkingConfig — leave it off.
+        pass
+
+    try:
+        client = genai.Client(api_key=api_key)
+        resp = client.models.generate_content(
+            model=model_name,
+            contents=[
+                genai_types.Part.from_bytes(data=raw_bytes, mime_type=media_type),
+                prompt,
+            ],
+            config=genai_types.GenerateContentConfig(**cfg_kwargs),
+        )
+    except Exception as e:
+        return "", {"error": f"Gemini call failed: {e}"}
+
+    text_out = (getattr(resp, "text", None) or "").strip()
+    if not text_out:
+        # Fallback: dig through candidates
+        try:
+            text_out = resp.candidates[0].content.parts[0].text or ""
+        except Exception:
+            text_out = ""
+
+    json_str = text_out.strip()
+    if "```" in json_str:
+        parts = json_str.split("```")
+        for p in parts:
+            if "{" in p:
+                if p.startswith("json"):
+                    p = p[4:]
+                json_str = p
+                break
+    start = json_str.find("{")
+    end = json_str.rfind("}")
+    if start == -1 or end == -1:
+        return text_out, {"error": "Gemini did not return JSON", "sku": None, "name": None, "meters": None}
+    try:
+        data = _json.loads(json_str[start:end + 1])
+    except Exception:
+        return text_out, {"error": "Gemini returned malformed JSON", "sku": None, "name": None, "meters": None}
+
+    sku = (data.get("sku") or None)
+    if sku:
+        sku = str(sku).strip().upper() or None
+    name = (data.get("name") or None)
+    if name:
+        name = str(name).strip() or None
+    meters = data.get("meters")
+    try:
+        meters = float(meters) if meters is not None else None
+    except (TypeError, ValueError):
+        meters = None
+    barcode = (data.get("barcode") or None)
+    if barcode:
+        # Keep alphanumeric (letter prefixes like 'KL055555' are valid).
+        import re as _re
+        cleaned = _re.sub(r"[^A-Za-z0-9]", "", str(barcode)).upper()
+        barcode = cleaned or None
+
+    return text_out, {"sku": sku, "name": name, "meters": meters, "barcode": barcode}
+
+
+def _ocr_label_xai(image_file):
+    """Send the label image to xAI Grok Vision and ask it to extract
+    {sku, name, meters, barcode} as structured JSON.
+
+    Uses xAI's OpenAI-compatible chat completions endpoint
+    (https://api.x.ai/v1/chat/completions). No SDK needed.
+
+    Requires XAI_API_KEY env var. Optional XAI_MODEL env var
+    (defaults to 'grok-2-vision-latest').
+    """
+    import base64
+    import json as _json
+
+    try:
+        import requests
+    except ImportError:
+        return "", {"error": "requests not installed"}
+
+    api_key = _env("XAI_API_KEY")
+    if not api_key:
+        return "", {"error": "XAI_API_KEY env var not set"}
+
+    try:
+        image_file.seek(0)
+    except Exception:
+        pass
+    raw_bytes = image_file.read()
+    if not raw_bytes:
+        return "", {"error": "Empty image"}
+
+    media_type = "image/jpeg"
+    if raw_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        media_type = "image/png"
+    elif raw_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        media_type = "image/gif"
+    elif raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
+        media_type = "image/webp"
+
+    b64 = base64.b64encode(raw_bytes).decode("ascii")
+    data_url = f"data:{media_type};base64,{b64}"
+
+    prompt = (
+        "This is a photo of a Turkish fabric roll label. Read EXACTLY "
+        "what is printed in THIS image — do not invent, do not "
+        "remember anything from previous images. Return ONLY a single "
+        "JSON object — no commentary, no markdown fences:\n\n"
+        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "..."}\n\n'
+        "LABEL STRUCTURE (top → bottom):\n"
+        "  1. BRAND   (e.g. KARVEN, DEMFIRAT, BELINO)  ← IGNORE, never extract\n"
+        "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
+        "  3. MODEL   (descriptive product/model name) → goes in 'name'\n"
+        "  4. METERS  (length in metres)               → goes in 'meters'\n"
+        "  5. BARCODE (the code under the barcode bars) → goes in 'barcode'\n\n"
+        "Field rules:\n"
+        "- sku: the short product CODE printed on the second line "
+        "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9'). Alphanumeric, "
+        "uppercase. Preserve Turkish letters (İ, Ş, Ğ, Ç, Ö, Ü) "
+        "exactly. NOT the long barcode number, NOT the brand.\n"
+        "- name: the MODEL NAME — the descriptive text printed "
+        "DIRECTLY UNDER the sku. Examples: 'S-LINE 1106 EKRU', "
+        "'KADİFE KREM', 'PANAMA 4500 GRİ', 'YAĞMUR DAMLASI ANTRASİT', "
+        "'POLO-203 / KIRIK BEYAZ'. Read this descriptive line "
+        "VERBATIM, exactly as printed. INCLUDE special characters "
+        "(- / + & . ' Turkish letters İŞĞÇÖÜ) and any numbers that "
+        "are part of the model name. DO NOT return the brand "
+        "(KARVEN/DEMFIRAT/BELINO etc.) for this field — the brand "
+        "is the FIRST line at the very top of the label and must be "
+        "skipped. If there really is no model line between the sku "
+        "and the meters/barcode area, return null.\n"
+        "- meters: roll length as a decimal number. Turkish labels "
+        "write '25,00 Metre' or '48,5 m' — interpret comma as decimal "
+        "point ('25,00' → 25.0). No unit.\n"
+        "- barcode: the code printed directly under the barcode strip. "
+        "ALPHANUMERIC — may have a letter prefix like 'KL055555' or "
+        "be all digits like '017400000228'. Copy EXACTLY what is "
+        "printed, including any letters at the start. Typically 8 to "
+        "16 chars. Different from the sku at the top.\n\n"
+        "If a field is illegible or genuinely not in THIS image, set "
+        "it to null. Do not invent values. Do not fall back to "
+        "previous-scan values."
+    )
+
+    # xAI deprecated the dedicated grok-2-vision models — vision is now
+    # built into the Grok 4 chat models. grok-4.3 is the fast non-reasoning
+    # variant, ideal for OCR. Override with XAI_MODEL if you want
+    # grok-4.20-0309-reasoning for tricky labels.
+    model_name = _env("XAI_MODEL") or "grok-4.3"
+
+    payload = {
+        "model": model_name,
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
+                {"type": "text", "text": prompt},
+            ],
+        }],
+        "temperature": 0,
+        # The output JSON is short (~120 chars). Capping max_tokens
+        # tight cuts response latency noticeably on Grok 4 — there's
+        # no reason to budget for an essay.
+        "max_tokens": 250,
+        "response_format": {"type": "json_object"},
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        resp = requests.post(
+            "https://api.x.ai/v1/chat/completions",
+            json=payload, headers=headers, timeout=30,
+        )
+    except requests.RequestException as e:
+        return "", {"error": f"xAI call failed: {e}"}
+
+    if resp.status_code != 200:
+        snippet = (resp.text or "")[:400]
+        return snippet, {"error": f"xAI HTTP {resp.status_code}: {snippet}"}
+
+    try:
+        body = resp.json()
+        text_out = (body.get("choices", [{}])[0]
+                        .get("message", {})
+                        .get("content", "") or "").strip()
+    except Exception as e:
+        return resp.text, {"error": f"xAI bad response: {e}"}
+
+    if not text_out:
+        return "", {"error": "xAI returned empty content"}
+
+    json_str = text_out.strip()
+    if "```" in json_str:
+        parts = json_str.split("```")
+        for p in parts:
+            if "{" in p:
+                if p.startswith("json"):
+                    p = p[4:]
+                json_str = p
+                break
+    start = json_str.find("{")
+    end = json_str.rfind("}")
+    if start == -1 or end == -1:
+        return text_out, {"error": "xAI did not return JSON", "sku": None, "name": None, "meters": None}
+    try:
+        data = _json.loads(json_str[start:end + 1])
+    except Exception:
+        return text_out, {"error": "xAI returned malformed JSON", "sku": None, "name": None, "meters": None}
+
+    sku = (data.get("sku") or None)
+    if sku:
+        sku = str(sku).strip().upper() or None
+    name = (data.get("name") or None)
+    if name:
+        name = str(name).strip() or None
+    meters = data.get("meters")
+    try:
+        meters = float(meters) if meters is not None else None
+    except (TypeError, ValueError):
+        meters = None
+    barcode = (data.get("barcode") or None)
+    if barcode:
+        # Keep alphanumeric (letter prefixes like 'KL055555' are valid).
+        # Strip whitespace/punctuation but preserve letters + digits.
+        import re as _re
+        cleaned = _re.sub(r"[^A-Za-z0-9]", "", str(barcode)).upper()
+        barcode = cleaned or None
+
+    return text_out, {"sku": sku, "name": name, "meters": meters, "barcode": barcode}
+
+
+def _ocr_label_tesseract(image_file):
+    """Tesseract fallback — same return shape as _ocr_label_claude."""
+    import os
+    import re
+    try:
+        from PIL import Image, ImageOps
+        import pytesseract
+    except ImportError as e:
+        return "", {"error": f"OCR libraries missing: {e}"}
+
+    custom_cmd = os.environ.get("TESSERACT_CMD")
+    if custom_cmd:
+        pytesseract.pytesseract.tesseract_cmd = custom_cmd
+    else:
+        default_win = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.path.exists(default_win):
+            pytesseract.pytesseract.tesseract_cmd = default_win
+
+    try:
+        img = Image.open(image_file)
+        img = ImageOps.exif_transpose(img)
+        if max(img.size) < 1200:
+            ratio = 1600 / max(img.size)
+            img = img.resize(
+                (int(img.size[0] * ratio), int(img.size[1] * ratio)),
+                Image.LANCZOS,
+            )
+        img = ImageOps.grayscale(img)
+        img = ImageOps.autocontrast(img, cutoff=2)
+        try:
+            installed_langs = pytesseract.get_languages(config="")
+        except Exception:
+            installed_langs = []
+        lang = "eng+tur" if "tur" in installed_langs else "eng"
+        raw = pytesseract.image_to_string(img, lang=lang, config="--psm 6")
+    except FileNotFoundError:
+        return "", {"error": "Tesseract binary not found"}
+    except Exception as e:
+        return "", {"error": f"OCR failed: {e}"}
+
+    # ── Parsing ─────────────────────────────────────────────────
+    # 1) SKU: alphanumeric, typically 5-15 chars, sometimes with hyphens or dots.
+    # 2) Meters: a number followed by 'm' or 'mt' or 'metre' etc.
+    # 3) Name: a line that's pure letters + spaces with no digits, longer than 3 chars.
+    text = raw or ""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    sku = None
+    meters = None
+    name = None
+
+    # Meters: 48.5 m / 48,5m / 48 metre / LEN 48.5
+    meter_pat = re.compile(
+        r"(\d{1,3}[.,]?\d{0,2})\s*(m|mt|metre|meters)\b",
+        re.IGNORECASE,
+    )
+
+    # Pass 1 — explicit SKU/LEN labels
+    for ln in lines:
+        if not sku:
+            m = re.search(r"\b(sku|kod|code|cod)\s*[:.\-]?\s*([A-Z0-9._-]{4,20})", ln, re.IGNORECASE)
+            if m:
+                sku = m.group(2).upper()
+        if not meters:
+            m = re.search(r"\b(len|length|metre|metraj|m)\s*[:.\-]?\s*(\d{1,3}[.,]?\d{0,2})", ln, re.IGNORECASE)
+            if m:
+                try:
+                    meters = float(m.group(2).replace(",", "."))
+                except ValueError:
+                    pass
+
+    # Pass 2 — bare-pattern fallbacks
+    if not meters:
+        for ln in lines:
+            m = meter_pat.search(ln)
+            if m:
+                try:
+                    meters = float(m.group(1).replace(",", "."))
+                    break
+                except ValueError:
+                    pass
+    if not sku:
+        for ln in lines:
+            # Heuristic: an upper-case alphanumeric token mixing letters AND digits
+            for tok in re.findall(r"\b[A-Z0-9._-]{4,20}\b", ln.upper()):
+                if any(c.isalpha() for c in tok) and any(c.isdigit() for c in tok):
+                    sku = tok
+                    break
+            if sku:
+                break
+    if not name:
+        for ln in lines:
+            stripped = re.sub(r"[^A-Za-zÇĞİÖŞÜçğıöşü\s]", "", ln).strip()
+            if len(stripped) >= 4 and any(c.isalpha() for c in stripped):
+                # Avoid grabbing single-letter tokens by ensuring multi-word
+                if len(stripped.split()) >= 1:
+                    name = stripped
+                    break
+
+    # Tesseract fallback doesn't try to extract barcode reliably.
+    parsed = {"sku": sku, "name": name, "meters": meters, "barcode": None}
+    return raw, parsed
+
+
+def _ocr_label(image_file):
+    """Dispatcher — picks the best OCR backend available.
+
+    Selection order:
+      1. OCR_BACKEND env var ('gemini' | 'xai' | 'claude' | 'tesseract') wins if set.
+      2. GEMINI_API_KEY or GOOGLE_API_KEY → Gemini (cheap + fast).
+      3. XAI_API_KEY → xAI Grok Vision.
+      4. ANTHROPIC_API_KEY → Claude (most accurate, slightly costlier).
+      5. Tesseract fallback (works offline but mediocre on real labels).
+
+    Vision-API errors auto-fall-back to the next backend so the user
+    always gets *some* result back even on a network blip. The chain
+    of attempts is recorded in `_attempts` so the debug panel can
+    show exactly WHY each tried backend failed (e.g. "gemini: 503
+    overload → falling back to xai").
+    """
+    backend = (_env("OCR_BACKEND") or "").lower().strip()
+    has_gemini = bool(_env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY"))
+    has_xai = bool(_env("XAI_API_KEY"))
+    has_claude = bool(_env("ANTHROPIC_API_KEY"))
+
+    print(
+        f"\n[OCR] ── new scan ── preferred={backend or 'auto'} "
+        f"has_xai={has_xai} has_gemini={has_gemini} has_claude={has_claude}",
+        flush=True,
+    )
+
+    attempts = []  # list of {backend, error} for the debug panel
+
+    def _safe_rewind():
+        try:
+            image_file.seek(0)
+        except Exception:
+            pass
+
+    def _try(name, fn):
+        _safe_rewind()
+        print(f"[OCR] → trying {name}…", flush=True)
+        raw, parsed = fn(image_file)
+        if parsed.get("error"):
+            err = parsed["error"]
+            # Truncate huge HTML/error pages to keep the terminal readable.
+            short_err = str(err)[:300]
+            print(f"[OCR] ✗ {name} FAILED: {short_err}", flush=True)
+            attempts.append({"backend": name, "error": err})
+            return None
+        print(
+            f"[OCR] ✓ {name} OK — sku={parsed.get('sku')!r} "
+            f"meters={parsed.get('meters')!r} barcode={parsed.get('barcode')!r} "
+            f"name={parsed.get('name')!r}",
+            flush=True,
+        )
+        # Show first 400 chars of raw response so the user can see what
+        # the model literally returned (useful when JSON parse fails).
+        if raw:
+            raw_str = str(raw)
+            print(f"[OCR]   raw: {raw_str[:400]}{'…' if len(raw_str) > 400 else ''}", flush=True)
+        parsed["_backend"] = name
+        parsed["_attempts"] = attempts + [{"backend": name, "error": None}]
+        return raw, parsed
+
+    # Build the try-order. The OCR_BACKEND env var (if set) just
+    # promotes its choice to the front — it does NOT mean "only this".
+    # If a preferred backend fails (no key, network error, quota), we
+    # still walk the remaining vision APIs before dropping to
+    # Tesseract. This is what the user actually wants: never silently
+    # downgrade to bad OCR while a paid API is still available.
+    #
+    # Auto-order preference: xai → gemini → claude → tesseract.
+    order = []
+    if backend in ("gemini", "xai", "claude"):
+        order.append(backend)
+    if has_xai and "xai" not in order:
+        order.append("xai")
+    if has_gemini and "gemini" not in order:
+        order.append("gemini")
+    if has_claude and "claude" not in order:
+        order.append("claude")
+    if backend == "tesseract":
+        # User explicitly forces tesseract — honour it without trying APIs.
+        order = ["tesseract"]
+    else:
+        order.append("tesseract")  # always the final fallback
+
+    fns = {
+        "gemini": _ocr_label_gemini,
+        "xai": _ocr_label_xai,
+        "claude": _ocr_label_claude,
+        "tesseract": _ocr_label_tesseract,
+    }
+
+    for name in order:
+        r = _try(name, fns[name])
+        if r:
+            return r
+
+    return "", {"error": "all backends failed", "_attempts": attempts}
+
+
+def reverse_consumption_for_order(order, user=None):
+    """Restore stock that was previously consumed for `order`. Walks
+    every StockMovement(out) whose reference matches the order's
+    number/pk, returns the meters to the original roll (if still
+    around), and writes a counter-balancing IN movement so the
+    timeline shows both events. Used by OrderEdit + cancel flows."""
+    from django.db import transaction as _tx
+    if not order:
+        return []
+
+    order_ref = getattr(order, "order_number", None) or f"Order #{order.pk}"
+    refs = [str(order_ref), str(order.pk), f"Order #{order.pk}"]
+    if order.order_number:
+        refs.append(order.order_number)
+
+    moves = StockMovement.objects.filter(
+        movement_type="out",
+        reference__in=refs,
+    ).select_related("product", "roll")
+
+    restored = []
+    with _tx.atomic():
+        for mv in moves:
+            wp = mv.product
+            roll = mv.roll
+            qty = mv.quantity or Decimal("0")
+            if qty <= 0:
+                continue
+            # Return meters to the original roll, if it's still around.
+            if roll and roll.product_id == wp.id:
+                curr = roll.meters_remaining if roll.meters_remaining is not None else Decimal("0")
+                roll.meters_remaining = curr + qty
+                # Re-evaluate status.
+                if roll.meters_remaining >= (roll.meters or Decimal("0")):
+                    roll.status = "in_stock"
+                else:
+                    roll.status = "partial"
+                roll.save(update_fields=["meters_remaining", "status"])
+            wp.quantity = (wp.quantity or Decimal("0")) + qty
+            wp.save(update_fields=["quantity", "updated_at"])
+
+            StockMovement.objects.create(
+                product=wp,
+                roll=roll,
+                movement_type="in",
+                quantity=qty,
+                reason=f"Order edit · reversed {order_ref}",
+                reference=str(order_ref),
+                created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+            )
+            restored.append({
+                "product": wp.id, "roll": roll.id if roll else None,
+                "qty": float(qty),
+            })
+    return restored
+
+
+def consume_for_order_items(order, user=None, reason_prefix="Order"):
+    """Decrement warehouse stock for every OrderItem in `order`.
+
+    Algorithm:
+      1. For each OrderItem find a WarehouseProduct whose sku/barcode
+         matches the item's product/variant. Search ALL warehouses;
+         prefer ones already holding stock (quantity > 0).
+      2. Walk that product's rolls oldest-first, taking meters from
+         each until the OrderItem.quantity is satisfied.
+      3. Each consumption emits a StockMovement(out) referencing the
+         order (its number/pk in the `reference` field) and the
+         specific roll.
+      4. If no warehouse has enough stock for an item, log the gap
+         on the StockMovement.reason but still consume what we can.
+
+    Returns a list of dicts describing each consumption (for logging /
+    UI feedback).
+    """
+    from django.db import transaction as _tx
+    results = []
+    if not order:
+        return results
+
+    order_ref = (
+        getattr(order, "order_number", None)
+        or f"Order #{order.pk}"
+    )
+
+    items = list(order.items.all().select_related("product", "product_variant"))
+    if not items:
+        return results
+
+    with _tx.atomic():
+        for it in items:
+            qty_needed = Decimal(str(it.quantity or 0))
+            if qty_needed <= 0:
+                continue
+            # Resolve SKU — prefer variant SKU.
+            sku = None
+            if it.product_variant_id and it.product_variant:
+                sku = getattr(it.product_variant, "variant_sku", None)
+            if not sku and it.product_id and it.product:
+                sku = getattr(it.product, "sku", None)
+            if not sku:
+                continue
+
+            # Find candidate WarehouseProducts (any warehouse, with stock first).
+            wp_qs = (
+                WarehouseProduct.objects
+                .filter(sku__iexact=sku)
+                .order_by("-quantity", "id")
+            )
+            remaining_needed = qty_needed
+            for wp in wp_qs:
+                if remaining_needed <= 0:
+                    break
+                if (wp.quantity or Decimal("0")) <= 0:
+                    continue
+                # Walk this warehouse's active rolls oldest first.
+                roll_qs = (
+                    wp.rolls.exclude(status="consumed")
+                    .order_by("scanned_at")
+                )
+                for roll in roll_qs:
+                    if remaining_needed <= 0:
+                        break
+                    avail = (
+                        roll.meters_remaining
+                        if roll.meters_remaining is not None
+                        else roll.meters
+                    ) or Decimal("0")
+                    if avail <= 0:
+                        continue
+                    take = min(avail, remaining_needed)
+                    roll.meters_remaining = avail - take
+                    if roll.meters_remaining <= 0:
+                        roll.status = "consumed"
+                    elif roll.meters_remaining < (roll.meters or Decimal("0")):
+                        roll.status = "partial"
+                    roll.save(update_fields=["meters_remaining", "status"])
+
+                    wp.quantity = (wp.quantity or Decimal("0")) - take
+                    wp.save(update_fields=["quantity", "updated_at"])
+
+                    StockMovement.objects.create(
+                        product=wp,
+                        roll=roll,
+                        movement_type="out",
+                        quantity=take,
+                        reason=f"{reason_prefix} {order_ref}",
+                        reference=str(order_ref),
+                        created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+                    )
+                    results.append({
+                        "warehouse": wp.warehouse_id,
+                        "product": wp.id,
+                        "roll": roll.id,
+                        "taken": float(take),
+                        "sku": sku,
+                    })
+                    remaining_needed -= take
+            if remaining_needed > 0:
+                # Log unfulfilled — a "ghost" movement on the first matching
+                # wp so the user can see it on the product timeline.
+                wp = WarehouseProduct.objects.filter(sku__iexact=sku).first()
+                if wp:
+                    StockMovement.objects.create(
+                        product=wp,
+                        roll=None,
+                        movement_type="adjustment",
+                        quantity=remaining_needed,
+                        reason=f"⚠️ Shortage: {reason_prefix} {order_ref} needed {remaining_needed}m more",
+                        reference=str(order_ref),
+                        created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+                    )
+                results.append({
+                    "warehouse": None, "product": None, "roll": None,
+                    "taken": 0, "sku": sku,
+                    "shortage": float(remaining_needed),
+                })
+
+    return results
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseProductDetail(View):
+    """Product detail under a warehouse — shows the product header
+    info, every roll (top) with its barcode + remaining meters, and
+    the full stock-movement timeline (in/out/adjustments)."""
+
+    template_name = "operating/warehouse_product_detail.html"
+
+    def get(self, request, warehouse_pk, product_pk):
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        product = get_object_or_404(
+            WarehouseProduct, pk=product_pk, warehouse=warehouse,
+        )
+        rolls = product.rolls.all().order_by("-scanned_at")
+        movements = product.movements.all().select_related("roll", "created_by")[:200]
+
+        # Aggregate quick stats
+        from django.db.models import Sum
+        from decimal import Decimal as _Dec
+        in_total = (
+            product.movements.filter(movement_type="in").aggregate(s=Sum("quantity"))["s"]
+            or _Dec("0")
+        )
+        out_total = (
+            product.movements.filter(movement_type="out").aggregate(s=Sum("quantity"))["s"]
+            or _Dec("0")
+        )
+
+        return render(request, self.template_name, {
+            "warehouse": warehouse,
+            "product": product,
+            "rolls": rolls,
+            "movements": movements,
+            "rolls_count": rolls.count(),
+            "in_total": in_total,
+            "out_total": out_total,
+            "active_rolls_count": rolls.exclude(status="consumed").count(),
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseMovements(View):
+    """Filterable, paginated stock-movement ledger for a warehouse.
+    Query params:
+      type   : in | out | adjustment (single or comma-separated)
+      from   : YYYY-MM-DD inclusive
+      to     : YYYY-MM-DD inclusive
+      product: WarehouseProduct.pk
+      q      : free-text search across reason/reference/product name/sku
+      min_qty: minimum |quantity|
+      max_qty: maximum |quantity|
+      page   : pagination
+    """
+    template_name = "operating/warehouse_movements.html"
+
+    def get(self, request, warehouse_pk):
+        from django.db.models import Q as _Q
+        from datetime import datetime as _dt
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+
+        qs = (
+            StockMovement.objects
+            .filter(product__warehouse=warehouse)
+            .select_related("product", "roll", "created_by")
+        )
+
+        types_param = (request.GET.get("type") or "").strip()
+        if types_param:
+            wanted = [t.strip() for t in types_param.split(",") if t.strip()]
+            qs = qs.filter(movement_type__in=wanted)
+
+        date_from = (request.GET.get("from") or "").strip()
+        date_to = (request.GET.get("to") or "").strip()
+        try:
+            if date_from:
+                d = _dt.strptime(date_from, "%Y-%m-%d").date()
+                qs = qs.filter(created_at__date__gte=d)
+        except ValueError:
+            pass
+        try:
+            if date_to:
+                d = _dt.strptime(date_to, "%Y-%m-%d").date()
+                qs = qs.filter(created_at__date__lte=d)
+        except ValueError:
+            pass
+
+        product_pk = (request.GET.get("product") or "").strip()
+        if product_pk.isdigit():
+            qs = qs.filter(product_id=int(product_pk))
+
+        q = (request.GET.get("q") or "").strip()
+        if q:
+            qs = qs.filter(
+                _Q(reason__icontains=q)
+                | _Q(reference__icontains=q)
+                | _Q(product__name__icontains=q)
+                | _Q(product__sku__icontains=q)
+                | _Q(roll__barcode__icontains=q)
+            )
+
+        from decimal import Decimal as _D
+        min_qty = (request.GET.get("min_qty") or "").strip().replace(",", ".")
+        max_qty = (request.GET.get("max_qty") or "").strip().replace(",", ".")
+        try:
+            if min_qty:
+                qs = qs.filter(quantity__gte=_D(min_qty))
+        except Exception:
+            pass
+        try:
+            if max_qty:
+                qs = qs.filter(quantity__lte=_D(max_qty))
+        except Exception:
+            pass
+
+        qs = qs.order_by("-created_at")
+
+        # Quick stats
+        from django.db.models import Sum
+        in_total = qs.filter(movement_type="in").aggregate(s=Sum("quantity"))["s"] or 0
+        out_total = qs.filter(movement_type="out").aggregate(s=Sum("quantity"))["s"] or 0
+        net = (in_total or 0) - (out_total or 0)
+
+        paginator = Paginator(qs, 50)
+        try:
+            page = paginator.page(request.GET.get("page", 1))
+        except (EmptyPage, PageNotAnInteger):
+            page = paginator.page(1)
+
+        # Product dropdown options
+        products = WarehouseProduct.objects.filter(warehouse=warehouse).order_by("name").values("id", "name", "sku")
+
+        # Preserve filter querystring for pagination links (without page key)
+        qd = request.GET.copy()
+        qd.pop("page", None)
+        filter_qs = qd.urlencode()
+
+        return render(request, self.template_name, {
+            "warehouse": warehouse,
+            "page_obj": page,
+            "paginator": paginator,
+            "movements": page.object_list,
+            "in_total": in_total,
+            "out_total": out_total,
+            "net": net,
+            "products": list(products),
+            "filter_qs": filter_qs,
+            "filters": {
+                "type": types_param,
+                "from": date_from,
+                "to": date_to,
+                "product": product_pk,
+                "q": q,
+                "min_qty": min_qty,
+                "max_qty": max_qty,
+            },
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseProductEdit(View):
+    """POST endpoint that updates editable WarehouseProduct fields.
+    On price change, also recomputes cost_usd / cost_try so the
+    warehouse total-value rollup is accurate. Emits an "adjustment"
+    movement only when quantity is manually overridden so the
+    timeline reflects the change."""
+
+    def post(self, request, warehouse_pk, product_pk):
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
+
+        name = (request.POST.get("name") or "").strip()
+        sku = (request.POST.get("sku") or "").strip()
+        barcode = (request.POST.get("barcode") or "").strip()
+        model = (request.POST.get("model") or "").strip()
+        purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
+        purchase_currency = (request.POST.get("purchase_currency") or "USD").strip().upper()
+        quantity_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
+
+        changes = []
+        update_fields = ["updated_at"]
+
+        if name and name != product.name:
+            product.name = name; update_fields.append("name"); changes.append(f"name → {name}")
+        # SKU / barcode can be cleared by sending empty string.
+        if (sku or "") != (product.sku or ""):
+            product.sku = sku or None; update_fields.append("sku"); changes.append("sku updated")
+        if (barcode or "") != (product.barcode or ""):
+            product.barcode = barcode or None; update_fields.append("barcode"); changes.append("barcode updated")
+        if (model or "") != (product.model or ""):
+            product.model = model or None; update_fields.append("model"); changes.append("model updated")
+
+        # Purchase price + currency — recompute cost_usd / cost_try so
+        # warehouse value rollup stops showing $0 for products that
+        # only had purchase_price set previously.
+        if purchase_price_raw:
+            try:
+                pp = Decimal(purchase_price_raw)
+                product.purchase_price = pp
+                product.purchase_currency = purchase_currency
+                update_fields.extend(["purchase_price", "purchase_currency"])
+                usd_try = _get_usd_try_rate() or Decimal("1")
+                if purchase_currency == "USD":
+                    product.cost_usd = pp
+                    product.cost_try = (pp * usd_try) if usd_try else None
+                elif purchase_currency == "TRY":
+                    product.cost_try = pp
+                    if usd_try and usd_try > 0:
+                        product.cost_usd = (pp / usd_try).quantize(Decimal("0.0001"))
+                elif purchase_currency == "EUR":
+                    product.cost_usd = pp
+                update_fields.extend(["cost_usd", "cost_try"])
+                changes.append(f"price → {pp} {purchase_currency}")
+            except (InvalidOperation, TypeError):
+                pass
+
+        # Manual quantity override — record as adjustment movement so
+        # the audit trail explains the delta.
+        if quantity_raw:
+            try:
+                new_qty = Decimal(quantity_raw)
+                old_qty = product.quantity or Decimal("0")
+                if new_qty != old_qty:
+                    delta = new_qty - old_qty
+                    product.quantity = new_qty
+                    update_fields.append("quantity")
+                    StockMovement.objects.create(
+                        product=product,
+                        roll=None,
+                        movement_type="adjustment",
+                        quantity=abs(delta),
+                        reason=f"Manual adjustment: {old_qty}m → {new_qty}m",
+                        reference="Product edit",
+                        created_by=request.user if request.user.is_authenticated else None,
+                    )
+                    changes.append(f"qty {old_qty} → {new_qty}")
+            except (InvalidOperation, TypeError):
+                pass
+
+        product.save(update_fields=list(set(update_fields)))
+
+        return JsonResponse({
+            "success": True,
+            "changes": changes,
+            "product": {
+                "id": product.pk,
+                "name": product.name,
+                "sku": product.sku,
+                "barcode": product.barcode,
+                "quantity": float(product.quantity or 0),
+                "purchase_price": float(product.purchase_price or 0),
+                "purchase_currency": product.purchase_currency,
+                "cost_usd": float(product.cost_usd or 0),
+            },
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseProductDelete(View):
+    """Delete a WarehouseProduct entirely. Cascades to rolls + movements
+    via the model FK delete behaviour. Before deleting we drop a final
+    "adjustment" movement on the warehouse-wide ledger? — no, since
+    deleting the product also deletes its movements. The user must
+    confirm via POST; the warehouse total updates automatically."""
+
+    def post(self, request, warehouse_pk, product_pk):
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
+        name = product.name
+        product.delete()  # cascades to rolls + movements
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "redirect_url": reverse("operating:warehouse_detail", args=[warehouse.pk]),
+            })
+        messages.success(request, f"Product '{name}' deleted")
+        return redirect("operating:warehouse_detail", warehouse.pk)
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseRollDelete(View):
+    """Delete a specific roll. Before removing the row from DB we
+    record a final OUT movement so the timeline shows where the
+    meters went. If the roll still had meters_remaining the parent
+    quantity is decremented accordingly."""
+
+    def post(self, request, warehouse_pk, product_pk, roll_pk):
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
+        roll = get_object_or_404(WarehouseProductRoll, pk=roll_pk, product=product)
+
+        reason = (request.POST.get("reason") or "").strip() or "Roll deleted"
+        remaining = (
+            roll.meters_remaining
+            if roll.meters_remaining is not None
+            else (roll.meters or Decimal("0"))
+        )
+
+        # Decrement parent quantity for whatever was still on the roll.
+        if remaining and remaining > 0:
+            product.quantity = max(
+                Decimal("0"), (product.quantity or Decimal("0")) - remaining
+            )
+            product.save(update_fields=["quantity", "updated_at"])
+
+        # Movement entry. Keep `roll=None` because the FK would dangle
+        # after the delete; embed the roll's identity in the reason.
+        StockMovement.objects.create(
+            product=product,
+            roll=None,
+            movement_type="out",
+            quantity=remaining or Decimal("0"),
+            reason=f"{reason} (roll #{roll.pk}"
+                   + (f" · {roll.barcode}" if roll.barcode else "")
+                   + ")",
+            reference=roll.barcode or f"roll#{roll.pk}",
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+
+        roll.delete()
+
+        return JsonResponse({
+            "success": True,
+            "product": {
+                "id": product.pk,
+                "quantity": float(product.quantity or 0),
+                "rolls_count": product.rolls.count(),
+                "active_rolls_count": product.rolls.exclude(status="consumed").count(),
+            },
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseStockOut(View):
+    """POST endpoint to record manual stock-out from a product. Body:
+        amount: decimal meters
+        roll_id (optional): consume from a specific roll
+        reason (optional)
+        reference (optional)
+    Returns JSON with the updated totals."""
+
+    def post(self, request, warehouse_pk, product_pk):
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        product = get_object_or_404(
+            WarehouseProduct, pk=product_pk, warehouse=warehouse,
+        )
+        amount_raw = (request.POST.get("amount") or "").strip().replace(",", ".")
+        try:
+            amount = Decimal(amount_raw)
+        except (InvalidOperation, TypeError):
+            return JsonResponse({"success": False, "error": "Invalid amount"}, status=400)
+        if amount <= 0:
+            return JsonResponse({"success": False, "error": "Amount must be positive"}, status=400)
+        if amount > (product.quantity or Decimal("0")):
+            return JsonResponse({
+                "success": False,
+                "error": f"Only {product.quantity}m available",
+            }, status=400)
+
+        roll = None
+        roll_id = request.POST.get("roll_id")
+        if roll_id:
+            roll = product.rolls.filter(pk=roll_id).first()
+            if not roll:
+                return JsonResponse({"success": False, "error": "Roll not found"}, status=404)
+            roll_rem = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+            if amount > (roll_rem or Decimal("0")):
+                return JsonResponse({
+                    "success": False,
+                    "error": f"Only {roll_rem}m left on this roll",
+                }, status=400)
+            roll.meters_remaining = (roll_rem or Decimal("0")) - amount
+            # Update status based on remaining.
+            if roll.meters_remaining <= Decimal("0"):
+                roll.status = "consumed"
+            elif roll.meters_remaining < (roll.meters or Decimal("0")):
+                roll.status = "partial"
+            roll.save(update_fields=["meters_remaining", "status"])
+
+        # Drop the parent quantity.
+        product.quantity = (product.quantity or Decimal("0")) - amount
+        product.save(update_fields=["quantity", "updated_at"])
+
+        StockMovement.objects.create(
+            product=product,
+            roll=roll,
+            movement_type="out",
+            quantity=amount,
+            reason=(request.POST.get("reason") or "Manual stock-out").strip() or "Manual stock-out",
+            reference=(request.POST.get("reference") or "").strip() or None,
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+
+        return JsonResponse({
+            "success": True,
+            "product": {
+                "id": product.pk,
+                "quantity": float(product.quantity or 0),
+                "rolls_count": product.rolls.count(),
+                "active_rolls_count": product.rolls.exclude(status="consumed").count(),
+            },
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseRollScan(View):
+    """POST endpoint hit by the camera scanner.
+
+    Expects multipart form-data with:
+      - image: the captured frame (JPEG/PNG)
+      - sku, name, meters (optional overrides if user has already confirmed in UI)
+      - commit: 'true' to actually save; otherwise just OCR + return.
+
+    Two-phase flow so the UI can confirm OCR'd values before writing.
+    """
+
+    def post(self, request, pk):
+        warehouse = get_object_or_404(Warehouse, pk=pk)
+        image = request.FILES.get("image")
+        commit = (request.POST.get("commit") or "").lower() == "true"
+
+        # ── Phase 1: pure OCR (called with commit=false) ────────
+        if not commit:
+            if not image:
+                return JsonResponse({"success": False, "error": "No image uploaded"}, status=400)
+            raw, parsed = _ocr_label(image)
+            if "error" in parsed:
+                return JsonResponse({
+                    "success": False,
+                    "error": parsed["error"],
+                    "raw": raw or "",
+                    "attempts": parsed.get("_attempts", []),
+                    "backend": "none",
+                    "parsed": {},
+                })
+
+            # Trust the OCR'd SKU as printed — vision LLMs (xAI/Gemini/
+            # Claude) read fabric-label SKUs very reliably, so the old
+            # Levenshtein "auto-correct to nearest existing SKU" behaviour
+            # ended up *changing* correct OCR output to a similar-but-
+            # wrong DB entry (e.g. KZL000691 → KZL000131). Always show
+            # the user exactly what was on the label.
+            original_sku = parsed.get("sku")
+
+            # Look up the existing product, if any. Exact match first;
+            # only fall back to fuzzy when there is NO exact match — and
+            # even then, we don't rewrite parsed["sku"]. Fuzzy just
+            # surfaces a candidate so the UI can flag "looks similar to
+            # SKU KZL000131 — same product?" without forcing it.
+            match = None
+            if parsed.get("sku"):
+                match = WarehouseProduct.objects.filter(
+                    warehouse=warehouse, sku__iexact=parsed["sku"],
+                ).first()
+            # Otherwise try by name as a last-resort heuristic.
+            if not match and parsed.get("name"):
+                match = WarehouseProduct.objects.filter(
+                    warehouse=warehouse,
+                    name__icontains=parsed["name"][:40],
+                ).first()
+
+            if match:
+                print(
+                    f"[OCR] matched existing product: #{match.pk} "
+                    f"sku={match.sku!r} name={match.name!r} qty={match.quantity}",
+                    flush=True,
+                )
+            else:
+                print("[OCR] no existing product matched — UI will offer to create one", flush=True)
+
+            backend = parsed.get("_backend") or "unknown"
+            attempts = parsed.get("_attempts") or [{"backend": backend, "error": None}]
+            print(f"[OCR] ── done ── final backend={backend}\n", flush=True)
+
+            return JsonResponse({
+                "success": True,
+                "parsed": {k: v for k, v in parsed.items() if not k.startswith("_")},
+                "backend": backend,
+                "attempts": attempts,  # full fallback chain for debug panel
+                "raw": (raw or "")[:4000],  # OCR backend's raw response — for the debug panel
+                "original_sku": original_sku,  # before fuzzy correction
+                "sku_was_corrected": bool(
+                    original_sku and parsed.get("sku")
+                    and original_sku.upper() != (parsed.get("sku") or "").upper()
+                ),
+                "matched_product": (
+                    {
+                        "id": match.pk,
+                        "name": match.name,
+                        "sku": match.sku,
+                        "quantity": float(match.quantity or 0),
+                        "rolls_count": match.rolls.count(),
+                    } if match else None
+                ),
+            })
+
+        # ── Phase 2: commit — write the roll to DB ──────────────
+        sku = (request.POST.get("sku") or "").strip()
+        name = (request.POST.get("name") or "").strip()
+        meters_raw = (request.POST.get("meters") or "").strip().replace(",", ".")
+        try:
+            meters = Decimal(meters_raw)
+        except (InvalidOperation, TypeError):
+            return JsonResponse({"success": False, "error": "Invalid meters value"}, status=400)
+        if meters <= 0:
+            return JsonResponse({"success": False, "error": "Meters must be positive"}, status=400)
+        if not sku and not name:
+            return JsonResponse({"success": False, "error": "SKU or name is required"}, status=400)
+
+        # Find or create the WarehouseProduct in this warehouse.
+        product = None
+        if sku:
+            product = WarehouseProduct.objects.filter(
+                warehouse=warehouse, sku__iexact=sku,
+            ).first()
+        if not product and name:
+            product = WarehouseProduct.objects.filter(
+                warehouse=warehouse, name__iexact=name,
+            ).first()
+        if not product:
+            # Create a fresh one.
+            product = WarehouseProduct.objects.create(
+                warehouse=warehouse,
+                name=name or sku,
+                sku=sku or None,
+                quantity=Decimal("0"),
+            )
+
+        # Optional manual fields: barcode (per-roll) + price (per-product).
+        barcode = (request.POST.get("barcode") or "").strip() or None
+        purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
+        purchase_currency = (request.POST.get("purchase_currency") or "").strip().upper() or product.purchase_currency or "USD"
+        if purchase_price_raw:
+            try:
+                purchase_price = Decimal(purchase_price_raw)
+                product.purchase_price = purchase_price
+                product.purchase_currency = purchase_currency
+                # ALSO populate cost_usd / cost_try so the warehouse
+                # value rollup actually reflects the price (the
+                # rollup multiplies quantity * cost_usd; if only
+                # purchase_price is set the rollup stays $0).
+                usd_try = _get_usd_try_rate() or Decimal("1")
+                if purchase_currency == "USD":
+                    product.cost_usd = purchase_price
+                    product.cost_try = (purchase_price * usd_try) if usd_try else None
+                elif purchase_currency == "TRY":
+                    product.cost_try = purchase_price
+                    if usd_try and usd_try > 0:
+                        product.cost_usd = (purchase_price / usd_try).quantize(Decimal("0.0001"))
+                elif purchase_currency == "EUR":
+                    # Treat as a USD-equivalent for the value rollup —
+                    # not perfect but better than $0. The accounting
+                    # service can be extended later for true EUR.
+                    product.cost_usd = purchase_price
+            except (InvalidOperation, TypeError):
+                pass
+        # Update product-level barcode if it didn't have one (per-roll
+        # barcode is the source of truth for stock-out scanning, but
+        # the product-level field stays handy for product search).
+        if barcode and not product.barcode:
+            product.barcode = barcode[:64]
+
+        # Save the roll.
+        roll = WarehouseProductRoll.objects.create(
+            product=product,
+            meters=meters,
+            meters_remaining=meters,
+            barcode=barcode[:64] if barcode else None,
+            lot_number=(request.POST.get("lot_number") or "").strip() or None,
+            scanned_by=request.user if request.user.is_authenticated else None,
+            source_image=image if image else None,
+            ocr_raw=(request.POST.get("ocr_raw") or "")[:5000] or None,
+        )
+
+        # Bump the parent quantity (denormalised cache).
+        product.quantity = (product.quantity or Decimal("0")) + meters
+        product.save(update_fields=[
+            "quantity", "updated_at", "barcode",
+            "purchase_price", "purchase_currency",
+            "cost_usd", "cost_try",
+        ])
+
+        # Stock-in ledger entry — drives the product detail timeline.
+        StockMovement.objects.create(
+            product=product,
+            roll=roll,
+            movement_type="in",
+            quantity=meters,
+            reason="Roll scanned",
+            reference=barcode or roll.lot_number or "",
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+
+        return JsonResponse({
+            "success": True,
+            "roll": {
+                "id": roll.pk,
+                "meters": float(roll.meters),
+                "barcode": roll.barcode,
+                "scanned_at": roll.scanned_at.strftime("%H:%M:%S"),
+            },
+            "product": {
+                "id": product.pk,
+                "name": product.name,
+                "sku": product.sku,
+                "quantity": float(product.quantity or 0),
+                "rolls_count": product.rolls.count(),
+            },
+        })

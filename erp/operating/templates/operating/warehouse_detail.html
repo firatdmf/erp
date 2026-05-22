@@ -1,479 +1,892 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load i18n %}
 {% load static %}
 
-{% block content %}
+{% block css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  .wh-d-page {
-    background: radial-gradient(ellipse 1200px 600px at 0% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-                #f8fafc;
-    min-height: 100vh;
-    padding: 16px 12px 24px;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-  .wh-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: #64748b;
-    text-decoration: none;
-    margin-bottom: 14px;
-    transition: color 0.15s;
-  }
-  .wh-back:hover { color: #6366f1; }
-
-  .wh-d-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 20px;
-  }
-  .wh-d-title h1 {
-    font-size: 26px;
-    font-weight: 800;
-    color: #0f172a;
-    margin: 0 0 6px;
-    letter-spacing: -0.4px;
-    background: linear-gradient(135deg, #0f172a, #6366f1);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .wh-d-meta { color: #64748b; font-size: 13px; display:flex; align-items:center; gap:10px; }
-
-  .wh-stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    margin-bottom: 22px;
-  }
-  .wh-stat-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 18px 20px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.2s;
-  }
-  .wh-stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: var(--accent, #6366f1);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  .wh-stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -8px rgba(15,23,42,0.12); }
-  .wh-stat-card:hover::before { opacity: 1; }
-  .wh-stat-card .icn {
-    width: 38px; height: 38px;
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--bg, #eef2ff);
-    color: var(--accent, #6366f1);
-    margin-bottom: 10px;
-    font-size: 16px;
-  }
-  .wh-stat-card .val {
-    font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px;
-  }
-  .wh-stat-card .lbl {
-    font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;
-    margin-top: 4px;
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
   }
 
-  @media (max-width: 1100px) { .wh-stats { grid-template-columns: repeat(2, 1fr); } }
+  .ord { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
 
-  /* Toolbar */
-  .wh-toolbar {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .wh-search {
-    position: relative;
-    flex: 0 0 360px;
-    max-width: 360px;
-    height: 44px;
-  }
-  .wh-search input {
-    width: 100%; height: 100%;
-    padding: 0 16px 0 42px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    background: #fff;
-    font-size: 14px;
-    color: #0f172a;
-    box-sizing: border-box;
-  }
-  .wh-search input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12); }
-  .wh-search .ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13px; }
-
-  .wh-action-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    height: 44px; padding: 0 16px;
-    background: #fff; border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 13px; font-weight: 600; color: #475569;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .wh-action-btn:hover { border-color: #6366f1; color: #6366f1; }
-
-  .wh-import-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    height: 44px; padding: 0 18px;
-    background: linear-gradient(135deg, #6366f1, #3b82f6);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    font-size: 13px; font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-    transition: all 0.2s;
-  }
-  .wh-import-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4); }
-
-  /* Sort dropdown */
-  .wh-sort {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    height: 44px;
-    background: #fff;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 0 36px 0 14px;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    cursor: pointer;
-  }
-  .wh-sort:hover { border-color: #cbd5e1; }
-  .wh-sort:focus-within { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12); }
-
-  .wh-sort::before {
-    content: 'Sort:';
-    font-size: 11px;
-    font-weight: 700;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-right: 8px;
-  }
-
-  .wh-sort::after {
-    content: '\f078';
-    font-family: 'Font Awesome 5 Free';
-    font-weight: 900;
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #94a3b8;
-    font-size: 11px;
-    pointer-events: none;
-  }
-
-  .wh-sort select,
-  select.wh-sort-select,
-  .wh-sort > select {
-    appearance: none !important;
-    -webkit-appearance: none !important;
-    -moz-appearance: none !important;
-    border: none !important;
-    outline: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    font-size: 13px;
-    font-weight: 600;
-    color: #334155;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    font-family: inherit;
-    min-width: 180px;
-    width: auto;
-  }
-  .wh-sort select:focus { box-shadow: none !important; border: none !important; }
-  .wh-sort select::-ms-expand { display: none; }
-
-  /* Filter chips */
-  .wh-chip {
+  /* CRUMBS */
+  .od-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-back {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 14px;
-    background: #fff;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 999px;
-    font-size: 12px; font-weight: 600;
-    color: #475569;
-    text-decoration: none;
-    transition: all 0.18s;
-    cursor: pointer;
-    font-family: inherit;
+    padding: 6px 12px; background: white; border: 1px solid #E0E6EE;
+    border-radius: 8px; font: 600 12.5px var(--font-sans);
+    color: var(--gray-700); cursor: pointer; transition: all 140ms;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04); text-decoration: none;
   }
-  .wh-chip:hover {
-    border-color: #6366f1; color: #6366f1;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15);
+  .od-back i { width: 14px; height: 14px; }
+  .od-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-sep { color: var(--gray-400); }
+  .od-crumb-here {
+    font: 600 12.5px var(--font-sans); color: var(--gray-700);
+    max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .wh-chip.active {
-    background: linear-gradient(135deg, #6366f1, #3b82f6);
-    color: #fff; border-color: transparent;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  }
-  .wh-chip i { font-size: 11px; }
 
-  /* Pagination */
+  /* HEAD */
+  .od-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 24px; margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px solid #E2E8EE;
+  }
+  .od-head-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .od-title { font: 800 28px var(--font-sans); letter-spacing: -0.01em; color: #0F1419; margin: 0; }
+  .od-meta { display: flex; align-items: center; gap: 10px; font: 500 12.5px var(--font-sans); color: var(--gray-600); flex-wrap: wrap; }
+  .od-meta i { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; color: var(--gray-500); }
+  .od-dot { width: 3px; height: 3px; background: #C5CCD3; border-radius: 50%; display: inline-block; }
+  .od-head-r { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* BUTTONS */
+  .ord-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 10px;
+    font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms;
+    white-space: nowrap; text-decoration: none; border: 1px solid transparent;
+  }
+  .ord-btn i { width: 14px; height: 14px; }
+  .ord-btn.ghost {
+    background: white; border: 1px solid #E0E6EE; color: var(--gray-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .ord-btn.ghost:hover { background: #F8FAFC; border-color: #C5CCD3; }
+  .ord-btn.ghost.danger { background: #FEF2F2; border-color: #FCA5A5; color: #B23B3B; }
+  .ord-btn.ghost.danger:hover { background: #FCE4E4; border-color: #F87171; color: #991B1B; }
+  .ord-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border: 1px solid var(--nejum-teal-700); color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
+  .ord-btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
+
+  /* CHIPS */
+  .od-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: 999px;
+    font: 600 11.5px var(--font-sans); letter-spacing: 0.02em;
+    background: #EEF1F5; color: var(--gray-700);
+    box-shadow: inset 0 0 0 1px #D6DDE5;
+    text-decoration: none;
+  }
+  .od-chip i { width: 11px; height: 11px; }
+  .od-chip.teal { background: var(--nejum-teal-50); color: var(--nejum-teal-700); box-shadow: inset 0 0 0 1px rgba(20,127,116,0.30); }
+  .od-chip.mono { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.04em; }
+
+  /* GRID */
+  .od-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: flex-start; }
+  .od-left, .od-right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .od-right { position: sticky; top: 16px; }
+
+  /* CARDS */
+  .od-card {
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .od-card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .od-card-h i.card-ico { color: var(--nejum-teal-600); width: 14px; height: 14px; }
+  .od-card-h h3 {
+    font: 700 11px var(--font-sans); color: var(--gray-600); margin: 0;
+    letter-spacing: 0.10em; text-transform: uppercase;
+  }
+  .od-card-sub { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; }
+
+  /* DETAIL LIST (right column info) */
+  .od-detail-list { display: flex; flex-direction: column; gap: 10px; }
+  .od-dt-block {
+    border-top: 1px dashed #E2E8EE; padding-top: 10px; margin-top: 4px;
+  }
+  .od-dt-block:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .od-dt-block .k { font: 600 10.5px var(--font-sans); color: var(--gray-500); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; display: block; }
+  .od-dt-stack { display: flex; flex-direction: column; gap: 3px; }
+  .od-dt-stack .v-line { font: 500 12.5px var(--font-sans); color: #0F1419; word-break: break-word; }
+  .od-dt-stack .v-line.mono { font: 500 12.5px var(--font-mono); color: var(--gray-700); }
+  .od-dt-stack a { color: var(--nejum-teal-700); text-decoration: none; font: 600 12.5px var(--font-sans); }
+  .od-dt-stack a:hover { text-decoration: underline; }
+  .od-empty-mute { font: 500 12.5px var(--font-sans); color: var(--gray-400); }
+
+  /* QUICK STATS (right column big numbers) */
+  .od-stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .od-stat {
+    background: #F8FAFC; border: 1px solid #E2E8EE; border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .od-stat .val {
+    font: 800 20px var(--font-sans); color: #0F1419; letter-spacing: -0.01em;
+    line-height: 1.1; font-variant-numeric: tabular-nums;
+  }
+  .od-stat .lbl {
+    font: 600 10.5px var(--font-sans); color: var(--gray-500);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px;
+  }
+  .od-stat.teal { background: var(--nejum-teal-50); border-color: rgba(20,127,116,0.20); }
+  .od-stat.teal .val { color: var(--nejum-teal-700); }
+  .od-stat.full { grid-column: 1 / -1; }
+
+  /* TOOLBAR (search + sort + sync) */
+  .od-toolbar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .od-search {
+    position: relative; flex: 1 1 320px; max-width: 420px; min-width: 220px;
+  }
+  .od-search input {
+    width: 100%; box-sizing: border-box;
+    padding: 10px 14px 10px 36px;
+    background: white; border: 1px solid #E0E6EE;
+    border-radius: 10px; outline: none;
+    font: 500 13px var(--font-sans); color: var(--ink);
+    transition: all 140ms;
+  }
+  .od-search input::placeholder { color: var(--gray-500); }
+  .od-search input:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .od-search .ico {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--gray-500); font-size: 12px;
+  }
+  .od-sort {
+    position: relative; display: inline-flex; align-items: center;
+    background: white; border: 1px solid #E0E6EE; border-radius: 10px;
+    padding: 0 32px 0 12px; height: 38px;
+    transition: all 140ms;
+  }
+  .od-sort:focus-within {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .od-sort::before {
+    content: 'Sort'; font: 700 10.5px var(--font-sans); color: var(--gray-500);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-right: 8px;
+  }
+  .od-sort::after {
+    content: '\f078'; font-family: 'Font Awesome 5 Free'; font-weight: 900;
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--gray-500); font-size: 10px; pointer-events: none;
+  }
+  .od-sort select {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    border: none; outline: none; background: transparent;
+    font: 600 13px var(--font-sans); color: var(--ink);
+    height: 100%; padding: 0; min-width: 160px; cursor: pointer;
+  }
+
+  /* CHIPS (filter pills) */
+  .od-chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .od-fchip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; background: white;
+    border: 1px solid #E0E6EE; border-radius: 999px;
+    font: 600 12px var(--font-sans); color: var(--gray-700);
+    cursor: pointer; transition: all 140ms;
+  }
+  .od-fchip i { width: 11px; height: 11px; color: var(--gray-500); }
+  .od-fchip:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .od-fchip:hover i { color: var(--nejum-teal-600); }
+  .od-fchip.active {
+    background: var(--nejum-teal-50); color: var(--nejum-teal-700);
+    border-color: rgba(20,127,116,0.30);
+  }
+  .od-fchip.active i { color: var(--nejum-teal-600); }
+
+  /* PRODUCTS TABLE */
+  .od-prods-wrap { overflow-x: auto; }
+  .od-prods { width: 100%; border-collapse: collapse; }
+  .od-prods th, .od-prods td {
+    padding: 11px 10px; text-align: left;
+    border-bottom: 1px solid #EEF1F5; font-size: 12.5px;
+    vertical-align: middle;
+  }
+  .od-prods th {
+    font: 700 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-500); background: transparent; border-bottom: 1px solid #E2E8EE;
+  }
+  .od-prods th.num, .od-prods td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .od-prods tr:last-child td { border-bottom: none; }
+  .od-prods tbody tr { transition: background-color 140ms; }
+  .od-prods tbody tr:hover { background: #F8FAFC; }
+  .od-prods .pname { font: 600 13px var(--font-sans); color: #0F1419; }
+  .od-prods .psub { font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
+  .od-prods .mono { font: 500 11.5px var(--font-mono); color: var(--gray-700); }
+  .od-prods .sku-pill {
+    display: inline-block; padding: 3px 9px; border-radius: 6px;
+    background: #F1F5F9; color: var(--gray-700);
+    font: 500 11.5px var(--font-mono); letter-spacing: 0.02em;
+    border: 1px solid #E2E8EE;
+  }
+  .od-prods .qty { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; }
+  .od-prods .rolls-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 3px;
+    padding: 2px 8px;
+    background: #FEF3C7; color: #8B5A00;
+    border: 1px solid #F5D78B;
+    border-radius: 999px;
+    font: 700 10px var(--font-sans); letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .od-prods .rolls-pill i { font-size: 9px; }
+  .od-prods .curr-pill {
+    display: inline-block; padding: 2px 7px; border-radius: 999px;
+    background: var(--nejum-teal-50); color: var(--nejum-teal-700);
+    font: 700 10px var(--font-sans); letter-spacing: 0.05em;
+    border: 1px solid rgba(20,127,116,0.25);
+    margin-left: 4px;
+  }
+  .od-prods .cost-usd { font: 700 12.5px var(--font-sans); color: var(--nejum-teal-700); }
+  .od-prods .cost-try { font: 700 12.5px var(--font-sans); color: #B27500; }
+
+  /* EMPTY STATE */
+  .od-empty {
+    text-align: center; padding: 50px 20px;
+  }
+  .od-empty i.empty-ico {
+    font-size: 36px; color: var(--gray-400); margin-bottom: 12px;
+  }
+  .od-empty h4 {
+    font: 700 14px var(--font-sans); color: var(--gray-700); margin: 0 0 6px;
+  }
+  .od-empty p { font: 500 12.5px var(--font-sans); color: var(--gray-500); margin: 0; }
+
+  /* PAGINATION (used inside partial) */
   .wh-pager { display: flex; gap: 4px; align-items: center; }
   .wh-pg-btn {
-    min-width: 32px; height: 32px;
-    padding: 0 10px;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 12px; font-weight: 600;
-    color: #475569;
-    cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-    transition: all 0.15s;
-    font-family: inherit;
+    min-width: 30px; height: 30px; padding: 0 10px;
+    background: white; border: 1px solid #E0E6EE; border-radius: 8px;
+    font: 600 12px var(--font-sans); color: var(--gray-700);
+    cursor: pointer; display: inline-flex; align-items: center;
+    justify-content: center; gap: 4px;
+    transition: all 140ms;
   }
   .wh-pg-btn:hover:not(:disabled):not(.active) {
-    border-color: #6366f1;
-    color: #6366f1;
+    border-color: var(--nejum-teal-500); color: var(--nejum-teal-700);
   }
   .wh-pg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .wh-pg-btn.active {
-    background: linear-gradient(135deg, #6366f1, #3b82f6);
-    color: #fff;
-    border-color: transparent;
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    color: white; border-color: var(--nejum-teal-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
   }
 
-  /* Table */
-  .wh-table-card {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
-  }
-  .wh-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .wh-table thead {
-    background: linear-gradient(to bottom, #fcfcfd, #f1f5f9);
-    border-bottom: 1px solid #e2e8f0;
-  }
-  .wh-table th {
-    padding: 14px 18px;
-    text-align: left;
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-  }
-  .wh-table td {
-    padding: 14px 18px;
-    vertical-align: middle;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 13.5px;
-    color: #334155;
-  }
-  .wh-table tbody tr { transition: background-color 0.15s; }
-  .wh-table tbody tr:hover { background: #f7f9fc; }
-
-  .wh-name { font-weight: 600; color: #1e293b; }
-  .wh-sku { font-family: 'SF Mono', monospace; font-size: 12px; color: #475569; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; border: 1px solid #e2e8f0; }
-  .wh-qty { font-weight: 800; color: #0f172a; font-size: 14px; }
-  .wh-currency-pill {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 10.5px;
-    font-weight: 700;
-    background: #eef2ff;
-    color: #4338ca;
-    border: 1px solid #c7d2fe;
-  }
-  .wh-cost-cell { font-weight: 700; color: #047857; }
-
-  /* Empty state */
-  .wh-empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: #64748b;
-  }
-  .wh-empty i { font-size: 44px; color: #cbd5e1; margin-bottom: 14px; }
-
-  /* Modal */
+  /* IMPORT MODAL */
   .wh-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(4px);
-    z-index: 10000;
-    align-items: center;
-    justify-content: center;
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,23,31,0.45);
+    backdrop-filter: blur(3px);
+    z-index: 10000; align-items: center; justify-content: center;
+    font-family: var(--font-sans);
   }
   .wh-modal.show { display: flex; }
   .wh-modal-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 28px;
-    max-width: 480px;
-    width: 90%;
-    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    padding: 24px; max-width: 480px; width: 90%;
+    box-shadow: 0 20px 60px rgba(15,23,31,0.20);
   }
-  .wh-modal-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 800; color: #0f172a; }
-  .wh-modal-card p { color: #64748b; font-size: 13px; margin: 0 0 18px; }
-
+  .wh-modal-card h3 {
+    margin: 0 0 6px; font: 700 16px var(--font-sans); color: #0F1419;
+  }
+  .wh-modal-card p {
+    font: 500 12.5px var(--font-sans); color: var(--gray-500); margin: 0 0 16px;
+  }
   .wh-drop {
-    border: 2px dashed #cbd5e1;
-    border-radius: 12px;
-    padding: 32px 18px;
-    text-align: center;
-    background: #f8fafc;
-    cursor: pointer;
-    transition: all 0.15s;
-    margin-bottom: 16px;
+    border: 2px dashed #E0E6EE; border-radius: 12px;
+    padding: 28px 18px; text-align: center; background: #F8FAFC;
+    cursor: pointer; transition: all 140ms; margin-bottom: 14px;
   }
   .wh-drop:hover, .wh-drop.dragging {
-    border-color: #6366f1;
-    background: #eef2ff;
+    border-color: var(--nejum-teal-500); background: var(--nejum-teal-50);
   }
   .wh-drop-icon {
-    width: 48px; height: 48px;
-    background: #e2e8f0; border-radius: 50%;
+    width: 44px; height: 44px; background: #E5EAF0; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 12px;
-    color: #64748b;
-    font-size: 20px;
+    margin: 0 auto 10px; color: var(--gray-600); font-size: 18px;
+    transition: all 140ms;
   }
-  .wh-drop:hover .wh-drop-icon { background: #6366f1; color: #fff; }
+  .wh-drop:hover .wh-drop-icon {
+    background: var(--nejum-teal-600); color: white;
+  }
+
+  /* DELETE CONFIRM MODAL */
+  .od-confirm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,23,31,0.45);
+    align-items: center; justify-content: center; z-index: 10000;
+    font-family: var(--font-sans);
+  }
+  .od-confirm-overlay.show { display: flex; }
+  .od-confirm-card {
+    background: white; border: 1px solid #E2E8EE; border-radius: 14px;
+    max-width: 420px; width: 90%; padding: 22px;
+    box-shadow: 0 20px 60px rgba(15,23,31,0.20);
+  }
+  .od-confirm-head {
+    display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px;
+  }
+  .od-confirm-ico {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #FEE2E2; color: #B23B3B;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .od-confirm-q { font: 700 15px var(--font-sans); color: #0F1419; margin-bottom: 4px; }
+  .od-confirm-sub { font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+  .od-confirm-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+  .ord-btn.danger {
+    background: #EF4444; border: 1px solid #B91C1C; color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .ord-btn.danger:hover { filter: brightness(1.04); color: white; }
+
+  /* RESPONSIVE */
+  @media (max-width: 1100px) {
+    .od-grid { grid-template-columns: 1fr; }
+    .od-right { position: static; }
+  }
+  @media (max-width: 700px) {
+    .od-head { flex-direction: column; align-items: stretch; }
+    .od-stats-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Roll Scanner (camera-driven label OCR) ──────────────── */
+  .rs-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 31, 0.78);
+    backdrop-filter: blur(6px);
+    z-index: 10000;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 18px;
+  }
+  .rs-overlay.show { display: flex; animation: rs-fade 180ms ease; }
+  @keyframes rs-fade { from { opacity: 0; } to { opacity: 1; } }
+  .rs-shell {
+    width: 100%; max-width: 1100px; max-height: 92vh;
+    background: white; border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    animation: rs-slide 260ms cubic-bezier(0.22,1,0.36,1);
+  }
+  @keyframes rs-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .rs-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid #E2E8EE;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFD 100%);
+  }
+  .rs-title {
+    display: inline-flex; align-items: center; gap: 10px;
+    font: 800 16px var(--font-sans); color: #0F1419;
+  }
+  .rs-title i { color: var(--nejum-teal-600); }
+  .rs-title small {
+    font: 500 12px var(--font-sans); color: var(--gray-500);
+    margin-left: 4px;
+  }
+  .rs-close {
+    width: 34px; height: 34px;
+    border: 1px solid #E2E8EE; background: white;
+    border-radius: 8px; color: var(--gray-700);
+    cursor: pointer; transition: all 140ms;
+  }
+  .rs-close:hover { background: #F8FAFC; border-color: #CBD5E1; }
+
+  .rs-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 0;
+    flex: 1; min-height: 0;
+  }
+  .rs-cam {
+    background: #0F1419;
+    display: flex; flex-direction: column;
+    position: relative;
+    min-height: 480px;
+  }
+  .rs-viewport {
+    flex: 1; position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #rsVideo {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .rs-guide {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    flex-direction: column;
+  }
+  .rs-guide-frame {
+    width: 78%; height: 56%;
+    border: 2px dashed rgba(255,255,255,0.55);
+    border-radius: 14px;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.18);
+  }
+  .rs-guide-hint {
+    margin-top: 12px;
+    background: rgba(0,0,0,0.55); color: white;
+    font: 600 12px var(--font-sans); letter-spacing: 0.02em;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .rs-flash {
+    position: absolute; inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 80ms ease;
+  }
+  .rs-flash.on { opacity: 0.85; }
+  .rs-processing {
+    position: absolute; inset: 0;
+    background: rgba(15,23,31,0.75);
+    color: white;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px;
+    font: 600 13px var(--font-sans);
+  }
+  .rs-cam-foot {
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.04);
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .rs-capture-btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 11px 22px;
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border: 1px solid var(--nejum-teal-700); color: white;
+    border-radius: 999px;
+    font: 700 13px var(--font-sans);
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(20,127,116,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+    transition: transform 140ms, box-shadow 140ms;
+  }
+  .rs-capture-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(20,127,116,0.42), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .rs-capture-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .rs-cam-hint {
+    font: 500 11.5px var(--font-sans);
+    color: rgba(255,255,255,0.55);
+  }
+  .rs-cam-hint i { margin-right: 4px; }
+
+  .rs-side {
+    display: flex; flex-direction: column;
+    background: #FAFBFD;
+    border-left: 1px solid #E2E8EE;
+    overflow: hidden;
+  }
+
+  .rs-confirm, .rs-idle {
+    padding: 16px 18px;
+    border-bottom: 1px solid #EEF1F5;
+  }
+  .rs-idle {
+    color: var(--gray-500);
+    font: 500 12.5px var(--font-sans);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px;
+    padding: 30px 20px;
+  }
+  .rs-idle i { font-size: 24px; color: #CBD5E1; }
+
+  .rs-confirm-h {
+    font: 800 13px var(--font-sans); color: #0F1419;
+    margin-bottom: 10px;
+    letter-spacing: -0.005em;
+  }
+  .rs-fld { margin-bottom: 9px; }
+  .rs-fld label {
+    display: block;
+    font: 600 11px var(--font-sans); color: var(--gray-700);
+    letter-spacing: 0.04em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .rs-required { color: #DC2626; }
+  .rs-input {
+    width: 100%;
+    padding: 8px 11px;
+    background: white;
+    border: 1px solid #E0E6EE; border-radius: 8px;
+    font: 500 13px var(--font-sans); color: #0F1419;
+    outline: none; box-sizing: border-box;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .rs-input:focus {
+    border-color: var(--nejum-teal-500);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
+  }
+  .rs-match {
+    margin: 8px 0;
+    padding: 7px 10px;
+    background: var(--nejum-teal-50, #E5F1F0);
+    color: var(--nejum-teal-700, #005354);
+    border: 1px solid rgba(20,127,116,0.20);
+    border-radius: 7px;
+    font: 600 11.5px var(--font-sans);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .rs-match.new {
+    background: #FEF3C7; color: #8B5A00; border-color: #F5D78B;
+  }
+  .rs-confirm-actions {
+    display: flex; gap: 8px; margin-top: 12px;
+  }
+  .rs-btn {
+    flex: 1;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 12px; border-radius: 8px;
+    font: 600 12.5px var(--font-sans);
+    border: 1px solid transparent;
+    cursor: pointer; transition: all 140ms;
+  }
+  .rs-btn.ghost { background: white; border-color: #E0E6EE; color: var(--gray-700); }
+  .rs-btn.ghost:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .rs-btn.primary {
+    background: linear-gradient(180deg, var(--nejum-teal-500) 0%, var(--nejum-teal-600) 100%);
+    border-color: var(--nejum-teal-700); color: white;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .rs-btn.primary:hover:not(:disabled) { filter: brightness(1.04); }
+  .rs-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .rs-debug { margin-top: 10px; font-size: 11px; color: var(--gray-500); }
+  .rs-debug summary { cursor: pointer; user-select: none; }
+  .rs-debug pre {
+    margin: 6px 0 0; padding: 8px;
+    background: #0F1419; color: #D1D5DB;
+    border-radius: 6px;
+    font: 500 10.5px var(--font-mono); line-height: 1.45;
+    max-height: 110px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-all;
+  }
+
+  .rs-recent {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .rs-recent-h {
+    padding: 11px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: white;
+    border-bottom: 1px solid #E2E8EE;
+    font: 700 10.5px var(--font-sans); color: var(--gray-700);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .rs-recent-count { color: var(--nejum-teal-700); font-size: 11px; }
+  .rs-recent-list {
+    flex: 1; overflow-y: auto;
+    padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .rs-recent-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 8px;
+    font: 600 12px var(--font-sans); color: #0F1419;
+    animation: rs-slide-in 220ms ease;
+  }
+  @keyframes rs-slide-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+  .rs-recent-row .rs-recent-ok {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: linear-gradient(180deg, #34D399, #10B981); color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; flex-shrink: 0;
+  }
+  .rs-recent-row .rs-recent-info {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rs-recent-row .rs-recent-meters {
+    font-weight: 800; color: var(--nejum-teal-700);
+    font-variant-numeric: tabular-nums;
+  }
+  .rs-recent-empty {
+    padding: 20px 16px;
+    text-align: center;
+    font: 500 12px var(--font-sans);
+    color: var(--gray-400);
+  }
+
+  /* Mobile / narrow: stack the panels */
+  @media (max-width: 860px) {
+    .rs-body { grid-template-columns: 1fr; }
+    .rs-cam { min-height: 360px; }
+    .rs-side { border-left: none; border-top: 1px solid #E2E8EE; }
+  }
 </style>
+{% endblock %}
 
-<div class="wh-d-page">
-  <a href="{% url 'operating:warehouse_list' %}" class="wh-back">
-    <i class="fa fa-chevron-left"></i> Back to warehouses
-  </a>
+{% block content %}
+<div class="ord">
 
-  <div class="wh-d-header">
-    <div class="wh-d-title">
-      <h1>{{ warehouse.name }}</h1>
-      <div class="wh-d-meta">
-        <span><i class="fa fa-map-marker-alt"></i> {{ warehouse.location|default:"No location" }}</span>
+  <!-- CRUMBS -->
+  <div class="od-crumbs">
+    <a href="{% url 'operating:warehouse_list' %}" class="od-back">
+      <i class="fa fa-arrow-left"></i> {% trans "Back to warehouses" %}
+    </a>
+    <span class="od-sep">/</span>
+    <span class="od-crumb-here">{{ warehouse.name }}</span>
+  </div>
+
+  <!-- HEAD -->
+  <div class="od-head">
+    <div>
+      <div class="od-head-row">
+        <h1 class="od-title">{{ warehouse.name }}</h1>
         {% if warehouse.accounting_book %}
-          <span style="display:inline-flex; align-items:center; gap:6px; padding:3px 10px; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; border-radius:999px; font-size:11.5px; font-weight:700;">
-            <i class="fa fa-book"></i> {{ warehouse.accounting_book.name }}
+          <span class="od-chip teal">
+            <i class="fa fa-book"></i>{{ warehouse.accounting_book.name }}
+          </span>
+        {% endif %}
+      </div>
+      {% trans "No location" as no_location %}
+      <div class="od-meta">
+        <span>
+          <i class="fa fa-map-pin"></i>{{ warehouse.location|default:no_location }}
+        </span>
+        <span class="od-dot"></span>
+        <span>
+          <i class="fa fa-box"></i>{{ product_count|default:0 }} {% trans "products" %}
+        </span>
+        <span class="od-dot"></span>
+        <span>
+          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0 }} {% trans "in stock" %}
+        </span>
+        {% if warehouse.created_at %}
+          <span class="od-dot"></span>
+          <span>
+            <i class="fa fa-calendar"></i>{% trans "Created" %} {{ warehouse.created_at|date:"d M Y" }}
           </span>
         {% endif %}
       </div>
     </div>
-    <div style="display:flex; gap:8px;">
-      <a href="{% url 'operating:warehouse_edit' warehouse.pk %}" class="wh-action-btn">
-        <i class="fa fa-pencil"></i> Edit
+    <div class="od-head-r">
+      <button type="button" class="ord-btn primary" onclick="openRollScanner()">
+        <i class="fa fa-camera"></i>{% trans "Scan roll" %}
+      </button>
+      <button type="button" class="ord-btn ghost" onclick="document.getElementById('whImportModal').classList.add('show')">
+        <i class="fa fa-file-import"></i>{% trans "Sync Products" %}
+      </button>
+      <a href="{% url 'operating:warehouse_edit' warehouse.pk %}" class="ord-btn ghost">
+        <i class="fa fa-edit"></i>{% trans "Edit" %}
       </a>
-    </div>
-  </div>
-
-  <!-- Stats -->
-  <div class="wh-stats">
-    <div class="wh-stat-card" style="--accent:#6366f1; --bg:#eef2ff;">
-      <div class="icn"><i class="fa fa-box-open"></i></div>
-      <div class="val">{{ product_count|default:0 }}</div>
-      <div class="lbl">Products</div>
-    </div>
-    <div class="wh-stat-card" style="--accent:#0ea5e9; --bg:#e0f2fe;">
-      <div class="icn"><i class="fa fa-cubes"></i></div>
-      <div class="val">{{ total_quantity|floatformat:0 }}</div>
-      <div class="lbl">Total Quantity</div>
-    </div>
-    <div class="wh-stat-card" style="--accent:#10b981; --bg:#ecfdf5;">
-      <div class="icn"><i class="fa fa-dollar-sign"></i></div>
-      <div class="val">${{ total_value_usd|floatformat:2 }}</div>
-      <div class="lbl">Net Worth (USD)</div>
-    </div>
-    <div class="wh-stat-card" style="--accent:#f59e0b; --bg:#fef3c7;">
-      <div class="icn" style="font-weight:800;">₺</div>
-      <div class="val">₺{{ total_value_try|floatformat:2 }}</div>
-      <div class="lbl">Net Worth (TRY)</div>
-    </div>
-  </div>
-
-  <!-- Toolbar -->
-  <div class="wh-toolbar">
-    <div class="wh-search">
-      <i class="fa fa-search ico"></i>
-      <input type="text" id="whSearchInput" placeholder="Search products by name, SKU, barcode..."
-             value="{{ search }}"
-             hx-get="{% url 'operating:warehouse_detail' warehouse.pk %}"
-             hx-trigger="keyup changed delay:300ms, whFilterChanged from:body"
-             hx-target="#wh-rows"
-             hx-include="#whSortInput"
-             name="search">
-    </div>
-
-    <!-- Sort dropdown -->
-    <div class="wh-sort">
-      <select id="whSortInput" name="sort" onchange="onWhSortChange()">
-        {% for key, label in sort_options %}
-          <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div style="margin-left:auto; display:flex; gap:10px;">
-      <button type="button" class="wh-import-btn" onclick="document.getElementById('whImportModal').classList.add('show')">
-        <i class="fa fa-file-import"></i> Sync Products
+      <button type="button" class="ord-btn ghost danger" onclick="openDeleteConfirm()">
+        <i class="fa fa-trash"></i>{% trans "Delete" %}
       </button>
     </div>
   </div>
 
-  <!-- Quick filter chips (HTMX live) -->
-  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;" id="whChips">
-    <button type="button" class="wh-chip {% if sort == 'qty_desc' %}active{% endif %}" data-sort="qty_desc" onclick="setWhSort('qty_desc')">
-      <i class="fa fa-cubes"></i> Top quantity
-    </button>
-    <button type="button" class="wh-chip {% if sort == 'total_usd_desc' %}active{% endif %}" data-sort="total_usd_desc" onclick="setWhSort('total_usd_desc')">
-      <i class="fa fa-dollar-sign"></i> Most valuable (USD)
-    </button>
-    <button type="button" class="wh-chip {% if sort == 'total_try_desc' %}active{% endif %}" data-sort="total_try_desc" onclick="setWhSort('total_try_desc')">
-      <span style="font-weight:800; font-size:13px;">₺</span> Most valuable (TRY)
-    </button>
-    <button type="button" class="wh-chip {% if sort == 'price_desc' %}active{% endif %}" data-sort="price_desc" onclick="setWhSort('price_desc')">
-      <i class="fa fa-tag"></i> Most expensive
-    </button>
-    <button type="button" class="wh-chip {% if sort == 'recent' %}active{% endif %}" data-sort="recent" onclick="setWhSort('recent')">
-      <i class="fa fa-clock"></i> Recently updated
-    </button>
-  </div>
+  {% if messages %}
+    {% for message in messages %}
+      <div class="od-card" style="background:#D1FAE5; border-color:#A7F3D0; color:#0E6E4A; padding:10px 14px; margin-bottom:14px; font:600 12.5px var(--font-sans);">
+        <i class="fa fa-check-circle" style="margin-right:8px;"></i>{{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
 
-  <!-- Product Table -->
-  <div class="wh-table-card">
-    <table class="wh-table">
-      <thead>
-        <tr>
-          <th>{% trans "NAME" %}</th>
-          <th>{% trans "SKU" %}</th>
-          <th>{% trans "BARCODE" %}</th>
-          <th>{% trans "QTY" %}</th>
-          <th>{% trans "UNIT COST" %}</th>
-          <th>{% trans "TOTAL (USD)" %}</th>
-          <th>{% trans "TOTAL (TRY)" %}</th>
-        </tr>
-      </thead>
-      <tbody id="wh-rows">
-        {% include "operating/partials/warehouse_product_table_body.html" %}
-      </tbody>
-    </table>
+  <!-- MAIN GRID -->
+  <div class="od-grid">
+
+    {# ============== LEFT ============== #}
+    <div class="od-left">
+
+      <!-- STOCK ITEMS -->
+      <section class="od-card">
+        <div class="od-card-h">
+          <i class="fa fa-boxes card-ico"></i>
+          <h3>{% trans "Stock items" %}</h3>
+          <span class="od-card-sub">
+            {{ product_count|default:0 }} {% trans "products" %}
+            {% if search %} · {% trans "filtered" %}{% endif %}
+          </span>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="od-toolbar">
+          <div class="od-search">
+            <i class="fa fa-search ico"></i>
+            <input type="text" id="whSearchInput"
+                   placeholder="{% trans 'Search by name, SKU, barcode…' %}"
+                   value="{{ search }}"
+                   hx-get="{% url 'operating:warehouse_detail' warehouse.pk %}"
+                   hx-trigger="keyup changed delay:300ms, whFilterChanged from:body"
+                   hx-target="#wh-rows"
+                   hx-include="#whSortInput"
+                   name="search">
+          </div>
+
+          <div class="od-sort">
+            <select id="whSortInput" name="sort" onchange="onWhSortChange()">
+              {% for key, label in sort_options %}
+                <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Quick filter chips (HTMX live) -->
+        <div class="od-chip-row" id="whChips">
+          <button type="button" class="od-fchip {% if sort == 'qty_desc' %}active{% endif %}" data-sort="qty_desc" onclick="setWhSort('qty_desc')">
+            <i class="fa fa-cubes"></i>{% trans "Top quantity" %}
+          </button>
+          <button type="button" class="od-fchip {% if sort == 'total_usd_desc' %}active{% endif %}" data-sort="total_usd_desc" onclick="setWhSort('total_usd_desc')">
+            <i class="fa fa-dollar-sign"></i>{% trans "Most valuable (USD)" %}
+          </button>
+          <button type="button" class="od-fchip {% if sort == 'total_try_desc' %}active{% endif %}" data-sort="total_try_desc" onclick="setWhSort('total_try_desc')">
+            <span style="font-weight:800; font-size:12px;">₺</span>{% trans "Most valuable (TRY)" %}
+          </button>
+          <button type="button" class="od-fchip {% if sort == 'price_desc' %}active{% endif %}" data-sort="price_desc" onclick="setWhSort('price_desc')">
+            <i class="fa fa-tag"></i>{% trans "Most expensive" %}
+          </button>
+          <button type="button" class="od-fchip {% if sort == 'recent' %}active{% endif %}" data-sort="recent" onclick="setWhSort('recent')">
+            <i class="fa fa-clock"></i>{% trans "Recently updated" %}
+          </button>
+        </div>
+
+        <!-- Product Table -->
+        <div class="od-prods-wrap">
+          <table class="od-prods">
+            <thead>
+              <tr>
+                <th>{% trans "Name" %}</th>
+                <th>{% trans "SKU" %}</th>
+                <th>{% trans "Barcode" %}</th>
+                <th class="num">{% trans "Qty" %}</th>
+                <th class="num">{% trans "Unit cost" %}</th>
+                <th class="num">{% trans "Total (USD)" %}</th>
+                <th class="num">{% trans "Total (TRY)" %}</th>
+              </tr>
+            </thead>
+            <tbody id="wh-rows">
+              {% include "operating/partials/warehouse_product_table_body.html" %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    {# ============== RIGHT ============== #}
+    <div class="od-right">
+
+      <!-- WAREHOUSE INFO -->
+      <section class="od-card">
+        <div class="od-card-h">
+          <i class="fa fa-warehouse card-ico"></i>
+          <h3>{% trans "Warehouse info" %}</h3>
+        </div>
+
+        <div class="od-detail-list">
+          <div class="od-dt-block">
+            <span class="k">{% trans "Name" %}</span>
+            <div class="od-dt-stack">
+              <span class="v-line">{{ warehouse.name }}</span>
+            </div>
+          </div>
+
+          <div class="od-dt-block">
+            <span class="k">{% trans "Location" %}</span>
+            <div class="od-dt-stack">
+              {% if warehouse.location %}
+                <span class="v-line">{{ warehouse.location }}</span>
+              {% else %}
+                <span class="v-line od-empty-mute">{% trans "Not set" %}</span>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if warehouse.description %}
+            <div class="od-dt-block">
+              <span class="k">{% trans "Description" %}</span>
+              <div class="od-dt-stack">
+                <span class="v-line">{{ warehouse.description|linebreaksbr }}</span>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if warehouse.accounting_book %}
+            <div class="od-dt-block">
+              <span class="k">{% trans "Accounting book" %}</span>
+              <div class="od-dt-stack">
+                <span class="v-line"><i class="fa fa-book" style="color:var(--nejum-teal-600);margin-right:6px;"></i>{{ warehouse.accounting_book.name }}</span>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if warehouse.created_at %}
+            <div class="od-dt-block">
+              <span class="k">{% trans "Created" %}</span>
+              <div class="od-dt-stack">
+                <span class="v-line">{{ warehouse.created_at|date:"d M Y · H:i" }}</span>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if warehouse.updated_at %}
+            <div class="od-dt-block">
+              <span class="k">{% trans "Last updated" %}</span>
+              <div class="od-dt-stack">
+                <span class="v-line">{{ warehouse.updated_at|date:"d M Y · H:i" }}</span>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- QUICK STATS -->
+      <section class="od-card">
+        <div class="od-card-h">
+          <i class="fa fa-chart-bar card-ico"></i>
+          <h3>{% trans "Quick stats" %}</h3>
+        </div>
+
+        <div class="od-stats-grid">
+          <div class="od-stat teal">
+            <div class="val">{{ product_count|default:0 }}</div>
+            <div class="lbl">{% trans "Products" %}</div>
+          </div>
+          <div class="od-stat">
+            <div class="val">{{ total_quantity|floatformat:0 }}</div>
+            <div class="lbl">{% trans "Total qty" %}</div>
+          </div>
+          <div class="od-stat full">
+            <div class="val">${{ total_value_usd|floatformat:2 }}</div>
+            <div class="lbl">{% trans "Net worth (USD)" %}</div>
+          </div>
+          <div class="od-stat full">
+            <div class="val" style="color:#B27500;">₺{{ total_value_try|floatformat:2 }}</div>
+            <div class="lbl">{% trans "Net worth (TRY)" %}</div>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </div>
 
@@ -481,22 +894,146 @@
 <div class="wh-modal" id="whImportModal">
   <div class="wh-modal-card">
     <h3>{% trans "Import Products from Excel" %}</h3>
-    <p>Upload an .xlsx file with columns: Name (Adı), Code (Kodu), Quantity (Miktar), Purchase Price (Alış Fiyatı), Currency.</p>
+    <p>{% trans "Upload an .xlsx file with columns: Name (Adı), Code (Kodu), Quantity (Miktar), Purchase Price (Alış Fiyatı), Currency." %}</p>
 
     <div class="wh-drop" id="whDrop" onclick="document.getElementById('whFile').click()">
       <div class="wh-drop-icon"><i class="fa fa-cloud-upload-alt"></i></div>
-      <p id="whDropText" style="margin: 0 0 6px; font-size:13px; color:#475569; font-weight:600;">Drag & drop Excel file here, or click to browse</p>
-      <p style="margin: 0; font-size:11px; color:#94a3b8;">Supports .xlsx · USD/TRY auto-converted</p>
+      <p id="whDropText" style="margin:0 0 6px; font:600 13px var(--font-sans); color:var(--gray-700);">
+        {% trans "Drag & drop Excel file here, or click to browse" %}
+      </p>
+      <p style="margin:0; font:500 11px var(--font-sans); color:var(--gray-500);">
+        {% trans "Supports .xlsx · USD/TRY auto-converted" %}
+      </p>
     </div>
     <input type="file" id="whFile" accept=".xlsx,.xls" style="display:none;">
 
     <div id="whImportResult" style="display:none;"></div>
 
-    <div style="display:flex; gap:10px; justify-content:flex-end;">
-      <button type="button" class="wh-action-btn" onclick="closeWhImportModal()">{% trans "Cancel" %}</button>
-      <button type="button" class="wh-import-btn" id="whUploadBtn" onclick="uploadWhFile()" disabled style="opacity:0.5;">
-        <i class="fa fa-upload"></i> Upload &amp; Import
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button type="button" class="ord-btn ghost" onclick="closeWhImportModal()">{% trans "Cancel" %}</button>
+      <button type="button" class="ord-btn primary" id="whUploadBtn" onclick="uploadWhFile()" disabled style="opacity:0.5;">
+        <i class="fa fa-upload"></i>{% trans "Upload & Import" %}
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="od-confirm-overlay" id="whDeleteConfirm">
+  <div class="od-confirm-card">
+    <div class="od-confirm-head">
+      <div class="od-confirm-ico"><i class="fa fa-trash"></i></div>
+      <div>
+        <div class="od-confirm-q">{% trans "Delete this warehouse?" %}</div>
+        <div class="od-confirm-sub">
+          {% blocktrans with name=warehouse.name %}"{{ name}}" and all its stock items will be permanently removed. This action cannot be undone.{% endblocktrans %}
+        </div>
+      </div>
+    </div>
+    <form method="post" action="{% url 'operating:warehouse_delete' warehouse.pk %}">
+      {% csrf_token %}
+      <div class="od-confirm-actions">
+        <button type="button" class="ord-btn ghost" onclick="closeDeleteConfirm()">
+          {% trans "Cancel" %}
+        </button>
+        <button type="submit" class="ord-btn danger">
+          <i class="fa fa-trash"></i>{% trans "Delete warehouse" %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ─── ROLL SCANNER (camera) ─────────────────────────────────── -->
+<div id="rollScannerOverlay" class="rs-overlay" aria-hidden="true">
+  <div class="rs-shell">
+    <div class="rs-head">
+      <div class="rs-title">
+        <i class="fa fa-camera"></i>
+        <span>{% trans "Roll scanner" %}</span>
+        <small id="rsWh">· {{ warehouse.name }}</small>
+      </div>
+      <button type="button" class="rs-close" onclick="closeRollScanner()" title="{% trans 'Close' %}">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="rs-body">
+      <!-- Left: camera view + capture controls -->
+      <div class="rs-cam">
+        <div class="rs-viewport">
+          <video id="rsVideo" autoplay playsinline muted></video>
+          <canvas id="rsCanvas" hidden></canvas>
+          <div id="rsGuide" class="rs-guide">
+            <div class="rs-guide-frame"></div>
+            <div class="rs-guide-hint">{% trans "Center the label here" %}</div>
+          </div>
+          <div id="rsFlash" class="rs-flash" hidden></div>
+          <div id="rsProcessing" class="rs-processing" hidden>
+            <i class="fa fa-spinner fa-spin fa-2x"></i>
+            <div>{% trans "Reading label…" %}</div>
+          </div>
+        </div>
+        <div class="rs-cam-foot">
+          <button type="button" id="rsCaptureBtn" class="rs-capture-btn" onclick="captureRoll()">
+            <i class="fa fa-camera"></i>
+            <span>{% trans "Capture" %}</span>
+          </button>
+          <div class="rs-cam-hint">
+            <i class="fa fa-keyboard"></i> {% trans "Press space to capture" %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: confirm panel + recent scans -->
+      <div class="rs-side">
+        <!-- Confirm card (appears after OCR) -->
+        <div id="rsConfirm" class="rs-confirm" hidden>
+          <div class="rs-confirm-h">{% trans "Confirm & save" %}</div>
+          <div class="rs-fld">
+            <label>{% trans "SKU" %}</label>
+            <input id="rsSku" type="text" class="rs-input">
+          </div>
+          <div class="rs-fld">
+            <label>{% trans "Name" %}</label>
+            <input id="rsName" type="text" class="rs-input">
+          </div>
+          <div class="rs-fld">
+            <label>{% trans "Meters" %} <span class="rs-required">*</span></label>
+            <input id="rsMeters" type="number" step="0.01" class="rs-input">
+          </div>
+          <div id="rsMatchBadge" class="rs-match" hidden></div>
+          <div class="rs-confirm-actions">
+            <button type="button" class="rs-btn ghost" onclick="cancelConfirm()">
+              <i class="fa fa-times"></i> {% trans "Discard" %}
+            </button>
+            <button type="button" id="rsSaveBtn" class="rs-btn primary" onclick="saveRoll()">
+              <i class="fa fa-check"></i> {% trans "Save & next" %}
+            </button>
+          </div>
+          <details class="rs-debug">
+            <summary>{% trans "Raw OCR text" %}</summary>
+            <pre id="rsRaw"></pre>
+          </details>
+        </div>
+
+        <!-- Idle state when no scan pending -->
+        <div id="rsIdle" class="rs-idle">
+          <i class="fa fa-camera-retro"></i>
+          <div>{% trans "Capture a label to start" %}</div>
+        </div>
+
+        <!-- Recent scans (session) -->
+        <div class="rs-recent">
+          <div class="rs-recent-h">
+            <span>{% trans "This session" %}</span>
+            <span class="rs-recent-count" id="rsTotalCount">0 {% trans "rolls" %} · 0 m</span>
+          </div>
+          <div id="rsRecentList" class="rs-recent-list">
+            <div class="rs-recent-empty">{% trans "No rolls yet." %}</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -514,8 +1051,7 @@
   function setWhSort(sortKey) {
     const sel = document.getElementById('whSortInput');
     if (sel) sel.value = sortKey;
-    // Toggle active class on chips immediately for snappy feedback
-    document.querySelectorAll('#whChips .wh-chip').forEach(el => {
+    document.querySelectorAll('#whChips .od-fchip').forEach(el => {
       el.classList.toggle('active', el.dataset.sort === sortKey);
     });
     htmx.trigger(document.body, 'whFilterChanged');
@@ -525,7 +1061,7 @@
     const sel = document.getElementById('whSortInput');
     if (!sel) return;
     const v = sel.value;
-    document.querySelectorAll('#whChips .wh-chip').forEach(el => {
+    document.querySelectorAll('#whChips .od-fchip').forEach(el => {
       el.classList.toggle('active', el.dataset.sort === v);
     });
   }
@@ -537,7 +1073,246 @@
     const btn = document.getElementById('whUploadBtn');
     btn.disabled = true;
     btn.style.opacity = '0.5';
-    document.getElementById('whDropText').textContent = 'Drag & drop Excel file here, or click to browse';
+    document.getElementById('whDropText').textContent = '{% trans "Drag & drop Excel file here, or click to browse" %}';
+  }
+
+  function openDeleteConfirm() {
+    document.getElementById('whDeleteConfirm').classList.add('show');
+  }
+  function closeDeleteConfirm() {
+    document.getElementById('whDeleteConfirm').classList.remove('show');
+  }
+
+  // ESC closes modals
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      closeDeleteConfirm();
+      closeWhImportModal();
+      if (document.getElementById('rollScannerOverlay').classList.contains('show')) {
+        closeRollScanner();
+      }
+    }
+    // Space → capture (only when scanner open & not inside an input)
+    if (e.code === 'Space'
+        && document.getElementById('rollScannerOverlay').classList.contains('show')
+        && !['INPUT','TEXTAREA'].includes((e.target.tagName || ''))) {
+      e.preventDefault();
+      captureRoll();
+    }
+  });
+
+  // ─── Roll Scanner ─────────────────────────────────────────
+  const scanUrl = "{% url 'operating:warehouse_roll_scan' warehouse.pk %}";
+  let rsStream = null;
+  let rsLastSku = null;
+  let rsLastSkuAt = 0;
+  let rsSession = { count: 0, meters: 0 };
+  // Hold the most recent OCR/parse result so saveRoll() can post raw text too.
+  let rsPending = null;
+
+  function openRollScanner() {
+    const overlay = document.getElementById('rollScannerOverlay');
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    startRollCamera();
+  }
+  function closeRollScanner() {
+    document.getElementById('rollScannerOverlay').classList.remove('show');
+    document.body.style.overflow = '';
+    stopRollCamera();
+    // Reset the confirm panel back to idle.
+    document.getElementById('rsConfirm').hidden = true;
+    document.getElementById('rsIdle').hidden = false;
+    rsPending = null;
+  }
+  function startRollCamera() {
+    const video = document.getElementById('rsVideo');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Camera API not supported in this browser.');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    }).then(function (stream) {
+      rsStream = stream;
+      video.srcObject = stream;
+    }).catch(function (err) {
+      alert('Camera access denied or unavailable: ' + err.message);
+    });
+  }
+  function stopRollCamera() {
+    if (rsStream) {
+      rsStream.getTracks().forEach(function (t) { t.stop(); });
+      rsStream = null;
+    }
+    document.getElementById('rsVideo').srcObject = null;
+  }
+
+  function captureRoll() {
+    const video = document.getElementById('rsVideo');
+    if (!video || !video.videoWidth) return;
+    const captureBtn = document.getElementById('rsCaptureBtn');
+    captureBtn.disabled = true;
+
+    // Flash animation
+    const flash = document.getElementById('rsFlash');
+    flash.hidden = false;
+    flash.classList.add('on');
+    setTimeout(function () { flash.classList.remove('on'); flash.hidden = true; }, 160);
+
+    // Snap a frame to canvas
+    const canvas = document.getElementById('rsCanvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    document.getElementById('rsProcessing').hidden = false;
+
+    canvas.toBlob(function (blob) {
+      if (!blob) {
+        captureBtn.disabled = false;
+        document.getElementById('rsProcessing').hidden = true;
+        return;
+      }
+      const fd = new FormData();
+      fd.append('image', blob, 'capture.jpg');
+      fd.append('commit', 'false');
+      fetch(scanUrl, {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+      }).then(function (r) { return r.json(); })
+        .then(function (data) {
+          captureBtn.disabled = false;
+          document.getElementById('rsProcessing').hidden = true;
+          if (!data.success) {
+            alert(data.error || 'OCR failed');
+            return;
+          }
+          showConfirmPanel(data, blob);
+        })
+        .catch(function () {
+          captureBtn.disabled = false;
+          document.getElementById('rsProcessing').hidden = true;
+          alert('Network error');
+        });
+    }, 'image/jpeg', 0.85);
+  }
+
+  function showConfirmPanel(data, imageBlob) {
+    const parsed = data.parsed || {};
+    rsPending = { blob: imageBlob, ocr_raw: data.ocr_raw || '' };
+    document.getElementById('rsIdle').hidden = true;
+    document.getElementById('rsConfirm').hidden = false;
+    document.getElementById('rsSku').value = parsed.sku || '';
+    document.getElementById('rsName').value = parsed.name || '';
+    document.getElementById('rsMeters').value = parsed.meters || '';
+    document.getElementById('rsRaw').textContent = data.ocr_raw || '(no text recognised)';
+    // Match badge
+    const badge = document.getElementById('rsMatchBadge');
+    if (data.matched_product) {
+      badge.hidden = false;
+      badge.classList.remove('new');
+      badge.innerHTML = '<i class="fa fa-check-circle"></i> Matched: <b>' +
+        (data.matched_product.name || '') + '</b> (' +
+        (data.matched_product.quantity || 0).toFixed(2) + 'm currently)';
+    } else {
+      badge.hidden = false;
+      badge.classList.add('new');
+      badge.innerHTML = '<i class="fa fa-plus-circle"></i> No match — will create a new product';
+    }
+    // Auto-focus meters if it came back null, else SKU.
+    setTimeout(function () {
+      (parsed.meters ? document.getElementById('rsMeters') : document.getElementById('rsMeters')).focus();
+    }, 50);
+  }
+
+  function cancelConfirm() {
+    document.getElementById('rsConfirm').hidden = true;
+    document.getElementById('rsIdle').hidden = false;
+    rsPending = null;
+  }
+
+  function saveRoll() {
+    if (!rsPending) return;
+    const saveBtn = document.getElementById('rsSaveBtn');
+    saveBtn.disabled = true;
+    const origLabel = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+
+    const sku = document.getElementById('rsSku').value.trim();
+    const name = document.getElementById('rsName').value.trim();
+    const meters = document.getElementById('rsMeters').value.trim();
+    if (!meters || parseFloat(meters) <= 0) {
+      alert('Please enter a positive meters value');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = origLabel;
+      return;
+    }
+    // Anti-duplicate: same SKU within 3 seconds = warn.
+    const now = Date.now();
+    if (sku && sku === rsLastSku && (now - rsLastSkuAt) < 3000) {
+      if (!confirm('Same SKU was just added — proceed anyway?')) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = origLabel;
+        return;
+      }
+    }
+
+    const fd = new FormData();
+    fd.append('image', rsPending.blob, 'capture.jpg');
+    fd.append('commit', 'true');
+    fd.append('sku', sku);
+    fd.append('name', name);
+    fd.append('meters', meters);
+    fd.append('ocr_raw', rsPending.ocr_raw);
+
+    fetch(scanUrl, {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (r) { return r.json(); })
+      .then(function (data) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = origLabel;
+        if (!data.success) {
+          alert(data.error || 'Save failed');
+          return;
+        }
+        rsLastSku = sku;
+        rsLastSkuAt = Date.now();
+        rsSession.count += 1;
+        rsSession.meters += parseFloat(meters);
+        updateRecentList(data);
+        // Reset back to camera-ready state.
+        cancelConfirm();
+      })
+      .catch(function () {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = origLabel;
+        alert('Network error');
+      });
+  }
+
+  function updateRecentList(data) {
+    const list = document.getElementById('rsRecentList');
+    const empty = list.querySelector('.rs-recent-empty');
+    if (empty) empty.remove();
+    const row = document.createElement('div');
+    row.className = 'rs-recent-row';
+    row.innerHTML =
+      '<span class="rs-recent-ok"><i class="fa fa-check"></i></span>' +
+      '<span class="rs-recent-info">' +
+        '<b>' + (data.product.sku || data.product.name) + '</b>' +
+        '<small style="color:var(--gray-500); margin-left:6px;">' + (data.product.name || '') + '</small>' +
+      '</span>' +
+      '<span class="rs-recent-meters">' + parseFloat(data.roll.meters).toFixed(2) + ' m</span>';
+    list.prepend(row);
+    document.getElementById('rsTotalCount').textContent =
+      rsSession.count + ' ' + (rsSession.count === 1 ? 'roll' : 'rolls') +
+      ' · ' + rsSession.meters.toFixed(2) + ' m';
   }
 
   // Drop zone
@@ -572,18 +1347,18 @@
     const btn = document.getElementById('whUploadBtn');
     const resultDiv = document.getElementById('whImportResult');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Importing...';
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Importing..." %}';
 
     resultDiv.style.display = 'block';
     resultDiv.innerHTML = `
-      <div style="padding:14px; background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; margin-bottom:14px;">
-        <div id="whProgressTitle" style="font-weight:700; color:#3730a3; margin-bottom:8px;">
-          <i class="fa fa-spinner fa-spin"></i> Reading file...
+      <div style="padding:14px; background:var(--nejum-teal-50); border:1px solid rgba(20,127,116,0.25); border-radius:10px; margin-bottom:14px;">
+        <div id="whProgressTitle" style="font:700 13px var(--font-sans); color:var(--nejum-teal-700); margin-bottom:8px;">
+          <i class="fa fa-spinner fa-spin"></i> {% trans "Reading file..." %}
         </div>
-        <div style="height:8px; background:#e0e7ff; border-radius:999px; overflow:hidden; margin-bottom:8px;">
-          <div id="whProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg,#6366f1,#3b82f6); transition:width .25s ease;"></div>
+        <div style="height:8px; background:#E0E6EE; border-radius:999px; overflow:hidden; margin-bottom:8px;">
+          <div id="whProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg,var(--nejum-teal-500),var(--nejum-teal-600)); transition:width .25s ease;"></div>
         </div>
-        <div id="whProgressText" style="font-size:12px; color:#4338ca;">Preparing...</div>
+        <div id="whProgressText" style="font:500 12px var(--font-sans); color:var(--nejum-teal-700);">{% trans "Preparing..." %}</div>
       </div>`;
 
     try {
@@ -593,21 +1368,19 @@
         body: fd,
       });
 
-      // If server responded with regular JSON error (e.g. 400)
       const ct = res.headers.get('content-type') || '';
       if (!res.ok && !ct.includes('x-ndjson')) {
         const data = await res.json();
         resultDiv.innerHTML = `
-          <div style="padding:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px;">
-            <div style="font-weight:700; color:#991b1b;"><i class="fa fa-exclamation-triangle"></i> ${data.error || 'Import failed'}</div>
-            ${data.detected_headers ? '<div style="font-size:11px; color:#7f1d1d; margin-top:6px;">Detected headers: ' + (data.detected_headers || []).join(', ') + '</div>' : ''}
+          <div style="padding:14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px;">
+            <div style="font:700 13px var(--font-sans); color:#991B1B;"><i class="fa fa-exclamation-triangle"></i> ${data.error || '{% trans "Import failed" %}'}</div>
+            ${data.detected_headers ? '<div style="font:500 11px var(--font-sans); color:#7F1D1D; margin-top:6px;">{% trans "Detected headers:" %} ' + (data.detected_headers || []).join(', ') + '</div>' : ''}
           </div>`;
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-upload"></i> Upload &amp; Import';
+        btn.innerHTML = '<i class="fa fa-upload"></i> {% trans "Upload & Import" %}';
         return;
       }
 
-      // Stream NDJSON progress updates
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -618,7 +1391,6 @@
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
-        // Split on newline
         let nl;
         while ((nl = buffer.indexOf('\n')) !== -1) {
           const line = buffer.slice(0, nl).trim();
@@ -631,17 +1403,17 @@
           if (msg.phase === 'start') {
             const title = document.getElementById('whProgressTitle');
             const text = document.getElementById('whProgressText');
-            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Importing ' + msg.total + ' rows...';
+            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Importing" %} ' + msg.total + ' {% trans "rows..." %}';
             if (text) text.textContent = '0 / ' + msg.total;
           } else if (msg.phase === 'processing') {
             const pct = Math.min(100, (msg.current / msg.total) * 100);
             const bar = document.getElementById('whProgressBar');
             const text = document.getElementById('whProgressText');
             if (bar) bar.style.width = pct.toFixed(1) + '%';
-            if (text) text.innerHTML = `<b>${msg.current.toLocaleString()}</b> / ${msg.total.toLocaleString()} · created: <b>${msg.created}</b> · updated: <b>${msg.updated}</b> · unchanged: <b>${msg.unchanged}</b>`;
+            if (text) text.innerHTML = `<b>${msg.current.toLocaleString()}</b> / ${msg.total.toLocaleString()} · {% trans "created:" %} <b>${msg.created}</b> · {% trans "updated:" %} <b>${msg.updated}</b> · {% trans "unchanged:" %} <b>${msg.unchanged}</b>`;
           } else if (msg.phase === 'saving') {
             const title = document.getElementById('whProgressTitle');
-            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (msg.message || 'Saving...');
+            if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (msg.message || '{% trans "Saving..." %}');
           } else if (msg.phase === 'done') {
             finalData = msg;
           }
@@ -650,28 +1422,28 @@
 
       if (finalData && finalData.success) {
         resultDiv.innerHTML = `
-          <div style="padding:14px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; margin-bottom:14px;">
-            <div style="font-weight:700; color:#065f46; margin-bottom:6px;">
-              <i class="fa fa-check-circle"></i> Import complete
+          <div style="padding:14px; background:#D1FAE5; border:1px solid #A7F3D0; border-radius:10px; margin-bottom:14px;">
+            <div style="font:700 13px var(--font-sans); color:#065F46; margin-bottom:6px;">
+              <i class="fa fa-check-circle"></i> {% trans "Import complete" %}
             </div>
-            <div style="font-size:12.5px; color:#047857;">
-              Created: <b>${finalData.created}</b> · Updated: <b>${finalData.updated}</b> · Unchanged: <b>${finalData.unchanged}</b> · Skipped: <b>${finalData.skipped}</b><br>
-              Total processed: <b>${finalData.total.toLocaleString()}</b> · USD/TRY rate: <b>${finalData.usd_to_try_rate}</b>
+            <div style="font:500 12.5px var(--font-sans); color:#047857;">
+              {% trans "Created:" %} <b>${finalData.created}</b> · {% trans "Updated:" %} <b>${finalData.updated}</b> · {% trans "Unchanged:" %} <b>${finalData.unchanged}</b> · {% trans "Skipped:" %} <b>${finalData.skipped}</b><br>
+              {% trans "Total processed:" %} <b>${finalData.total.toLocaleString()}</b> · {% trans "USD/TRY rate:" %} <b>${finalData.usd_to_try_rate}</b>
             </div>
           </div>`;
         setTimeout(() => location.reload(), 1500);
       } else {
         resultDiv.innerHTML = `
-          <div style="padding:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px;">
-            <div style="font-weight:700; color:#991b1b;">Import did not complete cleanly</div>
+          <div style="padding:14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px;">
+            <div style="font:700 13px var(--font-sans); color:#991B1B;">{% trans "Import did not complete cleanly" %}</div>
           </div>`;
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa fa-upload"></i> Upload &amp; Import';
+        btn.innerHTML = '<i class="fa fa-upload"></i> {% trans "Upload & Import" %}';
       }
     } catch (e) {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa fa-upload"></i> Upload &amp; Import';
-      resultDiv.innerHTML = `<div style="padding:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; color:#991b1b;">Upload error: ${e.message}</div>`;
+      btn.innerHTML = '<i class="fa fa-upload"></i> {% trans "Upload & Import" %}';
+      resultDiv.innerHTML = `<div style="padding:14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px; color:#991B1B; font:600 12.5px var(--font-sans);">{% trans "Upload error:" %} ${e.message}</div>`;
     }
   }
 </script>

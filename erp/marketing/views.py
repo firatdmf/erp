@@ -2629,7 +2629,8 @@ def get_products(request):
             WITH pids AS (SELECT unnest(%(pids)s::bigint[]) AS id),
             variants AS (
                 SELECT json_agg(sub) as data FROM (
-                    SELECT id, product_id, variant_sku, variant_price, variant_quantity, variant_featured
+                    SELECT id, product_id, variant_sku, variant_price, variant_b2b_price,
+                           variant_quantity, variant_featured
                     FROM marketing_productvariant
                     WHERE product_id IN (SELECT id FROM pids)
                 ) sub
@@ -2736,6 +2737,8 @@ def get_products(request):
             "description": p.description,
             "price": p.price,
             "prices": _convert_price(p.price, rates),
+            "b2b_price": float(p.b2b_price) if getattr(p, 'b2b_price', None) is not None else None,
+            "b2b_prices": _convert_price(p.b2b_price, rates) if getattr(p, 'b2b_price', None) is not None else None,
             "primary_image": p.primary_image.file_url if p.primary_image else None,
             "is_packaged": bool(p.is_packaged),
             "pack_count": int(p.pack_count) if p.pack_count else None,
@@ -2770,6 +2773,8 @@ def get_products(request):
             "variant_sku": v["variant_sku"],
             "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
             "variant_prices": _convert_price(v["variant_price"], rates),
+            "variant_b2b_price": float(v["variant_b2b_price"]) if v.get("variant_b2b_price") is not None else None,
+            "variant_b2b_prices": _convert_price(v["variant_b2b_price"], rates) if v.get("variant_b2b_price") is not None else None,
             "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
             "variant_featured": v.get("variant_featured", True),
             "product_variant_attribute_values": variant_av_map.get(v["id"], []),

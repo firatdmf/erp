@@ -684,30 +684,26 @@ class Warehouse(models.Model):
         return self.name
 
     def total_value_usd(self):
-        from django.db.models import Sum, F, DecimalField
-        from django.db.models.functions import Coalesce
+        """Sum the per-product USD value across the warehouse. Uses the
+        WarehouseProduct.total_cost_usd() method (with purchase_price
+        fallback) so products that have a price but no explicit
+        cost_usd still contribute to the rollup."""
         from decimal import Decimal
-        agg = self.products.aggregate(
-            total=Coalesce(
-                Sum(F('quantity') * F('cost_usd'), output_field=DecimalField(max_digits=18, decimal_places=2)),
-                Decimal('0'),
-                output_field=DecimalField(max_digits=18, decimal_places=2),
-            )
-        )
-        return agg['total'] or Decimal('0')
+        total = Decimal('0')
+        for p in self.products.all():
+            v = p.total_cost_usd()
+            if v:
+                total += v
+        return total
 
     def total_value_try(self):
-        from django.db.models import Sum, F, DecimalField
-        from django.db.models.functions import Coalesce
         from decimal import Decimal
-        agg = self.products.aggregate(
-            total=Coalesce(
-                Sum(F('quantity') * F('cost_try'), output_field=DecimalField(max_digits=18, decimal_places=2)),
-                Decimal('0'),
-                output_field=DecimalField(max_digits=18, decimal_places=2),
-            )
-        )
-        return agg['total'] or Decimal('0')
+        total = Decimal('0')
+        for p in self.products.all():
+            v = p.total_cost_try()
+            if v:
+                total += v
+        return total
 
     def product_count(self):
         return self.products.count()
@@ -766,15 +762,180 @@ class WarehouseProduct(models.Model):
     def __str__(self):
         return f"{self.name} ({self.sku or '-'}) @ {self.warehouse.name}"
 
-    def total_cost_usd(self):
-        if self.cost_usd is None:
+    # Live USD/TRY rate fetched lazily so the model file doesn't pull
+    # in accounting at import time. Cached per call.
+    @staticmethod
+    def _usd_try_rate():
+        try:
+            from accounting.services import get_exchange_rate
+            from decimal import Decimal as _D
+            r = get_exchange_rate("USD", "TRY")
+            if r:
+                return _D(str(r))
+        except Exception:
+            pass
+        return None
+
+    def unit_cost_usd(self):
+        """Best-effort unit cost in USD. Prefers the stored cost_usd
+        field; falls back to purchase_price converted from the
+        purchase_currency. Returns Decimal or None."""
+        from decimal import Decimal as _D
+        if self.cost_usd is not None:
+            return self.cost_usd
+        if self.purchase_price is None:
             return None
-        return (self.quantity or 0) * self.cost_usd
+        cur = (self.purchase_currency or "USD").upper()
+        if cur == "USD" or cur == "EUR":
+            # EUR ≈ USD as a coarse fallback (better than $0).
+            return self.purchase_price
+        if cur == "TRY":
+            rate = self._usd_try_rate()
+            if rate and rate > 0:
+                return (self.purchase_price / rate).quantize(_D("0.0001"))
+        return None
+
+    def unit_cost_try(self):
+        from decimal import Decimal as _D
+        if self.cost_try is not None:
+            return self.cost_try
+        if self.purchase_price is None:
+            return None
+        cur = (self.purchase_currency or "USD").upper()
+        if cur == "TRY":
+            return self.purchase_price
+        if cur == "USD":
+            rate = self._usd_try_rate()
+            if rate:
+                return (self.purchase_price * rate).quantize(_D("0.01"))
+        return None
+
+    def total_cost_usd(self):
+        unit = self.unit_cost_usd()
+        if unit is None:
+            return None
+        return (self.quantity or 0) * unit
 
     def total_cost_try(self):
-        if self.cost_try is None:
+        unit = self.unit_cost_try()
+        if unit is None:
             return None
-        return (self.quantity or 0) * self.cost_try
+        return (self.quantity or 0) * unit
+
+
+class WarehouseProductRoll(models.Model):
+    """A single physical roll/bale of a WarehouseProduct. Each scan
+    via the warehouse camera adds one of these. The parent
+    WarehouseProduct.quantity is the rolled-up sum of all roll
+    meters — kept consistent in the scan view."""
+
+    STATUS_CHOICES = [
+        ("in_stock", "In stock"),
+        ("partial", "Partially used"),
+        ("consumed", "Fully consumed"),
+    ]
+
+    product = models.ForeignKey(
+        WarehouseProduct,
+        related_name="rolls",
+        on_delete=models.CASCADE,
+    )
+    meters = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text="Initial length of this roll in meters",
+    )
+    meters_remaining = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Length still on the roll (drops as stock-outs happen)",
+    )
+    # The barcode printed on the label — each roll has a UNIQUE barcode
+    # so we can scan it later for stock-out / order picking.
+    barcode = models.CharField(max_length=64, blank=True, null=True, db_index=True)
+    lot_number = models.CharField(max_length=64, blank=True, null=True)
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default="in_stock", db_index=True,
+    )
+    notes = models.TextField(blank=True, null=True)
+    # Camera-scan provenance
+    scanned_at = models.DateTimeField(auto_now_add=True)
+    scanned_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scanned_rolls",
+    )
+    source_image = models.ImageField(
+        upload_to="roll_scans/%Y/%m/", blank=True, null=True,
+        help_text="The captured label image (kept for audit)",
+    )
+    ocr_raw = models.TextField(
+        blank=True, null=True,
+        help_text="Raw OCR text — useful for debugging misreads",
+    )
+
+    class Meta:
+        ordering = ["-scanned_at"]
+        indexes = [
+            models.Index(fields=["product", "-scanned_at"]),
+            models.Index(fields=["barcode"]),
+        ]
+
+    def __str__(self):
+        return f"Roll #{self.pk} · {self.meters}m · {self.product.sku or self.product.name}"
+
+
+class StockMovement(models.Model):
+    """A row in the stock-movement ledger for a WarehouseProduct.
+    Every change in inventory — scanned-in roll, sold/consumed meters,
+    manual adjustment — emits one of these so the product detail page
+    can show a date-by-date timeline."""
+
+    TYPE_CHOICES = [
+        ("in", "Stock in"),
+        ("out", "Stock out"),
+        ("adjustment", "Adjustment"),
+    ]
+
+    product = models.ForeignKey(
+        WarehouseProduct,
+        related_name="movements",
+        on_delete=models.CASCADE,
+    )
+    roll = models.ForeignKey(
+        WarehouseProductRoll,
+        related_name="movements",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        help_text="The specific roll affected, when applicable",
+    )
+    movement_type = models.CharField(
+        max_length=16, choices=TYPE_CHOICES, db_index=True,
+    )
+    # Always positive — sign comes from movement_type. Stored in meters.
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    reason = models.CharField(max_length=255, blank=True, null=True)
+    reference = models.CharField(
+        max_length=128, blank=True, null=True,
+        help_text="Free-form reference, e.g. order number, document id",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="stock_movements",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["product", "-created_at"]),
+        ]
+
+    def __str__(self):
+        sign = "+" if self.movement_type == "in" else ("-" if self.movement_type == "out" else "±")
+        return f"{sign}{self.quantity}m · {self.product.sku or self.product.name} · {self.created_at:%Y-%m-%d}"
 
 
 # A machine is a physical or virtual device that performs tasks in a workstation.

@@ -1,34 +1,49 @@
 {% load i18n %}
 {% for p in products %}
-<tr>
+<tr style="cursor: pointer;" onclick="window.location='{% url 'operating:warehouse_product_detail' warehouse.pk p.pk %}'">
   <td>
-    <div class="wh-name">{{ p.name }}</div>
-    {% if p.model %}<div style="font-size:11px; color:#94a3b8; margin-top:2px;">{{ p.model }}</div>{% endif %}
+    <div class="pname">{{ p.name }}</div>
+    {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
   </td>
-  <td>{% if p.sku %}<span class="wh-sku">{{ p.sku }}</span>{% else %}<span style="color:#cbd5e1;">—</span>{% endif %}</td>
-  <td style="font-size:12px; color:#64748b; font-family:monospace;">{{ p.barcode|default:"—" }}</td>
-  <td><span class="wh-qty">{{ p.quantity|floatformat:0 }}</span></td>
   <td>
+    {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+  </td>
+  <td><span class="mono">{{ p.barcode|default:"—" }}</span></td>
+  <td class="num">
+    <span class="qty">{{ p.quantity|floatformat:2 }} m</span>
+    {% with rcount=p.rolls.count %}
+      {% if rcount %}
+        <div class="rolls-pill" title="{% trans 'Rolls (tops)' %}">
+          <i class="fa fa-layer-group"></i>{{ rcount }} {% blocktrans count counter=rcount %}top{% plural %}top{% endblocktrans %}
+        </div>
+      {% endif %}
+    {% endwith %}
+  </td>
+  <td class="num">
     {% if p.purchase_price %}
-      <div>{{ p.purchase_price|floatformat:2 }} <span class="wh-currency-pill">{{ p.purchase_currency }}</span></div>
+      <span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>
     {% else %}
-      <span style="color:#cbd5e1;">—</span>
+      <span style="color:#C5CCD3;">—</span>
     {% endif %}
   </td>
-  <td class="wh-cost-cell">
-    {% if p.cost_usd %}${{ p.total_cost_usd|floatformat:2 }}{% else %}—{% endif %}
+  <td class="num">
+    {% with t=p.total_cost_usd %}
+      {% if t %}<span class="cost-usd">${{ t|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% endwith %}
   </td>
-  <td class="wh-cost-cell" style="color:#d97706;">
-    {% if p.cost_try %}₺{{ p.total_cost_try|floatformat:2 }}{% else %}—{% endif %}
+  <td class="num">
+    {% with t=p.total_cost_try %}
+      {% if t %}<span class="cost-try">₺{{ t|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% endwith %}
   </td>
 </tr>
 {% empty %}
 <tr>
   <td colspan="7">
-    <div class="wh-empty">
-      <i class="fa fa-box-open"></i>
-      <h3 style="margin:0 0 6px; color:#475569;">{% trans "No products in this warehouse" %}</h3>
-      <p style="margin:0; font-size:13px;">Click "Sync Products" to load from an Excel file.</p>
+    <div class="od-empty">
+      <i class="fa fa-box-open empty-ico"></i>
+      <h4>{% trans "No products in this warehouse" %}</h4>
+      <p>{% trans 'Click "Sync Products" to load from an Excel file.' %}</p>
     </div>
   </td>
 </tr>

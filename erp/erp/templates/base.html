@@ -1682,6 +1682,15 @@
     </div>
   </div>
 
+  <!-- Create Warehouse Sidebar Modal -->
+  <div id="warehouseSidebarOverlay" class="sidebar-overlay" onclick="closeWarehouseSidebar()">
+    <div class="sidebar-modal" onclick="event.stopPropagation();">
+      <div id="warehouseSidebarContent" style="display: contents;">
+        <!-- Content loaded via HTMX -->
+      </div>
+    </div>
+  </div>
+
   <!-- Contact Sidebar Modal (Nested from Company) -->
   <div id="contactSidebarOverlay" class="sidebar-overlay sidebar-nested" onclick="closeContactSidebar()">
     <div class="sidebar-modal" onclick="event.stopPropagation()">
@@ -1849,6 +1858,78 @@
           alert('An error occurred.');
           if (btnText) btnText.style.display = 'inline';
           if (btnSpinner) btnSpinner.classList.add('d-none');
+          submitBtn.disabled = false;
+        });
+    }
+
+    // Warehouse Sidebar — Add warehouse via right-side sidebar
+    function openWarehouseSidebar() {
+      const overlay = document.getElementById('warehouseSidebarOverlay');
+      const content = document.getElementById('warehouseSidebarContent');
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      content.innerHTML = '<div style="text-align:center; padding: 20px; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading form...</div>';
+      htmx.ajax('GET', '{% url "operating:create_warehouse_partial" %}', { target: '#warehouseSidebarContent', swap: 'innerHTML' });
+    }
+
+    function closeWarehouseSidebar() {
+      document.getElementById('warehouseSidebarOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function submitWarehouseForm(event) {
+      event.preventDefault();
+      const form = document.getElementById('warehouseForm');
+      const submitBtn = document.getElementById('warehouseSubmitBtn');
+      const btnText = submitBtn.querySelector('.btn-text');
+      const btnSpinner = submitBtn.querySelector('.btn-spinner');
+      const nameErr = document.getElementById('wh_name_error');
+
+      if (btnText) btnText.style.display = 'none';
+      if (btnSpinner) btnSpinner.style.display = 'inline-flex';
+      submitBtn.disabled = true;
+      if (nameErr) { nameErr.style.display = 'none'; nameErr.textContent = ''; }
+
+      const formData = new FormData(form);
+
+      fetch('{% url "operating:create_warehouse_partial" %}', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': '{{ csrf_token }}' }
+      })
+        .then(r => r.json().then(data => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          if (ok && data.success) {
+            const toast = document.getElementById('toastNotification');
+            if (toast) {
+              toast.querySelector('.toast-message-global').textContent =
+                'Warehouse "' + (data.name || '') + '" created successfully!';
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 3000);
+            }
+            closeWarehouseSidebar();
+            if (data.redirect_url) {
+              setTimeout(() => { window.location.href = data.redirect_url; }, 600);
+            }
+          } else {
+            // Inline-show the first error (typically name)
+            const errs = (data && data.errors) || {};
+            if (errs.name && nameErr) {
+              nameErr.textContent = errs.name;
+              nameErr.style.display = 'block';
+            } else {
+              alert(Object.values(errs).join('\n') || 'Failed to create warehouse');
+            }
+            if (btnText) btnText.style.display = 'inline';
+            if (btnSpinner) btnSpinner.style.display = 'none';
+            submitBtn.disabled = false;
+          }
+        })
+        .catch(err => {
+          console.error('Warehouse create failed:', err);
+          alert('Network error');
+          if (btnText) btnText.style.display = 'inline';
+          if (btnSpinner) btnSpinner.style.display = 'none';
           submitBtn.disabled = false;
         });
     }

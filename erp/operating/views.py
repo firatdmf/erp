@@ -373,6 +373,18 @@ class OrderCreate(View):
                     # Generate QR code
                     generate_machine_qr_for_order(order)
 
+                # ── Auto consume warehouse stock for every line item ──
+                # FIFO across warehouses, oldest roll first. Movements
+                # are logged to each affected WarehouseProduct timeline
+                # with the order number as the reference.
+                try:
+                    from .views_warehouse import consume_for_order_items
+                    consume_for_order_items(order, user=request.user, reason_prefix="Order")
+                except Exception as _e:
+                    # Don't break the order save if stock-out hits an
+                    # edge case — surface as a non-fatal message.
+                    messages.warning(request, f"Order saved but stock-out had an issue: {_e}")
+
                 return redirect("operating:order_detail", pk=order.pk)
             except Exception as e:
                 messages.error(request, f"Order creation failed: {e}")
@@ -594,7 +606,27 @@ class OrderEdit(UpdateView):
                         messages.error(self.request, "Invalid product data format.")
                         return self.form_invalid(form)
                 self.object.save()
+
+                # Order has been mutated — reverse the previous
+                # consumption then apply fresh consumption based on
+                # the current item set. This keeps stock movements
+                # idempotent against repeated edits.
+                try:
+                    from .views_warehouse import (
+                        reverse_consumption_for_order,
+                        consume_for_order_items,
+                    )
+                    reverse_consumption_for_order(self.object, user=self.request.user)
+                    consume_for_order_items(self.object, user=self.request.user, reason_prefix="Order")
+                except Exception as _e:
+                    messages.warning(self.request, f"Order updated but stock movement sync had an issue: {_e}")
+
                 messages.success(self.request, "Order updated successfully.")
+                if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return JsonResponse({
+                        "success": True,
+                        "redirect_url": reverse("operating:order_detail", args=[self.object.pk]),
+                    })
                 return redirect("operating:order_detail", pk=self.object.pk)
 
         except Exception as e:
@@ -1416,7 +1448,22 @@ def create_web_order(request):
                         custom_wing_type=custom_attrs.get('wingType') if is_custom else None,
                         custom_fabric_used_meters=item_data.get('custom_fabric_used_meters') if is_custom else None,
                     )
-            
+
+            # ── Auto consume warehouse stock for every line item ──
+            # Web orders always trigger immediate stock-out (FIFO across
+            # warehouses). Order edits later will reverse + reapply.
+            try:
+                from .views_warehouse import consume_for_order_items
+                consume_for_order_items(
+                    order,
+                    user=request.user if request.user.is_authenticated else None,
+                    reason_prefix="Web order",
+                )
+            except Exception as _e:
+                # Don't fail the checkout if stock-out errored — log
+                # silently and let the admin reconcile in the timeline.
+                print(f"[WEB ORDER STOCK] consume failed: {_e}")
+
             return JsonResponse({
                 'success': True,
                 'order_id': order.pk,

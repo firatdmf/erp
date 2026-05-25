@@ -944,7 +944,47 @@
 
         <div class="form-group">
           <label for="id_supplier">{% trans "Vendor" %}</label>
-          {{ form.supplier }}
+          <div class="supplier-row" style="display:flex; gap:8px; align-items:stretch;">
+            <div style="flex:1; min-width:0;">{{ form.supplier }}</div>
+            <button type="button" class="supplier-add-btn"
+                    onclick="openSupplierFromProductForm()"
+                    title="{% trans 'Add a new supplier' %}"
+                    style="flex-shrink:0; width:40px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #DDE3E7; background:white; border-radius:8px; cursor:pointer; color:var(--nejum-teal-700,#005354); font-size:16px; transition:background .14s, border-color .14s;"
+                    onmouseover="this.style.background='var(--nejum-teal-50,#E6F5F5)'; this.style.borderColor='var(--nejum-teal-300,#66B5B5)';"
+                    onmouseout="this.style.background='white'; this.style.borderColor='#DDE3E7';">
+              <i class="fa fa-plus"></i>
+            </button>
+          </div>
+          <script>
+            // Open the global Add-Supplier sidebar and register a one-
+            // shot callback so the new supplier appears + is selected
+            // without reloading this form (which would lose any
+            // unsaved edits the user has made).
+            function openSupplierFromProductForm() {
+              window.onSupplierAdded = function (data) {
+                const sel = document.getElementById('id_supplier');
+                if (!sel || !data || !data.supplier_id) return;
+                // Avoid dupes if the dropdown was already refreshed.
+                if (!sel.querySelector('option[value="' + data.supplier_id + '"]')) {
+                  const opt = document.createElement('option');
+                  opt.value = data.supplier_id;
+                  opt.textContent = data.supplier_name || ('Supplier #' + data.supplier_id);
+                  sel.appendChild(opt);
+                }
+                sel.value = String(data.supplier_id);
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+                // Clear the hook so subsequent opens elsewhere on the
+                // page (if any) fall back to default behaviour.
+                window.onSupplierAdded = null;
+              };
+              if (typeof openAddSupplierSidebar === 'function') {
+                openAddSupplierSidebar();
+              } else {
+                window.onSupplierAdded = null;
+                alert('Supplier sidebar not loaded.');
+              }
+            }
+          </script>
         </div>
 
         <div class="form-group">

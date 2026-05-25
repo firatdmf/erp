@@ -2,19 +2,29 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Order #{{ order.pk }}</title>
+  <title>{% trans "Order" %} #{{ order.pk }}</title>
   <style>
     /* xhtml2pdf supports a subset of CSS — keep it simple and inline-friendly.
        @page handles the actual PDF page size + margins. */
     @page {
       size: a4 portrait;
-      margin: 14mm 14mm 16mm 14mm;
+      /* Zero margin so the browser does NOT add its own header/footer
+         (URL + page number + date). We compensate with body padding
+         below to keep visual breathing room. */
+      margin: 0;
     }
     body {
       font-family: Helvetica, Arial, sans-serif;
       font-size: 11pt;
       color: #0F1419;
       line-height: 1.35;
+      padding: 14mm 14mm 16mm 14mm;
+      margin: 0;
+    }
+    /* Belt-and-braces: in browser print mode also hide any address
+       bars/headers the browser tries to inject. */
+    @media print {
+      html, body { margin: 0 !important; }
     }
     /* Header */
     .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 10pt; margin-bottom: 14pt; }
@@ -92,7 +102,7 @@
   <table class="hdr" cellspacing="0" cellpadding="0">
     <tr>
       <td>
-        <div class="brand">{{ BRAND_NAME|default:"Nejum ERP" }}</div>
+        <div class="brand">{{ BRAND_NAME|default:"Nejum ERP"|upper }}</div>
         <div class="doc-type">{% trans "Order" %}</div>
       </td>
       <td align="right">
@@ -135,23 +145,23 @@
           {% if order.contact %}
             <div class="name">{{ order.contact.name|default:"—"|capfirst }}</div>
             <div class="role">{% trans "Contact" %}</div>
-            {% if order.contact.email %}<div class="line"><b>Email:</b> {{ order.contact.email.0|default:order.contact.email }}</div>{% endif %}
-            {% if order.contact.phone %}<div class="line"><b>Phone:</b> {{ order.contact.phone.0|default:order.contact.phone }}</div>{% endif %}
-            {% if order.contact.address %}<div class="line"><b>Address:</b> {{ order.contact.address }}</div>{% endif %}
-            {% if order.contact.company %}<div class="line"><b>Company:</b> {{ order.contact.company }}</div>{% endif %}
+            {% if order.contact.email %}<div class="line"><b>{% trans "Email" %}:</b> {{ order.contact.email.0|default:order.contact.email }}</div>{% endif %}
+            {% if order.contact.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.contact.phone.0|default:order.contact.phone }}</div>{% endif %}
+            {% if order.contact.address %}<div class="line"><b>{% trans "Address" %}:</b> {{ order.contact.address }}</div>{% endif %}
+            {% if order.contact.company %}<div class="line"><b>{% trans "Company" %}:</b> {{ order.contact.company }}</div>{% endif %}
           {% elif order.company %}
             <div class="name">{{ order.company.name|default:"—"|capfirst }}</div>
             <div class="role">{% trans "Company" %}</div>
-            {% if order.company.email %}<div class="line"><b>Email:</b> {{ order.company.email }}</div>{% endif %}
-            {% if order.company.phone %}<div class="line"><b>Phone:</b> {{ order.company.phone }}</div>{% endif %}
-            {% if order.company.address %}<div class="line"><b>Address:</b> {{ order.company.address }}</div>{% endif %}
+            {% if order.company.email %}<div class="line"><b>{% trans "Email" %}:</b> {{ order.company.email }}</div>{% endif %}
+            {% if order.company.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.company.phone }}</div>{% endif %}
+            {% if order.company.address %}<div class="line"><b>{% trans "Address" %}:</b> {{ order.company.address }}</div>{% endif %}
             {% if order.company.tax_office %}<div class="line"><b>{% trans "Tax Office" %}:</b> {{ order.company.tax_office }}</div>{% endif %}
             {% if order.company.tax_number %}<div class="line"><b>{% trans "Tax No" %}:</b> {{ order.company.tax_number }}</div>{% endif %}
           {% elif order.web_client %}
             <div class="name">{{ order.web_client.name|default:order.web_client.username|capfirst }}</div>
             <div class="role">{% trans "Web Customer" %}</div>
-            {% if order.web_client.email %}<div class="line"><b>Email:</b> {{ order.web_client.email }}</div>{% endif %}
-            {% if order.web_client.phone %}<div class="line"><b>Phone:</b> {{ order.web_client.phone }}</div>{% endif %}
+            {% if order.web_client.email %}<div class="line"><b>{% trans "Email" %}:</b> {{ order.web_client.email }}</div>{% endif %}
+            {% if order.web_client.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.web_client.phone }}</div>{% endif %}
           {% else %}
             <div class="name">—</div>
             <div class="line" style="color: #6B7280;">{% trans "No customer attached" %}</div>
@@ -165,7 +175,7 @@
             <div class="role">{% trans "Delivery" %}</div>
             {% if order.delivery_address %}<div class="line">{{ order.delivery_address }}</div>{% endif %}
             {% if order.delivery_city or order.delivery_country %}<div class="line">{{ order.delivery_city|default:"" }}{% if order.delivery_city and order.delivery_country %}, {% endif %}{{ order.delivery_country|default:"" }}</div>{% endif %}
-            {% if order.delivery_phone %}<div class="line"><b>Phone:</b> {{ order.delivery_phone }}</div>{% endif %}
+            {% if order.delivery_phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.delivery_phone }}</div>{% endif %}
           {% elif order.billing_address %}
             {% if order.billing_address_title %}<div class="name">{{ order.billing_address_title }}</div>{% endif %}
             <div class="role">{% trans "Billing" %}</div>
@@ -235,10 +245,20 @@
   <!-- FOOTER -->
   <table class="foot" cellspacing="0" cellpadding="0">
     <tr>
-      <td>{{ BRAND_NAME|default:"Nejum ERP" }} · {% trans "Order" %} #{{ order.pk }}</td>
+      <td>{{ BRAND_NAME|default:"Nejum ERP"|upper }} · {% trans "Order" %} #{{ order.pk }}</td>
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>
+
+  {% if not is_pdf %}
+    <script>
+      // Auto-open browser print dialog when served as HTML (xhtml2pdf
+      // unavailable); user saves as PDF from there.
+      window.addEventListener('load', function () {
+        setTimeout(function () { window.print(); }, 250);
+      });
+    </script>
+  {% endif %}
 
 </body>
 </html>

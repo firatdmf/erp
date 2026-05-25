@@ -9,13 +9,23 @@
 .co-chev{color:var(--text-secondary);font-size:10px;transition:transform .25s;flex-shrink:0}
 .co-section.active .co-chev{transform:rotate(180deg)}
 .co-section-body{max-height:0;overflow:hidden;transition:max-height .3s ease;padding:0}
-.co-section.active .co-section-body{max-height:3000px;padding:16px 0 8px}
+/* When the section is active there is NO upper bound — long item
+   lists (20+ products) need to expand freely. The sidebar itself
+   already has overflow-y:auto so the user scrolls the whole sidebar
+   instead of fighting a nested inner scrollbar that cuts cards in
+   half. */
+.co-section.active .co-section-body{max-height:none;overflow:visible;padding:16px 0 8px}
 .co-type-group{display:flex;gap:8px}
 .co-type-btn{flex:1;padding:10px;border:1.5px solid var(--border-color);border-radius:6px;background:var(--bg-primary);cursor:pointer;text-align:center;font-size:12px;font-weight:600;color:var(--text-secondary);transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:4px}
 .co-type-btn i{font-size:16px}
 .co-type-btn input{display:none}
 .co-type-btn:has(input:checked){border-color:#1e293b;background:#f8fafc;color:#1e293b}
+/* No inner scroll on the products list — let cards render at full
+   height and let the outer sidebar scrollbar handle long lists. */
+.co-products-list{display:flex;flex-direction:column;gap:0}
 .co-product-card{border:1.5px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:10px;background:var(--bg-primary)}
+.co-product-card.co-just-added{animation:co-slide-in .28s cubic-bezier(.22,1,.36,1)}
+@keyframes co-slide-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 .co-product-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .co-product-head strong{font-size:13px;color:var(--text-primary)}
 .co-product-head .co-sku{font-size:11px;color:var(--text-secondary);font-family:monospace;display:block;margin-top:2px}
@@ -358,26 +368,39 @@
   window.selectProduct = function(sku, variant, title, price, categoryName) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
     itemIndex++;
-    orderItems.push({
+    // Newest item on top so the user immediately sees what they
+    // just added — important once the list grows past a few rows.
+    orderItems.unshift({
       index: itemIndex, sku, variant, title: title||sku, price: parseFloat(price)||0,
       quantity: 1, description: '', categoryName: categoryName||'',
       is_custom_curtain: false, custom_width:'', custom_height:'',
       custom_pleat_type:'', custom_pleat_density:'', custom_mounting_type:'',
       custom_wing_type:'', custom_fabric_used_meters:''
     });
-    renderProducts();
+    renderProducts({ highlightFirst: true });
     document.getElementById('co-product-search').value = '';
     document.getElementById('co-product-results').innerHTML = '';
     updateTotal();
     document.getElementById('co-sum-2').textContent = orderItems.length + ' items';
+    // Scroll the just-prepended (newest) card into view inside the
+    // sidebar so the user immediately sees what was added even when
+    // the list has scrolled far down.
+    const listEl = document.getElementById('co-products-list');
+    if (listEl && listEl.firstElementChild) {
+      listEl.firstElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   };
 
-  function renderProducts() {
+  function renderProducts(opts) {
+    opts = opts || {};
     const el = document.getElementById('co-products-list');
     if (!orderItems.length) { el.innerHTML = '<div class="co-empty">No products added yet</div>'; return; }
     el.innerHTML = orderItems.map((item, i) => {
       const cc = item.is_custom_curtain;
-      return `<div class="co-product-card">
+      // First (i===0) is the newest item — flash it briefly when
+      // selectProduct passed highlightFirst.
+      const justAdded = (opts.highlightFirst && i === 0) ? ' co-just-added' : '';
+      return `<div class="co-product-card${justAdded}">
         <div class="co-product-head">
           <div><strong>${esc(item.title)}</strong><span class="co-sku">${esc(item.sku)}</span></div>
           <button type="button" class="co-remove-btn" onclick="coRemove(${i})"><i class="fas fa-times"></i></button>

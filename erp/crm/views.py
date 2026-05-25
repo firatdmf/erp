@@ -1352,7 +1352,12 @@ def create_supplier_partial(request):
             return JsonResponse({
                 'success': True,
                 'message': f'Supplier "{supplier.company_name}" added successfully.',
-                'redirect_url': reverse('crm:supplier_list') # Or we can reload the current page
+                # Expose the new supplier so callers (e.g. product_form's
+                # inline + button) can insert + select it client-side
+                # without reloading the parent page.
+                'supplier_id': supplier.pk,
+                'supplier_name': supplier.company_name,
+                'redirect_url': reverse('crm:supplier_list'),
             })
         else:
              return JsonResponse({

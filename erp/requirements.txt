@@ -107,7 +107,12 @@ PyYAML==6.0.1
 qrcode==8.2
 regex==2024.5.15
 reportlab==4.4.4
-xhtml2pdf==0.2.17
+# NOTE: xhtml2pdf is intentionally NOT pinned here. Newer xhtml2pdf
+# pulls in svglib → rlPyCairo → pycairo, which needs system libcairo
+# — that breaks the Nixpacks build. The OrderPrint view falls back
+# to inline HTML (user prints with Ctrl+P) when xhtml2pdf is missing,
+# so leaving it out is safe. Install it manually only on environments
+# where you control the system packages.
 requests==2.31.0
 requests-file==3.0.1
 requests-oauthlib==1.3.1

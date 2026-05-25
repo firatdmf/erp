@@ -411,6 +411,27 @@ class Order(models.Model):
 
         # Now whenever an OrderItem is added, updated, or deleted, the overall Order.status will update automatically.
 
+    def gross_profit(self):
+        """Sum of every item's (price - cost) × quantity. Internal-only
+        metric — NEVER include in customer-facing PDFs/invoices.
+        For list views, pre-fetch items with select_related('product',
+        'product_variant') to avoid N+1 queries."""
+        from decimal import Decimal
+        total = Decimal("0")
+        for it in self.items.all():
+            total += it.gross_profit()
+        return total.quantize(Decimal("0.01"))
+
+    def gross_margin_pct(self):
+        """Gross profit as a percentage of revenue. Returns None when
+        revenue is zero so templates can hide the metric instead of
+        showing 'inf'."""
+        from decimal import Decimal
+        rev = self.total_value() or Decimal("0")
+        if rev <= 0:
+            return None
+        return (self.gross_profit() / Decimal(str(rev)) * Decimal("100")).quantize(Decimal("0.1"))
+
     def get_client(self):
         if self.contact:
             return self.contact
@@ -598,6 +619,24 @@ class OrderItem(models.Model):
 
     def subtotal(self):
         return self.price * self.quantity
+
+    def unit_cost(self):
+        """Cost per unit for gross-profit calc. Prefer the variant's
+        own cost; fall back to the parent product's cost. Returns 0 if
+        nothing is set so callers don't crash on None * Decimal."""
+        from decimal import Decimal
+        if self.product_variant and self.product_variant.variant_cost is not None:
+            return self.product_variant.variant_cost
+        if self.product and self.product.cost is not None:
+            return self.product.cost
+        return Decimal("0")
+
+    def gross_profit(self):
+        """Revenue minus cost for this single line."""
+        from decimal import Decimal
+        qty = self.quantity or Decimal("0")
+        price = self.price or Decimal("0")
+        return (price - self.unit_cost()) * qty
 
     def display_name(self):
         if self.product_variant:

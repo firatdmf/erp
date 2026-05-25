@@ -5053,7 +5053,12 @@
               toast.classList.add('show');
               setTimeout(() => toast.classList.remove('show'), 3000);
               closeAddSupplierSidebar();
-              if (data.redirect_url) {
+              // Page-level hook: a host page (e.g. product_form) can
+              // register window.onSupplierAdded(data) to keep its own
+              // dropdown in sync without a full reload.
+              if (typeof window.onSupplierAdded === 'function') {
+                try { window.onSupplierAdded(data); } catch (e) { console.error(e); }
+              } else if (data.redirect_url) {
                 window.location.href = data.redirect_url;
               } else {
                 window.location.reload();

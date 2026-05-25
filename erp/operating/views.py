@@ -198,6 +198,16 @@ class OrderDetail(DetailView):
     template_name = "operating/order_detail.html"
     context_object_name = "order"
 
+    def get_queryset(self):
+        # Prefetch items + their product/variant so gross_profit() can
+        # read costs without extra queries (the template also iterates
+        # items for the line breakdown).
+        return Order.objects.select_related(
+            "contact", "company", "web_client",
+        ).prefetch_related(
+            "items__product", "items__product_variant",
+        )
+
 
 class OrderPrint(DetailView):
     """Standalone PDF view: renders the order as a real PDF file using
@@ -230,15 +240,34 @@ class OrderPrint(DetailView):
         from io import BytesIO
         from django.template.loader import render_to_string
         from django.http import HttpResponse
-        from xhtml2pdf import pisa
+
+        def _html_fallback():
+            # Re-render with is_pdf=False so the template's auto-print
+            # JS fires — browsers' Save-as-PDF replaces xhtml2pdf.
+            ctx = dict(context)
+            ctx["is_pdf"] = False
+            return HttpResponse(render_to_string(
+                self.template_name, ctx, request=self.request,
+            ))
 
         html = render_to_string(self.template_name, context, request=self.request)
+
+        # xhtml2pdf is optional — newer versions pull in pycairo which
+        # needs system libcairo, which the deploy environment may not
+        # have. When it's missing OR fails, fall back to printable HTML.
+        try:
+            from xhtml2pdf import pisa
+        except ImportError:
+            return _html_fallback()
+
         buf = BytesIO()
-        result = pisa.CreatePDF(src=html, dest=buf, encoding="utf-8")
+        try:
+            result = pisa.CreatePDF(src=html, dest=buf, encoding="utf-8")
+        except Exception:
+            return _html_fallback()
 
         if result.err:
-            # Fallback: render the HTML directly so we don't 500 silently
-            return HttpResponse(html)
+            return _html_fallback()
 
         response = HttpResponse(buf.getvalue(), content_type="application/pdf")
         response["Content-Disposition"] = (
@@ -645,11 +674,15 @@ class OrderList(ListView):
     ordering = ["-created_at"]
     
     def get_queryset(self):
-        # Optimize with select_related and prefetch_related to avoid N+1 queries
+        # Optimize with select_related and prefetch_related to avoid N+1 queries.
+        # `items__product` and `items__product_variant` are needed because
+        # the gross_profit() helper reads cost from those — without
+        # prefetching, each order row would fire two extra queries per
+        # line item.
         return (
             Order.objects
             .select_related('contact', 'company', 'web_client')
-            .prefetch_related('items')
+            .prefetch_related('items__product', 'items__product_variant')
             .order_by("-created_at")
         )
     

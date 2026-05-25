@@ -209,6 +209,17 @@
   .num { text-align: right; }
   .ord-total { font: 700 14px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; }
   .ord-total span { font-weight: 500; color: var(--gray-500); font-size: 12px; }
+  /* Internal-only gross profit pill under the total */
+  .ord-gross {
+    margin-top: 4px;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 7px;
+    background: #F0FDF4; color: #166534;
+    border: 1px solid #BBF7D0;
+    border-radius: 999px;
+    font: 600 11px var(--font-sans); font-variant-numeric: tabular-nums;
+  }
+  .ord-gross i { font-size: 9px; opacity: 0.7; }
   .ord-status {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 4px 10px 4px 8px;
@@ -390,7 +401,15 @@
             <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
           {% endif %}
         </div>
-        <div class="num ord-total">{{ order.total_value|floatformat:2 }} <span>USD</span></div>
+        <div class="num ord-total">
+          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% with gp=order.gross_profit %}
+            <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-up"></i>
+              ${{ gp|floatformat:2 }}
+            </div>
+          {% endwith %}
+        </div>
         <span class="ord-status {{ order.status }}">
           <span class="ord-status-dot"></span>
           {{ order.get_status_display }}
@@ -447,7 +466,15 @@
         <div>
           <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
         </div>
-        <div class="num ord-total">{{ order.total_value|floatformat:2 }} <span>USD</span></div>
+        <div class="num ord-total">
+          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% with gp=order.gross_profit %}
+            <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-up"></i>
+              ${{ gp|floatformat:2 }}
+            </div>
+          {% endwith %}
+        </div>
         <span class="ord-status {{ order.status }}">
           <span class="ord-status-dot"></span>
           {{ order.get_status_display }}
@@ -503,7 +530,15 @@
             <span style="color: var(--gray-400);">—</span>
           {% endif %}
         </div>
-        <div class="num ord-total">{{ order.total_value|floatformat:2 }} <span>USD</span></div>
+        <div class="num ord-total">
+          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% with gp=order.gross_profit %}
+            <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-up"></i>
+              ${{ gp|floatformat:2 }}
+            </div>
+          {% endwith %}
+        </div>
         <span class="ord-status {{ order.status }}">
           <span class="ord-status-dot"></span>
           {{ order.get_status_display }}

@@ -6597,3 +6597,75 @@ msgstr "Hızlı özellik ekle"
 
 msgid "Custom attribute"
 msgstr "Özel özellik"
+
+msgid "PRO FORMA INVOICE"
+msgstr "PROFORMA FATURA"
+
+msgid "Issued by"
+msgstr "Düzenleyen"
+
+msgid "Received by"
+msgstr "Teslim Alan"
+
+msgid "Apply VAT"
+msgstr "KDV Uygula"
+
+msgid "Tax Base"
+msgstr "Matrah"
+
+msgid "Payment Status"
+msgstr "Tahsilat Durumu"
+
+msgid "Grand Total"
+msgstr "Genel Toplam"
+
+msgid "Paid"
+msgstr "Ödenen"
+
+msgid "Outstanding Balance"
+msgstr "Kalan Bakiye"
+
+msgid "Leave blank to use account values"
+msgstr "Boş bırakırsanız cari bilgileri kullanılır"
+
+msgid "Leave blank to use brand defaults"
+msgstr "Boş bırakırsanız firma bilgileri kullanılır"
+
+msgid "Issuer"
+msgstr "Düzenleyen Firma"
+
+msgid "Fax"
+msgstr "Faks"
+
+msgid "pcs"
+msgstr "adet"
+
+msgid "Inflows"
+msgstr "Girişler"
+
+msgid "Outflows"
+msgstr "Çıkışlar"
+
+msgid "Packaging"
+msgstr "Paketleniyor"
+
+msgid "Pick the stage and add shipping info — saved inline."
+msgstr "Aşamayı seçin ve kargo bilgilerini ekleyin — anında kaydedilir."
+
+msgid "Carrier"
+msgstr "Kargo Firması"
+
+msgid "Tracking number"
+msgstr "Takip Numarası"
+
+msgid "e.g. 1234567890"
+msgstr "örn. 1234567890"
+
+msgid "— Select —"
+msgstr "— Seçin —"
+
+msgid "More statuses (cancelled, returned, delivered…)"
+msgstr "Diğer durumlar (iptal, iade, teslim edildi…)"
+
+msgid "Save"
+msgstr "Kaydet"

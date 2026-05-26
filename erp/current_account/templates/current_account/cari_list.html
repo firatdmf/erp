@@ -55,12 +55,67 @@
   .ca-search-input::placeholder { color: var(--gray-500); }
   .ca-search-input:focus { background: white; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
 
-  .ca-toolbar { display:flex; flex-wrap:wrap; gap: 8px; align-items:center; padding: 10px 12px; background: white; border:1px solid #E2E8EE; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
-  .ca-toolbar select { padding: 7px 10px; border: 1px dashed #C5CCD3; border-radius: 8px; background: white; font: 500 12.5px var(--font-sans); color: var(--gray-700); cursor: pointer; outline: none; transition: all 140ms; }
-  .ca-toolbar select:hover { border-color: var(--gray-500); }
-  .ca-toolbar select:focus { border-style: solid; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
-  .ca-toolbar .fc-lbl { font: 600 11px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); margin-right: 2px; margin-left: 6px; }
-  .ca-toolbar .fc-lbl:first-child { margin-left: 0; }
+  /* Compact filter bar — single row of label-prefixed chips that
+     collapse cleanly down to phones. Same pattern as payment_list. */
+  .ca-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+  }
+  .ca-ctl {
+    display: flex; align-items: stretch;
+    background: white;
+    border: 1px solid #DDE3E7;
+    border-radius: 7px;
+    overflow: hidden;
+    min-width: 0;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .ca-ctl:hover { border-color: var(--gray-500); }
+  .ca-ctl:focus-within { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .ca-ctl-lbl {
+    flex-shrink: 0;
+    padding: 0 8px;
+    display: inline-flex; align-items: center;
+    background: #F8FAFC;
+    border-right: 1px solid #EEF1F5;
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  .ca-toolbar select {
+    flex: 1; min-width: 0;
+    padding: 7px 26px 7px 9px;
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    font: 500 12.5px var(--font-sans); color: var(--gray-700);
+    font-family: var(--font-sans);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='none' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    cursor: pointer;
+  }
+  @media (max-width: 720px) {
+    .ca-toolbar { grid-template-columns: 1fr 1fr; }
+    .ca-toolbar .ca-ctl:nth-child(3) { grid-column: 1 / -1; }
+    .ca-reset { grid-column: 1 / -1; justify-self: end; }
+  }
+  @media (max-width: 480px) {
+    .ca-toolbar { grid-template-columns: 1fr; padding: 8px; }
+    .ca-toolbar .ca-ctl:nth-child(3) { grid-column: auto; }
+  }
   .ca-reset { color: var(--gray-500); font: 500 12.5px var(--font-sans); text-decoration: none; padding: 7px 10px; margin-left: auto; }
   .ca-reset:hover { color: var(--nejum-teal-700); }
 
@@ -69,7 +124,7 @@
   .ca-result b { color: var(--ink); font-weight: 700; }
 
   .ca-list { background: white; border:1px solid #E2E8EE; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
-  .ca-list-head, .ca-row { display: grid; grid-template-columns: 110px 1.6fr 140px 1fr 160px 110px 28px; gap: 14px; align-items: center; padding: 12px 18px; }
+  .ca-list-head, .ca-row { display: grid; grid-template-columns: 110px 1.6fr 140px 160px 110px 28px; gap: 14px; align-items: center; padding: 12px 18px; }
   .ca-list-head { background: #FAFBFD; border-bottom: 1px solid #E2E8EE; font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); }
   .ca-list-head .num { text-align: right; }
   .ca-row { border-bottom: 1px solid #EEF1F5; cursor: pointer; transition: background 120ms; text-decoration: none; color: inherit; }
@@ -117,7 +172,7 @@
   .ca-empty p { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0 0 20px; }
 
   @media (max-width: 1100px) {
-    .ca-list-head, .ca-row { grid-template-columns: 100px 1.4fr 120px 1fr 140px 90px 22px; gap: 10px; }
+    .ca-list-head, .ca-row { grid-template-columns: 100px 1.4fr 120px 140px 90px 22px; gap: 10px; }
   }
   @media (max-width: 900px) {
     .ca-search-input { width: 200px; }
@@ -188,37 +243,37 @@
     </div>
 
     <div class="ca-toolbar">
-      <span class="fc-lbl">{% trans "Book" %}</span>
-      <select name="book" onchange="this.form.submit()">
-        <option value="">{% trans "All Books" %}</option>
-        {% for b in books %}<option value="{{ b.id }}" {% if filter_book == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
-      </select>
+      <label class="ca-ctl" title="{% trans 'Balance' %}">
+        <span class="ca-ctl-lbl">{% trans "Balance" %}</span>
+        <select name="balance" onchange="this.form.submit()">
+          <option value="">{% trans "All" %}</option>
+          <option value="positive"   {% if filter_balance == 'positive' %}selected{% endif %}>{% trans "Owes Us" %}</option>
+          <option value="negative"   {% if filter_balance == 'negative' %}selected{% endif %}>{% trans "We Owe" %}</option>
+          <option value="zero"       {% if filter_balance == 'zero' %}selected{% endif %}>{% trans "Closed" %}</option>
+          <option value="over_limit" {% if filter_balance == 'over_limit' %}selected{% endif %}>{% trans "Limit Exceeded" %}</option>
+        </select>
+      </label>
 
-      <span class="fc-lbl">{% trans "Balance" %}</span>
-      <select name="balance" onchange="this.form.submit()">
-        <option value="">{% trans "All Balances" %}</option>
-        <option value="positive"   {% if filter_balance == 'positive' %}selected{% endif %}>{% trans "Owes Us" %}</option>
-        <option value="negative"   {% if filter_balance == 'negative' %}selected{% endif %}>{% trans "We Owe" %}</option>
-        <option value="zero"       {% if filter_balance == 'zero' %}selected{% endif %}>{% trans "Closed" %}</option>
-        <option value="over_limit" {% if filter_balance == 'over_limit' %}selected{% endif %}>{% trans "Limit Exceeded" %}</option>
-      </select>
+      <label class="ca-ctl" title="{% trans 'Status' %}">
+        <span class="ca-ctl-lbl">{% trans "Status" %}</span>
+        <select name="active" onchange="this.form.submit()">
+          <option value="1" {% if filter_active == '1' %}selected{% endif %}>{% trans "Active" %}</option>
+          <option value="0" {% if filter_active == '0' %}selected{% endif %}>{% trans "Inactive" %}</option>
+          <option value=""  {% if filter_active == '' %}selected{% endif %}>{% trans "All" %}</option>
+        </select>
+      </label>
 
-      <span class="fc-lbl">{% trans "Status" %}</span>
-      <select name="active" onchange="this.form.submit()">
-        <option value="1" {% if filter_active == '1' %}selected{% endif %}>{% trans "Active" %}</option>
-        <option value="0" {% if filter_active == '0' %}selected{% endif %}>{% trans "Inactive" %}</option>
-        <option value=""  {% if filter_active == '' %}selected{% endif %}>{% trans "All" %}</option>
-      </select>
-
-      <span class="fc-lbl">{% trans "Sort" %}</span>
-      <select name="sort" onchange="this.form.submit()">
-        <option value="name"     {% if sort == 'name' %}selected{% endif %}>{% trans "Name (A→Z)" %}</option>
-        <option value="-name"    {% if sort == '-name' %}selected{% endif %}>{% trans "Name (Z→A)" %}</option>
-        <option value="code"     {% if sort == 'code' %}selected{% endif %}>{% trans "Code (asc)" %}</option>
-        <option value="-balance" {% if sort == '-balance' %}selected{% endif %}>{% trans "Balance (high→low)" %}</option>
-        <option value="balance"  {% if sort == 'balance' %}selected{% endif %}>{% trans "Balance (low→high)" %}</option>
-        <option value="recent"   {% if sort == 'recent' %}selected{% endif %}>{% trans "Most Recent" %}</option>
-      </select>
+      <label class="ca-ctl" title="{% trans 'Sort' %}">
+        <span class="ca-ctl-lbl">{% trans "Sort" %}</span>
+        <select name="sort" onchange="this.form.submit()">
+          <option value="name"     {% if sort == 'name' %}selected{% endif %}>{% trans "Name (A→Z)" %}</option>
+          <option value="-name"    {% if sort == '-name' %}selected{% endif %}>{% trans "Name (Z→A)" %}</option>
+          <option value="code"     {% if sort == 'code' %}selected{% endif %}>{% trans "Code (asc)" %}</option>
+          <option value="-balance" {% if sort == '-balance' %}selected{% endif %}>{% trans "Balance (high→low)" %}</option>
+          <option value="balance"  {% if sort == 'balance' %}selected{% endif %}>{% trans "Balance (low→high)" %}</option>
+          <option value="recent"   {% if sort == 'recent' %}selected{% endif %}>{% trans "Most Recent" %}</option>
+        </select>
+      </label>
 
       <a class="ca-reset" href="{% url 'current_account:cari_list' %}">{% trans "Clear" %}</a>
     </div>
@@ -234,7 +289,6 @@
       <div>{% trans "Code" %}</div>
       <div>{% trans "Account" %}</div>
       <div>{% trans "Type" %}</div>
-      <div>{% trans "Book" %}</div>
       <div class="num">{% trans "Balance" %}</div>
       <div>{% trans "Recent" %}</div>
       <div></div>
@@ -259,7 +313,6 @@
           <span class="ca-type-dot"></span>{{ c.get_type_display }}
         </span>
       </div>
-      <div class="ca-book">{{ c.book.name }}</div>
       <div class="num">
         <div class="ca-bal {% if c.cached_balance > 0 %}pos{% elif c.cached_balance < 0 %}neg{% else %}zero{% endif %}">
           {{ c.display_currency_symbol }}{{ c.absolute_balance|floatformat:2|intcomma }}

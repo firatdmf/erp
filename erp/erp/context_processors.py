@@ -14,6 +14,10 @@ def ui_theme(request):
     Settings.py reads these from the active env profile (.env or
     .env.<ENV_PROFILE>) and stores them as Django constants. Templates
     use `{{ UI_THEME }}`, `{{ DB_SCHEMA }}`, `{{ BRAND_NAME }}`.
+
+    BRAND_* (address/phone/email/etc.) are optional — used by the
+    invoice/proforma document template for the issuer header block.
+    Leave them unset and the template falls back to dashes.
     """
     base = getattr(_settings, "STOREFRONT_PREVIEW_URL", "http://localhost:3010/")
     sep = "&" if "?" in base else "?"
@@ -21,6 +25,14 @@ def ui_theme(request):
         "UI_THEME": getattr(_settings, "UI_THEME", ""),
         "DB_SCHEMA": getattr(_settings, "DB_SCHEMA", "public"),
         "BRAND_NAME": getattr(_settings, "BRAND_NAME", "Nejum"),
+        "BRAND_LEGAL_SUFFIX": getattr(_settings, "BRAND_LEGAL_SUFFIX", ""),
+        "BRAND_ADDRESS": getattr(_settings, "BRAND_ADDRESS", ""),
+        "BRAND_PHONE": getattr(_settings, "BRAND_PHONE", ""),
+        "BRAND_FAX": getattr(_settings, "BRAND_FAX", ""),
+        "BRAND_EMAIL": getattr(_settings, "BRAND_EMAIL", ""),
+        "BRAND_LOGO_URL": getattr(_settings, "BRAND_LOGO_URL", ""),
+        "BRAND_TAX_OFFICE": getattr(_settings, "BRAND_TAX_OFFICE", ""),
+        "BRAND_TAX_NUMBER": getattr(_settings, "BRAND_TAX_NUMBER", ""),
         "STOREFRONT_PREVIEW_URL": base,
         "STOREFRONT_PREVIEW_URL_WITH_EDIT": f"{base}{sep}edit=1",
     }

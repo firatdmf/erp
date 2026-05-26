@@ -1,0 +1,116 @@
+{% load i18n %}
+{% load humanize %}
+<div class="st-summary">
+  <div class="st-stat">
+    <div class="lbl">{% trans "Opening Balance" %}</div>
+    <div class="val {% if opening > 0 %}pos{% elif opening < 0 %}neg{% endif %}">{{ opening|floatformat:2|intcomma }}</div>
+  </div>
+  <div class="st-stat">
+    <div class="lbl">{% trans "Total Debit" %}</div>
+    <div class="val pos">+{{ debit_total|floatformat:2|intcomma }}</div>
+  </div>
+  <div class="st-stat">
+    <div class="lbl">{% trans "Total Credit" %}</div>
+    <div class="val neg">−{{ credit_total|floatformat:2|intcomma }}</div>
+  </div>
+  <div class="st-stat">
+    <div class="lbl">{% trans "Closing Balance" %}</div>
+    <div class="val {% if closing > 0 %}pos{% elif closing < 0 %}neg{% endif %}">{{ closing|floatformat:2|intcomma }}</div>
+  </div>
+</div>
+
+<div class="st-card">
+  {% if rows %}
+  <table class="st-tbl">
+    <thead>
+      <tr>
+        <th>{% trans "Date" %}</th>
+        <th>{% trans "Due Date" %}</th>
+        <th>{% trans "Type" %}</th>
+        <th>{% trans "Description" %}</th>
+        <th>{% trans "Reference" %}</th>
+        <th class="num">{% trans "Debit" %}</th>
+        <th class="num">{% trans "Credit" %}</th>
+        <th class="num">{% trans "Balance" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="opening">
+        <td colspan="7">{% trans "Opening Balance" %}</td>
+        <td class="num">{{ opening|floatformat:2|intcomma }}</td>
+      </tr>
+      {% for r in rows %}
+        {% with link_url='' pay=r.linked_payment inv=r.linked_invoice %}
+          {% if pay %}{% url 'current_account:payment_detail' pay.pk as link_url %}
+          {% elif inv %}{% url 'current_account:invoice_detail' inv.pk as link_url %}
+          {% endif %}
+      <tr {% if link_url %}class="mv-link" data-href="{{ link_url }}" style="cursor:pointer;"{% endif %}>
+        <td><span class="st-date">{{ r.mv.date|date:"d.m.Y" }}</span></td>
+        <td>{% if r.mv.due_date %}<span class="st-date">{{ r.mv.due_date|date:"d.m.Y" }}</span>{% else %}<span class="st-date muted">—</span>{% endif %}</td>
+        <td>
+          {% if link_url %}
+            <a class="mv-type mv-type-link" href="{{ link_url }}" onclick="event.stopPropagation();">
+              {{ r.mv.get_movement_type_display }}
+              <i data-lucide="arrow-up-right" style="width:11px;height:11px;margin-left:2px;vertical-align:-1px;opacity:0.7;"></i>
+            </a>
+          {% else %}
+            <span class="mv-type">{{ r.mv.get_movement_type_display }}</span>
+          {% endif %}
+        </td>
+        <td><span class="st-desc {% if not r.mv.description %}muted{% endif %}">{{ r.mv.description|default:"—" }}</span></td>
+        <td>
+          {% if pay %}
+            <a href="{% url 'current_account:payment_detail' pay.pk %}"
+               class="mv-ref"
+               onclick="event.stopPropagation();">{{ pay.number }}</a>
+            {% if r.is_cancel_row or pay.status != 'cancelled' %}
+              <span class="mv-st mv-st-{{ pay.status }}">{{ pay.get_status_display }}</span>
+            {% endif %}
+          {% elif inv %}
+            <a href="{% url 'current_account:invoice_detail' inv.pk %}"
+               class="mv-ref"
+               onclick="event.stopPropagation();">{{ inv.series }}-{{ inv.number }}</a>
+            {% if r.is_cancel_row or inv.status != 'cancelled' %}
+              <span class="mv-st mv-st-{{ inv.status }}">{{ inv.get_status_display }}</span>
+            {% endif %}
+          {% else %}
+            <span class="st-ref">{{ r.mv.reference|default:"—" }}</span>
+          {% endif %}
+        </td>
+        <td class="num {% if r.mv.amount > 0 %}pos{% else %}muted{% endif %}">{% if r.mv.amount > 0 %}{{ r.mv.amount|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+        <td class="num {% if r.mv.amount < 0 %}neg{% else %}muted{% endif %}">{% if r.mv.amount < 0 %}{{ r.mv.amount|floatformat:2|intcomma|cut:'-' }}{% else %}—{% endif %}</td>
+        <td class="num">{{ r.balance_after|floatformat:2|intcomma }}</td>
+      </tr>
+        {% endwith %}
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">{% trans "Total" %}</td>
+        <td class="num pos">+{{ debit_total|floatformat:2|intcomma }}</td>
+        <td class="num neg">−{{ credit_total|floatformat:2|intcomma }}</td>
+        <td class="num">{{ closing|floatformat:2|intcomma }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+    <div class="st-empty">
+      <div class="ico"><i data-lucide="inbox"></i></div>
+      <h3>{% trans "No movements" %}</h3>
+      <p>{% trans "No movements in the selected range." %}</p>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  // Re-render icons + re-bind row click after HTMX swap.
+  if (window.lucide) lucide.createIcons();
+  document.querySelectorAll('tr.mv-link[data-href]').forEach(function (tr) {
+    if (tr.__bound) return;
+    tr.__bound = true;
+    tr.addEventListener('click', function (e) {
+      if (e.target.closest('a, button')) return;
+      window.location.href = tr.dataset.href;
+    });
+  });
+</script>

@@ -42,15 +42,121 @@
   .st-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; box-shadow: 0 1px 2px rgba(15,23,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18); }
   .st-btn.primary:hover { filter: brightness(1.04); color: white; }
 
-  .st-toolbar { display:flex; flex-wrap:wrap; gap: 8px; align-items:center; padding: 10px 12px; background: white; border:1px solid #E2E8EE; border-radius: 12px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
-  .st-toolbar input[type=date] { padding: 7px 10px; border: 1px dashed #C5CCD3; border-radius: 8px; background: white; font: 500 12.5px var(--font-sans); color: var(--gray-700); outline: none; transition: all 140ms; font-variant-numeric: tabular-nums; }
-  .st-toolbar input[type=date]:hover { border-color: var(--gray-500); }
-  .st-toolbar input[type=date]:focus { border-style: solid; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
-  .st-toolbar .fc-lbl { font: 600 11px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); margin-right: 2px; margin-left: 6px; }
-  .st-toolbar .fc-lbl:first-child { margin-left: 0; }
-  .st-toolbar .spacer { flex: 1; }
-  .st-toolbar .clear-link { color: var(--gray-500); font: 500 12.5px var(--font-sans); text-decoration: none; padding: 7px 10px; }
-  .st-toolbar .clear-link:hover { color: var(--nejum-teal-700); }
+  /* Compact filter bar — same chip pattern as payment_list. */
+  .st-toolbar {
+    display: grid;
+    /* Pills (wide) | Baş | Bit | Temizle */
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+  }
+
+  /* Direction pill group — visual tabs with icons. */
+  .st-pills {
+    display: inline-flex;
+    background: #F4F7FB;
+    border: 1px solid #E2E8EE;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .st-pill {
+    flex: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: none; border-radius: 6px;
+    font: 600 12px var(--font-sans);
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: background 140ms, color 140ms, box-shadow 140ms;
+    white-space: nowrap;
+  }
+  .st-pill i { width: 14px; height: 14px; }
+  .st-pill:hover { color: var(--ink); background: rgba(255,255,255,0.6); }
+  .st-pill.active {
+    background: white;
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(15,23,31,0.10), 0 0 0 1px rgba(15,23,31,0.04);
+  }
+  .st-pill-in.active { color: #0E6E4A; }
+  .st-pill-in.active i { color: #10B981; }
+  .st-pill-out.active { color: #B23B12; }
+  .st-pill-out.active i { color: #DC2626; }
+  .st-pill-void.active { color: #991B1B; }
+  .st-pill-void.active i { color: #991B1B; }
+  /* Subtle indicator chip even when inactive so the in/out colour
+     is always visible. */
+  .st-pill-in i { color: #10B981; }
+  .st-pill-out i { color: #DC2626; }
+  .st-pill-void i { color: #991B1B; }
+
+  /* HTMX loading state — fade the results during swap so the user
+     sees something is happening on slow networks. */
+  #stmt-results.htmx-request { opacity: 0.5; transition: opacity 140ms; }
+  .st-ctl {
+    display: flex; align-items: stretch;
+    background: white;
+    border: 1px solid #DDE3E7;
+    border-radius: 7px;
+    overflow: hidden;
+    min-width: 0;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .st-ctl:hover { border-color: var(--gray-500); }
+  .st-ctl:focus-within { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .st-ctl-lbl {
+    flex-shrink: 0;
+    padding: 0 8px;
+    display: inline-flex; align-items: center;
+    background: #F8FAFC;
+    border-right: 1px solid #EEF1F5;
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  .st-toolbar select,
+  .st-toolbar input[type=date] {
+    flex: 1; min-width: 0;
+    padding: 7px 9px;
+    border: 0 !important; outline: none !important; box-shadow: none !important;
+    background: transparent;
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    font: 500 12.5px var(--font-sans); color: var(--gray-700);
+    font-family: var(--font-sans);
+  }
+  .st-toolbar select {
+    padding-right: 26px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='none' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+  }
+  .st-toolbar .clear-link {
+    justify-self: end;
+    color: var(--gray-500);
+    font: 600 12px var(--font-sans);
+    text-decoration: none;
+    padding: 7px 12px;
+    border-radius: 7px;
+    transition: color 140ms, background 140ms;
+  }
+  .st-toolbar .clear-link:hover { color: var(--nejum-teal-700); background: #F1F5F9; }
+  @media (max-width: 900px) {
+    .st-toolbar { grid-template-columns: 1fr 1fr; }
+    .st-pills { grid-column: 1 / -1; }
+    .st-toolbar .clear-link { grid-column: 1 / -1; justify-self: end; }
+  }
+  @media (max-width: 480px) {
+    .st-pill span { display: none; }
+    .st-pill { padding: 8px 12px; }
+  }
 
   .st-summary { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .st-stat { background: white; border:1px solid #E2E8EE; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
@@ -87,6 +193,38 @@
   .st-desc.muted { color: var(--gray-400); }
 
   .mv-type { display:inline-flex; align-items:center; gap: 5px; padding: 2px 9px; border-radius: 999px; font: 600 10.5px var(--font-sans); background: #EEF1F5; color: var(--gray-700); white-space: nowrap; }
+  a.mv-type-link { background: var(--nejum-teal-50, #E5F1F0); color: var(--nejum-teal-700, #005354); text-decoration: none; transition: background 140ms; }
+  a.mv-type-link:hover { background: var(--nejum-teal-100, #C8E3E1); color: var(--nejum-teal-700, #005354); }
+  tr.mv-link { transition: background 120ms; }
+  tr.mv-link:hover { background: #F4FAFA; }
+  .mv-ref {
+    font: 600 12px var(--font-mono);
+    color: var(--nejum-teal-700, #005354);
+    text-decoration: none;
+    padding: 2px 7px;
+    background: var(--nejum-teal-50, #E5F1F0);
+    border-radius: 5px;
+    letter-spacing: 0.02em;
+    transition: background 140ms;
+  }
+  .mv-ref:hover { background: var(--nejum-teal-100, #C8E3E1); }
+  .mv-st {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font: 700 9.5px var(--font-sans);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+  .mv-st-confirmed { background: #DCFCE7; color: #166534; }
+  .mv-st-draft     { background: #FEF3C7; color: #92400E; }
+  .mv-st-cancelled { background: #FEE2E2; color: #991B1B; }
+  .mv-st-issued    { background: #DBEAFE; color: #1E40AF; }
+  .mv-st-paid      { background: #DCFCE7; color: #166534; }
+  .mv-st-partially_paid { background: #FED7AA; color: #9A3412; }
+  .mv-st-overdue   { background: #FECACA; color: #991B1B; }
   .mv-type::before { content:''; width: 5px; height: 5px; border-radius: 50%; background: var(--gray-500); }
 
   .st-empty { padding: 80px 24px; text-align: center; }
@@ -124,86 +262,95 @@
     </button>
   </div>
 
-  <form class="st-toolbar no-print" method="get">
-    <span class="fc-lbl">{% trans "From" %}</span>
-    <input type="date" name="date_from" value="{{ date_from }}">
-    <span class="fc-lbl">{% trans "To" %}</span>
-    <input type="date" name="date_to" value="{{ date_to }}">
-    <button type="submit" class="st-btn primary"><i data-lucide="filter"></i>{% trans "Filter" %}</button>
+  <form class="st-toolbar no-print"
+        method="get"
+        hx-get="{% url 'current_account:cari_statement' cari.pk %}"
+        hx-target="#stmt-results"
+        hx-swap="innerHTML"
+        hx-trigger="change, submit"
+        hx-push-url="true"
+        hx-indicator="#stmt-results">
+    <div class="st-pills" role="tablist" aria-label="{% trans 'View' %}">
+      {% with active_all=1 %}{% if filter_direction or filter_status %}{% with active_all=0 %}{% endwith %}{% endif %}{% endwith %}
+      <button type="button"
+              data-dir="" data-status=""
+              class="st-pill {% if not filter_direction and not filter_status %}active{% endif %}"
+              hx-get="{% url 'current_account:cari_statement' cari.pk %}?{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}{% endif %}"
+              hx-target="#stmt-results"
+              hx-swap="innerHTML"
+              hx-push-url="true">
+        <i data-lucide="layers"></i><span>{% trans "All" %}</span>
+      </button>
+      <button type="button"
+              data-dir="in" data-status=""
+              class="st-pill st-pill-in {% if filter_direction == 'in' and not filter_status %}active{% endif %}"
+              hx-get="{% url 'current_account:cari_statement' cari.pk %}?direction=in{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+              hx-target="#stmt-results"
+              hx-swap="innerHTML"
+              hx-push-url="true">
+        <i data-lucide="arrow-down-circle"></i><span>{% trans "Inflows" %}</span>
+      </button>
+      <button type="button"
+              data-dir="out" data-status=""
+              class="st-pill st-pill-out {% if filter_direction == 'out' and not filter_status %}active{% endif %}"
+              hx-get="{% url 'current_account:cari_statement' cari.pk %}?direction=out{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+              hx-target="#stmt-results"
+              hx-swap="innerHTML"
+              hx-push-url="true">
+        <i data-lucide="arrow-up-circle"></i><span>{% trans "Outflows" %}</span>
+      </button>
+      <button type="button"
+              data-dir="" data-status="cancelled"
+              class="st-pill st-pill-void {% if filter_status == 'cancelled' %}active{% endif %}"
+              hx-get="{% url 'current_account:cari_statement' cari.pk %}?status=cancelled{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+              hx-target="#stmt-results"
+              hx-swap="innerHTML"
+              hx-push-url="true">
+        <i data-lucide="x-circle"></i><span>{% trans "Cancelled" %}</span>
+      </button>
+    </div>
+    <input type="hidden" name="direction" id="dirInput" value="{{ filter_direction }}">
+    <input type="hidden" name="status"    id="statusInput" value="{{ filter_status }}">
+
+    <label class="st-ctl" title="{% trans 'From' %}">
+      <span class="st-ctl-lbl">{% trans "From" %}</span>
+      <input type="date" name="date_from" value="{{ date_from }}">
+    </label>
+
+    <label class="st-ctl" title="{% trans 'To' %}">
+      <span class="st-ctl-lbl">{% trans "To" %}</span>
+      <input type="date" name="date_to" value="{{ date_to }}">
+    </label>
+
     <a href="{% url 'current_account:cari_statement' cari.pk %}" class="clear-link">{% trans "Clear" %}</a>
-    <span class="spacer"></span>
   </form>
 
-  <div class="st-summary">
-    <div class="st-stat">
-      <div class="lbl">{% trans "Opening Balance" %}</div>
-      <div class="val {% if opening > 0 %}pos{% elif opening < 0 %}neg{% endif %}">{{ opening|floatformat:2|intcomma }}</div>
-    </div>
-    <div class="st-stat">
-      <div class="lbl">{% trans "Total Debit" %}</div>
-      <div class="val pos">+{{ debit_total|floatformat:2|intcomma }}</div>
-    </div>
-    <div class="st-stat">
-      <div class="lbl">{% trans "Total Credit" %}</div>
-      <div class="val neg">−{{ credit_total|floatformat:2|intcomma }}</div>
-    </div>
-    <div class="st-stat">
-      <div class="lbl">{% trans "Closing Balance" %}</div>
-      <div class="val {% if closing > 0 %}pos{% elif closing < 0 %}neg{% endif %}">{{ closing|floatformat:2|intcomma }}</div>
-    </div>
-  </div>
-
-  <div class="st-card">
-    {% if rows %}
-    <table class="st-tbl">
-      <thead>
-        <tr>
-          <th>{% trans "Date" %}</th>
-          <th>{% trans "Due Date" %}</th>
-          <th>{% trans "Type" %}</th>
-          <th>{% trans "Description" %}</th>
-          <th>{% trans "Reference" %}</th>
-          <th class="num">{% trans "Debit" %}</th>
-          <th class="num">{% trans "Credit" %}</th>
-          <th class="num">{% trans "Balance" %}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="opening">
-          <td colspan="7">{% trans "Opening Balance" %}</td>
-          <td class="num">{{ opening|floatformat:2|intcomma }}</td>
-        </tr>
-        {% for r in rows %}
-        <tr>
-          <td><span class="st-date">{{ r.mv.date|date:"d.m.Y" }}</span></td>
-          <td>{% if r.mv.due_date %}<span class="st-date">{{ r.mv.due_date|date:"d.m.Y" }}</span>{% else %}<span class="st-date muted">—</span>{% endif %}</td>
-          <td><span class="mv-type">{{ r.mv.get_movement_type_display }}</span></td>
-          <td><span class="st-desc {% if not r.mv.description %}muted{% endif %}">{{ r.mv.description|default:"—" }}</span></td>
-          <td><span class="st-ref">{{ r.mv.reference|default:"—" }}</span></td>
-          <td class="num {% if r.mv.amount > 0 %}pos{% else %}muted{% endif %}">{% if r.mv.amount > 0 %}{{ r.mv.amount|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-          <td class="num {% if r.mv.amount < 0 %}neg{% else %}muted{% endif %}">{% if r.mv.amount < 0 %}{{ r.mv.amount|floatformat:2|intcomma|cut:'-' }}{% else %}—{% endif %}</td>
-          <td class="num">{{ r.balance_after|floatformat:2|intcomma }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-      <tfoot>
-        <tr>
-          <td colspan="5">{% trans "Total" %}</td>
-          <td class="num pos">+{{ debit_total|floatformat:2|intcomma }}</td>
-          <td class="num neg">−{{ credit_total|floatformat:2|intcomma }}</td>
-          <td class="num">{{ closing|floatformat:2|intcomma }}</td>
-        </tr>
-      </tfoot>
-    </table>
-    {% else %}
-      <div class="st-empty">
-        <div class="ico"><i data-lucide="inbox"></i></div>
-        <h3>{% trans "No movements" %}</h3>
-        <p>{% trans "No movements in the selected range." %}</p>
-      </div>
-    {% endif %}
+  <div id="stmt-results">
+    {% include "current_account/_cari_statement_results.html" %}
   </div>
 </div>
 
-<script>if (window.lucide) lucide.createIcons();</script>
+<script>
+  // Initial icon render — the partial re-runs lucide.createIcons() on
+  // every HTMX swap, this handles the first page load.
+  if (window.lucide) lucide.createIcons();
+
+  // Pill button group: HTMX swaps only the results container, so the
+  // buttons themselves wouldn't otherwise know their active state
+  // changed. Sync .active + both hidden inputs on every click so the
+  // user gets immediate visual feedback.
+  (function () {
+    const pills    = document.querySelectorAll('.st-pills .st-pill');
+    const dirInput = document.getElementById('dirInput');
+    const stInput  = document.getElementById('statusInput');
+    pills.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        pills.forEach(function (p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        if (dirInput) dirInput.value = btn.dataset.dir    || '';
+        if (stInput)  stInput.value  = btn.dataset.status || '';
+      });
+    });
+  })();
+</script>
 {% endblock %}

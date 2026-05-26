@@ -55,6 +55,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 # to filter products by multiple fields
 from django.db.models import Q
+from django.db import models
 
 
 from marketing.models import Product, ProductVariant
@@ -203,10 +204,137 @@ class OrderDetail(DetailView):
         # read costs without extra queries (the template also iterates
         # items for the line breakdown).
         return Order.objects.select_related(
-            "contact", "company", "web_client",
+            "contact", "company", "web_client", "cari",
         ).prefetch_related(
             "items__product", "items__product_variant",
         )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        cari = self.object.cari
+        if cari:
+            # Last 5 ledger movements for the sidebar widget — cheap
+            # query thanks to the (cari, -date) composite index.
+            ctx["cari_recent_movements"] = list(
+                cari.movements.select_related("currency").order_by("-date", "-id")[:5]
+            )
+            ctx["cari_invoices_count"] = cari.invoices.count()
+
+        # Invoices linked to THIS order. Used to (a) show the user
+        # what's already invoiced and (b) hide the "Create invoice"
+        # button when an active invoice already exists — preventing
+        # accidental duplicates that the user would have to clean up.
+        order_invoices = list(
+            self.object.invoices
+            .select_related("cari", "currency")
+            .order_by("-date", "-id")
+        )
+        ctx["order_invoices"] = order_invoices
+        ctx["has_active_invoice"] = any(
+            inv.status != "cancelled" for inv in order_invoices
+        )
+
+        # Status flow widget on the detail page — 4 ordered primary
+        # stages with an "active up to" highlight. We compare against
+        # ORDER_PRIMARY_STAGES so the bar still reads correctly even
+        # if order_status is a legacy value (e.g. "delivered" — that
+        # comes after "shipped", so all 4 are highlighted).
+        from .models import ORDER_PRIMARY_STAGES, ORDER_STATUS_CHOICES, CARRIER_CHOICES
+        primary = list(ORDER_PRIMARY_STAGES)
+        current = self.object.order_status or "pending"
+        # Position the bar fills up to. Statuses past "shipped"
+        # (in_transit / delivered / …) all count as 'shipped reached'.
+        if current in primary:
+            active_idx = primary.index(current)
+        elif current in {"in_transit", "out_for_delivery", "delivered"}:
+            active_idx = len(primary) - 1   # shipped + later → fill all 4
+        elif current in {"cancelled", "returned"}:
+            active_idx = -1                  # nothing filled
+        else:
+            active_idx = 0                   # default at first stage
+
+        ctx["status_stages"] = [
+            {"key": k, "label": dict(ORDER_STATUS_CHOICES).get(k, k), "filled": i <= active_idx}
+            for i, k in enumerate(primary)
+        ]
+        ctx["status_choices"]  = ORDER_STATUS_CHOICES
+        ctx["carrier_choices"] = CARRIER_CHOICES
+        ctx["is_terminal"] = current in {"cancelled", "returned"}
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        """Inline edit endpoints. Handles three actions:
+          - update_status: status / carrier / tracking_number bundle
+          - update_item:   single OrderItem field (quantity or price)
+          - update_notes:  order.notes
+        """
+        order = self.get_object()
+        from django.utils import timezone
+        from decimal import Decimal, InvalidOperation
+        from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES, OrderItem
+
+        action = (request.POST.get("action") or "").strip()
+
+        # ── Inline item edit (qty / price) ──────────────────────
+        if action == "update_item":
+            try:
+                item_id = int(request.POST.get("item_id") or 0)
+            except (TypeError, ValueError):
+                return JsonResponse({"ok": False, "error": "Bad item_id"}, status=400)
+            field = (request.POST.get("field") or "").strip()
+            value = (request.POST.get("value") or "").strip().replace(",", ".")
+
+            if field not in {"quantity", "price"}:
+                return JsonResponse({"ok": False, "error": "Field not editable"}, status=400)
+            try:
+                dec = Decimal(value)
+            except (InvalidOperation, ValueError):
+                return JsonResponse({"ok": False, "error": "Invalid number"}, status=400)
+            if dec < 0:
+                return JsonResponse({"ok": False, "error": "Must be ≥ 0"}, status=400)
+
+            item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            setattr(item, field, dec)
+            item.save(update_fields=[field, "updated_at"])
+            return JsonResponse({
+                "ok": True,
+                "item_id": item.pk,
+                "subtotal": float(item.subtotal()),
+                "order_total": float(order.total_value()),
+            })
+
+        # ── Inline notes edit ───────────────────────────────────
+        if action == "update_notes":
+            notes = request.POST.get("notes") or ""
+            order.notes = notes
+            order.save(update_fields=["notes", "updated_at"])
+            return JsonResponse({"ok": True})
+
+        if action != "update_status":
+            return self.get(request, *args, **kwargs)
+
+        new_status = (request.POST.get("order_status") or "").strip()
+        carrier = (request.POST.get("carrier") or "").strip()
+        tracking = (request.POST.get("tracking_number") or "").strip()
+
+        valid_statuses = {k for k, _ in ORDER_STATUS_CHOICES}
+        valid_carriers = {k for k, _ in CARRIER_CHOICES}
+
+        old_status = order.order_status
+        if new_status and new_status in valid_statuses:
+            order.order_status = new_status
+            # Stamp shipped_at automatically when transitioning to shipped.
+            if new_status == "shipped" and not order.shipped_at:
+                order.shipped_at = timezone.now()
+            if new_status == "delivered" and not order.delivered_at:
+                order.delivered_at = timezone.now()
+        if carrier:
+            order.carrier = carrier if carrier in valid_carriers else None
+        order.tracking_number = tracking or None
+        order.save(update_fields=["order_status", "carrier", "tracking_number",
+                                   "shipped_at", "delivered_at", "updated_at"])
+        messages.success(request, "Order updated.")
+        return redirect("operating:order_detail", pk=order.pk)
 
 
 class OrderPrint(DetailView):
@@ -413,6 +541,23 @@ class OrderCreate(View):
                     # Don't break the order save if stock-out hits an
                     # edge case — surface as a non-fatal message.
                     messages.warning(request, f"Order saved but stock-out had an issue: {_e}")
+
+                # ── Auto-link to a CariAccount + log the sales-order
+                # movement so the customer's ledger reflects this
+                # order immediately. Web orders are not routed through
+                # this view, so we don't gate on order kind here.
+                try:
+                    from current_account.services import (
+                        get_or_create_cari_for_order, post_order_movement,
+                    )
+                    member = getattr(request.user, "member", None)
+                    cari = get_or_create_cari_for_order(order, member=member)
+                    if cari and order.cari_id != cari.pk:
+                        order.cari = cari
+                        order.save(update_fields=["cari"])
+                    post_order_movement(order, member=member)
+                except Exception as _e:
+                    messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
 
                 return redirect("operating:order_detail", pk=order.pk)
             except Exception as e:
@@ -650,6 +795,23 @@ class OrderEdit(UpdateView):
                 except Exception as _e:
                     messages.warning(self.request, f"Order updated but stock movement sync had an issue: {_e}")
 
+                # ── Sync cari + movement after edit. If the customer
+                # was swapped, the order moves to the new cari and
+                # post_order_movement() updates the amount in place
+                # for the existing source-linked movement.
+                try:
+                    from current_account.services import (
+                        get_or_create_cari_for_order, post_order_movement,
+                    )
+                    member = getattr(self.request.user, "member", None)
+                    cari = get_or_create_cari_for_order(self.object, member=member)
+                    if cari and self.object.cari_id != cari.pk:
+                        self.object.cari = cari
+                        self.object.save(update_fields=["cari"])
+                    post_order_movement(self.object, member=member)
+                except Exception as _e:
+                    messages.warning(self.request, f"Order updated but cari sync had an issue: {_e}")
+
                 messages.success(self.request, "Order updated successfully.")
                 if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return JsonResponse({
@@ -807,17 +969,99 @@ class OrderItemUnitScanPack(View):
         return render(request, self.template_name, context)
 
 
-class OrderPackingList(ListView):
-    # model = Pack
+class OrderPackingList(View):
+    """Modern packing UI — pack at the OrderItem level.
+
+    GET  → render order items + their pack assignments. Auto-creates
+           Pack #1 the first time the page is opened.
+    POST → JSON API for the inline UI:
+           - action=add_pack            → create the next-numbered Pack
+           - action=assign  + item_id + pack_id → move item to that pack
+           - action=remove  + item_id   → unassign from any pack
+           - action=delete_pack + pack_id → remove pack (items go back to unassigned)
+    """
     template_name = "operating/order_packing_list.html"
 
-    # context_object_name = "packs"
-
     def get(self, request, pk):
-        order = Order.objects.get(pk=pk)
-        packs = Pack.objects.filter(order=order).order_by("pack_number")
-        context = {"order": order, "packs": packs}
-        return render(request, self.template_name, context)
+        from .models import PackedOrderItem
+        order = get_object_or_404(
+            Order.objects.prefetch_related(
+                "items__product", "items__product_variant",
+            ),
+            pk=pk,
+        )
+        # Auto-create Pack #1 if none exist — the UI assumes at least one.
+        if not order.packs.exists():
+            Pack.objects.create(order=order, pack_number=1)
+        packs = list(order.packs.order_by("pack_number")
+                                .prefetch_related("packed_order_items__order_item__product"))
+
+        items = list(order.items.select_related("product", "product_variant"))
+        assigned = {
+            poi.order_item_id: poi.pack_id
+            for poi in PackedOrderItem.objects.filter(pack__order=order)
+        }
+        for it in items:
+            it.assigned_pack_id = assigned.get(it.pk)
+
+        return render(request, self.template_name, {
+            "order": order,
+            "packs": packs,
+            "items": items,
+        })
+
+    def post(self, request, pk):
+        from .models import PackedOrderItem
+        order = get_object_or_404(Order, pk=pk)
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "add_pack":
+            next_n = (order.packs.aggregate(m=models.Max("pack_number"))["m"] or 0) + 1
+            pack = Pack.objects.create(order=order, pack_number=next_n)
+            return JsonResponse({"ok": True, "pack": {"id": pack.pk, "number": pack.pack_number}})
+
+        if action == "delete_pack":
+            try:
+                pack_id = int(request.POST.get("pack_id") or 0)
+            except (TypeError, ValueError):
+                return JsonResponse({"ok": False, "error": "Bad pack_id"}, status=400)
+            pack = get_object_or_404(Pack, pk=pack_id, order=order)
+            # Refuse to delete the last remaining pack.
+            if order.packs.count() <= 1:
+                return JsonResponse({"ok": False, "error": "Cannot delete the only pack"}, status=400)
+            pack.delete()  # CASCADE deletes the packed_order_items too
+            return JsonResponse({"ok": True})
+
+        if action == "assign":
+            try:
+                item_id = int(request.POST.get("item_id") or 0)
+                pack_id = int(request.POST.get("pack_id") or 0)
+            except (TypeError, ValueError):
+                return JsonResponse({"ok": False, "error": "Bad params"}, status=400)
+            item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            pack = get_object_or_404(Pack, pk=pack_id, order=order)
+            # OneToOneField guarantees one-pack-per-item: delete any
+            # existing assignment, then create the new one. This is
+            # the "auto-move" the user asked for.
+            PackedOrderItem.objects.filter(order_item=item).delete()
+            PackedOrderItem.objects.create(pack=pack, order_item=item)
+            return JsonResponse({
+                "ok": True,
+                "item_id": item.pk,
+                "pack_id": pack.pk,
+                "pack_number": pack.pack_number,
+            })
+
+        if action == "remove":
+            try:
+                item_id = int(request.POST.get("item_id") or 0)
+            except (TypeError, ValueError):
+                return JsonResponse({"ok": False, "error": "Bad item_id"}, status=400)
+            PackedOrderItem.objects.filter(order_item_id=item_id,
+                                           pack__order=order).delete()
+            return JsonResponse({"ok": True, "item_id": item_id})
+
+        return JsonResponse({"ok": False, "error": "Unknown action"}, status=400)
 
 
 # below is for receiving goods

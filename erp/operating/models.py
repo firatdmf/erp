@@ -12,6 +12,7 @@ from crm.models import Contact, Company
 from marketing.models import Product, ProductVariant, Supplier
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 # from accounting.models import AssetInventoryRawMaterial
 # uuid is used to generate unique identifiers for models.
@@ -268,18 +269,28 @@ STATUS_CHOICES = [
     ("cancelled", "Cancelled"),
 ]
 
-# Order status choices for customer-facing order tracking
+# Order status choices for customer-facing order tracking.
+# Labels go through gettext_lazy so the .po file controls the
+# displayed text (English source, Turkish translations).
+# The primary 4-stage flow the UI surfaces is:
+#   pending → preparing → packaging → shipped
+# The other statuses (confirmed, in_transit, …) remain for backward
+# compatibility with existing orders and the web-checkout API.
 ORDER_STATUS_CHOICES = [
-    ("pending", "Beklemede"),
-    ("confirmed", "Onaylandı"),
-    ("preparing", "Hazırlanıyor"),
-    ("shipped", "Kargoya Verildi"),
-    ("in_transit", "Yolda"),
-    ("out_for_delivery", "Dağıtımda"),
-    ("delivered", "Teslim Edildi"),
-    ("cancelled", "İptal Edildi"),
-    ("returned", "İade Edildi"),
+    ("pending",          _("Pending")),
+    ("confirmed",        _("Confirmed")),
+    ("preparing",        _("Preparing")),
+    ("packaging",        _("Packaging")),
+    ("shipped",          _("Shipped")),
+    ("in_transit",       _("In Transit")),
+    ("out_for_delivery", _("Out for Delivery")),
+    ("delivered",        _("Delivered")),
+    ("cancelled",        _("Cancelled")),
+    ("returned",         _("Returned")),
 ]
+# The four stages we surface on the order detail page as a progress
+# bar. Order matters — left to right is the natural flow.
+ORDER_PRIMARY_STAGES = ("pending", "preparing", "packaging", "shipped")
 
 # Carrier (shipping company) choices
 CARRIER_CHOICES = [
@@ -403,6 +414,18 @@ class Order(models.Model):
         null=True,
         blank=True,
         help_text="Kargo şirketi"
+    )
+
+    # Current-account link — auto-populated on save() for manual orders
+    # so cari pages can list this order's movements and so we don't
+    # double-create a cari for the same customer. Web orders skip this.
+    cari = models.ForeignKey(
+        "current_account.CariAccount",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+        help_text="Linked current account (auto-resolved from contact/company)"
     )
 
     def total_value(self):
@@ -1030,6 +1053,21 @@ class PackedItem(models.Model):
         self.order_item_unit.status = STATUS_CHOICES[5][0]  # ready
         self.order_item_unit.save(update_fields=["status"])
         super().save(*args, **kwargs)
+
+
+class PackedOrderItem(models.Model):
+    """Modern packing model — packs at the OrderItem level rather than
+    per-unit. Used by the simplified `order_packing_list` UI: every
+    OrderItem can be in at most ONE Pack; assigning to a new Pack
+    moves it, never duplicates."""
+    pack = models.ForeignKey(Pack, on_delete=models.CASCADE, related_name="packed_order_items")
+    order_item = models.OneToOneField(
+        "OrderItem", on_delete=models.CASCADE, related_name="packed_assignment",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["pack__pack_number", "id"]
 
 
 # class RawMaterialUnit(models.Model):

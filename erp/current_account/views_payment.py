@@ -102,9 +102,25 @@ def _filter_payments(request):
     if cari_id.isdigit():
         qs = qs.filter(cari_id=int(cari_id))
 
+    # Free-text cari filter: matches against name OR code so the user
+    # doesn't have to remember the exact spelling. Anchored by the
+    # filter bar's "Account" input.
+    cari_q = (request.GET.get("cari_q") or "").strip()
+    if cari_q:
+        qs = qs.filter(Q(cari__name__icontains=cari_q) | Q(cari__code__icontains=cari_q))
+
     type_ = request.GET.get("type") or ""
     if type_ in dict(Payment.PAYMENT_TYPES):
         qs = qs.filter(type=type_)
+
+    # Direction (Giriş / Çıkış) — money flow as seen by the company.
+    # Inflows = collections from customers + refunds from suppliers.
+    # Outflows = payments to suppliers + refunds to customers.
+    direction = (request.GET.get("direction") or "").strip()
+    if direction == "in":
+        qs = qs.filter(type__in=["collection", "refund_out"])
+    elif direction == "out":
+        qs = qs.filter(type__in=["payment", "refund_in"])
 
     status_ = request.GET.get("status") or ""
     if status_ in dict(Payment.STATUS_CHOICES):
@@ -146,7 +162,8 @@ class PaymentList(View):
             "q":            request.GET.get("q", ""),
             "filter_type":  request.GET.get("type", ""),
             "filter_status":request.GET.get("status", ""),
-            "filter_cari":  request.GET.get("cari", ""),
+            "filter_cari_q":request.GET.get("cari_q", ""),
+            "filter_direction": request.GET.get("direction", ""),
             "date_from":    request.GET.get("date_from", ""),
             "date_to":      request.GET.get("date_to", ""),
         })

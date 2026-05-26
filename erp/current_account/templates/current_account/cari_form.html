@@ -133,17 +133,10 @@
             </select>
           </div>
 
-          {% if not cari %}
-          <div class="cf-f">
-            <label>{% trans "Book" %}<span class="req">*</span></label>
-            <select name="book" required>
-              <option value="">{% trans "— Select —" %}</option>
-              {% for b in books %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
-            </select>
-          </div>
-          {% endif %}
+          {# Book selection removed — there is exactly one book and it
+             is auto-assigned by the view (get_default_book). #}
 
-          <div class="cf-f {% if cari %}span-2{% endif %}">
+          <div class="cf-f span-2">
             <label>{% trans "Currency" %}<span class="req">*</span></label>
             <select name="default_currency" required>
               {% for c in currencies %}<option value="{{ c.id }}" {% if cari and cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>{% endfor %}

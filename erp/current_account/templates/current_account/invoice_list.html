@@ -52,14 +52,74 @@
   .iv-search-input::placeholder { color: var(--gray-500); }
   .iv-search-input:focus { background: white; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
 
-  .iv-toolbar { display:flex; flex-wrap:wrap; gap: 8px; align-items:center; padding: 10px 12px; background: white; border:1px solid #E2E8EE; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
-  .iv-toolbar select, .iv-toolbar input[type=date] { padding: 7px 10px; border: 1px dashed #C5CCD3; border-radius: 8px; background: white; font: 500 12.5px var(--font-sans); color: var(--gray-700); cursor: pointer; outline: none; transition: all 140ms; font-family: var(--font-sans); }
-  .iv-toolbar select:hover, .iv-toolbar input[type=date]:hover { border-color: var(--gray-500); }
-  .iv-toolbar select:focus, .iv-toolbar input[type=date]:focus { border-style: solid; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
-  .iv-toolbar .fc-lbl { font: 600 11px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); margin-right: 2px; margin-left: 6px; }
-  .iv-toolbar .fc-lbl:first-child { margin-left: 0; }
-  .iv-reset { color: var(--gray-500); font: 500 12.5px var(--font-sans); text-decoration: none; padding: 7px 10px; margin-left: auto; }
-  .iv-reset:hover { color: var(--nejum-teal-700); }
+  /* Compact filter bar — same chip pattern as payment_list / cari_list */
+  .iv-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+  }
+  .iv-ctl {
+    display: flex; align-items: stretch;
+    background: white;
+    border: 1px solid #DDE3E7;
+    border-radius: 7px;
+    overflow: hidden;
+    min-width: 0;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .iv-ctl:hover { border-color: var(--gray-500); }
+  .iv-ctl:focus-within { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .iv-ctl-lbl {
+    flex-shrink: 0;
+    padding: 0 8px;
+    display: inline-flex; align-items: center;
+    background: #F8FAFC;
+    border-right: 1px solid #EEF1F5;
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  .iv-toolbar select,
+  .iv-toolbar input[type=date] {
+    flex: 1; min-width: 0;
+    padding: 7px 9px;
+    border: 0 !important; outline: none !important; box-shadow: none !important;
+    background: transparent;
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    font: 500 12.5px var(--font-sans); color: var(--gray-700);
+    font-family: var(--font-sans);
+  }
+  .iv-toolbar select {
+    padding-right: 26px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='none' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    cursor: pointer;
+  }
+  .iv-reset {
+    justify-self: end;
+    color: var(--gray-500);
+    font: 600 12px var(--font-sans);
+    text-decoration: none;
+    padding: 7px 12px;
+    border-radius: 7px;
+    transition: color 140ms, background 140ms;
+  }
+  .iv-reset:hover { color: var(--nejum-teal-700); background: #F1F5F9; }
+  @media (max-width: 720px) {
+    .iv-toolbar { grid-template-columns: 1fr 1fr; }
+    .iv-reset { grid-column: 1 / -1; justify-self: end; }
+  }
+  @media (max-width: 480px) {
+    .iv-toolbar { grid-template-columns: 1fr; padding: 8px; }
+  }
 
   .iv-meta { display:flex; align-items:center; justify-content:space-between; padding: 4px 6px; margin-bottom: 12px; }
   .iv-result { font: 500 12.5px var(--font-sans); color: var(--gray-600); }
@@ -175,23 +235,23 @@
     <div class="iv-toolbar">
       {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
 
-      <span class="fc-lbl">{% trans "Type" %}</span>
-      <select name="type" onchange="this.form.submit()">
-        <option value="">{% trans "All Types" %}</option>
-        {% for v,l in type_choices %}<option value="{{ v }}" {% if filter_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
-      </select>
+      <label class="iv-ctl" title="{% trans 'Type' %}">
+        <span class="iv-ctl-lbl">{% trans "Type" %}</span>
+        <select name="type" onchange="this.form.submit()">
+          <option value="">{% trans "All" %}</option>
+          {% for v,l in type_choices %}<option value="{{ v }}" {% if filter_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+        </select>
+      </label>
 
-      <span class="fc-lbl">{% trans "Book" %}</span>
-      <select name="book" onchange="this.form.submit()">
-        <option value="">{% trans "All Books" %}</option>
-        {% for b in books %}<option value="{{ b.id }}" {% if filter_book == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
-      </select>
+      <label class="iv-ctl" title="{% trans 'From' %}">
+        <span class="iv-ctl-lbl">{% trans "From" %}</span>
+        <input type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()">
+      </label>
 
-      <span class="fc-lbl">{% trans "From" %}</span>
-      <input type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()">
-
-      <span class="fc-lbl">{% trans "To" %}</span>
-      <input type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()">
+      <label class="iv-ctl" title="{% trans 'To' %}">
+        <span class="iv-ctl-lbl">{% trans "To" %}</span>
+        <input type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()">
+      </label>
 
       <a class="iv-reset" href="{% url 'current_account:invoice_list' %}">{% trans "Clear" %}</a>
     </div>

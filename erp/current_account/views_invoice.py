@@ -64,13 +64,18 @@ def _parse_items(items_json):
         desc = (raw.get("description") or "").strip()
         if not desc:
             continue
+        def _to_int(v):
+            try:
+                return int(v) if v not in (None, "", "null") else None
+            except (TypeError, ValueError):
+                return None
         out.append({
             "line_no":       i,
             "description":   desc[:300],
-            "product_id":    raw.get("product_id") or None,
-            "variant_id":    raw.get("variant_id") or None,
+            "product_id":    _to_int(raw.get("product_id")),
+            "variant_id":    _to_int(raw.get("variant_id")),
             "quantity":      _parse_decimal(raw.get("quantity"), "1"),
-            "unit":          (raw.get("unit") or "adet")[:20],
+            "unit":          (raw.get("unit") or "pcs")[:20],
             "unit_price":    _parse_decimal(raw.get("unit_price")),
             "discount_rate": _parse_decimal(raw.get("discount_rate")),
             "tax_rate":      _parse_decimal(raw.get("tax_rate"), "20"),
@@ -126,8 +131,14 @@ class InvoiceList(View):
     def get(self, request):
         qs = _filter_invoices(request)
 
-        totals = qs.aggregate(
-            n=Count("id"),
+        # Stats — exclude cancelled invoices from both the sum and the
+        # unpaid balance. They net to zero on the ledger anyway, so
+        # showing their amount as "open balance" would be misleading.
+        # The count still includes them so the user can see the full
+        # list size on the row count.
+        active_qs = qs.exclude(status="cancelled")
+        totals = qs.aggregate(n=Count("id"))
+        active_totals = active_qs.aggregate(
             total_sum=Sum("total"),
             unpaid_sum=Sum("balance"),
         )
@@ -136,8 +147,8 @@ class InvoiceList(View):
         ctx = {
             "invoices":    qs[:500],
             "n":           totals["n"] or 0,
-            "total_sum":   totals["total_sum"]  or Decimal("0.00"),
-            "unpaid_sum":  totals["unpaid_sum"] or Decimal("0.00"),
+            "total_sum":   active_totals["total_sum"]  or Decimal("0.00"),
+            "unpaid_sum":  active_totals["unpaid_sum"] or Decimal("0.00"),
             "books":       Book.objects.all(),
             "type_choices":   Invoice.INVOICE_TYPES,
             "status_choices": Invoice.STATUS_CHOICES,
@@ -161,9 +172,62 @@ class InvoiceCreate(View):
 
     def get(self, request):
         prefilled_cari = None
+        prefilled_order = None
+        items_json = "[]"
+
+        # ── Path A: explicit ?cari=<id> ───────────────────────────
         cari_id = request.GET.get("cari")
         if cari_id and cari_id.isdigit():
             prefilled_cari = CariAccount.objects.filter(pk=int(cari_id)).first()
+
+        # ── Path B: ?order=<id> — pre-fill cari + line items from
+        # the operating order so the user can create an invoice
+        # straight from the order detail page. The cari comes from
+        # the order's auto-linked cari (see operating/views.py).
+        order_id = request.GET.get("order")
+        if order_id and order_id.isdigit():
+            from operating.models import Order
+            prefilled_order = (
+                Order.objects.select_related("cari")
+                .prefetch_related("items__product", "items__product_variant")
+                .filter(pk=int(order_id)).first()
+            )
+            if prefilled_order:
+                # Block duplicate invoices — if this order already has a
+                # non-cancelled invoice, bounce back to the order detail
+                # with an explanatory message. The user must cancel or
+                # delete the existing one first.
+                existing = prefilled_order.invoices.exclude(status="cancelled").first()
+                if existing:
+                    messages.warning(
+                        request,
+                        _g("This order already has an invoice (%(num)s). Cancel or delete it before creating a new one.")
+                        % {"num": f"{existing.series}-{existing.number}"},
+                    )
+                    return redirect("operating:order_detail", pk=prefilled_order.pk)
+                if prefilled_order.cari and not prefilled_cari:
+                    prefilled_cari = prefilled_order.cari
+                # Shape order items into the invoice items_json format
+                # expected by _parse_items / the form's JS handler.
+                items = []
+                for it in prefilled_order.items.all():
+                    desc = ""
+                    if it.product_variant:
+                        desc = f"{it.product.title} [{it.product_variant.variant_sku}]"
+                    elif it.product:
+                        desc = it.product.title
+                    items.append({
+                        "description":   desc or "Item",
+                        "product_id":    it.product_id,
+                        "variant_id":    it.product_variant_id,
+                        "quantity":      str(it.quantity or 0),
+                        "unit":          "pcs",
+                        "unit_price":    str(it.price or 0),
+                        "discount_rate": "0",
+                        "tax_rate":      "20",
+                    })
+                import json as _json
+                items_json = _json.dumps(items)
 
         cari_options = (
             CariAccount.objects.filter(is_active=True).order_by("name")
@@ -173,11 +237,12 @@ class InvoiceCreate(View):
         return render(request, self.template_name, {
             "invoice": None,
             "prefilled_cari": prefilled_cari,
+            "prefilled_order": prefilled_order,
             "cari_options": cari_options,
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices": Invoice.INVOICE_TYPES,
             "default_due_days": 30,
-            "items_json": "[]",
+            "items_json": items_json,
         })
 
     def post(self, request):
@@ -217,6 +282,46 @@ class InvoiceCreate(View):
             messages.error(request, _g("Invalid date."))
             return redirect("current_account:invoice_create")
 
+        # If invoice is being created from an operating Order, capture
+        # the link so we can pre-fill from it next time and join the
+        # invoice to its source order in reports.
+        order_obj = None
+        order_id = request.POST.get("order")
+        if order_id and str(order_id).isdigit():
+            from operating.models import Order
+            order_obj = Order.objects.filter(pk=int(order_id)).first()
+            # Server-side duplicate guard — same check the GET path
+            # runs, so a stale form submit can't slip a second invoice
+            # past us.
+            if order_obj:
+                dup = order_obj.invoices.exclude(status="cancelled").first()
+                if dup:
+                    messages.warning(
+                        request,
+                        _g("This order already has an invoice (%(num)s). Cancel or delete it before creating a new one.")
+                        % {"num": f"{dup.series}-{dup.number}"},
+                    )
+                    return redirect("operating:order_detail", pk=order_obj.pk)
+
+        # Per-invoice consignee/issuer overrides (blank = use cari/brand)
+        snapshot = {
+            "bill_to_name":       (request.POST.get("bill_to_name") or "").strip(),
+            "bill_to_address":    (request.POST.get("bill_to_address") or "").strip(),
+            "bill_to_city":       (request.POST.get("bill_to_city") or "").strip(),
+            "bill_to_country":    (request.POST.get("bill_to_country") or "").strip(),
+            "bill_to_phone":      (request.POST.get("bill_to_phone") or "").strip(),
+            "bill_to_email":      (request.POST.get("bill_to_email") or "").strip(),
+            "bill_to_tax_office": (request.POST.get("bill_to_tax_office") or "").strip(),
+            "bill_to_tax_number": (request.POST.get("bill_to_tax_number") or "").strip(),
+            "issuer_name":        (request.POST.get("issuer_name") or "").strip(),
+            "issuer_address":     (request.POST.get("issuer_address") or "").strip(),
+            "issuer_phone":       (request.POST.get("issuer_phone") or "").strip(),
+            "issuer_fax":         (request.POST.get("issuer_fax") or "").strip(),
+            "issuer_email":       (request.POST.get("issuer_email") or "").strip(),
+            "issuer_tax_office":  (request.POST.get("issuer_tax_office") or "").strip(),
+            "issuer_tax_number":  (request.POST.get("issuer_tax_number") or "").strip(),
+        }
+
         with transaction.atomic():
             invoice = Invoice.objects.create(
                 cari=cari,
@@ -231,7 +336,9 @@ class InvoiceCreate(View):
                 currency_id=currency_id,
                 other_charges=_parse_decimal(request.POST.get("other_charges")),
                 notes=request.POST.get("notes", ""),
+                order=order_obj,
                 created_by=getattr(request.user, "member", None),
+                **snapshot,
             )
             for item in items_data:
                 InvoiceItem.objects.create(invoice=invoice, **item)
@@ -249,17 +356,32 @@ class InvoiceCreate(View):
 
 
 # ---------------------------------------------------------------------------
-# Edit (draft only)
+# Edit
+#   - Draft   → freely editable (no ledger movement yet)
+#   - Issued / Partially Paid / Paid / Overdue → editable; on save we
+#     refresh the linked CariMovement (description, date, due, amount)
+#     so the cari ledger stays in lock-step with the invoice. The
+#     amount-zero rule for order-attached invoices still applies, so
+#     edits to such invoices NEVER touch the balance.
+#   - Cancelled → not editable; the cancellation counter-movement
+#     already balanced the ledger, and changing the original would
+#     drift things out of sync.
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
 class InvoiceEdit(View):
     template_name = "current_account/invoice_form.html"
 
+    def _block_if_cancelled(self, request, invoice):
+        if invoice.status == "cancelled":
+            messages.warning(request, _g("Cancelled invoices can't be edited. Create a new one if needed."))
+            return redirect("current_account:invoice_detail", pk=invoice.pk)
+        return None
+
     def get(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if invoice.status != "draft":
-            messages.warning(request, _g("Only draft invoices can be edited."))
-            return redirect("current_account:invoice_detail", pk=pk)
+        blocked = self._block_if_cancelled(request, invoice)
+        if blocked:
+            return blocked
 
         return render(request, self.template_name, {
             "invoice": invoice,
@@ -279,10 +401,11 @@ class InvoiceEdit(View):
         })
 
     def post(self, request, pk):
+        from decimal import Decimal
         invoice = get_object_or_404(Invoice, pk=pk)
-        if invoice.status != "draft":
-            messages.error(request, _g("Only draft invoices can be edited."))
-            return redirect("current_account:invoice_detail", pk=pk)
+        blocked = self._block_if_cancelled(request, invoice)
+        if blocked:
+            return blocked
 
         try:
             items_data = _parse_items(request.POST.get("items_json", ""))
@@ -303,15 +426,45 @@ class InvoiceEdit(View):
                 invoice.currency_id = int(currency_id)
             invoice.other_charges = _parse_decimal(request.POST.get("other_charges"))
             invoice.notes = request.POST.get("notes", "")
+            # Per-invoice consignee + issuer overrides
+            for f in ("bill_to_name", "bill_to_address", "bill_to_city", "bill_to_country",
+                      "bill_to_phone", "bill_to_email", "bill_to_tax_office", "bill_to_tax_number",
+                      "issuer_name", "issuer_address", "issuer_phone", "issuer_fax",
+                      "issuer_email", "issuer_tax_office", "issuer_tax_number"):
+                setattr(invoice, f, (request.POST.get(f) or "").strip())
             invoice.save()
 
-            # Replace items wholesale (draft only — safe)
+            # Wipe + recreate items. For issued invoices this is also
+            # safe because each InvoiceItem doesn't carry external
+            # references — only the parent Invoice + its posted_movement
+            # do, which we update next.
             invoice.items.all().delete()
             for item in items_data:
                 InvoiceItem.objects.create(invoice=invoice, **item)
             invoice.recompute_totals(save=True)
 
-            if request.POST.get("auto_issue") == "1":
+            # ── Sync the cari movement if this invoice was already
+            # posted to the ledger. Order-attached invoices stay at
+            # amount=0 (no double counting); standalone invoices get
+            # their amount/desc/date refreshed in place.
+            mv = invoice.posted_movement
+            if mv:
+                if invoice.order_id:
+                    new_amount = Decimal("0.00")
+                else:
+                    new_amount = invoice.total * Decimal(invoice.ledger_sign)
+                mv.amount = new_amount
+                mv.amount_base = Decimal("0")    # force recompute on save
+                mv.date = invoice.date
+                mv.due_date = invoice.due_date
+                mv.currency = invoice.currency
+                mv.description = f"{invoice.get_type_display()} {invoice.series}-{invoice.number}"
+                mv.reference = f"{invoice.series}-{invoice.number}"
+                mv.save()
+                # CariMovement.save() already calls recompute_balance,
+                # so the cari snapshot is up-to-date now.
+
+            if request.POST.get("auto_issue") == "1" and invoice.status == "draft":
                 try:
                     invoice.issue(user=request.user)
                 except ValidationError as ve:
@@ -334,7 +487,9 @@ class InvoiceDetail(View):
                                            "posted_movement"),
             pk=pk,
         )
-        items = invoice.items.select_related("product", "variant").order_by("line_no")
+        items = invoice.items.select_related(
+            "product", "product__category", "variant",
+        ).order_by("line_no")
 
         # Tax breakdown by rate (for the totals summary)
         tax_breakdown = {}

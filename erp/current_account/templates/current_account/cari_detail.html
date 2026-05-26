@@ -113,6 +113,47 @@
   .cd-tbl td.num.pos { color: #B23B12; }
   .cd-tbl td.num.neg { color: #0E6E4A; }
   .cd-tbl .mv-type { display:inline-flex; align-items:center; gap: 4px; padding: 2px 8px; border-radius: 999px; font: 600 10.5px var(--font-sans); background: #EEF1F5; color: var(--gray-700); white-space: nowrap; }
+  /* Movement linked to a Payment/Invoice — teal pill + hover state */
+  .cd-tbl a.mv-type-link {
+    background: var(--nejum-teal-50, #E5F1F0);
+    color: var(--nejum-teal-700, #005354);
+    text-decoration: none;
+    transition: background 140ms, color 140ms;
+  }
+  .cd-tbl a.mv-type-link:hover {
+    background: var(--nejum-teal-100, #C8E3E1);
+    color: var(--nejum-teal-700, #005354);
+  }
+  .cd-tbl tr.mv-link:hover { background: #F4FAFA !important; }
+  /* Payment/Invoice reference + status badge in the Reference column */
+  .cd-tbl .mv-ref {
+    font: 600 12px var(--font-mono);
+    color: var(--nejum-teal-700, #005354);
+    text-decoration: none;
+    padding: 2px 7px;
+    background: var(--nejum-teal-50, #E5F1F0);
+    border-radius: 5px;
+    letter-spacing: 0.02em;
+    transition: background 140ms;
+  }
+  .cd-tbl .mv-ref:hover { background: var(--nejum-teal-100, #C8E3E1); }
+  .cd-tbl .mv-st {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font: 700 9.5px var(--font-sans);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+  .cd-tbl .mv-st-confirmed { background: #DCFCE7; color: #166534; }
+  .cd-tbl .mv-st-draft     { background: #FEF3C7; color: #92400E; }
+  .cd-tbl .mv-st-cancelled { background: #FEE2E2; color: #991B1B; }
+  .cd-tbl .mv-st-issued    { background: #DBEAFE; color: #1E40AF; }
+  .cd-tbl .mv-st-paid      { background: #DCFCE7; color: #166534; }
+  .cd-tbl .mv-st-partially_paid { background: #FED7AA; color: #9A3412; }
+  .cd-tbl .mv-st-overdue   { background: #FECACA; color: #991B1B; }
   .cd-tbl .invno { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); text-decoration: none; }
   .cd-tbl .invno:hover { text-decoration: underline; }
 
@@ -210,6 +251,45 @@
         </div>
       </div>
 
+      <!-- Recent orders -->
+      {% if recent_orders %}
+      <div class="cd-card">
+        <div class="cd-sect" style="padding-bottom: 4px;">
+          <div class="cd-sect-h">
+            <span class="ico"><i data-lucide="shopping-cart"></i></span>
+            <h3>{% trans "Recent Orders" %}</h3>
+            <a href="{% url 'operating:order_list' %}" class="all">{% trans "All" %} →</a>
+          </div>
+        </div>
+        <table class="cd-tbl">
+          <thead>
+            <tr>
+              <th>{% trans "Order" %}</th>
+              <th>{% trans "Date" %}</th>
+              <th>{% trans "Status" %}</th>
+              <th class="num">{% trans "Items" %}</th>
+              <th class="num">{% trans "Total" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for o in recent_orders %}
+            <tr>
+              <td>
+                <a class="invno" href="{% url 'operating:order_detail' o.pk %}">
+                  {% if o.order_number %}{{ o.order_number }}{% else %}#{{ o.pk }}{% endif %}
+                </a>
+              </td>
+              <td style="color: var(--gray-600); font-size: 12.5px;">{{ o.created_at|date:"d.m.Y" }}</td>
+              <td style="color: var(--gray-600); font-size: 12px;">{{ o.get_status_display }}</td>
+              <td class="num">{{ o.items.count }}</td>
+              <td class="num">${{ o.total_value|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
       <!-- Recent invoices -->
       {% if recent_invoices %}
       <div class="cd-card">
@@ -240,6 +320,7 @@
       </div>
       {% endif %}
 
+
       <!-- Recent movements -->
       <div class="cd-card">
         <div class="cd-sect" style="padding-bottom: 4px;">
@@ -256,14 +337,46 @@
           </thead>
           <tbody>
             {% for m in movements %}
-            <tr>
+            {% with link_url='' pay=m.linked_payment inv=m.linked_invoice %}
+              {% if pay %}{% url 'current_account:payment_detail' pay.pk as link_url %}
+              {% elif inv %}{% url 'current_account:invoice_detail' inv.pk as link_url %}
+              {% endif %}
+            <tr {% if link_url %}class="mv-link" data-href="{{ link_url }}" style="cursor:pointer;"{% endif %}>
               <td style="color: var(--gray-600); font-size: 12.5px;">{{ m.mv.date|date:"d.m.Y" }}</td>
-              <td><span class="mv-type">{{ m.mv.get_movement_type_display }}</span></td>
+              <td>
+                {% if link_url %}
+                  <a class="mv-type mv-type-link" href="{{ link_url }}" onclick="event.stopPropagation();">
+                    {{ m.mv.get_movement_type_display }}
+                    <i data-lucide="arrow-up-right" style="width:11px;height:11px;margin-left:2px;vertical-align:-1px;opacity:0.7;"></i>
+                  </a>
+                {% else %}
+                  <span class="mv-type">{{ m.mv.get_movement_type_display }}</span>
+                {% endif %}
+              </td>
               <td>{{ m.mv.description|default:"—" }}</td>
-              <td style="color: var(--gray-500); font-size: 12.5px;">{{ m.mv.reference|default:"—" }}</td>
+              <td style="font-size: 12.5px;">
+                {% if pay %}
+                  <a href="{% url 'current_account:payment_detail' pay.pk %}"
+                     class="mv-ref"
+                     onclick="event.stopPropagation();">{{ pay.number }}</a>
+                  {% if m.is_cancel_row or pay.status != 'cancelled' %}
+                    <span class="mv-st mv-st-{{ pay.status }}">{{ pay.get_status_display }}</span>
+                  {% endif %}
+                {% elif inv %}
+                  <a href="{% url 'current_account:invoice_detail' inv.pk %}"
+                     class="mv-ref"
+                     onclick="event.stopPropagation();">{{ inv.series }}-{{ inv.number }}</a>
+                  {% if m.is_cancel_row or inv.status != 'cancelled' %}
+                    <span class="mv-st mv-st-{{ inv.status }}">{{ inv.get_status_display }}</span>
+                  {% endif %}
+                {% else %}
+                  <span style="color: var(--gray-500);">{{ m.mv.reference|default:"—" }}</span>
+                {% endif %}
+              </td>
               <td class="num {% if m.mv.amount > 0 %}pos{% elif m.mv.amount < 0 %}neg{% endif %}">{% if m.mv.amount > 0 %}+{% endif %}{{ m.mv.amount|floatformat:2|intcomma }} {{ m.mv.currency.code }}</td>
               <td class="num">{{ m.balance_after|floatformat:2|intcomma }}</td>
             </tr>
+            {% endwith %}
             {% endfor %}
           </tbody>
         </table>
@@ -383,5 +496,15 @@
   </div>
 </div>
 
-<script>if (window.lucide) lucide.createIcons();</script>
+<script>
+  if (window.lucide) lucide.createIcons();
+  // Whole-row click for movements linked to a payment or invoice.
+  document.querySelectorAll('tr.mv-link[data-href]').forEach(function (tr) {
+    tr.addEventListener('click', function (e) {
+      // Don't hijack clicks that already landed on a real link or button.
+      if (e.target.closest('a, button')) return;
+      window.location.href = tr.dataset.href;
+    });
+  });
+</script>
 {% endblock %}

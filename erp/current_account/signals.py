@@ -107,6 +107,76 @@ def mirror_movement_to_legacy(sender, instance, created, **kwargs):
         )
 
 
+# ---------------------------------------------------------------------------
+# 3. Mirror collection/payment CariMovements into Payment rows
+#
+# Without this, anything that creates a "collection" or "payment" type
+# CariMovement directly (Add Movement form, manual code, scripts, etc.)
+# would be invisible on the /cari/tahsilat/ list, which reads from
+# Payment — not from CariMovement. We post_save here so EVERY entry
+# point gets covered, not just the one explicit view.
+# ---------------------------------------------------------------------------
+@receiver(post_save, sender=CariMovement)
+def mirror_movement_to_payment(sender, instance, created, **kwargs):
+    if not created:
+        return
+    if instance.movement_type not in ("collection", "payment"):
+        return
+    # Already linked from a Payment.confirm() call — that path created
+    # the Payment first and then the movement, so we don't want to
+    # double-up here.
+    #
+    # IMPORTANT: the OneToOne back-reference (`instance.payment`) is NOT
+    # set yet at this point — confirm() creates the movement first and
+    # only assigns posted_movement afterwards. So hasattr() alone races
+    # and creates a duplicate Payment, which then fails the unique
+    # constraint on posted_movement_id.
+    #
+    # The reliable signal is source_type/source_id: confirm() sets both
+    # to the Payment that owns this movement. If either is present, skip.
+    if hasattr(instance, "payment"):
+        return
+    try:
+        from .models import Payment
+        if (
+            instance.source_type_id
+            and instance.source_type.model_class() is Payment
+            and instance.source_id
+        ):
+            return
+    except Exception:
+        # Defensive — if source_type lookup blows up, fall through to
+        # mirror behaviour rather than crashing the save.
+        pass
+    # Skip during legacy backfills.
+    if instance.movement_type in ("legacy_ar", "legacy_ap"):
+        return
+
+    try:
+        from .views_payment import _next_payment_number
+        from .models import Payment
+        Payment.objects.create(
+            cari=instance.cari,
+            book=instance.book,
+            number=_next_payment_number(instance.book, instance.movement_type),
+            type=instance.movement_type,
+            method="cash",
+            status="confirmed",
+            date=instance.date,
+            amount=abs(instance.amount),
+            currency=instance.currency,
+            description=instance.description,
+            notes=instance.reference,
+            posted_movement=instance,
+            created_by=instance.created_by,
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger("current_account").warning(
+            "Mirror to Payment failed for CariMovement %s: %s", instance.pk, exc,
+        )
+
+
 @receiver(post_delete, sender=CariMovement)
 def unmirror_movement(sender, instance, **kwargs):
     from accounting.models import AssetAccountsReceivable, LiabilityAccountsPayable

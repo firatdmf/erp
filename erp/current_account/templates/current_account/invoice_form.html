@@ -99,19 +99,81 @@
   .if-cari-chip .change:hover { color: var(--nejum-teal-700); }
 
   /* Items table */
-  .if-items table { width: 100%; border-collapse: collapse; font: 400 13px var(--font-sans); }
-  .if-items thead th { background: #FAFBFD; border-top: 1px solid #E2E8EE; border-bottom: 1px solid #E2E8EE; font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); padding: 10px 12px; text-align: left; }
+  .if-items { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .if-items table { width: 100%; border-collapse: collapse; font: 400 13px var(--font-sans); table-layout: fixed; }
+  .if-items thead th { background: #FAFBFD; border-top: 1px solid #E2E8EE; border-bottom: 1px solid #E2E8EE; font: 600 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-500); padding: 9px 8px; text-align: left; white-space: nowrap; }
   .if-items thead th.amt { text-align: right; }
-  .if-items tbody td { padding: 6px 8px; border-bottom: 1px solid #EEF1F5; vertical-align: middle; }
+  .if-items tbody td { padding: 5px 6px; border-bottom: 1px solid #EEF1F5; vertical-align: middle; }
   .if-items tbody tr:last-child td { border-bottom: none; }
   .if-items tbody tr:hover { background: #FAFBFD; }
-  .if-items .line-no { font: 600 12px var(--font-mono); color: var(--gray-500); padding-left: 14px; }
-  .if-items input { width: 100%; border: 1px solid transparent; background: transparent; padding: 7px 10px; font: 500 13px var(--font-sans); color: var(--ink); outline: none; border-radius: 6px; transition: all 140ms; }
+  .if-items .line-no { font: 600 12px var(--font-mono); color: var(--gray-500); padding-left: 10px; }
+  .if-items input {
+    width: 100%; box-sizing: border-box;
+    border: 1px solid transparent; background: transparent;
+    padding: 6px 8px;
+    font: 500 13px var(--font-sans); color: var(--ink);
+    outline: none; border-radius: 6px;
+    transition: all 140ms;
+    /* numeric inputs: leave just enough room for the spinner arrows */
+    appearance: textfield; -moz-appearance: textfield;
+  }
   .if-items input:focus { border-color: var(--nejum-teal-500); background: white; box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
-  .if-items input.amt { text-align: right; font-variant-numeric: tabular-nums; }
-  .if-items .row-total { text-align: right; font: 700 13.5px var(--font-sans); padding: 12px 14px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+  .if-items input.amt { text-align: right; font-variant-numeric: tabular-nums; padding-right: 4px; }
+  .if-items .row-total { text-align: right; font: 700 13px var(--font-sans); padding: 8px 10px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
   .if-items .btn-del { background: transparent; border: 1px solid transparent; color: var(--gray-400); cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; transition: all 140ms; }
   .if-items .btn-del:hover { background: #FEF2F2; border-color: #FECDD3; color: #B23B12; }
+
+  /* Tablet — drop the Unit + Disc% columns, they're rarely changed
+     and free up ~14% of the row width for the numerics that matter. */
+  @media (max-width: 1100px) {
+    .if-items .col-unit, .if-items .col-disc { display: none; }
+  }
+  /* Phone — switch the table to a per-row card stack so each input
+     gets a full-width touch target instead of fighting for px. */
+  @media (max-width: 640px) {
+    .if-items table, .if-items thead, .if-items tbody, .if-items tr, .if-items td {
+      display: block; width: 100%;
+    }
+    .if-items thead { display: none; }
+    .if-items tbody tr {
+      border: 1px solid #E2E8EE;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: white;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+      position: relative;
+    }
+    .if-items tbody tr:hover { background: white; }
+    .if-items tbody td { padding: 0; border: none; }
+    .if-items tbody td[data-mlabel]::before {
+      content: attr(data-mlabel);
+      display: block;
+      font: 700 9.5px var(--font-sans);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gray-500);
+      margin-bottom: 2px;
+    }
+    .if-items tbody td.col-desc, .if-items tbody td.col-total {
+      grid-column: 1 / -1;
+    }
+    .if-items input { padding: 8px 10px; border: 1px solid #E0E6EE; background: white; font-size: 14px; }
+    .if-items input.amt { text-align: left; }
+    .if-items .line-no {
+      position: absolute; top: 10px; right: 38px;
+      padding: 2px 8px; background: #F4F7FB; border-radius: 999px;
+      font-size: 10px;
+    }
+    .if-items .row-total {
+      text-align: left; padding: 0;
+      font-size: 16px; color: var(--nejum-teal-700, #005354);
+    }
+    .if-items td.col-del { position: absolute; top: 6px; right: 6px; width: auto; }
+    .if-items .btn-del { padding: 4px; }
+  }
 
   .if-add-row-wrap { padding: 14px 22px; }
   .if-add-row { display: inline-flex; align-items: center; gap: 7px; background: white; border: 1px dashed #C5CCD3; color: var(--nejum-teal-700); font: 600 13px var(--font-sans); padding: 9px 14px; border-radius: 10px; cursor: pointer; transition: all 140ms; }
@@ -161,6 +223,7 @@
   <form id="invoiceForm" method="post">
     {% csrf_token %}
     <input type="hidden" name="items_json" id="itemsJson">
+    {% if prefilled_order %}<input type="hidden" name="order" value="{{ prefilled_order.id }}">{% endif %}
 
     <div class="if-grid">
       <!-- LEFT: header + items -->
@@ -237,13 +300,137 @@
           </div>
         </div>
 
+        <!-- Consignee (Bill-to) override -->
+        <div class="if-card">
+          <div class="if-sect">
+            <div class="if-sect-h">
+              <span class="ico"><i data-lucide="user"></i></span>
+              <h3>{% trans "Consignee" %}</h3>
+              <span class="sub">{% trans "Leave blank to use account values" %}</span>
+            </div>
+            <div class="if-row wide">
+              <div class="if-f">
+                <label>{% trans "Name" %}</label>
+                <input type="text" name="bill_to_name" value="{{ invoice.bill_to_name|default:'' }}"
+                       placeholder="{{ prefilled_cari.name|default:'' }}" maxlength="200">
+              </div>
+            </div>
+            <div class="if-row wide">
+              <div class="if-f">
+                <label>{% trans "Address" %}</label>
+                <textarea name="bill_to_address" rows="2"
+                          placeholder="{{ prefilled_cari.billing_address|default:'' }}">{{ invoice.bill_to_address|default:'' }}</textarea>
+              </div>
+            </div>
+            <div class="if-row">
+              <div class="if-f">
+                <label>{% trans "City" %}</label>
+                <input type="text" name="bill_to_city" value="{{ invoice.bill_to_city|default:'' }}"
+                       placeholder="{{ prefilled_cari.billing_city|default:'' }}" maxlength="100">
+              </div>
+              <div class="if-f">
+                <label>{% trans "Country" %}</label>
+                <input type="text" name="bill_to_country" value="{{ invoice.bill_to_country|default:'' }}"
+                       placeholder="{{ prefilled_cari.billing_country|default:'' }}" maxlength="50">
+              </div>
+            </div>
+            <div class="if-row">
+              <div class="if-f">
+                <label>{% trans "Phone" %}</label>
+                <input type="text" name="bill_to_phone" value="{{ invoice.bill_to_phone|default:'' }}"
+                       placeholder="{{ prefilled_cari.phone|default:'' }}" maxlength="30">
+              </div>
+              <div class="if-f">
+                <label>{% trans "Email" %}</label>
+                <input type="text" name="bill_to_email" value="{{ invoice.bill_to_email|default:'' }}"
+                       placeholder="{{ prefilled_cari.email|default:'' }}" maxlength="200">
+              </div>
+            </div>
+            <div class="if-row">
+              <div class="if-f">
+                <label>{% trans "Tax Office" %}</label>
+                <input type="text" name="bill_to_tax_office" value="{{ invoice.bill_to_tax_office|default:'' }}"
+                       placeholder="{{ prefilled_cari.tax_office|default:'' }}" maxlength="100">
+              </div>
+              <div class="if-f">
+                <label>{% trans "Tax No" %}</label>
+                <input type="text" name="bill_to_tax_number" value="{{ invoice.bill_to_tax_number|default:'' }}"
+                       placeholder="{{ prefilled_cari.tax_number|default:'' }}" maxlength="20">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Issuer (Our company) override -->
+        <div class="if-card">
+          <div class="if-sect">
+            <div class="if-sect-h">
+              <span class="ico"><i data-lucide="building-2"></i></span>
+              <h3>{% trans "Issuer" %}</h3>
+              <span class="sub">{% trans "Leave blank to use brand defaults" %}</span>
+            </div>
+            <div class="if-row wide">
+              <div class="if-f">
+                <label>{% trans "Name" %}</label>
+                <input type="text" name="issuer_name" value="{{ invoice.issuer_name|default:'' }}"
+                       placeholder="{{ BRAND_NAME|default:'' }}" maxlength="200">
+              </div>
+            </div>
+            <div class="if-row wide">
+              <div class="if-f">
+                <label>{% trans "Address" %}</label>
+                <textarea name="issuer_address" rows="2"
+                          placeholder="{{ BRAND_ADDRESS|default:'' }}">{{ invoice.issuer_address|default:'' }}</textarea>
+              </div>
+            </div>
+            <div class="if-row">
+              <div class="if-f">
+                <label>{% trans "Phone" %}</label>
+                <input type="text" name="issuer_phone" value="{{ invoice.issuer_phone|default:'' }}"
+                       placeholder="{{ BRAND_PHONE|default:'' }}" maxlength="30">
+              </div>
+              <div class="if-f">
+                <label>{% trans "Fax" %}</label>
+                <input type="text" name="issuer_fax" value="{{ invoice.issuer_fax|default:'' }}"
+                       placeholder="{{ BRAND_FAX|default:'' }}" maxlength="30">
+              </div>
+            </div>
+            <div class="if-row">
+              <div class="if-f">
+                <label>{% trans "Email" %}</label>
+                <input type="text" name="issuer_email" value="{{ invoice.issuer_email|default:'' }}"
+                       placeholder="{{ BRAND_EMAIL|default:'' }}" maxlength="200">
+              </div>
+              <div class="if-f">
+                <label>{% trans "Tax Office" %}</label>
+                <input type="text" name="issuer_tax_office" value="{{ invoice.issuer_tax_office|default:'' }}"
+                       placeholder="{{ BRAND_TAX_OFFICE|default:'' }}" maxlength="100">
+              </div>
+            </div>
+            <div class="if-row">
+              <div class="if-f">
+                <label>{% trans "Tax No" %}</label>
+                <input type="text" name="issuer_tax_number" value="{{ invoice.issuer_tax_number|default:'' }}"
+                       placeholder="{{ BRAND_TAX_NUMBER|default:'' }}" maxlength="20">
+              </div>
+              <div class="if-f"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- Invoice Items -->
         <div class="if-card">
           <div class="if-sect" style="padding-bottom: 4px;">
-            <div class="if-sect-h">
+            <div class="if-sect-h" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
               <span class="ico"><i data-lucide="list"></i></span>
               <h3>{% trans "Invoice Items" %}</h3>
               <span class="sub">{% trans "Lines and amounts" %}</span>
+              <label style="margin-left:auto; display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:#F4F7FB; border:1px solid #E2E8EE; border-radius:8px; font:600 12px var(--font-sans); color:var(--gray-700); cursor:pointer;">
+                <input type="checkbox" id="taxToggle" name="tax_enabled"
+                       {% if invoice.tax_amount %}checked{% endif %}
+                       style="margin:0;">
+                {% trans "Apply VAT" %}
+              </label>
             </div>
           </div>
 
@@ -251,15 +438,15 @@
             <table>
               <thead>
                 <tr>
-                  <th style="width: 4%;">#</th>
-                  <th style="width: 32%;">{% trans "Description" %}</th>
-                  <th class="amt" style="width: 9%;">{% trans "Quantity" %}</th>
-                  <th style="width: 7%;">{% trans "Unit" %}</th>
-                  <th class="amt" style="width: 12%;">{% trans "Unit Price" %}</th>
-                  <th class="amt" style="width: 8%;">{% trans "Disc %" %}</th>
-                  <th class="amt" style="width: 8%;">{% trans "VAT %" %}</th>
-                  <th class="amt" style="width: 16%;">{% trans "Total" %}</th>
-                  <th style="width: 4%;"></th>
+                  <th style="width: 36px;">#</th>
+                  <th style="width: 28%;">{% trans "Description" %}</th>
+                  <th class="amt" style="width: 80px;">{% trans "Qty" %}</th>
+                  <th class="col-unit" style="width: 60px;">{% trans "Unit" %}</th>
+                  <th class="amt" style="width: 100px;">{% trans "Unit Price" %}</th>
+                  <th class="amt col-disc" style="width: 70px;">{% trans "Disc %" %}</th>
+                  <th class="amt col-vat" style="width: 70px;">{% trans "VAT %" %}</th>
+                  <th class="amt" style="width: 110px;">{% trans "Total" %}</th>
+                  <th style="width: 36px;"></th>
                 </tr>
               </thead>
               <tbody id="itemsBody"></tbody>
@@ -301,7 +488,7 @@
               <div class="if-totals">
                 <div class="row"><span class="lbl">{% trans "Subtotal" %}</span><span class="val" id="sumSubtotal">0,00</span></div>
                 <div class="row"><span class="lbl">{% trans "Discount" %}</span><span class="val" id="sumDiscount">0,00</span></div>
-                <div class="row"><span class="lbl">{% trans "VAT" %}</span><span class="val" id="sumTax">0,00</span></div>
+                <div class="row col-vat" id="sumTaxRow"><span class="lbl">{% trans "VAT" %}</span><span class="val" id="sumTax">0,00</span></div>
                 <div class="row"><span class="lbl">{% trans "Other Charges" %}</span><span class="val" id="sumOther">0,00</span></div>
                 <div class="row grand"><span>{% trans "Grand Total" %}</span><span class="val" id="sumGrand">0,00</span></div>
               </div>
@@ -325,14 +512,21 @@
 <template id="rowTemplate">
   <tr class="iv-item">
     <td class="line-no">1</td>
-    <td><input type="text" data-field="description" placeholder="Product name or description" maxlength="300"></td>
-    <td><input type="number" class="amt" data-field="quantity" step="0.001" value="1" min="0"></td>
-    <td><input type="text" data-field="unit" value="pcs" maxlength="20" style="text-align:center;"></td>
-    <td><input type="number" class="amt" data-field="unit_price" step="0.01" value="0.00" min="0"></td>
-    <td><input type="number" class="amt" data-field="discount_rate" step="0.01" value="0" min="0" max="100"></td>
-    <td><input type="number" class="amt" data-field="tax_rate" step="0.01" value="20" min="0"></td>
-    <td class="row-total">0,00</td>
-    <td><button type="button" class="btn-del" title="Delete"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button></td>
+    <td class="col-desc" data-mlabel="{% trans 'Description' %}">
+      <input type="text" data-field="description" placeholder="{% trans 'Product name or description' %}" maxlength="300">
+      {# Hidden product/variant refs — written by the pre-fill step when
+         items come from an order, read back by buildItemsJson on save
+         so the InvoiceItem.product FK is preserved. #}
+      <input type="hidden" data-field="product_id">
+      <input type="hidden" data-field="variant_id">
+    </td>
+    <td data-mlabel="{% trans 'Quantity' %}"><input type="number" class="amt" data-field="quantity" step="0.001" value="1" min="0"></td>
+    <td class="col-unit" data-mlabel="{% trans 'Unit' %}"><input type="text" data-field="unit" value="pcs" maxlength="20" style="text-align:center;"></td>
+    <td data-mlabel="{% trans 'Unit Price' %}"><input type="number" class="amt" data-field="unit_price" step="0.01" value="0.00" min="0"></td>
+    <td class="col-disc" data-mlabel="{% trans 'Disc %' %}"><input type="number" class="amt" data-field="discount_rate" step="0.01" value="0" min="0" max="100"></td>
+    <td class="col-vat" data-mlabel="{% trans 'VAT %' %}"><input type="number" class="amt" data-field="tax_rate" step="0.01" value="20" min="0"></td>
+    <td class="col-total row-total" data-mlabel="{% trans 'Total' %}">0,00</td>
+    <td class="col-del"><button type="button" class="btn-del" title="{% trans 'Delete' %}"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button></td>
   </tr>
 </template>
 
@@ -393,9 +587,14 @@
   function buildItemsJson() {
     const out = [];
     [...itemsBody.querySelectorAll('.iv-item')].forEach(r => {
-      const get = (name) => r.querySelector(`[data-field="${name}"]`).value;
+      const get = (name) => {
+        const el = r.querySelector(`[data-field="${name}"]`);
+        return el ? el.value : "";
+      };
       out.push({
         description:   get('description'),
+        product_id:    get('product_id') || null,
+        variant_id:    get('variant_id') || null,
         quantity:      get('quantity'),
         unit:          get('unit'),
         unit_price:    get('unit_price'),
@@ -410,7 +609,8 @@
     const node = rowTpl.content.cloneNode(true);
     const row = node.querySelector('.iv-item');
     if (data) {
-      ['description', 'quantity', 'unit', 'unit_price', 'discount_rate', 'tax_rate'].forEach(f => {
+      ['description', 'product_id', 'variant_id', 'quantity', 'unit',
+       'unit_price', 'discount_rate', 'tax_rate'].forEach(f => {
         const el = row.querySelector(`[data-field="${f}"]`);
         if (el && data[f] !== undefined && data[f] !== null) el.value = data[f];
       });
@@ -430,6 +630,28 @@
   addBtn.addEventListener('click', () => addRow());
   otherChargesInput.addEventListener('input', computeAll);
 
+  // ── VAT toggle ─────────────────────────────────────────
+  // Hide VAT column entirely unless the user opts in. Default state
+  // is OFF for new invoices, ON if an existing invoice already has
+  // any tax (driven by the checkbox's `checked` attribute server-side).
+  const taxToggle = document.getElementById('taxToggle');
+  function applyTaxToggle() {
+    const enabled = !!(taxToggle && taxToggle.checked);
+    document.querySelectorAll('.col-vat').forEach(el => {
+      el.style.display = enabled ? '' : 'none';
+    });
+    document.querySelectorAll('input[data-field="tax_rate"]').forEach(inp => {
+      if (enabled) {
+        // Restore a reasonable default if currently 0 / blank.
+        if (!parseFloat(inp.value)) inp.value = 20;
+      } else {
+        inp.value = 0;
+      }
+    });
+    computeAll();
+  }
+  if (taxToggle) taxToggle.addEventListener('change', applyTaxToggle);
+
   // Auto-fill due date when date changes (default 30 days)
   if (dateInput && dueDateInput) {
     dateInput.addEventListener('change', () => {
@@ -448,6 +670,8 @@
   } else {
     addRow();
   }
+  // Apply the VAT toggle's initial state to all just-rendered rows.
+  applyTaxToggle();
 
   // Default today's date if empty
   if (dateInput && !dateInput.value) dateInput.valueAsDate = new Date();

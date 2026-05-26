@@ -246,6 +246,7 @@ class CariMovement(models.Model):
 
     MOVEMENT_TYPES = [
         ("opening",          _("Opening Balance")),
+        ("order_sale",       _("Sales Order")),
         ("invoice_sale",     _("Sales Invoice")),
         ("invoice_purchase", _("Purchase Invoice")),
         ("return_sale",      _("Sales Return")),
@@ -357,14 +358,29 @@ class CariSettings(models.Model):
 
     def next_invoice_number(self, series="FAT"):
         """
-        Generate next invoice number like FAT-2026-000001 and bump counter.
-        Counter is per book (not per series), so FAT-... and IRS-... share a sequence.
+        Generate the next invoice number using the brand prefix + 4-digit
+        year + zero-padded sequence (e.g. KRV20250000013). Falls back to
+        the legacy `FAT-YEAR-NNNNNN` shape when no brand prefix is set so
+        existing invoices stay decodable.
+
+        Counter is per book — all series share the same sequence so the
+        number is globally unique within a book regardless of the
+        invoice type.
         """
+        from django.utils import timezone
+        from django.conf import settings as _s
+
         with transaction.atomic():
             locked = CariSettings.objects.select_for_update().get(pk=self.pk)
-            from django.utils import timezone
             year = timezone.now().year
-            number = f"{series}-{year}-{str(locked.next_invoice_seq).zfill(6)}"
+            seq = locked.next_invoice_seq
+            prefix = getattr(_s, "BRAND_INVOICE_PREFIX", "").strip()
+            if prefix:
+                # Karven-style: KRV20250000013 (no dashes, 7-digit seq)
+                number = f"{prefix}{year}{str(seq).zfill(7)}"
+            else:
+                # Legacy fallback so old fixtures / tests keep working.
+                number = f"{series}-{year}-{str(seq).zfill(6)}"
             locked.next_invoice_seq += 1
             locked.save(update_fields=["next_invoice_seq"])
             return number
@@ -451,6 +467,29 @@ class Invoice(models.Model):
     earsiv_uuid    = models.CharField(max_length=50, blank=True)
     earsiv_status  = models.CharField(max_length=20, blank=True)
     earsiv_pdf_url = models.URLField(blank=True)
+
+    # ── Consignee snapshot (overrides cari values on THIS invoice).
+    # Blank → fall back to invoice.cari.* in the template. Letting
+    # users edit these per-invoice means they can correct typos or
+    # use a different shipping address without polluting the cari
+    # master record.
+    bill_to_name        = models.CharField(max_length=200, blank=True)
+    bill_to_address     = models.TextField(blank=True)
+    bill_to_city        = models.CharField(max_length=100, blank=True)
+    bill_to_country     = models.CharField(max_length=50,  blank=True)
+    bill_to_phone       = models.CharField(max_length=30,  blank=True)
+    bill_to_email       = models.CharField(max_length=200, blank=True)
+    bill_to_tax_office  = models.CharField(max_length=100, blank=True)
+    bill_to_tax_number  = models.CharField(max_length=20,  blank=True)
+
+    # ── Issuer snapshot (overrides BRAND_* settings on THIS invoice). #
+    issuer_name        = models.CharField(max_length=200, blank=True)
+    issuer_address     = models.TextField(blank=True)
+    issuer_phone       = models.CharField(max_length=30,  blank=True)
+    issuer_fax         = models.CharField(max_length=30,  blank=True)
+    issuer_email       = models.CharField(max_length=200, blank=True)
+    issuer_tax_office  = models.CharField(max_length=100, blank=True)
+    issuer_tax_number  = models.CharField(max_length=20,  blank=True)
 
     notes      = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -549,7 +588,17 @@ class Invoice(models.Model):
 
     # -- lifecycle ---------------------------------------------------------
     def issue(self, user=None):
-        """Draft → Issued. Creates a CariMovement that posts to the account ledger."""
+        """Draft → Issued.
+
+        Sign / amount rules:
+        - Standalone invoice (no linked order) → posts +/- total to the
+          ledger. This invoice IS the financial event.
+        - Invoice from an existing Order → posts amount = 0 to the
+          ledger. The order_sale movement created when the order was
+          placed already accounts for the receivable; we just want a
+          row in the statement that says "Sales Invoice FAT-XXX
+          issued" as a paper-trail marker, with no double counting.
+        """
         if self.status not in ("draft",):
             raise ValidationError(f"Only draft invoices can be issued (current status: {self.status}).")
         if self.type == "proforma":
@@ -560,7 +609,12 @@ class Invoice(models.Model):
         if not self.items.exists():
             raise ValidationError("Cannot issue an invoice with no items.")
 
-        amount_signed = self.total * Decimal(self.ledger_sign)
+        # Order-attached invoice → info-only (amount=0); standalone → real posting.
+        if self.order_id:
+            amount_signed = Decimal("0.00")
+        else:
+            amount_signed = self.total * Decimal(self.ledger_sign)
+
         movement = CariMovement.objects.create(
             cari=self.cari,
             book=self.book,
@@ -582,9 +636,12 @@ class Invoice(models.Model):
 
     def cancel(self, user=None, reason=""):
         """
-        Cancel an issued invoice. Creates a counter-movement so the ledger is
-        balanced again, and flips status to 'cancelled'. Audit-safe — does NOT
-        delete the original movement.
+        Cancel an issued invoice. Posts a counter-movement so the
+        ledger balances. Amount of the counter matches the original
+        (zero for order-attached invoices, ±total for standalone),
+        which means cancelling an info-only invoice movement is also
+        a no-op on the balance — exactly what we want.
+        Audit-safe — never deletes the original.
         """
         if self.status == "cancelled":
             return
@@ -594,7 +651,6 @@ class Invoice(models.Model):
             return
 
         if self.posted_movement_id:
-            # Counter-movement: same magnitude, opposite sign
             CariMovement.objects.create(
                 cari=self.cari,
                 book=self.book,

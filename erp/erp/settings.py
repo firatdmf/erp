@@ -241,6 +241,15 @@ BRAND_DEFAULTS = {
     "demfirat": {
         "DB_SCHEMA": "public",
         "BRAND_NAME": "Demfirat",
+        "BRAND_LEGAL_SUFFIX": "SAN. TİC. LTD. ŞTİ.",
+        "BRAND_ADDRESS": "Ergene 1. OSB Mahallesi, D100 Cad. no.38 Ergene / TEKİRDAĞ",
+        "BRAND_PHONE": "+90 (501) 057-1884",
+        "BRAND_FAX": "+90 (282) 675-1552",
+        "BRAND_EMAIL": "info@demfirat.com",
+        "BRAND_TAX_OFFICE": "",
+        "BRAND_TAX_NUMBER": "",
+        "BRAND_LOGO_URL": "",
+        "BRAND_INVOICE_PREFIX": "DMF",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3000",
         "STOREFRONT_PREVIEW_URL": "http://localhost:3000/",
@@ -248,6 +257,15 @@ BRAND_DEFAULTS = {
     "belino": {
         "DB_SCHEMA": "BELINO",
         "BRAND_NAME": "Belino",
+        "BRAND_LEGAL_SUFFIX": "SAN. TİC. LTD. ŞTİ.",
+        "BRAND_ADDRESS": "",
+        "BRAND_PHONE": "",
+        "BRAND_FAX": "",
+        "BRAND_EMAIL": "",
+        "BRAND_TAX_OFFICE": "",
+        "BRAND_TAX_NUMBER": "",
+        "BRAND_LOGO_URL": "",
+        "BRAND_INVOICE_PREFIX": "BLN",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3010",
         "STOREFRONT_PREVIEW_URL": "http://localhost:3010/",
@@ -259,6 +277,15 @@ _brand_cfg = BRAND_DEFAULTS.get(BRAND, BRAND_DEFAULTS["demfirat"])
 UI_THEME = config("UI_THEME", default=_brand_cfg["UI_THEME"]).strip()
 DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
 BRAND_NAME = config("BRAND_NAME", default=_brand_cfg["BRAND_NAME"]).strip()
+BRAND_LEGAL_SUFFIX = config("BRAND_LEGAL_SUFFIX", default=_brand_cfg.get("BRAND_LEGAL_SUFFIX", "")).strip()
+BRAND_ADDRESS = config("BRAND_ADDRESS", default=_brand_cfg.get("BRAND_ADDRESS", "")).strip()
+BRAND_PHONE = config("BRAND_PHONE", default=_brand_cfg.get("BRAND_PHONE", "")).strip()
+BRAND_FAX = config("BRAND_FAX", default=_brand_cfg.get("BRAND_FAX", "")).strip()
+BRAND_EMAIL = config("BRAND_EMAIL", default=_brand_cfg.get("BRAND_EMAIL", "")).strip()
+BRAND_TAX_OFFICE = config("BRAND_TAX_OFFICE", default=_brand_cfg.get("BRAND_TAX_OFFICE", "")).strip()
+BRAND_TAX_NUMBER = config("BRAND_TAX_NUMBER", default=_brand_cfg.get("BRAND_TAX_NUMBER", "")).strip()
+BRAND_LOGO_URL = config("BRAND_LOGO_URL", default=_brand_cfg.get("BRAND_LOGO_URL", "")).strip()
+BRAND_INVOICE_PREFIX = config("BRAND_INVOICE_PREFIX", default=_brand_cfg.get("BRAND_INVOICE_PREFIX", "")).strip()
 CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL", default=_brand_cfg["CLIENT_PUBLIC_URL"]).strip()
 STOREFRONT_PREVIEW_URL = config(
     "STOREFRONT_PREVIEW_URL", default=_brand_cfg["STOREFRONT_PREVIEW_URL"]

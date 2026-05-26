@@ -22,7 +22,7 @@ from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
 
 from accounting.models import Book, CurrencyCategory
-from .models import CariAccount, CariMovement, CariSettings
+from .models import CariAccount, CariMovement, CariSettings, Payment, Invoice
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +34,21 @@ def _books():
 
 def _currencies():
     return CurrencyCategory.objects.all().order_by("code")
+
+
+# Movement types we expose to the user in dropdowns. We deliberately
+# strip:
+# - legacy_ar / legacy_ap → internal migration markers, never user-picked
+# - payment              → consolidated under "collection"; cari.type
+#                          decides direction at save time, so the user
+#                          only ever sees ONE "Tahsilat" option
+# - check_in / check_out → handled by the dedicated Check/Note form
+#                          (Quick Actions → "Check / Note"), no point
+#                          duplicating them in the generic dropdown
+_HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "payment", "check_in", "check_out"}
+
+def _user_movement_choices():
+    return [(v, l) for v, l in CariMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
 
 
 def _filter_caris(request):
@@ -141,14 +156,19 @@ class CariCreate(View):
         })
 
     def post(self, request):
-        book_id = request.POST.get("book")
+        # Book is no longer a user-facing choice — there is one book
+        # company-wide. Auto-resolve via the shared service so the
+        # UI stays simple and we don't risk picking the wrong one.
+        from .services import get_default_book
+        book = get_default_book()
+
         currency_id = request.POST.get("default_currency")
-        if not book_id or not currency_id:
-            messages.error(request, _g("Book and currency are required."))
+        if not currency_id:
+            messages.error(request, _g("Currency is required."))
             return redirect("current_account:cari_create")
 
         cari = CariAccount(
-            book_id=int(book_id),
+            book=book,
             name=request.POST.get("name", "").strip(),
             type=request.POST.get("type", "customer"),
             default_currency_id=int(currency_id),
@@ -235,10 +255,65 @@ class CariEdit(View):
         return redirect("current_account:cari_detail", pk=cari.pk)
 
 
+def _attach_links(rows):
+    """Annotate each {'mv': ..., 'balance_after': ...} row with the
+    Payment/Invoice it relates to and whether it is the cancellation
+    counter-movement (so the template can avoid double-stamping the
+    CANCELLED badge on the original row)."""
+    from django.contrib.contenttypes.models import ContentType
+    pay_ct = ContentType.objects.get_for_model(Payment)
+    inv_ct = ContentType.objects.get_for_model(Invoice)
+
+    # Pre-fetch all Payment/Invoice rows referenced via the generic
+    # source FK (one query each, not N).
+    cancel_pay_ids = [
+        r["mv"].source_id for r in rows
+        if r["mv"].movement_type == "adjustment"
+        and r["mv"].source_type_id == pay_ct.id and r["mv"].source_id
+    ]
+    cancel_inv_ids = [
+        r["mv"].source_id for r in rows
+        if r["mv"].movement_type == "adjustment"
+        and r["mv"].source_type_id == inv_ct.id and r["mv"].source_id
+    ]
+    pay_map = {p.pk: p for p in Payment.objects.filter(pk__in=cancel_pay_ids)} if cancel_pay_ids else {}
+    inv_map = {i.pk: i for i in Invoice.objects.filter(pk__in=cancel_inv_ids)} if cancel_inv_ids else {}
+
+    for r in rows:
+        mv = r["mv"]
+        linked_pay = None
+        linked_inv = None
+        is_cancel = False
+
+        # 1) Originals — Payment.posted_movement (OneToOne reverse).
+        try:
+            linked_pay = mv.payment
+        except Payment.DoesNotExist:
+            linked_pay = None
+        if linked_pay is None:
+            try:
+                linked_inv = mv.invoice
+            except Invoice.DoesNotExist:
+                linked_inv = None
+
+        # 2) Cancellation counter-movements — generic FK source.
+        if not linked_pay and not linked_inv and mv.movement_type == "adjustment" and mv.source_id:
+            if mv.source_type_id == pay_ct.id:
+                linked_pay = pay_map.get(mv.source_id)
+                is_cancel = bool(linked_pay)
+            elif mv.source_type_id == inv_ct.id:
+                linked_inv = inv_map.get(mv.source_id)
+                is_cancel = bool(linked_inv)
+
+        r["linked_payment"] = linked_pay
+        r["linked_invoice"] = linked_inv
+        r["is_cancel_row"] = is_cancel
+    return rows
+
+
 # ---------------------------------------------------------------------------
 # Detail
 # ---------------------------------------------------------------------------
-@method_decorator(login_required, name="dispatch")
 class CariDetail(View):
     template_name = "current_account/cari_detail.html"
 
@@ -258,14 +333,24 @@ class CariDetail(View):
         for mv in recent_movements:
             movements_with_balance.append({"mv": mv, "balance_after": running})
             running -= mv.amount
+        _attach_links(movements_with_balance)
 
         recent_invoices = cari.invoices.select_related("currency").order_by("-date", "-id")[:10]
+
+        # Orders attached to this cari — newest first. Items prefetched
+        # so gross_profit() can run cheaply in the template if needed.
+        recent_orders = (
+            cari.orders.select_related("contact", "company", "web_client")
+            .prefetch_related("items__product", "items__product_variant")
+            .order_by("-created_at")[:20]
+        )
 
         ctx = {
             "cari":     cari,
             "movements": movements_with_balance,
             "recent_invoices": recent_invoices,
-            "movement_type_choices": CariMovement.MOVEMENT_TYPES,
+            "recent_orders": recent_orders,
+            "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
         }
         return render(request, self.template_name, ctx)
@@ -279,37 +364,104 @@ class CariStatement(View):
     template_name = "current_account/cari_statement.html"
 
     def get(self, request, pk):
+        from django.contrib.contenttypes.models import ContentType
+
         cari = get_object_or_404(CariAccount, pk=pk)
 
-        qs = cari.movements.select_related("currency").all().order_by("date", "id")
+        # ── Filters from query string ──────────────────────────────
         date_from = request.GET.get("date_from") or ""
         date_to   = request.GET.get("date_to")   or ""
+        direction = (request.GET.get("direction") or "").strip()   # in / out
+        status_f  = (request.GET.get("status") or "").strip()      # cancelled
+
+        # Cancellation predicate — match BOTH halves of each cancel pair:
+        #   (a) the counter-CANCEL adjustment row (source FK + CANCEL
+        #       prefix in description/reference)
+        #   (b) the ORIGINAL payment/invoice row, whichever way it's
+        #       linked. Two link paths exist for historical reasons:
+        #       - source_type/source_id FK (set by Payment.confirm)
+        #       - posted_movement OneToOne reverse (`mv.payment` /
+        #         `mv.invoice`) — present even when the source FK was
+        #         never populated (e.g. movements added via the
+        #         "Add Movement" form that the signal then mirrored
+        #         into a Payment).
+        # Without the reverse-FK leg, cancelled collections added via
+        # the manual form leak into Girişler.
+        pay_ct = ContentType.objects.get_for_model(Payment)
+        inv_ct = ContentType.objects.get_for_model(Invoice)
+        cancel_counter_q = (
+            Q(movement_type="adjustment")
+            & Q(source_type__in=[pay_ct, inv_ct])
+            & Q(source_id__isnull=False)
+            & (Q(reference__startswith="CANCEL") | Q(description__startswith="CANCEL"))
+        )
+        cancelled_pay_ids = list(Payment.objects.filter(status="cancelled").values_list("pk", flat=True))
+        cancelled_inv_ids = list(Invoice.objects.filter(status="cancelled").values_list("pk", flat=True))
+        cancelled_original_q = (
+            # explicit FK side
+            (Q(source_type=pay_ct) & Q(source_id__in=cancelled_pay_ids))
+            | (Q(source_type=inv_ct) & Q(source_id__in=cancelled_inv_ids))
+            # reverse OneToOne side
+            | Q(payment__status="cancelled")
+            | Q(invoice__status="cancelled")
+        )
+        all_cancel_q = cancel_counter_q | cancelled_original_q
+
+        # Base queryset — date range first so the prior-balance
+        # calculation stays correct.
+        base = cari.movements.select_related("currency").all()
+        qs = base.order_by("date", "id")
         if date_from:
             qs = qs.filter(date__gte=date_from)
         if date_to:
             qs = qs.filter(date__lte=date_to)
 
-        # Walking forward → running balance per row
-        running = Decimal("0.00")
+        # Status:
+        #   default / direction filters → ACTIVE only (cancelled hidden
+        #     from list and totals)
+        #   status=cancelled → ONLY cancelled rows
+        if status_f == "cancelled":
+            qs = qs.filter(all_cancel_q)
+        else:
+            qs = qs.exclude(all_cancel_q)
+
+        # Direction (only meaningful when status != cancelled):
+        if status_f != "cancelled":
+            if direction == "in":
+                qs = qs.filter(amount__lt=0)
+            elif direction == "out":
+                qs = qs.filter(amount__gt=0)
+
+        # Walking forward → running balance per row.
+        # Opening balance uses prior movements (also excluding
+        # cancelled, so the live ledger stays consistent).
         rows = []
-        # Determine the opening balance (movements outside the range)
-        prior_qs = cari.movements
+        prior_qs = base
         if date_from:
             prior_qs = prior_qs.filter(date__lt=date_from)
         else:
             prior_qs = prior_qs.none()
-        running = prior_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-        opening = running
+        if status_f != "cancelled":
+            prior_qs = prior_qs.exclude(all_cancel_q)
+        opening = prior_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+        running = opening
 
-        debit_total = Decimal("0.00")
-        credit_total = Decimal("0.00")
         for mv in qs:
             running += mv.amount
+            rows.append({"mv": mv, "balance_after": running})
+        _attach_links(rows)
+
+        # Totals match the filtered rows. For cancelled-only view this
+        # naturally shows the cancelled amount (debit/credit both sum
+        # since each cancellation has +X and -X) and closing = 0.
+        debit_total = Decimal("0.00")
+        credit_total = Decimal("0.00")
+        for r in rows:
+            mv = r["mv"]
             if mv.amount > 0:
                 debit_total += mv.amount
             else:
                 credit_total += abs(mv.amount)
-            rows.append({"mv": mv, "balance_after": running})
 
         ctx = {
             "cari":         cari,
@@ -320,7 +472,13 @@ class CariStatement(View):
             "credit_total": credit_total,
             "date_from":    date_from,
             "date_to":      date_to,
+            "filter_direction": direction,
+            "filter_status":    status_f,
         }
+        # HTMX partial — when the filter bar fires, swap only the
+        # results region instead of re-rendering the whole page.
+        if request.headers.get("HX-Request") == "true":
+            return render(request, "current_account/_cari_statement_results.html", ctx)
         return render(request, self.template_name, ctx)
 
 
@@ -335,7 +493,7 @@ class CariMovementCreate(View):
         cari = get_object_or_404(CariAccount, pk=pk)
         return render(request, self.template_name, {
             "cari": cari,
-            "movement_type_choices": CariMovement.MOVEMENT_TYPES,
+            "movement_type_choices": _user_movement_choices(),
             "currencies": _currencies(),
         })
 
@@ -359,6 +517,14 @@ class CariMovementCreate(View):
         currency_id = request.POST.get("currency") or cari.default_currency_id
         movement_type = request.POST.get("movement_type") or "adjustment"
 
+        # The user always picks "Tahsilat" (collection) in the dropdown,
+        # because we hide "payment". For supplier accounts, money moving
+        # this direction is semantically a PAYMENT (we're paying them),
+        # so normalise here. Keeps Payment.type accurate downstream and
+        # the tahsilat list labels match reality.
+        if movement_type == "collection" and cari.type == "supplier":
+            movement_type = "payment"
+
         mv = CariMovement.objects.create(
             cari=cari,
             book=cari.book,
@@ -371,6 +537,11 @@ class CariMovementCreate(View):
             reference=request.POST.get("reference", ""),
             created_by=getattr(request.user, "member", None),
         )
+
+        # Payment mirror (collection / payment types) is handled by the
+        # post_save signal on CariMovement — see signals.py. That way
+        # any code path that creates such a movement automatically
+        # gets a matching Payment, not just this view.
         messages.success(request, _g("Movement added."))
         return redirect("current_account:cari_detail", pk=cari.pk)
 

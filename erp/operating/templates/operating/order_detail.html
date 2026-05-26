@@ -159,6 +159,131 @@
   .od-tl-step:not(.done) .od-tl-l { color: var(--gray-500); }
   .od-tl-t { font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 3px; }
 
+  /* ── New: 4-stage progress bar (pending → preparing → packaging → shipped) ── */
+  .od-stages {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .od-stage {
+    flex: 1; min-width: 130px;
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 10px 14px;
+    background: white; color: var(--gray-500);
+    border: 1.5px solid #E0E6EE; border-radius: 10px;
+    font: 600 13px var(--font-sans);
+    cursor: pointer; transition: all 140ms;
+  }
+  .od-stage:hover { border-color: #9AA3AC; color: #0F1419; }
+  .od-stage-n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: #F1F4F8; color: var(--gray-500);
+    font: 700 11px var(--font-sans);
+    flex-shrink: 0;
+  }
+  .od-stage.filled {
+    background: var(--nejum-teal-50, #E5F1F0);
+    color: var(--nejum-teal-700, #005354);
+    border-color: var(--nejum-teal-300, #66B5B5);
+  }
+  .od-stage.filled .od-stage-n {
+    background: var(--nejum-teal-600, #00696A);
+    color: white;
+  }
+  .od-stage.now {
+    background: var(--nejum-teal-600, #00696A);
+    color: white;
+    border-color: var(--nejum-teal-700, #005354);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.18);
+  }
+  .od-stage.now .od-stage-n {
+    background: white; color: var(--nejum-teal-700, #005354);
+  }
+  .od-stage-arrow {
+    color: var(--gray-400);
+    font: 700 16px var(--font-sans);
+    flex-shrink: 0;
+  }
+  @media (max-width: 720px) {
+    .od-stages { flex-direction: column; align-items: stretch; }
+    .od-stage-arrow { display: none; }
+    .od-stage { width: 100%; }
+  }
+
+  /* Shipping info row */
+  .od-ship {
+    padding: 14px;
+    background: #FAFBFD;
+    border: 1px solid #EEF1F5;
+    border-radius: 10px;
+  }
+  .od-ship-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 600px) { .od-ship-grid { grid-template-columns: 1fr; } }
+  .od-ship-f { display: flex; flex-direction: column; gap: 5px; }
+  .od-ship-l {
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  .od-ship select, .od-ship input {
+    padding: 9px 11px;
+    background: white;
+    border: 1px solid #DDE3E7;
+    border-radius: 7px;
+    font: 500 13px var(--font-sans);
+    color: #0F1419;
+    outline: none;
+  }
+  .od-ship select:focus, .od-ship input:focus {
+    border-color: var(--nejum-teal-500, #147F74);
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.10);
+  }
+  .od-ship-actions {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .od-ship-meta {
+    font: 500 11.5px var(--font-sans); color: var(--gray-600);
+  }
+  .od-ship-meta i { margin-right: 4px; color: var(--nejum-teal-600); }
+
+  /* Collapsible "more statuses" */
+  .od-more-status {
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px dashed #EEF1F5;
+  }
+  .od-more-status summary {
+    cursor: pointer; user-select: none;
+    font: 600 12px var(--font-sans);
+    color: var(--gray-600);
+    padding: 4px 0;
+  }
+  .od-more-status summary:hover { color: var(--nejum-teal-700); }
+  .od-more-grid {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .od-stage-mini {
+    padding: 5px 11px;
+    background: white;
+    border: 1px solid #DDE3E7;
+    border-radius: 999px;
+    font: 600 11.5px var(--font-sans);
+    color: var(--gray-600);
+    cursor: pointer; transition: all 140ms;
+  }
+  .od-stage-mini:hover { border-color: #9AA3AC; color: #0F1419; }
+  .od-stage-mini.active {
+    background: var(--nejum-teal-50); border-color: var(--nejum-teal-500);
+    color: var(--nejum-teal-700); font-weight: 700;
+  }
+
   /* PRODUCTS TABLE */
   .od-prods { width: 100%; border-collapse: collapse; }
   .od-prods th, .od-prods td {
@@ -172,6 +297,119 @@
   .od-prods th.num, .od-prods td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .od-prods tr:last-child td { border-bottom: none; }
   .od-prods .mono { font: 500 11.5px var(--font-mono); color: var(--gray-600); }
+  /* Inline editable cells — look like static text until focused. */
+  .od-inline-input {
+    width: 90px;
+    padding: 4px 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 6px;
+    font: 600 13px var(--font-sans);
+    color: var(--ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    transition: border-color 140ms, background 140ms;
+  }
+  .od-inline-input:hover {
+    border-color: #DDE3E7;
+    background: #FAFCFB;
+  }
+  .od-inline-input:focus {
+    border-color: var(--nejum-teal-500);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.10);
+  }
+  .od-inline-input.saving { background: #FEF3C7; }
+  .od-inline-input.saved  { background: #DCFCE7; }
+  /* Notes textarea */
+  .od-notes-edit {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px 12px;
+    border: 1px solid #E2E8EE;
+    border-radius: 8px;
+    font: 500 13px var(--font-sans);
+    color: var(--ink);
+    background: white;
+    resize: vertical;
+    outline: none;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .od-notes-edit:hover  { border-color: #C5CCD3; }
+  .od-notes-edit:focus  { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .od-notes-edit.saving { background: #FFFBEB; }
+  .od-notes-edit.saved  { background: #F0FDF4; }
+  .od-edit-hint { font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 4px; }
+
+  /* Inline-edit dirty flag — orange-tinted border + background. */
+  .od-inline-input.dirty,
+  .od-notes-edit.dirty {
+    border-color: #F59E0B !important;
+    background: #FFFBEB !important;
+  }
+
+  /* Sticky save bar — slides up from the bottom when there are
+     unsaved changes. Pointer-events:none when hidden so it doesn't
+     swallow clicks on the page below. */
+  .od-savebar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 200;
+    pointer-events: none;
+    transform: translateY(120%);
+    transition: transform 220ms cubic-bezier(0.22,1,0.36,1);
+    padding: 12px;
+  }
+  .od-savebar.show {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  .od-savebar-inner {
+    max-width: 700px; margin: 0 auto;
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    background: #0F1419;
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(15,23,31,0.35), 0 4px 10px rgba(15,23,31,0.20);
+  }
+  .od-savebar-msg {
+    display: inline-flex; align-items: center; gap: 8px;
+    flex: 1;
+    font: 600 13px var(--font-sans);
+    color: white;
+  }
+  .od-savebar-msg b { font-weight: 800; color: #F59E0B; }
+  .od-savebar .ord-btn {
+    padding: 8px 14px;
+    font: 700 12.5px var(--font-sans);
+  }
+  .od-savebar .ord-btn.ghost {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.20);
+    color: white;
+  }
+  .od-savebar .ord-btn.ghost:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.35);
+  }
+  .od-savebar .ord-btn.primary {
+    background: linear-gradient(180deg, #147F74, #00696A);
+    border-color: #005354;
+    color: white;
+  }
+  .od-savebar .ord-btn.primary:hover { filter: brightness(1.08); }
+  @media (max-width: 600px) {
+    .od-savebar { padding: 8px; }
+    .od-savebar-inner { gap: 6px; padding: 10px 12px; }
+    .od-savebar .ord-btn { padding: 7px 10px; font-size: 11.5px; }
+    .od-savebar-msg { font-size: 12px; }
+  }
+
+  /* Push page content above the save bar when it's visible so the
+     last card isn't hidden underneath. */
+  body.has-dirty-savebar { padding-bottom: 80px; }
   .od-prod { display: flex; align-items: center; gap: 10px; }
   .od-prod-img {
     width: 36px; height: 36px; border-radius: 7px; flex-shrink: 0;
@@ -390,9 +628,6 @@
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
       {% if order.status != 'completed' %}
-        <a href="#" onclick="openEditOrderSidebar({{ order.pk }}); return false;" class="ord-btn ghost">
-          <i class="fa fa-edit"></i>{% trans "Edit" %}
-        </a>
         <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-industry"></i>{% trans "Production" %}
         </a>
@@ -415,80 +650,73 @@
     {# ============== LEFT ============== #}
     <div class="od-left">
 
-      {% if order.web_client or order.is_guest_order %}
-      <!-- STATUS PICKER + TIMELINE (web orders only) -->
+      <!-- STATUS + SHIPPING — available for every order, manual or web -->
       <section class="od-card">
         <div class="od-card-h">
           <h3>{% trans "Order status" %}</h3>
-          <span class="od-card-sub">{% trans "Updating the status sends an automatic notification to the customer" %}</span>
+          <span class="od-card-sub">{% trans "Pick the stage and add shipping info — saved inline." %}</span>
         </div>
 
-        <form method="post" action="{% url 'operating:web_order_status' order.pk %}" id="od-status-form">
+        <form method="post" action="{% url 'operating:order_detail' order.pk %}" id="od-status-form">
           {% csrf_token %}
-          <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}"/>
+          <input type="hidden" name="action" value="update_status">
+          <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}">
 
-          <div class="od-spk">
-            {% for code, label, color, bg, dot in nejum_status_choices %}{% endfor %}
-            {# inline list — keep labels TR for the user-facing pill colors #}
-            <button type="button" data-status="pending"          class="od-spk-btn {% if order.order_status == 'pending' or not order.order_status %}active{% endif %}"   style="{% if order.order_status == 'pending' or not order.order_status %}color:#B27500;background:#FEF3C7;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F59E0B;"></span>{% trans "Pending" %}</button>
-            <button type="button" data-status="confirmed"        class="od-spk-btn {% if order.order_status == 'confirmed' %}active{% endif %}" style="{% if order.order_status == 'confirmed' %}color:#0E6E4A;background:#D1FAE5;border-color:#0E6E4A;{% endif %}"><span class="od-spk-dot" style="background:#10B981;"></span>{% trans "Confirmed" %}</button>
-            <button type="button" data-status="preparing"        class="od-spk-btn {% if order.order_status == 'preparing' %}active{% endif %}" style="{% if order.order_status == 'preparing' %}color:#1565C0;background:#DBEAFE;border-color:#1565C0;{% endif %}"><span class="od-spk-dot" style="background:#3B82F6;"></span>{% trans "Preparing / Sourcing" %}</button>
-            <button type="button" data-status="shipped"          class="od-spk-btn {% if order.order_status == 'shipped' %}active{% endif %}" style="{% if order.order_status == 'shipped' %}color:#B27500;background:#FFEDD5;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F97316;"></span>{% trans "Shipped" %}</button>
-            <button type="button" data-status="in_transit"       class="od-spk-btn {% if order.order_status == 'in_transit' %}active{% endif %}" style="{% if order.order_status == 'in_transit' %}color:#B27500;background:#FFEDD5;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F97316;"></span>{% trans "In transit" %}</button>
-            <button type="button" data-status="out_for_delivery" class="od-spk-btn {% if order.order_status == 'out_for_delivery' %}active{% endif %}" style="{% if order.order_status == 'out_for_delivery' %}color:#B27500;background:#FFEDD5;border-color:#B27500;{% endif %}"><span class="od-spk-dot" style="background:#F97316;"></span>{% trans "Out for delivery" %}</button>
-            <button type="button" data-status="delivered"        class="od-spk-btn {% if order.order_status == 'delivered' %}active{% endif %}" style="{% if order.order_status == 'delivered' %}color:#0E6E4A;background:#D1FAE5;border-color:#0E6E4A;{% endif %}"><span class="od-spk-dot" style="background:#10B981;"></span>{% trans "Delivered" %}</button>
-            <button type="button" data-status="cancelled"        class="od-spk-btn {% if order.order_status == 'cancelled' %}active{% endif %}" style="{% if order.order_status == 'cancelled' %}color:#B23B3B;background:#FEE2E2;border-color:#B23B3B;{% endif %}"><span class="od-spk-dot" style="background:#EF4444;"></span>{% trans "Cancelled" %}</button>
-            <button type="button" data-status="returned"         class="od-spk-btn {% if order.order_status == 'returned' %}active{% endif %}" style="{% if order.order_status == 'returned' %}color:#B23B3B;background:#FEE2E2;border-color:#B23B3B;{% endif %}"><span class="od-spk-dot" style="background:#EF4444;"></span>{% trans "Returned" %}</button>
+          {# 4-stage progress bar — pending → preparing → packaging → shipped #}
+          <div class="od-stages">
+            {% for s in status_stages %}
+            <button type="button"
+                    class="od-stage {% if s.filled %}filled{% endif %} {% if s.key == order.order_status %}now{% endif %}"
+                    data-status="{{ s.key }}">
+              <span class="od-stage-n">{{ forloop.counter }}</span>
+              <span class="od-stage-l">{{ s.label }}</span>
+            </button>
+            {% if not forloop.last %}<span class="od-stage-arrow {% if status_stages|slice:forloop.counter|first|default:0 %}filled{% endif %}">→</span>{% endif %}
+            {% endfor %}
           </div>
 
-          {# Timeline #}
-          {% with current=order.order_status|default:'pending' %}
-          <div class="od-tl">
-            {# Step 1: pending always done #}
-            <div class="od-tl-step done {% if current == 'pending' %}now{% endif %}">
-              <div class="od-tl-ico"><i class="fa fa-shopping-bag"></i></div>
-              <div>
-                <div class="od-tl-l">{% trans "Order received" %}</div>
-                <div class="od-tl-t">{{ order.created_at|date:"d M · H:i" }}</div>
-              </div>
+          <div class="od-ship">
+            <div class="od-ship-grid">
+              <label class="od-ship-f">
+                <span class="od-ship-l">{% trans "Carrier" %}</span>
+                <select name="carrier">
+                  <option value="">{% trans "— Select —" %}</option>
+                  {% for code, label in carrier_choices %}
+                  <option value="{{ code }}" {% if order.carrier == code %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="od-ship-f">
+                <span class="od-ship-l">{% trans "Tracking number" %}</span>
+                <input type="text" name="tracking_number" value="{{ order.tracking_number|default:'' }}"
+                       placeholder="{% trans 'e.g. 1234567890' %}">
+              </label>
             </div>
-
-            <div class="od-tl-step {% if current == 'confirmed' or current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}done{% endif %} {% if current == 'confirmed' %}now{% endif %}">
-              <div class="od-tl-ico"><i class="fa fa-check-circle"></i></div>
-              <div>
-                <div class="od-tl-l">{% trans "Confirmed" %}</div>
-                <div class="od-tl-t">{% if current == 'confirmed' or current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}{{ order.updated_at|date:"d M · H:i" }}{% else %}—{% endif %}</div>
-              </div>
-            </div>
-
-            <div class="od-tl-step {% if current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}done{% endif %} {% if current == 'preparing' %}now{% endif %}">
-              <div class="od-tl-ico"><i class="fa fa-cube"></i></div>
-              <div>
-                <div class="od-tl-l">{% trans "Preparing" %}</div>
-                <div class="od-tl-t">{% if current == 'preparing' or current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}—{% else %}—{% endif %}</div>
-              </div>
-            </div>
-
-            <div class="od-tl-step {% if current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' or current == 'delivered' %}done{% endif %} {% if current == 'shipped' or current == 'in_transit' or current == 'out_for_delivery' %}now{% endif %}">
-              <div class="od-tl-ico"><i class="fa fa-truck"></i></div>
-              <div>
-                <div class="od-tl-l">{% trans "Shipped" %}</div>
-                <div class="od-tl-t">{% if order.shipped_at %}{{ order.shipped_at|date:"d M · H:i" }}{% else %}—{% endif %}</div>
-              </div>
-            </div>
-
-            <div class="od-tl-step {% if current == 'delivered' %}done now{% endif %}">
-              <div class="od-tl-ico"><i class="fa fa-flag-checkered"></i></div>
-              <div>
-                <div class="od-tl-l">{% trans "Delivered" %}</div>
-                <div class="od-tl-t">{% if order.delivered_at %}{{ order.delivered_at|date:"d M · H:i" }}{% else %}—{% endif %}</div>
-              </div>
+            <div class="od-ship-actions">
+              <span class="od-ship-meta">
+                {% if order.shipped_at %}<i class="fa fa-truck"></i> {% trans "Shipped" %}: {{ order.shipped_at|date:"d M Y · H:i" }}{% endif %}
+                {% if order.delivered_at %} · <i class="fa fa-check-circle"></i> {% trans "Delivered" %}: {{ order.delivered_at|date:"d M Y · H:i" }}{% endif %}
+              </span>
+              <button type="submit" class="ord-btn primary">
+                <i class="fa fa-save"></i> {% trans "Save" %}
+              </button>
             </div>
           </div>
-          {% endwith %}
         </form>
+
+        <details class="od-more-status">
+          <summary>{% trans "More statuses (cancelled, returned, delivered…)" %}</summary>
+          <div class="od-more-grid">
+            {% for code, label in status_choices %}
+            <button type="button" form="od-status-form"
+                    class="od-stage-mini {% if order.order_status == code %}active{% endif %}"
+                    data-status="{{ code }}">
+              {{ label }}
+            </button>
+            {% endfor %}
+          </div>
+        </details>
       </section>
-      {% endif %}
 
       <!-- PRODUCTS -->
       <section class="od-card">
@@ -531,9 +759,21 @@
               </td>
               <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
               <td><span class="mono">{{ item.product_variant.variant_sku|default:"—" }}</span></td>
-              <td class="num">{{ item.quantity|default:0 }}</td>
-              <td class="num">${{ item.price|default:0|floatformat:2 }}</td>
-              <td class="num"><b>${{ item.subtotal|floatformat:2 }}</b></td>
+              <td class="num">
+                <input type="number" class="od-inline-input" step="0.01" min="0"
+                       value="{{ item.quantity|default:0|stringformat:'g' }}"
+                       data-item-id="{{ item.pk }}" data-field="quantity"
+                       data-original="{{ item.quantity|default:0|stringformat:'g' }}"
+                       onwheel="this.blur()">
+              </td>
+              <td class="num">
+                <input type="number" class="od-inline-input" step="0.01" min="0"
+                       value="{{ item.price|default:0|stringformat:'g' }}"
+                       data-item-id="{{ item.pk }}" data-field="price"
+                       data-original="{{ item.price|default:0|stringformat:'g' }}"
+                       onwheel="this.blur()">
+              </td>
+              <td class="num" data-item-subtotal="{{ item.pk }}"><b>${{ item.subtotal|floatformat:2 }}</b></td>
             </tr>
             {% endfor %}
           </tbody>
@@ -541,11 +781,11 @@
         <div class="od-totals">
           <div class="od-tot-row">
             <span>{% trans "Subtotal" %}</span>
-            <span>${{ order.total_value|floatformat:2 }}</span>
+            <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
           </div>
           <div class="od-tot-row total">
             <span>{% trans "Grand total" %}</span>
-            <span>${{ order.total_value|floatformat:2 }}</span>
+            <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
           </div>
           {% with gp=order.gross_profit gm=order.gross_margin_pct %}
           <div class="od-tot-row od-gross" style="margin-top:6px; padding:8px 10px; background:#F0FDF4; border:1px dashed #BBF7D0; border-radius:8px; color:#166534;">
@@ -567,6 +807,17 @@
         {% else %}
         <div class="od-empty-mute" style="padding: 20px 0; text-align: center;">{% trans "This order has no items yet" %}</div>
         {% endif %}
+      </section>
+
+      <!-- NOTES (inline editable) -->
+      <section class="od-card">
+        <div class="od-card-h">
+          <h3>{% trans "Notes" %}</h3>
+          <span class="od-card-sub">{% trans "Saves automatically as you type" %}</span>
+        </div>
+        <textarea id="od-notes-edit" class="od-notes-edit"
+                  data-original="{{ order.notes|default:'' }}"
+                  placeholder="{% trans 'Internal notes about this order…' %}">{{ order.notes|default:'' }}</textarea>
       </section>
 
       {% if order.web_client or order.is_guest_order %}
@@ -683,6 +934,122 @@
         {% endif %}
       </section>
 
+      {% if order.cari %}
+      <!-- CURRENT ACCOUNT (CARI) — internal ledger snapshot -->
+      <section class="od-card">
+        <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
+          <h3>{% trans "Current account" %}</h3>
+          <div style="display:flex; align-items:center; gap:8px;">
+            {% if not has_active_invoice %}
+              <a href="{% url 'current_account:invoice_create' %}?order={{ order.pk }}"
+                 class="od-link"
+                 style="font-size: 11.5px; padding:5px 10px; background:#147F74; color:#fff; border-radius:6px;"
+                 title="{% trans 'Create invoice from this order' %}">
+                <i class="fa fa-file-invoice"></i> {% trans "Create invoice" %}
+              </a>
+            {% endif %}
+            <a href="{% url 'current_account:cari_detail' order.cari.pk %}"
+               class="od-link" style="font-size: 11.5px;">
+              {% trans "Open cari" %} <i class="fa fa-external-link-alt"></i>
+            </a>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius:10px; margin-top:8px;">
+          <div>
+            <div style="font:600 11px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
+              {{ order.cari.code }} · {{ order.cari.get_type_display }}
+            </div>
+            <div style="font:700 14px var(--font-sans); color:#0F1419; margin-top:2px;">{{ order.cari.name }}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font:600 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
+              {{ order.cari.balance_label }}
+            </div>
+            <div style="font:800 16px var(--font-sans); color:{% if order.cari.cached_balance > 0 %}#B45309{% elif order.cari.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
+              {{ order.cari.display_currency_symbol }}{{ order.cari.absolute_balance|floatformat:2 }}
+            </div>
+          </div>
+        </div>
+
+        {% if cari_recent_movements %}
+        <div style="margin-top:12px;">
+          <div style="font:700 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;">
+            {% trans "Recent movements" %}
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            {% for mv in cari_recent_movements %}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#FFF; border:1px solid #EEF1F5; border-radius:8px; font-size:12px;">
+              <div style="min-width:0; flex:1;">
+                <div style="font-weight:600; color:#0F1419;">{{ mv.get_movement_type_display }}</div>
+                <div style="color:var(--gray-500); font-size:10.5px; margin-top:1px;">
+                  {{ mv.date|date:"d M Y" }}{% if mv.reference %} · {{ mv.reference }}{% endif %}
+                </div>
+              </div>
+              <div style="font-weight:700; font-variant-numeric:tabular-nums; color:{% if mv.amount >= 0 %}#B45309{% else %}#147F74{% endif %}; flex-shrink:0; margin-left:8px;">
+                {% if mv.amount >= 0 %}+{% endif %}{{ mv.currency.symbol }}{{ mv.amount|floatformat:2 }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      {% if order_invoices %}
+      <!-- LINKED INVOICES — invoices generated from this order -->
+      <section class="od-card">
+        <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
+          <h3>{% trans "Invoices" %}</h3>
+          <span style="font:600 11px var(--font-sans); color:var(--gray-500); letter-spacing:.04em; text-transform:uppercase;">
+            {{ order_invoices|length }} {% trans "linked" %}
+          </span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+          {% for inv in order_invoices %}
+          <a href="{% url 'current_account:invoice_detail' inv.pk %}"
+             style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:#FFF; border:1px solid #E2E8EE; border-radius:9px; text-decoration:none; transition:border-color 140ms;"
+             onmouseover="this.style.borderColor='var(--nejum-teal-300,#66B5B5)'"
+             onmouseout="this.style.borderColor='#E2E8EE'">
+            <div style="min-width:0; flex:1;">
+              <div style="font:600 12px var(--font-mono); color:var(--nejum-teal-700, #005354);">
+                {{ inv.series }}-{{ inv.number }}
+              </div>
+              <div style="font:500 11px var(--font-sans); color:var(--gray-500); margin-top:2px;">
+                {{ inv.date|date:"d.m.Y" }} · {{ inv.get_type_display }}
+              </div>
+            </div>
+            <span style="flex-shrink:0; padding:2px 8px; border-radius:999px; font:700 10px var(--font-sans); letter-spacing:.06em; text-transform:uppercase;
+              {% if inv.status == 'paid' %}background:#DCFCE7;color:#166534;
+              {% elif inv.status == 'partially_paid' %}background:#FED7AA;color:#9A3412;
+              {% elif inv.status == 'issued' %}background:#DBEAFE;color:#1E40AF;
+              {% elif inv.status == 'draft' %}background:#FEF3C7;color:#92400E;
+              {% elif inv.status == 'overdue' %}background:#FECACA;color:#991B1B;
+              {% elif inv.status == 'cancelled' %}background:#FEE2E2;color:#991B1B;{% endif %}">
+              {{ inv.get_status_display }}
+            </span>
+            <div style="flex-shrink:0; text-align:right;">
+              <div style="font:700 13px var(--font-sans); color:#0F1419; font-variant-numeric:tabular-nums;">
+                {{ inv.currency.symbol }}{{ inv.total|floatformat:2 }}
+              </div>
+              <div style="font:500 10.5px var(--font-sans); color:var(--gray-500); margin-top:1px;">
+                {% trans "Balance" %}: {{ inv.currency.symbol }}{{ inv.balance|floatformat:2 }}
+              </div>
+            </div>
+            <i class="fa fa-chevron-right" style="color:var(--gray-400); font-size:11px;"></i>
+          </a>
+          {% endfor %}
+        </div>
+        {% if has_active_invoice %}
+        <div style="margin-top:10px; padding:8px 10px; background:#F0FDF4; border:1px dashed #BBF7D0; border-radius:7px; font:500 11.5px var(--font-sans); color:#166534;">
+          <i class="fa fa-info-circle"></i>
+          {% trans "An active invoice already exists. Cancel or delete it before creating a new one." %}
+        </div>
+        {% endif %}
+      </section>
+      {% endif %}
+
       <!-- DELIVERY ADDRESS -->
       {% if order.delivery_address %}
       <section class="od-card">
@@ -725,13 +1092,33 @@
   </div>
 </div>
 
+<!-- Sticky save bar — slides in from bottom only when there are
+     unsaved changes to the inline-editable fields. -->
+<div id="od-savebar" class="od-savebar" aria-hidden="true">
+  <div class="od-savebar-inner">
+    <span class="od-savebar-msg">
+      <i class="fa fa-circle" style="color:#F59E0B; font-size:8px;"></i>
+      <b id="od-savebar-count">0</b> {% trans "unsaved change" %}<span id="od-savebar-plural">s</span>
+    </span>
+    <button type="button" id="od-savebar-discard" class="ord-btn ghost">
+      <i class="fa fa-undo"></i> {% trans "Discard" %}
+    </button>
+    <button type="button" id="od-savebar-save" class="ord-btn primary">
+      <i class="fa fa-save"></i> {% trans "Save changes" %}
+    </button>
+  </div>
+</div>
+
 <script>
-  // Status picker — submits the form with the chosen status
+  // Status picker: each stage button + the legacy mini buttons update
+  // the hidden input and submit. The carrier/tracking inputs ride
+  // along since they're part of the same form.
   const statusForm = document.getElementById('od-status-form');
   const statusInput = document.getElementById('od-status-input');
   if (statusForm && statusInput) {
-    document.querySelectorAll('.od-spk-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+    document.querySelectorAll('.od-stage, .od-stage-mini, .od-spk-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
         const s = btn.dataset.status;
         if (!s) return;
         statusInput.value = s;
@@ -739,5 +1126,131 @@
       });
     });
   }
+
+  // ── Inline edit: dirty tracking + manual Save.
+  //   - Auto-save is intentionally OFF — the user wants to control
+  //     when changes commit.
+  //   - Each input remembers its original value via data-original.
+  //     If the live value differs, the input + page enter "dirty"
+  //     state and the sticky save bar slides up.
+  //   - "Save changes" flushes every dirty input/notes in one batch
+  //     of AJAX POSTs (one per field) and then clears the dirty flag.
+  //   - "Discard" reverts every input to its data-original value.
+  (function () {
+    const ORDER_URL = window.location.pathname;
+    const CSRF = '{{ csrf_token }}';
+    const bar      = document.getElementById('od-savebar');
+    const countEl  = document.getElementById('od-savebar-count');
+    const pluralEl = document.getElementById('od-savebar-plural');
+    const saveBtn  = document.getElementById('od-savebar-save');
+    const discardBtn = document.getElementById('od-savebar-discard');
+    const notes    = document.getElementById('od-notes-edit');
+    const inputs   = document.querySelectorAll('.od-inline-input');
+
+    function postUpdate(payload) {
+      const body = new URLSearchParams(payload);
+      return fetch(ORDER_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+        body,
+      }).then(r => r.json().catch(() => ({})));
+    }
+
+    function refreshDirty() {
+      let dirty = [];
+      inputs.forEach(inp => {
+        const a = String(inp.value).trim();
+        const b = String(inp.dataset.original || '').trim();
+        if (a !== b) {
+          inp.classList.add('dirty');
+          dirty.push(inp);
+        } else {
+          inp.classList.remove('dirty');
+        }
+      });
+      if (notes) {
+        if ((notes.value || '') !== (notes.dataset.original || '')) {
+          notes.classList.add('dirty');
+          dirty.push(notes);
+        } else {
+          notes.classList.remove('dirty');
+        }
+      }
+      countEl.textContent = dirty.length;
+      pluralEl.style.display = dirty.length === 1 ? 'none' : 'inline';
+      if (dirty.length > 0) {
+        bar.classList.add('show');
+        document.body.classList.add('has-dirty-savebar');
+      } else {
+        bar.classList.remove('show');
+        document.body.classList.remove('has-dirty-savebar');
+      }
+      return dirty;
+    }
+
+    inputs.forEach(inp => {
+      // 'input' fires on every keystroke + spinner click.
+      inp.addEventListener('input', refreshDirty);
+    });
+    if (notes) notes.addEventListener('input', refreshDirty);
+
+    discardBtn.addEventListener('click', () => {
+      inputs.forEach(inp => { inp.value = inp.dataset.original || ''; });
+      if (notes) notes.value = notes.dataset.original || '';
+      refreshDirty();
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      const dirty = refreshDirty();
+      if (dirty.length === 0) return;
+      saveBtn.disabled = true;
+      const origLabel = saveBtn.innerHTML;
+      saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
+
+      try {
+        let latestTotal = null;
+        for (const el of dirty) {
+          if (el === notes) {
+            const r = await postUpdate({ action: 'update_notes', notes: el.value });
+            if (!(r && r.ok)) throw new Error(r && r.error || 'Notes save failed');
+            notes.dataset.original = notes.value;
+          } else {
+            const r = await postUpdate({
+              action: 'update_item',
+              item_id: el.dataset.itemId,
+              field:   el.dataset.field,
+              value:   el.value,
+            });
+            if (!(r && r.ok)) throw new Error(r && r.error || 'Item save failed');
+            el.dataset.original = el.value;
+            if (r.subtotal !== undefined) {
+              const sub = document.querySelector('[data-item-subtotal="' + el.dataset.itemId + '"]');
+              if (sub) sub.innerHTML = '<b>$' + Number(r.subtotal).toFixed(2) + '</b>';
+            }
+            if (r.order_total !== undefined) latestTotal = r.order_total;
+          }
+        }
+        if (latestTotal !== null) {
+          document.querySelectorAll('[data-order-total]').forEach(el => {
+            el.textContent = '$' + Number(latestTotal).toFixed(2);
+          });
+        }
+      } catch (e) {
+        alert(e.message || 'Save failed — please refresh.');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = origLabel;
+        refreshDirty();
+      }
+    });
+
+    // Warn before leaving with unsaved changes.
+    window.addEventListener('beforeunload', (e) => {
+      if (bar.classList.contains('show')) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  })();
 </script>
 {% endblock %}

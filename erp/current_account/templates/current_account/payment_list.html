@@ -52,12 +52,102 @@
   .pl-search-input::placeholder { color: var(--gray-500); }
   .pl-search-input:focus { background: white; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
 
-  .pl-toolbar { display:flex; flex-wrap:wrap; gap: 8px; align-items:center; padding: 10px 12px; background: white; border:1px solid #E2E8EE; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
-  .pl-toolbar select, .pl-toolbar input[type=date] { padding: 7px 10px; border: 1px dashed #C5CCD3; border-radius: 8px; background: white; font: 500 12.5px var(--font-sans); color: var(--gray-700); cursor: pointer; outline: none; transition: all 140ms; font-family: var(--font-sans); }
-  .pl-toolbar select:hover, .pl-toolbar input[type=date]:hover { border-color: var(--gray-500); }
-  .pl-toolbar select:focus, .pl-toolbar input[type=date]:focus { border-style: solid; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
-  .pl-toolbar .fc-lbl { font: 600 11px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); margin-right: 2px; margin-left: 6px; }
-  .pl-toolbar .fc-lbl:first-child { margin-left: 0; }
+  /* Compact filter bar: a single horizontal row of 3 controls + a
+     reset link. Labels are baked into each control as a tiny prefix
+     (no separate <span class="fc-lbl"> hogging space). On phones
+     the row collapses to a 3-column grid that still fits on one line. */
+  .pl-toolbar {
+    display: grid;
+    /* Yön | Tip | Cari ara | Başlangıç | Bitiş | Temizle */
+    grid-template-columns: minmax(0, 140px) minmax(0, 160px) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: white;
+    border: 1px solid #E2E8EE;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.03);
+  }
+  .pl-ctl {
+    display: flex; align-items: stretch;
+    background: white;
+    border: 1px solid #DDE3E7;
+    border-radius: 7px;
+    overflow: hidden;
+    min-width: 0;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .pl-ctl:hover { border-color: var(--gray-500); }
+  .pl-ctl:focus-within { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .pl-ctl-lbl {
+    flex-shrink: 0;
+    padding: 0 8px;
+    display: inline-flex; align-items: center;
+    background: #F8FAFC;
+    border-right: 1px solid #EEF1F5;
+    font: 700 10px var(--font-sans);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  .pl-toolbar select,
+  .pl-toolbar input[type=date] {
+    flex: 1; min-width: 0;
+    padding: 7px 9px;
+    /* Strip every chrome the browser likes to draw — base reset
+       elsewhere puts a 1px border on selects which produces the
+       nested-box look. */
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    font: 500 12.5px var(--font-sans); color: var(--gray-700);
+    font-family: var(--font-sans);
+  }
+  /* Restore the native dropdown chevron we just stripped from <select>. */
+  .pl-toolbar select {
+    padding-right: 26px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='none' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+  }
+  /* Cari name search — compact text input matching the rest of the chips. */
+  .pl-toolbar input[type="text"][name="cari_q"] {
+    flex: 1; min-width: 0;
+    padding: 7px 9px;
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent;
+    font: 500 12.5px var(--font-sans); color: var(--gray-700);
+    font-family: var(--font-sans);
+  }
+  .pl-reset {
+    justify-self: end;
+    padding: 7px 12px;
+    font: 600 12px var(--font-sans);
+    color: var(--gray-500);
+    text-decoration: none;
+    border-radius: 7px;
+    transition: color 140ms, background 140ms;
+  }
+  .pl-reset:hover { color: var(--nejum-teal-700); background: #F1F5F9; }
+
+  /* Tablet: 2-up grid; Account spans full row, reset drops below */
+  @media (max-width: 900px) {
+    .pl-toolbar { grid-template-columns: 1fr 1fr; }
+    .pl-ctl-cari { grid-column: 1 / -1; }
+    .pl-reset { grid-column: 1 / -1; justify-self: end; }
+  }
+  /* Phone: stack but keep the bar compact — labels stay inline so
+     each row is only ~36px tall, not the old full-width column. */
+  @media (max-width: 480px) {
+    .pl-toolbar { grid-template-columns: 1fr; padding: 8px; }
+    .pl-reset { padding: 6px 10px; }
+  }
   .pl-reset { color: var(--gray-500); font: 500 12.5px var(--font-sans); text-decoration: none; padding: 7px 10px; margin-left: auto; }
   .pl-reset:hover { color: var(--nejum-teal-700); }
 
@@ -81,6 +171,33 @@
   .pl-cari { color: var(--ink); font: 600 13px var(--font-sans); text-decoration: none; }
   .pl-cari:hover { color: var(--nejum-teal-700); }
   .pl-cari-code { font: 500 11.5px var(--font-mono); color: var(--gray-500); margin-top: 2px; }
+
+  /* Per-row "go to cari" action button */
+  .pl-row-actions { text-align: right; padding-right: 12px !important; }
+  .pl-go {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px;
+    background: white;
+    border: 1px solid #DDE3E7;
+    border-radius: 7px;
+    font: 600 11.5px var(--font-sans);
+    color: var(--gray-700);
+    text-decoration: none;
+    transition: all 140ms;
+    white-space: nowrap;
+  }
+  .pl-go i { width: 13px; height: 13px; }
+  .pl-go .arr { opacity: 0.55; transition: transform 140ms, opacity 140ms; }
+  .pl-go:hover {
+    background: var(--nejum-teal-50);
+    border-color: var(--nejum-teal-300, #66B5B5);
+    color: var(--nejum-teal-700);
+  }
+  .pl-go:hover .arr { opacity: 1; transform: translateX(2px); }
+  @media (max-width: 720px) {
+    .pl-go span { display: none; } /* shrink to icon-only on phones */
+    .pl-go { padding: 6px 8px; }
+  }
   .pl-method, .pl-cash { font: 500 12.5px var(--font-sans); color: var(--gray-600); }
   .pl-cash.muted { color: var(--gray-400); }
 
@@ -147,12 +264,12 @@
 
   <form method="get" id="pl-filter-form">
     <div class="pl-tabs">
-      <a href="?{% if q %}q={{ q }}&{% endif %}{% if filter_type %}type={{ filter_type }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}{% endif %}" class="pl-tab {% if not filter_status %}active{% endif %}">
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if filter_type %}type={{ filter_type }}&{% endif %}{% if filter_cari_q %}cari_q={{ filter_cari_q }}&{% endif %}{% if filter_direction %}direction={{ filter_direction }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}{% endif %}" class="pl-tab {% if not filter_status %}active{% endif %}">
         <i data-lucide="layers"></i>
         <span>{% trans "All" %}</span>
       </a>
       {% for val, label in status_choices %}
-        <a href="?status={{ val }}{% if q %}&q={{ q }}{% endif %}{% if filter_type %}&type={{ filter_type }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="pl-tab {% if filter_status == val %}active{% endif %}">
+        <a href="?status={{ val }}{% if q %}&q={{ q }}{% endif %}{% if filter_type %}&type={{ filter_type }}{% endif %}{% if filter_cari_q %}&cari_q={{ filter_cari_q }}{% endif %}{% if filter_direction %}&direction={{ filter_direction }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="pl-tab {% if filter_status == val %}active{% endif %}">
           <i data-lucide="{% if val == 'draft' %}file-edit{% elif val == 'confirmed' %}check-circle{% elif val == 'cancelled' %}x-circle{% else %}circle{% endif %}"></i>
           <span>{{ label }}</span>
         </a>
@@ -167,17 +284,33 @@
     {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
 
     <div class="pl-toolbar">
-      <span class="fc-lbl">{% trans "Type" %}</span>
-      <select name="type" onchange="this.form.submit()">
-        <option value="">{% trans "All Types" %}</option>
-        {% for v,l in type_choices %}<option value="{{ v }}" {% if filter_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
-      </select>
+      <label class="pl-ctl" title="{% trans 'Direction' %}">
+        <span class="pl-ctl-lbl">{% trans "Direction" %}</span>
+        <select name="direction" onchange="this.form.submit()">
+          <option value="">{% trans "All" %}</option>
+          <option value="in"  {% if filter_direction == 'in' %}selected{% endif %}>{% trans "Inflows" %}</option>
+          <option value="out" {% if filter_direction == 'out' %}selected{% endif %}>{% trans "Outflows" %}</option>
+        </select>
+      </label>
 
-      <span class="fc-lbl">{% trans "From" %}</span>
-      <input type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()">
+      <label class="pl-ctl pl-ctl-cari" title="{% trans 'Account' %}">
+        <span class="pl-ctl-lbl">{% trans "Account" %}</span>
+        <input type="text"
+               name="cari_q"
+               value="{{ filter_cari_q }}"
+               placeholder="{% trans 'Search…' %}"
+               autocomplete="off">
+      </label>
 
-      <span class="fc-lbl">{% trans "To" %}</span>
-      <input type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()">
+      <label class="pl-ctl" title="{% trans 'From' %}">
+        <span class="pl-ctl-lbl">{% trans "From" %}</span>
+        <input type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()">
+      </label>
+
+      <label class="pl-ctl" title="{% trans 'To' %}">
+        <span class="pl-ctl-lbl">{% trans "To" %}</span>
+        <input type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()">
+      </label>
 
       <a class="pl-reset" href="{% url 'current_account:payment_list' %}">{% trans "Clear" %}</a>
     </div>
@@ -200,6 +333,7 @@
           <th>{% trans "Cash Account" %}</th>
           <th>{% trans "Status" %}</th>
           <th class="num">{% trans "Amount" %}</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -227,6 +361,14 @@
             </span>
           </td>
           <td class="num">{{ p.currency.symbol }}{{ p.amount|floatformat:2|intcomma }}</td>
+          <td class="pl-row-actions">
+            <a class="pl-go" href="{% url 'current_account:cari_detail' p.cari.pk %}"
+               title="{% trans 'Open current account' %}">
+              <i data-lucide="user-circle"></i>
+              <span>{% trans "Account" %}</span>
+              <i data-lucide="arrow-right" class="arr"></i>
+            </a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -244,5 +386,21 @@
 
 <script>
   if (window.lucide) lucide.createIcons();
+
+  // Cari "Account" filter: submit on Enter or 500ms after the user
+  // stops typing — keeps the URL clean and lets the server's
+  // icontains query do the matching.
+  (function () {
+    const el = document.querySelector('.pl-toolbar input[name="cari_q"]');
+    if (!el) return;
+    let t = null;
+    el.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(() => el.form.submit(), 500);
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(t); el.form.submit(); }
+    });
+  })();
 </script>
 {% endblock %}

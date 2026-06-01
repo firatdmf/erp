@@ -211,6 +211,24 @@ class OrderDetail(DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        # Attach available-stock metadata to each item so the template
+        # can show "Stok: N" next to the qty input and compute the max
+        # the user can bump it to (current qty + remaining stock).
+        for it in self.object.items.all():
+            if it.product_variant_id and it.product_variant:
+                stock = it.product_variant.variant_quantity
+            elif it.product_id and it.product:
+                stock = it.product.quantity
+            else:
+                stock = None
+            it.available_stock = stock
+            it.allow_oversell = bool(getattr(it.product, "selling_while_out_of_stock", False))
+            try:
+                cur = float(it.quantity or 0)
+                avail = float(stock) if stock is not None else None
+                it.max_qty = (cur + avail) if avail is not None else None
+            except (TypeError, ValueError):
+                it.max_qty = None
         cari = self.object.cari
         if cari:
             # Last 5 ledger movements for the sidebar widget — cheap
@@ -268,12 +286,83 @@ class OrderDetail(DetailView):
           - update_item:   single OrderItem field (quantity or price)
           - update_notes:  order.notes
         """
-        order = self.get_object()
+        # NB: use a plain queryset here — get_queryset() prefetches items,
+        # which means order.items.all() would return STALE cached rows even
+        # after we save a new price/qty in this same request. That made the
+        # movement / order_total snapshot wrong by one revision. Fresh fetch
+        # forces every order.items.all() call to hit the DB.
+        order = get_object_or_404(Order, pk=self.kwargs["pk"])
         from django.utils import timezone
         from decimal import Decimal, InvalidOperation
         from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES, OrderItem
+        from current_account.services import (
+            get_or_create_cari_for_order, post_order_movement, reverse_order_movement,
+        )
 
         action = (request.POST.get("action") or "").strip()
+        member = getattr(request.user, "member", None)
+
+        def _sync_cari_total():
+            """Re-post the cari movement for this order after its total
+            changed (qty/price/add/remove). Idempotent — updates in place
+            when the movement already exists."""
+            try:
+                if order.cari_id:
+                    post_order_movement(order, member=member)
+            except Exception:
+                pass
+
+        def _profit_snapshot():
+            """Order-level cost + profit numbers for the totals widget.
+            Refreshes after qty/price/add/remove so the user sees real
+            margin without a page reload."""
+            try:
+                tc = float(order.total_cost() or 0)
+                gp = float(order.gross_profit() or 0)
+                ov = float(order.total_value() or 0)
+                margin = round(gp / ov * 100, 1) if ov > 0 else None
+                return {"total_cost": tc, "gross_profit": gp, "margin": margin}
+            except Exception:
+                return None
+
+        def _cari_snapshot():
+            """Return a small JSON-able dict with the current cari balance
+            so the client can refresh the sidebar without a page reload.
+
+            We deliberately fetch a fresh CariAccount + CariMovement from
+            the DB here — the signal handler has already updated the
+            movement.amount and re-aggregated cached_balance via
+            CariAccount.objects.filter(...).update(), which does NOT
+            invalidate any in-memory Cari instance. A direct DB read is
+            the only way to get the post-update value."""
+            if not order.cari_id:
+                return None
+            try:
+                from current_account.models import CariAccount, CariMovement
+                from django.contrib.contenttypes.models import ContentType
+                cari = CariAccount.objects.get(pk=order.cari_id)
+                ct = ContentType.objects.get_for_model(order.__class__)
+                mv = CariMovement.objects.filter(
+                    source_type=ct, source_id=order.pk, movement_type="order_sale",
+                ).first()
+                mv_amount = float(mv.amount) if mv else None
+                mv_symbol = (mv.currency.symbol if (mv and mv.currency_id) else "") or ""
+                bal = float(cari.cached_balance or 0)
+                abs_bal = abs(bal)
+                if bal > 0: color = "#B45309"
+                elif bal < 0: color = "#147F74"
+                else: color = "#374151"
+                return {
+                    "balance": bal,
+                    "absolute_balance": abs_bal,
+                    "balance_label": cari.balance_label,
+                    "currency_symbol": cari.display_currency_symbol or "",
+                    "color": color,
+                    "mv_amount": mv_amount,
+                    "mv_symbol": mv_symbol,
+                }
+            except Exception:
+                return None
 
         # ── Inline item edit (qty / price) ──────────────────────
         if action == "update_item":
@@ -294,13 +383,53 @@ class OrderDetail(DetailView):
                 return JsonResponse({"ok": False, "error": "Must be ≥ 0"}, status=400)
 
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
+
+            # Stock guard on quantity bumps. The signal will deduct the
+            # delta after save — if the available stock can't cover the
+            # delta, refuse the change so we don't go negative.
+            if field == "quantity":
+                old_qty = Decimal(str(item.quantity or 0))
+                delta = dec - old_qty
+                if delta > 0:
+                    src = item.product_variant or item.product
+                    allow_oversell = bool(getattr(item.product, "selling_while_out_of_stock", False))
+                    stock_attr = "variant_quantity" if item.product_variant_id else "quantity"
+                    stock = getattr(src, stock_attr, None) if src else None
+                    if stock is not None and not allow_oversell and Decimal(str(stock)) < delta:
+                        return JsonResponse({
+                            "ok": False,
+                            "error": f"Not enough stock — available: {stock}",
+                        }, status=400)
+
             setattr(item, field, dec)
             item.save(update_fields=[field, "updated_at"])
+            _sync_cari_total()
+
+            # Refresh in-memory variant/product stock so the response
+            # mirrors the post-deduction state.
+            if item.product_variant_id:
+                item.product_variant.refresh_from_db(fields=["variant_quantity"])
+                new_stock = item.product_variant.variant_quantity
+            elif item.product_id:
+                item.product.refresh_from_db(fields=["quantity"])
+                new_stock = item.product.quantity
+            else:
+                new_stock = None
+            allow_oversell = bool(getattr(item.product, "selling_while_out_of_stock", False))
+            max_qty = None
+            if new_stock is not None and not allow_oversell:
+                max_qty = float(item.quantity or 0) + float(new_stock)
+
             return JsonResponse({
                 "ok": True,
                 "item_id": item.pk,
                 "subtotal": float(item.subtotal()),
                 "order_total": float(order.total_value()),
+                "cari": _cari_snapshot(),
+                "profit": _profit_snapshot(),
+                "stock": float(new_stock) if new_stock is not None else None,
+                "max_qty": max_qty,
+                "allow_oversell": allow_oversell,
             })
 
         # ── Inline notes edit ───────────────────────────────────
@@ -308,6 +437,155 @@ class OrderDetail(DetailView):
             notes = request.POST.get("notes") or ""
             order.notes = notes
             order.save(update_fields=["notes", "updated_at"])
+            return JsonResponse({"ok": True})
+
+        # ── Add item ────────────────────────────────────────────
+        if action == "add_item":
+            sku = (request.POST.get("sku") or "").strip()
+            is_variant = (request.POST.get("is_variant") or "").lower() == "true"
+            qty_raw = (request.POST.get("quantity") or "1").replace(",", ".")
+            price_raw = (request.POST.get("price") or "0").replace(",", ".")
+            if not sku:
+                return JsonResponse({"ok": False, "error": "Missing SKU"}, status=400)
+            try:
+                qty = Decimal(qty_raw)
+                price = Decimal(price_raw)
+            except (InvalidOperation, ValueError):
+                return JsonResponse({"ok": False, "error": "Invalid number"}, status=400)
+            if qty <= 0 or price < 0:
+                return JsonResponse({"ok": False, "error": "Bad qty/price"}, status=400)
+
+            variant = None
+            if is_variant:
+                variant = ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
+                if not variant:
+                    return JsonResponse({"ok": False, "error": "Variant not found"}, status=404)
+                product = variant.product
+            else:
+                product = Product.objects.filter(sku=sku).first()
+                if not product:
+                    return JsonResponse({"ok": False, "error": "Product not found"}, status=404)
+
+            # Block adds that exceed current stock — unless the product
+            # is marked "selling_while_out_of_stock".
+            allow_oversell = bool(getattr(product, "selling_while_out_of_stock", False))
+            if not allow_oversell:
+                stock = variant.variant_quantity if variant else product.quantity
+                if stock is not None and Decimal(str(stock)) < qty:
+                    return JsonResponse({
+                        "ok": False,
+                        "error": f"Not enough stock — available: {stock}",
+                    }, status=400)
+
+            item = OrderItem.objects.create(
+                order=order, product=product, product_variant=variant,
+                quantity=qty, price=price,
+            )
+            _sync_cari_total()
+
+            # Refresh stock for the response so the new row shows the
+            # post-deduction figure right away.
+            if variant:
+                variant.refresh_from_db(fields=["variant_quantity"])
+                new_stock = variant.variant_quantity
+            else:
+                product.refresh_from_db(fields=["quantity"])
+                new_stock = product.quantity
+            max_qty = None
+            if new_stock is not None and not allow_oversell:
+                max_qty = float(qty) + float(new_stock)
+
+            return JsonResponse({
+                "ok": True,
+                "item": {
+                    "id": item.pk,
+                    "product_title": product.title or "",
+                    "product_url": reverse("marketing:product_detail", args=[product.pk]),
+                    "product_sku": product.sku or "",
+                    "variant_sku": variant.variant_sku if variant else "",
+                    "image_url": (product.files.first().file_url
+                                  if product.files.exists() and product.files.first().file_url else ""),
+                    "quantity": float(qty),
+                    "price": float(price),
+                    "subtotal": float(item.subtotal()),
+                    "unit_cost": float(item.unit_cost() or 0),
+                    "stock": float(new_stock) if new_stock is not None else None,
+                    "max_qty": max_qty,
+                    "allow_oversell": allow_oversell,
+                },
+                "order_total": float(order.total_value()),
+                "cari": _cari_snapshot(),
+                "profit": _profit_snapshot(),
+            })
+
+        # ── Remove item ─────────────────────────────────────────
+        if action == "remove_item":
+            try:
+                item_id = int(request.POST.get("item_id") or 0)
+            except (TypeError, ValueError):
+                return JsonResponse({"ok": False, "error": "Bad item_id"}, status=400)
+            item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            item.delete()
+            _sync_cari_total()
+            return JsonResponse({
+                "ok": True,
+                "order_total": float(order.total_value()),
+                "cari": _cari_snapshot(),
+                "profit": _profit_snapshot(),
+            })
+
+        # ── Update customer ─────────────────────────────────────
+        if action == "update_customer":
+            ctype = (request.POST.get("customer_type") or "").strip()
+            try:
+                cpk = int(request.POST.get("customer_pk") or 0)
+            except (TypeError, ValueError):
+                cpk = 0
+
+            if ctype == "contact" and cpk:
+                c = get_object_or_404(Contact, pk=cpk)
+                order.contact = c
+                order.company = None
+            elif ctype == "company" and cpk:
+                co = get_object_or_404(Company, pk=cpk)
+                order.company = co
+                order.contact = None
+            elif ctype == "none":
+                order.contact = None
+                order.company = None
+            else:
+                return JsonResponse({"ok": False, "error": "Bad customer"}, status=400)
+            order.save(update_fields=["contact", "company", "updated_at"])
+
+            # Customer changed → re-resolve the cari and move the ledger
+            # row to the new account. The old movement (if any) is reversed
+            # before posting fresh to avoid orphaning balance on the old cari.
+            try:
+                new_cari = get_or_create_cari_for_order(order, member=member)
+                if order.cari_id and (not new_cari or new_cari.pk != order.cari_id):
+                    reverse_order_movement(order)
+                if new_cari and order.cari_id != new_cari.pk:
+                    order.cari = new_cari
+                    order.save(update_fields=["cari", "updated_at"])
+                if new_cari:
+                    post_order_movement(order, member=member)
+                elif order.cari_id:
+                    # Customer cleared → drop the cari link entirely.
+                    reverse_order_movement(order)
+                    order.cari = None
+                    order.save(update_fields=["cari", "updated_at"])
+            except Exception:
+                pass
+            return JsonResponse({"ok": True})
+
+        # ── Update guest info ───────────────────────────────────
+        if action == "update_guest":
+            order.guest_first_name = (request.POST.get("guest_first_name") or "").strip() or None
+            order.guest_last_name = (request.POST.get("guest_last_name") or "").strip() or None
+            order.guest_email = (request.POST.get("guest_email") or "").strip() or None
+            order.guest_phone = (request.POST.get("guest_phone") or "").strip() or None
+            order.save(update_fields=["guest_first_name", "guest_last_name",
+                                       "guest_email", "guest_phone", "updated_at"])
             return JsonResponse({"ok": True})
 
         if action != "update_status":
@@ -335,6 +613,174 @@ class OrderDetail(DetailView):
                                    "shipped_at", "delivered_at", "updated_at"])
         messages.success(request, "Order updated.")
         return redirect("operating:order_detail", pk=order.pk)
+
+
+# ---------------------------------------------------------------------------
+# Customer card partial — full HTMX flow.
+# Single endpoint that handles GET (refresh) + POST (mutations) and always
+# returns the rendered card HTML so HTMX can swap it into the page without
+# any client-side reload.
+# ---------------------------------------------------------------------------
+def order_customer_card_view(request, pk):
+    from .models import Order
+    from crm.models import Contact, Company
+    from current_account.services import (
+        get_or_create_cari_for_order, post_order_movement, reverse_order_movement,
+    )
+
+    order = get_object_or_404(Order, pk=pk)
+    member = getattr(request.user, "member", None)
+
+    def _save_cari_link(prev_cari_id):
+        """After contact/company on the order changed, re-resolve the cari
+        and move the order_sale movement to the new account."""
+        try:
+            new_cari = get_or_create_cari_for_order(order, member=member)
+            # If the cari is changing, reverse the old movement first.
+            if prev_cari_id and (not new_cari or new_cari.pk != prev_cari_id):
+                reverse_order_movement(order)
+            if new_cari and order.cari_id != new_cari.pk:
+                order.cari = new_cari
+                order.save(update_fields=["cari", "updated_at"])
+            if new_cari:
+                post_order_movement(order, member=member)
+            elif order.cari_id:
+                reverse_order_movement(order)
+                order.cari = None
+                order.save(update_fields=["cari", "updated_at"])
+        except Exception:
+            pass
+
+    mode = "view"
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        # ── Switch to an existing customer ───────────────────
+        if action == "switch":
+            ctype = (request.POST.get("customer_type") or "").strip()
+            try:
+                cpk = int(request.POST.get("customer_pk") or 0)
+            except (TypeError, ValueError):
+                cpk = 0
+            prev_cari_id = order.cari_id
+            fields_changed = ["contact", "company", "web_client",
+                              "is_guest_order", "updated_at"]
+            # Clear all customer linkages first so the swap is atomic.
+            order.contact = None
+            order.company = None
+            order.web_client = None
+            order.is_guest_order = False
+            if ctype == "contact" and cpk:
+                order.contact = get_object_or_404(Contact, pk=cpk)
+            elif ctype == "company" and cpk:
+                order.company = get_object_or_404(Company, pk=cpk)
+            elif ctype == "web_client" and cpk:
+                from authentication.models import WebClient
+                order.web_client = get_object_or_404(WebClient, pk=cpk)
+            elif ctype == "guest":
+                order.is_guest_order = True
+            order.save(update_fields=fields_changed)
+            _save_cari_link(prev_cari_id)
+            mode = "edit"
+
+        # ── Clear linked customer ────────────────────────────
+        elif action == "clear":
+            prev_cari_id = order.cari_id
+            order.contact = None
+            order.company = None
+            order.save(update_fields=["contact", "company", "updated_at"])
+            _save_cari_link(prev_cari_id)
+            mode = "edit"
+
+        # ── Inline field edit on the linked contact/company ──
+        elif action == "update_field":
+            from django.contrib.postgres.fields import ArrayField as _ArrayField
+            field = (request.POST.get("field") or "").strip()
+            value = (request.POST.get("value") or "").strip()
+            target = order.contact or order.company
+            allowed = {
+                "contact": {"name", "job_title", "email", "phone", "address", "country"},
+                "company": {"name", "email", "phone", "address", "country", "website"},
+            }
+            if target:
+                kind = "contact" if order.contact_id else "company"
+                if field in allowed[kind]:
+                    # email / phone are ArrayField on both models — store as
+                    # a single-item list so the existing display logic shows it.
+                    try:
+                        model_field = target.__class__._meta.get_field(field)
+                        if isinstance(model_field, _ArrayField):
+                            setattr(target, field, [value] if value else [])
+                        else:
+                            setattr(target, field, value)
+                        target.save(update_fields=[field])
+                    except Exception:
+                        pass
+                    # If the contact's name changed AND the cari was named
+                    # after it, keep the cari label in sync. Safe / cheap.
+                    if field == "name" and order.cari_id:
+                        try:
+                            order.cari.name = value or order.cari.name
+                            order.cari.save(update_fields=["name"])
+                        except Exception:
+                            pass
+            mode = "edit"
+
+        # ── Inline delivery-address edit (order-level) ──────
+        elif action == "update_delivery":
+            field = (request.POST.get("field") or "").strip()
+            value = (request.POST.get("value") or "").strip()
+            allowed = {"delivery_address_title", "delivery_address",
+                       "delivery_city", "delivery_country", "delivery_phone"}
+            if field in allowed:
+                setattr(order, field, value)
+                order.save(update_fields=[field, "updated_at"])
+            mode = "edit"
+
+        # ── Inline guest field edit ──────────────────────────
+        elif action == "update_guest":
+            field = (request.POST.get("field") or "").strip()
+            value = (request.POST.get(field) or "").strip() or None
+            if field in {"guest_first_name", "guest_last_name",
+                          "guest_email", "guest_phone"}:
+                setattr(order, field, value)
+                order.save(update_fields=[field, "updated_at"])
+            mode = "edit"
+
+        # ── Create brand-new Contact + link + cari ───────────
+        elif action == "create_contact":
+            name = (request.POST.get("name") or "").strip()
+            if not name:
+                mode = "create"
+            else:
+                prev_cari_id = order.cari_id
+                email_val = (request.POST.get("email") or "").strip()
+                phone_val = (request.POST.get("phone") or "").strip()
+                new_contact = Contact.objects.create(
+                    name=name,
+                    email=[email_val] if email_val else [],
+                    phone=[phone_val] if phone_val else [],
+                    address=(request.POST.get("address") or "").strip(),
+                    country=(request.POST.get("country") or "").strip(),
+                )
+                order.contact = new_contact
+                order.company = None
+                order.save(update_fields=["contact", "company", "updated_at"])
+                _save_cari_link(prev_cari_id)
+                mode = "view"
+
+    elif request.method == "GET":
+        mode = request.GET.get("mode") or "view"
+
+    # Re-fetch order to ensure related .cari, .contact etc. are fresh
+    # for the template (the snapshot used by HTMX swap is independent of
+    # whatever client mode toggle was in effect when the form fired).
+    order = get_object_or_404(Order, pk=pk)
+    return render(request, "operating/partials/_customer_card.html", {
+        "order": order,
+        "cust_card_mode": mode,
+    })
 
 
 class OrderPrint(DetailView):
@@ -473,16 +919,10 @@ class OrderCreate(View):
                         order.guest_email = request.POST.get("guest_email", "")
                         order.guest_phone = request.POST.get("guest_phone", "")
 
-                    # Payment
-                    order.payment_method = request.POST.get("payment_method", "cash")
-                    try:
-                        order.original_price = float(request.POST.get("total_price", 0))
-                    except (ValueError, TypeError):
-                        pass
-                    try:
-                        order.paid_amount = float(request.POST.get("paid_amount", 0))
-                    except (ValueError, TypeError):
-                        pass
+                    # Payment method / amount-paid fields removed from
+                    # the form — deposit is handled separately below as
+                    # a proper cari collection. We leave the fields on
+                    # the model alone (they stay NULL for new orders).
 
                     # Delivery Address
                     order.delivery_address_title = request.POST.get("delivery_address_title", "")
@@ -558,6 +998,40 @@ class OrderCreate(View):
                     post_order_movement(order, member=member)
                 except Exception as _e:
                     messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
+
+                # ── Deposit (collection) — post against the cari if the
+                # user ticked "Deposit received" and entered an amount.
+                # Creates + confirms a Payment so it lands in the cari
+                # ledger as a deduction.
+                deposit_flag = (request.POST.get("deposit_received") or "").strip()
+                try:
+                    deposit_amount = float(request.POST.get("deposit_amount") or 0)
+                except (ValueError, TypeError):
+                    deposit_amount = 0
+                if deposit_flag and deposit_amount > 0 and order.cari_id:
+                    try:
+                        from decimal import Decimal
+                        from datetime import date
+                        from current_account.models import Payment
+                        from current_account.views_payment import _next_payment_number
+                        from current_account.services import get_default_book, _resolve_currency
+
+                        book = get_default_book()
+                        currency = _resolve_currency(order)
+                        pay = Payment.objects.create(
+                            cari=order.cari, book=book,
+                            number=_next_payment_number(book, "collection"),
+                            type="collection", method="cash", status="draft",
+                            date=date.today(),
+                            amount=Decimal(str(deposit_amount)),
+                            currency=currency,
+                            description=f"Deposit for Order #{order.pk}",
+                            notes=f"ORD-{order.pk}",
+                            created_by=member,
+                        )
+                        pay.confirm(user=request.user if request.user.is_authenticated else None)
+                    except Exception as _e:
+                        messages.warning(request, f"Order saved but deposit posting failed: {_e}")
 
                 return redirect("operating:order_detail", pk=order.pk)
             except Exception as e:
@@ -1208,6 +1682,40 @@ def delete_order(request, pk):
     return redirect("operating:order_list")
 
 
+@require_POST
+def bulk_delete_orders(request):
+    """Delete a set of orders by id. Used by the order_list checkbox
+    selection + floating "Delete selected" bar. Returns JSON with the
+    count actually deleted so the JS can flash a confirmation.
+
+    OrderItem.post_delete signals (stock restore + cari reversal) fire
+    naturally as the cascade unfolds — no extra work needed here."""
+    ids_raw = request.POST.getlist("order_ids[]") or request.POST.getlist("order_ids")
+    if not ids_raw and request.content_type == "application/json":
+        try:
+            payload = json.loads(request.body.decode() or "{}")
+            ids_raw = payload.get("order_ids") or []
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            ids_raw = []
+    ids = []
+    for v in ids_raw:
+        try:
+            ids.append(int(v))
+        except (TypeError, ValueError):
+            pass
+    if not ids:
+        return JsonResponse({"ok": False, "error": "No order_ids supplied"}, status=400)
+    qs = Order.objects.filter(pk__in=ids)
+    count = qs.count()
+    # Iterate so each Order.delete() triggers its cascade signals
+    # (OrderItem post_delete restores catalog stock; cari movement is
+    # reversed). bulk delete via qs.delete() would still cascade but
+    # we keep it per-row for predictable signal ordering on Postgres.
+    for o in qs:
+        o.delete()
+    return JsonResponse({"ok": True, "deleted": count})
+
+
 
 def webclient_autocomplete(request):
     from authentication.models import WebClient
@@ -1252,29 +1760,61 @@ def product_autocomplete(request):
         """Escape string for safe use inside JS onclick single quotes"""
         return (s or "").replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", " ")
 
+    def stock_badge(qty, allow_oversell):
+        """Render a small "Stok: N" pill so the user sees availability
+        right in the autocomplete row. None → unlimited (no badge).
+        Zero → red badge. Positive → grey/green badge. allow_oversell
+        flips the negative-stock case to neutral instead of red."""
+        if qty is None:
+            return ""
+        try:
+            q = float(qty)
+        except (TypeError, ValueError):
+            return ""
+        if q <= 0 and not allow_oversell:
+            color, bg = "#B91C1C", "#FEE2E2"
+        elif q < 10:
+            color, bg = "#92400E", "#FEF3C7"
+        else:
+            color, bg = "#065F46", "#D1FAE5"
+        return (
+            f"<span style='font-size:10.5px;font-weight:600;padding:2px 6px;"
+            f"border-radius:6px;color:{color};background:{bg};margin-right:8px;'>"
+            f"Stok: {q:g}</span>"
+        )
+
     def render_item(product, variant=None):
         title = escape(product.title or "")
         cat_name = escape(product.category.name if product.category else "")
         title_js = js_str(product.title or "")
         cat_js = js_str(product.category.name if product.category else "")
+        allow_oversell = bool(getattr(product, "selling_while_out_of_stock", False))
 
         if variant:
             sku = escape(variant.variant_sku or "")
             price = variant.variant_price or product.price or 0
+            stock = variant.variant_quantity
+            stock_arg = "null" if stock is None else f"{float(stock):g}"
+            oversell_arg = "true" if allow_oversell else "false"
             attr_info = variant.attribute_summary() if hasattr(variant, 'attribute_summary') else ''
             attr_display = f' <span style="color:#6b7280;font-size:11px;">({escape(attr_info)})</span>' if attr_info else ''
             return (
-                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}')\">"
+                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\">"
                 f"<strong>{title}</strong> - <code>{sku}</code>{attr_display}"
-                f" <span style='color:#059669;font-weight:600;float:right;'>${price}</span></li>"
+                f" <span style='float:right;'>{stock_badge(stock, allow_oversell)}"
+                f"<span style='color:#059669;font-weight:600;'>${price}</span></span></li>"
             )
         else:
             sku = escape(product.sku or "")
             price = product.price or 0
+            stock = product.quantity
+            stock_arg = "null" if stock is None else f"{float(stock):g}"
+            oversell_arg = "true" if allow_oversell else "false"
             return (
-                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}')\">"
+                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\">"
                 f"<strong>{title}</strong> - <code>{sku}</code>"
-                f" <span style='color:#059669;font-weight:600;float:right;'>${price}</span></li>"
+                f" <span style='float:right;'>{stock_badge(stock, allow_oversell)}"
+                f"<span style='color:#059669;font-weight:600;'>${price}</span></span></li>"
             )
 
     items = []

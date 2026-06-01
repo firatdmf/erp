@@ -641,6 +641,9 @@ def my_emails(request):
     company_filter = request.GET.get('company_filter', '').strip()
     contact_filter = request.GET.get('contact_filter', '').strip()
     email_filter = request.GET.get('email_filter', '').strip()
+    # Top-level search across subject / sender / snippet / body — drives
+    # the search box in the redesigned UI.
+    search_query = request.GET.get('q', '').strip()
     
     # Check connection via GoogleChatCredentials (same as Chat/Drive)
     google_creds = GoogleChatCredentials.objects.filter(user=request.user).first()
@@ -696,6 +699,15 @@ def my_emails(request):
                 models.Q(from_email__icontains=email_filter) |
                 models.Q(to_emails__icontains=email_filter)
             )
+        # Top-level search box — looks across subject, sender, snippet, body.
+        if search_query:
+            emails = emails.filter(
+                models.Q(subject__icontains=search_query) |
+                models.Q(from_email__icontains=search_query) |
+                models.Q(from_name__icontains=search_query) |
+                models.Q(snippet__icontains=search_query) |
+                models.Q(body_text__icontains=search_query)
+            )
     
     # Folder counts (Optimized: Single query)
     folder_counts = {}
@@ -748,6 +760,7 @@ def my_emails(request):
         'filter_company': company_filter,
         'filter_contact': contact_filter,
         'filter_email': email_filter,
+        'search_query': search_query,
         'is_htmx': is_htmx,
     }
     

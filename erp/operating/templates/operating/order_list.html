@@ -150,7 +150,7 @@
   }
   .ord-list-head, .ord-row {
     display: grid;
-    grid-template-columns: 56px 200px 1.4fr 1fr 1fr 150px 24px;
+    grid-template-columns: 28px 56px 200px 1.4fr 1fr 1fr 150px 24px;
     gap: 16px;
     align-items: center;
     padding: 12px 18px;
@@ -173,6 +173,48 @@
   }
   .ord-row:last-child { border-bottom: none; }
   .ord-row:hover { background: #FAFBFD; }
+  .ord-row.selected { background: #F0FDFA; }
+  .ord-row.selected:hover { background: #E5F8F4; }
+
+  /* Row selection checkbox. The cell is a <label> so clicking anywhere
+     in the 28px column toggles the checkbox. We stop both default and
+     propagation in JS so the parent <a> doesn't navigate. */
+  .ord-select {
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; height: 100%;
+  }
+  .ord-select input[type="checkbox"] {
+    width: 16px; height: 16px; cursor: pointer; accent-color: #147F74;
+  }
+
+  /* Floating bulk action bar — appears at the bottom centred when 1+
+     rows are checked. Mirrors the design of the save bar on order
+     detail to feel familiar. */
+  .ord-bulk-bar {
+    position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 120%);
+    z-index: 100; transition: transform 220ms cubic-bezier(.4,0,.2,1);
+    background: #0F1419; color: #fff; border-radius: 14px;
+    padding: 10px 14px; box-shadow: 0 12px 36px rgba(15,23,31,0.28);
+    display: flex; align-items: center; gap: 14px; min-width: 320px;
+    pointer-events: none;
+  }
+  .ord-bulk-bar.show { transform: translate(-50%, 0); pointer-events: auto; }
+  .ord-bulk-bar-msg { font: 600 13px var(--font-sans); }
+  .ord-bulk-bar-msg b { color: #FBBF24; font-weight: 800; }
+  .ord-bulk-bar .ord-btn {
+    padding: 7px 12px; font-size: 12px;
+  }
+  .ord-bulk-bar .ord-btn.ghost {
+    background: transparent; border-color: rgba(255,255,255,0.18);
+    color: #E5E7EB;
+  }
+  .ord-bulk-bar .ord-btn.ghost:hover {
+    background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.32);
+  }
+  .ord-bulk-bar .ord-btn.danger {
+    background: #DC2626; border-color: #DC2626; color: #fff;
+  }
+  .ord-bulk-bar .ord-btn.danger:hover { background: #B91C1C; border-color: #B91C1C; }
   .ord-kind {
     display: inline-flex; align-items: center; justify-content: center;
     padding: 4px 0;
@@ -271,7 +313,7 @@
   .ord-empty p { font: 500 13px var(--font-sans); color: var(--gray-500); margin: 0 0 20px; }
 
   @media (max-width: 1100px) {
-    .ord-list-head, .ord-row { grid-template-columns: 56px 1.2fr 1.4fr 0.8fr 0.9fr 130px 20px; }
+    .ord-list-head, .ord-row { grid-template-columns: 28px 56px 1.2fr 1.4fr 0.8fr 0.9fr 130px 20px; }
   }
   @media (max-width: 900px) {
     .ord-search-input { width: 200px; }
@@ -299,7 +341,7 @@
     <div class="ord-head-r">
       <button type="button" class="ord-btn ghost"><i class="fa fa-download"></i>{% trans "Export" %}</button>
       <button type="button" class="ord-btn ghost"><i class="fa fa-filter"></i>{% trans "Filter" %}</button>
-      <a href="{% url 'operating:create_order' %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "New order" %}</a>
+      <button type="button" onclick="openOrderSidebar(); return false;" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "New order" %}</button>
     </div>
   </div>
 
@@ -338,6 +380,9 @@
     {% if orders %}
     <div class="ord-list">
       <div class="ord-list-head">
+        <label class="ord-select" title="{% trans 'Select all on this tab' %}">
+          <input type="checkbox" class="ord-select-all">
+        </label>
         <span></span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
@@ -347,7 +392,10 @@
         <span></span>
       </div>
       {% for order in orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-search="{{ order.pk }} {% if order.contact %}{{ order.contact.name }}{% elif order.company %}{{ order.company.name }}{% elif order.web_client %}{{ order.web_client.name }} {{ order.web_client.username }}{% endif %} {{ order.order_number }}">
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}" data-search="{{ order.pk }} {% if order.contact %}{{ order.contact.name }}{% elif order.company %}{{ order.company.name }}{% elif order.web_client %}{{ order.web_client.name }} {{ order.web_client.username }}{% endif %} {{ order.order_number }}">
+        <label class="ord-select">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+        </label>
         {% if order.web_client %}
           <span class="ord-kind b2c">B2C</span>
         {% elif order.contact or order.company %}
@@ -423,7 +471,7 @@
       <div class="ico"><i class="fa fa-shopping-cart"></i></div>
       <h3>{% trans "No orders yet" %}</h3>
       <p>{% trans "Create your first order to get started" %}</p>
-      <a href="{% url 'operating:create_order' %}" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "Create order" %}</a>
+      <button type="button" onclick="openOrderSidebar(); return false;" class="ord-btn primary"><i class="fa fa-plus"></i>{% trans "Create order" %}</button>
     </div>
     {% endif %}
   </div>
@@ -433,6 +481,9 @@
     {% if b2b_orders %}
     <div class="ord-list">
       <div class="ord-list-head">
+        <label class="ord-select" title="{% trans 'Select all on this tab' %}">
+          <input type="checkbox" class="ord-select-all">
+        </label>
         <span></span>
         <span>{% trans "Order" %}</span>
         <span>{% trans "Customer" %}</span>
@@ -442,7 +493,10 @@
         <span></span>
       </div>
       {% for order in b2b_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row">
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}">
+        <label class="ord-select">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+        </label>
         <span class="ord-kind b2b">B2B</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
@@ -506,7 +560,10 @@
         <span></span>
       </div>
       {% for order in b2c_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row">
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}">
+        <label class="ord-select">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+        </label>
         <span class="ord-kind b2c">B2C</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
@@ -557,6 +614,17 @@
   </div>
 </div>
 
+<!-- Floating bulk action bar -->
+<div id="ord-bulk-bar" class="ord-bulk-bar" aria-hidden="true">
+  <span class="ord-bulk-bar-msg">
+    <b id="ord-bulk-count">0</b> {% trans "order selected" %}<span id="ord-bulk-plural">s</span>
+  </span>
+  <button type="button" id="ord-bulk-clear" class="ord-btn ghost">{% trans "Clear" %}</button>
+  <button type="button" id="ord-bulk-delete" class="ord-btn danger">
+    <i class="fa fa-trash"></i> {% trans "Delete selected" %}
+  </button>
+</div>
+
 <script>
   // Tab switching
   document.querySelectorAll('.ord-tab').forEach(btn => {
@@ -590,5 +658,138 @@
       if (counter) counter.innerHTML = `<b>${visible}</b>`;
     });
   }
+
+  // ─────────────────────────────────────────────────────────────────
+  //  Row selection + bulk delete
+  // ─────────────────────────────────────────────────────────────────
+  (function () {
+    const bar       = document.getElementById('ord-bulk-bar');
+    const countEl   = document.getElementById('ord-bulk-count');
+    const pluralEl  = document.getElementById('ord-bulk-plural');
+    const clearBtn  = document.getElementById('ord-bulk-clear');
+    const deleteBtn = document.getElementById('ord-bulk-delete');
+    if (!bar || !deleteBtn) return;
+
+    // The same order can appear in multiple panes (e.g. "All" and "B2B")
+    // so we sync state by data-order-id across all visible checkboxes.
+    const selected = new Set();
+
+    function refresh() {
+      countEl.textContent = selected.size;
+      pluralEl.style.display = selected.size === 1 ? 'none' : 'inline';
+      bar.classList.toggle('show', selected.size > 0);
+      // Highlight rows
+      document.querySelectorAll('.ord-row').forEach(row => {
+        row.classList.toggle('selected', selected.has(row.dataset.orderId));
+      });
+      // Sync any header "select all" boxes in panes where all visible
+      // rows are checked.
+      document.querySelectorAll('.ord-list-wrap').forEach(pane => {
+        const rows = pane.querySelectorAll('.ord-select-row');
+        if (!rows.length) return;
+        const allChecked = Array.from(rows).every(cb => cb.checked);
+        const someChecked = Array.from(rows).some(cb => cb.checked);
+        const head = pane.querySelector('.ord-select-all');
+        if (head) {
+          head.checked = allChecked && rows.length > 0;
+          head.indeterminate = !allChecked && someChecked;
+        }
+      });
+    }
+
+    // Stop the parent <a> from navigating when the user clicks anywhere
+    // inside the 28px checkbox cell.
+    document.querySelectorAll('.ord-select').forEach(lbl => {
+      lbl.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    });
+
+    document.querySelectorAll('.ord-select-row').forEach(cb => {
+      cb.addEventListener('click', (e) => e.stopPropagation());
+      cb.addEventListener('change', (e) => {
+        const id = cb.dataset.orderId;
+        if (cb.checked) selected.add(id);
+        else selected.delete(id);
+        // Mirror the change to any other checkbox with the same id
+        // (e.g. the same order appears under "All" and "B2B").
+        document.querySelectorAll(`.ord-select-row[data-order-id="${id}"]`)
+          .forEach(other => { if (other !== cb) other.checked = cb.checked; });
+        refresh();
+      });
+    });
+
+    // "Select all" in a list head — only toggles rows in that pane.
+    document.querySelectorAll('.ord-select-all').forEach(head => {
+      head.addEventListener('click', (e) => e.stopPropagation());
+      head.addEventListener('change', () => {
+        const pane = head.closest('.ord-list-wrap');
+        if (!pane) return;
+        pane.querySelectorAll('.ord-select-row').forEach(cb => {
+          cb.checked = head.checked;
+          const id = cb.dataset.orderId;
+          if (head.checked) selected.add(id);
+          else selected.delete(id);
+          // Mirror to other panes.
+          document.querySelectorAll(`.ord-select-row[data-order-id="${id}"]`)
+            .forEach(other => { other.checked = head.checked; });
+        });
+        refresh();
+      });
+    });
+
+    clearBtn?.addEventListener('click', () => {
+      selected.clear();
+      document.querySelectorAll('.ord-select-row, .ord-select-all').forEach(cb => {
+        cb.checked = false;
+        cb.indeterminate = false;
+      });
+      refresh();
+    });
+
+    deleteBtn?.addEventListener('click', async () => {
+      if (selected.size === 0) return;
+      const ids = Array.from(selected);
+      const msg = ids.length === 1
+        ? '{% trans "Delete this order? This cannot be undone." %}'
+        : ('{% trans "Delete" %} ' + ids.length + ' {% trans "orders? This cannot be undone." %}');
+      if (!confirm(msg)) return;
+
+      deleteBtn.disabled = true;
+      const origLabel = deleteBtn.innerHTML;
+      deleteBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Deleting…" %}';
+      try {
+        const fd = new FormData();
+        ids.forEach(id => fd.append('order_ids[]', id));
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+        const r = await fetch('{% url "operating:bulk_delete_orders" %}', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+          body: fd,
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!(data && data.ok)) throw new Error(data && data.error || 'Delete failed');
+        // Remove deleted rows from all panes without a reload.
+        ids.forEach(id => {
+          document.querySelectorAll(`.ord-row[data-order-id="${id}"]`).forEach(row => row.remove());
+        });
+        selected.clear();
+        refresh();
+        // Update tab counts.
+        document.querySelectorAll('.ord-tab').forEach(t => {
+          const pane = document.querySelector(`.ord-list-wrap[data-pane="${t.dataset.tab}"]`);
+          if (!pane) return;
+          const c = pane.querySelectorAll('.ord-row').length;
+          const cn = t.querySelector('.ord-tab-count');
+          if (cn) cn.textContent = c;
+        });
+      } catch (e) {
+        alert(e.message || 'Delete failed.');
+      } finally {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = origLabel;
+      }
+    });
+  })();
 </script>
 {% endblock %}

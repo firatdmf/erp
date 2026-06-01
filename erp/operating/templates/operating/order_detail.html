@@ -322,6 +322,12 @@
   }
   .od-inline-input.saving { background: #FEF3C7; }
   .od-inline-input.saved  { background: #DCFCE7; }
+  /* Readonly state (default for qty/price until Edit is on) */
+  .od-inline-input[readonly] { cursor: default; color: var(--gray-700); }
+  .od-inline-input[readonly]:hover { border-color: transparent; background: transparent; }
+  .od-inline-input[readonly]:focus { border-color: transparent; background: transparent; box-shadow: none; }
+  .od-inline-input[readonly]::-webkit-inner-spin-button,
+  .od-inline-input[readonly]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   /* Notes textarea */
   .od-notes-edit {
     width: 100%;
@@ -410,6 +416,119 @@
   /* Push page content above the save bar when it's visible so the
      last card isn't hidden underneath. */
   body.has-dirty-savebar { padding-bottom: 80px; }
+
+  /* Edit-mode visibility for products + customer cards. */
+  .od-edit-only { display: none !important; }
+  .od-card.editing div.od-edit-only,
+  .od-card.editing button.od-edit-only { display: block !important; }
+  .od-card.editing td.od-edit-only,
+  .od-card.editing th.od-edit-only { display: table-cell !important; }
+  .od-card.editing #od-prods-edit-toggle,
+  .od-card.editing #od-cust-edit-toggle { background: #147F74; color: #fff; border-color: #147F74; }
+
+  .od-row-del {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: #FEF2F2; color: #B91C1C;
+    border: 1px solid #FECACA;
+    cursor: pointer; transition: all 0.15s;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .od-row-del:hover { background: #FEE2E2; border-color: #FCA5A5; }
+
+  /* Visual warning when qty input exceeds available stock. */
+  .od-inline-input.over-stock {
+    border-color: #FCA5A5 !important;
+    background: #FEE2E2 !important;
+    color: #B91C1C;
+  }
+
+  /* Per-row stock indicator (visible in edit mode under the qty input). */
+  .od-row-stock { margin-top: 3px; }
+  .od-stock-pill {
+    display:inline-block; font:600 10.5px var(--font-sans);
+    padding: 2px 7px; border-radius: 6px;
+  }
+  .od-stock-pill.ok  { color:#065F46; background:#D1FAE5; }
+  .od-stock-pill.low { color:#92400E; background:#FEF3C7; }
+  .od-stock-pill.out { color:#B91C1C; background:#FEE2E2; }
+  .od-stock-pill b { font-weight: 800; }
+
+  /* Product autocomplete dropdown (matches existing pattern). */
+  .od-prod-ac { position: absolute; left: 0; right: 0; top: 100%;
+    z-index: 30; max-height: 280px; overflow-y: auto; }
+  .od-prod-ac .product_autocomplete_list ul {
+    list-style: none; margin: 4px 0 0; padding: 4px;
+    background: #fff; border: 1px solid #E2E8EE; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15,23,31,0.08);
+  }
+  .od-prod-ac .product_autocomplete_list li {
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    font: 500 12.5px var(--font-sans); color: #0F1419;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .od-prod-ac .product_autocomplete_list li:hover { background: #F0FDFA; }
+  .od-prod-ac .product_autocomplete_list code {
+    font-family: var(--font-mono, monospace); font-size: 11.5px; color: #6b7280;
+  }
+
+  /* Customer edit / create form. */
+  .od-cust-edit, .od-cust-create { display: none; }
+  .od-card.editing .od-cust-edit { display: block; }
+  .od-card.editing .od-cust-view { display: none; }
+  .od-card.creating .od-cust-create { display: block; }
+  .od-card.creating .od-cust-view,
+  .od-card.creating .od-cust-edit { display: none; }
+  .od-cust-flbl {
+    display:block; font:600 11px var(--font-sans); color:var(--gray-500);
+    text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px;
+  }
+  /* Source picker (CRM / Web / Guest) mirroring the create-order form */
+  .od-cust-srcs { display:flex; gap:6px; margin-top:4px; }
+  .od-cust-src {
+    flex:1; padding:8px 6px; text-align:center; cursor:pointer;
+    border:1.5px solid #E2E8EE; border-radius:7px;
+    background:#FFF; font:600 11.5px var(--font-sans); color:var(--gray-700);
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    transition: all .15s;
+  }
+  .od-cust-src i { font-size:14px; color:#64748B; }
+  .od-cust-src input { display:none; }
+  .od-cust-src:has(input:checked) {
+    border-color:#147F74; background:#F0FDFA; color:#0F766E;
+  }
+  .od-cust-src:has(input:checked) i { color:#147F74; }
+  .od-cust-src:hover { border-color:#94A3B8; }
+  .od-cust-grp #od-webclient-search-results .product_autocomplete_list ul {
+    list-style:none; margin:4px 0 0; padding:4px;
+    background:#fff; border:1px solid #E2E8EE; border-radius:8px;
+    box-shadow:0 8px 24px rgba(15,23,31,0.08);
+    position:absolute; left:0; right:0; top:100%; z-index:30;
+    max-height:240px; overflow-y:auto;
+  }
+  .od-cust-grp #od-webclient-search-results li {
+    padding:8px 10px; border-radius:6px; cursor:pointer;
+    font:500 12.5px var(--font-sans); color:#0F1419;
+  }
+  .od-cust-grp #od-webclient-search-results li:hover { background:#F0FDFA; }
+  .od-cust-field {
+    transition: background 140ms, border-color 140ms;
+  }
+  .od-cust-field.htmx-request { background: #FEF3C7; }
+  .od-cust-field.htmx-settling { background: #DCFCE7; }
+  .od-cust-ac { position: relative; }
+  .od-cust-ac .customer-autocomplete-list {
+    list-style: none; margin: 4px 0 0; padding: 4px;
+    background: #fff; border: 1px solid #E2E8EE; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15,23,31,0.08);
+    position: absolute; left: 0; right: 0; top: 100%; z-index: 30;
+    max-height: 240px; overflow-y: auto;
+  }
+  .od-cust-ac .customer-ac-item {
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    font: 500 12.5px var(--font-sans); color: #0F1419;
+  }
+  .od-cust-ac .customer-ac-item:hover { background: #F0FDFA; }
+  .od-cust-ac .customer-ac-empty { padding: 8px 10px; color: #9ca3af; font-size: 12px; }
   .od-prod { display: flex; align-items: center; gap: 10px; }
   .od-prod-img {
     width: 36px; height: 36px; border-radius: 7px; flex-shrink: 0;
@@ -719,12 +838,16 @@
       </section>
 
       <!-- PRODUCTS -->
-      <section class="od-card">
-        <div class="od-card-h">
-          <h3>{% trans "Products" %}</h3>
-          <span class="od-card-sub">{{ order.items.count }} {% trans "items" %}</span>
+      <section class="od-card" id="od-products-card">
+        <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:baseline; gap:10px;">
+            <h3>{% trans "Products" %}</h3>
+            <span class="od-card-sub"><span id="od-items-count">{{ order.items.count }}</span> {% trans "items" %}</span>
+          </div>
+          <button type="button" id="od-prods-edit-toggle" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
+            <i class="fa fa-pen" data-edit-icon></i> <span data-edit-label>{% trans "Edit" %}</span>
+          </button>
         </div>
-        {% if order.items.all %}
         <table class="od-prods">
           <thead>
             <tr>
@@ -732,13 +855,15 @@
               <th>SKU</th>
               <th>{% trans "Variant" %}</th>
               <th class="num">{% trans "Qty" %}</th>
-              <th class="num">{% trans "Unit" %}</th>
+              <th class="num">{% trans "Price" %}</th>
+              <th class="num" title="{% trans 'Per-unit cost (internal)' %}">{% trans "Cost" %}</th>
               <th class="num">{% trans "Amount" %}</th>
+              <th class="od-edit-only" style="width:36px;"></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="od-items-tbody">
             {% for item in order.items.all %}
-            <tr>
+            <tr data-item-row="{{ item.pk }}">
               <td>
                 {% if item.product %}
                 <a href="{% url 'marketing:product_detail' item.product.pk %}" class="od-prod-link">
@@ -760,24 +885,80 @@
               <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
               <td><span class="mono">{{ item.product_variant.variant_sku|default:"—" }}</span></td>
               <td class="num">
-                <input type="number" class="od-inline-input" step="0.01" min="0"
+                <input type="number" class="od-inline-input" step="0.01" min="0" readonly
                        value="{{ item.quantity|default:0|stringformat:'g' }}"
                        data-item-id="{{ item.pk }}" data-field="quantity"
                        data-original="{{ item.quantity|default:0|stringformat:'g' }}"
+                       data-stock="{{ item.available_stock|default_if_none:'' }}"
+                       data-oversell="{% if item.allow_oversell %}true{% else %}false{% endif %}"
+                       {% if item.max_qty is not None and not item.allow_oversell %}max="{{ item.max_qty|stringformat:'g' }}"{% endif %}
                        onwheel="this.blur()">
+                {% if item.available_stock is not None %}
+                <div class="od-row-stock od-edit-only" data-row-stock="{{ item.pk }}">
+                  {% with s=item.available_stock %}
+                  <span class="od-stock-pill {% if s <= 0 and not item.allow_oversell %}out{% elif s < 10 %}low{% else %}ok{% endif %}">
+                    {% trans "Stock" %}: <b>{{ s|stringformat:'g' }}</b>
+                  </span>
+                  {% endwith %}
+                </div>
+                {% endif %}
               </td>
               <td class="num">
-                <input type="number" class="od-inline-input" step="0.01" min="0"
+                <input type="number" class="od-inline-input" step="0.01" min="0" readonly
                        value="{{ item.price|default:0|stringformat:'g' }}"
                        data-item-id="{{ item.pk }}" data-field="price"
                        data-original="{{ item.price|default:0|stringformat:'g' }}"
                        onwheel="this.blur()">
               </td>
+              <td class="num" data-item-cost="{{ item.pk }}">
+                {% with uc=item.unit_cost %}
+                  {% if uc and uc > 0 %}
+                    <span style="color:var(--gray-700);">${{ uc|floatformat:2 }}</span>
+                  {% else %}
+                    <span class="od-empty-mute" title="{% trans 'No cost set on this product' %}">—</span>
+                  {% endif %}
+                {% endwith %}
+              </td>
               <td class="num" data-item-subtotal="{{ item.pk }}"><b>${{ item.subtotal|floatformat:2 }}</b></td>
+              <td class="od-edit-only">
+                <button type="button" class="od-row-del" data-remove-item="{{ item.pk }}" title="{% trans 'Remove' %}">
+                  <i class="fa fa-times"></i>
+                </button>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
+        {% if not order.items.all %}
+        <div id="od-no-items" class="od-empty-mute" style="padding: 20px 0; text-align: center;">{% trans "This order has no items yet" %}</div>
+        {% endif %}
+
+        <!-- Add-item row (edit mode) -->
+        <div id="od-add-item-row" class="od-edit-only" style="margin-top:10px; padding:10px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px;">
+          <div style="display:grid; grid-template-columns: 1fr 90px 110px auto; gap:8px; align-items:start;">
+            <div style="position:relative;">
+              <input type="text" name="product" id="od-add-product-input" class="od-inline-input" autocomplete="off"
+                     placeholder="{% trans 'Search product by name or SKU…' %}"
+                     hx-get="{% url 'operating:product_autocomplete' %}"
+                     hx-trigger="keyup changed delay:200ms"
+                     hx-target="#od-add-product-results"
+                     hx-swap="innerHTML"
+                     style="width:100%;">
+              <div id="od-add-product-results" class="od-prod-ac"></div>
+              <input type="hidden" id="od-add-sku">
+              <input type="hidden" id="od-add-is-variant" value="false">
+              <input type="hidden" id="od-add-stock" value="">
+              <input type="hidden" id="od-add-oversell" value="false">
+              <div id="od-add-product-pick" style="display:none; margin-top:4px; font-size:11.5px; color:#147F74; font-weight:600;"></div>
+              <div id="od-add-stock-info" style="display:none; margin-top:4px; font-size:11.5px;"></div>
+            </div>
+            <input type="number" id="od-add-qty" class="od-inline-input" min="0" step="0.01" placeholder="Qty" value="1" onwheel="this.blur()">
+            <input type="number" id="od-add-price" class="od-inline-input" min="0" step="0.01" placeholder="Price" value="0" onwheel="this.blur()">
+            <button type="button" id="od-add-item-btn" class="ord-btn primary" style="white-space:nowrap;">
+              <i class="fa fa-plus"></i> {% trans "Add" %}
+            </button>
+          </div>
+        </div>
         <div class="od-totals">
           <div class="od-tot-row">
             <span>{% trans "Subtotal" %}</span>
@@ -787,15 +968,28 @@
             <span>{% trans "Grand total" %}</span>
             <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
           </div>
-          {% with gp=order.gross_profit gm=order.gross_margin_pct %}
-          <div class="od-tot-row od-gross" style="margin-top:6px; padding:8px 10px; background:#F0FDF4; border:1px dashed #BBF7D0; border-radius:8px; color:#166534;">
+          {% with tc=order.total_cost gp=order.gross_profit gm=order.gross_margin_pct %}
+          <div class="od-tot-row" style="margin-top:6px; padding:8px 10px; background:#FFFBEB; border:1px dashed #FDE68A; border-radius:8px; color:#92400E;">
             <span style="display:inline-flex; align-items:center; gap:6px;">
               <i class="fa fa-lock" style="font-size:10px; opacity:0.6;" title="{% trans 'Internal only — not on invoice' %}"></i>
-              {% trans "Gross profit" %}
-              {% if gm is not None %}<small style="opacity:0.75; font-weight:600;">· {{ gm }}%</small>{% endif %}
+              {% trans "Total cost (COGS)" %}
             </span>
-            <span style="font-weight:700;">${{ gp|floatformat:2 }}</span>
+            <span data-order-cost style="font-weight:700;">${{ tc|floatformat:2 }}</span>
           </div>
+          <div class="od-tot-row od-gross" style="margin-top:4px; padding:8px 10px; background:#F0FDF4; border:1px dashed #BBF7D0; border-radius:8px; color:#166534;">
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <i class="fa fa-lock" style="font-size:10px; opacity:0.6;" title="{% trans 'Internal only — not on invoice' %}"></i>
+              {% trans "Profit" %}
+              <small data-order-margin style="opacity:0.75; font-weight:600;">{% if gm is not None and tc and tc > 0 %}· {{ gm }}%{% endif %}</small>
+            </span>
+            <span data-order-profit style="font-weight:700;">${{ gp|floatformat:2 }}</span>
+          </div>
+          {% if not tc or tc == 0 %}
+          <div class="od-tot-row" style="margin-top:4px; padding:6px 10px; font-size:11px; color:#92400E; background:#FEF3C7; border:1px dashed #FCD34D; border-radius:8px;">
+            <i class="fa fa-info-circle" style="margin-right:4px;"></i>
+            {% trans "Profit shown reflects $0 cost — set product/variant cost to get real margin." %}
+          </div>
+          {% endif %}
           {% endwith %}
           {% if order.paid_amount and order.paid_currency and order.paid_currency != 'USD' %}
           <div class="od-tot-row" style="opacity:0.7;">
@@ -804,16 +998,12 @@
           </div>
           {% endif %}
         </div>
-        {% else %}
-        <div class="od-empty-mute" style="padding: 20px 0; text-align: center;">{% trans "This order has no items yet" %}</div>
-        {% endif %}
       </section>
 
       <!-- NOTES (inline editable) -->
       <section class="od-card">
         <div class="od-card-h">
           <h3>{% trans "Notes" %}</h3>
-          <span class="od-card-sub">{% trans "Saves automatically as you type" %}</span>
         </div>
         <textarea id="od-notes-edit" class="od-notes-edit"
                   data-original="{{ order.notes|default:'' }}"
@@ -868,71 +1058,8 @@
 
     {# ============== RIGHT ============== #}
     <div class="od-right">
-      <!-- CUSTOMER -->
-      <section class="od-card">
-        <div class="od-card-h"><h3>{% trans "Customer" %}</h3></div>
-
-        {% if order.contact %}
-          <div class="od-cust">
-            <div class="od-cust-avatar" style="background:#147F74;">{{ order.contact.name|slice:":2"|upper }}</div>
-            <div>
-              <div class="od-cust-n">{{ order.contact.name|capfirst }}</div>
-              <div class="od-cust-c">{% trans "B2B · Individual" %}</div>
-            </div>
-          </div>
-          <div class="od-detail-list">
-            {% if order.contact.email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.contact.email.0|default:"—" }}</b></div>{% endif %}
-            {% if order.contact.phone %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.contact.phone.0|default:"—" }}</b></div>{% endif %}
-          </div>
-          <a class="od-link" href="{% url 'crm:contact_detail' order.contact.pk %}">{% trans "Open profile" %} <i class="fa fa-external-link-alt"></i></a>
-
-        {% elif order.company %}
-          <div class="od-cust">
-            <div class="od-cust-avatar" style="background:#0A5F70;">{{ order.company.name|slice:":2"|upper }}</div>
-            <div>
-              <div class="od-cust-n">{{ order.company.name|capfirst }}</div>
-              <div class="od-cust-c">{% trans "B2B · Corporate" %}</div>
-            </div>
-          </div>
-          <div class="od-detail-list">
-            {% if order.company.email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.company.email }}</b></div>{% endif %}
-            {% if order.company.phone %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.company.phone }}</b></div>{% endif %}
-          </div>
-          <a class="od-link" href="{% url 'crm:company_detail' order.company.pk %}">{% trans "Open company profile" %} <i class="fa fa-external-link-alt"></i></a>
-
-        {% elif order.web_client %}
-          {% with display=order.web_client.name|default:order.web_client.username %}
-          <div class="od-cust">
-            <div class="od-cust-avatar" style="background:#C2A45A;">{{ display|slice:":2"|upper }}</div>
-            <div>
-              <div class="od-cust-n">{{ display }}</div>
-              <div class="od-cust-c">{% trans "Web customer" %}</div>
-            </div>
-          </div>
-          {% endwith %}
-          <div class="od-detail-list">
-            {% if order.web_client.email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.web_client.email }}</b></div>{% endif %}
-            {% if order.web_client.phone_number %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.web_client.phone_number }}</b></div>{% endif %}
-            <div class="od-dt"><span>{% trans "Dealer no" %}</span><b class="mono">BLN-{{ order.web_client.id|stringformat:"04d" }}</b></div>
-          </div>
-
-        {% elif order.is_guest_order %}
-          <div class="od-cust">
-            <div class="od-cust-avatar" style="background:#6B8E7F;">G</div>
-            <div>
-              <div class="od-cust-n">{{ order.guest_first_name }} {{ order.guest_last_name }}</div>
-              <div class="od-cust-c">{% trans "Guest order" %}</div>
-            </div>
-          </div>
-          <div class="od-detail-list">
-            {% if order.guest_email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.guest_email }}</b></div>{% endif %}
-            {% if order.guest_phone %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.guest_phone }}</b></div>{% endif %}
-          </div>
-
-        {% else %}
-          <div class="od-empty-mute" style="padding: 12px 0;">{% trans "No customer assigned" %}</div>
-        {% endif %}
-      </section>
+      <!-- CUSTOMER (HTMX-managed partial) -->
+      {% include "operating/partials/_customer_card.html" with cust_card_mode='view' %}
 
       {% if order.cari %}
       <!-- CURRENT ACCOUNT (CARI) — internal ledger snapshot -->
@@ -963,10 +1090,10 @@
             <div style="font:700 14px var(--font-sans); color:#0F1419; margin-top:2px;">{{ order.cari.name }}</div>
           </div>
           <div style="text-align:right;">
-            <div style="font:600 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
+            <div id="od-cari-label" style="font:600 10.5px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
               {{ order.cari.balance_label }}
             </div>
-            <div style="font:800 16px var(--font-sans); color:{% if order.cari.cached_balance > 0 %}#B45309{% elif order.cari.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
+            <div id="od-cari-balance" style="font:800 16px var(--font-sans); color:{% if order.cari.cached_balance > 0 %}#B45309{% elif order.cari.cached_balance < 0 %}#147F74{% else %}#374151{% endif %}; font-variant-numeric:tabular-nums; margin-top:2px;">
               {{ order.cari.display_currency_symbol }}{{ order.cari.absolute_balance|floatformat:2 }}
             </div>
           </div>
@@ -979,14 +1106,15 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:6px;">
             {% for mv in cari_recent_movements %}
-            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#FFF; border:1px solid #EEF1F5; border-radius:8px; font-size:12px;">
+            <div {% if mv.source_id == order.pk and mv.movement_type == 'order_sale' %}id="od-cari-order-mv"{% endif %}
+                 style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#FFF; border:1px solid #EEF1F5; border-radius:8px; font-size:12px;">
               <div style="min-width:0; flex:1;">
                 <div style="font-weight:600; color:#0F1419;">{{ mv.get_movement_type_display }}</div>
                 <div style="color:var(--gray-500); font-size:10.5px; margin-top:1px;">
                   {{ mv.date|date:"d M Y" }}{% if mv.reference %} · {{ mv.reference }}{% endif %}
                 </div>
               </div>
-              <div style="font-weight:700; font-variant-numeric:tabular-nums; color:{% if mv.amount >= 0 %}#B45309{% else %}#147F74{% endif %}; flex-shrink:0; margin-left:8px;">
+              <div data-cari-mv-amount style="font-weight:700; font-variant-numeric:tabular-nums; color:{% if mv.amount >= 0 %}#B45309{% else %}#147F74{% endif %}; flex-shrink:0; margin-left:8px;">
                 {% if mv.amount >= 0 %}+{% endif %}{{ mv.currency.symbol }}{{ mv.amount|floatformat:2 }}
               </div>
             </div>
@@ -1145,7 +1273,30 @@
     const saveBtn  = document.getElementById('od-savebar-save');
     const discardBtn = document.getElementById('od-savebar-discard');
     const notes    = document.getElementById('od-notes-edit');
-    const inputs   = document.querySelectorAll('.od-inline-input');
+
+    function getInputs() {
+      // Only inputs that are item qty/price (have data-item-id + data-field).
+      return document.querySelectorAll('.od-inline-input[data-item-id][data-field]');
+    }
+    function bindInput(inp) {
+      if (inp.dataset.bound === '1') return;
+      inp.dataset.bound = '1';
+      inp.addEventListener('input', refreshDirty);
+      // Stock cap warning for qty fields. Visually marks the input red
+      // when the typed qty exceeds the cap; save still calls the server
+      // for the authoritative answer.
+      if (inp.dataset.field === 'quantity') {
+        inp.addEventListener('input', () => {
+          const stock = inp.dataset.stock;
+          if (!stock || inp.dataset.oversell === 'true') return;
+          const original = Number(inp.dataset.original || 0);
+          const cap = original + Number(stock);
+          if (Number(inp.value) > cap) inp.classList.add('over-stock');
+          else inp.classList.remove('over-stock');
+        });
+      }
+    }
+    window.__odBindInputs = function () { getInputs().forEach(bindInput); };
 
     function postUpdate(payload) {
       const body = new URLSearchParams(payload);
@@ -1155,10 +1306,97 @@
         body,
       }).then(r => r.json().catch(() => ({})));
     }
+    window.__odPostUpdate = postUpdate;
+
+    // Refresh the right-sidebar cari card from the snapshot the server
+    // returns after each mutating action. Keeps balance in sync without
+    // a page reload.
+    function applyCariSnapshot(snap) {
+      if (!snap) return;
+      const balEl   = document.getElementById('od-cari-balance');
+      const labelEl = document.getElementById('od-cari-label');
+      if (balEl) {
+        const sym = snap.currency_symbol || '';
+        balEl.textContent = sym + Number(snap.absolute_balance).toFixed(2);
+        if (snap.color) balEl.style.color = snap.color;
+      }
+      if (labelEl && snap.balance_label) labelEl.textContent = snap.balance_label;
+      // Update this order's row inside "Recent movements" if it's visible.
+      const mvRow = document.getElementById('od-cari-order-mv');
+      if (mvRow && snap.mv_amount !== null && snap.mv_amount !== undefined) {
+        const amtEl = mvRow.querySelector('[data-cari-mv-amount]');
+        if (amtEl) {
+          const sign = snap.mv_amount >= 0 ? '+' : '';
+          amtEl.textContent = sign + (snap.mv_symbol || '') + Number(snap.mv_amount).toFixed(2);
+          amtEl.style.color = snap.mv_amount >= 0 ? '#B45309' : '#147F74';
+        }
+      }
+    }
+    window.__odApplyCari = applyCariSnapshot;
+
+    // Refresh Total cost / Profit / Margin from the snapshot the server
+    // returns alongside every mutating action.
+    function applyProfitSnapshot(p) {
+      if (!p) return;
+      document.querySelectorAll('[data-order-cost]').forEach(el => {
+        el.textContent = '$' + Number(p.total_cost || 0).toFixed(2);
+      });
+      document.querySelectorAll('[data-order-profit]').forEach(el => {
+        el.textContent = '$' + Number(p.gross_profit || 0).toFixed(2);
+      });
+      document.querySelectorAll('[data-order-margin]').forEach(el => {
+        el.textContent = (p.margin === null || p.margin === undefined) ? '' : ('· ' + p.margin + '%');
+      });
+    }
+    window.__odApplyProfit = applyProfitSnapshot;
+
+    // Refresh a row's "Stock: N" pill + qty `max` attribute after a
+    // successful save. Called from save loop and from add_item.
+    function updateRowStock(itemId, stock, maxQty, allowOversell) {
+      const row = document.querySelector('[data-item-row="' + itemId + '"]');
+      if (!row) return;
+      // Update max on the qty input.
+      const qInput = row.querySelector('input[data-field="quantity"]');
+      if (qInput) {
+        if (stock !== null && stock !== undefined) qInput.dataset.stock = String(stock);
+        if (allowOversell !== undefined)           qInput.dataset.oversell = allowOversell ? 'true' : 'false';
+        if (maxQty !== null && maxQty !== undefined && !allowOversell) {
+          qInput.setAttribute('max', String(maxQty));
+        } else {
+          qInput.removeAttribute('max');
+        }
+      }
+      // Update / inject the stock pill.
+      let pill = row.querySelector('.od-stock-pill');
+      const stockNum = stock === null || stock === undefined ? null : Number(stock);
+      if (stockNum === null) {
+        if (pill) pill.parentNode.remove();
+        return;
+      }
+      let cls = 'ok';
+      if (stockNum <= 0 && !allowOversell) cls = 'out';
+      else if (stockNum < 10) cls = 'low';
+      if (pill) {
+        pill.classList.remove('ok','low','out');
+        pill.classList.add(cls);
+        pill.innerHTML = '{% trans "Stock" %}: <b>' + stockNum + '</b>';
+      } else {
+        // No pill yet (originally null stock). Inject one.
+        const qtyTd = row.querySelector('td.num');
+        if (qtyTd) {
+          const wrap = document.createElement('div');
+          wrap.className = 'od-row-stock od-edit-only';
+          wrap.setAttribute('data-row-stock', itemId);
+          wrap.innerHTML = '<span class="od-stock-pill ' + cls + '">{% trans "Stock" %}: <b>' + stockNum + '</b></span>';
+          qtyTd.appendChild(wrap);
+        }
+      }
+    }
+    window.__odUpdateRowStock = updateRowStock;
 
     function refreshDirty() {
       let dirty = [];
-      inputs.forEach(inp => {
+      getInputs().forEach(inp => {
         const a = String(inp.value).trim();
         const b = String(inp.dataset.original || '').trim();
         if (a !== b) {
@@ -1188,14 +1426,12 @@
       return dirty;
     }
 
-    inputs.forEach(inp => {
-      // 'input' fires on every keystroke + spinner click.
-      inp.addEventListener('input', refreshDirty);
-    });
+    window.__odBindInputs();
     if (notes) notes.addEventListener('input', refreshDirty);
+    window.__odRefreshDirty = refreshDirty;
 
     discardBtn.addEventListener('click', () => {
-      inputs.forEach(inp => { inp.value = inp.dataset.original || ''; });
+      getInputs().forEach(inp => { inp.value = inp.dataset.original || ''; });
       if (notes) notes.value = notes.dataset.original || '';
       refreshDirty();
     });
@@ -1228,6 +1464,10 @@
               if (sub) sub.innerHTML = '<b>$' + Number(r.subtotal).toFixed(2) + '</b>';
             }
             if (r.order_total !== undefined) latestTotal = r.order_total;
+            if (r.cari) applyCariSnapshot(r.cari);
+            if (r.profit) applyProfitSnapshot(r.profit);
+            // Refresh the row's stock pill + qty max cap.
+            updateRowStock(el.dataset.itemId, r.stock, r.max_qty, r.allow_oversell);
           }
         }
         if (latestTotal !== null) {
@@ -1251,6 +1491,318 @@
         e.returnValue = '';
       }
     });
+  })();
+
+  // ──────────────────────────────────────────────────────────
+  //  Products card: Edit toggle, add item, remove item.
+  // ──────────────────────────────────────────────────────────
+  (function () {
+    const card    = document.getElementById('od-products-card');
+    const toggle  = document.getElementById('od-prods-edit-toggle');
+    const tbody   = document.getElementById('od-items-tbody');
+    const addBtn  = document.getElementById('od-add-item-btn');
+    const addSku  = document.getElementById('od-add-sku');
+    const addIsV  = document.getElementById('od-add-is-variant');
+    const addInp  = document.getElementById('od-add-product-input');
+    const addPick = document.getElementById('od-add-product-pick');
+    const addQty  = document.getElementById('od-add-qty');
+    const addPrice= document.getElementById('od-add-price');
+    const addRes  = document.getElementById('od-add-product-results');
+    const countEl = document.getElementById('od-items-count');
+    const noItems = document.getElementById('od-no-items');
+
+    if (!card || !toggle) return;
+
+    function applyReadonly() {
+      const editing = card.classList.contains('editing');
+      tbody?.querySelectorAll('.od-inline-input[data-item-id]').forEach(inp => {
+        if (editing) inp.removeAttribute('readonly');
+        else inp.setAttribute('readonly', 'readonly');
+      });
+    }
+    window.__odApplyReadonly = applyReadonly;
+    toggle.addEventListener('click', () => {
+      const willEdit = !card.classList.contains('editing');
+      // When CANCELLING (leaving edit mode), discard any dirty input
+      // values so the row reflects the persisted state. Without this
+      // the save-bar lingered showing "unsaved change" even though the
+      // user clearly wanted to back out.
+      if (!willEdit) {
+        document.querySelectorAll('.od-inline-input[data-item-id]').forEach(inp => {
+          if (inp.dataset.original !== undefined) inp.value = inp.dataset.original;
+          inp.classList.remove('dirty', 'over-stock');
+        });
+        if (window.__odRefreshDirty) window.__odRefreshDirty();
+      }
+      card.classList.toggle('editing');
+      const editing = card.classList.contains('editing');
+      const lbl = toggle.querySelector('[data-edit-label]');
+      const ico = toggle.querySelector('[data-edit-icon]');
+      if (lbl) lbl.textContent = editing ? '{% trans "Cancel" %}' : '{% trans "Edit" %}';
+      if (ico) {
+        ico.classList.toggle('fa-pen',   !editing);
+        ico.classList.toggle('fa-times',  editing);
+      }
+      applyReadonly();
+    });
+
+    // Override the existing inline product-autocomplete selectProduct() so
+    // clicking a result fills our hidden SKU + label instead of the global
+    // edit-order behaviour. base.html loads create_edit_order.js AFTER our
+    // inline script, so we wait for DOMContentLoaded to win the global slot.
+    function odSelectProduct(sku, isVariant, title, price, category, stock, allowOversell) {
+      if (!addSku) return;
+      addSku.value = sku || '';
+      addIsV.value = isVariant ? 'true' : 'false';
+      const addStock = document.getElementById('od-add-stock');
+      const addOversell = document.getElementById('od-add-oversell');
+      const addStockInfo = document.getElementById('od-add-stock-info');
+      const oversellBool = (allowOversell === true || allowOversell === 'true');
+      if (addStock)    addStock.value    = (stock === null || stock === undefined) ? '' : String(stock);
+      if (addOversell) addOversell.value = oversellBool ? 'true' : 'false';
+      if (addPrice && (!addPrice.value || addPrice.value === '0')) addPrice.value = price || 0;
+      if (addPick) {
+        addPick.style.display = 'block';
+        addPick.innerHTML = '<i class="fa fa-check-circle"></i> ' +
+          (title || '') + ' <code style="color:#6b7280;">' + (sku || '') + '</code>';
+      }
+      // Show stock info + cap the qty input.
+      if (addStockInfo) {
+        if (stock === null || stock === undefined) {
+          addStockInfo.style.display = 'none';
+          if (addQty) addQty.removeAttribute('max');
+        } else {
+          const s = Number(stock);
+          let color = '#065F46', bg = '#D1FAE5', label = '{% trans "In stock" %}';
+          if (s <= 0 && !oversellBool) { color='#B91C1C'; bg='#FEE2E2'; label='{% trans "Out of stock" %}'; }
+          else if (s < 10) { color='#92400E'; bg='#FEF3C7'; label='{% trans "Low stock" %}'; }
+          addStockInfo.style.display = 'block';
+          addStockInfo.innerHTML =
+            '<span style="padding:2px 6px;border-radius:6px;background:'+bg+';color:'+color+';font-weight:600;">' +
+            label + ': ' + s + '</span>';
+          if (addQty && !oversellBool) addQty.setAttribute('max', String(s));
+          else if (addQty) addQty.removeAttribute('max');
+        }
+      }
+      if (addInp) addInp.value = title || '';
+      if (addRes) addRes.innerHTML = '';
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => { window.selectProduct = odSelectProduct; });
+    } else {
+      window.selectProduct = odSelectProduct;
+    }
+
+    // Add new item
+    addBtn?.addEventListener('click', async () => {
+      const sku = (addSku.value || '').trim();
+      if (!sku) { alert('{% trans "Pick a product first." %}'); return; }
+      const qty = (addQty.value || '0').trim();
+      const price = (addPrice.value || '0').trim();
+      // Client-side stock guard. Server still re-validates.
+      const addStock = document.getElementById('od-add-stock');
+      const addOversell = document.getElementById('od-add-oversell');
+      const stockVal = addStock && addStock.value !== '' ? Number(addStock.value) : null;
+      const allowOversell = addOversell && addOversell.value === 'true';
+      if (stockVal !== null && !allowOversell && Number(qty) > stockVal) {
+        alert('{% trans "Not enough stock." %} {% trans "Available:" %} ' + stockVal);
+        addQty.focus();
+        return;
+      }
+      addBtn.disabled = true;
+      const origLabel = addBtn.innerHTML;
+      addBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+      try {
+        const r = await window.__odPostUpdate({
+          action: 'add_item',
+          sku, is_variant: addIsV.value, quantity: qty, price,
+        });
+        if (!(r && r.ok)) throw new Error(r && r.error || 'Add failed');
+
+        // Build the new row matching the existing structure.
+        const it = r.item;
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-item-row', it.id);
+        const prodLink = it.product_url
+          ? `<a href="${it.product_url}" class="od-prod-link">`
+          : '';
+        const prodLinkEnd = it.product_url ? '</a>' : '';
+        const img = it.image_url
+          ? `<img class="od-prod-img" src="${it.image_url}" alt="">`
+          : '<span class="od-prod-img"></span>';
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const q = Number(it.quantity).toString();
+        const p = Number(it.price).toString();
+        const maxAttr = (it.max_qty !== null && it.max_qty !== undefined && !it.allow_oversell)
+          ? (' max="' + it.max_qty + '"') : '';
+        const stockAttr = (it.stock !== null && it.stock !== undefined)
+          ? (' data-stock="' + it.stock + '"') : ' data-stock=""';
+        const oversellAttr = ' data-oversell="' + (it.allow_oversell ? 'true' : 'false') + '"';
+        // Stock pill HTML (edit-mode visible).
+        let stockPill = '';
+        if (it.stock !== null && it.stock !== undefined) {
+          const s = Number(it.stock);
+          let cls = 'ok';
+          if (s <= 0 && !it.allow_oversell) cls = 'out';
+          else if (s < 10) cls = 'low';
+          stockPill = '<div class="od-row-stock od-edit-only" data-row-stock="' + it.id + '">' +
+                     '<span class="od-stock-pill ' + cls + '">{% trans "Stock" %}: <b>' + s + '</b></span></div>';
+        }
+        tr.innerHTML =
+          '<td>' + prodLink +
+            '<div class="od-prod">' + img + '<span>' + esc(it.product_title) + '</span></div>' +
+            prodLinkEnd +
+          '</td>' +
+          '<td><span class="mono">' + esc(it.product_sku || '—') + '</span></td>' +
+          '<td><span class="mono">' + esc(it.variant_sku || '—') + '</span></td>' +
+          '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +
+            ' value="' + q + '" data-item-id="' + it.id + '" data-field="quantity"' +
+            ' data-original="' + q + '"' + stockAttr + oversellAttr + maxAttr +
+            ' onwheel="this.blur()">' + stockPill + '</td>' +
+          '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +
+            ' value="' + p + '" data-item-id="' + it.id + '" data-field="price"' +
+            ' data-original="' + p + '" onwheel="this.blur()"></td>' +
+          '<td class="num" data-item-cost="' + it.id + '">' +
+            ((it.unit_cost && Number(it.unit_cost) > 0)
+              ? '<span style="color:var(--gray-700);">$' + Number(it.unit_cost).toFixed(2) + '</span>'
+              : '<span class="od-empty-mute" title="No cost set">—</span>') +
+          '</td>' +
+          '<td class="num" data-item-subtotal="' + it.id + '"><b>$' + Number(it.subtotal).toFixed(2) + '</b></td>' +
+          '<td class="od-edit-only"><button type="button" class="od-row-del" data-remove-item="' + it.id + '" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button></td>';
+        tbody.appendChild(tr);
+
+        // Re-bind dirty tracking + update totals.
+        if (window.__odBindInputs) window.__odBindInputs();
+        if (countEl) countEl.textContent = tbody.querySelectorAll('tr').length;
+        if (noItems) noItems.style.display = 'none';
+        document.querySelectorAll('[data-order-total]').forEach(el => {
+          el.textContent = '$' + Number(r.order_total).toFixed(2);
+        });
+        if (r.cari && window.__odApplyCari) window.__odApplyCari(r.cari);
+        if (r.profit && window.__odApplyProfit) window.__odApplyProfit(r.profit);
+
+        // Reset the add row.
+        addSku.value = ''; addIsV.value = 'false';
+        addInp.value = ''; addRes.innerHTML = '';
+        addQty.value = '1'; addPrice.value = '0';
+        addQty.removeAttribute('max');
+        if (addPick) { addPick.style.display = 'none'; addPick.innerHTML = ''; }
+        const _stockInfo = document.getElementById('od-add-stock-info');
+        if (_stockInfo) { _stockInfo.style.display = 'none'; _stockInfo.innerHTML = ''; }
+        const _stockHid = document.getElementById('od-add-stock');
+        if (_stockHid) _stockHid.value = '';
+      } catch (e) {
+        alert(e.message || 'Add failed.');
+      } finally {
+        addBtn.disabled = false;
+        addBtn.innerHTML = origLabel;
+      }
+    });
+
+    // Delegated remove handler
+    tbody?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-remove-item]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-remove-item');
+      if (!confirm('{% trans "Remove this item from the order?" %}')) return;
+      btn.disabled = true;
+      try {
+        const r = await window.__odPostUpdate({ action: 'remove_item', item_id: id });
+        if (!(r && r.ok)) throw new Error(r && r.error || 'Remove failed');
+        const row = tbody.querySelector('[data-item-row="' + id + '"]');
+        if (row) row.remove();
+        if (countEl) countEl.textContent = tbody.querySelectorAll('tr').length;
+        if (tbody.querySelectorAll('tr').length === 0 && noItems) noItems.style.display = '';
+        document.querySelectorAll('[data-order-total]').forEach(el => {
+          el.textContent = '$' + Number(r.order_total).toFixed(2);
+        });
+        if (r.cari && window.__odApplyCari) window.__odApplyCari(r.cari);
+        if (r.profit && window.__odApplyProfit) window.__odApplyProfit(r.profit);
+        if (window.__odRefreshDirty) window.__odRefreshDirty();
+      } catch (err) {
+        alert(err.message || 'Remove failed.');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  })();
+
+  // ──────────────────────────────────────────────────────────
+  //  Customer card — all server interactions go through HTMX. JS only
+  //  handles the local view/edit/create mode toggle and forwards
+  //  autocomplete picks as a "switch" POST.
+  //
+  //  The card itself is fully replaced via hx-swap="outerHTML" after
+  //  any action, so we rebind delegated listeners every swap by using
+  //  `document` as the listener root.
+  // ──────────────────────────────────────────────────────────
+  (function () {
+    const CSRF = '{{ csrf_token }}';
+    const SECTION_SEL = '#od-customer-section';
+
+    // Mode toggle: buttons inside the card carry `data-od-cust-mode`.
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-od-cust-mode]');
+      if (!btn) return;
+      const section = btn.closest(SECTION_SEL);
+      if (!section) return;
+      const card = section.querySelector('.od-card');
+      if (!card) return;
+      const mode = btn.getAttribute('data-od-cust-mode');
+      card.classList.remove('editing', 'creating');
+      if (mode === 'edit') card.classList.add('editing');
+      else if (mode === 'create') card.classList.add('creating');
+    });
+
+    // Autocomplete pick (contact / company) → POST switch with HTMX.
+    document.addEventListener('click', (e) => {
+      const li = e.target.closest('.customer-ac-item');
+      if (!li) return;
+      const section = li.closest(SECTION_SEL) || document.querySelector(SECTION_SEL);
+      if (!section || typeof htmx === 'undefined') return;
+      const type = li.getAttribute('data-type');
+      const pk   = li.getAttribute('data-pk');
+      const url  = '{% url "operating:order_customer_card" order.pk %}';
+      htmx.ajax('POST', url, {
+        target: SECTION_SEL,
+        swap: 'outerHTML',
+        values: { action: 'switch', customer_type: type, customer_pk: pk },
+        headers: { 'X-CSRFToken': CSRF },
+      });
+    });
+
+    // Source picker (CRM / Web / Guest) — purely client-side toggle of
+    // which field block is visible. The actual swap happens only when
+    // the user picks a customer / converts to guest.
+    document.addEventListener('change', (e) => {
+      const radio = e.target.closest('input[name="od_cust_source"]');
+      if (!radio) return;
+      const section = radio.closest(SECTION_SEL);
+      if (!section) return;
+      const src = radio.value;
+      section.querySelectorAll('.od-cust-grp').forEach(grp => {
+        grp.style.display = grp.dataset.grp === src ? '' : 'none';
+      });
+    });
+
+    // Web client autocomplete pick. base.html may load an unrelated
+    // selectWebClient from create_edit_order.js; we override on DOMContentLoaded
+    // so our version wins on the order detail page.
+    function odSelectWebClient(pk, name) {
+      const url = '{% url "operating:order_customer_card" order.pk %}';
+      if (typeof htmx === 'undefined') return;
+      htmx.ajax('POST', url, {
+        target: SECTION_SEL,
+        swap: 'outerHTML',
+        values: { action: 'switch', customer_type: 'web_client', customer_pk: pk },
+        headers: { 'X-CSRFToken': CSRF },
+      });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => { window.selectWebClient = odSelectWebClient; });
+    } else {
+      window.selectWebClient = odSelectWebClient;
+    }
   })();
 </script>
 {% endblock %}

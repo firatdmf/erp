@@ -179,14 +179,6 @@
                 <span class="trans-tab-flag">TR</span>
                 <span class="trans-tab-name">{% trans "Turkish" %}</span>
               </button>
-              <button type="button" class="trans-tab" data-lang="ru">
-                <span class="trans-tab-flag">RU</span>
-                <span class="trans-tab-name">{% trans "Russian" %}</span>
-              </button>
-              <button type="button" class="trans-tab" data-lang="pl">
-                <span class="trans-tab-flag">PL</span>
-                <span class="trans-tab-name">{% trans "Polish" %}</span>
-              </button>
             </div>
             <div class="trans-panel active" data-lang="en">
               <label class="trans-label">{% trans "Product Name" %}</label>
@@ -224,44 +216,6 @@
               <div class="quill-wrap">
                 <div id="quill-extra-tr" class="trans-extra" data-lang="tr"></div>
                 <textarea id="html-extra-source-tr" class="html-source-area" data-lang="tr"></textarea>
-              </div>
-            </div>
-            <div class="trans-panel" data-lang="ru">
-              <label class="trans-label">{% trans "Product Name" %}</label>
-              <input type="text" class="trans-input trans-title" data-lang="ru" placeholder="Введите название продукта...">
-              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-ru" class="trans-desc" data-lang="ru"></div>
-                <textarea id="html-source-ru" class="html-source-area" data-lang="ru"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Care Instructions" %} <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-care-ru" class="trans-care" data-lang="ru"></div>
-                <textarea id="html-care-source-ru" class="html-source-area" data-lang="ru"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">{% trans "Additional Info" %} <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('ru')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-extra-ru" class="trans-extra" data-lang="ru"></div>
-                <textarea id="html-extra-source-ru" class="html-source-area" data-lang="ru"></textarea>
-              </div>
-            </div>
-            <div class="trans-panel" data-lang="pl">
-              <label class="trans-label">{% trans "Product Name" %}</label>
-              <input type="text" class="trans-input trans-title" data-lang="pl" placeholder="{% trans 'Wprowadz nazwe produktu...' %}">
-              <label class="trans-label" style="display:flex;align-items:center;">{% trans "Description" %} <button type="button" class="html-source-btn" onclick="toggleHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-pl" class="trans-desc" data-lang="pl"></div>
-                <textarea id="html-source-pl" class="html-source-area" data-lang="pl"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Instrukcje pielęgnacji <button type="button" class="html-source-btn" onclick="toggleCareHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-care-pl" class="trans-care" data-lang="pl"></div>
-                <textarea id="html-care-source-pl" class="html-source-area" data-lang="pl"></textarea>
-              </div>
-              <label class="trans-label" style="display:flex;align-items:center;margin-top:12px;">Dodatkowe informacje <button type="button" class="html-source-btn" onclick="toggleExtraHtmlSource('pl')"><span>&lt;/&gt;</span></button></label>
-              <div class="quill-wrap">
-                <div id="quill-extra-pl" class="trans-extra" data-lang="pl"></div>
-                <textarea id="html-extra-source-pl" class="html-source-area" data-lang="pl"></textarea>
               </div>
             </div>
           </div>
@@ -2425,7 +2379,7 @@
   const descField = document.getElementById('id_description');
   if (!descField) return;
 
-  const langs = ['tr', 'en', 'ru', 'pl'];
+  const langs = ['tr', 'en'];
   const tabBtns = document.querySelectorAll('.trans-tab');
   const panels = document.querySelectorAll('.trans-panel');
   const quillEditors = {};
@@ -2462,9 +2416,7 @@
       theme: 'snow',
       modules: { toolbar: toolbarOptions },
       placeholder: lang === 'en' ? 'Enter product description...'
-        : lang === 'tr' ? 'Urun aciklamasi giriniz...'
-        : lang === 'ru' ? 'Введите описание продукта...'
-        : 'Wprowadz opis produktu...'
+        : 'Urun aciklamasi giriniz...'
     });
     quillEditors[lang] = editor;
     editor.on('text-change', syncToDescription);
@@ -2476,9 +2428,7 @@
         theme: 'snow',
         modules: { toolbar: toolbarOptions },
         placeholder: lang === 'en' ? 'Enter care instructions...'
-          : lang === 'tr' ? 'Bakım talimatlarını giriniz...'
-          : lang === 'ru' ? 'Введите инструкции по уходу...'
-          : 'Wprowadź instrukcje pielęgnacji...'
+          : 'Bakım talimatlarını giriniz...'
       });
       quillCareEditors[lang] = careEditor;
       careEditor.on('text-change', syncToDescription);
@@ -2491,9 +2441,7 @@
         theme: 'snow',
         modules: { toolbar: toolbarOptions },
         placeholder: lang === 'en' ? 'Additional info (optional)...'
-          : lang === 'tr' ? 'Ek bilgi (opsiyonel)...'
-          : lang === 'ru' ? 'Дополнительная информация...'
-          : 'Dodatkowe informacje (opcjonalnie)...'
+          : 'Ek bilgi (opsiyonel)...'
       });
       quillExtraEditors[lang] = extraEditor;
       extraEditor.on('text-change', syncToDescription);

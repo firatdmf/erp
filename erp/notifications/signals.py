@@ -40,14 +40,26 @@ def get_notification_recipients(notification_type):
 
 def create_order_notification_handler(sender, instance, created, **kwargs):
     """
-    Create notifications when a new order is created.
-    Notifies all members who have order notifications enabled.
+    Create notifications when a new web/guest order is placed.
+
+    Manual orders (entered by staff via the create-order sidebar) do
+    NOT generate notifications — per explicit user request, notifications
+    should only fire for incoming customer orders (web client or guest
+    checkout), not for internal data entry.
     """
     if not created:
         return
-    
+
+    # Skip manual entry — only notify for web / guest orders.
+    is_customer_order = bool(
+        getattr(instance, "web_client_id", None) or
+        getattr(instance, "is_guest_order", False)
+    )
+    if not is_customer_order:
+        return
+
     print(f"📦 Order signal triggered for Order #{instance.pk}")
-    
+
     # Don't notify for orders without an order_number (internal orders)
     # Only notify for web orders or orders with explicit order numbers
     order_number = instance.order_number or f"#{instance.pk}"

@@ -1166,7 +1166,22 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
         const activeInput = document.querySelector(`input[name="variant_active_${originalIndex + 1}"]`);
 
-        const price = priceInput?.value || existingData.price || '';
+        // Parent product defaults — used when a brand-new variant row
+        // has no price / cost / SKU of its own. User explicitly asked
+        // for new variants to inherit the main product's pricing and
+        // for empty SKUs to fall back to "parent_sku_<value>".
+        const _parentSku   = (document.getElementById('id_sku')?.value || '').trim();
+        const _parentPrice = (document.getElementById('id_price')?.value || '').trim();
+        const _parentCost  = (document.getElementById('id_cost')?.value || '').trim();
+        const _parentB2b   = (document.getElementById('id_b2b_price')?.value || '').trim();
+        const _slugBits = displayOptions
+            .map(opt => (combo[opt] || '').toString().trim().toLowerCase().replace(/\s+/g, '_'))
+            .filter(Boolean);
+        const _autoSku = _parentSku
+            ? `${_parentSku}_${_slugBits.join('_')}`
+            : _slugBits.join('_');
+
+        const price = priceInput?.value || existingData.price || _parentPrice || '';
         const quantity = quantityInput?.value || existingData.quantity || '';
         // Featured: prefer the live DOM checkbox if rendered already;
         // else respect server-loaded existingData; else default to true
@@ -1180,10 +1195,10 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         } else {
             featured = true;
         }
-        const cost = costInput?.value || existingData.cost || '';
+        const cost = costInput?.value || existingData.cost || _parentCost || '';
         const b2bPriceInput = document.querySelector(`input[name="variant_b2b_price_${originalIndex + 1}"]`);
-        const b2bPrice = b2bPriceInput?.value || existingData.b2b_price || '';
-        const sku = skuInput?.value || existingData.sku || existingData.item_code || ''; // fallback to item_code if sku missing
+        const b2bPrice = b2bPriceInput?.value || existingData.b2b_price || _parentB2b || '';
+        const sku = skuInput?.value || existingData.sku || existingData.item_code || _autoSku || '';
         const barcode = barcodeInput?.value || existingData.barcode || '';
         const active = activeInput ? (activeInput.value === 'true') : (existingData.is_active !== false);
 

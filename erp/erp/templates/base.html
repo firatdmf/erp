@@ -3774,7 +3774,17 @@
   </div>
   </div>
 
-  <!-- Order Sidebar Modal -->
+  <!-- Order Sidebar Modal — half-screen on desktop, full-screen on mobile -->
+  <style>
+    @media (min-width: 769px) {
+      #orderSidebarOverlay .sidebar-modal,
+      #editOrderSidebarOverlay .sidebar-modal {
+        width: 50vw !important;
+        max-width: 50vw !important;
+        min-width: 520px !important;
+      }
+    }
+  </style>
   <div id="orderSidebarOverlay" class="sidebar-overlay" onclick="closeOrderSidebar()">
     <div class="sidebar-modal" onclick="event.stopPropagation();">
       <div class="sidebar-header">

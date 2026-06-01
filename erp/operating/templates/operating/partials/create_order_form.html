@@ -134,31 +134,11 @@
     </div>
   </div>
 
-  <!-- Step 2: Products -->
-  <div class="co-section active" id="co-step-2">
-    <div class="co-section-header" onclick="coToggle(2)">
-      <div class="co-section-num">2</div>
-      <span>Products</span>
-      <span class="co-section-summary" id="co-sum-2"></span>
-      <i class="fas fa-chevron-down co-chev"></i>
-    </div>
-    <div class="co-section-body">
-      <div class="form-group">
-        <label>{% trans "Search Product" %}</label>
-        <input type="text" id="co-product-search" class="form-input" placeholder="Name, SKU or variant SKU..."
-          hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
-          hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
-      </div>
-      <div id="co-product-results" class="co-autocomplete-results"></div>
-      <div id="co-products-list"></div>
-      <input type="hidden" id="product_json_input" name="product_json_input">
-    </div>
-  </div>
-
-  <!-- Step 3: Customer -->
-  <div class="co-section" id="co-step-3">
+  <!-- Step 2: Customer (moved before Products per UX request — ID stays
+       co-step-3 to keep existing JS sum/summary references intact) -->
+  <div class="co-section active" id="co-step-3">
     <div class="co-section-header" onclick="coToggle(3)">
-      <div class="co-section-num">3</div>
+      <div class="co-section-num">2</div>
       <span>Customer</span>
       <span class="co-section-summary" id="co-sum-3"></span>
       <i class="fas fa-chevron-down co-chev"></i>
@@ -166,17 +146,31 @@
     <div class="co-section-body">
       {% if order %}
         {# Hidden anchor with preset customer info — read by the
-           edit-mode bootstrap script above to prefill the picker. #}
+           edit-mode bootstrap below to switch tabs and prefill. #}
         {% if order.contact %}
           <span id="co-customer-preset" hidden
-                data-type="contact"
+                data-source="crm" data-type="contact"
                 data-pk="{{ order.contact.pk }}"
                 data-name="{{ order.contact.name|capfirst }}"></span>
         {% elif order.company %}
           <span id="co-customer-preset" hidden
-                data-type="company"
+                data-source="crm" data-type="company"
                 data-pk="{{ order.company.pk }}"
                 data-name="{{ order.company.name|capfirst }}"></span>
+        {% elif order.web_client %}
+          {% with name=order.web_client.name|default:order.web_client.username %}
+          <span id="co-customer-preset" hidden
+                data-source="web" data-type="web_client"
+                data-pk="{{ order.web_client.pk }}"
+                data-name="{{ name }}"></span>
+          {% endwith %}
+        {% elif order.is_guest_order %}
+          <span id="co-customer-preset" hidden
+                data-source="guest"
+                data-guest-first="{{ order.guest_first_name|default:'' }}"
+                data-guest-last="{{ order.guest_last_name|default:'' }}"
+                data-guest-email="{{ order.guest_email|default:'' }}"
+                data-guest-phone="{{ order.guest_phone|default:'' }}"></span>
         {% endif %}
       {% endif %}
       <!-- Customer Source -->
@@ -270,30 +264,52 @@
     </div>
   </div>
 
-  <!-- Step 4: Payment & Notes -->
+  <!-- Step 3: Products (badge 3, ID stays co-step-2 so JS keeps working) -->
+  <div class="co-section active" id="co-step-2">
+    <div class="co-section-header" onclick="coToggle(2)">
+      <div class="co-section-num">3</div>
+      <span>Products</span>
+      <span class="co-section-summary" id="co-sum-2"></span>
+      <i class="fas fa-chevron-down co-chev"></i>
+    </div>
+    <div class="co-section-body">
+      <div class="form-group">
+        <label>{% trans "Search Product" %}</label>
+        <input type="text" id="co-product-search" class="form-input" placeholder="Name, SKU or variant SKU..."
+          hx-get="{% url 'operating:product_autocomplete' %}" hx-trigger="keyup changed delay:200ms"
+          hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
+      </div>
+      <div id="co-product-results" class="co-autocomplete-results"></div>
+      <div id="co-products-list"></div>
+      <input type="hidden" id="product_json_input" name="product_json_input">
+    </div>
+  </div>
+
+  <!-- Step 4: Deposit & Notes (replaces the old Payment Method section) -->
   <div class="co-section" id="co-step-4">
     <div class="co-section-header" onclick="coToggle(4)">
       <div class="co-section-num">4</div>
-      <span>Payment</span>
+      <span>{% trans "Deposit & Notes" %}</span>
       <span class="co-section-summary" id="co-sum-4"></span>
       <i class="fas fa-chevron-down co-chev"></i>
     </div>
     <div class="co-section-body">
       <div class="form-group">
-        <label>{% trans "Payment Method" %}</label>
-        <div class="co-type-group">
-          <label class="co-type-btn">
-            <input type="radio" name="payment_method" value="cash" checked>
-            <i class="fas fa-money-bill-wave"></i> Cash
-          </label>
-          <label class="co-type-btn">
-            <input type="radio" name="payment_method" value="credit_card">
-            <i class="fas fa-credit-card"></i> Card
-          </label>
-          <label class="co-type-btn">
-            <input type="radio" name="payment_method" value="bank_transfer">
-            <i class="fas fa-university"></i> Transfer
-          </label>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+          <input type="checkbox" id="co-deposit-toggle" name="deposit_received" value="1"
+                 onchange="document.getElementById('co-deposit-row').style.display=this.checked?'block':'none'; if(!this.checked) document.getElementById('co-deposit-amount').value='';">
+          <i class="fas fa-hand-holding-usd" style="color:#147F74;"></i>
+          {% trans "Deposit received from customer" %}
+        </label>
+      </div>
+      <div id="co-deposit-row" class="form-group" style="display:none; padding:10px 12px; background:#F0FDFA; border:1px solid #CCFBF1; border-radius:8px;">
+        <label>{% trans "Deposit amount" %}</label>
+        <input type="number" id="co-deposit-amount" name="deposit_amount" class="form-input"
+               value="" min="0" step="0.01" placeholder="0.00"
+               style="background:#FFF;">
+        <div style="font-size:11.5px; color:#0F766E; margin-top:4px;">
+          <i class="fas fa-info-circle"></i>
+          {% trans "This amount will be posted as a collection on the customer's cari right after the order is created." %}
         </div>
       </div>
 
@@ -304,28 +320,20 @@
     </div>
   </div>
 
-  <!-- Total & Payment Amount -->
-  <div style="padding-top:12px;">
-    <div class="co-row" style="margin-bottom:12px;">
-      <div class="form-group">
-        <label>{% trans "Total Price" %}</label>
-        <input type="number" id="co-total-price" name="total_price" class="form-input" value="0" min="0" step="0.01" placeholder="0.00" oninput="coUpdateRemaining()">
-      </div>
-      <div class="form-group">
-        <label>{% trans "Amount Paid" %}</label>
-        <input type="number" id="co-amount-paid" name="paid_amount" class="form-input" value="0" min="0" step="0.01" placeholder="0.00" oninput="coUpdateRemaining()">
-      </div>
-      <div class="form-group">
-        <label>{% trans "Remaining" %}</label>
-        <div id="co-remaining" style="font-size:14px;font-weight:700;color:#ef4444;padding-top:8px;">$0.00</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="sidebar-footer" style="padding:0;border:none;margin-top:4px;">
+  <div class="sidebar-footer" style="padding:0;border:none;margin-top:4px; display:flex; flex-direction:column; gap:6px; align-items:stretch;">
     <button type="submit" id="submit_order_button" class="btn btn-primary w-full" style="flex:1;justify-content:center;">
       <i class="fas fa-check"></i> {% if order %}{% trans "Save changes" %}{% else %}{% trans "Place Order" %}{% endif %}
     </button>
+    <div style="font-size:11.5px; color:#6b7280; text-align:center;">
+      <i class="fas fa-keyboard" style="margin-right:4px;"></i>
+      {% trans "Press" %}
+      <kbd style="padding:1px 5px; background:#F1F5F9; border:1px solid #CBD5E1; border-radius:4px; font-family:var(--font-mono, monospace); font-size:11px;">Ctrl</kbd>
+      <span style="opacity:.5;">/</span>
+      <kbd style="padding:1px 5px; background:#F1F5F9; border:1px solid #CBD5E1; border-radius:4px; font-family:var(--font-mono, monospace); font-size:11px;">⌘</kbd>
+      +
+      <kbd style="padding:1px 5px; background:#F1F5F9; border:1px solid #CBD5E1; border-radius:4px; font-family:var(--font-mono, monospace); font-size:11px;">Enter</kbd>
+      {% trans "to save" %}
+    </div>
   </div>
 
 </form>
@@ -550,14 +558,35 @@
 
   function updateTotal() {}
 
-  window.coUpdateRemaining = function() {
-    const total = parseFloat(document.getElementById('co-total-price').value) || 0;
-    const paid = parseFloat(document.getElementById('co-amount-paid').value) || 0;
-    const remaining = total - paid;
-    const el = document.getElementById('co-remaining');
-    el.textContent = '$' + remaining.toFixed(2);
-    el.style.color = remaining > 0 ? '#ef4444' : '#059669';
-  };
+  // Deposit / Total / Remaining row was removed in favor of the
+  // "Deposit received" checkbox in step 4. Keep this as a no-op so
+  // any leftover `oninput="coUpdateRemaining()"` references are safe.
+  window.coUpdateRemaining = function() {};
+
+  // Block plain Enter from submitting the form — user explicitly asked
+  // for this after accidentally placing an order with one Enter press.
+  // Plain Enter inside any field is swallowed (textareas/selects still
+  // get their default behaviour). Ctrl/Cmd+Enter anywhere submits.
+  (function () {
+    const form = document.getElementById('createOrderForm');
+    if (!form) return;
+    form.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter') return;
+      const t = ev.target;
+      // Always allow Enter inside multi-line fields (textarea / Quill).
+      const isMultiline = (t && (t.tagName === 'TEXTAREA' ||
+        (t.getAttribute && t.getAttribute('contenteditable') === 'true')));
+      if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey) {
+        ev.preventDefault();
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        return;
+      }
+      if (isMultiline) return;
+      // Bare Enter on a single-line input → swallow.
+      ev.preventDefault();
+    });
+  })();
 
   document.getElementById('createOrderForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -616,31 +645,71 @@
     var sum2 = document.getElementById('co-sum-2');
     if (sum2 && orderItems.length) sum2.textContent = orderItems.length + ' items';
 
-    // Existing customer prefill from data attrs printed below.
+    // Existing customer prefill — switch the source tab (CRM / Web /
+    // Guest) to whatever the order was originally tied to, then fill
+    // the relevant fields. Without this, the radio always defaulted to
+    // CRM in edit mode even for web/guest orders.
     var preset = document.getElementById('co-customer-preset');
     if (preset) {
-      var type = preset.dataset.type;
-      var pk = preset.dataset.pk;
-      var name = preset.dataset.name || '';
-      if (type && pk) {
-        var typeInput = document.getElementById('customer-type');
-        var pkInput = document.getElementById('customer-pk');
-        var searchInput = document.getElementById('co-customer-search');
-        var selected = document.getElementById('co-customer-selected');
-        if (typeInput) typeInput.value = type;
-        if (pkInput) pkInput.value = pk;
-        if (searchInput) searchInput.value = name;
-        if (selected) {
-          var icon = type === 'company' ? 'fa-building' : 'fa-user';
-          selected.style.display = 'inline-flex';
-          selected.innerHTML =
-            '<i class="fas ' + icon + '"></i>' +
-            '<span></span>' +
-            '<button type="button" class="co-badge-clear" title="Clear"><i class="fas fa-times"></i></button>';
-          selected.querySelector('span').textContent = name;
-          var sum3 = document.getElementById('co-sum-3');
-          if (sum3) sum3.textContent = name;
+      var source = preset.dataset.source || 'crm';
+      var radio = document.querySelector('input[name="customer_source"][value="' + source + '"]');
+      if (radio) {
+        radio.checked = true;
+        if (typeof coCustomerSource === 'function') coCustomerSource(source);
+      }
+      var sum3 = document.getElementById('co-sum-3');
+
+      if (source === 'crm') {
+        var type = preset.dataset.type;
+        var pk = preset.dataset.pk;
+        var name = preset.dataset.name || '';
+        if (type && pk) {
+          var typeInput = document.getElementById('customer-type');
+          var pkInput = document.getElementById('customer-pk');
+          var searchInput = document.getElementById('co-customer-search');
+          var selected = document.getElementById('co-customer-selected');
+          if (typeInput) typeInput.value = type;
+          if (pkInput) pkInput.value = pk;
+          if (searchInput) searchInput.value = name;
+          if (selected) {
+            var icon = type === 'company' ? 'fa-building' : 'fa-user';
+            selected.style.display = 'inline-flex';
+            selected.innerHTML =
+              '<i class="fas ' + icon + '"></i>' +
+              '<span></span>' +
+              '<button type="button" class="co-badge-clear" title="Clear"><i class="fas fa-times"></i></button>';
+            selected.querySelector('span').textContent = name;
+            if (sum3) sum3.textContent = name;
+          }
         }
+      } else if (source === 'web') {
+        var wpk = preset.dataset.pk;
+        var wname = preset.dataset.name || '';
+        var wpkInput = document.getElementById('webclient-pk');
+        var wSearch = document.getElementById('co-webclient-search');
+        var wSel = document.getElementById('co-webclient-selected');
+        if (wpkInput) wpkInput.value = wpk;
+        if (wSearch) wSearch.value = wname;
+        if (wSel) {
+          wSel.style.display = 'inline-flex';
+          wSel.innerHTML =
+            '<i class="fas fa-globe"></i>' +
+            '<span></span>' +
+            '<button type="button" class="co-badge-clear" title="Clear" data-clear="web"><i class="fas fa-times"></i></button>';
+          wSel.querySelector('span').textContent = wname;
+        }
+        if (sum3) sum3.textContent = wname;
+      } else if (source === 'guest') {
+        var g = preset.dataset;
+        var setVal = function (selector, v) {
+          var el = document.querySelector(selector);
+          if (el) el.value = v || '';
+        };
+        setVal('input[name="guest_first_name"]', g.guestFirst);
+        setVal('input[name="guest_last_name"]',  g.guestLast);
+        setVal('input[name="guest_email"]',      g.guestEmail);
+        setVal('input[name="guest_phone"]',      g.guestPhone);
+        if (sum3) sum3.textContent = ((g.guestFirst || '') + ' ' + (g.guestLast || '')).trim() || 'Guest';
       }
     }
 

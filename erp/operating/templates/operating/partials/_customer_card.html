@@ -1,0 +1,328 @@
+{% load i18n %}
+<div id="od-customer-section">
+  <section class="od-card{% if cust_card_mode == 'edit' %} editing{% elif cust_card_mode == 'create' %} creating{% endif %}" id="od-customer-card">
+    <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
+      <h3>{% trans "Customer" %}</h3>
+      <div style="display:flex; gap:6px;">
+        <button type="button" class="ord-btn ghost" data-od-cust-mode="edit"
+                style="font-size:12px; padding:6px 10px;"
+                title="{% trans 'Edit customer info' %}">
+          <i class="fa fa-pen"></i> <span>{% trans "Edit" %}</span>
+        </button>
+        <button type="button" class="ord-btn ghost" data-od-cust-mode="create"
+                style="font-size:12px; padding:6px 10px;"
+                title="{% trans 'Create a new contact and link it to this order' %}">
+          <i class="fa fa-user-plus"></i>
+        </button>
+      </div>
+    </div>
+
+    {# ─── VIEW MODE ─────────────────────────────────────────── #}
+    <div class="od-cust-view">
+      {% if order.contact %}
+        <div class="od-cust">
+          <div class="od-cust-avatar" style="background:#147F74;">{{ order.contact.name|slice:":2"|upper }}</div>
+          <div>
+            <div class="od-cust-n">{{ order.contact.name|capfirst }}</div>
+            <div class="od-cust-c">
+              {% if order.contact.company %}{{ order.contact.company.name }}{% else %}{% trans "B2B · Individual" %}{% endif %}
+              {% if order.contact.job_title %} · {{ order.contact.job_title }}{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="od-detail-list">
+          <div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.contact.email.0|default:"—" }}</b></div>
+          <div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.contact.phone.0|default:"—" }}</b></div>
+          <div class="od-dt"><span>{% trans "Address" %}</span><b>{{ order.contact.address|default:"—"|truncatechars:60 }}</b></div>
+          {% if order.contact.country %}<div class="od-dt"><span>{% trans "Country" %}</span><b>{{ order.contact.country }}</b></div>{% endif %}
+        </div>
+        <a class="od-link" href="{% url 'crm:contact_detail' order.contact.pk %}">{% trans "Open profile" %} <i class="fa fa-external-link-alt"></i></a>
+
+      {% elif order.company %}
+        <div class="od-cust">
+          <div class="od-cust-avatar" style="background:#0A5F70;">{{ order.company.name|slice:":2"|upper }}</div>
+          <div>
+            <div class="od-cust-n">{{ order.company.name|capfirst }}</div>
+            <div class="od-cust-c">{% trans "B2B · Corporate" %}</div>
+          </div>
+        </div>
+        <div class="od-detail-list">
+          <div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.company.email.0|default:"—" }}</b></div>
+          <div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.company.phone.0|default:"—" }}</b></div>
+          <div class="od-dt"><span>{% trans "Address" %}</span><b>{{ order.company.address|default:"—"|truncatechars:60 }}</b></div>
+          {% if order.company.website %}<div class="od-dt"><span>{% trans "Website" %}</span><b>{{ order.company.website }}</b></div>{% endif %}
+          {% if order.company.country %}<div class="od-dt"><span>{% trans "Country" %}</span><b>{{ order.company.country }}</b></div>{% endif %}
+        </div>
+        <a class="od-link" href="{% url 'crm:company_detail' order.company.pk %}">{% trans "Open company profile" %} <i class="fa fa-external-link-alt"></i></a>
+
+      {% elif order.web_client %}
+        {% with display=order.web_client.name|default:order.web_client.username %}
+        <div class="od-cust">
+          <div class="od-cust-avatar" style="background:#C2A45A;">{{ display|slice:":2"|upper }}</div>
+          <div>
+            <div class="od-cust-n">{{ display }}</div>
+            <div class="od-cust-c">{% trans "Web customer" %}</div>
+          </div>
+        </div>
+        {% endwith %}
+        <div class="od-detail-list">
+          {% if order.web_client.email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.web_client.email }}</b></div>{% endif %}
+          {% if order.web_client.phone_number %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.web_client.phone_number }}</b></div>{% endif %}
+          <div class="od-dt"><span>{% trans "Dealer no" %}</span><b class="mono">BLN-{{ order.web_client.id|stringformat:"04d" }}</b></div>
+        </div>
+
+      {% elif order.is_guest_order %}
+        <div class="od-cust">
+          <div class="od-cust-avatar" style="background:#6B8E7F;">G</div>
+          <div>
+            <div class="od-cust-n">{{ order.guest_first_name }} {{ order.guest_last_name }}</div>
+            <div class="od-cust-c">{% trans "Guest order" %}</div>
+          </div>
+        </div>
+        <div class="od-detail-list">
+          {% if order.guest_email %}<div class="od-dt"><span>{% trans "Email" %}</span><b>{{ order.guest_email }}</b></div>{% endif %}
+          {% if order.guest_phone %}<div class="od-dt"><span>{% trans "Phone" %}</span><b>{{ order.guest_phone }}</b></div>{% endif %}
+        </div>
+
+      {% else %}
+        <div class="od-empty-mute" style="padding: 12px 0;">{% trans "No customer assigned" %}</div>
+      {% endif %}
+    </div>
+
+    {# ─── EDIT MODE ─────────────────────────────────────────── #}
+    <div class="od-cust-edit">
+      <div class="form-group" style="margin-bottom:10px;">
+        <div class="od-cust-srcs">
+          <label class="od-cust-src" data-src="crm">
+            <input type="radio" name="od_cust_source" value="crm"
+                   {% if order.contact or order.company or not order.web_client and not order.is_guest_order %}checked{% endif %}>
+            <i class="fa fa-address-book"></i> {% trans "CRM" %}
+          </label>
+          <label class="od-cust-src" data-src="web">
+            <input type="radio" name="od_cust_source" value="web"
+                   {% if order.web_client %}checked{% endif %}>
+            <i class="fa fa-globe"></i> {% trans "Web" %}
+          </label>
+          <label class="od-cust-src" data-src="guest">
+            <input type="radio" name="od_cust_source" value="guest"
+                   {% if order.is_guest_order %}checked{% endif %}>
+            <i class="fa fa-user"></i> {% trans "Guest" %}
+          </label>
+        </div>
+      </div>
+
+      {# === CRM group === #}
+      <div class="od-cust-grp" data-grp="crm"
+           {% if not order.contact and not order.company and order.web_client or order.is_guest_order %}style="display:none;"{% endif %}>
+        <div class="od-cust-ac" style="margin-bottom: 10px; position: relative;">
+          <label class="od-cust-flbl">{% trans "Search contact or company" %}</label>
+          <input type="text" name="customer" class="od-input" autocomplete="off"
+                 placeholder="{% trans 'Search contact or company…' %}"
+                 hx-get="{% url 'crm:customer_autocomplete' %}"
+                 hx-trigger="keyup changed delay:250ms"
+                 hx-target="#od-cust-search-results"
+                 hx-swap="innerHTML"
+                 style="width:100%; margin-top:4px;">
+          <div id="od-cust-search-results"></div>
+        </div>
+
+        {% if order.contact or order.company %}
+          {% with target=order.contact|default:order.company %}
+          <div style="padding:10px; background:#F0FDFA; border:1px solid #CCFBF1; border-radius:10px; margin-bottom: 10px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <div style="min-width:0;">
+              <div style="font:600 11px var(--font-sans); color:#0F766E; text-transform:uppercase; letter-spacing:.06em;">
+                {% trans "Selected" %}
+              </div>
+              <div style="font:700 13.5px var(--font-sans); color:#0F1419; margin-top:2px;">
+                <i class="fa fa-{% if order.contact %}user{% else %}building{% endif %}" style="color:#147F74; margin-right:4px;"></i>
+                {{ target.name|capfirst }}
+              </div>
+            </div>
+            <button type="button" class="od-row-del" title="{% trans 'Clear' %}"
+                    hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                    hx-vals='{"action":"clear"}'
+                    hx-target="#od-customer-section" hx-swap="outerHTML"
+                    hx-confirm="{% trans 'Clear the linked customer?' %}">
+              <i class="fa fa-times"></i>
+            </button>
+          </div>
+          {% endwith %}
+        {% endif %}
+      </div>
+
+      {# === Web client group === #}
+      <div class="od-cust-grp" data-grp="web"
+           {% if not order.web_client %}style="display:none;"{% endif %}>
+        <div class="od-cust-ac" style="position: relative;">
+          <label class="od-cust-flbl">{% trans "Search web client" %}</label>
+          <input type="text" name="webclient_q" class="od-input" autocomplete="off"
+                 placeholder="{% trans 'Email or username…' %}"
+                 hx-get="{% url 'operating:webclient_autocomplete' %}"
+                 hx-trigger="keyup changed delay:250ms"
+                 hx-target="#od-webclient-search-results"
+                 hx-swap="innerHTML"
+                 style="width:100%; margin-top:4px;">
+          <div id="od-webclient-search-results"></div>
+        </div>
+        {% if order.web_client %}
+          <div style="margin-top:10px; padding:10px; background:#F8FAFC; border:1px solid #E2E8EE; border-radius:10px;">
+            <div style="font:600 11px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em;">
+              {% trans "Linked web client" %}
+            </div>
+            <div style="margin-top:6px; font-weight:600;">
+              {{ order.web_client.name|default:order.web_client.username }}
+            </div>
+            <div style="font-size:12px; color:var(--gray-500); margin-top:2px;">
+              {{ order.web_client.email|default:"—" }}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      {# === Guest group === #}
+      <div class="od-cust-grp" data-grp="guest"
+           {% if not order.is_guest_order %}style="display:none;"{% endif %}>
+        {% if order.is_guest_order %}
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+          <div>
+            <label class="od-cust-flbl">{% trans "First name" %}</label>
+            <input type="text" class="od-input" name="guest_first_name"
+                   value="{{ order.guest_first_name|default:'' }}"
+                   hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                   hx-trigger="change"
+                   hx-target="#od-customer-section" hx-swap="outerHTML"
+                   hx-vals='{"action":"update_guest","field":"guest_first_name"}'
+                   hx-include="this">
+          </div>
+          <div>
+            <label class="od-cust-flbl">{% trans "Last name" %}</label>
+            <input type="text" class="od-input" name="guest_last_name"
+                   value="{{ order.guest_last_name|default:'' }}"
+                   hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                   hx-trigger="change"
+                   hx-target="#od-customer-section" hx-swap="outerHTML"
+                   hx-vals='{"action":"update_guest","field":"guest_last_name"}'
+                   hx-include="this">
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label class="od-cust-flbl">{% trans "Email" %}</label>
+          <input type="email" class="od-input" name="guest_email" style="width:100%;"
+                 value="{{ order.guest_email|default:'' }}"
+                 hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                 hx-trigger="change"
+                 hx-target="#od-customer-section" hx-swap="outerHTML"
+                 hx-vals='{"action":"update_guest","field":"guest_email"}'
+                 hx-include="this">
+        </div>
+        <div style="margin-top:8px;">
+          <label class="od-cust-flbl">{% trans "Phone" %}</label>
+          <input type="text" class="od-input" name="guest_phone" style="width:100%;"
+                 value="{{ order.guest_phone|default:'' }}"
+                 hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                 hx-trigger="change"
+                 hx-target="#od-customer-section" hx-swap="outerHTML"
+                 hx-vals='{"action":"update_guest","field":"guest_phone"}'
+                 hx-include="this">
+        </div>
+        {% else %}
+        <div class="od-empty-mute" style="padding: 8px 0; font-size: 12px;">
+          <i class="fa fa-info-circle"></i> {% trans "Convert this order to a guest order — its current customer link will be cleared." %}
+        </div>
+        <button type="button" class="ord-btn primary" style="width:100%; font-size:12px; margin-top: 6px;"
+                hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                hx-vals='{"action":"switch","customer_type":"guest"}'
+                hx-target="#od-customer-section" hx-swap="outerHTML"
+                hx-confirm="{% trans 'Convert to guest order? Current customer link will be removed.' %}">
+          <i class="fa fa-user"></i> {% trans "Convert to guest" %}
+        </button>
+        {% endif %}
+      </div>
+
+      <div style="margin-top:14px; padding-top:12px; border-top:1px dashed #E2E8EE;">
+        <div style="font:600 11px var(--font-sans); color:var(--gray-500); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;">
+          {% trans "Delivery address" %}
+        </div>
+        <div class="form-group">
+          <input type="text" class="od-input" name="value" style="width:100%;"
+                 value="{{ order.delivery_address_title|default:'' }}"
+                 placeholder="{% trans 'Address title (Home, Work…)' %}"
+                 hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                 hx-trigger="change"
+                 hx-target="#od-customer-section" hx-swap="outerHTML"
+                 hx-vals='{"action":"update_delivery","field":"delivery_address_title"}'>
+        </div>
+        <div class="form-group" style="margin-top:6px;">
+          <textarea class="od-input" name="value" rows="2" style="width:100%;"
+                    placeholder="{% trans 'Full address' %}"
+                    hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                    hx-trigger="change"
+                    hx-target="#od-customer-section" hx-swap="outerHTML"
+                    hx-vals='{"action":"update_delivery","field":"delivery_address"}'>{{ order.delivery_address|default:'' }}</textarea>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px;">
+          <input type="text" class="od-input" name="value"
+                 value="{{ order.delivery_city|default:'' }}"
+                 placeholder="{% trans 'City' %}"
+                 hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                 hx-trigger="change"
+                 hx-target="#od-customer-section" hx-swap="outerHTML"
+                 hx-vals='{"action":"update_delivery","field":"delivery_city"}'>
+          <input type="text" class="od-input" name="value"
+                 value="{{ order.delivery_country|default:'' }}"
+                 placeholder="{% trans 'Country' %}"
+                 hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                 hx-trigger="change"
+                 hx-target="#od-customer-section" hx-swap="outerHTML"
+                 hx-vals='{"action":"update_delivery","field":"delivery_country"}'>
+        </div>
+        <div class="form-group" style="margin-top:6px;">
+          <input type="text" class="od-input" name="value" style="width:100%;"
+                 value="{{ order.delivery_phone|default:'' }}"
+                 placeholder="{% trans 'Phone' %}"
+                 hx-post="{% url 'operating:order_customer_card' order.pk %}"
+                 hx-trigger="change"
+                 hx-target="#od-customer-section" hx-swap="outerHTML"
+                 hx-vals='{"action":"update_delivery","field":"delivery_phone"}'>
+        </div>
+      </div>
+    </div>
+
+    {# ─── CREATE MODE ──────────────────────────────────────── #}
+    <div class="od-cust-create">
+      <form hx-post="{% url 'operating:order_customer_card' order.pk %}"
+            hx-target="#od-customer-section" hx-swap="outerHTML"
+            style="display:flex; flex-direction:column; gap:8px;">
+        <input type="hidden" name="action" value="create_contact">
+        <div>
+          <label class="od-cust-flbl">{% trans "Name (required)" %}</label>
+          <input type="text" class="od-input" name="name" required placeholder="{% trans 'Full name' %}">
+        </div>
+        <div>
+          <label class="od-cust-flbl">{% trans "Email" %}</label>
+          <input type="email" class="od-input" name="email" placeholder="someone@example.com">
+        </div>
+        <div>
+          <label class="od-cust-flbl">{% trans "Phone" %}</label>
+          <input type="text" class="od-input" name="phone" placeholder="+90 ...">
+        </div>
+        <div>
+          <label class="od-cust-flbl">{% trans "Address" %}</label>
+          <textarea class="od-input" name="address" rows="2"></textarea>
+        </div>
+        <div>
+          <label class="od-cust-flbl">{% trans "Country" %}</label>
+          <input type="text" class="od-input" name="country">
+        </div>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button type="submit" class="ord-btn primary" style="flex:1; font-size:12px;">
+            <i class="fa fa-check"></i> {% trans "Create & link" %}
+          </button>
+          <button type="button" class="ord-btn ghost" data-od-cust-mode="view" style="font-size:12px;">
+            {% trans "Cancel" %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>

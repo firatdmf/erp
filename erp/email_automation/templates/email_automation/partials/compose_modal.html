@@ -1,919 +1,599 @@
 {% load i18n %}
-<div class="modal-backdrop" onclick="closeComposeModal()"></div>
-<div class="compose-modal">
-    <div class="compose-header">
-        <h3>{% trans "New Message" %}</h3>
-        <button class="close-btn" onclick="closeComposeModal()"><i class="fas fa-times"></i></button>
-    </div>
-
-    <form id="composeForm">
-        {% csrf_token %}
-        <input type="hidden" name="company_id" id="hiddenCompanyId" value="{{ company_id|default:'' }}">
-        <input type="hidden" name="contact_id" id="hiddenContactId" value="{{ contact_id|default:'' }}">
-
-        <!-- To field with autocomplete -->
-        <div class="compose-field recipient-field">
-            <label class="field-label">To</label>
-            <div class="recipient-container" id="toContainer">
-                <div class="recipient-chips" id="toChips">
-                    {% if recipient_email %}
-                    <span class="recipient-chip" data-email="{{ recipient_email }}">
-                        <span class="chip-text">{{ recipient_name|default:recipient_email }}</span>
-                        <i class="fas fa-times chip-remove" onclick="removeChip(this)"></i>
-                    </span>
-                    {% endif %}
-                </div>
-                <input type="text" class="recipient-input" id="toInput"
-                    placeholder="{% if not recipient_email %}Search contacts / companies or type email...{% endif %}"
-                    autocomplete="off">
-                <div class="recipient-dropdown" id="toDropdown"></div>
-            </div>
-        </div>
-
-        <div class="compose-field" style="display: none;" id="ccField">
-            <label class="field-label">Cc</label>
-            <div class="recipient-container" id="ccContainer">
-                <div class="recipient-chips" id="ccChips"></div>
-                <input type="text" class="recipient-input" id="ccInput"
-                    placeholder="Search contacts / companies or type email..." autocomplete="off">
-                <div class="recipient-dropdown" id="ccDropdown"></div>
-            </div>
-        </div>
-
-        <div class="compose-field" style="display: none;" id="bccField">
-            <label class="field-label">{% trans "Bcc" %}</label>
-            <div class="recipient-container" id="bccContainer">
-                <div class="recipient-chips" id="bccChips"></div>
-                <input type="text" class="recipient-input" id="bccInput"
-                    placeholder="Search contacts / companies or type email..." autocomplete="off">
-                <div class="recipient-dropdown" id="bccDropdown"></div>
-            </div>
-        </div>
-
-        <div class="compose-actions-secondary">
-            <span onclick="toggleField('ccField')">Cc</span>
-            <span onclick="toggleField('bccField')">Bcc</span>
-        </div>
-
-        <div class="compose-field">
-            <input type="text" name="subject" class="compose-input" placeholder="Subject" value="{{ subject }}"
-                required>
-        </div>
-
-        <div class="compose-body">
-            <textarea name="body" class="compose-textarea" placeholder="Write your message here..."></textarea>
-        </div>
-
-        <div class="file-preview-area" id="filePreviewArea"></div>
-
-        <div class="compose-footer">
-            <div class="compose-tools">
-                <label for="fileInput" class="tool-btn" title="Attach File">
-                    <i class="fas fa-paperclip"></i>
-                </label>
-                <input type="file" id="fileInput" name="attachments" multiple style="display: none;"
-                    onchange="handleFileSelect(event)">
-
-                <button type="button" class="tool-btn" title="Insert Template">
-                    <i class="fas fa-file-alt"></i>
-                </button>
-            </div>
-
-            <!-- Changed to type="button" and added onclick to prevent default form submission -->
-            <button type="button" class="send-btn" id="sendBtn" onclick="sendEmail(event)">
-                <span class="send-btn-content">
-                    <i class="fas fa-paper-plane"></i> Send
-                </span>
-                <span class="send-btn-loading" style="display:none;">
-                    <i class="fas fa-spinner fa-spin"></i> Sending...
-                </span>
-            </button>
-        </div>
-
-        <!-- Error toast -->
-        <div class="compose-error-toast" id="composeErrorToast" style="display:none;">
-            <i class="fas fa-exclamation-circle"></i>
-            <span id="composeErrorText"></span>
-        </div>
-    </form>
-</div>
-
 <style>
-    .modal-backdrop {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.3);
-        z-index: 9998;
-    }
+  .nmc-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(15,20,25,0.22);
+    backdrop-filter: blur(2px);
+    z-index: 9998;
+    animation: nmc-fade .18s ease-out;
+  }
+  @keyframes nmc-fade { from { opacity: 0; } }
 
-    .compose-modal {
-        position: fixed;
-        bottom: 0;
-        right: 80px;
-        width: 580px;
-        max-width: 90vw;
-        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
-        border-radius: 12px 12px 0 0;
-        background: white;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        height: 560px;
-        max-height: 85vh;
-        animation: modalSlideUp 0.2s ease-out;
-    }
+  .nmc-modal {
+    position: fixed; bottom: 28px; right: 28px;
+    width: 720px; max-width: calc(100vw - 56px);
+    max-height: 88vh;
+    background: #FFF;
+    border: 1px solid #E2E8EE;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(15,20,25,0.22);
+    z-index: 9999;
+    display: flex; flex-direction: column;
+    font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+    animation: nmc-slide .26s cubic-bezier(.22,1,.36,1);
+    overflow: hidden;
+  }
+  @keyframes nmc-slide { from { transform: translateY(24px); opacity: 0; } }
 
-    @keyframes modalSlideUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
+  /* ── Header ── */
+  .nmc-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 22px;
+    background: linear-gradient(135deg, #147F74, #0F766E);
+    color: #FFF;
+    cursor: move; user-select: none;
+    flex-shrink: 0;
+  }
+  .nmc-head-title {
+    font: 700 14px var(--font-sans);
+    display: flex; align-items: center; gap: 10px;
+    letter-spacing: -.005em;
+  }
+  .nmc-head-title i { font-size: 14px; opacity: .9; }
+  .nmc-head-actions { display: flex; gap: 6px; }
+  .nmc-head-btn {
+    width: 30px; height: 30px;
+    background: rgba(255,255,255,0.14); border: none; border-radius: 8px;
+    color: #FFF; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    transition: background .12s;
+  }
+  .nmc-head-btn:hover { background: rgba(255,255,255,0.26); }
 
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
+  /* ── Form ── */
+  .nmc-form {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    background: #FFF;
+  }
+  .nmc-fields {
+    padding: 20px 22px 4px;
+    flex: 1; min-height: 0;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 14px;
+  }
 
-    .compose-header {
-        padding: 12px 20px;
-        background: #1e293b;
-        color: white;
-        border-radius: 12px 12px 0 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+  /* ── Field group ── */
+  .nmc-field { display: flex; flex-direction: column; gap: 6px; }
+  .nmc-flbl {
+    font: 600 11px var(--font-sans); color: #64748B;
+    text-transform: uppercase; letter-spacing: .08em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .nmc-flbl-r { margin-left: auto; display: flex; gap: 4px; }
+  .nmc-toggle {
+    color: #0F766E; font: 600 11px var(--font-sans);
+    cursor: pointer; padding: 3px 9px;
+    border-radius: 6px;
+    border: 1px solid #CCFBF1; background: #F0FDFA;
+    transition: all .12s;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .nmc-toggle:hover { background: #CCFBF1; }
 
-    .compose-header h3 {
-        margin: 0;
-        font-size: 15px;
-        font-weight: 600;
-    }
+  /* ── Recipient (chip) input ── */
+  .nmc-chips-box {
+    border: 1.5px solid #E2E8EE;
+    border-radius: 10px;
+    padding: 7px 10px;
+    background: #FFF;
+    min-height: 42px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    transition: all .15s;
+    position: relative;
+  }
+  .nmc-chips-box:focus-within {
+    border-color: #147F74;
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.10);
+  }
+  .nmc-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 8px 4px 11px;
+    background: #E5F1F0;
+    border: 1px solid #CCFBF1;
+    border-radius: 14px;
+    font: 500 12.5px var(--font-sans);
+    color: #005354;
+    max-width: 100%;
+  }
+  .nmc-chip > span { overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .nmc-chip-x {
+    cursor: pointer; opacity: .6;
+    width: 16px; height: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font-size: 9px;
+    transition: all .12s;
+  }
+  .nmc-chip-x:hover { opacity: 1; background: #99F6E4; }
+  .nmc-chip-input {
+    flex: 1 1 160px; min-width: 120px;
+    border: none; outline: none;
+    background: transparent;
+    font: 500 13.5px var(--font-sans);
+    color: #0F1419;
+    padding: 4px 0;
+  }
+  .nmc-chip-input::placeholder { color: #94A3B8; }
 
-    .close-btn {
-        background: none;
-        border: none;
-        color: rgba(255, 255, 255, 0.7);
-        cursor: pointer;
-        font-size: 16px;
-        padding: 4px;
-        transition: color 0.12s;
-    }
+  /* ── Autocomplete dropdown ── */
+  .nmc-ac {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+    background: #FFF;
+    border: 1px solid #E2E8EE;
+    border-radius: 12px;
+    box-shadow: 0 14px 32px rgba(15,20,25,0.14);
+    max-height: 280px; overflow-y: auto;
+    z-index: 100;
+    display: none;
+    padding: 4px;
+  }
+  .nmc-ac.show { display: block; }
+  .nmc-ac-item {
+    padding: 9px 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    font: 500 13px var(--font-sans);
+    color: #0F1419;
+    border-radius: 8px;
+  }
+  .nmc-ac-item:hover, .nmc-ac-item.hl { background: #F0FDFA; color: #005354; }
+  .nmc-ac-item i {
+    width: 26px; height: 26px;
+    background: #F0FDFA; color: #0F766E;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .nmc-ac-name { font-weight: 600; }
+  .nmc-ac-email { color: #94A3B8; font-size: 11.5px; margin-left: 4px; }
 
-    .close-btn:hover {
-        color: white;
-    }
+  /* ── Subject / Body ── */
+  .nmc-input {
+    width: 100%; box-sizing: border-box;
+    padding: 11px 14px;
+    border: 1.5px solid #E2E8EE;
+    border-radius: 10px;
+    background: #FFF;
+    font: 500 13.5px var(--font-sans);
+    color: #0F1419;
+    outline: none;
+    transition: all .15s;
+  }
+  .nmc-input::placeholder { color: #94A3B8; }
+  .nmc-input:focus {
+    border-color: #147F74;
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.10);
+  }
+  textarea.nmc-input {
+    resize: vertical;
+    min-height: 180px;
+    line-height: 1.6;
+    font-weight: 400;
+    font-size: 13.5px;
+  }
 
-    #composeForm {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        overflow: hidden;
-    }
+  /* ── Attachments preview ── */
+  .nmc-attachments {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 0 22px;
+  }
+  .nmc-attachments:empty { padding: 0; }
+  .nmc-att {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8EE;
+    border-radius: 9px;
+    font: 500 12.5px var(--font-sans);
+    color: #475569;
+  }
+  .nmc-att > i { color: #147F74; font-size: 13px; }
+  .nmc-att-rm {
+    cursor: pointer; color: #94A3B8; font-size: 11px; margin-left: 2px;
+    width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+  .nmc-att-rm:hover { color: #FFF; background: #DC2626; }
 
-    .compose-field {
-        padding: 8px 16px;
-        border-bottom: 1px solid #e2e8f0;
-    }
+  /* ── Toast ── */
+  .nmc-toast {
+    margin: 4px 22px;
+    padding: 11px 14px;
+    border-radius: 9px;
+    font: 600 12.5px var(--font-sans);
+    display: flex; align-items: center; gap: 9px;
+    animation: nmc-slide .22s;
+  }
 
-    .field-label {
-        font-size: 13px;
-        color: #94a3b8;
-        font-weight: 500;
-        min-width: 28px;
-        margin-right: 4px;
-    }
+  /* ── Footer ── */
+  .nmc-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px;
+    border-top: 1px solid #E2E8EE;
+    background: #FAFCFB;
+    flex-shrink: 0;
+  }
+  .nmc-tools { display: flex; gap: 4px; }
+  .nmc-tool {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: transparent; border: 1px solid transparent;
+    cursor: pointer;
+    color: #475569;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .12s;
+  }
+  .nmc-tool:hover { background: #E5F1F0; color: #005354; border-color: #CCFBF1; }
 
-    .compose-input {
-        width: 100%;
-        border: none;
-        outline: none;
-        font-size: 14px;
-        padding: 4px 0;
-    }
+  .nmc-send {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 11px 22px;
+    background: #147F74; color: #FFF;
+    border: none; border-radius: 10px;
+    font: 600 13.5px var(--font-sans);
+    cursor: pointer;
+    transition: all .15s;
+    box-shadow: 0 2px 4px rgba(20,127,116,0.18);
+  }
+  .nmc-send:hover { background: #0F766E; box-shadow: 0 4px 14px rgba(20,127,116,0.28); transform: translateY(-1px); }
+  .nmc-send:disabled { background: #94A3B8; cursor: not-allowed; transform: none; box-shadow: none; }
+  .nmc-send i { font-size: 12px; }
 
-    /* --- Recipient autocomplete styles --- */
-    .recipient-field {
-        position: relative;
-    }
-
-    .recipient-container {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 4px;
-        position: relative;
-    }
-
-    .recipient-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-    }
-
-    .recipient-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        background: linear-gradient(135deg, #eef2ff, #e0e7ff);
-        border: 1px solid #c7d2fe;
-        padding: 3px 8px 3px 10px;
-        border-radius: 16px;
-        font-size: 12px;
-        color: #4338ca;
-        font-weight: 500;
-        animation: chipIn 0.15s ease-out;
-        max-width: 200px;
-    }
-
-    .recipient-chip.company-chip {
-        background: linear-gradient(135deg, #fef3c7, #fde68a);
-        border-color: #fbbf24;
-        color: #92400e;
-    }
-
-    @keyframes chipIn {
-        from {
-            transform: scale(0.8);
-            opacity: 0;
-        }
-
-        to {
-            transform: scale(1);
-            opacity: 1;
-        }
-    }
-
-    .chip-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .chip-remove {
-        cursor: pointer;
-        font-size: 10px;
-        opacity: 0.6;
-        padding: 2px;
-        transition: opacity 0.15s;
-    }
-
-    .chip-remove:hover {
-        opacity: 1;
-    }
-
-    .recipient-input {
-        flex: 1;
-        min-width: 160px;
-        border: none;
-        outline: none;
-        font-size: 14px;
-        padding: 4px 0;
-        background: transparent;
-    }
-
-    .recipient-dropdown {
-        display: none;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-        z-index: 10001;
-        max-height: 220px;
-        overflow-y: auto;
-        margin-top: 4px;
-    }
-
-    .recipient-dropdown.show {
-        display: block;
-    }
-
-    .dropdown-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 14px;
-        cursor: pointer;
-        transition: background 0.12s;
-    }
-
-    .dropdown-item:hover,
-    .dropdown-item.active {
-        background: #f1f5f9;
-        color: #1e293b;
-    }
-
-    .dropdown-item-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 13px;
-        flex-shrink: 0;
-    }
-
-    .dropdown-item-icon.contact {
-        background: #eef2ff;
-        color: #6366f1;
-    }
-
-    .dropdown-item-icon.company {
-        background: #fef3c7;
-        color: #d97706;
-    }
-
-    .dropdown-item-info {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .dropdown-item-name {
-        font-size: 13px;
-        font-weight: 600;
-        color: #1e293b;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .dropdown-item-detail {
-        font-size: 11px;
-        color: #94a3b8;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .dropdown-item-badge {
-        font-size: 10px;
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-        flex-shrink: 0;
-    }
-
-    .dropdown-item-badge.contact {
-        background: #eef2ff;
-        color: #6366f1;
-    }
-
-    .dropdown-item-badge.company {
-        background: #fef3c7;
-        color: #d97706;
-    }
-
-    .dropdown-empty {
-        padding: 16px;
-        text-align: center;
-        color: #94a3b8;
-        font-size: 13px;
-    }
-
-    .dropdown-hint {
-        padding: 8px 14px;
-        font-size: 11px;
-        color: #94a3b8;
-        border-top: 1px solid #f1f5f9;
-    }
-
-    /* --- End autocomplete styles --- */
-
-    .compose-actions-secondary {
-        padding: 4px 16px;
-        font-size: 12px;
-        color: #64748b;
-        display: flex;
-        gap: 12px;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .compose-actions-secondary span {
-        cursor: pointer;
-    }
-
-    .compose-actions-secondary span:hover {
-        text-decoration: underline;
-    }
-
-    .compose-body {
-        flex: 1;
-        padding: 16px;
-        overflow-y: auto;
-    }
-
-    .compose-textarea {
-        width: 100%;
-        height: 100%;
-        border: none;
-        outline: none;
-        resize: none;
-        font-family: inherit;
-        font-size: 14px;
-        line-height: 1.6;
-    }
-
-    .compose-footer {
-        padding: 12px 16px;
-        border-top: 1px solid #e2e8f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #f8fafc;
-    }
-
-    .compose-tools {
-        display: flex;
-        gap: 8px;
-    }
-
-    .tool-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        border: 1px solid transparent;
-        background: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        color: #64748b;
-        transition: all 0.15s;
-    }
-
-    .tool-btn:hover {
-        background: #e2e8f0;
-        color: #1e293b;
-    }
-
-    .send-btn {
-        padding: 10px 24px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: all 0.25s ease;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .send-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-        transition: left 0.5s;
-    }
-
-    .send-btn:hover::before {
-        left: 100%;
-    }
-
-    .send-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
-    }
-
-    .send-btn:disabled {
-        cursor: not-allowed;
-        transform: none;
-    }
-
-    .send-btn.sending {
-        background: linear-gradient(135deg, #818cf8 0%, #8b5cf6 100%);
-        animation: sendPulse 1.5s ease-in-out infinite;
-        pointer-events: none;
-    }
-
-    @keyframes sendPulse {
-
-        0%,
-        100% {
-            box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.5);
-        }
-
-        50% {
-            box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
-        }
-    }
-
-    /* Error toast */
-    .compose-error-toast {
-        padding: 10px 16px;
-        background: linear-gradient(135deg, #fef2f2, #fee2e2);
-        border-left: 3px solid #ef4444;
-        color: #b91c1c;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        animation: slideUpToast 0.3s ease;
-    }
-
-    @keyframes slideUpToast {
-        from {
-            opacity: 0;
-            transform: translateY(8px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .file-preview-area {
-        padding: 0 16px 8px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .file-preview-item {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        background: #eef2ff;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        color: #667eea;
-    }
-
-    .remove-file {
-        cursor: pointer;
-        font-size: 14px;
-    }
+  @media (max-width: 760px) {
+    .nmc-modal { right: 12px; left: 12px; bottom: 12px; width: auto; }
+  }
 </style>
 
+<div class="nmc-backdrop" onclick="closeComposeModal()"></div>
+<div class="nmc-modal" id="nmc-modal">
+  <!-- Header -->
+  <div class="nmc-head" id="nmc-head">
+    <div class="nmc-head-title">
+      <i class="fas fa-pen-to-square"></i> {% trans "New message" %}
+    </div>
+    <div class="nmc-head-actions">
+      <button type="button" class="nmc-head-btn" onclick="closeComposeModal()" title="{% trans 'Close' %}">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <form class="nmc-form" id="nmc-form" onsubmit="event.preventDefault(); nmcSend();">
+    {% csrf_token %}
+    <input type="hidden" name="company_id" id="nmc-company-id" value="{{ company_id|default:'' }}">
+    <input type="hidden" name="contact_id" id="nmc-contact-id" value="{{ contact_id|default:'' }}">
+
+    <div class="nmc-fields">
+
+      <!-- TO -->
+      <div class="nmc-field">
+        <div class="nmc-flbl">
+          <span>{% trans "To" %}</span>
+          <div class="nmc-flbl-r">
+            <span class="nmc-toggle" id="nmc-cc-link"
+                  onclick="document.getElementById('nmc-cc-field').style.display='flex'; this.style.display='none';">Cc</span>
+            <span class="nmc-toggle" id="nmc-bcc-link"
+                  onclick="document.getElementById('nmc-bcc-field').style.display='flex'; this.style.display='none';">Bcc</span>
+          </div>
+        </div>
+        <div class="nmc-chips-box" data-kind="to">
+          {% if recipient_email %}
+          <span class="nmc-chip" data-email="{{ recipient_email }}">
+            <span>{{ recipient_name|default:recipient_email }}</span>
+            <span class="nmc-chip-x" onclick="nmcRemoveChip(this)"><i class="fas fa-times"></i></span>
+          </span>
+          {% endif %}
+          <input type="text" class="nmc-chip-input"
+                 placeholder="{% if not recipient_email %}{% trans 'Type email, name or company…' %}{% endif %}"
+                 autocomplete="off">
+          <div class="nmc-ac"></div>
+        </div>
+      </div>
+
+      <!-- CC -->
+      <div class="nmc-field" id="nmc-cc-field" style="display:none;">
+        <div class="nmc-flbl"><span>Cc</span></div>
+        <div class="nmc-chips-box" data-kind="cc">
+          <input type="text" class="nmc-chip-input" placeholder="{% trans 'Carbon copy recipients' %}" autocomplete="off">
+          <div class="nmc-ac"></div>
+        </div>
+      </div>
+
+      <!-- BCC -->
+      <div class="nmc-field" id="nmc-bcc-field" style="display:none;">
+        <div class="nmc-flbl"><span>Bcc</span></div>
+        <div class="nmc-chips-box" data-kind="bcc">
+          <input type="text" class="nmc-chip-input" placeholder="{% trans 'Blind copy recipients' %}" autocomplete="off">
+          <div class="nmc-ac"></div>
+        </div>
+      </div>
+
+      <!-- SUBJECT -->
+      <div class="nmc-field">
+        <div class="nmc-flbl"><span>{% trans "Subject" %}</span></div>
+        <input type="text" id="nmc-subject" class="nmc-input"
+               placeholder="{% trans 'Write a clear subject line' %}" value="{{ subject|default:'' }}">
+      </div>
+
+      <!-- BODY -->
+      <div class="nmc-field" style="flex:1;">
+        <div class="nmc-flbl"><span>{% trans "Message" %}</span></div>
+        <textarea id="nmc-body" class="nmc-input"
+                  placeholder="{% trans 'Write your message here…' %}" rows="10"></textarea>
+      </div>
+
+      <!-- Attachments preview row (above footer, within the scroll area) -->
+      <div id="nmc-attachments-row" class="nmc-field" style="display:none;">
+        <div class="nmc-flbl"><span>{% trans "Attachments" %}</span></div>
+        <div class="nmc-attachments" id="nmc-attachments"></div>
+      </div>
+
+      <!-- Toast -->
+      <div id="nmc-toast" class="nmc-toast" style="display:none;"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="nmc-foot">
+      <div class="nmc-tools">
+        <input type="file" id="nmc-file-input" multiple style="display:none;" onchange="nmcOnFiles(event)">
+        <button type="button" class="nmc-tool" title="{% trans 'Attach files' %}"
+                onclick="document.getElementById('nmc-file-input').click()">
+          <i class="fas fa-paperclip"></i>
+        </button>
+        <button type="button" class="nmc-tool" title="{% trans 'Discard' %}"
+                onclick="if(confirm('{% trans 'Discard this draft?' %}')) closeComposeModal();">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+      <button type="submit" class="nmc-send" id="nmc-send-btn">
+        <i class="fas fa-paper-plane"></i> <span id="nmc-send-label">{% trans "Send" %}</span>
+      </button>
+    </div>
+  </form>
+</div>
+
 <script>
-    // ============================================================
-    // Recipient Autocomplete
-    // ============================================================
-    let searchTimeout = null;
-    let activeDropdownIndex = -1;
+(function(){
+  const RECIPIENTS_URL = '{% url "email_automation:api_recipients" %}';
+  const SEND_URL       = '{% url "email_automation:send_email" %}';
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+  let attachedFiles = [];
 
-    function initRecipientInput(inputId, dropdownId, chipsId) {
-        const input = document.getElementById(inputId);
-        const dropdown = document.getElementById(dropdownId);
+  window.closeComposeModal = function () {
+    const host = document.getElementById('nm-compose-host') || document.getElementById('mb-compose-host');
+    if (host) host.innerHTML = '';
+  };
 
-        if (!input || !dropdown) return;
+  window.nmcRemoveChip = function (x) {
+    const chip = x.closest('.nmc-chip');
+    if (chip) chip.remove();
+  };
 
-        input.addEventListener('input', function () {
-            const query = this.value.trim();
-            clearTimeout(searchTimeout);
-            activeDropdownIndex = -1;
+  function chipsFor(kind) {
+    const box = document.querySelector(`.nmc-chips-box[data-kind="${kind}"]`);
+    if (!box) return [];
+    return Array.from(box.querySelectorAll('.nmc-chip')).map(c => c.dataset.email).filter(Boolean);
+  }
 
-            if (query.length < 2) {
-                dropdown.classList.remove('show');
-                dropdown.innerHTML = '';
-                return;
-            }
+  function addChip(box, email, label) {
+    const e = (email || '').trim();
+    if (!e) return;
+    if (Array.from(box.querySelectorAll('.nmc-chip')).some(c => c.dataset.email === e)) return;
+    const chip = document.createElement('span');
+    chip.className = 'nmc-chip';
+    chip.dataset.email = e;
+    chip.innerHTML = `<span>${(label || e).replace(/</g,'&lt;')}</span>
+                      <span class="nmc-chip-x" onclick="nmcRemoveChip(this)"><i class="fas fa-times"></i></span>`;
+    const input = box.querySelector('.nmc-chip-input');
+    box.insertBefore(chip, input);
+    input.value = '';
+    input.placeholder = '';
+    const ac = box.querySelector('.nmc-ac');
+    if (ac) { ac.classList.remove('show'); ac.innerHTML = ''; }
+  }
 
-            searchTimeout = setTimeout(() => {
-                fetchRecipients(query, dropdown, chipsId);
-            }, 250);
-        });
+  document.querySelectorAll('.nmc-chips-box').forEach(box => {
+    const input = box.querySelector('.nmc-chip-input');
+    const ac    = box.querySelector('.nmc-ac');
+    if (!input || !ac) return;
 
-        // Keyboard navigation
-        input.addEventListener('keydown', function (e) {
-            const items = dropdown.querySelectorAll('.dropdown-item');
+    // Clicking the chip area should focus the input
+    box.addEventListener('click', (e) => {
+      if (e.target === box) input.focus();
+    });
 
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                activeDropdownIndex = Math.min(activeDropdownIndex + 1, items.length - 1);
-                updateActiveItem(items);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                activeDropdownIndex = Math.max(activeDropdownIndex - 1, -1);
-                updateActiveItem(items);
-            } else if (e.key === 'Enter' && activeDropdownIndex >= 0 && items.length > 0) {
-                e.preventDefault();
-                items[activeDropdownIndex].click();
-            } else if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
-                // Add raw email if valid
-                const val = this.value.replace(',', '').trim();
-                if (val && val.includes('@')) {
-                    e.preventDefault();
-                    addChip(chipsId, val, val, 'email');
-                    this.value = '';
-                    dropdown.classList.remove('show');
-                }
-            } else if (e.key === 'Backspace' && !this.value) {
-                // Remove last chip
-                const chips = document.getElementById(chipsId);
-                const lastChip = chips.querySelector('.recipient-chip:last-child');
-                if (lastChip) lastChip.remove();
-            }
-        });
+    let debounce;
+    input.addEventListener('input', () => {
+      const q = input.value.trim();
+      if (q.length < 2) { ac.classList.remove('show'); ac.innerHTML = ''; return; }
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        try {
+          const r = await fetch(`${RECIPIENTS_URL}?q=${encodeURIComponent(q)}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          });
+          const data = await r.json();
+          ac.innerHTML = '';
+          (data.results || []).forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'nmc-ac-item';
+            const icon = item.kind === 'company' ? 'fa-building' : 'fa-user';
+            div.innerHTML =
+              `<i class="fas ${icon}"></i>
+               <div style="min-width:0;flex:1;">
+                 <div class="nmc-ac-name">${(item.name || '').replace(/</g,'&lt;')}</div>
+                 <div class="nmc-ac-email">${(item.email || '').replace(/</g,'&lt;')}</div>
+               </div>`;
+            div.addEventListener('click', () => addChip(box, item.email, item.name));
+            ac.appendChild(div);
+          });
+          if (data.results && data.results.length) ac.classList.add('show');
+          else ac.classList.remove('show');
+        } catch (e) { /* silent */ }
+      }, 200);
+    });
 
-        // Close dropdown on outside click
-        document.addEventListener('click', function (e) {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-                dropdown.classList.remove('show');
-            }
-        });
-    }
-
-    function updateActiveItem(items) {
-        items.forEach((item, i) => {
-            item.classList.toggle('active', i === activeDropdownIndex);
-        });
-        if (activeDropdownIndex >= 0 && items[activeDropdownIndex]) {
-            items[activeDropdownIndex].scrollIntoView({ block: 'nearest' });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+        const v = input.value.trim().replace(/,$/, '');
+        if (v) {
+          e.preventDefault();
+          addChip(box, v, v);
         }
+      }
+      if (e.key === 'Backspace' && !input.value) {
+        const last = box.querySelector('.nmc-chip:last-of-type');
+        if (last) last.remove();
+      }
+      if (e.key === 'Escape') ac.classList.remove('show');
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => ac.classList.remove('show'), 150);
+      const v = input.value.trim();
+      if (v) addChip(box, v, v);
+    });
+  });
+
+  window.nmcOnFiles = function (ev) {
+    const files = Array.from(ev.target.files || []);
+    files.forEach(f => attachedFiles.push(f));
+    renderAttachments();
+    ev.target.value = '';
+  };
+  function renderAttachments() {
+    const host = document.getElementById('nmc-attachments');
+    const row = document.getElementById('nmc-attachments-row');
+    host.innerHTML = '';
+    if (!attachedFiles.length) { row.style.display = 'none'; return; }
+    row.style.display = 'flex';
+    attachedFiles.forEach((f, idx) => {
+      const div = document.createElement('span');
+      div.className = 'nmc-att';
+      const kb = (f.size / 1024).toFixed(0);
+      div.innerHTML =
+        `<i class="fas fa-paperclip"></i>
+         <span>${f.name.replace(/</g,'&lt;')}</span>
+         <span style="color:#94A3B8;font-size:11px;">${kb} KB</span>
+         <span class="nmc-chip-x nmc-att-rm" data-idx="${idx}"><i class="fas fa-times"></i></span>`;
+      div.querySelector('.nmc-att-rm').addEventListener('click', () => {
+        attachedFiles.splice(idx, 1); renderAttachments();
+      });
+      host.appendChild(div);
+    });
+  }
+
+  // Draggable header
+  (function makeDraggable () {
+    const modal = document.getElementById('nmc-modal');
+    const head  = document.getElementById('nmc-head');
+    if (!modal || !head) return;
+    let sx=0, sy=0, ox=0, oy=0, dragging=false;
+    head.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;
+      dragging = true;
+      sx = e.clientX; sy = e.clientY;
+      const r = modal.getBoundingClientRect();
+      ox = r.left; oy = r.top;
+      modal.style.right = ''; modal.style.bottom = '';
+      modal.style.left = ox + 'px'; modal.style.top = oy + 'px';
+      document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      modal.style.left = (ox + e.clientX - sx) + 'px';
+      modal.style.top  = (oy + e.clientY - sy) + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      dragging = false; document.body.style.userSelect = '';
+    });
+  })();
+
+  function showToast(msg, kind) {
+    const t = document.getElementById('nmc-toast');
+    if (!t) return;
+    if (kind === 'ok') {
+      t.style.background = '#D1FAE5'; t.style.color = '#065F46'; t.style.borderLeft = '3px solid #065F46';
+    } else {
+      t.style.background = '#FEE2E2'; t.style.color = '#B91C1C'; t.style.borderLeft = '3px solid #DC2626';
     }
+    t.innerHTML = `<i class="fas fa-${kind==='ok'?'check-circle':'exclamation-circle'}"></i> ${msg}`;
+    t.style.display = 'flex';
+  }
 
-    function fetchRecipients(query, dropdown, chipsId) {
-        fetch(`/email/api/recipients/?q=${encodeURIComponent(query)}`)
-            .then(res => res.json())
-            .then(results => {
-                dropdown.innerHTML = '';
+  window.nmcSend = async function () {
+    const btn = document.getElementById('nmc-send-btn');
+    const lbl = document.getElementById('nmc-send-label');
+    const to = chipsFor('to');
+    const cc = chipsFor('cc');
+    const bcc = chipsFor('bcc');
+    const subject = document.getElementById('nmc-subject').value.trim();
+    const body    = document.getElementById('nmc-body').value;
 
-                if (results.length === 0) {
-                    dropdown.innerHTML = `
-                        <div class="dropdown-empty">
-                            <i class="fas fa-search" style="margin-bottom:4px"></i><br>
-                            No contacts or companies found
-                        </div>
-                        <div class="dropdown-hint">
-                            <i class="fas fa-info-circle"></i> Type a full email and press Enter to add manually
-                        </div>
-                    `;
-                    dropdown.classList.add('show');
-                    return;
-                }
+    if (!to.length) { showToast('{% trans "Add at least one recipient." %}'); return; }
+    if (!subject)   { showToast('{% trans "Subject is required." %}'); return; }
 
-                results.forEach(r => {
-                    const item = document.createElement('div');
-                    item.className = 'dropdown-item';
-                    const icon = r.type === 'contact' ? 'fa-user' : 'fa-building';
-                    const detail = r.type === 'contact' && r.company
-                        ? `${r.email} · ${r.company}`
-                        : r.email;
+    btn.disabled = true;
+    lbl.textContent = '{% trans "Sending…" %}';
 
-                    item.innerHTML = `
-                        <div class="dropdown-item-icon ${r.type}">
-                            <i class="fas ${icon}"></i>
-                        </div>
-                        <div class="dropdown-item-info">
-                            <div class="dropdown-item-name">${escapeHtml(r.name)}</div>
-                            <div class="dropdown-item-detail">${escapeHtml(detail)}</div>
-                        </div>
-                        <span class="dropdown-item-badge ${r.type}">${r.type === 'contact' ? 'Contact' : 'Company'}</span>
-                    `;
+    const fd = new FormData();
+    to.forEach(e => fd.append('to[]', e));
+    cc.forEach(e => fd.append('cc[]', e));
+    bcc.forEach(e => fd.append('bcc[]', e));
+    fd.append('subject', subject);
+    fd.append('body', body);
+    const c = document.getElementById('nmc-company-id')?.value;
+    const k = document.getElementById('nmc-contact-id')?.value;
+    if (c) fd.append('company_id', c);
+    if (k) fd.append('contact_id', k);
+    attachedFiles.forEach(f => fd.append('attachments', f));
 
-                    item.addEventListener('click', () => {
-                        const email = r.email || '';
-                        addChip(chipsId, email, r.name, r.type, r.id);
-                        const input = dropdown.previousElementSibling;
-                        input.value = '';
-                        dropdown.classList.remove('show');
-                        input.focus();
-                    });
-
-                    dropdown.appendChild(item);
-                });
-
-                dropdown.classList.add('show');
-            })
-            .catch(err => {
-                console.error('Recipient search error:', err);
-            });
-    }
-
-    function addChip(chipsId, email, name, type, id) {
-        const chips = document.getElementById(chipsId);
-
-        // Don't add duplicate
-        const existing = chips.querySelectorAll('.recipient-chip');
-        for (const chip of existing) {
-            if (chip.dataset.email === email) return;
+    try {
+      const r = await fetch(SEND_URL, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd,
+      });
+      const data = await r.json();
+      if (!r.ok || !data.success) throw new Error(data.error || 'Send failed');
+      showToast('{% trans "Sent!" %}', 'ok');
+      setTimeout(() => {
+        closeComposeModal();
+        if (typeof htmx !== 'undefined') {
+          const mainHost = document.getElementById('mb-main-host');
+          if (mainHost) {
+            htmx.ajax('GET', '{% url 'email_automation:my_emails' %}?folder=sent', '#mb-main-host');
+          }
         }
-
-        const chip = document.createElement('span');
-        chip.className = 'recipient-chip' + (type === 'company' ? ' company-chip' : '');
-        chip.dataset.email = email;
-        chip.dataset.type = type || 'email';
-        if (id) chip.dataset.id = id;
-
-        chip.innerHTML = `
-            <span class="chip-text">${escapeHtml(name || email)}</span>
-            <i class="fas fa-times chip-remove" onclick="removeChip(this)"></i>
-        `;
-        chips.appendChild(chip);
-
-        // Auto-fill hidden CRM fields from To chips
-        if (chipsId === 'toChips' && id) {
-            if (type === 'company') {
-                const hidden = document.getElementById('hiddenCompanyId');
-                if (hidden) hidden.value = id;
-            } else if (type === 'contact') {
-                const hidden = document.getElementById('hiddenContactId');
-                if (hidden) hidden.value = id;
-            }
-        }
-
-        // Update input placeholder
-        updatePlaceholder(chipsId);
+      }, 700);
+    } catch (e) {
+      showToast(e.message || 'Send failed');
+      btn.disabled = false;
+      lbl.textContent = '{% trans "Send" %}';
     }
+  };
 
-    function removeChip(el) {
-        const chip = el.closest('.recipient-chip');
-        const chipsId = chip.parentElement.id;
-        chip.remove();
-        updatePlaceholder(chipsId);
-    }
-
-    function updatePlaceholder(chipsId) {
-        const chips = document.getElementById(chipsId);
-        const input = chips.nextElementSibling;
-        if (chips.children.length > 0) {
-            input.placeholder = '';
-        } else {
-            input.placeholder = 'Search contacts / companies or type email...';
-        }
-    }
-
-    function getChipEmails(chipsId) {
-        const chips = document.getElementById(chipsId);
-        return Array.from(chips.querySelectorAll('.recipient-chip')).map(c => c.dataset.email).filter(Boolean);
-    }
-
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    // ============================================================
-    // Compose actions
-    // ============================================================
-
-    function closeComposeModal() {
-        document.getElementById('composeModalContainer').innerHTML = '';
-    }
-
-    function toggleField(id) {
-        const el = document.getElementById(id);
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function handleFileSelect(event) {
-        const files = event.target.files;
-        const preview = document.getElementById('filePreviewArea');
-        preview.innerHTML = '';
-
-        Array.from(files).forEach(file => {
-            const item = document.createElement('div');
-            item.className = 'file-preview-item';
-            item.innerHTML = `
-                <i class="fas fa-file"></i>
-                <span>${escapeHtml(file.name)}</span>
-                <i class="fas fa-times remove-file"></i>
-            `;
-            preview.appendChild(item);
-        });
-    }
-
-    function showComposeError(message) {
-        const toast = document.getElementById('composeErrorToast');
-        const text = document.getElementById('composeErrorText');
-        if (toast && text) {
-            text.textContent = message;
-            toast.style.display = 'flex';
-            setTimeout(() => { toast.style.display = 'none'; }, 5000);
-        }
-    }
-
-    function sendEmail(event) {
-        // Prevent default just in case
-        if (event) event.preventDefault();
-
-        console.log('[SEND] sendEmail called');
-
-        // Auto-add text in To field as chip if valid email
-        const toInput = document.getElementById('toInput');
-        if (toInput && toInput.value.trim()) {
-            const val = toInput.value.trim();
-            if (val.includes('@')) {
-                addChip('toChips', val, val, 'email');
-                toInput.value = '';
-            }
-        }
-
-        const form = document.getElementById('composeForm');
-        const formData = new FormData(form);
-        const btn = document.getElementById('sendBtn');
-        const btnContent = btn.querySelector('.send-btn-content');
-        const btnLoading = btn.querySelector('.send-btn-loading');
-
-        // Hide previous error
-        const errorToast = document.getElementById('composeErrorToast');
-        if (errorToast) errorToast.style.display = 'none';
-
-        // Collect recipients from chips
-        const toEmails = getChipEmails('toChips');
-        console.log('[SEND] To emails:', toEmails);
-
-        if (toEmails.length === 0) {
-            showComposeError('Please add at least one recipient.');
-            return;
-        }
-
-        // Add recipients to formData
-        toEmails.forEach(e => formData.append('to[]', e));
-        getChipEmails('ccChips').forEach(e => formData.append('cc[]', e));
-        getChipEmails('bccChips').forEach(e => formData.append('bcc[]', e));
-
-        // --- Show loading state ---
-        btn.disabled = true;
-        btn.classList.add('sending');
-        if (btnContent) btnContent.style.display = 'none';
-        if (btnLoading) btnLoading.style.display = 'inline-flex';
-        console.log('[SEND] Sending request to /email/send/');
-
-        function resetBtn() {
-            btn.disabled = false;
-            btn.classList.remove('sending');
-            if (btnContent) btnContent.style.display = 'inline-flex';
-            if (btnLoading) btnLoading.style.display = 'none';
-        }
-
-        fetch('/email/send/', {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-        })
-            .then(res => {
-                console.log('[SEND] Response status:', res.status);
-                return res.json().then(data => ({ ok: res.ok, data }));
-            })
-            .then(({ ok, data }) => {
-                console.log('[SEND] Response data:', data);
-                if (ok && data.success) {
-                    // Close modal immediately
-                    closeComposeModal();
-
-                    // Show global green success toast
-                    if (window.showGlobalToast) {
-                        window.showGlobalToast('Mail başarıyla gönderildi!');
-                    }
-
-                    // Update Sent count in sidebar immediately
-                    const sentLink = document.querySelector('a[hx-get*="/sent/"]');
-                    if (sentLink) {
-                        let badge = sentLink.querySelector('.folder-count');
-                        if (!badge) {
-                            badge = document.createElement('span');
-                            badge.className = 'folder-count';
-                            badge.textContent = '0';
-                            sentLink.appendChild(badge);
-                        }
-                        const currentCount = parseInt(badge.textContent || '0');
-                        badge.textContent = currentCount + 1;
-                    }
-
-                    // Refresh inbox via HTMX
-                    const activeLink = document.querySelector('.folder-link.active');
-                    if (activeLink && typeof htmx !== 'undefined') {
-                        // Use standard HTMX triggers
-                        htmx.trigger(activeLink, 'click');
-                    }
-                } else {
-                    resetBtn();
-                    showComposeError(data.error || 'Mail gönderilemedi.');
-                }
-            })
-            .catch(err => {
-                console.error('[SEND] Error:', err);
-                resetBtn();
-                showComposeError(err.message || 'Bağlantı hatası. Tekrar deneyin.');
-            });
-    }
-
-    // Initialize all recipient inputs
-    initRecipientInput('toInput', 'toDropdown', 'toChips');
-    initRecipientInput('ccInput', 'ccDropdown', 'ccChips');
-    initRecipientInput('bccInput', 'bccDropdown', 'bccChips');
+  // Auto-focus the most useful field on open
+  setTimeout(() => {
+    const subj = document.getElementById('nmc-subject');
+    const body = document.getElementById('nmc-body');
+    const toInp = document.querySelector('.nmc-chips-box[data-kind="to"] .nmc-chip-input');
+    if (subj && subj.value && body) body.focus();
+    else if (toInp && !toInp.previousElementSibling) toInp.focus();
+    else if (subj) subj.focus();
+  }, 100);
+})();
 </script>

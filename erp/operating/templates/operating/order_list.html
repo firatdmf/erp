@@ -191,14 +191,22 @@
      rows are checked. Mirrors the design of the save bar on order
      detail to feel familiar. */
   .ord-bulk-bar {
-    position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 120%);
-    z-index: 100; transition: transform 220ms cubic-bezier(.4,0,.2,1);
+    position: fixed; left: 50%; bottom: 18px;
+    transform: translate(-50%, calc(100% + 40px));
+    z-index: 100; transition: transform 220ms cubic-bezier(.4,0,.2,1), opacity 180ms;
     background: #0F1419; color: #fff; border-radius: 14px;
     padding: 10px 14px; box-shadow: 0 12px 36px rgba(15,23,31,0.28);
     display: flex; align-items: center; gap: 14px; min-width: 320px;
     pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
   }
-  .ord-bulk-bar.show { transform: translate(-50%, 0); pointer-events: auto; }
+  .ord-bulk-bar.show {
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+  }
   .ord-bulk-bar-msg { font: 600 13px var(--font-sans); }
   .ord-bulk-bar-msg b { color: #FBBF24; font-weight: 800; }
   .ord-bulk-bar .ord-btn {

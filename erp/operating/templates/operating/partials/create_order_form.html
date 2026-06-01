@@ -320,7 +320,30 @@
     </div>
   </div>
 
-  <div class="sidebar-footer" style="padding:0;border:none;margin-top:4px; display:flex; flex-direction:column; gap:6px; align-items:stretch;">
+  <!-- Read-only order total summary — server-of-truth value computed
+       in JS from orderItems; the user cannot edit it directly, they
+       change qty/price on each product card and this updates live. -->
+  <div id="co-order-total-row"
+       style="display:flex; align-items:center; justify-content:space-between;
+              padding:14px 16px; margin-top:10px;
+              background:linear-gradient(135deg,#F0FDFA,#FFF);
+              border:1px solid #CCFBF1; border-radius:10px;">
+    <div>
+      <div style="font:600 11px 'Inter',sans-serif; color:#0F766E; text-transform:uppercase; letter-spacing:.08em;">
+        {% trans "Order total" %}
+      </div>
+      <div style="font:500 11.5px 'Inter',sans-serif; color:#64748B; margin-top:2px;">
+        <span id="co-total-count">0</span> {% trans "items" %}
+      </div>
+    </div>
+    <div id="co-total-amount"
+         style="font:800 22px 'Inter',sans-serif; color:#0F1419;
+                font-variant-numeric: tabular-nums; letter-spacing:-.3px;">
+      $0.00
+    </div>
+  </div>
+
+  <div class="sidebar-footer" style="padding:0;border:none;margin-top:12px; display:flex; flex-direction:column; gap:6px; align-items:stretch;">
     <button type="submit" id="submit_order_button" class="btn btn-primary w-full" style="flex:1;justify-content:center;">
       <i class="fas fa-check"></i> {% if order %}{% trans "Save changes" %}{% else %}{% trans "Place Order" %}{% endif %}
     </button>
@@ -373,14 +396,23 @@
 
   window.coToggle = function(s) { document.getElementById('co-step-'+s).classList.toggle('active'); };
 
-  window.selectProduct = function(sku, variant, title, price, categoryName) {
+  window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
+    // Block selection if the product is completely out of stock (unless
+    // the merchant marked it sellable while out of stock).
+    const _stock = (stock === null || stock === undefined || stock === 'null') ? null : Number(stock);
+    const _allowOversell = (allowOversell === true || allowOversell === 'true');
+    if (_stock !== null && _stock <= 0 && !_allowOversell) {
+      showToast('{% trans "Out of stock — cannot add this product." %}', 'error');
+      return;
+    }
     itemIndex++;
     // Newest item on top so the user immediately sees what they
     // just added — important once the list grows past a few rows.
     orderItems.unshift({
       index: itemIndex, sku, variant, title: title||sku, price: parseFloat(price)||0,
       quantity: 1, description: '', categoryName: categoryName||'',
+      stock: _stock, allow_oversell: _allowOversell,
       is_custom_curtain: false, custom_width:'', custom_height:'',
       custom_pleat_type:'', custom_pleat_density:'', custom_mounting_type:'',
       custom_wing_type:'', custom_fabric_used_meters:''
@@ -422,7 +454,12 @@
           </select>
         </div>
         <div class="co-row">
-          <div class="form-group"><label>{% trans "Qty" %}</label><input type="number" class="form-input" value="${item.quantity}" min="0.01" step="0.01" onchange="coUpd(${i},'quantity',this.value)"></div>
+          <div class="form-group">
+            <label>{% trans "Qty" %}${(item.stock !== null && item.stock !== undefined && !item.allow_oversell) ? ` <span style="font-weight:500;font-size:10.5px;color:${item.stock<=0?'#B91C1C':item.stock<10?'#92400E':'#065F46'};background:${item.stock<=0?'#FEE2E2':item.stock<10?'#FEF3C7':'#D1FAE5'};padding:1px 6px;border-radius:5px;margin-left:6px;">Stok: ${item.stock}</span>` : ''}</label>
+            <input type="number" class="form-input" value="${item.quantity}" min="0.01" step="0.01"
+                   oninput="coUpd(${i},'quantity',this.value)"
+                   onchange="coUpd(${i},'quantity',this.value)">
+          </div>
           <div class="form-group"><label>{% trans "Unit Price" %}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
         </div>
@@ -462,6 +499,8 @@
         <div class="form-group" style="margin-top:8px;margin-bottom:0"><label>{% trans "Description" %}</label><input type="text" class="form-input" value="${esc(item.description)}" placeholder="Note..." onchange="coUpd(${i},'description',this.value)"></div>
       </div>`;
     }).join('');
+    updateTotal();
+    if (window.refreshStockState) refreshStockState();
   }
 
   window.coCustomerSource = function(src) {
@@ -547,7 +586,65 @@
       if (t) t.textContent = '$'+(orderItems[i].quantity*orderItems[i].price).toFixed(2);
       updateTotal();
     }
+    // Mark / unmark the row for stock violation, and refresh the submit
+    // button's enabled state. We DO NOT clamp the qty automatically —
+    // the user must correct it manually before they can submit.
+    refreshStockState();
   };
+
+  // Walk every order item, flag any whose qty exceeds stock, and toggle
+  // the Place Order button accordingly. Visual cue: red input border +
+  // a per-row warning chip; the submit button shows the reason on hover.
+  function refreshStockState() {
+    let blockedReasons = [];
+    orderItems.forEach((it, i) => {
+      const overStock =
+        it.stock !== null && it.stock !== undefined &&
+        !it.allow_oversell &&
+        Number(it.quantity) > Number(it.stock);
+      // Find the qty input for this row to mark it red.
+      const cards = document.querySelectorAll('#co-products-list .co-product-card');
+      const card = cards[i];
+      if (card) {
+        const qtyInput = card.querySelector('input[type="number"]');
+        if (qtyInput) {
+          qtyInput.style.borderColor = overStock ? '#DC2626' : '';
+          qtyInput.style.background  = overStock ? '#FEE2E2' : '';
+        }
+        let warn = card.querySelector('.co-stock-warn');
+        if (overStock) {
+          if (!warn) {
+            warn = document.createElement('div');
+            warn.className = 'co-stock-warn';
+            warn.style.cssText = 'margin-top:6px;padding:6px 10px;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:7px;font:600 11.5px Inter,sans-serif;color:#B91C1C;display:flex;align-items:center;gap:6px;';
+            card.appendChild(warn);
+          }
+          warn.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ` +
+            `{% trans "Quantity exceeds available stock" %} (${it.stock}). ` +
+            `{% trans "Lower it to enable Place Order." %}`;
+          blockedReasons.push(`${it.sku}: max ${it.stock}`);
+        } else if (warn) {
+          warn.remove();
+        }
+      } else if (overStock) {
+        blockedReasons.push(`${it.sku}: max ${it.stock}`);
+      }
+    });
+    const btn = document.getElementById('submit_order_button');
+    if (btn) {
+      btn.disabled = blockedReasons.length > 0;
+      if (blockedReasons.length > 0) {
+        btn.title = '{% trans "Fix stock issues:" %} ' + blockedReasons.join(' · ');
+        btn.style.opacity = '0.55';
+        btn.style.cursor = 'not-allowed';
+      } else {
+        btn.title = '';
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+      }
+    }
+  }
+  window.refreshStockState = refreshStockState;
 
   window.coType = function(i, t) {
     if (!orderItems[i]) return;
@@ -556,7 +653,19 @@
     if (el) el.style.display = (t==='custom_curtain') ? 'block' : 'none';
   };
 
-  function updateTotal() {}
+  function updateTotal() {
+    const amtEl = document.getElementById('co-total-amount');
+    const cntEl = document.getElementById('co-total-count');
+    if (!amtEl) return;
+    let sum = 0;
+    orderItems.forEach(it => {
+      const q = parseFloat(it.quantity) || 0;
+      const p = parseFloat(it.price) || 0;
+      sum += q * p;
+    });
+    amtEl.textContent = '$' + sum.toFixed(2);
+    if (cntEl) cntEl.textContent = orderItems.length;
+  }
 
   // Deposit / Total / Remaining row was removed in favor of the
   // "Deposit received" checkbox in step 4. Keep this as a no-op so
@@ -588,9 +697,16 @@
     });
   })();
 
-  document.getElementById('createOrderForm').addEventListener('submit', function(e) {
+  document.getElementById('createOrderForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (!orderItems.length) { showToast('Add at least one product','error'); return; }
+    // Stock cap final check — bail out if any line over the available stock.
+    for (const it of orderItems) {
+      if (it.stock !== null && it.stock !== undefined && !it.allow_oversell && it.quantity > it.stock) {
+        showToast(`${it.sku}: {% trans "qty exceeds stock" %} (${it.stock})`, 'error');
+        return;
+      }
+    }
     // Include `item_id` for items that came from the server (edit
     // mode) so the backend updates them instead of creating dupes.
     // New items (no existing_item_id) get added as fresh OrderItems.
@@ -624,7 +740,48 @@
       this.appendChild(delField);
     }
     delField.value = JSON.stringify(deletedExistingItemIds);
-    this.submit();
+
+    // Send via fetch so we can intercept stock-cap errors from the
+    // backend and show them as a toast — without losing the sidebar.
+    // The server returns JSON {ok:false, error:"..."} on stock failure
+    // (200/302 redirect on success). Native submit was hiding the
+    // error message behind a full-page render of create_order.html.
+    const form = this;
+    const submitBtn = document.getElementById('submit_order_button');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      const fd = new FormData(form);
+      const r = await fetch(form.action, {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        redirect: 'follow',
+      });
+      const ct = r.headers.get('Content-Type') || '';
+      if (ct.includes('application/json')) {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || data.ok === false) {
+          showToast(data.error || 'Order save failed', 'error');
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+        // success path — server may also return JSON with order_id
+        if (data.order_id) {
+          window.location.href = '/operating/orders/' + data.order_id + '/';
+          return;
+        }
+      }
+      // HTML response → success-redirect to wherever the server sent us
+      if (r.redirected) {
+        window.location.href = r.url;
+      } else {
+        // Fall back: reload to show messages framework
+        window.location.reload();
+      }
+    } catch (err) {
+      showToast(err.message || 'Order save failed', 'error');
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
 
   function esc(s) { if (!s) return ''; const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }

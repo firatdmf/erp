@@ -886,6 +886,45 @@ class OrderCreate(View):
                 messages.error(request, "Invalid product data format.")
                 return render(request, "operating/create_order.html", {"form": form})
 
+        # ── Stock cap validation ────────────────────────────────
+        # Refuse the whole order if any line wants more units than the
+        # catalog (variant_quantity / Product.quantity) has on hand. The
+        # frontend already warns, but a malicious or out-of-sync client
+        # could bypass it.
+        if product_json_input:
+            from decimal import Decimal
+            for it in product_json_input:
+                sku = it.get("product", {}).get("sku")
+                is_variant = it.get("product", {}).get("variant")
+                try:
+                    qty = Decimal(str(it.get("quantity") or 0))
+                except Exception:
+                    qty = Decimal("0")
+                if qty <= 0 or not sku:
+                    continue
+                try:
+                    if is_variant:
+                        variant = ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
+                        if not variant: continue
+                        product_obj = variant.product
+                        stock = variant.variant_quantity
+                    else:
+                        product_obj = Product.objects.filter(sku=sku).first()
+                        if not product_obj: continue
+                        stock = product_obj.quantity
+                    allow_oversell = bool(getattr(product_obj, "selling_while_out_of_stock", False))
+                    if not allow_oversell and stock is not None and Decimal(str(stock)) < qty:
+                        msg = (f"Not enough stock for {sku} — requested {qty}, "
+                               f"available {stock}.")
+                        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                            return JsonResponse({"ok": False, "error": msg}, status=400)
+                        messages.error(request, msg)
+                        return render(request, "operating/create_order.html", {"form": form})
+                except Exception:
+                    # Don't block on lookup errors — let the create flow
+                    # surface the real problem when it tries to save.
+                    continue
+
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -1091,6 +1130,61 @@ class OrderEdit(UpdateView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         form = self.get_form()
+
+        # ── Stock cap validation on edit ────────────────────────
+        # For each line in the payload, compare requested qty against
+        # current stock + the row's already-allocated qty (since the
+        # existing OrderItem has already consumed from the catalog).
+        # Reject the save if any line over-runs the cap.
+        import json as _json
+        from decimal import Decimal
+        pj = request.POST.get("product_json_input")
+        if pj:
+            try:
+                items_in = _json.loads(pj)
+            except Exception:
+                items_in = []
+            from operating.models import OrderItem as _OI
+            existing_qty = {
+                oi.pk: Decimal(str(oi.quantity or 0))
+                for oi in _OI.objects.filter(order=self.object)
+            }
+            for it in items_in or []:
+                sku = (it.get("product") or {}).get("sku")
+                is_variant = (it.get("product") or {}).get("variant")
+                try:
+                    qty = Decimal(str(it.get("quantity") or 0))
+                except Exception:
+                    qty = Decimal("0")
+                if qty <= 0 or not sku:
+                    continue
+                # The "available" we need to fit into is:
+                #   stock_on_hand + qty_already_allocated_by_this_row
+                existing_id = it.get("item_id")
+                already = existing_qty.get(existing_id, Decimal("0"))
+                try:
+                    if is_variant:
+                        variant = ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
+                        if not variant: continue
+                        product_obj = variant.product
+                        stock = variant.variant_quantity
+                    else:
+                        product_obj = Product.objects.filter(sku=sku).first()
+                        if not product_obj: continue
+                        stock = product_obj.quantity
+                    allow_oversell = bool(getattr(product_obj, "selling_while_out_of_stock", False))
+                    if allow_oversell or stock is None:
+                        continue
+                    cap = Decimal(str(stock)) + already
+                    if qty > cap:
+                        msg = (f"Not enough stock for {sku} — requested {qty}, "
+                               f"available {cap} (stock {stock} + already in this row {already}).")
+                        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                            return JsonResponse({"ok": False, "error": msg}, status=400)
+                        messages.error(request, msg)
+                        return self.form_invalid(form)
+                except Exception:
+                    continue
 
         if form.is_valid():
             return self.form_valid(form)

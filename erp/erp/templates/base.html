@@ -2144,6 +2144,131 @@
     let selectedUsers = [];
     let userSearchTimeout = null;
 
+    // ─────────────────────────────────────────────────────────────
+    //  Shared dashboard task list live-refresh. Every task mutation
+    //  (create, edit, delete, complete) calls this so the home page
+    //  reflects server state without a full reload. Uses HTMX-style
+    //  partial swap by parsing the rendered dashboard and replacing
+    //  the task list + tab counters in place.
+    // ─────────────────────────────────────────────────────────────
+    window.refreshDashboardTaskList = function (opts) {
+      // Only do anything when we're actually on the dashboard.
+      const onDashboard = ['/dashboard', '/home']
+          .some(p => window.location.pathname.startsWith(p))
+          || window.location.pathname === '/';
+      if (!onDashboard) return;
+      const listEl = document.getElementById('njTaskList');
+      if (!listEl) return;
+
+      // Optimistic patch — if the caller passed a task payload, mutate
+      // the DOM immediately so the user sees the change in <50ms while
+      // the background fetch reconciles with the server.
+      opts = opts || {};
+      if (opts.optimistic && opts.task) {
+        try { applyOptimisticTaskPatch(opts.task, opts.mode); } catch (_) {}
+      }
+
+      try {
+        const dateStr = window.selectedDate
+          ? `${window.selectedDate.getFullYear()}-${String(window.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(window.selectedDate.getDate()).padStart(2, '0')}`
+          : new Date().toISOString().slice(0, 10);
+        const currentTab = window.currentTaskTab || 'myTasks';
+        fetch(`${window.location.pathname}?date=${dateStr}&tab=${currentTab}`, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+        })
+          .then(r => r.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newList = doc.getElementById('njTaskList');
+            if (newList) listEl.innerHTML = newList.innerHTML;
+            doc.querySelectorAll('.home-tab .tab-count').forEach((c, idx) => {
+              const local = document.querySelectorAll('.home-tab .tab-count')[idx];
+              if (!local) return;
+              local.textContent = c.textContent;
+              local.classList.toggle('zero', c.classList.contains('zero'));
+            });
+            ['tasksByDate', 'completedTasks', 'delegatedTasks'].forEach(g => {
+              const node = doc.getElementById('data-' + g) || doc.querySelector(`[data-name="${g}"]`);
+              if (node) {
+                try { window[g] = JSON.parse(node.textContent || 'null') || window[g]; }
+                catch (_) {}
+              }
+            });
+            if (typeof wireTaskActions === 'function') {
+              try { wireTaskActions(); } catch (_) {}
+            }
+            if (typeof window.render === 'function') {
+              try { window.render(); } catch (_) {}
+            }
+            if (typeof window.updateTodayHeader === 'function') {
+              try { window.updateTodayHeader(); } catch (_) {}
+            }
+          })
+          .catch(() => { /* silent — UI already shows toast */ });
+      } catch (_) {}
+    };
+
+    // Optimistic DOM patch for instant feedback. `mode` is 'create',
+    // 'update', or 'delete'. For update we mutate the existing card's
+    // visible fields; for create we insert a freshly-built card at the
+    // top of the list; for delete we just remove the matching node.
+    function applyOptimisticTaskPatch(task, mode) {
+      const list = document.getElementById('njTaskList');
+      if (!list) return;
+      const existing = task.id
+        ? list.querySelector('.task-card[data-task-id="' + task.id + '"]')
+        : null;
+
+      if (mode === 'delete' && existing) {
+        existing.remove();
+        return;
+      }
+      if (mode === 'update' && existing) {
+        const nameEl = existing.querySelector('.task-text');
+        if (nameEl && task.name) {
+          // Preserve any leading kind-pill (team) span.
+          const pill = nameEl.querySelector('.kind-pill');
+          nameEl.textContent = task.name;
+          if (pill) nameEl.insertBefore(pill, nameEl.firstChild);
+        }
+        const dateEl = existing.querySelector('.task-date');
+        if (dateEl && task.due_date) {
+          const icon = dateEl.querySelector('i');
+          dateEl.innerHTML = (icon ? icon.outerHTML + ' ' : '') + task.due_date;
+        }
+        if (task.priority) {
+          existing.className = existing.className.replace(/prio-\w+/, 'prio-' + task.priority);
+        }
+        existing.style.boxShadow = '0 0 0 3px #14b8a6';
+        setTimeout(() => { existing.style.boxShadow = ''; }, 1000);
+        return;
+      }
+      if (mode === 'create' && task.name) {
+        const dueText = task.due_date || '';
+        const card = document.createElement('div');
+        card.className = 'task-card prio-' + (task.priority || 'medium');
+        card.setAttribute('data-task-id', task.id || ('tmp-' + Date.now()));
+        card.setAttribute('data-kind', task.kind || 'personal');
+        card.style.cursor = 'pointer';
+        card.innerHTML =
+          '<div class="task-stripe"></div>' +
+          '<div class="task-body">' +
+            '<div class="task-top">' +
+              '<div class="task-text">' + (task.name || '').replace(/</g, '&lt;') + '</div>' +
+            '</div>' +
+            '<div class="task-meta">' +
+              (dueText ? '<span class="task-date">' + dueText + '</span>' : '') +
+            '</div>' +
+          '</div>';
+        list.insertBefore(card, list.firstChild);
+        card.style.boxShadow = '0 0 0 3px #14b8a6';
+        setTimeout(() => { card.style.boxShadow = ''; }, 1000);
+      }
+    }
+    window.applyOptimisticTaskPatch = applyOptimisticTaskPatch;
+
     function openTaskSidebar(teamId = null, teamName = null) {
       document.getElementById('taskSidebarOverlay').classList.add('active');
       document.body.style.overflow = 'hidden';
@@ -2466,27 +2591,20 @@
               if (onTeamTasks || data._fallback) {
                 window.location.reload();
               } else if (onDashboard) {
-                // Reload the dashboard task list inline without full navigation
-                try {
-                  const dateStr = window.selectedDate
-                    ? `${window.selectedDate.getFullYear()}-${String(window.selectedDate.getMonth() + 1).padStart(2, '0')}-${String(window.selectedDate.getDate()).padStart(2, '0')}`
-                    : new Date().toISOString().slice(0, 10);
-                  const currentTab = window.currentTaskTab || 'myTasks';
-                  fetch(`/dashboard/?date=${dateStr}&tab=${currentTab}`, {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                  })
-                    .then(r => r.text())
-                    .then(html => {
-                      // Replace just the task panel — selector chosen to be robust
-                      const parser = new DOMParser();
-                      const doc = parser.parseFromString(html, 'text/html');
-                      const newPanel = doc.querySelector('.tasks-section, #taskListContainer, .task-list-wrap');
-                      const existingPanel = document.querySelector('.tasks-section, #taskListContainer, .task-list-wrap');
-                      if (newPanel && existingPanel) {
-                        existingPanel.innerHTML = newPanel.innerHTML;
-                      }
-                    });
-                } catch (err) { /* ignore — toast is enough */ }
+                // Optimistic insert + background reconciliation.
+                if (typeof window.refreshDashboardTaskList === 'function') {
+                  window.refreshDashboardTaskList({
+                    optimistic: true,
+                    mode: 'create',
+                    task: data.task || {
+                      id: data.task_id,
+                      name: data.task_name || (formData.get && formData.get('name')) || '',
+                      due_date: data.due_date || '',
+                      priority: data.priority || 'medium',
+                      kind: 'personal',
+                    },
+                  });
+                }
               }
 
               // Success toast

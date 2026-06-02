@@ -2774,7 +2774,20 @@ function prepareVariantsForSubmission() {
         console.log(`prepareVariantsForSubmission: index=${index}, variantImg:`, variantImg);
         console.log(`  hasImages=${hasImages}, images count=${variantImg?.images?.length || 0}`);
 
+        // Resolve the stable variant_id (if this is an existing variant
+        // being edited) so the backend can update by id — that way the
+        // user can rename variant_sku without orphaning the row + losing
+        // its images. Lookup key is the attribute combo, which is stable
+        // across SKU renames.
+        const _attrKey = Object.entries(combo)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, val]) => `${key}:${val}`)
+            .join('|');
+        const _existingForId = existingVariantData[_attrKey] || {};
+        const _variantId = _existingForId.variant_id || '';
+
         const variantData = {
+            variant_id: _variantId,
             variant_sku: skuInput && skuInput.value ? skuInput.value : variantValues,
             variant_attribute_values: combo,
             variant_price: priceInput ? parseFloat(priceInput.value) || 0 : 0,

@@ -1002,6 +1002,21 @@
             <label>{% trans "Meters" %} <span class="rs-required">*</span></label>
             <input id="rsMeters" type="number" step="0.01" class="rs-input">
           </div>
+          <div class="rs-fld">
+            <label>
+              {% trans "Barcode" %}
+              <span style="font-weight:500; font-size:11px; color:var(--gray-500); margin-left:4px;">
+                {% trans "(per-roll — same product, different bar code)" %}
+              </span>
+            </label>
+            <input id="rsBarcode" type="text" class="rs-input"
+                   placeholder="{% trans 'Scanned or typed barcode' %}"
+                   autocomplete="off">
+          </div>
+          <div class="rs-fld">
+            <label>{% trans "Lot number (optional)" %}</label>
+            <input id="rsLot" type="text" class="rs-input" autocomplete="off">
+          </div>
           <div id="rsMatchBadge" class="rs-match" hidden></div>
           <div class="rs-confirm-actions">
             <button type="button" class="rs-btn ghost" onclick="cancelConfirm()">
@@ -1208,6 +1223,12 @@
     document.getElementById('rsSku').value = parsed.sku || '';
     document.getElementById('rsName').value = parsed.name || '';
     document.getElementById('rsMeters').value = parsed.meters || '';
+    // Pre-fill barcode from OCR if the label had one — user can edit
+    // before saving. Each scanned roll has its own unique barcode.
+    const bcInp = document.getElementById('rsBarcode');
+    if (bcInp) bcInp.value = parsed.barcode || '';
+    const lotInp = document.getElementById('rsLot');
+    if (lotInp) lotInp.value = parsed.lot_number || '';
     document.getElementById('rsRaw').textContent = data.ocr_raw || '(no text recognised)';
     // Match badge
     const badge = document.getElementById('rsMatchBadge');
@@ -1232,6 +1253,11 @@
     document.getElementById('rsConfirm').hidden = true;
     document.getElementById('rsIdle').hidden = false;
     rsPending = null;
+    // Clear the per-roll fields so the next scan doesn't inherit them.
+    ['rsSku','rsName','rsMeters','rsBarcode','rsLot'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) el.value = '';
+    });
   }
 
   function saveRoll() {
@@ -1244,16 +1270,21 @@
     const sku = document.getElementById('rsSku').value.trim();
     const name = document.getElementById('rsName').value.trim();
     const meters = document.getElementById('rsMeters').value.trim();
+    const barcode = (document.getElementById('rsBarcode')?.value || '').trim();
+    const lot = (document.getElementById('rsLot')?.value || '').trim();
     if (!meters || parseFloat(meters) <= 0) {
       alert('Please enter a positive meters value');
       saveBtn.disabled = false;
       saveBtn.innerHTML = origLabel;
       return;
     }
-    // Anti-duplicate: same SKU within 3 seconds = warn.
+    // Anti-duplicate: same SKU + same barcode within 3 seconds = warn.
+    // (Same SKU alone is fine — different rolls of the same product are
+    // expected, distinguished by barcode.)
     const now = Date.now();
-    if (sku && sku === rsLastSku && (now - rsLastSkuAt) < 3000) {
-      if (!confirm('Same SKU was just added — proceed anyway?')) {
+    const dupKey = (sku || '') + '|' + (barcode || '');
+    if (barcode && dupKey === rsLastSku && (now - rsLastSkuAt) < 3000) {
+      if (!confirm('Same SKU + barcode was just added — proceed anyway?')) {
         saveBtn.disabled = false;
         saveBtn.innerHTML = origLabel;
         return;
@@ -1266,6 +1297,8 @@
     fd.append('sku', sku);
     fd.append('name', name);
     fd.append('meters', meters);
+    if (barcode) fd.append('barcode', barcode);
+    if (lot)     fd.append('lot_number', lot);
     fd.append('ocr_raw', rsPending.ocr_raw);
 
     fetch(scanUrl, {
@@ -1281,7 +1314,7 @@
           alert(data.error || 'Save failed');
           return;
         }
-        rsLastSku = sku;
+        rsLastSku = dupKey;  // composite SKU+barcode key
         rsLastSkuAt = Date.now();
         rsSession.count += 1;
         rsSession.meters += parseFloat(meters);

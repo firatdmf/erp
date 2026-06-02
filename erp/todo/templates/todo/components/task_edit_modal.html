@@ -141,6 +141,17 @@
           // Update task in DOM (only the specific task card, no full reload)
           updateTaskInDOM(data.task);
 
+          // Instant DOM patch + background reconciliation. The
+          // optimistic patch updates the card immediately (~50ms);
+          // the reconciliation refresh syncs counters + JSON caches.
+          if (typeof window.refreshDashboardTaskList === 'function') {
+            window.refreshDashboardTaskList({
+              optimistic: true,
+              mode: 'update',
+              task: data.task,
+            });
+          }
+
           // Update calendar if date changed (using new ISO date fields from backend)
           if (data.task.old_due_date_iso && data.task.due_date_iso) {
             if (typeof window.updateCalendarAfterTaskEdit === 'function') {

@@ -674,17 +674,32 @@ class BaseProductView(ModelFormMixin):
         if DEBUG_PERF:
             print(f"\n⏱️  Processing {len(variants_data)} variants...")
 
-        # product's existing variants' SKUs
+        # Delete variants the user removed.
+        #
+        # CRITICAL: we exclude variants whose `variant_id` is in the
+        # payload — that means the user kept the variant; they may just
+        # have renamed its `variant_sku`. Deleting them by stale SKU
+        # would cascade-orphan their images and trip the OrderItem FK
+        # PROTECT. The rename itself happens further down.
         delete_start = time.time()
-        existing_skus = set(self.object.variants.values_list("variant_sku", flat=True))
-        # SKU's submitted in the form
+        kept_variant_ids = set()
+        for v in variants_data:
+            vid = v.get("variant_id")
+            try:
+                if vid:
+                    kept_variant_ids.add(int(vid))
+            except (TypeError, ValueError):
+                pass
         submitted_skus = {
             v["variant_sku"] for v in variants_data if v.get("variant_sku")
         }
-        # delete variants that are no longer with us.
-        deleted_count = ProductVariant.objects.filter(
-            product=self.object, variant_sku__in=(existing_skus - submitted_skus)
-        ).delete()[0]
+        existing_skus = set(self.object.variants.values_list("variant_sku", flat=True))
+        # Variants whose SKU isn't in the new list AND whose pk wasn't
+        # claimed by the user as "kept" → safe to delete.
+        deletable_qs = ProductVariant.objects.filter(
+            product=self.object, variant_sku__in=(existing_skus - submitted_skus),
+        ).exclude(pk__in=kept_variant_ids)
+        deleted_count = deletable_qs.delete()[0]
         print(f"  ✓ Deleted {deleted_count} variants: {time.time() - delete_start:.3f}s")
         
         # Pre-fetch ALL data in one go to minimize queries
@@ -776,43 +791,91 @@ class BaseProductView(ModelFormMixin):
         
         variant_create_start = time.time()
         
-        # Determine total unique SKUs to form existing variants list
+        # Collect both the new desired SKUs AND any ids of variants the
+        # frontend explicitly said it was editing. Looking up by id first
+        # is what lets the user rename variant_sku without losing the
+        # row's images / attributes / FK references — the FK is the id,
+        # not the SKU.
         variant_skus = [v.get("variant_sku") for v in variants_data if v.get("variant_sku")]
-        
-        # Fetch existing variants to minimize DB queries
+        variant_ids_in_payload = []
+        for v in variants_data:
+            vid = v.get("variant_id")
+            try:
+                if vid:
+                    variant_ids_in_payload.append(int(vid))
+            except (TypeError, ValueError):
+                pass
+
+        # Fetch every existing variant whose id is mentioned OR whose
+        # current SKU is in the new list — covers both fresh rename and
+        # plain "no change" cases.
         existing_variants = ProductVariant.objects.filter(
-            product=self.object, variant_sku__in=variant_skus
+            product=self.object
+        ).filter(
+            models.Q(pk__in=variant_ids_in_payload) | models.Q(variant_sku__in=variant_skus)
         ).prefetch_related('files')
-        
-        existing_variants_dict = {}
+
+        existing_variants_dict = {}             # keyed by current variant_sku
+        existing_variants_by_id = {}            # keyed by id (stable across renames)
         variant_files_cache = {}
         for var in existing_variants:
             existing_variants_dict[var.variant_sku] = var
+            existing_variants_by_id[var.pk] = var
             variant_files_cache[var.variant_sku] = {f.pk: f for f in var.files.all()}
-        
-        # Create missing variants in bulk. Pass variant_featured=True
-        # explicitly so a new variant is "available" by default — the
-        # model default is True too, but being explicit guards against
-        # accidental skips later if the field gets renamed or if a
-        # save-path setter wipes the default.
+
+        # Apply pending SKU renames first — if the payload's variant_id
+        # already matches an existing variant but the new sku differs,
+        # rename it. Then re-key the dict so downstream `.get(sku)` calls
+        # work with the NEW sku.
+        sku_renames = []  # list of (old_sku, new_sku, variant) for logging
+        for v in variants_data:
+            vid = v.get("variant_id")
+            new_sku = v.get("variant_sku")
+            if not vid or not new_sku:
+                continue
+            try:
+                vid = int(vid)
+            except (TypeError, ValueError):
+                continue
+            var = existing_variants_by_id.get(vid)
+            if not var:
+                continue
+            if var.variant_sku != new_sku:
+                old_sku = var.variant_sku
+                # remove the old key from the sku-keyed dict, save the
+                # new sku on the model, re-key under the new sku
+                existing_variants_dict.pop(old_sku, None)
+                if old_sku in variant_files_cache:
+                    variant_files_cache[new_sku] = variant_files_cache.pop(old_sku)
+                var.variant_sku = new_sku
+                var.save(update_fields=["variant_sku"])
+                existing_variants_dict[new_sku] = var
+                sku_renames.append((old_sku, new_sku, var))
+        if sku_renames:
+            print(f"  ↻ Renamed {len(sku_renames)} variant SKU(s): " +
+                  ", ".join(f'{o}→{n}' for o, n, _ in sku_renames))
+
+        # Create truly missing variants in bulk. variant_featured=True so
+        # a new variant is "available" by default.
         variants_to_create = []
         for sku in variant_skus:
             if sku not in existing_variants_dict:
                 variants_to_create.append(
                     ProductVariant(product=self.object, variant_sku=sku, variant_featured=True)
                 )
-        
+
         if variants_to_create:
             created = ProductVariant.objects.bulk_create(variants_to_create)
             for v in created:
                 existing_variants_dict[v.variant_sku] = v
+                existing_variants_by_id[v.pk] = v
         
         # Now update all variant fields and collect for bulk_update
         variants_to_update = []
         changed_fields = set()  # Track which fields actually changed
         
         # Fields that are not part of the model (form-only fields)
-        non_model_fields = {"variant_sku", "variant_attribute_values", "variant_images", "primary_image_index", "product_attributes"}
+        non_model_fields = {"variant_id", "variant_sku", "variant_attribute_values", "variant_images", "primary_image_index", "product_attributes"}
         
         for variant_data in variants_data:
             variant_sku = variant_data.get("variant_sku")

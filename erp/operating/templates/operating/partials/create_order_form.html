@@ -592,56 +592,49 @@
     refreshStockState();
   };
 
-  // Walk every order item, flag any whose qty exceeds stock, and toggle
-  // the Place Order button accordingly. Visual cue: red input border +
-  // a per-row warning chip; the submit button shows the reason on hover.
+  // Visual stock indicator only — orders can still be placed even when
+  // qty exceeds stock. Stock is deducted from the catalog only when the
+  // order moves into a fulfilment status (shipped/delivered), so a
+  // back-ordered line is fine at create time. The yellow amber pill is
+  // an informational cue, not a block.
   function refreshStockState() {
-    let blockedReasons = [];
     orderItems.forEach((it, i) => {
       const overStock =
         it.stock !== null && it.stock !== undefined &&
         !it.allow_oversell &&
         Number(it.quantity) > Number(it.stock);
-      // Find the qty input for this row to mark it red.
       const cards = document.querySelectorAll('#co-products-list .co-product-card');
       const card = cards[i];
-      if (card) {
-        const qtyInput = card.querySelector('input[type="number"]');
-        if (qtyInput) {
-          qtyInput.style.borderColor = overStock ? '#DC2626' : '';
-          qtyInput.style.background  = overStock ? '#FEE2E2' : '';
+      if (!card) return;
+      const qtyInput = card.querySelector('input[type="number"]');
+      if (qtyInput) {
+        qtyInput.style.borderColor = overStock ? '#F59E0B' : '';
+        qtyInput.style.background  = overStock ? '#FFFBEB' : '';
+      }
+      let warn = card.querySelector('.co-stock-warn');
+      if (overStock) {
+        if (!warn) {
+          warn = document.createElement('div');
+          warn.className = 'co-stock-warn';
+          warn.style.cssText = 'margin-top:6px;padding:6px 10px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:7px;font:600 11.5px Inter,sans-serif;color:#92400E;display:flex;align-items:center;gap:6px;';
+          card.appendChild(warn);
         }
-        let warn = card.querySelector('.co-stock-warn');
-        if (overStock) {
-          if (!warn) {
-            warn = document.createElement('div');
-            warn.className = 'co-stock-warn';
-            warn.style.cssText = 'margin-top:6px;padding:6px 10px;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:7px;font:600 11.5px Inter,sans-serif;color:#B91C1C;display:flex;align-items:center;gap:6px;';
-            card.appendChild(warn);
-          }
-          warn.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ` +
-            `{% trans "Quantity exceeds available stock" %} (${it.stock}). ` +
-            `{% trans "Lower it to enable Place Order." %}`;
-          blockedReasons.push(`${it.sku}: max ${it.stock}`);
-        } else if (warn) {
-          warn.remove();
-        }
-      } else if (overStock) {
-        blockedReasons.push(`${it.sku}: max ${it.stock}`);
+        warn.innerHTML =
+          `<i class="fas fa-info-circle"></i> ` +
+          `{% trans "Back-order: needs" %} ${(Number(it.quantity) - Number(it.stock)).toFixed(2)} ` +
+          `{% trans "more than current stock" %} (${it.stock}). ` +
+          `{% trans "Will be deducted when the order ships." %}`;
+      } else if (warn) {
+        warn.remove();
       }
     });
+    // Submit stays enabled regardless.
     const btn = document.getElementById('submit_order_button');
     if (btn) {
-      btn.disabled = blockedReasons.length > 0;
-      if (blockedReasons.length > 0) {
-        btn.title = '{% trans "Fix stock issues:" %} ' + blockedReasons.join(' · ');
-        btn.style.opacity = '0.55';
-        btn.style.cursor = 'not-allowed';
-      } else {
-        btn.title = '';
-        btn.style.opacity = '';
-        btn.style.cursor = '';
-      }
+      btn.disabled = false;
+      btn.title = '';
+      btn.style.opacity = '';
+      btn.style.cursor = '';
     }
   }
   window.refreshStockState = refreshStockState;
@@ -700,13 +693,9 @@
   document.getElementById('createOrderForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (!orderItems.length) { showToast('Add at least one product','error'); return; }
-    // Stock cap final check — bail out if any line over the available stock.
-    for (const it of orderItems) {
-      if (it.stock !== null && it.stock !== undefined && !it.allow_oversell && it.quantity > it.stock) {
-        showToast(`${it.sku}: {% trans "qty exceeds stock" %} (${it.stock})`, 'error');
-        return;
-      }
-    }
+    // Over-stock lines are allowed — they're back-orders. The amber
+    // warning chip on the card flags them; stock isn't deducted until
+    // the order moves into a fulfilment status (shipped/delivered).
     // Include `item_id` for items that came from the server (edit
     // mode) so the backend updates them instead of creating dupes.
     // New items (no existing_item_id) get added as fresh OrderItems.

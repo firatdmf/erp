@@ -16,14 +16,19 @@ from django.contrib.postgres.fields import ArrayField
 
 
 def product_file_directory_path(instance, filename):
-    # file will be uploaded to MEDIA_ROOT/product_files/<product_sku>/<filename>
-    # if(instance.product_variant):
-    #     return f"product_files/{instance.product.sku}/{instance.product_variant.variant_sku}/{instance.sequence}_{filename}"
-    # return f"product_files/{instance.product.sku}/{instance.sequence}_{filename}"
-    if instance.product_variant:
-        return f"product_files/{instance.product.sku}/images/productSKU_{instance.product.sku}_variantSKU_{instance.product_variant.variant_sku}_{filename}"
-    else:
-        return f"product_files/{instance.product.sku}/images/{filename}"
+    """Path for new uploads.
+
+    Anchored on the stable product.id / variant.id rather than the
+    user-editable SKU — that way renaming `variant_sku` (or even the
+    parent product's sku) doesn't orphan future uploads from the
+    earlier-uploaded ones. Existing file_url values in ProductFile are
+    untouched; only NEW uploads use this layout.
+    """
+    pid = getattr(instance.product, "pk", None) or "no-product"
+    if instance.product_variant_id:
+        vid = instance.product_variant_id
+        return f"product_files/p{pid}/v{vid}/{filename}"
+    return f"product_files/p{pid}/{filename}"
 
 
 def product_category_directory_path(instance, filename):
@@ -294,7 +299,7 @@ class ProductVariant(models.Model):
         blank=False,
     )
     variant_sku = models.CharField(
-        max_length=20, null=False, blank=False, db_index=True
+        max_length=20, null=False, blank=False, db_index=True, unique=True,
     )
     # Barcode (ISBN, UPC, GTIN, etc.)
     variant_barcode = models.CharField(

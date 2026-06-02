@@ -48,9 +48,16 @@ class TaskForm(forms.ModelForm):
         from authentication.models import Member
         self.fields['member'].queryset = Member.objects.select_related('user').all()
         
-        # Initialize the due date as today's date
-        if not self.instance.pk and 'due_date' in self.fields:
-            self.fields['due_date'].widget.attrs['value'] = timezone.localdate().strftime('%Y-%m-%d')
+        # Initialize the due date — today for new tasks, the existing
+        # value for edit. Without this, edit-mode HTML5 <input type=date>
+        # could render empty if Django's locale-aware date format
+        # (e.g. "Dec. 17, 2025") doesn't match the ISO format the
+        # browser expects.
+        if 'due_date' in self.fields:
+            if self.instance.pk and self.instance.due_date:
+                self.fields['due_date'].widget.attrs['value'] = self.instance.due_date.strftime('%Y-%m-%d')
+            elif not self.instance.pk:
+                self.fields['due_date'].widget.attrs['value'] = timezone.localdate().strftime('%Y-%m-%d')
             
         self.fields['name'].label = "Task name"
         self.fields['priority'].label = "Priority"

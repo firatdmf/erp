@@ -292,6 +292,17 @@ ORDER_STATUS_CHOICES = [
 # bar. Order matters — left to right is the natural flow.
 ORDER_PRIMARY_STAGES = ("pending", "preparing", "packaging", "shipped")
 
+# Statuses that "consume" catalog stock. While an order sits in these
+# states the catalog `quantity` / `variant_quantity` for each item is
+# considered allocated. Pre-fulfilment statuses (pending / preparing /
+# packaging / confirmed) and terminal-cancel statuses (cancelled /
+# returned) DO NOT consume stock — the goods either haven't left or
+# have come back. The Order pre_save/post_save signals deduct/restore
+# atomically when the status crosses this boundary.
+STOCK_DEDUCT_STATUSES = frozenset({
+    "shipped", "in_transit", "out_for_delivery", "delivered",
+})
+
 # Carrier (shipping company) choices
 CARRIER_CHOICES = [
     ("yurtici", "Yurtiçi Kargo"),
@@ -407,6 +418,13 @@ class Order(models.Model):
         choices=ORDER_STATUS_CHOICES,
         default="pending",
         help_text="Müşteriye gösterilen sipariş durumu"
+    )
+    # Set the moment the catalog stock is first deducted for this
+    # order's items (the post_save signal handles it on status change
+    # into STOCK_DEDUCT_STATUSES). NULL means stock not yet consumed.
+    stock_consumed_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When catalog stock was deducted for this order's items."
     )
     carrier = models.CharField(
         max_length=50,

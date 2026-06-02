@@ -285,10 +285,11 @@
   }
 
   /* PRODUCTS TABLE */
-  .od-prods { width: 100%; border-collapse: collapse; }
+  .od-prods { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .od-prods th, .od-prods td {
     padding: 10px 8px; text-align: left;
     border-bottom: 1px solid #EEF1F5; font-size: 12.5px;
+    vertical-align: middle;
   }
   .od-prods th {
     font: 600 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase;
@@ -297,20 +298,41 @@
   .od-prods th.num, .od-prods td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .od-prods tr:last-child td { border-bottom: none; }
   .od-prods .mono { font: 500 11.5px var(--font-mono); color: var(--gray-600); }
-  /* Inline editable cells — look like static text until focused. */
+
+  /* Fixed column widths so every editable cell (Qty / Price / Cost /
+     Amount) stays the same size — without this the table-auto layout
+     stretches them based on content, which made the inline inputs look
+     mis-aligned. */
+  .od-prods th:nth-child(1), .od-prods td:nth-child(1) { width: auto; }        /* Product */
+  .od-prods th:nth-child(2), .od-prods td:nth-child(2) { width: 100px; }       /* SKU */
+  .od-prods th:nth-child(3), .od-prods td:nth-child(3) { width: 120px; }       /* Variant */
+  .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 120px; }       /* Qty */
+  .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 120px; }       /* Price */
+  .od-prods th:nth-child(6), .od-prods td:nth-child(6) { width: 90px;  }       /* Cost */
+  .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 100px; }       /* Amount */
+  .od-prods th.od-edit-only, .od-prods td.od-edit-only { width: 40px; }        /* Delete btn */
+
+  /* Inline editable cells — look like static text until focused. They
+     fill their fixed-width cell so Qty + Price line up exactly. */
   .od-inline-input {
-    width: 90px;
-    padding: 4px 6px;
+    width: 100%; max-width: 110px;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    height: 32px;
     border: 1px solid transparent;
     background: transparent;
-    border-radius: 6px;
+    border-radius: 7px;
     font: 600 13px var(--font-sans);
     color: var(--ink);
     text-align: right;
     font-variant-numeric: tabular-nums;
     outline: none;
     transition: border-color 140ms, background 140ms;
+    margin-left: auto;
   }
+  /* Right-align the inputs inside their numeric cells so the column
+     reads as a vertical edge. */
+  .od-prods td.num .od-inline-input { display: inline-block; }
   .od-inline-input:hover {
     border-color: #DDE3E7;
     background: #FAFCFB;
@@ -443,7 +465,7 @@
   }
 
   /* Per-row stock indicator (visible in edit mode under the qty input). */
-  .od-row-stock { margin-top: 3px; }
+  .od-row-stock { margin-top: 4px; text-align: right; }
   .od-stock-pill {
     display:inline-block; font:600 10.5px var(--font-sans);
     padding: 2px 7px; border-radius: 6px;
@@ -934,16 +956,16 @@
         {% endif %}
 
         <!-- Add-item row (edit mode) -->
-        <div id="od-add-item-row" class="od-edit-only" style="margin-top:10px; padding:10px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px;">
-          <div style="display:grid; grid-template-columns: 1fr 90px 110px auto; gap:8px; align-items:start;">
+        <div id="od-add-item-row" class="od-edit-only" style="margin-top:10px; padding:12px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px;">
+          <div style="display:grid; grid-template-columns: 1fr 120px 120px 120px; gap:10px; align-items:center;">
             <div style="position:relative;">
-              <input type="text" name="product" id="od-add-product-input" class="od-inline-input" autocomplete="off"
+              <input type="text" name="product" id="od-add-product-input" class="od-add-input" autocomplete="off"
                      placeholder="{% trans 'Search product by name or SKU…' %}"
                      hx-get="{% url 'operating:product_autocomplete' %}"
                      hx-trigger="keyup changed delay:200ms"
                      hx-target="#od-add-product-results"
                      hx-swap="innerHTML"
-                     style="width:100%;">
+                     style="width:100%; height:36px; padding:7px 10px; border:1px solid #E2E8EE; background:#FFF; border-radius:8px; font:500 13px var(--font-sans); box-sizing:border-box; outline:none;">
               <div id="od-add-product-results" class="od-prod-ac"></div>
               <input type="hidden" id="od-add-sku">
               <input type="hidden" id="od-add-is-variant" value="false">
@@ -952,9 +974,11 @@
               <div id="od-add-product-pick" style="display:none; margin-top:4px; font-size:11.5px; color:#147F74; font-weight:600;"></div>
               <div id="od-add-stock-info" style="display:none; margin-top:4px; font-size:11.5px;"></div>
             </div>
-            <input type="number" id="od-add-qty" class="od-inline-input" min="0" step="0.01" placeholder="Qty" value="1" onwheel="this.blur()">
-            <input type="number" id="od-add-price" class="od-inline-input" min="0" step="0.01" placeholder="Price" value="0" onwheel="this.blur()">
-            <button type="button" id="od-add-item-btn" class="ord-btn primary" style="white-space:nowrap;">
+            <input type="number" id="od-add-qty" class="od-add-input" min="0" step="0.01" placeholder="Qty" value="1" onwheel="this.blur()"
+                   style="width:100%; height:36px; padding:7px 10px; border:1px solid #E2E8EE; background:#FFF; border-radius:8px; font:600 13px var(--font-sans); text-align:right; font-variant-numeric:tabular-nums; box-sizing:border-box; outline:none;">
+            <input type="number" id="od-add-price" class="od-add-input" min="0" step="0.01" placeholder="Price" value="0" onwheel="this.blur()"
+                   style="width:100%; height:36px; padding:7px 10px; border:1px solid #E2E8EE; background:#FFF; border-radius:8px; font:600 13px var(--font-sans); text-align:right; font-variant-numeric:tabular-nums; box-sizing:border-box; outline:none;">
+            <button type="button" id="od-add-item-btn" class="ord-btn primary" style="white-space:nowrap; height:36px; justify-content:center;">
               <i class="fa fa-plus"></i> {% trans "Add" %}
             </button>
           </div>

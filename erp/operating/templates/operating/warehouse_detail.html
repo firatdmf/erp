@@ -390,6 +390,16 @@
     overflow: hidden;
     animation: rs-slide 260ms cubic-bezier(0.22,1,0.36,1);
   }
+  /* Frozen capture: shown over the live <video> after a snap so the
+     user has a stable still while the OCR / confirm panel loads. */
+  #rsFrozen {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    background: #0F1419;
+    display: none;
+  }
+  #rsFrozen.show { display: block; }
   @keyframes rs-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   .rs-head {
     display: flex; align-items: center; justify-content: space-between;
@@ -640,6 +650,57 @@
     .rs-body { grid-template-columns: 1fr; }
     .rs-cam { min-height: 360px; }
     .rs-side { border-left: none; border-top: 1px solid #E2E8EE; }
+  }
+
+  /* ── True mobile (<= 720px): full-viewport sheet, scrollable side
+        panel, condensed camera, sticky save button. The earlier
+        @media stack still applies; this just refines the layout for
+        small touch screens so the user can scroll through every
+        field after a scan. */
+  @media (max-width: 720px) {
+    .rs-overlay { padding: 0; }
+    .rs-shell {
+      max-width: 100vw; max-height: 100vh;
+      width: 100vw; height: 100vh;
+      border-radius: 0;
+    }
+    .rs-body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .rs-cam {
+      min-height: 0;
+      height: 56vh;          /* gives the side panel room below */
+    }
+    .rs-viewport {
+      aspect-ratio: 3 / 4;   /* matches typical roll-label portrait */
+      max-height: 100%;
+    }
+    .rs-side {
+      max-height: none;
+      overflow-y: visible;
+    }
+    .rs-confirm, .rs-idle, .rs-recent {
+      padding: 14px 14px;
+    }
+    .rs-confirm-actions {
+      position: sticky; bottom: 0;
+      background: linear-gradient(180deg, rgba(250,251,253,0.0), #FAFBFD 35%);
+      padding-top: 10px;
+      margin: 0 -14px -14px;
+      padding-left: 14px; padding-right: 14px; padding-bottom: 12px;
+      display: flex; gap: 8px;
+    }
+    .rs-confirm-actions .rs-btn { flex: 1; justify-content: center; }
+    .rs-cam-foot { padding: 10px 12px; }
+    .rs-cam-hint { display: none; }   /* no keyboard hint on mobile */
+    .rs-capture-btn { width: 100%; justify-content: center; padding: 13px 18px; font-size: 14px; }
+    .rs-title { font-size: 14px; }
+  }
+  @media (max-width: 720px) and (orientation: landscape) {
+    .rs-cam { height: 70vh; }
   }
 </style>
 {% endblock %}
@@ -964,6 +1025,7 @@
         <div class="rs-viewport">
           <video id="rsVideo" autoplay playsinline muted></video>
           <canvas id="rsCanvas" hidden></canvas>
+          <img id="rsFrozen" alt="">
           <div id="rsGuide" class="rs-guide">
             <div class="rs-guide-frame"></div>
             <div class="rs-guide-hint">{% trans "Center the label here" %}</div>
@@ -1016,6 +1078,23 @@
           <div class="rs-fld">
             <label>{% trans "Lot number (optional)" %}</label>
             <input id="rsLot" type="text" class="rs-input" autocomplete="off">
+          </div>
+          <div class="rs-fld">
+            <label>
+              {% trans "Purchase price" %}
+              <span style="font-weight:500; font-size:11px; color:var(--gray-500); margin-left:4px;">
+                {% trans "(not on label — enter manually)" %}
+              </span>
+            </label>
+            <div style="display:flex; gap:6px;">
+              <input id="rsPrice" type="number" step="0.01" min="0" class="rs-input"
+                     placeholder="0.00" autocomplete="off" style="flex:1;">
+              <select id="rsCurrency" class="rs-input" style="flex:0 0 80px; cursor:pointer;">
+                <option value="USD">USD</option>
+                <option value="TRY" selected>TRY</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
           </div>
           <div id="rsMatchBadge" class="rs-match" hidden></div>
           <div class="rs-confirm-actions">
@@ -1139,6 +1218,15 @@
     document.getElementById('rsConfirm').hidden = true;
     document.getElementById('rsIdle').hidden = false;
     rsPending = null;
+    // Drop any frozen preview to release the blob URL.
+    try {
+      const frozen = document.getElementById('rsFrozen');
+      if (frozen) {
+        frozen.classList.remove('show');
+        if (frozen._url) { URL.revokeObjectURL(frozen._url); frozen._url = null; }
+        frozen.removeAttribute('src');
+      }
+    } catch (_) {}
   }
   function startRollCamera() {
     const video = document.getElementById('rsVideo');
@@ -1189,6 +1277,18 @@
         document.getElementById('rsProcessing').hidden = true;
         return;
       }
+      // Freeze the captured frame as a still — covers the live video
+      // so the user sees exactly what was sent for OCR. Cleared on
+      // cancelConfirm() or after a successful save.
+      try {
+        const frozen = document.getElementById('rsFrozen');
+        if (frozen) {
+          if (frozen._url) URL.revokeObjectURL(frozen._url);
+          frozen._url = URL.createObjectURL(blob);
+          frozen.src = frozen._url;
+          frozen.classList.add('show');
+        }
+      } catch (_) {}
       const fd = new FormData();
       fd.append('image', blob, 'capture.jpg');
       fd.append('commit', 'false');
@@ -1253,11 +1353,23 @@
     document.getElementById('rsConfirm').hidden = true;
     document.getElementById('rsIdle').hidden = false;
     rsPending = null;
+    // Drop the frozen frame so the user sees the live camera again.
+    try {
+      const frozen = document.getElementById('rsFrozen');
+      if (frozen) {
+        frozen.classList.remove('show');
+        if (frozen._url) { URL.revokeObjectURL(frozen._url); frozen._url = null; }
+        frozen.removeAttribute('src');
+      }
+    } catch (_) {}
     // Clear the per-roll fields so the next scan doesn't inherit them.
-    ['rsSku','rsName','rsMeters','rsBarcode','rsLot'].forEach(function(id){
+    ['rsSku','rsName','rsMeters','rsBarcode','rsLot','rsPrice'].forEach(function(id){
       var el = document.getElementById(id);
       if (el) el.value = '';
     });
+    // Reset currency to the default (TRY) for the next entry.
+    var curEl = document.getElementById('rsCurrency');
+    if (curEl) curEl.value = 'TRY';
   }
 
   function saveRoll() {
@@ -1272,6 +1384,8 @@
     const meters = document.getElementById('rsMeters').value.trim();
     const barcode = (document.getElementById('rsBarcode')?.value || '').trim();
     const lot = (document.getElementById('rsLot')?.value || '').trim();
+    const price = (document.getElementById('rsPrice')?.value || '').trim();
+    const currency = (document.getElementById('rsCurrency')?.value || '').trim() || 'TRY';
     if (!meters || parseFloat(meters) <= 0) {
       alert('Please enter a positive meters value');
       saveBtn.disabled = false;
@@ -1299,6 +1413,8 @@
     fd.append('meters', meters);
     if (barcode) fd.append('barcode', barcode);
     if (lot)     fd.append('lot_number', lot);
+    if (price)   fd.append('purchase_price', price);
+    if (currency) fd.append('purchase_currency', currency);
     fd.append('ocr_raw', rsPending.ocr_raw);
 
     fetch(scanUrl, {

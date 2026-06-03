@@ -231,24 +231,57 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
 
 
 def _send_via_gmail_oauth(to_email, subject, html_body, pdf_name, pdf_bytes):
-    """Send through the first usable connected Gmail account (OAuth).
+    """Send through a connected Google account that has the gmail.send
+    scope, using OAuth.
+
+    IMPORTANT: the tokens are minted by the Google sign-in / Chat OAuth
+    client (GoogleChatCredentials.client_id) — NOT settings.GMAIL_CLIENT_ID.
+    Refreshing with the wrong client yields "unauthorized_client", which
+    is exactly what broke the previous attempt. So we build the Gmail
+    service from the credential's OWN client_id / client_secret and
+    refresh against the issuing client, which succeeds.
 
     Returns True if dispatched, False to let the caller fall back to
     SMTP. Never raises."""
     try:
-        from email_automation.models import EmailAccount
-        from email_automation.gmail_utils import get_gmail_service, send_email as gmail_send
+        from authentication.models import GoogleChatCredentials
+        from email_automation.gmail_utils import send_email as gmail_send
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        from googleapiclient.discovery import build
 
-        account = (EmailAccount.objects
-                   .filter(is_active=True)
-                   .exclude(access_token="")
-                   .order_by("-id")
-                   .first())
-        if not account:
+        creds = (GoogleChatCredentials.objects
+                 .filter(scopes__icontains="gmail.send")
+                 .exclude(refresh_token__isnull=True)
+                 .exclude(refresh_token="")
+                 .order_by("-updated_at")
+                 .first())
+        if not creds:
             return False
-        service = get_gmail_service(account)
-        if not service:
-            return False
+
+        scopes = (creds.scopes or "").replace(",", " ").split()
+        c = Credentials(
+            token=creds.token or None,
+            refresh_token=creds.refresh_token,
+            token_uri=creds.token_uri or "https://oauth2.googleapis.com/token",
+            client_id=creds.client_id,
+            client_secret=creds.client_secret,
+            scopes=scopes,
+        )
+        # Proactively refresh — the stored access token is usually stale,
+        # and refreshing with the issuing client gets a fresh one. Persist
+        # it back so subsequent sends reuse it.
+        if c.refresh_token:
+            try:
+                c.refresh(Request())
+                creds.token = c.token
+                creds.save(update_fields=["token", "updated_at"])
+            except Exception as ref_exc:
+                # If refresh fails but we still hold a (maybe-valid) token,
+                # fall through and let the send attempt decide.
+                print(f"[order_email] token refresh warning: {ref_exc}")
+
+        service = build("gmail", "v1", credentials=c)
 
         attachments = None
         if pdf_bytes:
@@ -256,7 +289,7 @@ def _send_via_gmail_oauth(to_email, subject, html_body, pdf_name, pdf_bytes):
 
         gmail_send(
             service=service,
-            sender=account.email_address,
+            sender=creds.email or "me",
             to=to_email,
             subject=subject,
             message_text="",      # plain-text part empty; HTML carries the body

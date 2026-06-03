@@ -1684,16 +1684,9 @@
       if (!sku) { alert('{% trans "Pick a product first." %}'); return; }
       const qty = (addQty.value || '0').trim();
       const price = (addPrice.value || '0').trim();
-      // Client-side stock guard. Server still re-validates.
-      const addStock = document.getElementById('od-add-stock');
-      const addOversell = document.getElementById('od-add-oversell');
-      const stockVal = addStock && addStock.value !== '' ? Number(addStock.value) : null;
-      const allowOversell = addOversell && addOversell.value === 'true';
-      if (stockVal !== null && !allowOversell && Number(qty) > stockVal) {
-        alert('{% trans "Not enough stock." %} {% trans "Available:" %} ' + stockVal);
-        addQty.focus();
-        return;
-      }
+      // Stock is informational only — back-order is allowed. Stock is
+      // deducted when the order ships, not at add time, so we never
+      // block adding a line for being over/out of stock.
       addBtn.disabled = true;
       const origLabel = addBtn.innerHTML;
       addBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';

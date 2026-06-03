@@ -415,14 +415,12 @@
 
   window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
-    // Block selection if the product is completely out of stock (unless
-    // the merchant marked it sellable while out of stock).
+    // Stock is informational only — out-of-stock / low-stock products
+    // can still be added (back-order). Catalog stock is deducted only
+    // when the order moves into a fulfilment status (shipped), so an
+    // order can always be created regardless of current stock.
     const _stock = (stock === null || stock === undefined || stock === 'null') ? null : Number(stock);
     const _allowOversell = (allowOversell === true || allowOversell === 'true');
-    if (_stock !== null && _stock <= 0 && !_allowOversell) {
-      showToast('{% trans "Out of stock — cannot add this product." %}', 'error');
-      return;
-    }
     itemIndex++;
     // Newest item on top so the user immediately sees what they
     // just added — important once the list grows past a few rows.

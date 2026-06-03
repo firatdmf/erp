@@ -1134,6 +1134,59 @@
     </ul>
   </nav>
   <main>
+    {% if messages %}
+    <div class="nj-flash" id="njFlash">
+      {% for message in messages %}
+      <div class="nj-flash-item {{ message.tags }}">
+        <i class="fa fa-{% if 'error' in message.tags %}circle-exclamation{% elif 'warning' in message.tags %}triangle-exclamation{% else %}circle-check{% endif %}"></i>
+        <span>{{ message }}</span>
+        <button type="button" class="nj-flash-x" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+      </div>
+      {% endfor %}
+    </div>
+    <style>
+      .nj-flash {
+        position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+        z-index: 11000; display: flex; flex-direction: column; gap: 8px;
+        width: min(520px, calc(100vw - 32px));
+      }
+      .nj-flash-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 14px;
+        background: #FFF;
+        border: 1px solid #E2E8EE;
+        border-left: 4px solid #10B981;
+        border-radius: 10px;
+        box-shadow: 0 10px 28px rgba(15,23,31,0.14);
+        font: 600 13px var(--font-sans, 'Inter', system-ui, sans-serif);
+        color: #0F1419;
+        animation: njFlashIn .26s cubic-bezier(.22,1,.36,1);
+      }
+      .nj-flash-item i { color: #10B981; font-size: 15px; flex-shrink: 0; }
+      .nj-flash-item.error   { border-left-color: #DC2626; }
+      .nj-flash-item.error i { color: #DC2626; }
+      .nj-flash-item.warning   { border-left-color: #F59E0B; }
+      .nj-flash-item.warning i { color: #F59E0B; }
+      .nj-flash-x {
+        margin-left: auto; background: transparent; border: none;
+        color: #94A3B8; font-size: 18px; line-height: 1; cursor: pointer;
+        padding: 0 2px;
+      }
+      .nj-flash-x:hover { color: #0F1419; }
+      @keyframes njFlashIn { from { opacity: 0; transform: translateY(-8px); } }
+    </style>
+    <script>
+      (function () {
+        var box = document.getElementById('njFlash');
+        if (!box) return;
+        setTimeout(function () {
+          box.style.transition = 'opacity .4s ease';
+          box.style.opacity = '0';
+          setTimeout(function () { if (box.parentNode) box.remove(); }, 420);
+        }, 4000);
+      })();
+    </script>
+    {% endif %}
     {% block content %}
 
     {% endblock %}

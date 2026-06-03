@@ -92,13 +92,15 @@ def signin(request):
             #     request,
             #     "authentication/index.html",
             #     {
-            #         "fname": fname,
-            #     },
-            # )
-            # print(go_to_url)
-            # below takes it back to where they started in the url
-            # return redirect(go_to_url)
-            return redirect("/authentication/home")
+            # Respect ?next= if the user was bounced here from a
+            # protected page. Otherwise drop them straight on the
+            # main dashboard (panel) — that's what they expect after
+            # signing in, not the legacy /authentication/home shim.
+            safe_next = (go_to_url or "").strip()
+            if safe_next and safe_next.startswith("/") and not safe_next.startswith("//") \
+                    and safe_next not in {"/authentication/signin", "/authentication/signin/", "home"}:
+                return redirect(safe_next)
+            return redirect("/")
         else:
             messages.error(request, "Bad Credentials!")
             # this is the name of the url

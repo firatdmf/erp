@@ -2,859 +2,748 @@
 {% load i18n %}
 {% load static %}
 
-{% block title %}Analytics Dashboard{% endblock %}
+{% block title %}{% trans "Sales Analytics" %} · Nejum{% endblock %}
 
 {% block css %}
 <style>
-    .analytics-container {
-        display: flex;
-        gap: 1.5rem;
-        padding: 2rem;
-        max-width: 1400px;
-        margin: 0 auto;
-        background: #fafafa;
-        min-height: 100vh;
+  :root {
+    --an-teal: #147F74;
+    --an-teal-50: #E5F1F0;
+    --an-teal-100: #CCFBF1;
+    --an-teal-600: #00696A;
+    --an-teal-700: #005354;
+    --an-ink: #0F1419;
+    --an-gray-50: #F8FAFC;
+    --an-gray-100: #F1F5F9;
+    --an-gray-200: #E2E8EE;
+    --an-gray-300: #CBD5E1;
+    --an-gray-400: #94A3B8;
+    --an-gray-500: #64748B;
+    --an-gray-600: #475569;
+    --an-gray-700: #334155;
+    --an-amber: #B45309;
+    --an-red: #DC2626;
+    --an-green: #0E6E4A;
+    --an-blue: #1565C0;
+  }
+
+  .an-wrap {
+    padding: 20px 24px 80px;
+    font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+    background: #FAFBFD;
+    min-height: calc(100vh - 60px);
+    color: var(--an-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── header ── */
+  .an-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 18px; gap: 16px; flex-wrap: wrap;
+  }
+  .an-eyebrow {
+    font: 600 11px var(--font-sans); color: var(--an-gray-500);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  .an-title {
+    font: 700 24px var(--font-sans); color: var(--an-ink);
+    letter-spacing: -.4px; margin: 4px 0 0;
+  }
+  .an-title-sub { font: 500 13px var(--font-sans); color: var(--an-gray-500); margin-top: 4px; }
+
+  /* ── filter bar ── */
+  .an-filters {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-bottom: 18px;
+  }
+  .an-seg {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #FFF;
+    border: 1px solid var(--an-gray-200);
+    border-radius: 10px;
+    padding: 4px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .an-seg-btn {
+    border: none; background: transparent;
+    padding: 7px 13px;
+    border-radius: 7px;
+    font: 600 12.5px var(--font-sans);
+    color: var(--an-gray-600);
+    cursor: pointer;
+    transition: all .12s;
+    white-space: nowrap;
+  }
+  .an-seg-btn:hover { color: var(--an-ink); background: var(--an-gray-50); }
+  .an-seg-btn.active {
+    background: var(--an-teal-50);
+    color: var(--an-teal-700);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,.20);
+  }
+  .an-seg-label {
+    font: 600 10px var(--font-sans); color: var(--an-gray-400);
+    text-transform: uppercase; letter-spacing: .08em;
+    padding: 0 6px 0 2px; align-self: center;
+  }
+  /* Custom date range */
+  .an-daterange { gap: 6px; }
+  .an-daterange.active-range { box-shadow: inset 0 0 0 1px rgba(20,127,116,.30); background: var(--an-teal-50); }
+  .an-date {
+    border: 1px solid var(--an-gray-200);
+    background: #FFF;
+    border-radius: 7px;
+    padding: 6px 8px;
+    font: 600 12px var(--font-sans);
+    color: var(--an-ink);
+    outline: none;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .an-date:focus { border-color: var(--an-teal); box-shadow: 0 0 0 3px rgba(20,127,116,.10); }
+  .an-date-sep { color: var(--an-gray-400); font-size: 12px; }
+  .an-date-apply, .an-date-clear {
+    width: 30px; height: 30px;
+    border: none; border-radius: 7px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; transition: all .12s;
+  }
+  .an-date-apply { background: var(--an-teal); color: #FFF; }
+  .an-date-apply:hover { background: var(--an-teal-700); }
+  .an-date-clear { background: var(--an-gray-100); color: var(--an-gray-600); }
+  .an-date-clear:hover { background: var(--an-red); color: #FFF; }
+
+  /* ── card ── */
+  .an-card {
+    background: #FFF;
+    border: 1px solid var(--an-gray-200);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+    padding: 18px 20px;
+  }
+  .an-card-h {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  }
+  .an-card-h h3 { font: 700 14px var(--font-sans); margin: 0; letter-spacing: -.005em; }
+  .an-card-h .sub { font: 500 11.5px var(--font-sans); color: var(--an-gray-500); margin-left: auto; }
+
+  /* ── KPI grid ── */
+  .an-kpis {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px; margin-bottom: 16px;
+  }
+  @media (max-width: 1000px) { .an-kpis { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 520px)  { .an-kpis { grid-template-columns: 1fr; } }
+  .an-kpi {
+    background: #FFF;
+    border: 1px solid var(--an-gray-200);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .an-kpi::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--an-teal);
+  }
+  .an-kpi.profit::before { background: var(--an-green); }
+  .an-kpi.profit.neg::before { background: var(--an-red); }
+  .an-kpi.cost::before { background: var(--an-amber); }
+  .an-kpi.orders::before { background: var(--an-blue); }
+  .an-kpi-top { display: flex; align-items: center; justify-content: space-between; }
+  .an-kpi-label {
+    font: 600 11px var(--font-sans); color: var(--an-gray-500);
+    text-transform: uppercase; letter-spacing: .07em;
+  }
+  .an-kpi-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    background: var(--an-teal-50); color: var(--an-teal-700);
+  }
+  .an-kpi.profit .an-kpi-icon { background: #D1FAE5; color: var(--an-green); }
+  .an-kpi.profit.neg .an-kpi-icon { background: #FEE2E2; color: var(--an-red); }
+  .an-kpi.cost .an-kpi-icon { background: #FEF3C7; color: var(--an-amber); }
+  .an-kpi.orders .an-kpi-icon { background: #DBEAFE; color: var(--an-blue); }
+  .an-kpi-value {
+    font: 800 26px var(--font-sans); letter-spacing: -.02em;
+    margin: 10px 0 2px; font-variant-numeric: tabular-nums;
+  }
+  .an-kpi.profit.neg .an-kpi-value { color: var(--an-red); }
+  .an-kpi-meta { font: 500 12px var(--font-sans); color: var(--an-gray-500); }
+  .an-kpi-meta b.pos { color: var(--an-green); }
+  .an-kpi-meta b.neg { color: var(--an-red); }
+
+  /* ── main grid ── */
+  .an-grid {
+    display: grid; grid-template-columns: 1.6fr 1fr;
+    gap: 16px; margin-bottom: 16px;
+  }
+  @media (max-width: 1000px) { .an-grid { grid-template-columns: 1fr; } }
+
+  .an-chart-box { height: 300px; position: relative; }
+  .an-chart-box.sm { height: 230px; }
+
+  /* ── channel split ── */
+  .an-channel-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--an-gray-100);
+  }
+  .an-channel-row:last-child { border-bottom: none; }
+  .an-channel-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .an-channel-name { font: 600 13px var(--font-sans); }
+  .an-channel-sub { font: 500 11.5px var(--font-sans); color: var(--an-gray-500); }
+  .an-channel-val { margin-left: auto; text-align: right; }
+  .an-channel-val .big { font: 800 16px var(--font-sans); font-variant-numeric: tabular-nums; }
+  .an-channel-val .pct { font: 600 11px var(--font-sans); color: var(--an-gray-500); }
+
+  /* ── tables ── */
+  .an-tbl { width: 100%; border-collapse: collapse; }
+  .an-tbl th {
+    text-align: left; font: 600 10.5px var(--font-sans);
+    letter-spacing: .07em; text-transform: uppercase; color: var(--an-gray-500);
+    padding: 8px 6px; border-bottom: 1px solid var(--an-gray-200);
+  }
+  .an-tbl th.num, .an-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .an-tbl td {
+    padding: 11px 6px; border-bottom: 1px solid var(--an-gray-100);
+    font: 500 13px var(--font-sans); vertical-align: middle;
+  }
+  .an-tbl tr:last-child td { border-bottom: none; }
+  .an-rank {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--an-gray-100); color: var(--an-gray-600);
+    font: 700 11px var(--font-mono, monospace);
+  }
+  .an-rank.top { background: var(--an-teal-50); color: var(--an-teal-700); }
+  .an-prod-name { font-weight: 600; color: var(--an-ink); }
+  .an-prod-sku { font: 500 11px var(--font-mono, monospace); color: var(--an-gray-400); margin-top: 2px; }
+
+  /* ── customer rows ── */
+  .an-cust {
+    display: grid; grid-template-columns: 26px 34px 1fr auto;
+    gap: 11px; align-items: center;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--an-gray-100);
+    text-decoration: none; color: inherit;
+    transition: background .12s;
+  }
+  .an-cust:last-child { border-bottom: none; }
+  .an-cust:hover { background: var(--an-gray-50); }
+  .an-cust-avatar {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font: 700 13px var(--font-sans);
+    flex-shrink: 0;
+  }
+  .an-cust-avatar.company { background: #DBEAFE; color: var(--an-blue); }
+  .an-cust-avatar.contact { background: var(--an-teal-50); color: var(--an-teal-700); }
+  .an-cust-avatar.web     { background: #FEF3C7; color: var(--an-amber); }
+  .an-cust-name { font: 600 13px var(--font-sans); color: var(--an-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .an-cust-meta { font: 500 11px var(--font-sans); color: var(--an-gray-500); margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .an-cust-kind {
+    font: 700 9px var(--font-sans); letter-spacing: .08em; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 4px;
+  }
+  .an-cust-kind.company { background: #DBEAFE; color: var(--an-blue); }
+  .an-cust-kind.contact { background: var(--an-teal-50); color: var(--an-teal-700); }
+  .an-cust-kind.web     { background: #FEF3C7; color: var(--an-amber); }
+  .an-cust-cari {
+    font: 600 10.5px var(--font-mono, monospace);
+    color: var(--an-gray-600);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .an-cust-cari .bal { font-weight: 700; }
+  .an-cust-cari .bal.owe { color: var(--an-amber); }
+  .an-cust-cari .bal.credit { color: var(--an-green); }
+  .an-cust-spent { text-align: right; }
+  .an-cust-spent .amt { font: 800 14.5px var(--font-sans); color: var(--an-ink); font-variant-numeric: tabular-nums; }
+  .an-cust-spent .ord { font: 500 11px var(--font-sans); color: var(--an-gray-500); }
+
+  /* ── status mix ── */
+  .an-status-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--an-gray-100); margin-bottom: 12px; }
+  .an-status-seg { height: 100%; }
+  .an-status-legend { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+  .an-status-item { display: inline-flex; align-items: center; gap: 7px; font: 500 12px var(--font-sans); color: var(--an-gray-700); }
+  .an-status-item .dot { width: 9px; height: 9px; border-radius: 3px; }
+  .an-status-item b { font-weight: 700; color: var(--an-ink); margin-left: 2px; }
+
+  /* ── empty ── */
+  .an-empty {
+    padding: 40px 20px; text-align: center; color: var(--an-gray-400);
+    font: 500 13px var(--font-sans);
+  }
+  .an-empty i { font-size: 26px; display: block; margin-bottom: 10px; color: var(--an-gray-300); }
+
+  /* ═══ Mobile responsive ═══════════════════════════════════════
+     The global Nejum mobile shell (hamburger app-bar + bottom nav)
+     already kicks in <=1024px via mobile-shell.css; here we make the
+     analytics content itself flow cleanly on small screens. */
+  @media (max-width: 1024px) {
+    .an-wrap { padding: 14px 10px 40px; }
+    .an-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .an-wrap { padding: 12px 8px 32px; }
+    .an-head { flex-direction: column; align-items: stretch; gap: 6px; }
+    .an-title { font-size: 21px; }
+
+    /* Filter bar — each control becomes a full-width row, buttons wrap
+       inside so nothing overflows horizontally. */
+    .an-filters { gap: 8px; }
+    .an-seg {
+      width: 100%; flex-wrap: wrap; justify-content: flex-start;
+      box-sizing: border-box;
     }
+    .an-seg-btn { flex: 1 1 auto; justify-content: center; }
+    .an-daterange { gap: 6px; }
+    .an-date { flex: 1 1 130px; min-width: 0; }
+    .an-date-apply, .an-date-clear { flex: 0 0 auto; }
 
-    .analytics-main {
-        flex: 1;
-    }
+    /* KPIs single column already handled at 520px; widen to 2-up to 600 */
+    .an-kpi-value { font-size: 23px; }
 
-    .analytics-sidebar {
-        width: 300px;
-        flex-shrink: 0;
-    }
+    /* Charts a touch shorter so they don't dominate the viewport. */
+    .an-chart-box { height: 240px; }
+    .an-chart-box.sm { height: 200px; }
 
-    .analytics-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 1.5rem;
-        flex-wrap: wrap;
-        gap: 1rem;
-    }
-
-    .header-left h1 {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: #1a1a1a;
-        margin: 0 0 0.5rem 0;
-    }
-
-    .header-left p {
-        color: #666;
-        font-size: 0.875rem;
-        margin: 0;
-    }
-
-    .header-right {
-        display: flex;
-        gap: 1rem;
-        align-items: center;
-    }
-
-    .last-update {
-        background: white;
-        padding: 0.75rem 1.25rem;
-        border-radius: 25px;
-        font-size: 0.875rem;
-        color: #666;
-        border: 1px solid #e5e5e5;
-    }
-
-    .summary-cards {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .summary-card {
-        background: white;
-        padding: 1.25rem;
-        border-radius: 16px;
-        border: 1px solid #f0f0f0;
-    }
-
-    .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.75rem;
-    }
-
-    .card-icon {
-        width: 40px;
-        height: 40px;
-        background: #f5f5f5;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        color: #666;
-    }
-
-    .card-icon.custom {
-        background: #fef3c7;
-        color: #d97706;
-    }
-
-    .card-icon.fabric {
-        background: #dbeafe;
-        color: #2563eb;
-    }
-
-    .card-label {
-        font-size: 0.8125rem;
-        color: #666;
-        margin-bottom: 0.25rem;
-    }
-
-    .card-value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1a1a1a;
-    }
-
-    .chart-section {
-        background: white;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        border: 1px solid #f0f0f0;
-    }
-
-    .chart-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 1.5rem;
-        flex-wrap: wrap;
-        gap: 1rem;
-    }
-
-    .chart-title h3 {
-        font-size: 1.125rem;
-        font-weight: 600;
-        color: #1a1a1a;
-        margin: 0 0 0.25rem 0;
-    }
-
-    .chart-title p {
-        font-size: 0.875rem;
-        color: #666;
-        margin: 0;
-    }
-
-    .chart-controls {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-
-    .period-tabs {
-        display: flex;
-        gap: 0.25rem;
-        background: #f5f5f5;
-        padding: 0.25rem;
-        border-radius: 25px;
-    }
-
-    .period-tabs a,
-    .period-tabs button {
-        padding: 0.5rem 1rem;
-        font-size: 0.8125rem;
-        color: #666;
-        background: transparent;
-        border: none;
-        border-radius: 20px;
-        cursor: pointer;
-        font-weight: 500;
-        text-decoration: none;
-        transition: all 0.2s;
-    }
-
-    .period-tabs a:hover,
-    .period-tabs button:hover {
-        color: #1a1a1a;
-    }
-
-    .period-tabs a.active,
-    .period-tabs button.active {
-        background: white;
-        color: #1a1a1a;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-
-    .weekly-btn {
-        background: #d4a800;
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-size: 0.8125rem;
-        font-weight: 600;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .weekly-btn:hover {
-        background: #b89500;
-    }
-
-    .weekly-btn.active {
-        background: #16a34a;
-    }
-
-    .chart-container {
-        height: 300px;
-        position: relative;
-    }
-
-    .bottom-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
-    }
-
-    .list-card {
-        background: white;
-        border-radius: 16px;
-        border: 1px solid #f0f0f0;
-        overflow: hidden;
-    }
-
-    .list-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem 1.25rem;
-        border-bottom: 1px solid #f5f5f5;
-        background: #fafafa;
-    }
-
-    .list-header h3 {
-        font-size: 0.9375rem;
-        font-weight: 600;
-        color: #1a1a1a;
-        margin: 0;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .list-header h3 .badge {
-        font-size: 0.6875rem;
-        padding: 0.2rem 0.5rem;
-        border-radius: 10px;
-        font-weight: 500;
-    }
-
-    .badge-custom {
-        background: #fef3c7;
-        color: #d97706;
-    }
-
-    .badge-fabric {
-        background: #dbeafe;
-        color: #2563eb;
-    }
-
-    .list-item {
-        display: flex;
-        align-items: center;
-        padding: 0.875rem 1.25rem;
-        gap: 0.875rem;
-        border-bottom: 1px solid #f5f5f5;
-    }
-
-    .list-item:last-child {
-        border-bottom: none;
-    }
-
-    .item-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        color: white;
-        font-size: 0.75rem;
-        flex-shrink: 0;
-    }
-
-    .item-avatar.product {
-        background: #f5f5f5;
-        color: #666;
-        font-size: 1rem;
-    }
-
-    .item-avatar.custom {
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-    }
-
-    .item-avatar.fabric {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    }
-
-    .item-info {
-        flex: 1;
-        min-width: 0;
-    }
-
-    .item-name {
-        font-weight: 600;
-        color: #1a1a1a;
-        font-size: 0.875rem;
-        margin-bottom: 0.125rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .item-meta {
-        font-size: 0.75rem;
-        color: #999;
-    }
-
-    .item-value {
-        text-align: right;
-    }
-
-    .item-amount {
-        font-weight: 600;
-        color: #1a1a1a;
-        font-size: 0.875rem;
-    }
-
-    .filter-card {
-        background: white;
-        border-radius: 16px;
-        padding: 1.5rem;
-        border: 1px solid #f0f0f0;
-        position: sticky;
-        top: 2rem;
-    }
-
-    .filter-header {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .filter-header h3 {
-        font-size: 1rem;
-        font-weight: 600;
-        color: #1a1a1a;
-        margin: 0;
-    }
-
-    .filter-section {
-        margin-bottom: 1.25rem;
-    }
-
-    .filter-label {
-        font-size: 0.8125rem;
-        color: #666;
-        margin-bottom: 0.5rem;
-        display: block;
-        font-weight: 500;
-    }
-
-    .filter-select {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        border: 1px solid #e5e5e5;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        background: white;
-        cursor: pointer;
-    }
-
-    .product-type-buttons {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-
-    .product-type-btn {
-        flex: 1;
-        padding: 0.75rem 0.5rem;
-        border: 1px solid #e5e5e5;
-        border-radius: 10px;
-        font-size: 0.75rem;
-        font-weight: 500;
-        cursor: pointer;
-        background: white;
-        text-align: center;
-        transition: all 0.2s;
-        text-decoration: none;
-        color: #666;
-    }
-
-    .product-type-btn:hover {
-        border-color: #d4a800;
-    }
-
-    .product-type-btn.active {
-        background: #fef3c7;
-        border-color: #d4a800;
-        color: #1a1a1a;
-    }
-
-    .apply-btn {
-        width: 100%;
-        padding: 0.875rem;
-        background: #d4a800;
-        color: white;
-        border: none;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-
-    .apply-btn:hover {
-        background: #b89500;
-    }
-
-    .empty-message {
-        text-align: center;
-        padding: 1.5rem;
-        color: #999;
-        font-size: 0.875rem;
-    }
-
-    @media (max-width: 1024px) {
-        .analytics-container {
-            flex-direction: column;
-        }
-
-        .analytics-sidebar {
-            width: 100%;
-        }
-
-        .summary-cards {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        .bottom-grid {
-            grid-template-columns: 1fr;
-        }
-    }
+    /* Tighter tables + customer rows. */
+    .an-card { padding: 14px 14px; }
+    .an-tbl th, .an-tbl td { padding: 9px 4px; }
+    .an-prod-name { font-size: 12.5px; }
+    .an-cust { grid-template-columns: 20px 30px 1fr auto; gap: 8px; padding: 11px 2px; }
+    .an-cust-avatar { width: 30px; height: 30px; font-size: 11.5px; }
+    .an-cust-spent .amt { font-size: 13.5px; }
+    .an-cust-meta { gap: 4px; }
+  }
+  @media (max-width: 420px) {
+    /* On the smallest phones, drop the per-product mini chart and the
+       customer rank chip to save width. */
+    .an-cust { grid-template-columns: 30px 1fr auto; }
+    .an-cust > .an-rank { display: none; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="analytics-container">
-    <div class="analytics-main">
-        <!-- Header -->
-        <div class="analytics-header">
-            <div class="header-left">
-                <h1>{% trans "Overview" %}</h1>
-                <p>Review your order data and performance metrics</p>
-            </div>
-            <div class="header-right">
-                <div class="last-update">Last Update: {% now "d M, H:i" %}</div>
-            </div>
-        </div>
+<div class="an-wrap">
 
-        <!-- Summary Cards -->
-        <div class="summary-cards">
-            <div class="summary-card">
-                <div class="card-header">
-                    <div class="card-icon"><i class="fas fa-wallet"></i></div>
-                </div>
-                <div class="card-label">Total Revenue</div>
-                <div class="card-value">${{ summary.total_revenue|floatformat:2|default:"0.00" }}</div>
-            </div>
-            <div class="summary-card">
-                <div class="card-header">
-                    <div class="card-icon"><i class="fas fa-shopping-bag"></i></div>
-                </div>
-                <div class="card-label">Total Orders</div>
-                <div class="card-value">{{ summary.total_orders|default:"0" }}</div>
-            </div>
-            <div class="summary-card">
-                <div class="card-header">
-                    <div class="card-icon custom"><i class="fas fa-cut"></i></div>
-                </div>
-                <div class="card-label">Custom Curtain</div>
-                <div class="card-value">{{ summary.custom_curtain_count|default:"0" }}</div>
-            </div>
-            <div class="summary-card">
-                <div class="card-header">
-                    <div class="card-icon fabric"><i class="fas fa-scroll"></i></div>
-                </div>
-                <div class="card-label">Fabric</div>
-                <div class="card-value">{{ summary.fabric_count|default:"0" }}</div>
-            </div>
-            <div class="summary-card">
-                <div class="card-header">
-                    <div class="card-icon" style="background: linear-gradient(135deg, #10b981, #059669);"><i
-                            class="fas fa-chart-line"></i></div>
-                </div>
-                <div class="card-label">Total Profit</div>
-                <div class="card-value" style="color: #10b981;">${{ summary.total_profit|floatformat:2|default:"0.00" }}
-                </div>
-            </div>
-            <div class="summary-card">
-                <div class="card-header">
-                    <div class="card-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);"><i
-                            class="fas fa-coins"></i></div>
-                </div>
-                <div class="card-label">Total Cost</div>
-                <div class="card-value" style="color: #ef4444;">${{ summary.total_cost|floatformat:2|default:"0.00" }}
-                </div>
-            </div>
-        </div>
+  <!-- Header -->
+  <div class="an-head">
+    <div>
+      <div class="an-eyebrow">{% trans "Analytics" %}</div>
+      <h1 class="an-title">{% trans "Sales Overview" %}</h1>
+      <div class="an-title-sub">
+        {% if custom_range %}{{ custom_start }} → {{ custom_end }}
+        {% elif range == '7d' %}{% trans "Last 7 days" %}
+        {% elif range == '30d' %}{% trans "Last 30 days" %}
+        {% elif range == '90d' %}{% trans "Last 3 months" %}
+        {% elif range == '180d' %}{% trans "Last 6 months" %}
+        {% else %}{% trans "Last year" %}{% endif %}
+        {% if channel == 'web' %} · {% trans "Web sales" %}{% elif channel == 'manual' %} · {% trans "Manual sales" %}{% endif %}
+      </div>
+    </div>
+  </div>
 
-        <!-- Chart Section -->
-        <div class="chart-section">
-            <div class="chart-header">
-                <div class="chart-title">
-                    <h3>{% trans "Sales Trends" %}</h3>
-                    <p>Revenue distribution over time</p>
-                </div>
-                <div class="chart-controls">
-                    <div class="period-tabs">
-                        <button type="button" onclick="switchPeriod('weekly')"
-                            class="period-tab {% if period == 'weekly' %}active{% endif %}"
-                            data-period="weekly">{% trans "Weekly" %}</button>
-                        <button type="button" onclick="switchPeriod('monthly')"
-                            class="period-tab {% if period == 'monthly' or not period %}active{% endif %}"
-                            data-period="monthly">{% trans "Monthly" %}</button>
-                        <button type="button" onclick="switchPeriod('yearly')"
-                            class="period-tab {% if period == 'yearly' %}active{% endif %}"
-                            data-period="yearly">{% trans "Yearly" %}</button>
-                    </div>
-                    <button class="weekly-btn" id="toggleWeeklyBtn" onclick="toggleWeeklyView()">
-                        <i class="fas fa-calendar-week"></i> Last 7 Days
-                    </button>
-                </div>
-            </div>
-            <div class="chart-container">
-                <canvas id="salesChart"></canvas>
-            </div>
-        </div>
+  <!-- Filters -->
+  <form id="anForm" method="get">
+    <input type="hidden" name="range" value="{{ range }}">
+    <input type="hidden" name="channel" value="{{ channel }}">
+    <input type="hidden" name="product_type" value="{{ product_type }}">
 
-        <!-- Bottom Lists -->
-        <div class="bottom-grid">
-            <!-- Top Custom Curtains -->
-            <div class="list-card">
-                <div class="list-header">
-                    <h3><i class="fas fa-cut"></i> Top Selling Curtains <span class="badge badge-custom">Curtain</span>
-                    </h3>
-                </div>
-                {% for product in top_custom %}
-                <div class="list-item">
-                    <div class="item-avatar custom"><i class="fas fa-cut"></i></div>
-                    <div class="item-info">
-                        <div class="item-name">{{ product.product__title|truncatewords:4|default:"Unknown" }}</div>
-                        <div class="item-meta">{{ product.product__sku }}</div>
-                    </div>
-                    <div class="item-value">
-                        <div class="item-amount">{{ product.total_quantity }} Sales</div>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="empty-message">No curtain sales yet</div>
-                {% endfor %}
-            </div>
+    <div class="an-filters">
+      <!-- Time window presets -->
+      <div class="an-seg">
+        <span class="an-seg-label"><i class="fa fa-calendar-day"></i></span>
+        <button type="button" class="an-seg-btn {% if range == '7d' and not custom_range %}active{% endif %}" onclick="anSetRange('7d')">{% trans "1 week" %}</button>
+        <button type="button" class="an-seg-btn {% if range == '30d' and not custom_range %}active{% endif %}" onclick="anSetRange('30d')">{% trans "1 month" %}</button>
+        <button type="button" class="an-seg-btn {% if range == '90d' and not custom_range %}active{% endif %}" onclick="anSetRange('90d')">{% trans "3 months" %}</button>
+        <button type="button" class="an-seg-btn {% if range == '180d' and not custom_range %}active{% endif %}" onclick="anSetRange('180d')">{% trans "6 months" %}</button>
+        <button type="button" class="an-seg-btn {% if range == '365d' and not custom_range %}active{% endif %}" onclick="anSetRange('365d')">{% trans "1 year" %}</button>
+      </div>
 
-            <!-- Top Fabric -->
-            <div class="list-card">
-                <div class="list-header">
-                    <h3><i class="fas fa-scroll"></i> Top Selling Fabrics <span class="badge badge-fabric">Fabric</span>
-                    </h3>
-                </div>
-                {% for product in top_fabric %}
-                <div class="list-item">
-                    <div class="item-avatar fabric"><i class="fas fa-scroll"></i></div>
-                    <div class="item-info">
-                        <div class="item-name">{{ product.product__title|truncatewords:4|default:"Unknown" }}</div>
-                        <div class="item-meta">{{ product.product__sku }}</div>
-                    </div>
-                    <div class="item-value">
-                        <div class="item-amount">{{ product.total_quantity|floatformat:2 }} Meters</div>
-                    </div>
-                </div>
-                {% empty %}
-                <div class="empty-message">No fabric sales yet</div>
-                {% endfor %}
-            </div>
+      <!-- Custom date range -->
+      <div class="an-seg an-daterange {% if custom_range %}active-range{% endif %}">
+        <span class="an-seg-label"><i class="fa fa-calendar-week"></i></span>
+        <input type="date" name="start" id="anStart" class="an-date" value="{{ custom_start }}" max="{{ custom_end|default:'' }}">
+        <span class="an-date-sep">→</span>
+        <input type="date" name="end" id="anEnd" class="an-date" value="{{ custom_end }}" min="{{ custom_start|default:'' }}">
+        <button type="button" class="an-date-apply" onclick="anApplyRange()" title="{% trans 'Apply date range' %}">
+          <i class="fa fa-arrow-right"></i>
+        </button>
+        {% if custom_range %}
+        <button type="button" class="an-date-clear" onclick="anClearRange()" title="{% trans 'Clear date range' %}">
+          <i class="fa fa-times"></i>
+        </button>
+        {% endif %}
+      </div>
 
-            <!-- Top Customers -->
-            <div class="list-card" style="grid-column: span 2;">
-                <div class="list-header">
-                    <h3><i class="fas fa-users"></i> Top Customers</h3>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr);">
-                    {% for customer in top_customers|slice:":6" %}
-                    <div class="list-item">
-                        <div class="item-avatar">{{ customer.web_client__name|slice:":2"|upper|default:"??" }}</div>
-                        <div class="item-info">
-                            <div class="item-name">{{ customer.web_client__name|default:"Guest" }}</div>
-                            <div class="item-meta">{{ customer.order_count }} Orders</div>
-                        </div>
-                        <div class="item-value">
-                            <div class="item-amount">${{ customer.total_spent|floatformat:2 }}</div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="empty-message" style="grid-column: span 2;">No customer data yet</div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
+      <!-- Channel -->
+      <div class="an-seg">
+        <span class="an-seg-label">{% trans "Channel" %}</span>
+        <button type="button" class="an-seg-btn {% if channel == 'all' %}active{% endif %}" onclick="anSet('channel','all')">{% trans "All" %}</button>
+        <button type="button" class="an-seg-btn {% if channel == 'web' %}active{% endif %}" onclick="anSet('channel','web')"><i class="fa fa-globe" style="font-size:10px;margin-right:4px;"></i>{% trans "Web" %}</button>
+        <button type="button" class="an-seg-btn {% if channel == 'manual' %}active{% endif %}" onclick="anSet('channel','manual')"><i class="fa fa-store" style="font-size:10px;margin-right:4px;"></i>{% trans "Manual" %}</button>
+      </div>
+
+      <!-- Product type -->
+      <div class="an-seg">
+        <span class="an-seg-label">{% trans "Type" %}</span>
+        <button type="button" class="an-seg-btn {% if product_type == 'all' %}active{% endif %}" onclick="anSet('product_type','all')">{% trans "All" %}</button>
+        <button type="button" class="an-seg-btn {% if product_type == 'custom' %}active{% endif %}" onclick="anSet('product_type','custom')">{% trans "Custom" %}</button>
+        <button type="button" class="an-seg-btn {% if product_type == 'fabric' %}active{% endif %}" onclick="anSet('product_type','fabric')">{% trans "Fabric" %}</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- KPI cards -->
+  <div class="an-kpis">
+    <div class="an-kpi">
+      <div class="an-kpi-top">
+        <span class="an-kpi-label">{% trans "Revenue" %}</span>
+        <span class="an-kpi-icon"><i class="fa fa-dollar-sign"></i></span>
+      </div>
+      <div class="an-kpi-value">${{ summary.total_revenue|floatformat:2 }}</div>
+      <div class="an-kpi-meta">{{ summary.total_orders }} {% trans "orders" %}</div>
     </div>
 
-    <!-- Sidebar -->
-    <div class="analytics-sidebar">
-        <div class="filter-card">
-            <div class="filter-header">
-                <i class="fas fa-sliders-h"></i>
-                <h3>{% trans "Filter" %}</h3>
-            </div>
-
-            <form method="get" action="">
-                <input type="hidden" name="period" value="{{ period|default:'monthly' }}">
-
-                <div class="filter-section">
-                    <label class="filter-label">{% trans "Product Type" %}</label>
-                    <div class="product-type-buttons">
-                        <a href="?period={{ period }}&days={{ days }}&product_type=all"
-                            class="product-type-btn {% if product_type == 'all' or not product_type %}active{% endif %}">
-                            <i class="fas fa-layer-group"></i><br>All
-                        </a>
-                        <a href="?period={{ period }}&days={{ days }}&product_type=custom"
-                            class="product-type-btn {% if product_type == 'custom' %}active{% endif %}">
-                            <i class="fas fa-cut"></i><br>Custom Curtain
-                        </a>
-                        <a href="?period={{ period }}&days={{ days }}&product_type=fabric"
-                            class="product-type-btn {% if product_type == 'fabric' %}active{% endif %}">
-                            <i class="fas fa-scroll"></i><br>Fabric
-                        </a>
-                    </div>
-                </div>
-
-                <div class="filter-section">
-                    <label class="filter-label">{% trans "Date Range" %}</label>
-                    <select name="days" class="filter-select" onchange="this.form.submit()">
-                        <option value="7" {% if days == 7 %}selected{% endif %}>{% trans "Last 7 days" %}</option>
-                        <option value="30" {% if days == 30 %}selected{% endif %}>{% trans "Last 30 days" %}</option>
-                        <option value="90" {% if days == 90 %}selected{% endif %}>{% trans "Last 90 days" %}</option>
-                        <option value="180" {% if days == 180 %}selected{% endif %}>{% trans "Last 6 months" %}</option>
-                        <option value="365" {% if days == 365 or not days %}selected{% endif %}>{% trans "Last 1 year" %}</option>
-                        <option value="730" {% if days == 730 %}selected{% endif %}>{% trans "Last 2 years" %}</option>
-                    </select>
-                </div>
-
-                <input type="hidden" name="product_type" value="{{ product_type|default:'all' }}">
-            </form>
-        </div>
+    <div class="an-kpi profit {% if summary.total_profit < 0 %}neg{% endif %}">
+      <div class="an-kpi-top">
+        <span class="an-kpi-label">{% trans "Profit" %}</span>
+        <span class="an-kpi-icon"><i class="fa fa-arrow-trend-up"></i></span>
+      </div>
+      <div class="an-kpi-value">${{ summary.total_profit|floatformat:2 }}</div>
+      <div class="an-kpi-meta">
+        {% trans "Margin" %}
+        <b class="{% if summary.margin_pct < 0 %}neg{% else %}pos{% endif %}">{{ summary.margin_pct }}%</b>
+      </div>
     </div>
+
+    <div class="an-kpi cost">
+      <div class="an-kpi-top">
+        <span class="an-kpi-label">{% trans "Cost (COGS)" %}</span>
+        <span class="an-kpi-icon"><i class="fa fa-box"></i></span>
+      </div>
+      <div class="an-kpi-value">${{ summary.total_cost|floatformat:2 }}</div>
+      <div class="an-kpi-meta">{% trans "Goods sold" %}</div>
+    </div>
+
+    <div class="an-kpi orders">
+      <div class="an-kpi-top">
+        <span class="an-kpi-label">{% trans "Avg order" %}</span>
+        <span class="an-kpi-icon"><i class="fa fa-receipt"></i></span>
+      </div>
+      <div class="an-kpi-value">${{ summary.avg_order|floatformat:2 }}</div>
+      <div class="an-kpi-meta">{% trans "per order" %}</div>
+    </div>
+  </div>
+
+  <!-- Trend + Channel -->
+  <div class="an-grid">
+    <div class="an-card">
+      <div class="an-card-h">
+        <h3>{% trans "Revenue trend" %}</h3>
+        <span class="sub">
+          {% if granularity == 'daily' %}{% trans "Daily" %}{% elif granularity == 'weekly' %}{% trans "Weekly" %}{% else %}{% trans "Monthly" %}{% endif %}
+        </span>
+      </div>
+      <div class="an-chart-box"><canvas id="trendChart"></canvas></div>
+    </div>
+
+    <div class="an-card">
+      <div class="an-card-h">
+        <h3>{% trans "Sales by channel" %}</h3>
+      </div>
+      <div class="an-chart-box sm"><canvas id="channelChart"></canvas></div>
+      <div style="margin-top:14px;">
+        <div class="an-channel-row">
+          <span class="an-channel-dot" style="background:#F59E0B;"></span>
+          <div>
+            <div class="an-channel-name">{% trans "Web sales" %}</div>
+            <div class="an-channel-sub">{{ web_split.orders }} {% trans "orders" %}</div>
+          </div>
+          <div class="an-channel-val">
+            <div class="big">${{ web_split.revenue|floatformat:2 }}</div>
+          </div>
+        </div>
+        <div class="an-channel-row">
+          <span class="an-channel-dot" style="background:#147F74;"></span>
+          <div>
+            <div class="an-channel-name">{% trans "Manual sales" %}</div>
+            <div class="an-channel-sub">{{ manual_split.orders }} {% trans "orders" %}</div>
+          </div>
+          <div class="an-channel-val">
+            <div class="big">${{ manual_split.revenue|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top products + customers -->
+  <div class="an-grid">
+    <!-- Top products -->
+    <div class="an-card">
+      <div class="an-card-h">
+        <h3>{% trans "Top products" %}</h3>
+        <span class="sub">{% trans "by revenue" %}</span>
+      </div>
+      {% if top_products %}
+      <div class="an-chart-box sm" style="margin-bottom:14px;"><canvas id="productChart"></canvas></div>
+      <table class="an-tbl">
+        <thead>
+          <tr>
+            <th style="width:28px;">#</th>
+            <th>{% trans "Product" %}</th>
+            <th class="num">{% trans "Qty" %}</th>
+            <th class="num">{% trans "Revenue" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in top_products %}
+          <tr>
+            <td><span class="an-rank {% if forloop.counter <= 3 %}top{% endif %}">{{ forloop.counter }}</span></td>
+            <td>
+              <div class="an-prod-name">{{ p.product__title|default:"—"|truncatechars:36 }}</div>
+              {% if p.product__sku %}<div class="an-prod-sku">{{ p.product__sku }}</div>{% endif %}
+            </td>
+            <td class="num">{{ p.qty|floatformat:"-2" }}</td>
+            <td class="num"><b>${{ p.revenue|floatformat:2 }}</b></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="an-empty"><i class="fa fa-box-open"></i>{% trans "No product sales in this period." %}</div>
+      {% endif %}
+    </div>
+
+    <!-- Top customers -->
+    <div class="an-card">
+      <div class="an-card-h">
+        <h3>{% trans "Top customers" %}</h3>
+        <span class="sub">{% trans "by spend" %}</span>
+      </div>
+      {% if top_customers %}
+      <div>
+        {% for c in top_customers %}
+        {% if c.kind == 'company' %}
+          <a class="an-cust" href="{% url 'crm:company_detail' c.id %}">
+        {% elif c.kind == 'contact' %}
+          <a class="an-cust" href="{% url 'crm:contact_detail' c.id %}">
+        {% else %}
+          <span class="an-cust">
+        {% endif %}
+          <span class="an-rank {% if forloop.counter <= 3 %}top{% endif %}">{{ forloop.counter }}</span>
+          <span class="an-cust-avatar {{ c.kind }}">
+            {% if c.kind == 'company' %}<i class="fa fa-building"></i>
+            {% elif c.kind == 'web' %}<i class="fa fa-globe"></i>
+            {% else %}{{ c.name|slice:":2"|upper }}{% endif %}
+          </span>
+          <div style="min-width:0;">
+            <div class="an-cust-name">{{ c.name|truncatechars:28 }}</div>
+            <div class="an-cust-meta">
+              <span class="an-cust-kind {{ c.kind }}">
+                {% if c.kind == 'company' %}{% trans "Company" %}{% elif c.kind == 'contact' %}{% trans "Contact" %}{% else %}{% trans "Web" %}{% endif %}
+              </span>
+              {% if c.cari %}
+                <span class="an-cust-cari" onclick="event.preventDefault(); window.location='{% url 'current_account:cari_detail' c.cari.pk %}';" title="{% trans 'Open current account' %}">
+                  <i class="fa fa-wallet"></i>{{ c.cari.code }} ·
+                  <span class="bal {% if c.cari.balance > 0 %}owe{% elif c.cari.balance < 0 %}credit{% endif %}">{{ c.cari.symbol }}{{ c.cari.abs_balance|floatformat:2 }} {{ c.cari.label }}</span>
+                </span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="an-cust-spent">
+            <div class="amt">${{ c.spent|floatformat:2 }}</div>
+            <div class="ord">{{ c.orders }} {% trans "orders" %}</div>
+          </div>
+        {% if c.kind == 'company' or c.kind == 'contact' %}</a>{% else %}</span>{% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="an-empty"><i class="fa fa-users"></i>{% trans "No customer sales in this period." %}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Status distribution -->
+  {% if status_rows %}
+  <div class="an-card">
+    <div class="an-card-h">
+      <h3>{% trans "Order status mix" %}</h3>
+      <span class="sub">{% trans "all orders in window" %}</span>
+    </div>
+    <div class="an-status-bar" id="anStatusBar"></div>
+    <div class="an-status-legend" id="anStatusLegend"></div>
+  </div>
+  {% endif %}
+
 </div>
 
-<!-- Chart.js CDN -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
 <script>
-    // Chart data from Django
-    var mainLabels = [];
-    var mainRevenues = [];
-    var weeklyLabels = [];
-    var weeklyRevenues = [];
-    var isWeeklyView = false;
-    var salesChart = null;
-
-    {% if chart_labels %}
-    mainLabels = {{ chart_labels | safe }};
-    {% endif %}
-
-    {% if chart_revenues %}
-    mainRevenues = {{ chart_revenues | safe }};
-    {% endif %}
-
-    {% if weekly_labels %}
-    weeklyLabels = {{ weekly_labels | safe }};
-    {% endif %}
-
-    {% if weekly_revenues %}
-    weeklyRevenues = {{ weekly_revenues | safe }};
-    {% endif %}
-
-    // If no data, show placeholder
-    if (!mainLabels || mainLabels.length === 0) {
-        mainLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  // Filter form helper — set a hidden field and submit. Channel /
+  // product-type keep whatever date window is active.
+  function anSet(name, value) {
+    var f = document.getElementById('anForm');
+    var inp = f.querySelector('[name="' + name + '"]');
+    if (inp) { inp.value = value; f.submit(); }
+  }
+  // Preset window — clears any custom date range first.
+  function anSetRange(value) {
+    var f = document.getElementById('anForm');
+    f.querySelector('[name="range"]').value = value;
+    document.getElementById('anStart').value = '';
+    document.getElementById('anEnd').value = '';
+    f.submit();
+  }
+  // Apply the custom from/to dates. Requires both ends.
+  function anApplyRange() {
+    var s = document.getElementById('anStart').value;
+    var e = document.getElementById('anEnd').value;
+    if (!s || !e) {
+      alert('{% trans "Please pick both a start and an end date." %}');
+      return;
     }
-    if (!mainRevenues || mainRevenues.length === 0) {
-        mainRevenues = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    }
+    document.getElementById('anForm').submit();
+  }
+  // Clear the custom range and fall back to the preset.
+  function anClearRange() {
+    document.getElementById('anStart').value = '';
+    document.getElementById('anEnd').value = '';
+    document.getElementById('anForm').submit();
+  }
 
-    function toggleWeeklyView() {
-        isWeeklyView = !isWeeklyView;
-        var btn = document.getElementById('toggleWeeklyBtn');
+  (function () {
+    var trendLabels = {{ trend_labels|safe }};
+    var trendRev    = {{ trend_rev|safe }};
+    var channelData = {{ channel_chart|safe }};
+    var prodLabels  = {{ prod_labels|safe }};
+    var prodRev     = {{ prod_rev|safe }};
+    var statusRows  = [{% for s in status_rows %}{ status: "{{ s.order_status }}", n: {{ s.n }} }{% if not forloop.last %},{% endif %}{% endfor %}];
 
-        if (isWeeklyView) {
-            btn.classList.add('active');
-            btn.innerHTML = '<i class="fas fa-chart-line"></i> Main Chart';
-            updateChart(weeklyLabels && weeklyLabels.length > 0 ? weeklyLabels : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                weeklyRevenues && weeklyRevenues.length > 0 ? weeklyRevenues : [0, 0, 0, 0, 0, 0, 0]);
-        } else {
-            btn.classList.remove('active');
-            btn.innerHTML = '<i class="fas fa-calendar-week"></i> Last 7 Days';
-            updateChart(mainLabels, mainRevenues);
-        }
-    }
+    if (typeof Chart === 'undefined') return;
 
-    function updateChart(labels, data) {
-        if (salesChart && salesChart.data) {
-            salesChart.data.labels = labels;
-            salesChart.data.datasets[0].data = data;
-            salesChart.update('active');
-        } else {
-            console.error("Chart or Chart data not found during update");
-        }
-    }
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+    Chart.defaults.color = '#64748B';
 
-    // Smooth period switching without page reload
-    function switchPeriod(period) {
-        // Update active tab
-        document.querySelectorAll('.period-tab').forEach(function (tab) {
-            tab.classList.remove('active');
-            if (tab.dataset.period === period) {
-                tab.classList.add('active');
+    var money = function (v) {
+      return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    };
+
+    // ── Revenue trend (line) ──
+    var tEl = document.getElementById('trendChart');
+    if (tEl && trendLabels.length) {
+      var ctx = tEl.getContext('2d');
+      var grad = ctx.createLinearGradient(0, 0, 0, 300);
+      grad.addColorStop(0, 'rgba(20,127,116,0.28)');
+      grad.addColorStop(1, 'rgba(20,127,116,0.01)');
+      new Chart(ctx, {
+        type: 'line',
+        data: { labels: trendLabels, datasets: [{
+          label: 'Revenue', data: trendRev,
+          borderColor: '#147F74', backgroundColor: grad, fill: true,
+          tension: 0.35, borderWidth: 2.5, pointRadius: 3,
+          pointBackgroundColor: '#147F74', pointBorderColor: '#fff', pointBorderWidth: 1.5,
+          pointHoverRadius: 6,
+        }]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1419', padding: 11, cornerRadius: 8, displayColors: false,
+              callbacks: { label: function (c) { return '$' + c.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } }
             }
-        });
-
-        // Get current URL params
-        var params = new URLSearchParams(window.location.search);
-        params.set('period', period);
-        params.set('format', 'json');
-
-        // Add loading state
-        var chartContainer = document.querySelector('.chart-container');
-        chartContainer.style.opacity = '0.5';
-
-        // Fetch data from server
-        fetch('?' + params.toString(), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                // Update chart with smooth animation
-                if (data.chart_labels && data.chart_revenues) {
-                    updateChart(data.chart_labels, data.chart_revenues);
-                }
-                chartContainer.style.opacity = '1';
-
-                // Update URL without reload
-                params.delete('format');
-                history.pushState({}, '', '?' + params.toString());
-            })
-            .catch(function (error) {
-                console.error('Error:', error);
-                chartContainer.style.opacity = '1';
-            });
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+            y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: function (v) { return money(v); } } }
+          }
+        }
+      });
+    } else if (tEl) {
+      tEl.parentElement.innerHTML = '<div class="an-empty"><i class="fa fa-chart-line"></i>{% trans "No sales in this period." %}</div>';
     }
 
-    // Wait for DOM
-    document.addEventListener('DOMContentLoaded', function () {
-        var canvas = document.getElementById('salesChart');
-        if (!canvas) {
-            console.error("Sales chart canvas not found");
-            return;
+    // ── Channel doughnut ──
+    var cEl = document.getElementById('channelChart');
+    if (cEl && (channelData[0] > 0 || channelData[1] > 0)) {
+      new Chart(cEl.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['{% trans "Web" %}', '{% trans "Manual" %}'],
+          datasets: [{ data: channelData, backgroundColor: ['#F59E0B', '#147F74'], borderWidth: 0, hoverOffset: 6 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '64%',
+          plugins: {
+            legend: { display: false },
+            tooltip: { backgroundColor: '#0F1419', padding: 10, cornerRadius: 8,
+              callbacks: { label: function (c) { return c.label + ': $' + c.parsed.toLocaleString('en-US', { minimumFractionDigits: 2 }); } } }
+          }
         }
+      });
+    } else if (cEl) {
+      cEl.parentElement.innerHTML = '<div class="an-empty"><i class="fa fa-circle-notch"></i>{% trans "No channel data." %}</div>';
+    }
 
-        if (typeof Chart === 'undefined') {
-            console.error("Chart.js library not loaded");
-            const container = canvas.parentElement;
-            if (container) {
-                container.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;"><i class="fas fa-exclamation-triangle"></i><p>Chart library failed to load.</p></div>';
-            }
-            return;
+    // ── Top products (horizontal bar) ──
+    var pEl = document.getElementById('productChart');
+    if (pEl && prodLabels.length) {
+      new Chart(pEl.getContext('2d'), {
+        type: 'bar',
+        data: { labels: prodLabels, datasets: [{ label: 'Revenue', data: prodRev, backgroundColor: '#147F74', borderRadius: 6, barThickness: 'flex', maxBarThickness: 22 }] },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { backgroundColor: '#0F1419', padding: 10, cornerRadius: 8, displayColors: false,
+              callbacks: { label: function (c) { return '$' + c.parsed.x.toLocaleString('en-US', { minimumFractionDigits: 2 }); } } }
+          },
+          scales: {
+            x: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: function (v) { return money(v); } } },
+            y: { grid: { display: false } }
+          }
         }
+      });
+    }
 
-        var ctx = canvas.getContext('2d');
-        if (!ctx) return;
+    // ── Status mix bar (pure DOM, no chart lib needed) ──
+    var STATUS_COLORS = {
+      pending: '#F59E0B', confirmed: '#10B981', preparing: '#3B82F6', packaging: '#3B82F6',
+      shipped: '#F97316', in_transit: '#F97316', out_for_delivery: '#F97316',
+      delivered: '#10B981', cancelled: '#EF4444', returned: '#EF4444'
+    };
+    var STATUS_LABELS = {
+      pending: '{% trans "Pending" %}', confirmed: '{% trans "Confirmed" %}', preparing: '{% trans "Preparing" %}',
+      packaging: '{% trans "Packaging" %}', shipped: '{% trans "Shipped" %}', in_transit: '{% trans "In transit" %}',
+      out_for_delivery: '{% trans "Out for delivery" %}', delivered: '{% trans "Delivered" %}',
+      cancelled: '{% trans "Cancelled" %}', returned: '{% trans "Returned" %}'
+    };
+    var bar = document.getElementById('anStatusBar');
+    var legend = document.getElementById('anStatusLegend');
+    if (bar && statusRows.length) {
+      var total = statusRows.reduce(function (s, r) { return s + r.n; }, 0) || 1;
+      statusRows.forEach(function (r) {
+        var col = STATUS_COLORS[r.status] || '#94A3B8';
+        var seg = document.createElement('div');
+        seg.className = 'an-status-seg';
+        seg.style.width = (r.n / total * 100) + '%';
+        seg.style.background = col;
+        seg.title = (STATUS_LABELS[r.status] || r.status) + ': ' + r.n;
+        bar.appendChild(seg);
 
-        // Create gradient
-        var gradient = ctx.createLinearGradient(0, 0, 0, 300);
-        gradient.addColorStop(0, 'rgba(212, 168, 0, 0.4)');
-        gradient.addColorStop(1, 'rgba(212, 168, 0, 0.05)');
-
-        // Create chart
-        salesChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: mainLabels,
-                datasets: [{
-                    label: 'Revenue ($)',
-                    data: mainRevenues,
-                    borderColor: '#d4a800',
-                    backgroundColor: gradient,
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 3,
-                    pointRadius: 5,
-                    pointBackgroundColor: '#d4a800',
-                    pointBorderColor: '#ffffff',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: '#1a1a1a',
-                        titleColor: '#ffffff',
-                        bodyColor: '#ffffff',
-                        padding: 12,
-                        cornerRadius: 8,
-                        displayColors: false,
-                        callbacks: {
-                            label: function (context) {
-                                return '$' + context.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            }
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        color: '#888888'
-                    }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: '#f0f0f0'
-                    },
-                    ticks: {
-                        color: '#888888',
-                        callback: function (value) {
-                            return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        }
-                    }
-                }
-            }
-        });
-    });
+        var item = document.createElement('span');
+        item.className = 'an-status-item';
+        item.innerHTML = '<span class="dot" style="background:' + col + ';"></span>' +
+          (STATUS_LABELS[r.status] || r.status) + ' <b>' + r.n + '</b>';
+        legend.appendChild(item);
+      });
+    }
+  })();
 </script>
 {% endblock %}

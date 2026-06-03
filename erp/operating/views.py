@@ -439,6 +439,13 @@ class OrderDetail(DetailView):
             order.save(update_fields=["notes", "updated_at"])
             return JsonResponse({"ok": True})
 
+        # ── Toggle customer-notification opt-in ─────────────────
+        if action == "update_notify":
+            raw = (request.POST.get("notify_customer") or "").strip().lower()
+            order.notify_customer = raw in ("1", "true", "on", "yes")
+            order.save(update_fields=["notify_customer", "updated_at"])
+            return JsonResponse({"ok": True, "notify_customer": order.notify_customer})
+
         # ── Add item ────────────────────────────────────────────
         if action == "add_item":
             sku = (request.POST.get("sku") or "").strip()
@@ -919,6 +926,10 @@ class OrderCreate(View):
                         order.guest_email = request.POST.get("guest_email", "")
                         order.guest_phone = request.POST.get("guest_phone", "")
 
+                    # Notification opt-in — staff ticked "Send customer
+                    # emails for this order" in the create sidebar.
+                    order.notify_customer = bool(request.POST.get("notify_customer"))
+
                     # Payment method / amount-paid fields removed from
                     # the form — deposit is handled separately below as
                     # a proper cari collection. We leave the fields on
@@ -1033,6 +1044,17 @@ class OrderCreate(View):
                     except Exception as _e:
                         messages.warning(request, f"Order saved but deposit posting failed: {_e}")
 
+                # ── Customer notification email ───────────────────────
+                # Best-effort — never blocks the order save. Sends only
+                # when notify_customer is True (staff opt-in) AND the
+                # order has a usable customer email.
+                try:
+                    if order.notify_customer:
+                        from .order_notifications import send_order_event_email
+                        send_order_event_email(order, "created", attach_pdf=True)
+                except Exception as _e:
+                    messages.warning(request, f"Order saved but confirmation email failed: {_e}")
+
                 return redirect("operating:order_detail", pk=order.pk)
             except Exception as e:
                 messages.error(request, f"Order creation failed: {e}")
@@ -1104,6 +1126,14 @@ class OrderEdit(UpdateView):
                 # Save the order
                 self.object = form.save()
                 # order = self.object
+
+                # Notification preference — read from POST since OrderForm
+                # doesn't include the field. Lets staff toggle it from
+                # the same Edit sidebar.
+                new_notify = bool(self.request.POST.get("notify_customer"))
+                if self.object.notify_customer != new_notify:
+                    self.object.notify_customer = new_notify
+                    self.object.save(update_fields=["notify_customer", "updated_at"])
 
                 # Handle customer update
                 customer = self.request.POST.get("customer")
@@ -2494,274 +2524,247 @@ class OrderAnalytics(LoginRequiredMixin, View):
     """
     template_name = "operating/order_analytics.html"
     
+    # Time-window presets exposed in the UI.
+    RANGE_DAYS = {"7d": 7, "30d": 30, "90d": 90, "180d": 180, "365d": 365}
+
+    @staticmethod
+    def _granularity(days):
+        """Pick chart bucket size so the trend line is readable for any
+        window — daily for short ranges, weekly mid, monthly for a year."""
+        if days <= 31:
+            return "daily"
+        if days <= 180:
+            return "weekly"
+        return "monthly"
+
     def get(self, request):
-        from django.core.cache import cache
-        
-        # Get filter parameters
-        period = request.GET.get('period', 'monthly')
-        days = int(request.GET.get('days', 365))
-        product_type = request.GET.get('product_type', 'all')
-        
-        # Cache key based on parameters
-        cache_key = f"analytics_{period}_{days}_{product_type}"
-        cached_context = cache.get(cache_key)
-        
-        if cached_context:
-            # Serve from cache (5 minute cache)
-            return render(request, self.template_name, cached_context)
-        
         from django.utils import timezone
-        
-        # Date range
-        end_date = timezone.now()
-        start_date = end_date - timedelta(days=days)
-        
-        # Single optimized query for orders with only needed fields
-        orders = Order.objects.filter(
-            created_at__gte=start_date,
-            original_price__isnull=False  # Orders with USD price
-        ).exclude(
-            payment_status='failed'
-        ).only('id', 'created_at', 'original_price', 'payment_status', 'web_client_id')
-        
-        # Get order IDs for subqueries (more efficient than __in with queryset)
-        order_ids = list(orders.values_list('id', flat=True))
-        
-        # Summary metrics in single query
-        # Use original_price for USD revenue (this is the actual order total in USD)
-        summary = orders.aggregate(
-            total_orders=Count('id'),
-            total_revenue=Sum('original_price'),  # USD price from order
-            avg_order_value=Avg('original_price'),
-        )
-        
-        # Product counts in single query with conditional annotation
-        from django.db.models import Case, When, IntegerField
-        
-        product_counts = OrderItem.objects.filter(
-            order_id__in=order_ids
-        ).aggregate(
-            custom_count=Count('id', filter=Q(is_custom_curtain=True)),
-            fabric_count=Count('id', filter=Q(is_custom_curtain=False))
-        )
-        
-        custom_curtain_count = product_counts['custom_count']
-        fabric_count = product_counts['fabric_count']
-        
-        # Calculate total profit from order items
-        # Revenue = sum of (price * quantity) for each OrderItem
-        # Cost = sum of (product_cost * quantity) for each OrderItem
-        # Profit = Revenue - Cost
-        order_items = OrderItem.objects.filter(
-            order_id__in=order_ids
-        ).select_related('product', 'product_variant')
-        
-        total_revenue_from_items = Decimal('0')
-        total_profit = Decimal('0')
-        
-        for item in order_items:
-            qty = item.quantity or Decimal('1')  # Default to 1 if null
-            item_revenue = item.price * qty
-            total_revenue_from_items += item_revenue
-            
-            # Profit logic sync with SalesDashboard
-            item_profit = Decimal('0')
-            variant_cost = Decimal('0')
-            variant_price = Decimal('0')
-            
-            if item.product_variant:
-                variant_cost = item.product_variant.variant_cost or Decimal('0')
-                variant_price = item.product_variant.variant_price or Decimal('0')
-            elif item.product:
-                variant_cost = item.product.cost or Decimal('0')
-                variant_price = item.product.price or Decimal('0')
-            
-            if item.is_custom_curtain:
-                # Custom Curtain Formula:
-                # Profit = Total Price - (Fabric Amount × (variant_cost + 1)) - (Total Price × 0.145)
-                # Where:
-                #   - Total Price = item.price × quantity (item_revenue)
-                #   - Fabric Amount = custom_fabric_used_meters
-                #   - variant_cost + 1 = fabric cost + labor/overhead per meter
-                #   - 0.145 = 14.5% commission (payment processor/marketplace fee)
-                fabric_amount = item.custom_fabric_used_meters or Decimal('0')
-                fabric_cost_with_labor = fabric_amount * (variant_cost + Decimal('1'))
-                commission = item_revenue * Decimal('0.145')
-                item_profit = item_revenue - fabric_cost_with_labor - commission
-            else:
-                # Standard Item: Profit = Qty * (Sold Price - Cost)
-                unit_margin = item.price - variant_cost
-                item_profit = qty * unit_margin
-                
-            total_profit += item_profit
-        
-        # Derive total cost from Revenue and Profit to ensure consistency
-        total_cost = total_revenue_from_items - total_profit
-        
-        # Success rate - single query
-        all_orders_count = Order.objects.filter(created_at__gte=start_date).count()
-        successful_orders = orders.filter(payment_status='success').count()
-        success_rate = (successful_orders / all_orders_count * 100) if all_orders_count > 0 else 0
-        
-        # Optimized trend data query
-        if period == 'daily':
-            truncate_func = TruncDate('created_at')
-        elif period == 'weekly':
-            truncate_func = TruncWeek('created_at')
-        elif period == 'yearly':
-            truncate_func = TruncYear('created_at')
+        from django.db.models import Sum, Count, F, Value, DecimalField
+        from django.db.models.functions import Coalesce, TruncDate, TruncWeek, TruncMonth
+        from current_account.models import CariAccount
+        from datetime import datetime, time
+
+        DEC = DecimalField(max_digits=16, decimal_places=2)
+
+        # ── Filters ──────────────────────────────────────────────
+        channel = request.GET.get("channel", "all")        # all | web | manual
+        if channel not in ("all", "web", "manual"):
+            channel = "all"
+
+        product_type = request.GET.get("product_type", "all")  # all | custom | fabric
+        if product_type not in ("all", "custom", "fabric"):
+            product_type = "all"
+
+        # Time window — a custom from/to date range (YYYY-MM-DD) takes
+        # priority over the preset buttons. The end date is inclusive
+        # (covers the whole day). If only one bound or an invalid date
+        # is given we fall back to the preset range.
+        custom_start_raw = (request.GET.get("start") or "").strip()
+        custom_end_raw = (request.GET.get("end") or "").strip()
+        custom_range = False
+        custom_start = custom_end = ""
+        rng = request.GET.get("range", "30d")
+        if rng not in self.RANGE_DAYS:
+            rng = "30d"
+
+        if custom_start_raw and custom_end_raw:
+            try:
+                sd = datetime.strptime(custom_start_raw, "%Y-%m-%d").date()
+                ed = datetime.strptime(custom_end_raw, "%Y-%m-%d").date()
+                if sd > ed:
+                    sd, ed = ed, sd  # tolerate reversed inputs
+                start_date = timezone.make_aware(datetime.combine(sd, time.min))
+                end_date = timezone.make_aware(datetime.combine(ed, time.max))
+                days = max((ed - sd).days, 1)
+                custom_range = True
+                custom_start, custom_end = sd.isoformat(), ed.isoformat()
+            except (ValueError, TypeError):
+                custom_range = False
+
+        if not custom_range:
+            days = self.RANGE_DAYS[rng]
+            end_date = timezone.now()
+            start_date = end_date - timedelta(days=days)
+
+        # Sales = orders in window, excluding cancelled / returned (not revenue).
+        EXCLUDED = ["cancelled", "returned"]
+        base_orders = Order.objects.filter(
+            created_at__gte=start_date, created_at__lte=end_date
+        ).exclude(order_status__in=EXCLUDED)
+
+        # Channel predicates — partition EVERY order so web + manual
+        # always reconciles with the total. Web = placed through the
+        # online store (has a web_client). Manual = anything entered by
+        # staff (no web_client), whether or not a customer is attached
+        # yet. This matches the business meaning: "internet satışı" vs
+        # "manuel satış".
+        web_q = Q(web_client_id__isnull=False)
+        manual_q = Q(web_client_id__isnull=True)
+
+        if channel == "web":
+            filtered_orders = base_orders.filter(web_q)
+        elif channel == "manual":
+            filtered_orders = base_orders.filter(manual_q)
         else:
-            truncate_func = TruncMonth('created_at')
-        
-        trend_data = list(OrderItem.objects.filter(
-            order_id__in=order_ids
-        ).annotate(
-            date=truncate_func
-        ).values('date').annotate(
-            count=Count('order', distinct=True),
-            revenue=Sum(F('quantity') * F('price'))  # Calculate from items
-        ).order_by('date'))
-        
-        # Format trend data for Chart.js
-        chart_labels = []
-        chart_counts = []
-        chart_revenues = []
-        
-        date_formats = {
-            'daily': '%d %b',
-            'weekly': 'Week %W',
-            'yearly': '%Y',
-            'monthly': '%b %Y'
-        }
-        fmt = date_formats.get(period, '%b %Y')
-        
-        for item in trend_data:
-            if item['date']:
-                chart_labels.append(item['date'].strftime(fmt))
-                chart_counts.append(item['count'])
-                chart_revenues.append(float(item['revenue'] or 0))
-        
-        # Weekly breakdown - optimized
-        week_start = end_date - timedelta(days=7)
-        weekly_data = list(OrderItem.objects.filter(
-            order_id__in=order_ids,  # Use order_ids which is already filtered by date
-            order__created_at__gte=week_start
-        ).annotate(
-            date=TruncDate('order__created_at')
-        ).values('date').annotate(
-            count=Count('order', distinct=True),
-            revenue=Sum(F('quantity') * F('price'))  # Calculate from items
-        ).order_by('date'))
-        
-        weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        weekly_labels = []
-        weekly_counts = []
-        weekly_revenues = []
-        
-        for item in weekly_data:
-            if item['date']:
-                weekly_labels.append(weekday_names[item['date'].weekday()])
-                weekly_counts.append(item['count'])
-                weekly_revenues.append(float(item['revenue'] or 0))
-        
-        # Top products - single optimized query with product type filter
-        base_items = OrderItem.objects.filter(order_id__in=order_ids)
-        
-        if product_type == 'custom':
-            base_items = base_items.filter(is_custom_curtain=True)
-        elif product_type == 'fabric':
-            base_items = base_items.filter(is_custom_curtain=False)
-        
-        top_products = list(base_items.values(
-            'product__title', 'product__sku', 'is_custom_curtain'
-        ).annotate(
-            total_quantity=Sum('quantity'),
-            total_revenue=Sum(F('quantity') * F('price')),
-            order_count=Count('order', distinct=True)
-        ).order_by('-total_quantity')[:10])
-        
-        # Top curtains (custom curtains + ready_made_curtain category)
-        top_custom = list(OrderItem.objects.filter(
-            order_id__in=order_ids
-        ).filter(
-            Q(is_custom_curtain=True) | Q(product__category__name='ready_made_curtain')
-        ).values('product__title', 'product__sku').annotate(
-            total_quantity=Count('id'),
-            total_revenue=Sum('price'),
-            order_count=Count('order', distinct=True)
-        ).order_by('-total_quantity')[:5])
-        
-        # Top fabric - exclude custom curtains and ready_made_curtain
-        top_fabric = list(OrderItem.objects.filter(
-            order_id__in=order_ids, is_custom_curtain=False
-        ).exclude(
-            product__category__name='ready_made_curtain'
-        ).values('product__title', 'product__sku').annotate(
-            total_quantity=Sum('quantity'),
-            total_revenue=Sum(F('quantity') * F('price')),
-            order_count=Count('order', distinct=True)
-        ).order_by('-total_quantity')[:5])
-        
-        # Top customers - optimized
-        # Top customers - optimized - calculate from items as original_price is unreliable
-        top_customers = list(OrderItem.objects.filter(
-            order_id__in=order_ids,
-            order__web_client__isnull=False
-        ).values(
-            'order__web_client__id', 'order__web_client__name', 'order__web_client__email'
-        ).annotate(
-            web_client__id=F('order__web_client__id'),
-            web_client__name=F('order__web_client__name'),
-            web_client__email=F('order__web_client__email'),
-            order_count=Count('order', distinct=True),
-            total_spent=Sum(F('quantity') * F('price'))
-        ).order_by('-total_spent')[:10])
-        
-        # Product chart data
-        product_labels = [p['product__title'][:20] if p['product__title'] else 'Unknown' for p in top_products]
-        product_quantities = [float(p['total_quantity'] or 0) for p in top_products]
-        product_revenues = [float(p['total_revenue'] or 0) for p in top_products]
-        
+            filtered_orders = base_orders
+        filtered_ids = list(filtered_orders.values_list("id", flat=True))
+
+        # ── Money — computed from OrderItem lines so it's correct for
+        #    BOTH web orders (carry original_price) and manual/B2B orders
+        #    (which don't). unit_cost mirrors OrderItem.unit_cost():
+        #    variant_cost preferred, else product.cost, else 0. ──
+        unit_cost_expr = Coalesce(
+            F("product_variant__variant_cost"), F("product__cost"),
+            Value(Decimal("0")), output_field=DEC,
+        )
+        line_rev = F("quantity") * F("price")
+        line_cost = F("quantity") * unit_cost_expr
+
+        items = OrderItem.objects.filter(order_id__in=filtered_ids)
+        if product_type == "custom":
+            items = items.filter(is_custom_curtain=True)
+        elif product_type == "fabric":
+            items = items.filter(is_custom_curtain=False)
+
+        money = items.aggregate(
+            revenue=Coalesce(Sum(line_rev, output_field=DEC), Value(Decimal("0"), output_field=DEC)),
+            cost=Coalesce(Sum(line_cost, output_field=DEC), Value(Decimal("0"), output_field=DEC)),
+        )
+        total_revenue = money["revenue"] or Decimal("0")
+        total_cost = money["cost"] or Decimal("0")
+        total_profit = total_revenue - total_cost
+        total_orders = filtered_orders.count()
+        avg_order = (total_revenue / total_orders) if total_orders else Decimal("0")
+        margin_pct = (total_profit / total_revenue * 100) if total_revenue else Decimal("0")
+
+        # ── Channel split — always from base_orders so both web & manual
+        #    show regardless of the channel filter selection. ──
+        def _channel_money(qfilter):
+            ids = list(base_orders.filter(qfilter).values_list("id", flat=True))
+            rev = OrderItem.objects.filter(order_id__in=ids).aggregate(
+                r=Coalesce(Sum(line_rev, output_field=DEC), Value(Decimal("0"), output_field=DEC))
+            )["r"] or Decimal("0")
+            return {"orders": len(ids), "revenue": float(rev)}
+        web_split = _channel_money(web_q)
+        manual_split = _channel_money(manual_q)
+
+        # ── Trend line ──
+        gran = self._granularity(days)
+        trunc = {"daily": TruncDate, "weekly": TruncWeek, "monthly": TruncMonth}[gran]("order__created_at")
+        trend = list(
+            OrderItem.objects.filter(order_id__in=filtered_ids)
+            .annotate(bucket=trunc)
+            .values("bucket")
+            .annotate(
+                revenue=Sum(line_rev, output_field=DEC),
+                orders=Count("order", distinct=True),
+            )
+            .order_by("bucket")
+        )
+        fmt = {"daily": "%d %b", "weekly": "%d %b", "monthly": "%b %Y"}[gran]
+        trend_labels, trend_rev, trend_cnt = [], [], []
+        for t in trend:
+            if t["bucket"]:
+                trend_labels.append(t["bucket"].strftime(fmt))
+                trend_rev.append(float(t["revenue"] or 0))
+                trend_cnt.append(t["orders"])
+
+        # ── Top products (by revenue) ──
+        top_products = list(
+            items.values("product__title", "product__sku")
+            .annotate(
+                qty=Coalesce(Sum("quantity"), Value(Decimal("0"), output_field=DEC)),
+                revenue=Sum(line_rev, output_field=DEC),
+                orders=Count("order", distinct=True),
+            )
+            .order_by("-revenue")[:12]
+        )
+        for p in top_products:
+            p["qty"] = float(p["qty"] or 0)
+            p["revenue"] = float(p["revenue"] or 0)
+        prod_labels = [(p["product__title"] or "—")[:24] for p in top_products[:8]]
+        prod_rev = [p["revenue"] for p in top_products[:8]]
+
+        # ── Top customers — merge company / contact / web-client rankings ──
+        cust = []
+        for r in (OrderItem.objects.filter(order_id__in=filtered_ids, order__company__isnull=False)
+                  .values("order__company__id", "order__company__name")
+                  .annotate(spent=Sum(line_rev, output_field=DEC), orders=Count("order", distinct=True))):
+            cust.append({"kind": "company", "id": r["order__company__id"],
+                         "name": r["order__company__name"] or "—",
+                         "spent": float(r["spent"] or 0), "orders": r["orders"]})
+        for r in (OrderItem.objects.filter(order_id__in=filtered_ids,
+                                            order__company__isnull=True,
+                                            order__contact__isnull=False)
+                  .values("order__contact__id", "order__contact__name")
+                  .annotate(spent=Sum(line_rev, output_field=DEC), orders=Count("order", distinct=True))):
+            cust.append({"kind": "contact", "id": r["order__contact__id"],
+                         "name": r["order__contact__name"] or "—",
+                         "spent": float(r["spent"] or 0), "orders": r["orders"]})
+        for r in (OrderItem.objects.filter(order_id__in=filtered_ids, order__web_client__isnull=False)
+                  .values("order__web_client__id", "order__web_client__name", "order__web_client__username")
+                  .annotate(spent=Sum(line_rev, output_field=DEC), orders=Count("order", distinct=True))):
+            nm = r["order__web_client__name"] or r["order__web_client__username"] or "Web customer"
+            cust.append({"kind": "web", "id": r["order__web_client__id"],
+                         "name": nm, "spent": float(r["spent"] or 0), "orders": r["orders"]})
+        cust.sort(key=lambda c: c["spent"], reverse=True)
+        top_customers = cust[:10]
+
+        # Attach cari snapshot for company / contact customers.
+        comp_ids = [c["id"] for c in top_customers if c["kind"] == "company"]
+        cont_ids = [c["id"] for c in top_customers if c["kind"] == "contact"]
+        cari_by_company, cari_by_contact = {}, {}
+        if comp_ids:
+            for ca in CariAccount.objects.filter(company_id__in=comp_ids).select_related("default_currency"):
+                cari_by_company.setdefault(ca.company_id, ca)
+        if cont_ids:
+            for ca in CariAccount.objects.filter(contact_id__in=cont_ids).select_related("default_currency"):
+                cari_by_contact.setdefault(ca.contact_id, ca)
+        for c in top_customers:
+            ca = cari_by_company.get(c["id"]) if c["kind"] == "company" else \
+                (cari_by_contact.get(c["id"]) if c["kind"] == "contact" else None)
+            if ca:
+                c["cari"] = {
+                    "pk": ca.pk, "code": ca.code, "name": ca.name,
+                    "balance": float(ca.cached_balance or 0),
+                    "abs_balance": float(ca.absolute_balance or 0),
+                    "label": str(ca.balance_label),
+                    "symbol": ca.display_currency_symbol or "",
+                }
+            else:
+                c["cari"] = None
+
+        # ── Status distribution (for the mix bar) ──
+        status_rows = list(base_orders.values("order_status").annotate(n=Count("id")).order_by("-n"))
+
         context = {
-            'summary': {
-                'total_orders': summary['total_orders'] or 0,
-                'total_revenue': total_revenue_from_items,  # From OrderItem prices (correct)
-                'total_profit': total_profit,  # Revenue - Cost
-                'total_cost': total_cost,
-                'avg_order_value': total_revenue_from_items / (summary['total_orders'] or 1),
-                'success_rate': round(success_rate, 1),
-                'custom_curtain_count': custom_curtain_count,
-                'fabric_count': fabric_count,
+            "summary": {
+                "total_orders": total_orders,
+                "total_revenue": float(total_revenue),
+                "total_profit": float(total_profit),
+                "total_cost": float(total_cost),
+                "avg_order": float(avg_order),
+                "margin_pct": round(float(margin_pct), 1),
             },
-            'chart_labels': json.dumps(chart_labels),
-            'chart_counts': json.dumps(chart_counts),
-            'chart_revenues': json.dumps(chart_revenues),
-            'weekly_labels': json.dumps(weekly_labels),
-            'weekly_counts': json.dumps(weekly_counts),
-            'weekly_revenues': json.dumps(weekly_revenues),
-            'top_products': top_products,
-            'top_custom': top_custom,
-            'top_fabric': top_fabric,
-            'product_labels': json.dumps(product_labels),
-            'product_quantities': json.dumps(product_quantities),
-            'product_revenues': json.dumps(product_revenues),
-            'top_customers': top_customers,
-            'period': period,
-            'days': days,
-            'product_type': product_type,
+            "web_split": web_split,
+            "manual_split": manual_split,
+            "trend_labels": json.dumps(trend_labels),
+            "trend_rev": json.dumps(trend_rev),
+            "trend_cnt": json.dumps(trend_cnt),
+            "channel_chart": json.dumps([web_split["revenue"], manual_split["revenue"]]),
+            "prod_labels": json.dumps(prod_labels),
+            "prod_rev": json.dumps(prod_rev),
+            "top_products": top_products,
+            "top_customers": top_customers,
+            "status_rows": status_rows,
+            "range": rng,
+            "channel": channel,
+            "product_type": product_type,
+            "granularity": gran,
+            "custom_range": custom_range,
+            "custom_start": custom_start,
+            "custom_end": custom_end,
         }
-        
-        # Cache for 5 minutes
-        cache.set(cache_key, context, 300)
-        
-        # Return JSON for AJAX requests
-        if request.GET.get('format') == 'json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'chart_labels': chart_labels,
-                'chart_revenues': chart_revenues,
-                'period': period,
-            })
-        
         return render(request, self.template_name, context)
 
 

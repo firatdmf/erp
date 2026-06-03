@@ -426,6 +426,14 @@ class Order(models.Model):
         null=True, blank=True,
         help_text="When catalog stock was deducted for this order's items."
     )
+    # When True, the customer (contact / company / web client / guest)
+    # is emailed an order confirmation on create and every meaningful
+    # status change (preparing, shipped + tracking, delivered, etc.).
+    # Off by default — opt-in at create time, toggleable on detail.
+    notify_customer = models.BooleanField(
+        default=False,
+        help_text="Send transactional emails to the customer for this order."
+    )
     carrier = models.CharField(
         max_length=50,
         choices=CARRIER_CHOICES,

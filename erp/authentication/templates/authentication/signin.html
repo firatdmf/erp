@@ -1,391 +1,488 @@
+{% load i18n %}
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - Nejum ERP</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #4F46E5;
-            /* Indigo 600 */
-            --primary-hover: #4338CA;
-            /* Indigo 700 */
-            --bg-color: #F9FAFB;
-            --text-color: #111827;
-            --text-secondary: #6B7280;
-            --border-color: #D1D5DB;
-            --input-bg: #FFFFFF;
-            --radius: 12px;
-            --glass-bg: rgba(255, 255, 255, 0.1);
-            --glass-border: rgba(255, 255, 255, 0.2);
-            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% trans "Sign in" %} · Nejum</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&family=Caveat:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --teal:        #147F74;
+      --teal-50:     #F0FDFA;
+      --teal-100:    #CCFBF1;
+      --teal-600:    #0D9488;
+      --teal-700:    #0F766E;
+      --teal-900:    #134E4A;
+      --ink:         #0F1419;
+      --gray-50:     #F8FAFC;
+      --gray-100:    #F1F5F9;
+      --gray-200:    #E2E8EE;
+      --gray-300:    #CBD5E1;
+      --gray-400:    #94A3B8;
+      --gray-500:    #64748B;
+      --gray-600:    #475569;
+      --gray-700:    #334155;
+      --red:         #DC2626;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: var(--ink);
+      background: #FAFCFB;
+    }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    /* ─── split layout ─── */
+    .nl-split { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
+    @media (max-width: 960px) { .nl-split { grid-template-columns: 1fr; } }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            height: 100vh;
-            display: flex;
-            overflow: hidden;
-        }
+    /* ─── left brand pane ─── */
+    .nl-brand {
+      position: relative;
+      overflow: hidden;
+      color: #FFF;
+      padding: 56px 64px;
+      display: flex; flex-direction: column;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(20,127,116,0.35) 0%, transparent 55%),
+        radial-gradient(circle at 80% 90%, rgba(13,148,136,0.40) 0%, transparent 55%),
+        linear-gradient(135deg, #0B3D38 0%, #134E4A 50%, #0F766E 100%);
+    }
+    .nl-brand::before {
+      /* Subtle dot grid */
+      content: "";
+      position: absolute; inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px);
+      background-size: 22px 22px;
+      pointer-events: none;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.1));
+    }
+    .nl-brand-top { position: relative; z-index: 2; display: flex; align-items: flex-end; gap: 10px; }
+    /* The Nejum logo is the script wordmark used across the app
+       (Caveat font, teal). Sits in the dark brand pane in solid white
+       with a subtle teal underline. */
+    .nl-logo-wordmark {
+      font-family: 'Caveat', cursive;
+      font-weight: 700;
+      font-size: 56px;
+      line-height: 1;
+      letter-spacing: -0.005em;
+      color: #FFFFFF;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.10);
+      position: relative;
+    }
+    .nl-logo-wordmark::after {
+      content: "";
+      position: absolute;
+      left: 6%; right: 6%; bottom: -6px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent 0%, #5EEAD4 30%, #5EEAD4 70%, transparent 100%);
+      border-radius: 2px;
+      opacity: 0.85;
+    }
+    .nl-logo-sub {
+      font: 500 10px 'Inter', sans-serif;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--teal-100);
+      opacity: 0.80;
+      padding-bottom: 12px;
+    }
+    .nl-brand-body {
+      position: relative; z-index: 2;
+      flex: 1;
+      display: flex; flex-direction: column; justify-content: center;
+      max-width: 460px;
+    }
+    .nl-brand-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 999px;
+      font: 600 11px 'Inter', sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--teal-100);
+      width: fit-content;
+      margin-bottom: 24px;
+    }
+    .nl-brand-eyebrow .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #5EEAD4;
+      box-shadow: 0 0 0 4px rgba(94,234,212,0.18);
+    }
+    .nl-brand h1 {
+      font: 800 42px/1.12 'Plus Jakarta Sans', sans-serif;
+      letter-spacing: -0.03em;
+      color: #FFF;
+      margin-bottom: 18px;
+    }
+    .nl-brand h1 .accent {
+      background: linear-gradient(120deg, #5EEAD4 0%, #99F6E4 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .nl-brand p {
+      font: 400 15px/1.65 'Inter', sans-serif;
+      color: rgba(255,255,255,0.75);
+      max-width: 420px;
+    }
+    .nl-brand-features {
+      position: relative; z-index: 2;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 36px;
+      max-width: 460px;
+    }
+    .nl-feat {
+      display: flex; align-items: center; gap: 11px;
+      padding: 13px 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      font: 600 12.5px 'Inter', sans-serif;
+      color: rgba(255,255,255,0.92);
+    }
+    .nl-feat-icon {
+      width: 28px; height: 28px; flex-shrink: 0;
+      background: rgba(94,234,212,0.18);
+      color: #5EEAD4;
+      border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .nl-brand-foot {
+      position: relative; z-index: 2;
+      font: 500 12px 'Inter', sans-serif;
+      color: rgba(255,255,255,0.5);
+      margin-top: 28px;
+    }
 
-        /* Split Layout */
-        .split-screen {
-            display: flex;
-            width: 100%;
-            height: 100%;
-        }
+    /* ─── right form pane ─── */
+    .nl-form-pane {
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px 32px;
+      background:
+        radial-gradient(circle at 100% 0%, rgba(20,127,116,0.04), transparent 40%),
+        #FAFCFB;
+    }
+    .nl-form-card {
+      width: 100%; max-width: 420px;
+    }
+    .nl-card-eyebrow {
+      font: 600 11px 'Inter', sans-serif;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--teal-700);
+    }
+    .nl-card-title {
+      font: 800 30px 'Plus Jakarta Sans', sans-serif;
+      letter-spacing: -0.025em;
+      color: var(--ink);
+      margin: 8px 0 8px;
+    }
+    .nl-card-sub {
+      font: 500 14px/1.55 'Inter', sans-serif;
+      color: var(--gray-500);
+      margin-bottom: 32px;
+    }
+    .nl-field { margin-bottom: 16px; }
+    .nl-field label {
+      display: block;
+      font: 600 12px 'Inter', sans-serif;
+      color: var(--gray-700);
+      letter-spacing: 0.02em;
+      margin-bottom: 7px;
+    }
+    .nl-input-wrap { position: relative; }
+    .nl-input-wrap > svg {
+      position: absolute;
+      left: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--gray-400);
+      pointer-events: none;
+    }
+    .nl-input {
+      width: 100%; box-sizing: border-box;
+      padding: 13px 14px 13px 42px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: 10px;
+      font: 500 14px 'Inter', sans-serif;
+      color: var(--ink);
+      background: #FFF;
+      outline: none;
+      transition: all 0.15s;
+    }
+    .nl-input::placeholder { color: var(--gray-400); font-weight: 400; }
+    .nl-input:hover { border-color: var(--gray-300); }
+    .nl-input:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 4px rgba(20,127,116,0.10);
+    }
+    .nl-pwd-toggle {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      width: 32px; height: 32px;
+      background: transparent; border: none; cursor: pointer;
+      color: var(--gray-500);
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 6px;
+      transition: all 0.12s;
+    }
+    .nl-pwd-toggle:hover { background: var(--gray-100); color: var(--teal); }
 
-        /* Left Side - Premium V2 Design */
-        .left-pane {
-            flex: 1;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            padding: 3rem;
-            overflow: hidden;
-            background-color: #0F172A;
-            /* Fallback dark bg */
-        }
+    .nl-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 4px 0 20px;
+    }
+    .nl-check {
+      display: inline-flex; align-items: center; gap: 8px;
+      font: 500 13px 'Inter', sans-serif;
+      color: var(--gray-700);
+      cursor: pointer;
+      user-select: none;
+    }
+    .nl-check input { width: 16px; height: 16px; accent-color: var(--teal); cursor: pointer; }
+    .nl-link {
+      font: 600 13px 'Inter', sans-serif;
+      color: var(--teal-700);
+      text-decoration: none;
+    }
+    .nl-link:hover { color: var(--teal); text-decoration: underline; }
 
-        /* Animated Mesh Gradient Background */
-        .left-pane-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-                radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
-                radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
-            z-index: 1;
-        }
+    .nl-submit {
+      width: 100%;
+      padding: 14px 18px;
+      background: linear-gradient(180deg, var(--teal) 0%, var(--teal-700) 100%);
+      color: #FFF;
+      border: none;
+      border-radius: 10px;
+      font: 700 14px 'Inter', sans-serif;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 4px 12px rgba(20,127,116,0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .nl-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(20,127,116,0.30), inset 0 1px 0 rgba(255,255,255,0.18);
+    }
+    .nl-submit:active { transform: translateY(0); }
 
-        /* Floating Orbs */
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            z-index: 2;
-            opacity: 0.8;
-            animation: float 20s infinite ease-in-out alternate;
-        }
+    .nl-error {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px;
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      border-left: 3px solid var(--red);
+      border-radius: 9px;
+      font: 600 13px 'Inter', sans-serif;
+      color: #B91C1C;
+      margin-bottom: 20px;
+    }
 
-        .orb-1 {
-            top: -10%;
-            left: -10%;
-            width: 50vw;
-            height: 50vw;
-            background: #4F46E5;
-            animation-duration: 25s;
-        }
+    .nl-divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 26px 0 22px;
+      color: var(--gray-400);
+      font: 500 11.5px 'Inter', sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .nl-divider::before, .nl-divider::after {
+      content: ""; flex: 1; height: 1px; background: var(--gray-200);
+    }
 
-        .orb-2 {
-            bottom: -10%;
-            right: -10%;
-            width: 50vw;
-            height: 50vw;
-            background: #7C3AED;
-            animation-duration: 30s;
-            animation-direction: alternate-reverse;
-        }
+    .nl-signup {
+      text-align: center;
+      font: 500 13.5px 'Inter', sans-serif;
+      color: var(--gray-500);
+      margin-top: 24px;
+    }
+    .nl-signup a {
+      color: var(--teal-700);
+      font-weight: 700;
+      text-decoration: none;
+      margin-left: 4px;
+    }
+    .nl-signup a:hover { text-decoration: underline; }
 
-        .orb-3 {
-            top: 40%;
-            left: 40%;
-            width: 30vw;
-            height: 30vw;
-            background: #06B6D4;
-            /* Cyan accent */
-            opacity: 0.4;
-            animation-duration: 22s;
-        }
-
-        @keyframes float {
-            0% {
-                transform: translate(0, 0) rotate(0deg);
-            }
-
-            100% {
-                transform: translate(50px, 50px) rotate(10deg);
-            }
-        }
-
-        /* Noise Texture */
-        .noise-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 3;
-            opacity: 0.05;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-            pointer-events: none;
-        }
-
-        /* Glassmorphism Card */
-        .brand-content {
-            position: relative;
-            z-index: 10;
-            text-align: center;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            padding: 3rem;
-            border-radius: 24px;
-            box-shadow: var(--glass-shadow);
-            max-width: 500px;
-            width: 100%;
-            transition: transform 0.3s ease;
-        }
-
-        .brand-content:hover {
-            transform: translateY(-5px);
-        }
-
-        .brand-content h1 {
-            font-size: 3.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            letter-spacing: -0.05em;
-            background: linear-gradient(135deg, #FFFFFF 0%, #E0E7FF 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .brand-content p {
-            font-size: 1.125rem;
-            color: rgba(255, 255, 255, 0.9);
-            line-height: 1.6;
-            margin: 0 auto;
-        }
-
-        /* Right Side - Form */
-        .right-pane {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 2rem;
-            background-color: white;
-            position: relative;
-            z-index: 20;
-            /* Ensure form is above background elements just in case */
-        }
-
-        .login-container {
-            width: 100%;
-            max-width: 420px;
-            padding: 2rem;
-        }
-
-        .login-header {
-            margin-bottom: 2.5rem;
-        }
-
-        .login-header h2 {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-color);
-            margin-bottom: 0.5rem;
-        }
-
-        .login-header p {
-            color: var(--text-secondary);
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-            position: relative;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            font-size: 0.9rem;
-            color: var(--text-color);
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.875rem 1rem;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            font-size: 1rem;
-            color: var(--text-color);
-            background-color: var(--input-bg);
-            transition: all 0.2s ease;
-            font-family: inherit;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 0.875rem;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: var(--radius);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-            margin-top: 1rem;
-        }
-
-        .submit-btn:hover {
-            background-color: var(--primary-hover);
-        }
-
-        .submit-btn:active {
-            transform: scale(0.98);
-        }
-
-        .error-message {
-            background-color: #FECACA;
-            color: #991B1B;
-            padding: 0.75rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 900px) {
-            .split-screen {
-                flex-direction: column;
-            }
-
-            .left-pane {
-                flex: 0 0 240px;
-                /* Slightly taller for mobile header feel */
-                padding: 1.5rem;
-                overflow: hidden;
-            }
-
-            .orb {
-                filter: blur(40px);
-                /* Reduce blur load on mobile */
-            }
-
-            .brand-content {
-                padding: 1.5rem;
-                background: rgba(255, 255, 255, 0.15);
-                /* More visible on mobile */
-            }
-
-            .brand-content h1 {
-                font-size: 2rem;
-            }
-
-            .brand-content p {
-                display: none;
-                /* Hide description on mobile to save space */
-            }
-
-            .right-pane {
-                flex: 1;
-                border-top-left-radius: 24px;
-                border-top-right-radius: 24px;
-                margin-top: -24px;
-                z-index: 20;
-                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
-            }
-        }
-    </style>
+    /* ─── mobile ─── */
+    @media (max-width: 960px) {
+      .nl-brand {
+        padding: 28px 24px 36px;
+        min-height: auto;
+      }
+      .nl-brand h1 { font-size: 28px; }
+      .nl-brand p { font-size: 13.5px; }
+      .nl-brand-body { max-width: none; margin: 18px 0; }
+      .nl-brand-features { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+      .nl-brand-foot { display: none; }
+      .nl-form-pane { padding: 32px 22px 40px; }
+      .nl-card-title { font-size: 26px; }
+      .nl-logo-wordmark { font-size: 44px; }
+      .nl-logo-sub { font-size: 9px; padding-bottom: 9px; }
+    }
+    @media (max-width: 540px) {
+      .nl-brand-features { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 
 <body>
-    <div class="split-screen">
-        <!-- Left Side -->
-        <div class="left-pane">
-            <div class="left-pane-bg"></div>
-            <div class="orb orb-1"></div>
-            <div class="orb orb-2"></div>
-            <div class="orb orb-3"></div>
-            <div class="noise-overlay"></div>
+<div class="nl-split">
 
-            <div class="brand-content">
-                <h1>Nejum ERP</h1>
-                <p>Seamlessly manage your business with our intelligent enterprise resource planning solution.</p>
-            </div>
-        </div>
-
-        <!-- Right Side -->
-        <div class="right-pane">
-            <div class="login-container">
-                <div class="login-header">
-                    <h2>Welcome back</h2>
-                    <p>Please enter your details to sign in.</p>
-                </div>
-
-                {% if errorMessage %}
-                <div class="error-message">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        viewBox="0 0 16 16">
-                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                        <path
-                            d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z" />
-                    </svg>
-                    {{ errorMessage }}
-                </div>
-                {% endif %}
-
-                <form action="{% url 'authentication:signin' %}" method="post">
-                    {% csrf_token %}
-
-                    <div class="form-group">
-                        <label for="username">Username</label>
-                        <input type="text" id="username" name="username" placeholder="Enter your username"
-                            class="form-input" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" name="password" placeholder="••••••••" class="form-input"
-                            required>
-                    </div>
-
-                    <input type="hidden" name="next" value="{{ next }}">
-
-                    <button type="submit" class="submit-btn">Sign In</button>
-
-                    <div style="margin-top: 1.5rem; text-align: center;">
-                        <span style="color: var(--text-secondary); font-size: 0.9rem;">Don't have an account? </span>
-                        <a href="{% url 'authentication:signup' %}"
-                            style="color: var(--primary-color); font-weight: 500; text-decoration: none; font-size: 0.9rem;">Sign
-                            up</a>
-                    </div>
-                </form>
-            </div>
-        </div>
+  <!-- ============ LEFT BRAND PANE ============ -->
+  <aside class="nl-brand">
+    <div class="nl-brand-top">
+      <span class="nl-logo-wordmark">nejum</span>
+      <span class="nl-logo-sub">ERP Platform</span>
     </div>
-</body>
 
+    <div class="nl-brand-body">
+      <span class="nl-brand-eyebrow"><span class="dot"></span> Welcome back</span>
+      <h1>Every part of your business, <span class="accent">in one place.</span></h1>
+      <p>CRM, inventory, orders, accounting, team and marketing — connected end to end. Sign in to pick up where you left off.</p>
+    </div>
+
+    <div class="nl-brand-features">
+      <div class="nl-feat">
+        <span class="nl-feat-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </span>
+        CRM & contacts
+      </div>
+      <div class="nl-feat">
+        <span class="nl-feat-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7"/><path d="M3 7l9-4 9 4"/><path d="M12 11v6"/></svg>
+        </span>
+        Inventory & warehouse
+      </div>
+      <div class="nl-feat">
+        <span class="nl-feat-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </span>
+        Orders & shipping
+      </div>
+      <div class="nl-feat">
+        <span class="nl-feat-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </span>
+        Accounting & finance
+      </div>
+      <div class="nl-feat">
+        <span class="nl-feat-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </span>
+        Team & tasks
+      </div>
+      <div class="nl-feat">
+        <span class="nl-feat-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M22 6 12 13 2 6"/></svg>
+        </span>
+        Mail & campaigns
+      </div>
+    </div>
+
+    <div class="nl-brand-foot">
+      © {% now "Y" %} Nejum. All rights reserved.
+    </div>
+  </aside>
+
+  <!-- ============ RIGHT FORM PANE ============ -->
+  <main class="nl-form-pane">
+    <div class="nl-form-card">
+      <div class="nl-card-eyebrow">Sign in</div>
+      <h2 class="nl-card-title">Welcome back</h2>
+      <p class="nl-card-sub">Use your work credentials to continue.</p>
+
+      {% if messages %}
+        {% for message in messages %}
+        <div style="display:flex;align-items:center;gap:9px;padding:11px 14px;margin-bottom:14px;
+                    border-radius:10px;font:600 13px var(--font-sans);
+                    {% if 'error' in message.tags %}background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;
+                    {% else %}background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;{% endif %}">
+          <i class="fas fa-{% if 'error' in message.tags %}circle-exclamation{% else %}circle-check{% endif %}"></i>
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+      {% endif %}
+
+      {% if errorMessage %}
+      <div class="nl-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg>
+        <span>{{ errorMessage }}</span>
+      </div>
+      {% endif %}
+
+      <form action="{% url 'authentication:signin' %}" method="post" autocomplete="on">
+        {% csrf_token %}
+
+        <div class="nl-field">
+          <label for="username">Username or email</label>
+          <div class="nl-input-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="username" name="username" type="text" class="nl-input"
+                   placeholder="you@nejum.com" autocomplete="username" autofocus required>
+          </div>
+        </div>
+
+        <div class="nl-field">
+          <label for="password">Password</label>
+          <div class="nl-input-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="password" name="password" type="password" class="nl-input"
+                   placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" class="nl-pwd-toggle" id="nlPwdToggle" aria-label="Show password">
+              <svg id="nlEyeOpen"  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg id="nlEyeClose" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="nl-row">
+          <label class="nl-check">
+            <input type="checkbox" name="remember" id="remember" checked>
+            <span>Stay signed in</span>
+          </label>
+          <a href="#" class="nl-link">Forgot password?</a>
+        </div>
+
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <button type="submit" class="nl-submit">
+          Sign in
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+
+        <div class="nl-divider">or</div>
+
+        <div class="nl-signup">
+          New to Nejum? <a href="{% url 'authentication:signup' %}">Create an account</a>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script>
+  (function () {
+    const btn = document.getElementById('nlPwdToggle');
+    const inp = document.getElementById('password');
+    const open = document.getElementById('nlEyeOpen');
+    const close = document.getElementById('nlEyeClose');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const showing = inp.type === 'text';
+      inp.type = showing ? 'password' : 'text';
+      open.style.display  = showing ? '' : 'none';
+      close.style.display = showing ? 'none' : '';
+      btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+    });
+  })();
+</script>
+</body>
 </html>

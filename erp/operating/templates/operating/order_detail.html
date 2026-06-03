@@ -779,12 +779,6 @@
     </div>
   </div>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="od-banner"><i class="fa fa-check-circle"></i>{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-
   <!-- MAIN GRID -->
   <div class="od-grid">
 
@@ -1035,6 +1029,30 @@
         <textarea id="od-notes-edit" class="od-notes-edit"
                   data-original="{{ order.notes|default:'' }}"
                   placeholder="{% trans 'Internal notes about this order…' %}">{{ order.notes|default:'' }}</textarea>
+      </section>
+
+      <!-- CUSTOMER NOTIFICATIONS — toggle email opt-in on/off live. -->
+      <section class="od-card" id="od-notify-card">
+        <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <h3>{% trans "Customer notifications" %}</h3>
+            <span class="od-card-sub">
+              {% trans "Email the customer when the order changes (created, shipping, delivered)." %}
+            </span>
+          </div>
+          <label class="od-switch" style="display:inline-flex; align-items:center; gap:10px; cursor:pointer;">
+            <input type="checkbox" id="od-notify-toggle"
+                   {% if order.notify_customer %}checked{% endif %}
+                   style="width:18px; height:18px; cursor:pointer; accent-color:#147F74;">
+            <span id="od-notify-label" style="font:700 12.5px var(--font-sans); color:{% if order.notify_customer %}#0F766E{% else %}#94A3B8{% endif %};">
+              {% if order.notify_customer %}{% trans "ON" %}{% else %}{% trans "OFF" %}{% endif %}
+            </span>
+          </label>
+        </div>
+        <div style="font-size:11.5px; color:#64748B; margin-top:8px;">
+          <i class="fa fa-info-circle" style="color:#147F74; margin-right:4px;"></i>
+          {% trans "Status emails are sent to the customer's email on record (contact / company / web client). PDF attached for create + shipped + delivered." %}
+        </div>
       </section>
 
       {% if order.web_client or order.is_guest_order %}
@@ -1334,6 +1352,32 @@
       }).then(r => r.json().catch(() => ({})));
     }
     window.__odPostUpdate = postUpdate;
+
+    // Customer-notifications toggle. Posts the new flag via the same
+    // POST endpoint and updates the ON/OFF label live so the user gets
+    // immediate feedback (no page reload).
+    const _notifyToggle = document.getElementById('od-notify-toggle');
+    const _notifyLabel  = document.getElementById('od-notify-label');
+    if (_notifyToggle) {
+      _notifyToggle.addEventListener('change', async () => {
+        const on = _notifyToggle.checked;
+        _notifyLabel.textContent = on ? '{% trans "ON" %}' : '{% trans "OFF" %}';
+        _notifyLabel.style.color  = on ? '#0F766E' : '#94A3B8';
+        try {
+          const r = await postUpdate({
+            action: 'update_notify',
+            notify_customer: on ? '1' : '0',
+          });
+          if (!(r && r.ok)) throw new Error(r && r.error || 'Failed');
+        } catch (e) {
+          // Revert UI on failure.
+          _notifyToggle.checked = !on;
+          _notifyLabel.textContent = !on ? '{% trans "ON" %}' : '{% trans "OFF" %}';
+          _notifyLabel.style.color  = !on ? '#0F766E' : '#94A3B8';
+          alert(e.message || 'Could not update');
+        }
+      });
+    }
 
     // Refresh the right-sidebar cari card from the snapshot the server
     // returns after each mutating action. Keeps balance in sync without

@@ -3,235 +3,446 @@
 {% load static %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
+<style>
+  :root {
+    --po-teal: #147F74;
+    --po-teal-50: #F0FDFA;
+    --po-teal-100: #CCFBF1;
+    --po-teal-700: #0F766E;
+    --po-ink: #0F1419;
+    --po-gray-50: #F8FAFC;
+    --po-gray-100: #F1F5F9;
+    --po-gray-200: #E2E8EE;
+    --po-gray-300: #CBD5E1;
+    --po-gray-400: #94A3B8;
+    --po-gray-500: #64748B;
+    --po-gray-600: #475569;
+    --po-gray-700: #334155;
+  }
+
+  .po-wrap {
+    padding: 20px 24px;
+    font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+    background: #FAFBFD;
+    min-height: calc(100vh - 60px);
+    color: var(--po-ink);
+  }
+
+  /* ── header ── */
+  .po-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 18px; gap: 16px; flex-wrap: wrap;
+  }
+  .po-eyebrow {
+    font: 600 11px var(--font-sans); color: var(--po-gray-500);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  .po-title {
+    font: 700 24px var(--font-sans); color: var(--po-ink);
+    letter-spacing: -.4px; margin: 4px 0 0;
+  }
+  .po-head-r { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .po-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    border-radius: 9px;
+    font: 600 12.5px var(--font-sans);
+    border: 1px solid var(--po-gray-200);
+    background: #FFF; color: var(--po-gray-700);
+    cursor: pointer; transition: all .15s;
+    text-decoration: none;
+  }
+  .po-btn:hover { border-color: var(--po-gray-300); color: var(--po-ink); background: var(--po-gray-50); }
+  .po-btn.primary {
+    background: var(--po-teal); color: #FFF;
+    border-color: var(--po-teal);
+    box-shadow: 0 1px 2px rgba(20,127,116,.18);
+  }
+  .po-btn.primary:hover { background: var(--po-teal-700); border-color: var(--po-teal-700); }
+  .po-btn i { font-size: 12px; }
+
+  /* ── tabs + search row (matches order_list .ord-tabs) ── */
+  .po-tabs {
+    display: flex; align-items: center; gap: 6px;
+    background: #FFF;
+    border: 1px solid var(--po-gray-200);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+    margin-bottom: 16px;
+  }
+  .po-tab {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    border: none; background: transparent;
+    border-radius: 8px;
+    font: 600 13px var(--font-sans);
+    color: var(--po-gray-600);
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .po-tab.active {
+    background: var(--po-teal-50);
+    color: var(--po-teal-700);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,.18);
+  }
+  .po-tab i { font-size: 13px; }
+  .po-tab-count {
+    font: 700 11px var(--font-sans);
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--po-gray-100);
+    color: var(--po-gray-500);
+    min-width: 22px; text-align: center;
+  }
+  .po-tab.active .po-tab-count { background: var(--po-teal); color: #FFF; }
+
+  .po-tabs-r { margin-left: auto; position: relative; display: flex; align-items: center; }
+  .po-search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--po-gray-400); font-size: 13px;
+    pointer-events: none; z-index: 1;
+  }
+  input.po-search-input {
+    width: 340px;
+    padding: 9px 38px 9px 38px !important;
+    background: var(--po-gray-50);
+    border: 1px solid transparent !important;
+    border-radius: 8px;
+    font: 500 13px var(--font-sans);
+    color: var(--po-ink);
+    outline: none;
+    transition: all .15s;
+    box-sizing: border-box;
+  }
+  input.po-search-input::placeholder { color: var(--po-gray-400); }
+  input.po-search-input:focus {
+    background: #FFF;
+    border-color: var(--po-teal) !important;
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.10);
+  }
+  .po-search-clear {
+    position: absolute; right: 10px;
+    width: 22px; height: 22px;
+    border: none; background: var(--po-gray-200);
+    color: var(--po-gray-600);
+    border-radius: 50%; cursor: pointer;
+    display: none;                  /* hidden by default */
+    align-items: center; justify-content: center;
+    font-size: 9px;
+    transition: all .12s;
+  }
+  .po-search-clear.show { display: flex; }
+  .po-search-clear:hover { background: #DC2626; color: #FFF; }
+
+  /* ── list (matches order_list .ord-list) ── */
+  .po-list {
+    background: #FFF;
+    border: 1px solid var(--po-gray-200);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .po-list-head, .po-row {
+    display: grid;
+    grid-template-columns: 100px 1.6fr 130px 130px 130px 60px;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 18px;
+  }
+  .po-list-head {
+    background: var(--po-gray-50);
+    border-bottom: 1px solid var(--po-gray-200);
+    font: 600 10.5px var(--font-sans);
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--po-gray-500);
+  }
+  .po-list-head .num, .po-row .num { text-align: right; }
+  .po-row {
+    border-bottom: 1px solid #EEF1F5;
+    cursor: pointer;
+    transition: background 120ms;
+    text-decoration: none;
+    color: inherit;
+  }
+  .po-row:last-child { border-bottom: none; }
+  .po-row:hover { background: var(--po-gray-50); }
+
+  .po-id { font: 700 13px var(--font-mono, ui-monospace, monospace); color: var(--po-teal-700); }
+
+  .po-supp { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .po-supp-avatar {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--po-teal-50), var(--po-teal-100));
+    color: var(--po-teal-700);
+    display: flex; align-items: center; justify-content: center;
+    font: 700 13px var(--font-sans);
+    flex-shrink: 0;
+  }
+  .po-supp-info { min-width: 0; }
+  .po-supp-name {
+    font: 600 13px var(--font-sans); color: var(--po-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .po-supp-sub {
+    font: 500 11.5px var(--font-sans); color: var(--po-gray-500);
+    margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .po-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font: 700 11px var(--font-sans);
+    letter-spacing: 0.02em;
+  }
+  .po-status .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .po-status.draft     { color: #B45309; background: #FEF3C7; }
+  .po-status.draft     .dot { background: #F59E0B; }
+  .po-status.sent      { color: #1565C0; background: #DBEAFE; }
+  .po-status.sent      .dot { background: #3B82F6; }
+  .po-status.confirmed { color: #0E6E4A; background: #D1FAE5; }
+  .po-status.confirmed .dot { background: #10B981; }
+  .po-status.received  { color: #0E6E4A; background: #D1FAE5; }
+  .po-status.received  .dot { background: #10B981; }
+  .po-status.cancelled { color: #475569; background: #E5E7EB; }
+  .po-status.cancelled .dot { background: #94A3B8; }
+
+  .po-amount {
+    font: 700 13.5px var(--font-sans);
+    color: var(--po-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .po-amount small { font-weight: 600; font-size: 11px; color: var(--po-gray-500); margin-left: 3px; }
+
+  .po-date {
+    font: 500 12px var(--font-sans);
+    color: var(--po-gray-600);
+  }
+  .po-date small { display: block; color: var(--po-gray-400); margin-top: 2px; font-size: 10.5px; }
+
+  .po-chev { text-align: right; color: var(--po-gray-300); font-size: 14px; }
+  .po-row:hover .po-chev { color: var(--po-teal); }
+
+  /* ── empty state ── */
+  .po-empty {
+    padding: 80px 30px;
+    text-align: center;
+    background: #FFF;
+    border: 1px solid var(--po-gray-200);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .po-empty .ico {
+    width: 64px; height: 64px;
+    background: var(--po-gray-50);
+    border: 1px dashed var(--po-gray-200);
+    border-radius: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--po-gray-400); font-size: 24px;
+    margin-bottom: 14px;
+  }
+  .po-empty h3 {
+    font: 700 16px var(--font-sans); color: var(--po-gray-700); margin: 0 0 6px;
+  }
+  .po-empty p {
+    font: 400 13px var(--font-sans); margin: 0 auto 18px; max-width: 360px;
+    color: var(--po-gray-500);
+  }
+
+  /* ── pagination ── */
+  .po-pager {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 4px;
+    margin-top: 8px;
+  }
+  .po-pager-info {
+    font: 500 12px var(--font-sans); color: var(--po-gray-500);
+  }
+  .po-pager-btns { display: flex; gap: 4px; }
+  .po-pager-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--po-gray-200);
+    background: #FFF; color: var(--po-gray-700);
+    border-radius: 8px;
+    font: 600 12px var(--font-sans);
+    text-decoration: none;
+    transition: all .12s;
+  }
+  .po-pager-btn:hover { border-color: var(--po-teal); color: var(--po-teal); background: var(--po-teal-50); }
+  .po-pager-btn.active {
+    background: var(--po-teal);
+    border-color: var(--po-teal);
+    color: #FFF;
+  }
+  .po-pager-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+  .po-pager-btn.disabled:hover { border-color: var(--po-gray-200); color: var(--po-gray-700); background: #FFF; }
+
+  @media (max-width: 900px) {
+    .po-list-head { display: none; }
+    .po-row {
+      grid-template-columns: 1fr;
+      gap: 6px;
+      padding: 14px 16px;
+    }
+    .po-row .num { text-align: left; }
+    input.po-search-input { width: 100%; }
+    .po-tabs-r { width: 100%; margin-left: 0; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="product-list-container">
-    <!-- Header Section -->
-    <div class="page-header">
-        <div class="header-left">
-            <h1>{% trans "Purchase Orders" %}</h1>
-            <span class="product-count">{{ paginator.count|default:orders.count }} order{{ paginator.count|default:orders.count|pluralize }}</span>
-        </div>
-        <div class="header-right">
-            <a href="#" onclick="openPurchaseOrderSidebar(); return false;" class="btn btn-primary">
-                <i class="fa fa-plus"></i>
-                New Order
-            </a>
-        </div>
+<div class="po-wrap">
+
+  <!-- Header -->
+  <div class="po-head">
+    <div>
+      <div class="po-eyebrow">{% trans "Procurement" %}</div>
+      <h1 class="po-title">{% trans "Purchase Orders" %}</h1>
     </div>
-
-    <!-- Search Section -->
-    <div class="search-section">
-        <div class="search-box-modern">
-            <i class="fa fa-search search-icon"></i>
-            <input type="text" id="instantSearch" placeholder="Search orders by supplier or status..."
-                class="search-input-modern" autocomplete="off" value="{{ search_query }}">
-            <button type="button" class="search-clear" id="searchClear"
-                style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
-                <i class="fa fa-times"></i>
-            </button>
-        </div>
+    <div class="po-head-r">
+      <a href="#" onclick="openPurchaseOrderSidebar(); return false;" class="po-btn primary">
+        <i class="fa fa-plus"></i> {% trans "New purchase order" %}
+      </a>
     </div>
+  </div>
 
-    <!-- Orders Table -->
-    <div class="table-container">
-        <table class="products-table">
-            <thead>
-                <tr>
-                    <th style="width: 80px;">ID</th>
-                    <th>{% trans "Supplier" %}</th>
-                    <th style="width: 150px;">{% trans "Status" %}</th>
-                    <th style="width: 150px;">{% trans "Amount" %}</th>
-                    <th style="width: 150px;">{% trans "Date" %}</th>
-                    <th style="width: 100px;">{% trans "Actions" %}</th>
-                </tr>
-            </thead>
-            <tbody id="ordersTableBody">
-                {% for order in orders %}
-                <tr class="product-row" onclick="window.location='{% url 'procurement:order_detail' order.pk %}'"
-                    style="cursor: pointer;">
-                    <td>
-                        <span class="text-muted">PO-{{ order.pk }}</span>
-                    </td>
-                    <td>
-                        <div class="product-info">
-                            <div class="product-title">{{
-                                order.supplier.company_name|default:order.supplier.contact_name }}</div>
-                            {% if order.supplier.company_name and order.supplier.contact_name %}
-                            <div class="product-description">{{ order.supplier.contact_name }}</div>
-                            {% endif %}
-                        </div>
-                    </td>
-                    <td>
-                        {% if order.status == 'confirmed' %}
-                        <span class="badge" style="background-color: #dcfce7; color: #16a34a;">Confirmed</span>
-                        {% elif order.status == 'received' %}
-                        <span class="badge" style="background-color: #f0fdf4; color: #15803d;">Received</span>
-                        {% elif order.status == 'cancelled' %}
-                        <span class="badge" style="background-color: #f1f5f9; color: #64748b;">Cancelled</span>
-                        {% elif order.status == 'sent' %}
-                        <span class="badge" style="background-color: #e0f2fe; color: #0284c7;">Sent</span>
-                        {% else %}
-                        <span class="badge" style="background-color: #fff7ed; color: #c2410c;">Draft</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="font-medium">{{ order.currency }} {{ order.total_amount }}</span>
-                    </td>
-                    <td>
-                        <span class="text-muted" style="font-size: 0.875rem;">{{ order.created_at|date:"M d, Y"
-                            }}</span>
-                    </td>
-                    <td>
-                        <div class="action-buttons" onclick="event.stopPropagation();">
-                            <a href="{% url 'procurement:order_detail' order.pk %}" class="btn-icon" title="View">
-                                <i class="fa fa-eye"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="empty-state">
-                        <div class="empty-state-content">
-                            <i class="fas fa-shopping-cart"
-                                style="font-size: 48px; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                            <p>No purchase orders found</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+  <!-- Tabs + Search -->
+  <div class="po-tabs">
+    <button type="button" class="po-tab active">
+      <i class="fa fa-shopping-cart"></i>
+      <span>{% trans "All Orders" %}</span>
+      <span class="po-tab-count">{{ paginator.count|default:orders.count }}</span>
+    </button>
+    <div class="po-tabs-r">
+      <i class="fa fa-search po-search-icon"></i>
+      <input type="text" id="instantSearch" class="po-search-input"
+             placeholder="{% trans 'Search by supplier or status…' %}"
+             autocomplete="off" value="{{ search_query }}">
+      <button type="button"
+              class="po-search-clear{% if search_query %} show{% endif %}"
+              id="searchClear"
+              onclick="clearSearch()">
+        <i class="fa fa-times"></i>
+      </button>
     </div>
+  </div>
 
-    <!-- Pagination -->
-    {% if is_paginated %}
-    <div class="pagination-container">
-        <div class="pagination-info">
-            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} orders
-        </div>
-        <div class="pagination">
-            {% if page_obj.has_previous %}
-            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn"
-                title="First"><i class="fa fa-angles-left"></i></a>
-            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
-                class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
-            {% else %}
-            <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
-            <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
-            {% endif %}
-
-            {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-            <span class="pagination-btn active">{{ num }}</span>
-            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
-                href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">
-                {{ num
-                }}</a>
-                {% endif %}
-                {% endfor %}
-
-                {% if page_obj.has_next %}
-                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}"
-                    class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
-                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}"
-                    class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
-                {% else %}
-                <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
-                <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
-                {% endif %}
-        </div>
+  <!-- List -->
+  {% if orders %}
+  <div class="po-list">
+    <div class="po-list-head">
+      <span>{% trans "Order" %}</span>
+      <span>{% trans "Supplier" %}</span>
+      <span>{% trans "Status" %}</span>
+      <span class="num">{% trans "Amount" %}</span>
+      <span>{% trans "Date" %}</span>
+      <span></span>
     </div>
-    {% endif %}
+    {% for order in orders %}
+    <a href="{% url 'procurement:order_detail' order.pk %}" class="po-row">
+      <span class="po-id">PO-{{ order.pk }}</span>
+
+      <div class="po-supp">
+        {% with name=order.supplier.company_name|default:order.supplier.contact_name %}
+        <div class="po-supp-avatar">{{ name|slice:":2"|upper }}</div>
+        <div class="po-supp-info">
+          <div class="po-supp-name">{{ name|default:"—" }}</div>
+          {% if order.supplier.company_name and order.supplier.contact_name %}
+            <div class="po-supp-sub">{{ order.supplier.contact_name }}</div>
+          {% endif %}
+        </div>
+        {% endwith %}
+      </div>
+
+      <span class="po-status {{ order.status|default:'draft' }}">
+        <span class="dot"></span>
+        {% if order.status == 'confirmed' %}{% trans "Confirmed" %}
+        {% elif order.status == 'received' %}{% trans "Received" %}
+        {% elif order.status == 'cancelled' %}{% trans "Cancelled" %}
+        {% elif order.status == 'sent' %}{% trans "Sent" %}
+        {% else %}{% trans "Draft" %}
+        {% endif %}
+      </span>
+
+      <span class="po-amount num">
+        {{ order.total_amount|default:"0.00" }}<small>{{ order.currency|default:"" }}</small>
+      </span>
+
+      <span class="po-date">
+        {{ order.created_at|date:"d M Y" }}
+        <small>{{ order.created_at|date:"H:i" }}</small>
+      </span>
+
+      <span class="po-chev"><i class="fa fa-chevron-right"></i></span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="po-empty">
+    <div class="ico"><i class="fas fa-shopping-cart"></i></div>
+    <h3>{% trans "No purchase orders yet" %}</h3>
+    <p>{% trans "Create your first purchase order to track what you're buying from suppliers." %}</p>
+    <a href="#" onclick="openPurchaseOrderSidebar(); return false;" class="po-btn primary">
+      <i class="fa fa-plus"></i> {% trans "New purchase order" %}
+    </a>
+  </div>
+  {% endif %}
+
+  {% if is_paginated %}
+  <div class="po-pager">
+    <div class="po-pager-info">
+      {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktrans %}
+    </div>
+    <div class="po-pager-btns">
+      {% if page_obj.has_previous %}
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="po-pager-btn"><i class="fa fa-chevron-left"></i></a>
+      {% else %}
+      <span class="po-pager-btn disabled"><i class="fa fa-chevron-left"></i></span>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+          <span class="po-pager-btn active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="po-pager-btn">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="po-pager-btn"><i class="fa fa-chevron-right"></i></a>
+      {% else %}
+      <span class="po-pager-btn disabled"><i class="fa fa-chevron-right"></i></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 
-<style>
-    .pagination-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.5rem 0;
-        margin-top: 1rem;
-    }
-
-    .pagination-info {
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-    }
-
-    .pagination {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-    }
-
-    .pagination-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 36px;
-        height: 36px;
-        padding: 0 0.75rem;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        background: var(--bg-primary);
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-        font-weight: 500;
-        text-decoration: none;
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-
-    .pagination-btn:hover:not(.disabled):not(.active) {
-        background: var(--bg-hover);
-        border-color: var(--accent-primary);
-        color: var(--accent-primary);
-    }
-
-    .pagination-btn.active {
-        background: var(--accent-primary);
-        border-color: var(--accent-primary);
-        color: white;
-        font-weight: 600;
-    }
-
-    .pagination-btn.disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-    }
-</style>
-
 <script>
-    // Backend search functionality
+  (function () {
     const searchInput = document.getElementById('instantSearch');
     const searchClear = document.getElementById('searchClear');
+    if (!searchInput) return;
 
-    if (searchInput) {
-        // Navigate to search URL with debounce
-        let searchTimeout;
-        searchInput.addEventListener('input', function (e) {
-            const query = e.target.value.trim();
-            searchClear.style.display = query ? 'flex' : 'none';
-
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (query) {
-                    window.location.href = '{% url "procurement:order_list" %}?search=' + encodeURIComponent(query);
-                } else {
-                    window.location.href = '{% url "procurement:order_list" %}';
-                }
-            }, 500); // 500ms debounce
-        });
-    }
-
-    function clearSearch() {
-        searchInput.value = '';
-        searchClear.style.display = 'none';
-        window.location.href = '{% url "procurement:order_list" %}';
-    }
+    let searchTimeout;
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.trim();
+      searchClear.classList.toggle('show', !!query);
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const base = '{% url "procurement:order_list" %}';
+        window.location.href = query ? base + '?search=' + encodeURIComponent(query) : base;
+      }, 500);
+    });
+    window.clearSearch = function () {
+      searchInput.value = '';
+      searchClear.classList.remove('show');
+      window.location.href = '{% url "procurement:order_list" %}';
+    };
+  })();
 </script>
 {% endblock %}

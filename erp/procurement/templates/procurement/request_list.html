@@ -3,253 +3,477 @@
 {% load static %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'erp/css/product_list.css' %}?v=7.0" />
+<style>
+  :root {
+    --pr-teal: #147F74;
+    --pr-teal-50: #F0FDFA;
+    --pr-teal-100: #CCFBF1;
+    --pr-teal-700: #0F766E;
+    --pr-ink: #0F1419;
+    --pr-gray-50: #F8FAFC;
+    --pr-gray-100: #F1F5F9;
+    --pr-gray-200: #E2E8EE;
+    --pr-gray-300: #CBD5E1;
+    --pr-gray-400: #94A3B8;
+    --pr-gray-500: #64748B;
+    --pr-gray-600: #475569;
+    --pr-gray-700: #334155;
+  }
+
+  .pr-wrap {
+    padding: 20px 24px;
+    font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+    background: #FAFBFD;
+    min-height: calc(100vh - 60px);
+    color: var(--pr-ink);
+  }
+
+  /* ── header ── */
+  .pr-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 18px; gap: 16px; flex-wrap: wrap;
+  }
+  .pr-eyebrow {
+    font: 600 11px var(--font-sans); color: var(--pr-gray-500);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  .pr-title {
+    font: 700 24px var(--font-sans); color: var(--pr-ink);
+    letter-spacing: -.4px; margin: 4px 0 0;
+  }
+  .pr-head-r { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .pr-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    border-radius: 9px;
+    font: 600 12.5px var(--font-sans);
+    border: 1px solid var(--pr-gray-200);
+    background: #FFF; color: var(--pr-gray-700);
+    cursor: pointer; transition: all .15s;
+    text-decoration: none;
+  }
+  .pr-btn:hover { border-color: var(--pr-gray-300); color: var(--pr-ink); background: var(--pr-gray-50); }
+  .pr-btn.primary {
+    background: var(--pr-teal); color: #FFF;
+    border-color: var(--pr-teal);
+    box-shadow: 0 1px 2px rgba(20,127,116,.18);
+  }
+  .pr-btn.primary:hover { background: var(--pr-teal-700); border-color: var(--pr-teal-700); }
+  .pr-btn i { font-size: 12px; }
+
+  /* ── tabs + search row ── */
+  .pr-tabs {
+    display: flex; align-items: center; gap: 6px;
+    background: #FFF;
+    border: 1px solid var(--pr-gray-200);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+    margin-bottom: 16px;
+  }
+  .pr-tab {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 14px;
+    border: none; background: transparent;
+    border-radius: 8px;
+    font: 600 13px var(--font-sans);
+    color: var(--pr-gray-600);
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .pr-tab.active {
+    background: var(--pr-teal-50);
+    color: var(--pr-teal-700);
+    box-shadow: inset 0 0 0 1px rgba(20,127,116,.18);
+  }
+  .pr-tab i { font-size: 13px; }
+  .pr-tab-count {
+    font: 700 11px var(--font-sans);
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--pr-gray-100);
+    color: var(--pr-gray-500);
+    min-width: 22px; text-align: center;
+  }
+  .pr-tab.active .pr-tab-count { background: var(--pr-teal); color: #FFF; }
+
+  .pr-tabs-r { margin-left: auto; position: relative; display: flex; align-items: center; }
+  .pr-search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--pr-gray-400); font-size: 13px;
+    pointer-events: none; z-index: 1;
+  }
+  input.pr-search-input {
+    width: 340px;
+    padding: 9px 38px 9px 38px !important;
+    background: var(--pr-gray-50);
+    border: 1px solid transparent !important;
+    border-radius: 8px;
+    font: 500 13px var(--font-sans);
+    color: var(--pr-ink);
+    outline: none;
+    transition: all .15s;
+    box-sizing: border-box;
+  }
+  input.pr-search-input::placeholder { color: var(--pr-gray-400); }
+  input.pr-search-input:focus {
+    background: #FFF;
+    border-color: var(--pr-teal) !important;
+    box-shadow: 0 0 0 3px rgba(20,127,116,0.10);
+  }
+  .pr-search-clear {
+    position: absolute; right: 10px;
+    width: 22px; height: 22px;
+    border: none; background: var(--pr-gray-200);
+    color: var(--pr-gray-600);
+    border-radius: 50%; cursor: pointer;
+    display: none;
+    align-items: center; justify-content: center;
+    font-size: 9px;
+    transition: all .12s;
+  }
+  .pr-search-clear.show { display: flex; }
+  .pr-search-clear:hover { background: #DC2626; color: #FFF; }
+
+  /* ── list ── */
+  .pr-list {
+    background: #FFF;
+    border: 1px solid var(--pr-gray-200);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .pr-list-head, .pr-row {
+    display: grid;
+    grid-template-columns: 90px 1.6fr 1fr 110px 130px 130px 60px;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 18px;
+  }
+  .pr-list-head {
+    background: var(--pr-gray-50);
+    border-bottom: 1px solid var(--pr-gray-200);
+    font: 600 10.5px var(--font-sans);
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--pr-gray-500);
+  }
+  .pr-row {
+    border-bottom: 1px solid #EEF1F5;
+    cursor: pointer;
+    transition: background 120ms;
+    text-decoration: none;
+    color: inherit;
+  }
+  .pr-row:last-child { border-bottom: none; }
+  .pr-row:hover { background: var(--pr-gray-50); }
+
+  .pr-id { font: 700 13px var(--font-mono, ui-monospace, monospace); color: var(--pr-teal-700); }
+
+  .pr-req { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .pr-req-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--pr-teal-50), var(--pr-teal-100));
+    color: var(--pr-teal-700);
+    display: flex; align-items: center; justify-content: center;
+    font: 700 13px var(--font-sans);
+    flex-shrink: 0;
+  }
+  .pr-req-info { min-width: 0; }
+  .pr-req-name {
+    font: 600 13px var(--font-sans); color: var(--pr-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pr-req-sub {
+    font: 500 11.5px var(--font-sans); color: var(--pr-gray-500);
+    margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .pr-dept-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 7px;
+    background: var(--pr-gray-100);
+    color: var(--pr-gray-700);
+    font: 600 11.5px var(--font-sans);
+  }
+  .pr-dept-pill i { color: var(--pr-gray-500); font-size: 10px; }
+
+  /* priority + status pills share the same shape */
+  .pr-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font: 700 11px var(--font-sans);
+    letter-spacing: .02em;
+  }
+  .pr-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* priority */
+  .pr-pri.critical { color: #B91C1C; background: #FEE2E2; }
+  .pr-pri.critical .dot { background: #DC2626; }
+  .pr-pri.high     { color: #C2410C; background: #FFEDD5; }
+  .pr-pri.high     .dot { background: #EA580C; }
+  .pr-pri.medium   { color: #1565C0; background: #DBEAFE; }
+  .pr-pri.medium   .dot { background: #3B82F6; }
+  .pr-pri.low      { color: #475569; background: #E5E7EB; }
+  .pr-pri.low      .dot { background: #94A3B8; }
+
+  /* status */
+  .pr-st.pending   { color: #B45309; background: #FEF3C7; }
+  .pr-st.pending   .dot { background: #F59E0B; }
+  .pr-st.approved  { color: #0E6E4A; background: #D1FAE5; }
+  .pr-st.approved  .dot { background: #10B981; }
+  .pr-st.rejected  { color: #B91C1C; background: #FEE2E2; }
+  .pr-st.rejected  .dot { background: #DC2626; }
+  .pr-st.ordered   { color: #5B21B6; background: #EDE9FE; }
+  .pr-st.ordered   .dot { background: #8B5CF6; }
+  .pr-st.completed { color: #0E6E4A; background: #D1FAE5; }
+  .pr-st.completed .dot { background: #10B981; }
+  .pr-st.cancelled { color: #475569; background: #E5E7EB; }
+  .pr-st.cancelled .dot { background: #94A3B8; }
+
+  .pr-date {
+    font: 500 12px var(--font-sans);
+    color: var(--pr-gray-600);
+  }
+  .pr-date small { display: block; color: var(--pr-gray-400); margin-top: 2px; font-size: 10.5px; }
+
+  .pr-chev { text-align: right; color: var(--pr-gray-300); font-size: 14px; }
+  .pr-row:hover .pr-chev { color: var(--pr-teal); }
+
+  /* ── empty state ── */
+  .pr-empty {
+    padding: 80px 30px;
+    text-align: center;
+    background: #FFF;
+    border: 1px solid var(--pr-gray-200);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .pr-empty .ico {
+    width: 64px; height: 64px;
+    background: var(--pr-gray-50);
+    border: 1px dashed var(--pr-gray-200);
+    border-radius: 18px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--pr-gray-400); font-size: 24px;
+    margin-bottom: 14px;
+  }
+  .pr-empty h3 {
+    font: 700 16px var(--font-sans); color: var(--pr-gray-700); margin: 0 0 6px;
+  }
+  .pr-empty p {
+    font: 400 13px var(--font-sans); margin: 0 auto 18px; max-width: 380px;
+    color: var(--pr-gray-500);
+  }
+
+  /* ── pagination ── */
+  .pr-pager {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 4px;
+    margin-top: 8px;
+  }
+  .pr-pager-info {
+    font: 500 12px var(--font-sans); color: var(--pr-gray-500);
+  }
+  .pr-pager-btns { display: flex; gap: 4px; }
+  .pr-pager-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--pr-gray-200);
+    background: #FFF; color: var(--pr-gray-700);
+    border-radius: 8px;
+    font: 600 12px var(--font-sans);
+    text-decoration: none;
+    transition: all .12s;
+  }
+  .pr-pager-btn:hover { border-color: var(--pr-teal); color: var(--pr-teal); background: var(--pr-teal-50); }
+  .pr-pager-btn.active {
+    background: var(--pr-teal);
+    border-color: var(--pr-teal);
+    color: #FFF;
+  }
+  .pr-pager-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+  .pr-pager-btn.disabled:hover { border-color: var(--pr-gray-200); color: var(--pr-gray-700); background: #FFF; }
+
+  @media (max-width: 980px) {
+    .pr-list-head { display: none; }
+    .pr-row {
+      grid-template-columns: 1fr;
+      gap: 6px;
+      padding: 14px 16px;
+    }
+    input.pr-search-input { width: 100%; }
+    .pr-tabs-r { width: 100%; margin-left: 0; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="product-list-container">
-    <!-- Header Section -->
-    <div class="page-header">
-        <div class="header-left">
-            <h1>{% trans "Purchase Requests" %}</h1>
-            <span class="product-count">{{ paginator.count|default:requests.count }} request{{ paginator.count|default:requests.count|pluralize }}</span>
-        </div>
-        <div class="header-right">
-            <a href="#" onclick="openPurchaseRequestSidebar(); return false;" class="btn btn-primary">
-                <i class="fa fa-plus"></i>
-                New Request
-            </a>
-        </div>
+<div class="pr-wrap">
+
+  <!-- Header -->
+  <div class="pr-head">
+    <div>
+      <div class="pr-eyebrow">{% trans "Procurement" %}</div>
+      <h1 class="pr-title">{% trans "Purchase Requests" %}</h1>
     </div>
-
-    <!-- Search Section -->
-    <div class="search-section">
-        <div class="search-box-modern">
-            <i class="fa fa-search search-icon"></i>
-            <input type="text" id="instantSearch" placeholder="Search requests by requester, department, or reason..."
-                class="search-input-modern" autocomplete="off" value="{{ search_query }}">
-            <button type="button" class="search-clear" id="searchClear"
-                style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" onclick="clearSearch()">
-                <i class="fa fa-times"></i>
-            </button>
-        </div>
+    <div class="pr-head-r">
+      <a href="#" onclick="openPurchaseRequestSidebar(); return false;" class="pr-btn primary">
+        <i class="fa fa-plus"></i> {% trans "New purchase request" %}
+      </a>
     </div>
+  </div>
 
-    <!-- Requests Table -->
-    <div class="table-container">
-        <table class="products-table">
-            <thead>
-                <tr>
-                    <th style="width: 60px;">ID</th>
-                    <th>{% trans "Requester" %}</th>
-                    <th style="width: 200px;">{% trans "Department" %}</th>
-                    <th style="width: 150px;">{% trans "Priority" %}</th>
-                    <th style="width: 150px;">{% trans "Status" %}</th>
-                    <th style="width: 150px;">{% trans "Date" %}</th>
-                    <th style="width: 100px;">{% trans "Actions" %}</th>
-                </tr>
-            </thead>
-            <tbody id="requestsTableBody">
-                {% for request in requests %}
-                <tr class="product-row" onclick="window.location='{% url 'procurement:request_detail' request.pk %}'"
-                    style="cursor: pointer;">
-                    <td>
-                        <span class="text-muted">#{{ request.pk }}</span>
-                    </td>
-                    <td>
-                        <div class="product-info">
-                            <div class="product-title">{{
-                                request.requester.get_full_name|default:request.requester.username }}</div>
-                            {% if request.reason %}
-                            <div class="product-description">{{ request.reason|truncatechars:50 }}</div>
-                            {% endif %}
-                        </div>
-                    </td>
-                    <td>
-                        {% if request.department %}
-                        <span class="badge badge-category">{{ request.department }}</span>
-                        {% else %}
-                        <span class="text-muted">-</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if request.priority == 'critical' %}
-                        <span class="badge" style="background-color: #fee2e2; color: #dc2626;">Critical</span>
-                        {% elif request.priority == 'high' %}
-                        <span class="badge" style="background-color: #ffedd5; color: #ea580c;">High</span>
-                        {% elif request.priority == 'medium' %}
-                        <span class="badge" style="background-color: #e0f2fe; color: #0284c7;">Medium</span>
-                        {% else %}
-                        <span class="badge" style="background-color: #f1f5f9; color: #64748b;">Low</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if request.status == 'approved' %}
-                        <span class="badge" style="background-color: #dcfce7; color: #16a34a;">Approved</span>
-                        {% elif request.status == 'rejected' %}
-                        <span class="badge" style="background-color: #fee2e2; color: #dc2626;">Rejected</span>
-                        {% elif request.status == 'ordered' %}
-                        <span class="badge" style="background-color: #e0e7ff; color: #4f46e5;">Ordered</span>
-                        {% elif request.status == 'completed' %}
-                        <span class="badge" style="background-color: #f0fdf4; color: #15803d;">Completed</span>
-                        {% elif request.status == 'cancelled' %}
-                        <span class="badge" style="background-color: #f1f5f9; color: #64748b;">Cancelled</span>
-                        {% else %}
-                        <span class="badge" style="background-color: #fff7ed; color: #c2410c;">Pending</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="text-muted" style="font-size: 0.875rem;">{{ request.created_at|date:"M d, Y"
-                            }}</span>
-                    </td>
-                    <td>
-                        <div class="action-buttons" onclick="event.stopPropagation();">
-                            <a href="{% url 'procurement:request_detail' request.pk %}" class="btn-icon" title="View">
-                                <i class="fa fa-eye"></i>
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" class="empty-state">
-                        <div class="empty-state-content">
-                            <i class="fas fa-file-invoice"
-                                style="font-size: 48px; color: #cbd5e1; margin-bottom: 1rem;"></i>
-                            <p>No purchase requests found</p>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+  <!-- Tabs + Search -->
+  <div class="pr-tabs">
+    <button type="button" class="pr-tab active">
+      <i class="fa fa-file-invoice"></i>
+      <span>{% trans "All Requests" %}</span>
+      <span class="pr-tab-count">{{ paginator.count|default:requests.count }}</span>
+    </button>
+    <div class="pr-tabs-r">
+      <i class="fa fa-search pr-search-icon"></i>
+      <input type="text" id="instantSearch" class="pr-search-input"
+             placeholder="{% trans 'Search by requester, department or reason…' %}"
+             autocomplete="off" value="{{ search_query }}">
+      <button type="button"
+              class="pr-search-clear{% if search_query %} show{% endif %}"
+              id="searchClear"
+              onclick="clearSearch()">
+        <i class="fa fa-times"></i>
+      </button>
     </div>
+  </div>
 
-    <!-- Pagination -->
-    {% if is_paginated %}
-    <div class="pagination-container">
-        <div class="pagination-info">
-            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} requests
-        </div>
-        <div class="pagination">
-            {% if page_obj.has_previous %}
-            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page=1" class="pagination-btn"
-                title="First"><i class="fa fa-angles-left"></i></a>
-            <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}"
-                class="pagination-btn" title="Previous"><i class="fa fa-angle-left"></i></a>
-            {% else %}
-            <span class="pagination-btn disabled"><i class="fa fa-angles-left"></i></span>
-            <span class="pagination-btn disabled"><i class="fa fa-angle-left"></i></span>
-            {% endif %}
-
-            {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-            <span class="pagination-btn active">{{ num }}</span>
-            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %} <a
-                href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pagination-btn">
-                {{ num
-                }}</a>
-                {% endif %}
-                {% endfor %}
-
-                {% if page_obj.has_next %}
-                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}"
-                    class="pagination-btn" title="Next"><i class="fa fa-angle-right"></i></a>
-                <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ paginator.num_pages }}"
-                    class="pagination-btn" title="Last"><i class="fa fa-angles-right"></i></a>
-                {% else %}
-                <span class="pagination-btn disabled"><i class="fa fa-angle-right"></i></span>
-                <span class="pagination-btn disabled"><i class="fa fa-angles-right"></i></span>
-                {% endif %}
-        </div>
+  <!-- List -->
+  {% if requests %}
+  <div class="pr-list">
+    <div class="pr-list-head">
+      <span>{% trans "Request" %}</span>
+      <span>{% trans "Requester" %}</span>
+      <span>{% trans "Department" %}</span>
+      <span>{% trans "Priority" %}</span>
+      <span>{% trans "Status" %}</span>
+      <span>{% trans "Date" %}</span>
+      <span></span>
     </div>
-    {% endif %}
+    {% for request in requests %}
+    <a href="{% url 'procurement:request_detail' request.pk %}" class="pr-row">
+      <span class="pr-id">#{{ request.pk }}</span>
+
+      <div class="pr-req">
+        {% with name=request.requester.get_full_name|default:request.requester.username %}
+        <div class="pr-req-avatar">{{ name|slice:":2"|upper }}</div>
+        <div class="pr-req-info">
+          <div class="pr-req-name">{{ name }}</div>
+          {% if request.reason %}
+            <div class="pr-req-sub">{{ request.reason|truncatechars:50 }}</div>
+          {% endif %}
+        </div>
+        {% endwith %}
+      </div>
+
+      <div>
+        {% if request.department %}
+          <span class="pr-dept-pill"><i class="fa fa-building-user"></i>{{ request.department }}</span>
+        {% else %}
+          <span style="color:var(--pr-gray-400);">—</span>
+        {% endif %}
+      </div>
+
+      <span class="pr-pill pr-pri {{ request.priority|default:'low' }}">
+        <span class="dot"></span>
+        {% if request.priority == 'critical' %}{% trans "Critical" %}
+        {% elif request.priority == 'high' %}{% trans "High" %}
+        {% elif request.priority == 'medium' %}{% trans "Medium" %}
+        {% else %}{% trans "Low" %}
+        {% endif %}
+      </span>
+
+      <span class="pr-pill pr-st {{ request.status|default:'pending' }}">
+        <span class="dot"></span>
+        {% if request.status == 'approved' %}{% trans "Approved" %}
+        {% elif request.status == 'rejected' %}{% trans "Rejected" %}
+        {% elif request.status == 'ordered' %}{% trans "Ordered" %}
+        {% elif request.status == 'completed' %}{% trans "Completed" %}
+        {% elif request.status == 'cancelled' %}{% trans "Cancelled" %}
+        {% else %}{% trans "Pending" %}
+        {% endif %}
+      </span>
+
+      <span class="pr-date">
+        {{ request.created_at|date:"d M Y" }}
+        <small>{{ request.created_at|date:"H:i" }}</small>
+      </span>
+
+      <span class="pr-chev"><i class="fa fa-chevron-right"></i></span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="pr-empty">
+    <div class="ico"><i class="fas fa-file-invoice"></i></div>
+    <h3>{% trans "No purchase requests yet" %}</h3>
+    <p>{% trans "Create your first request — teams can flag what they need; managers approve and convert it into a purchase order." %}</p>
+    <a href="#" onclick="openPurchaseRequestSidebar(); return false;" class="pr-btn primary">
+      <i class="fa fa-plus"></i> {% trans "New purchase request" %}
+    </a>
+  </div>
+  {% endif %}
+
+  {% if is_paginated %}
+  <div class="pr-pager">
+    <div class="pr-pager-info">
+      {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=paginator.count %}Showing {{ start }}–{{ end }} of {{ total }}{% endblocktrans %}
+    </div>
+    <div class="pr-pager-btns">
+      {% if page_obj.has_previous %}
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="pr-pager-btn"><i class="fa fa-chevron-left"></i></a>
+      {% else %}
+      <span class="pr-pager-btn disabled"><i class="fa fa-chevron-left"></i></span>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+          <span class="pr-pager-btn active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+          <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ num }}" class="pr-pager-btn">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <a href="?{% if search_query %}search={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}" class="pr-pager-btn"><i class="fa fa-chevron-right"></i></a>
+      {% else %}
+      <span class="pr-pager-btn disabled"><i class="fa fa-chevron-right"></i></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 
-<style>
-    .pagination-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.5rem 0;
-        margin-top: 1rem;
-    }
-
-    .pagination-info {
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-    }
-
-    .pagination {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-    }
-
-    .pagination-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 36px;
-        height: 36px;
-        padding: 0 0.75rem;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        background: var(--bg-primary);
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-        font-weight: 500;
-        text-decoration: none;
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-
-    .pagination-btn:hover:not(.disabled):not(.active) {
-        background: var(--bg-hover);
-        border-color: var(--accent-primary);
-        color: var(--accent-primary);
-    }
-
-    .pagination-btn.active {
-        background: var(--accent-primary);
-        border-color: var(--accent-primary);
-        color: white;
-        font-weight: 600;
-    }
-
-    .pagination-btn.disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-    }
-</style>
-
 <script>
-    // Backend search functionality
+  (function () {
     const searchInput = document.getElementById('instantSearch');
     const searchClear = document.getElementById('searchClear');
+    if (!searchInput) return;
 
-    if (searchInput) {
-        // Navigate to search URL with debounce
-        let searchTimeout;
-        searchInput.addEventListener('input', function (e) {
-            const query = e.target.value.trim();
-            searchClear.style.display = query ? 'flex' : 'none';
-
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (query) {
-                    window.location.href = '{% url "procurement:request_list" %}?search=' + encodeURIComponent(query);
-                } else {
-                    window.location.href = '{% url "procurement:request_list" %}';
-                }
-            }, 500); // 500ms debounce
-        });
-    }
-
-    function clearSearch() {
-        searchInput.value = '';
-        searchClear.style.display = 'none';
-        window.location.href = '{% url "procurement:request_list" %}';
-    }
+    let searchTimeout;
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.trim();
+      searchClear.classList.toggle('show', !!query);
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const base = '{% url "procurement:request_list" %}';
+        window.location.href = query ? base + '?search=' + encodeURIComponent(query) : base;
+      }, 500);
+    });
+    window.clearSearch = function () {
+      searchInput.value = '';
+      searchClear.classList.remove('show');
+      window.location.href = '{% url "procurement:request_list" %}';
+    };
+  })();
 </script>
 {% endblock %}

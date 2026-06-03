@@ -155,6 +155,41 @@ def _capture_order_old_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Order)
+def email_customer_on_status_change(sender, instance, created, **kwargs):
+    """Fire a transactional email when the order's order_status
+    transitions into a notable state. Gated on Order.notify_customer.
+
+    Skips the 'created' event here — that's handled at create-time in
+    the view so we can guarantee the customer email is resolved off
+    the freshly-saved order (signals fire before some downstream
+    customer-linking steps in certain code paths)."""
+    if not instance.notify_customer:
+        return
+    new_status = instance.order_status
+    old_status = getattr(instance, "_old_status", None) if not created else None
+    if not created and old_status == new_status:
+        return
+    # Events worth emailing about. "pending" is the initial state, not
+    # a notification trigger; first email goes out at create time.
+    notify_events = {
+        "confirmed", "preparing", "packaging",
+        "shipped", "in_transit", "out_for_delivery", "delivered",
+        "cancelled", "returned",
+    }
+    if new_status not in notify_events:
+        return
+    try:
+        from .order_notifications import send_order_event_email
+        # Attach PDF only for the big lifecycle events. For tiny
+        # status nudges the customer doesn't need the file again.
+        attach_pdf = new_status in {"shipped", "delivered", "cancelled"}
+        send_order_event_email(instance, new_status, attach_pdf=attach_pdf)
+    except Exception as _exc:
+        import traceback as _tb
+        _tb.print_exc()
+
+
+@receiver(post_save, sender=Order)
 def sync_catalog_stock_on_order_status_change(sender, instance, created, **kwargs):
     """When the order moves INTO a fulfilment status (shipped / in
     transit / out for delivery / delivered) the catalog stock for every

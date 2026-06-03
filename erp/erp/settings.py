@@ -216,6 +216,10 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # CORS - must be before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Force English as the default for users with no explicit language
+    # cookie/session — must run BEFORE LocaleMiddleware so that one
+    # doesn't override us based on Accept-Language.
+    "erp.middleware.ForceEnglishDefaultMiddleware",
     "django.middleware.locale.LocaleMiddleware",  # i18n: detect/activate user language
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -474,7 +478,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 #     "allauth.account.auth_backends.AuthenticationBackend",
 # )
 
-# LOGIN_REDIRECT_URL = ""
+LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/authentication/signin"
 LOGOUT_REDIRECT_URL = "/authentication/index"
 # LOGOUT_REDIRECT_URL = "/"

@@ -1,0 +1,1 @@
+Your order is on the way — {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}

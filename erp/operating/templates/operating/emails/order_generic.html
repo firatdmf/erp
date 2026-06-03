@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ event_label }} — Order {{ order.order_number|default:order.pk }}</title>
+</head>
+<body style="margin:0;padding:0;background:#F4F7FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0F1419;">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4F7FA;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table cellpadding="0" cellspacing="0" border="0" width="600" style="background:#FFFFFF;border-radius:14px;border:1px solid #E2E8EE;overflow:hidden;max-width:600px;">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding:24px 32px;background:linear-gradient(135deg,#147F74,#0F766E);color:#FFFFFF;">
+              <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.85;">{{ event_label }}</div>
+              <div style="font-size:22px;font-weight:700;margin-top:6px;">
+                Order {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}
+              </div>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:28px 32px;font-size:14.5px;line-height:1.65;color:#334155;">
+              {% if customer_name %}<p style="margin:0 0 14px;">Hi {{ customer_name }},</p>{% endif %}
+
+              {% if event == 'created' %}
+                <p style="margin:0 0 16px;">We've received your order and started processing it. A copy of your invoice is attached for your records.</p>
+              {% elif event == 'preparing' %}
+                <p style="margin:0 0 16px;">Good news — your order is now being prepared.</p>
+              {% elif event == 'packaging' %}
+                <p style="margin:0 0 16px;">Your order is being packaged and will be handed to the carrier shortly.</p>
+              {% elif event == 'shipped' or event == 'in_transit' or event == 'out_for_delivery' %}
+                <p style="margin:0 0 16px;">Your order is on its way!</p>
+                {% if carrier or tracking_number %}
+                <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F0FDFA;border:1px solid #CCFBF1;border-radius:10px;padding:16px;margin:12px 0 18px;">
+                  <tr>
+                    <td>
+                      {% if carrier %}<div style="font-size:12px;color:#0F766E;text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Carrier</div>
+                      <div style="font-size:15px;font-weight:700;color:#0F1419;margin-top:2px;">{{ carrier }}</div>{% endif %}
+                      {% if tracking_number %}<div style="font-size:12px;color:#0F766E;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:10px;">Tracking number</div>
+                      <div style="font-size:16px;font-weight:800;font-family:Menlo,Consolas,monospace;color:#0F1419;margin-top:2px;">{{ tracking_number }}</div>{% endif %}
+                    </td>
+                  </tr>
+                </table>
+                {% endif %}
+              {% elif event == 'delivered' %}
+                <p style="margin:0 0 16px;">Your order has been delivered. We hope you're happy with it — please let us know if there's anything we can do.</p>
+              {% elif event == 'cancelled' %}
+                <p style="margin:0 0 16px;">Your order has been cancelled. If this was unexpected, please reach out and we'll sort it out.</p>
+              {% elif event == 'returned' %}
+                <p style="margin:0 0 16px;">We've recorded the return on this order.</p>
+              {% else %}
+                <p style="margin:0 0 16px;">Your order's status has been updated.</p>
+              {% endif %}
+
+              <!-- Order summary -->
+              <div style="border:1px solid #E2E8EE;border-radius:10px;padding:16px 18px;margin-top:18px;">
+                <div style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Order summary</div>
+                <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:13.5px;color:#334155;">
+                  {% for it in order.items.all %}
+                  <tr>
+                    <td style="padding:6px 0;">
+                      <div style="font-weight:600;color:#0F1419;">{{ it.product.title|default:'Product' }}</div>
+                      {% if it.product_variant %}<div style="font-size:11.5px;color:#64748B;">{{ it.product_variant.variant_sku }}</div>{% endif %}
+                    </td>
+                    <td align="right" style="padding:6px 0;white-space:nowrap;">
+                      {{ it.quantity|floatformat:2 }} × {{ it.price|floatformat:2 }}
+                      <div style="font-weight:700;color:#0F1419;">${{ it.subtotal|floatformat:2 }}</div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  <tr><td colspan="2" style="padding:8px 0 0;border-top:1px solid #E2E8EE;"></td></tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:600;">Total</td>
+                    <td align="right" style="padding:8px 0;font-weight:800;font-size:16px;color:#0F1419;">${{ order.total_value|floatformat:2 }}</td>
+                  </tr>
+                </table>
+              </div>
+
+              {% if order.delivery_address %}
+              <div style="margin-top:18px;">
+                <div style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Delivery address</div>
+                <div style="font-size:13.5px;color:#334155;line-height:1.55;">
+                  {% if order.delivery_address_title %}{{ order.delivery_address_title }}<br>{% endif %}
+                  {{ order.delivery_address }}<br>
+                  {% if order.delivery_city %}{{ order.delivery_city }}{% if order.delivery_country %}, {{ order.delivery_country }}{% endif %}{% endif %}
+                  {% if order.delivery_phone %}<br>{{ order.delivery_phone }}{% endif %}
+                </div>
+              </div>
+              {% endif %}
+
+              <p style="margin:22px 0 0;font-size:13px;color:#64748B;">
+                If you have any questions, just reply to this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:18px 32px;background:#FAFBFD;border-top:1px solid #EEF1F5;font-size:11.5px;color:#94A3B8;text-align:center;">
+              Order reference: <b style="color:#475569;">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</b>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

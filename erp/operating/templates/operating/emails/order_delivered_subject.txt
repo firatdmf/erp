@@ -1,0 +1,1 @@
+Delivered — Order {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}

@@ -253,7 +253,10 @@ BRAND_DEFAULTS = {
         "BRAND_TAX_OFFICE": "",
         "BRAND_TAX_NUMBER": "",
         "BRAND_LOGO_URL": "",
-        "BRAND_INVOICE_PREFIX": "DMF",
+        # Empty → invoices use the legacy dashed format INV-YEAR-NNNNNN
+        # (see CariSettings.next_invoice_number). Set a non-empty value
+        # to switch to the compact PREFIX+YEAR+SEQ shape.
+        "BRAND_INVOICE_PREFIX": "",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3000",
         "STOREFRONT_PREVIEW_URL": "http://localhost:3000/",

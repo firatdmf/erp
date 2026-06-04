@@ -356,12 +356,12 @@ class CariSettings(models.Model):
             locked.save(update_fields=["next_cari_seq"])
             return code
 
-    def next_invoice_number(self, series="FAT"):
+    def next_invoice_number(self, series="INV"):
         """
         Generate the next invoice number using the brand prefix + 4-digit
         year + zero-padded sequence (e.g. KRV20250000013). Falls back to
-        the legacy `FAT-YEAR-NNNNNN` shape when no brand prefix is set so
-        existing invoices stay decodable.
+        the dashed `INV-YEAR-NNNNNN` shape when no brand prefix is set
+        (the default for the demfirat brand) so numbers stay readable.
 
         Counter is per book — all series share the same sequence so the
         number is globally unique within a book regardless of the
@@ -426,7 +426,7 @@ class Invoice(models.Model):
     cari   = models.ForeignKey(CariAccount, on_delete=models.PROTECT, related_name="invoices")
     book   = models.ForeignKey(Book, on_delete=models.PROTECT, related_name="invoices")
 
-    series = models.CharField(max_length=10, default="FAT")
+    series = models.CharField(max_length=10, default="INV")
     number = models.CharField(max_length=30)
     type   = models.CharField(max_length=20, choices=INVOICE_TYPES, default="sales")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")

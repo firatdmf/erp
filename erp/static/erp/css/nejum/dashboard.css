@@ -461,6 +461,304 @@
 .btn-lock:hover { color: #B91C1C; border-color: #FCA5A5; background: #FEF2F2; }
 .btn-lock svg { width: 13px; height: 13px; stroke-width: 1.85; }
 
+/* ============ DELETE BUTTON ============ */
+/* Matches the pill height of .btn-complete / .btn-view so the action
+   row stays visually balanced. White by default with a soft red icon
+   and label; on hover the whole pill fills with the red wash. */
+.btn-delete {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  font: 600 12px var(--font-sans);
+  color: #DC2626;
+  background: white;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1);
+}
+.btn-delete:hover {
+  background: linear-gradient(180deg, #FEE2E2 0%, #FECACA 100%);
+  border-color: #FCA5A5;
+  color: #991B1B;
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.5),
+    0 4px 10px rgba(220, 38, 38, 0.18);
+}
+.btn-delete:active { transform: translateY(0); }
+.btn-delete:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+}
+.btn-delete:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-delete svg { width: 13px; height: 13px; stroke-width: 2; }
+
+/* ============ TEAM TASK VARIANT ============ */
+/* Team-task cards get a violet stripe + faint violet wash to stand
+   apart from personal Tasks at a glance. The "Team" pill sits on its
+   own line above the title so it never crowds the task name. */
+.task-card.team-card { background: linear-gradient(180deg, #FAFAFE 0%, #FFFFFF 100%); }
+.task-card.team-card .task-stripe { background: linear-gradient(180deg, #A78BFA 0%, #7C3AED 100%); }
+.avatar.avatar-purple {
+  background: linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%);
+  color: #5B21B6;
+}
+.kind-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font: 700 9.5px var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin: 0 0 4px;
+  width: fit-content;
+}
+.kind-pill.kind-team {
+  background: #EDE9FE;
+  color: #6D28D9;
+  border: 1px solid #DDD6FE;
+}
+.kind-pill svg { width: 10px; height: 10px; stroke-width: 2.2; }
+/* Push the team-pill onto its own row above the task title so it
+   never visually merges with the name. */
+.task-text .kind-pill { display: inline-flex; }
+.task-card.team-card .task-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.task-entity.task-entity-team {
+  background: #F5F3FF;
+  color: #6D28D9;
+  border-color: #E9E5FF;
+}
+/* Supplier-linked tasks — soft amber pill to distinguish them
+   from contact (gray), company (slate), and team (violet). */
+.task-entity.task-entity-supplier {
+  background: #FEF3C7;
+  color: #8B5A00;
+  border-color: #F5D78B;
+}
+
+/* ============ COMPLETED TAB ============ */
+/* Cards: each row is a `.nj-cmpl-card` containing a custom checkbox
+   on the left, an `<a class="nj-cmpl-body">` link covering the bulk
+   of the row (clicking navigates to the task detail page), and a
+   chevron + optional lock badge on the right. */
+.nj-cmpl-toolbar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFD 100%);
+  border: 1px solid #E2E8EE;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 31, 0.04);
+}
+.nj-cmpl-checkall {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 600 12.5px var(--font-sans);
+  color: var(--gray-700);
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+.nj-cmpl-checkall input { position: absolute; opacity: 0; pointer-events: none; }
+.nj-cmpl-count {
+  margin-left: auto;
+  font: 600 12px var(--font-sans);
+  color: var(--gray-500);
+  padding: 3px 9px;
+  background: #F1F5F9;
+  border-radius: 999px;
+}
+.nj-cmpl-del {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 14px;
+  background: white;
+  border: 1px solid #FECACA;
+  color: #DC2626;
+  border-radius: 9px;
+  font: 600 12.5px var(--font-sans);
+  cursor: pointer;
+  transition: all 160ms;
+}
+.nj-cmpl-del:hover:not(:disabled) {
+  background: linear-gradient(180deg, #FEE2E2 0%, #FECACA 100%);
+  border-color: #FCA5A5;
+  color: #991B1B;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.18);
+  transform: translateY(-1px);
+}
+.nj-cmpl-del:disabled { opacity: 0.42; cursor: not-allowed; }
+.nj-cmpl-del svg { width: 13px; height: 13px; }
+
+.nj-cmpl-list { display: flex; flex-direction: column; gap: 8px; }
+
+.nj-cmpl-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: stretch;
+  background: white;
+  border: 1px solid #E2E8EE;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 31, 0.04);
+  transition: border-color 160ms, box-shadow 160ms, transform 160ms;
+  position: relative;
+}
+.nj-cmpl-card:hover {
+  border-color: var(--nejum-teal-500, #147F74);
+  box-shadow: 0 4px 12px rgba(20, 127, 116, 0.10);
+  transform: translateY(-1px);
+}
+.nj-cmpl-card.is-checked {
+  border-color: rgba(20, 127, 116, 0.45);
+  background: linear-gradient(180deg, var(--nejum-teal-50, #E5F1F0) 0%, #FFFFFF 70%);
+}
+.nj-cmpl-card.is-locked { opacity: 0.7; }
+.nj-cmpl-card.is-locked .nj-cmpl-body { cursor: not-allowed; pointer-events: none; }
+
+/* Custom checkbox column — bigger hit area, no native browser look. */
+.nj-cmpl-checkwrap {
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+}
+.nj-cmpl-check { position: absolute; opacity: 0; pointer-events: none; }
+.nj-cmpl-checkmark {
+  width: 18px; height: 18px;
+  background: white;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 140ms;
+  position: relative;
+}
+.nj-cmpl-checkmark::after {
+  content: '';
+  width: 9px; height: 5px;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: rotate(-45deg) translate(1px, -1px);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.nj-cmpl-checkwrap input:checked + .nj-cmpl-checkmark,
+.nj-cmpl-checkall input:checked + .nj-cmpl-checkmark {
+  background: var(--nejum-teal-600, #00696A);
+  border-color: var(--nejum-teal-700, #005354);
+}
+.nj-cmpl-checkwrap input:checked + .nj-cmpl-checkmark::after,
+.nj-cmpl-checkall input:checked + .nj-cmpl-checkmark::after { opacity: 1; }
+.nj-cmpl-checkall input:indeterminate + .nj-cmpl-checkmark {
+  background: var(--nejum-teal-600, #00696A);
+  border-color: var(--nejum-teal-700, #005354);
+}
+.nj-cmpl-checkall input:indeterminate + .nj-cmpl-checkmark::after {
+  content: '';
+  width: 9px; height: 0;
+  border: none;
+  border-top: 2px solid white;
+  transform: rotate(0deg);
+  opacity: 1;
+}
+.nj-cmpl-checkwrap input[disabled] + .nj-cmpl-checkmark {
+  background: #F1F5F9;
+  border-color: #E2E8EE;
+  cursor: not-allowed;
+}
+
+/* Body link — covers the rest of the row, navigates to task detail. */
+.nj-cmpl-body {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 6px 12px 4px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+.nj-cmpl-body:hover { color: inherit; }
+
+.nj-cmpl-row1 {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+.nj-cmpl-done-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  background: linear-gradient(180deg, #34D399 0%, #10B981 100%);
+  color: white;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 2px rgba(16, 185, 129, 0.25);
+}
+.nj-cmpl-title {
+  font: 700 13.5px var(--font-sans);
+  color: #0F1419;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.nj-cmpl-when {
+  font: 500 11px var(--font-sans);
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+.nj-cmpl-row2 {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font: 500 11.5px var(--font-sans);
+  color: var(--gray-600);
+}
+.nj-cmpl-pers {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--gray-700);
+  font-weight: 600;
+}
+.nj-cmpl-avatar {
+  width: 20px; height: 20px;
+  background: linear-gradient(180deg, var(--nejum-teal-500, #147F74), var(--nejum-teal-600, #00696A));
+  color: white;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 700 10px var(--font-sans);
+  flex-shrink: 0;
+}
+.nj-cmpl-due {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--gray-500);
+}
+.nj-cmpl-due svg { color: var(--gray-400); }
+.nj-cmpl-entity {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px;
+  background: #F1F5F9;
+  color: var(--gray-700);
+  border-radius: 999px;
+  font: 600 10.5px var(--font-sans);
+  border: 1px solid #E2E8EE;
+}
+.nj-cmpl-entity svg { color: var(--gray-500); }
+
+.nj-cmpl-end {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 14px 0 8px;
+  color: var(--gray-400, #94A3B8);
+}
+.nj-cmpl-lock-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8EE;
+  border-radius: 6px;
+  color: var(--gray-500);
+}
+.nj-cmpl-chev { transition: color 140ms, transform 140ms; }
+.nj-cmpl-card:hover .nj-cmpl-chev {
+  color: var(--nejum-teal-700, #005354);
+  transform: translateX(2px);
+}
+
 /* ============ EMPTY STATE ============ */
 .empty-state {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -721,3 +1019,77 @@ main:has(.njdash) {
 .njdash .cal-title-icon svg {
   stroke-width: 1.75 !important;
 }
+
+/* New Task Button Modern Styling - Light Teal Outline Design */
+.home-action.primary.nj-new-task-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  height: 38px !important;
+  padding: 0 18px !important;
+  border-radius: 19px !important; /* Modern rounded pill */
+  font: 600 13px var(--font-sans, 'Plus Jakarta Sans') !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(13, 148, 136, 0.3) !important;
+  color: #0d9488 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: none !important;
+}
+.home-action.primary.nj-new-task-btn:hover {
+  transform: translateY(-1.5px) !important;
+  background: #0d9488 !important;
+  border-color: #0d9488 !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2) !important;
+}
+.home-action.primary.nj-new-task-btn:active {
+  transform: translateY(0) !important;
+}
+.home-action.primary.nj-new-task-btn svg {
+  width: 15px !important;
+  height: 15px !important;
+  stroke-width: 2.2 !important;
+  transition: transform 0.2s ease !important;
+}
+.home-action.primary.nj-new-task-btn:hover svg {
+  transform: scale(1.1) !important;
+}
+
+/* Today's Tasks card header layout */
+.today-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* Empty State Action Button */
+.nj-empty-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  margin-top: 14px;
+  border-radius: 18px;
+  font: 600 12.5px var(--font-sans, 'Plus Jakarta Sans');
+  background: linear-gradient(135deg, #0d9488 0%, #008080 100%);
+  border: 1px solid #115e59;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 128, 128, 0.15);
+  transition: all 0.2s ease;
+}
+
+.nj-empty-action-btn:hover {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 128, 128, 0.25);
+}
+
+.nj-empty-action-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+

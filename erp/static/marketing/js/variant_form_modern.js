@@ -75,24 +75,24 @@ function loadExistingVariants() {
                         <div class="option_header">
                             <span class="drag_handle"><i class="fa fa-grip-vertical"></i></span>
                             <div class="option_name_input">
-                                <label>Option Name</label>
-                                <input type="text" 
-                                       placeholder="e.g. Size, Color" 
+                                <label>${(window.VARIANT_T && window.VARIANT_T.option_name) || 'Option Name'}</label>
+                                <input type="text"
+                                       placeholder="${(window.VARIANT_T && window.VARIANT_T.option_placeholder) || 'e.g. Size, Color'}"
                                        value="${option.name}"
                                        oninput="updateOptionName('${optionId}', this.value)"
                                        class="option_name_field">
                             </div>
                         </div>
                         <div class="option_values_section">
-                            <label>Option Values</label>
+                            <label>${(window.VARIANT_T && window.VARIANT_T.option_values) || 'Option Values'}</label>
                             <div class="option_values_list" id="${optionId}_values"></div>
                             <button type="button" class="btn_add_value" onclick="addValueField('${optionId}')">
-                                <i class="fa fa-plus"></i> Add another value
+                                <i class="fa fa-plus"></i> ${(window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value'}
                             </button>
                         </div>
                         <div class="option_actions">
                             <button type="button" class="btn_remove_option" onclick="removeOption('${optionId}')">
-                                Delete
+                                ${(window.VARIANT_T && window.VARIANT_T.delete) || 'Delete'}
                             </button>
                         </div>
                     </div>
@@ -175,6 +175,7 @@ function loadExistingVariantImages() {
                 variant_id: variant.variant_id,
                 price: variant.variant_price,
                 cost: variant.variant_cost,
+                b2b_price: variant.variant_b2b_price,
                 quantity: variant.variant_quantity,
                 sku: variant.variant_sku,
                 barcode: variant.variant_barcode,
@@ -307,23 +308,23 @@ function addNewOption() {
             <div class="option_header">
                 <span class="drag_handle"><i class="fa fa-grip-vertical"></i></span>
                 <div class="option_name_input">
-                    <label>Option Name</label>
-                    <input type="text" 
-                           placeholder="e.g. Size, Color" 
+                    <label>${(window.VARIANT_T && window.VARIANT_T.option_name) || 'Option Name'}</label>
+                    <input type="text"
+                           placeholder="${(window.VARIANT_T && window.VARIANT_T.option_placeholder) || 'e.g. Size, Color'}"
                            oninput="updateOptionName('${optionId}', this.value)"
                            class="option_name_field">
                 </div>
             </div>
             <div class="option_values_section">
-                <label>Option Values</label>
+                <label>${(window.VARIANT_T && window.VARIANT_T.option_values) || 'Option Values'}</label>
                 <div class="option_values_list" id="${optionId}_values"></div>
                 <button type="button" class="btn_add_value" onclick="addValueField('${optionId}')">
-                    <i class="fa fa-plus"></i> Add another value
+                    <i class="fa fa-plus"></i> ${(window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value'}
                 </button>
             </div>
             <div class="option_actions">
                 <button type="button" class="btn_remove_option" onclick="removeOption('${optionId}')">
-                    Delete
+                    ${(window.VARIANT_T && window.VARIANT_T.delete) || 'Delete'}
                 </button>
             </div>
         </div>
@@ -344,7 +345,7 @@ function addValueField(optionId, value = '') {
         <div class="value_field_wrapper" data-value-index="${valueIndex}">
             <span class="drag_handle_small"><i class="fa fa-grip-vertical"></i></span>
             <input type="text"
-                   placeholder="${valueIndex === 0 ? '' : 'Add another value'}"
+                   placeholder="${valueIndex === 0 ? '' : ((window.VARIANT_T && window.VARIANT_T.add_value) || 'Add another value')}"
                    value="${value}"
                    oninput="updateOptionValue('${optionId}', ${valueIndex}, this.value)"
                    class="value_input">
@@ -1108,11 +1109,16 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         .map(d => d.name);
 
     // Build table HTML - Cost, SKU, Barcode columns are removed from view
-    let tableHTML = '<thead><tr><th style="width: 50px;"></th><th style="width: 60px;">PHOTO</th>';
+    const VT = (window.VARIANT_T || { photo:'PHOTO', price:'PRICE', stock:'STOCK', featured:'FEATURED', attributes:'ATTRIBUTES', opt_labels: {} });
+    const labelOf = (name) => {
+        const k = (name || '').toLowerCase().trim();
+        return (VT.opt_labels && VT.opt_labels[k]) || (name || '').toUpperCase();
+    };
+    let tableHTML = `<thead><tr><th style="width: 50px;"></th><th style="width: 60px;">${VT.photo}</th>`;
     displayOptions.forEach(name => {
-        tableHTML += `<th>${name.toUpperCase()}</th>`;
+        tableHTML += `<th>${labelOf(name)}</th>`;
     });
-    tableHTML += '<th>PRICE</th><th>STOCK</th><th>FEATURED</th><th style="text-align: center;">ATTRIBUTES</th></tr></thead><tbody>';
+    tableHTML += `<th>${VT.price}</th><th>${VT.stock}</th><th>${VT.featured}</th><th style="text-align: center;">${VT.attributes}</th></tr></thead><tbody>`;
 
     // Helper to generate row HTML (avoids duplication between grouped/ungrouped)
     const generateRowHTML = (combo, originalIndex, displayOptions, groupId = '') => {
@@ -1160,11 +1166,39 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${originalIndex + 1}"]`);
         const activeInput = document.querySelector(`input[name="variant_active_${originalIndex + 1}"]`);
 
-        const price = priceInput?.value || existingData.price || '';
+        // Parent product defaults — used when a brand-new variant row
+        // has no price / cost / SKU of its own. User explicitly asked
+        // for new variants to inherit the main product's pricing and
+        // for empty SKUs to fall back to "parent_sku_<value>".
+        const _parentSku   = (document.getElementById('id_sku')?.value || '').trim();
+        const _parentPrice = (document.getElementById('id_price')?.value || '').trim();
+        const _parentCost  = (document.getElementById('id_cost')?.value || '').trim();
+        const _parentB2b   = (document.getElementById('id_b2b_price')?.value || '').trim();
+        const _slugBits = displayOptions
+            .map(opt => (combo[opt] || '').toString().trim().toLowerCase().replace(/\s+/g, '_'))
+            .filter(Boolean);
+        const _autoSku = _parentSku
+            ? `${_parentSku}_${_slugBits.join('_')}`
+            : _slugBits.join('_');
+
+        const price = priceInput?.value || existingData.price || _parentPrice || '';
         const quantity = quantityInput?.value || existingData.quantity || '';
-        const featured = featuredInput ? featuredInput.checked : (existingData.featured !== false);
-        const cost = costInput?.value || existingData.cost || '';
-        const sku = skuInput?.value || existingData.sku || existingData.item_code || ''; // fallback to item_code if sku missing
+        // Featured: prefer the live DOM checkbox if rendered already;
+        // else respect server-loaded existingData; else default to true
+        // for brand-new variants. The model default is also True so this
+        // matches the server side.
+        let featured;
+        if (featuredInput) {
+            featured = featuredInput.checked;
+        } else if (Object.prototype.hasOwnProperty.call(existingData, 'featured')) {
+            featured = existingData.featured !== false;
+        } else {
+            featured = true;
+        }
+        const cost = costInput?.value || existingData.cost || _parentCost || '';
+        const b2bPriceInput = document.querySelector(`input[name="variant_b2b_price_${originalIndex + 1}"]`);
+        const b2bPrice = b2bPriceInput?.value || existingData.b2b_price || _parentB2b || '';
+        const sku = skuInput?.value || existingData.sku || existingData.item_code || _autoSku || '';
         const barcode = barcodeInput?.value || existingData.barcode || '';
         const active = activeInput ? (activeInput.value === 'true') : (existingData.is_active !== false);
 
@@ -1195,7 +1229,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         displayOptions.forEach((optionName, optIdx) => {
             const value = combo[optionName] || '';
             if (optIdx === 0) {
-                rowHTML += `<td><span style="font-weight: 500;">${value}</span><br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> Edit</span></td>`;
+                rowHTML += `<td><span style="font-weight: 500;">${value}</span><br><span class="variant_row_edit_hint"><i class="fa fa-pencil-alt"></i> ${(window.VARIANT_T && window.VARIANT_T.edit_hint) || 'Edit'}</span></td>`;
             } else {
                 rowHTML += `<td><span style="font-weight: 500;">${value}</span></td>`;
             }
@@ -1233,6 +1267,7 @@ function renderVariantTable(combinations, selectedGrouping = null) {
         // HIDDEN INPUTS for Modal Fields (wrapped in td to avoid browser foster-parenting)
         rowHTML += `<td style="display:none;">`;
         rowHTML += `<input type="hidden" name="variant_cost_${originalIndex + 1}" value="${cost}">`;
+        rowHTML += `<input type="hidden" name="variant_b2b_price_${originalIndex + 1}" value="${b2bPrice}">`;
         rowHTML += `<input type="hidden" name="variant_sku_${originalIndex + 1}" value="${sku}">`;
         rowHTML += `<input type="hidden" name="variant_barcode_${originalIndex + 1}" value="${barcode}">`;
         rowHTML += `<input type="hidden" name="variant_active_${originalIndex + 1}" value="${active}">`;
@@ -2711,6 +2746,7 @@ function prepareVariantsForSubmission() {
         // Get form values for this variant
         const priceInput = document.querySelector(`input[name="variant_price_${index + 1}"]`);
         const costInput = document.querySelector(`input[name="variant_cost_${index + 1}"]`);
+        const b2bPriceInput = document.querySelector(`input[name="variant_b2b_price_${index + 1}"]`);
         const quantityInput = document.querySelector(`input[name="variant_quantity_${index + 1}"]`);
         const skuInput = document.querySelector(`input[name="variant_sku_${index + 1}"]`);
         const barcodeInput = document.querySelector(`input[name="variant_barcode_${index + 1}"]`);
@@ -2722,6 +2758,9 @@ function prepareVariantsForSubmission() {
         }
         if (costInput && costInput.value) {
             costInput.value = costInput.value.replace(',', '.');
+        }
+        if (b2bPriceInput && b2bPriceInput.value) {
+            b2bPriceInput.value = b2bPriceInput.value.replace(',', '.');
         }
         if (quantityInput && quantityInput.value) {
             quantityInput.value = quantityInput.value.replace(',', '.');
@@ -2735,11 +2774,25 @@ function prepareVariantsForSubmission() {
         console.log(`prepareVariantsForSubmission: index=${index}, variantImg:`, variantImg);
         console.log(`  hasImages=${hasImages}, images count=${variantImg?.images?.length || 0}`);
 
+        // Resolve the stable variant_id (if this is an existing variant
+        // being edited) so the backend can update by id — that way the
+        // user can rename variant_sku without orphaning the row + losing
+        // its images. Lookup key is the attribute combo, which is stable
+        // across SKU renames.
+        const _attrKey = Object.entries(combo)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, val]) => `${key}:${val}`)
+            .join('|');
+        const _existingForId = existingVariantData[_attrKey] || {};
+        const _variantId = _existingForId.variant_id || '';
+
         const variantData = {
+            variant_id: _variantId,
             variant_sku: skuInput && skuInput.value ? skuInput.value : variantValues,
             variant_attribute_values: combo,
             variant_price: priceInput ? parseFloat(priceInput.value) || 0 : 0,
             variant_cost: costInput && costInput.value !== '' ? parseFloat(costInput.value) : null,
+            variant_b2b_price: b2bPriceInput && b2bPriceInput.value !== '' ? parseFloat(b2bPriceInput.value) : null,
             variant_quantity: quantityInput ? parseFloat(quantityInput.value) || 0 : 0,
             variant_barcode: barcodeInput ? barcodeInput.value : '',
             variant_featured: featuredInput ? featuredInput.checked : true,
@@ -3605,6 +3658,7 @@ function openVariantDetailModal(variantIndex) {
     const idx = variantIndex + 1;
     const price = document.querySelector(`input[name="variant_price_${idx}"]`)?.value || '';
     const cost = document.querySelector(`input[name="variant_cost_${idx}"]`)?.value || '';
+    const b2bPrice = document.querySelector(`input[name="variant_b2b_price_${idx}"]`)?.value || '';
     const sku = document.querySelector(`input[name="variant_sku_${idx}"]`)?.value || '';
     const barcode = document.querySelector(`input[name="variant_barcode_${idx}"]`)?.value || '';
     const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
@@ -3613,12 +3667,14 @@ function openVariantDetailModal(variantIndex) {
     // Populate modal inputs
     const priceEl = document.getElementById('modal_variant_price');
     const costEl = document.getElementById('modal_variant_cost');
+    const b2bPriceEl = document.getElementById('modal_variant_b2b_price');
     const skuEl = document.getElementById('modal_variant_sku');
     const barcodeEl = document.getElementById('modal_variant_barcode');
     const activeEl = document.getElementById('modal_variant_active');
 
     if (priceEl) priceEl.value = price;
     if (costEl) costEl.value = cost;
+    if (b2bPriceEl) b2bPriceEl.value = b2bPrice;
     if (skuEl) skuEl.value = sku;
     if (barcodeEl) barcodeEl.value = barcode;
     if (activeEl) activeEl.checked = isActive;
@@ -3647,6 +3703,7 @@ function saveVariantDetailModal() {
     // Get values from modal
     const price = document.getElementById('modal_variant_price').value;
     const cost = document.getElementById('modal_variant_cost').value;
+    const b2bPrice = document.getElementById('modal_variant_b2b_price')?.value || '';
     const sku = document.getElementById('modal_variant_sku').value;
     const barcode = document.getElementById('modal_variant_barcode').value;
     const isActive = document.getElementById('modal_variant_active').checked;
@@ -3654,12 +3711,14 @@ function saveVariantDetailModal() {
     // Update DOM inputs (hidden and visible)
     const priceInput = document.querySelector(`input[name="variant_price_${idx}"]`);
     const costInput = document.querySelector(`input[name="variant_cost_${idx}"]`);
+    const b2bPriceInput = document.querySelector(`input[name="variant_b2b_price_${idx}"]`);
     const skuInput = document.querySelector(`input[name="variant_sku_${idx}"]`);
     const barcodeInput = document.querySelector(`input[name="variant_barcode_${idx}"]`);
     const activeInput = document.querySelector(`input[name="variant_active_${idx}"]`);
 
     if (priceInput) priceInput.value = price;
     if (costInput) costInput.value = cost;
+    if (b2bPriceInput) b2bPriceInput.value = b2bPrice;
     if (skuInput) skuInput.value = sku;
     if (barcodeInput) barcodeInput.value = barcode;
     if (activeInput) activeInput.value = isActive;

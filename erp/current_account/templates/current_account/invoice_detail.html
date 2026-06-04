@@ -491,6 +491,7 @@
     </a>
     <div class="iv-tools">
       <button onclick="window.print()" class="iv-btn ghost"><i data-lucide="printer"></i>{% trans "Print" %}</button>
+      <a href="{% url 'current_account:invoice_excel' invoice.pk %}" class="iv-btn ghost"><i data-lucide="sheet"></i>{% trans "Excel" %}</a>
       {% if invoice.status != 'cancelled' %}
         <a href="{% url 'current_account:invoice_edit' invoice.pk %}" class="iv-btn ghost"
            {% if invoice.status != 'draft' %}onclick="return confirm('{% trans 'This invoice is already issued. Editing will sync the cari ledger. Continue?' %}');"{% endif %}>

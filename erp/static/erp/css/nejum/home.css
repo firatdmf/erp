@@ -388,6 +388,59 @@
 }
 .btn-view:hover { color: var(--gray-800); border-color: #B8C2C8; background: #FAFBFC; }
 .btn-view svg { width: 13px; height: 13px; stroke-width: 1.85; }
+.btn-delete {
+  margin-left: auto;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+  background: white;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 180ms;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,1);
+}
+.btn-delete:hover {
+  background: #FEF2F2;
+  border-color: #FCA5A5;
+  color: #991B1B;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.12);
+}
+.btn-delete:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-delete svg { width: 14px; height: 14px; stroke-width: 2; }
+
+/* ============ TEAM TASK VARIANT ============ */
+/* Team-task cards get a violet stripe + faint violet wash so they're
+   visually distinct from personal Tasks at a glance. */
+.task-card.team-card { background: linear-gradient(180deg, #FAFAFE 0%, #FFFFFF 100%); }
+.task-card.team-card .task-stripe { background: linear-gradient(180deg, #A78BFA 0%, #7C3AED 100%); }
+.avatar.avatar-purple {
+  background: linear-gradient(180deg, #DDD6FE 0%, #C4B5FD 100%);
+  color: #5B21B6;
+}
+.kind-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 7px;
+  font: 700 9.5px var(--font-sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.kind-pill.kind-team {
+  background: #EDE9FE;
+  color: #6D28D9;
+  border: 1px solid #DDD6FE;
+}
+.kind-pill svg { width: 10px; height: 10px; stroke-width: 2.2; }
+.task-entity.task-entity-team {
+  background: #F5F3FF;
+  color: #6D28D9;
+  border-color: #E9E5FF;
+}
 .btn-lock {
   margin-left: auto;
   width: 30px; height: 30px;

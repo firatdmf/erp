@@ -446,6 +446,60 @@ class OrderDetail(DetailView):
             order.save(update_fields=["notify_customer", "updated_at"])
             return JsonResponse({"ok": True, "notify_customer": order.notify_customer})
 
+        # ── Preview add item (no database save) ──────────────────
+        if action == "preview_add_item":
+            sku = (request.POST.get("sku") or "").strip()
+            is_variant = (request.POST.get("is_variant") or "").lower() == "true"
+            qty_raw = (request.POST.get("quantity") or "1").replace(",", ".")
+            price_raw = (request.POST.get("price") or "0").replace(",", ".")
+            if not sku:
+                return JsonResponse({"ok": False, "error": "Missing SKU"}, status=400)
+            try:
+                qty = Decimal(qty_raw)
+                price = Decimal(price_raw)
+            except (InvalidOperation, ValueError):
+                return JsonResponse({"ok": False, "error": "Invalid number"}, status=400)
+            if qty <= 0 or price < 0:
+                return JsonResponse({"ok": False, "error": "Bad qty/price"}, status=400)
+
+            variant = None
+            if is_variant:
+                variant = ProductVariant.objects.filter(variant_sku=sku).select_related("product").first()
+                if not variant:
+                    return JsonResponse({"ok": False, "error": "Variant not found"}, status=404)
+                product = variant.product
+            else:
+                product = Product.objects.filter(sku=sku).first()
+                if not product:
+                    return JsonResponse({"ok": False, "error": "Product not found"}, status=404)
+
+            allow_oversell = bool(getattr(product, "selling_while_out_of_stock", False))
+            stock = variant.variant_quantity if is_variant else product.quantity
+            max_qty = None
+            if stock is not None and not allow_oversell:
+                max_qty = float(qty) + float(stock)
+                
+            unit_cost = variant.variant_cost if is_variant else product.cost
+
+            return JsonResponse({
+                "ok": True,
+                "item": {
+                    "product_title": product.title or "",
+                    "product_url": reverse("marketing:product_detail", args=[product.pk]),
+                    "product_sku": product.sku or "",
+                    "variant_sku": variant.variant_sku if variant else "",
+                    "image_url": (product.files.first().file_url
+                                  if product.files.exists() and product.files.first().file_url else ""),
+                    "quantity": float(qty),
+                    "price": float(price),
+                    "subtotal": float(qty * price),
+                    "unit_cost": float(unit_cost or 0),
+                    "stock": float(stock) if stock is not None else None,
+                    "max_qty": max_qty,
+                    "allow_oversell": allow_oversell,
+                }
+            })
+
         # ── Add item ────────────────────────────────────────────
         if action == "add_item":
             sku = (request.POST.get("sku") or "").strip()
@@ -785,10 +839,14 @@ def order_customer_card_view(request, pk):
 
 
 class OrderPrint(DetailView):
-    """Standalone PDF view: renders the order as a real PDF file using
-    xhtml2pdf so the browser shows it without ANY user-agent URL/date
-    headers/footers. Inline disposition lets the browser open it in a tab
-    and the user can save/print/share it as-is."""
+    """Printable order view.
+
+    Serves the order as styled HTML and lets the BROWSER render it and
+    "Save as PDF". We deliberately do NOT use xhtml2pdf here: it cannot
+    render this card/badge/two-column layout cleanly (it scatters the
+    blocks down the page and spills onto a second sheet), whereas the
+    browser reproduces the on-screen design pixel-perfect. The template
+    auto-opens the print dialog when is_pdf is False."""
     model = Order
     template_name = "operating/order_print.html"
     context_object_name = "order"
@@ -812,43 +870,17 @@ class OrderPrint(DetailView):
         return ctx
 
     def render_to_response(self, context, **response_kwargs):
-        from io import BytesIO
         from django.template.loader import render_to_string
         from django.http import HttpResponse
 
-        def _html_fallback():
-            # Re-render with is_pdf=False so the template's auto-print
-            # JS fires — browsers' Save-as-PDF replaces xhtml2pdf.
-            ctx = dict(context)
-            ctx["is_pdf"] = False
-            return HttpResponse(render_to_string(
-                self.template_name, ctx, request=self.request,
-            ))
-
-        html = render_to_string(self.template_name, context, request=self.request)
-
-        # xhtml2pdf is optional — newer versions pull in pycairo which
-        # needs system libcairo, which the deploy environment may not
-        # have. When it's missing OR fails, fall back to printable HTML.
-        try:
-            from xhtml2pdf import pisa
-        except ImportError:
-            return _html_fallback()
-
-        buf = BytesIO()
-        try:
-            result = pisa.CreatePDF(src=html, dest=buf, encoding="utf-8")
-        except Exception:
-            return _html_fallback()
-
-        if result.err:
-            return _html_fallback()
-
-        response = HttpResponse(buf.getvalue(), content_type="application/pdf")
-        response["Content-Disposition"] = (
-            f'inline; filename="order-{self.object.pk}.pdf"'
-        )
-        return response
+        # Render the printable HTML and let the browser handle PDF output
+        # (Print → Save as PDF). is_pdf=False triggers the auto-print
+        # dialog and keeps the page looking exactly like the on-screen
+        # design — no xhtml2pdf re-layout that breaks the cards/badges.
+        ctx = dict(context)
+        ctx["is_pdf"] = False
+        html = render_to_string(self.template_name, ctx, request=self.request)
+        return HttpResponse(html)
 
 
 class OrderCreate(View):
@@ -1523,7 +1555,15 @@ class OrderPackingList(View):
         if action == "add_pack":
             next_n = (order.packs.aggregate(m=models.Max("pack_number"))["m"] or 0) + 1
             pack = Pack.objects.create(order=order, pack_number=next_n)
-            return JsonResponse({"ok": True, "pack": {"id": pack.pk, "number": pack.pack_number}})
+            return JsonResponse({
+                "ok": True,
+                "pack": {
+                    "id": pack.pk,
+                    "number": pack.pack_number,
+                    "code": pack.code,
+                    "qr_code_url": pack.qr_code_url,
+                }
+            })
 
         if action == "delete_pack":
             try:
@@ -1810,7 +1850,7 @@ def product_autocomplete(request):
             color, bg = "#065F46", "#D1FAE5"
         return (
             f"<span style='font-size:10.5px;font-weight:600;padding:2px 6px;"
-            f"border-radius:6px;color:{color};background:{bg};margin-right:8px;'>"
+            f"border-radius:6px;color:{color};background:{bg};margin-right:8px;white-space:nowrap;'>"
             f"Stok: {q:g}</span>"
         )
 
@@ -1830,10 +1870,14 @@ def product_autocomplete(request):
             attr_info = variant.attribute_summary() if hasattr(variant, 'attribute_summary') else ''
             attr_display = f' <span style="color:#6b7280;font-size:11px;">({escape(attr_info)})</span>' if attr_info else ''
             return (
-                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\">"
+                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+                f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
                 f"<strong>{title}</strong> - <code>{sku}</code>{attr_display}"
-                f" <span style='float:right;'>{stock_badge(stock, allow_oversell)}"
-                f"<span style='color:#059669;font-weight:600;'>${price}</span></span></li>"
+                f"</span>"
+                f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
+                f"{stock_badge(stock, allow_oversell)}"
+                f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+                f"</span></li>"
             )
         else:
             sku = escape(product.sku or "")
@@ -1842,10 +1886,14 @@ def product_autocomplete(request):
             stock_arg = "null" if stock is None else f"{float(stock):g}"
             oversell_arg = "true" if allow_oversell else "false"
             return (
-                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\">"
+                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+                f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
                 f"<strong>{title}</strong> - <code>{sku}</code>"
-                f" <span style='float:right;'>{stock_badge(stock, allow_oversell)}"
-                f"<span style='color:#059669;font-weight:600;'>${price}</span></span></li>"
+                f"</span>"
+                f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
+                f"{stock_badge(stock, allow_oversell)}"
+                f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+                f"</span></li>"
             )
 
     items = []
@@ -2017,6 +2065,321 @@ def generate_pdf_qr_for_order_item_units(request, pk):
             "Content-Disposition": f'attachment; filename="order_item_{pk}_qr.pdf"'
         },
     )
+
+
+def get_pack_qr_image(pack):
+    import requests
+    from PIL import Image
+    from io import BytesIO
+    import json
+    import segno
+    from marketing.utils.bunny_storage import upload_to_bunny
+
+    if pack.qr_code_url:
+        try:
+            response = requests.get(pack.qr_code_url, timeout=5)
+            response.raise_for_status()
+            return Image.open(BytesIO(response.content)).convert("RGB")
+        except Exception:
+            pass
+    # Generate on the fly if fetch fails or URL is empty
+    payload = {
+        "pack_id": pack.pk,
+        "code": pack.code,
+        "order_id": pack.order.pk,
+        "pack_number": pack.pack_number
+    }
+    qr = segno.make(json.dumps(payload))
+    buf = BytesIO()
+    qr.save(buf, kind="png", scale=5)
+    buf.seek(0)
+    # Also upload it to update/fix the url
+    try:
+        path = f"media/orders/{pack.order.pk}/packs/{pack.pk}/qr_{pack.pk}.png"
+        buf.seek(0)
+        url = upload_to_bunny(buf, path)
+        pack.qr_code_url = url
+        pack.save(update_fields=["qr_code_url"])
+    except Exception:
+        pass
+    buf.seek(0)
+    return Image.open(buf).convert("RGB")
+
+
+def order_packing_list_pdf(request, pk):
+    from django.utils.translation import gettext as _
+    from django.utils.translation import get_language
+    from .models import Order, Pack
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether
+    from reportlab.platypus import Image as RLImage
+    from .order_notifications import _ensure_pdf_fonts
+    
+    order = get_object_or_404(Order, pk=pk)
+    packs = order.packs.all().order_by("pack_number")
+    
+    # Determine the active language
+    lang = (get_language() or 'tr').lower()
+    is_tr = lang.startswith('tr')
+    
+    # Text labels mapping dynamically based on active language
+    labels = {
+        'title': "Sipariş Paket Listesi" if is_tr else "Order Packing List",
+        'order_no': "Sipariş No" if is_tr else "Order No",
+        'date': "Tarih" if is_tr else "Date",
+        'customer': "Müşteri" if is_tr else "Customer",
+        'package': "Paket" if is_tr else "Package",
+        'product': "Ürün" if is_tr else "Product",
+        'sku': "SKU",
+        'qty': "Miktar" if is_tr else "Qty",
+    }
+    
+    font = _ensure_pdf_fonts() or "Helvetica"
+    font_bold = f"{font}-Bold" if font != "Helvetica" else "Helvetica-Bold"
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15 * mm,
+        leftMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+        title=f"{labels['title']} #{order.pk}"
+    )
+    
+    story = []
+    
+    title_style = ParagraphStyle(
+        name="TitleStyle",
+        fontName=font_bold,
+        fontSize=18,
+        textColor=colors.HexColor("#111111"),
+        spaceAfter=15
+    )
+    
+    normal_style = ParagraphStyle(
+        name="NormalStyle",
+        fontName=font,
+        fontSize=10,
+        textColor=colors.HexColor("#333333"),
+        leading=14
+    )
+    
+    heading_style = ParagraphStyle(
+        name="HeadingStyle",
+        fontName=font_bold,
+        fontSize=12,
+        textColor=colors.HexColor("#00696A"),
+        spaceBefore=15,
+        spaceAfter=5
+    )
+
+    story.append(Paragraph(labels['title'], title_style))
+    story.append(Paragraph(f"<b>{labels['order_no']}:</b> {order.order_number or order.pk}", normal_style))
+    story.append(Paragraph(f"<b>{labels['date']}:</b> {order.created_at.strftime('%d.%m.%Y %H:%M')}", normal_style))
+    
+    cust_name = ""
+    if order.contact:
+        cust_name = order.contact.name
+    elif order.company:
+        cust_name = order.company.name
+    elif order.web_client:
+        cust_name = order.web_client.name or order.web_client.username
+    story.append(Paragraph(f"<b>{labels['customer']}:</b> {cust_name or '-'}", normal_style))
+    
+    story.append(Spacer(1, 10))
+    
+    for pack in packs:
+        pack_story = []
+        pack_story.append(Paragraph(f"{labels['package']} #{pack.pack_number} ({pack.code})", heading_style))
+        
+        qr_pil = get_pack_qr_image(pack)
+        
+        items_data = [[
+            Paragraph(f"<b>{labels['product']}</b>", normal_style),
+            Paragraph(f"<b>{labels['sku']}</b>", normal_style),
+            Paragraph(f"<b>{labels['qty']}</b>", normal_style)
+        ]]
+        
+        pois = pack.packed_order_items.all()
+        for poi in pois:
+            it = poi.order_item
+            title = getattr(it.product, "title", None) or it.description or "Product"
+            sku = (it.product_variant.variant_sku if (it.product_variant_id and it.product_variant) 
+                   else (it.product.sku if it.product else "-"))
+            qty = str(it.quantity)
+            items_data.append([
+                Paragraph(title, normal_style),
+                Paragraph(sku, normal_style),
+                Paragraph(qty, normal_style)
+            ])
+            
+        col_widths = [85 * mm, 38 * mm, 20 * mm]
+        tbl = Table(items_data, colWidths=col_widths)
+        tbl.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8EE")),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#F9FAFB")),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        qr_io = BytesIO()
+        qr_pil.save(qr_io, format="PNG")
+        qr_io.seek(0)
+        rl_qr_img = RLImage(qr_io, width=32 * mm, height=32 * mm)
+        rl_qr_img.hAlign = 'CENTER'
+        
+        layout_table = Table([[tbl, rl_qr_img]], colWidths=[143 * mm, 37 * mm])
+        layout_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        
+        pack_story.append(layout_table)
+        pack_story.append(Spacer(1, 10))
+        
+        story.append(KeepTogether(pack_story))
+        
+    doc.build(story)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="packing_list_{order.order_number or order.pk}.pdf"'
+    return response
+
+
+def pack_pdf(request, pack_pk):
+    from django.utils.translation import gettext as _
+    from django.utils.translation import get_language
+    from .models import Pack
+    from reportlab.lib.pagesizes import A6
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+    from .order_notifications import _ensure_pdf_fonts
+    
+    pack = get_object_or_404(Pack, pk=pack_pk)
+    order = pack.order
+    
+    # Determine the active language
+    lang = (get_language() or 'tr').lower()
+    is_tr = lang.startswith('tr')
+    
+    # Text labels mapping dynamically based on active language
+    labels = {
+        'package': "PAKET" if is_tr else "PACKAGE",
+        'order': "Sipariş" if is_tr else "Order",
+        'contents': "İÇERİK" if is_tr else "CONTENTS",
+        'product': "Ürün" if is_tr else "Product",
+        'qty': "Miktar" if is_tr else "Qty",
+    }
+    
+    font = _ensure_pdf_fonts() or "Helvetica"
+    font_bold = f"{font}-Bold" if font != "Helvetica" else "Helvetica-Bold"
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A6,
+        rightMargin=8 * mm,
+        leftMargin=8 * mm,
+        topMargin=8 * mm,
+        bottomMargin=8 * mm,
+        title=f"Pack {pack.code}"
+    )
+    
+    story = []
+    
+    title_style = ParagraphStyle(
+        name="LabelTitle",
+        fontName=font_bold,
+        fontSize=12,
+        textColor=colors.HexColor("#111111"),
+        alignment=1,
+        spaceAfter=4
+    )
+    
+    subtitle_style = ParagraphStyle(
+        name="LabelSub",
+        fontName=font,
+        fontSize=8,
+        textColor=colors.HexColor("#555555"),
+        alignment=1,
+        spaceAfter=10
+    )
+    
+    normal_style = ParagraphStyle(
+        name="LabelNormal",
+        fontName=font,
+        fontSize=8,
+        textColor=colors.HexColor("#111111"),
+        leading=11
+    )
+    
+    code_style = ParagraphStyle(
+        name="LabelCode",
+        fontName=font_bold,
+        fontSize=9,
+        textColor=colors.HexColor("#00696A"),
+        alignment=1,
+        spaceBefore=6
+    )
+
+    story.append(Paragraph(f"<b>{labels['package']} #{pack.pack_number}</b>", title_style))
+    story.append(Paragraph(f"{labels['order']}: {order.order_number or order.pk}", subtitle_style))
+    
+    qr_pil = get_pack_qr_image(pack)
+    qr_io = BytesIO()
+    qr_pil.save(qr_io, format="PNG")
+    qr_io.seek(0)
+    rl_qr_img = RLImage(qr_io, width=40 * mm, height=40 * mm)
+    rl_qr_img.hAlign = 'CENTER'
+    
+    story.append(rl_qr_img)
+    story.append(Paragraph(f"{pack.code}", code_style))
+    story.append(Spacer(1, 8))
+    
+    story.append(Paragraph(f"<b>{labels['contents']}:</b>", normal_style))
+    
+    items_data = [[
+        Paragraph(f"<b>{labels['product']}</b>", normal_style),
+        Paragraph(f"<b>{labels['qty']}</b>", normal_style)
+    ]]
+    
+    pois = pack.packed_order_items.all()
+    for poi in pois:
+        it = poi.order_item
+        title = getattr(it.product, "title", None) or it.description or "Product"
+        qty = str(it.quantity)
+        items_data.append([
+            Paragraph(title, normal_style),
+            Paragraph(qty, normal_style)
+        ])
+        
+    tbl = Table(items_data, colWidths=[65 * mm, 24 * mm])
+    tbl.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    story.append(tbl)
+    
+    doc.build(story)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="pack_{pack.code}.pdf"'
+    return response
 
 
 def get_order_status(request, order_id):

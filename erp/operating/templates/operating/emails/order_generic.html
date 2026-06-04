@@ -5,16 +5,21 @@
   <title>{{ event_label }} — Order {{ order.order_number|default:order.pk }}</title>
 </head>
 <body style="margin:0;padding:0;background:#F4F7FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0F1419;">
+  <!-- Preheader (hidden inbox preview text) -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#F4F7FA;">
+    {{ event_label }} · {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %} · {{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:2 }}
+  </div>
   <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F4F7FA;padding:32px 16px;">
     <tr>
       <td align="center">
         <table cellpadding="0" cellspacing="0" border="0" width="600" style="background:#FFFFFF;border-radius:14px;border:1px solid #E2E8EE;overflow:hidden;max-width:600px;">
 
-          <!-- Header -->
+          <!-- Header (bgcolor= is the Outlook fallback for the gradient) -->
           <tr>
-            <td style="padding:24px 32px;background:linear-gradient(135deg,#147F74,#0F766E);color:#FFFFFF;">
-              <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.85;">{{ event_label }}</div>
-              <div style="font-size:22px;font-weight:700;margin-top:6px;">
+            <td bgcolor="#0F766E" style="padding:22px 32px;background:#0F766E;background:linear-gradient(135deg,#147F74,#0F766E);color:#FFFFFF;">
+              <div style="font-size:18px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">{{ BRAND_NAME|default:"Nejum" }}</div>
+              <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:10px;color:#D7F2EE;">{{ event_label }}</div>
+              <div style="font-size:21px;font-weight:700;margin-top:3px;">
                 Order {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}
               </div>
             </td>
@@ -59,22 +64,22 @@
               <div style="border:1px solid #E2E8EE;border-radius:10px;padding:16px 18px;margin-top:18px;">
                 <div style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Order summary</div>
                 <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:13.5px;color:#334155;">
-                  {% for it in order.items.all %}
+                  {% for it in order_items %}
                   <tr>
                     <td style="padding:6px 0;">
                       <div style="font-weight:600;color:#0F1419;">{{ it.product.title|default:'Product' }}</div>
-                      {% if it.product_variant %}<div style="font-size:11.5px;color:#64748B;">{{ it.product_variant.variant_sku }}</div>{% endif %}
+                      {% if it.product_variant and it.product_variant.variant_sku %}<div style="font-size:11.5px;color:#64748B;">{{ it.product_variant.variant_sku }}</div>{% endif %}
                     </td>
                     <td align="right" style="padding:6px 0;white-space:nowrap;">
-                      {{ it.quantity|floatformat:2 }} × {{ it.price|floatformat:2 }}
-                      <div style="font-weight:700;color:#0F1419;">${{ it.subtotal|floatformat:2 }}</div>
+                      {{ it.quantity|default:0|floatformat:2 }} × {{ currency_symbol|default:"$" }}{{ it.price|default:0|floatformat:2 }}
+                      <div style="font-weight:700;color:#0F1419;">{{ currency_symbol|default:"$" }}{{ it.line_total_calc|default:0|floatformat:2 }}</div>
                     </td>
                   </tr>
                   {% endfor %}
                   <tr><td colspan="2" style="padding:8px 0 0;border-top:1px solid #E2E8EE;"></td></tr>
                   <tr>
                     <td style="padding:8px 0;font-weight:600;">Total</td>
-                    <td align="right" style="padding:8px 0;font-weight:800;font-size:16px;color:#0F1419;">${{ order.total_value|floatformat:2 }}</td>
+                    <td align="right" style="padding:8px 0;font-weight:800;font-size:16px;color:#0F1419;">{{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:2 }}</td>
                   </tr>
                 </table>
               </div>
@@ -99,8 +104,14 @@
 
           <!-- Footer -->
           <tr>
-            <td style="padding:18px 32px;background:#FAFBFD;border-top:1px solid #EEF1F5;font-size:11.5px;color:#94A3B8;text-align:center;">
-              Order reference: <b style="color:#475569;">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</b>
+            <td style="padding:20px 32px;background:#FAFBFD;border-top:1px solid #EEF1F5;font-size:11.5px;color:#94A3B8;line-height:1.6;">
+              <div style="font-weight:700;color:#475569;font-size:12.5px;">{{ BRAND_NAME|default:"Nejum" }}</div>
+              {% if BRAND_ADDRESS %}<div>{{ BRAND_ADDRESS }}</div>{% endif %}
+              <div>{% if BRAND_PHONE %}{{ BRAND_PHONE }}{% endif %}{% if BRAND_PHONE and BRAND_EMAIL %} · {% endif %}{% if BRAND_EMAIL %}<a href="mailto:{{ BRAND_EMAIL }}" style="color:#0F766E;text-decoration:none;">{{ BRAND_EMAIL }}</a>{% endif %}</div>
+              <div style="margin-top:10px;color:#B6C0CC;">
+                Order reference: <b style="color:#64748B;">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</b>
+                {% if BRAND_EMAIL %} · To stop order emails, reply “unsubscribe”.{% endif %}
+              </div>
             </td>
           </tr>
         </table>

@@ -2,7 +2,7 @@ from django.urls import path
 
 from django.views.generic import TemplateView
 
-from . import views, views_invoice, views_payment, views_report, views_check
+from . import views, views_invoice, views_payment, views_report, views_check, invoice_excel
 
 app_name = "current_account"
 
@@ -20,6 +20,7 @@ urlpatterns = [
     path("fatura/",                  views_invoice.InvoiceList.as_view(),   name="invoice_list"),
     path("fatura/yeni/",             views_invoice.InvoiceCreate.as_view(), name="invoice_create"),
     path("fatura/<int:pk>/",         views_invoice.InvoiceDetail.as_view(), name="invoice_detail"),
+    path("fatura/<int:pk>/excel/",   invoice_excel.invoice_excel,           name="invoice_excel"),
     path("fatura/<int:pk>/duzenle/", views_invoice.InvoiceEdit.as_view(),   name="invoice_edit"),
     path("fatura/<int:pk>/kes/",     views_invoice.InvoiceIssue.as_view(),  name="invoice_issue"),
     path("fatura/<int:pk>/iptal/",   views_invoice.InvoiceCancel.as_view(), name="invoice_cancel"),

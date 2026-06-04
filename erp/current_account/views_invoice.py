@@ -264,7 +264,7 @@ class InvoiceCreate(View):
             return redirect("current_account:invoice_create")
 
         invoice_type = request.POST.get("type") or "sales"
-        series = request.POST.get("series") or "FAT"
+        series = request.POST.get("series") or "INV"
         currency_id = int(request.POST.get("currency") or cari.default_currency_id)
 
         settings_obj = CariSettings.for_book(cari.book)

@@ -153,6 +153,7 @@ def dashboard_component(csrf_token,path,member):
     # JS slice by selected day. Demfirat path skips this work.
     all_tasks_by_date = {}
     today_tasks_data = []
+    future_tasks_data = []
     delegated_tasks_data = []
     completed_tasks_data = []
     if _theme == 'nejum' and member:
@@ -265,6 +266,8 @@ def dashboard_component(csrf_token,path,member):
                 # Future tasks are excluded by design.
                 if t.due_date <= today_date:
                     today_tasks_data.append(payload)
+                else:
+                    future_tasks_data.append(payload)
 
             # Sort the initial list to match the JS default order:
             # today's tasks first (priority high→low), then overdue
@@ -383,7 +386,7 @@ def dashboard_component(csrf_token,path,member):
                 )
                 _user_d = getattr(member, 'user', None) if member else None
                 _can_delete_d = t.can_be_deleted_by(_user_d) if _user_d else False
-                delegated_tasks_data.append({
+                _payload_d = {
                     'id': t.id,
                     'name': t.name,
                     'can_edit': _can_edit_d,
@@ -399,7 +402,10 @@ def dashboard_component(csrf_token,path,member):
                     'entity_name': entity_name,
                     'entity_type': entity_type,
                     'kind': 'personal',
-                })
+                }
+                delegated_tasks_data.append(_payload_d)
+                if t.due_date > today_date:
+                    future_tasks_data.append(_payload_d)
             # ─── Team tasks ────────────────────────────────────────────
             # The Nejum dashboard cards must show team tasks alongside
             # personal ones. We include team tasks where the user is in
@@ -489,6 +495,8 @@ def dashboard_component(csrf_token,path,member):
                         all_tasks_by_date.setdefault(key, []).append(tt_payload)
                         if tt_date <= today_date:
                             today_tasks_data.append(tt_payload)
+                        else:
+                            future_tasks_data.append(tt_payload)
                         # Tasks others assigned to me also show on the
                         # "Assigned Tasks" tab — only if I'm not the
                         # delegator.
@@ -507,6 +515,13 @@ def dashboard_component(csrf_token,path,member):
                 -int(''.join(p['date_iso'].split('-')))
                   if p['date_iso'] != _today_iso2 else 0,
                 _prio2.get(p['priority'], 9),
+            ))
+
+            # Sort future tasks chronologically by due date ascending, then priority
+            _prio_f = {'urgent': 0, 'high': 1, 'medium': 2, 'low': 3}
+            future_tasks_data.sort(key=lambda p: (
+                p['date_iso'],
+                _prio_f.get(p['priority'], 9)
             ))
         except Exception as _e:
             # Surface the cause instead of silently swallowing it —
@@ -541,6 +556,9 @@ def dashboard_component(csrf_token,path,member):
         # for the "Completed" dashboard tab with bulk-delete checkboxes.
         'completed_tasks_json': json.dumps(completed_tasks_data),
         'completed_tasks_count': len(completed_tasks_data),
+        # Future tasks for the Task Reports view
+        'future_tasks_json': json.dumps(future_tasks_data),
+        'future_tasks_count': len(future_tasks_data),
         # 'country_of_the_day':country_of_the_day,
         'path':path,
         'member':member,

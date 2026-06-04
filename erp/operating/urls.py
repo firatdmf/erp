@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import views_warehouse
+from . import order_excel
 from django.views.generic import TemplateView
 
 
@@ -29,6 +30,7 @@ urlpatterns = [
     path("orders/<int:pk>/", views.OrderDetail.as_view(), name="order_detail"),
     path("orders/<int:pk>/customer/", views.order_customer_card_view, name="order_customer_card"),
     path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
+    path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),
     path("orders/delete/<int:pk>/", views.delete_order, name="delete_order"),
@@ -49,6 +51,16 @@ urlpatterns = [
         "orders/<int:pk>/packing_list/export_excel/",
         views.export_packing_list_excel,
         name="export_packing_list_excel",
+    ),
+    path(
+        "orders/<int:pk>/packing_list/pdf/",
+        views.order_packing_list_pdf,
+        name="order_packing_list_pdf",
+    ),
+    path(
+        "packs/<int:pack_pk>/pdf/",
+        views.pack_pdf,
+        name="pack_pdf",
     ),
     path(
         "raw_material_good/list",

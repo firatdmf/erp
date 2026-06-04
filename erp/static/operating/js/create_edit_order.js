@@ -57,6 +57,30 @@ const generate_order_item_row = (index, sku, variant, itemId = null) => {
     `;
 }
 
+// Exposed globally so the product_autocomplete view's inline onclick
+// can hit this from either the create or edit order page. Signature
+// matches what views.product_autocomplete renders:
+// selectProduct(sku, variant, title, price, categoryName)
+window.selectProduct = function (sku, variant, title, price, categoryName) {
+  selectProductLegacy(sku, variant, title, price, categoryName);
+  // After adding, prefill the price column with the autocomplete's
+  // price so the user doesn't have to retype it.
+  if (price != null) {
+    const idx = order_data.order_items.length;
+    const priceInput = document.getElementById('price_' + idx);
+    if (priceInput) {
+      priceInput.value = Number(price) || 0;
+      // Fire input event so the total recalculates.
+      priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  // Clear the autocomplete dropdown + search input.
+  const results = document.getElementById('product-search-results');
+  if (results) results.innerHTML = '';
+  const search = document.getElementById('product-input');
+  if (search) search.value = '';
+};
+
 // This function is called when a product is selected from the autocomplete (edit order page)
 const selectProductLegacy = (sku, variant) => {
   console.log(sku);

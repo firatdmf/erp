@@ -313,6 +313,31 @@ class TaskReport(View):
         
         print(f"Assigned tasks count: {assigned_tasks_query.count()}")
         
+        # Future Tasks - tasks in the future (due_date > today, completed = False) (OPTIMIZED)
+        today = timezone.localdate()
+        future_tasks_query = Task.objects.filter(
+            completed=False,
+            due_date__gt=today
+        ).select_related(
+            'contact', 
+            'company', 
+            'member__user',
+            'created_by__user'
+        ).order_by('due_date', '-priority')
+        
+        # Apply search filter for Future Tasks
+        if search_query:
+            future_tasks_query = future_tasks_query.filter(
+                Q(name__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(contact__name__icontains=search_query) |
+                Q(company__name__icontains=search_query) |
+                Q(member__user__first_name__icontains=search_query) |
+                Q(member__user__last_name__icontains=search_query)
+            )
+        
+        print(f"Future tasks count: {future_tasks_query.count()}")
+        
         # Calculate statistics BEFORE applying search (for display purposes)
         # These should NOT change when user searches
         my_total_count = Task.objects.filter(member=current_member, completed=False).count()
@@ -320,10 +345,19 @@ class TaskReport(View):
             created_by=current_member,
             completed=False
         ).exclude(member=current_member).count()
+        future_total_count = Task.objects.filter(completed=False, due_date__gt=today).count()
+        
+        # Paginate My Tasks
+        my_tasks_paginator = Paginator(my_tasks_query, 10)  # 10 tasks per page
+        my_tasks_page = my_tasks_paginator.get_page(page_number if tab == 'myTasks' else 1)
         
         # Paginate Assigned Tasks
         assigned_tasks_paginator = Paginator(assigned_tasks_query, 10)  # 10 tasks per page
         assigned_tasks_page = assigned_tasks_paginator.get_page(page_number if tab == 'assignedTasks' else 1)
+
+        # Paginate Future Tasks
+        future_tasks_paginator = Paginator(future_tasks_query, 10)  # 10 tasks per page
+        future_tasks_page = future_tasks_paginator.get_page(page_number if tab == 'futureTasks' else 1)
         
         # Annotate each task with deletion permission so the template can
         # show/hide the trash icon per row without recomputing.
@@ -332,13 +366,15 @@ class TaskReport(View):
             _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
         for _t in assigned_tasks_page.object_list:
             _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
+        for _t in future_tasks_page.object_list:
+            _t.can_be_deleted_by_user = _t.can_be_deleted_by(_user)
 
         # AJAX için direkt döndür - statistics'i hesaplama (ÇOOK DAHA HIZLI)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             if tab == 'myTasks':
                 html = render_to_string('todo/components/task_table.html', {
                     'tasks': my_tasks_page,
-                    'today': timezone.localdate(),
+                    'today': today,
                     'total_count': my_total_count,  # Use pre-calculated total, not filtered count
                     'completed_count': 0,  # Skip expensive query
                     'ongoing_count': my_total_count,  # Use pre-calculated total
@@ -346,10 +382,10 @@ class TaskReport(View):
                     'search_query': search_query,
                     'tab': tab,
                 }, request=request)
-            else:
+            elif tab == 'assignedTasks':
                 html = render_to_string('todo/components/task_table.html', {
                     'tasks': assigned_tasks_page,
-                    'today': timezone.localdate(),
+                    'today': today,
                     'total_count': assigned_total_count,  # Use pre-calculated total, not filtered count
                     'completed_count': 0,  # Skip expensive query
                     'ongoing_count': assigned_total_count,  # Use pre-calculated total
@@ -357,11 +393,21 @@ class TaskReport(View):
                     'search_query': search_query,
                     'tab': tab,
                 }, request=request)
+            elif tab == 'futureTasks':
+                html = render_to_string('todo/components/task_table.html', {
+                    'tasks': future_tasks_page,
+                    'today': today,
+                    'total_count': future_total_count,
+                    'completed_count': 0,
+                    'ongoing_count': future_total_count,
+                    'is_future_view': True,
+                    'search_query': search_query,
+                    'tab': tab,
+                }, request=request)
             return HttpResponse(html)
         
         # Full page load için statistics hesapla
         from datetime import timedelta
-        today = timezone.localdate()
         week_start = today - timedelta(days=today.weekday())  # Monday
         week_end = week_start + timedelta(days=6)  # Sunday
         
@@ -390,8 +436,9 @@ class TaskReport(View):
         context = {
             'my_tasks': my_tasks_page,
             'assigned_tasks': assigned_tasks_page,
+            'future_tasks': future_tasks_page,
             'current_member': current_member,
-            'today': timezone.localdate(),
+            'today': today,
             'search_query': search_query,
             # My Tasks stats
             'my_total_count': my_total,
@@ -401,6 +448,8 @@ class TaskReport(View):
             'assigned_total_count': assigned_total,
             'assigned_completed_count': assigned_completed_this_week,
             'assigned_ongoing_count': assigned_ongoing,
+            # Future Tasks stats
+            'future_total_count': future_total_count,
         }
         
         return render(request, self.template_name, context)

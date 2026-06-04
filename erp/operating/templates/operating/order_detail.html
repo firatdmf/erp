@@ -289,7 +289,7 @@
   .od-prods th, .od-prods td {
     padding: 10px 8px; text-align: left;
     border-bottom: 1px solid #EEF1F5; font-size: 12.5px;
-    vertical-align: middle;
+    vertical-align: top;
   }
   .od-prods th {
     font: 600 10.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase;
@@ -310,7 +310,7 @@
   .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 120px; }       /* Price */
   .od-prods th:nth-child(6), .od-prods td:nth-child(6) { width: 90px;  }       /* Cost */
   .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 100px; }       /* Amount */
-  .od-prods th.od-edit-only, .od-prods td.od-edit-only { width: 40px; }        /* Delete btn */
+  .od-prods th.od-edit-only, .od-prods td.od-edit-only { width: 40px; text-align: center; }        /* Delete btn */
 
   /* Inline editable cells — look like static text until focused. They
      fill their fixed-width cell so Qty + Price line up exactly. */
@@ -768,6 +768,9 @@
       <a href="{% url 'operating:order_print' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
+      <a href="{% url 'operating:order_excel' order.pk %}" class="ord-btn ghost">
+        <i class="fa fa-file-excel"></i>{% trans "Excel" %}
+      </a>
       {% if order.status != 'completed' %}
         <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-industry"></i>{% trans "Production" %}
@@ -926,7 +929,7 @@
                        data-original="{{ item.price|default:0|stringformat:'g' }}"
                        onwheel="this.blur()">
               </td>
-              <td class="num" data-item-cost="{{ item.pk }}">
+              <td class="num" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
                 {% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
                     <span style="color:var(--gray-700);">${{ uc|floatformat:2 }}</span>
@@ -951,7 +954,7 @@
 
         <!-- Add-item row (edit mode) -->
         <div id="od-add-item-row" class="od-edit-only" style="margin-top:10px; padding:12px; background:#F8FAFC; border:1px dashed #CBD5E1; border-radius:10px;">
-          <div style="display:grid; grid-template-columns: 1fr 120px 120px 120px; gap:10px; align-items:center;">
+          <div style="display:grid; grid-template-columns: 1fr 120px 120px 120px; gap:10px; align-items:start;">
             <div style="position:relative;">
               <input type="text" name="product" id="od-add-product-input" class="od-add-input" autocomplete="off"
                      placeholder="{% trans 'Search product by name or SKU…' %}"
@@ -1320,21 +1323,87 @@
     const notes    = document.getElementById('od-notes-edit');
 
     function getInputs() {
-      // Only inputs that are item qty/price (have data-item-id + data-field).
-      return document.querySelectorAll('.od-inline-input[data-item-id][data-field]');
+      // Only inputs that are item qty/price (have data-item-id + data-field) and not in deleted rows.
+      return document.querySelectorAll('tr[data-item-row]:not([data-item-deleted="true"]) .od-inline-input[data-item-id][data-field]');
     }
+    function recalculateTotalsLocally() {
+      let orderTotal = 0;
+      let totalCost = 0;
+      const tbody = document.getElementById('od-items-tbody');
+      if (!tbody) return;
+      tbody.querySelectorAll('tr[data-item-row]:not([data-item-deleted="true"])').forEach(row => {
+        const qtyInp = row.querySelector('input[data-field="quantity"]');
+        const priceInp = row.querySelector('input[data-field="price"]');
+        const costTd = row.querySelector('[data-item-cost]');
+        if (qtyInp && priceInp) {
+          const qty = parseFloat(qtyInp.value) || 0;
+          const price = parseFloat(priceInp.value) || 0;
+          const sub = qty * price;
+          orderTotal += sub;
+          
+          if (costTd) {
+            const unitCost = parseFloat(costTd.getAttribute('data-unit-cost')) || 0;
+            totalCost += qty * unitCost;
+          }
+          
+          // Update the row subtotal display
+          const subEl = row.querySelector('[data-item-subtotal]');
+          if (subEl) {
+            subEl.innerHTML = '<b>$' + sub.toFixed(2) + '</b>';
+          }
+        }
+      });
+      // Update order totals display
+      document.querySelectorAll('[data-order-total]').forEach(el => {
+        el.textContent = '$' + orderTotal.toFixed(2);
+      });
+      
+      // Update cost, profit, margin
+      document.querySelectorAll('[data-order-cost]').forEach(el => {
+        el.textContent = '$' + totalCost.toFixed(2);
+      });
+      const grossProfit = orderTotal - totalCost;
+      document.querySelectorAll('[data-order-profit]').forEach(el => {
+        el.textContent = '$' + grossProfit.toFixed(2);
+      });
+      document.querySelectorAll('[data-order-margin]').forEach(el => {
+        if (totalCost > 0) {
+          const gm = ((grossProfit / orderTotal) * 100).toFixed(1);
+          el.textContent = '· ' + gm + '%';
+        } else if (orderTotal > 0) {
+          el.textContent = '· 100.0%';
+        } else {
+          el.textContent = '';
+        }
+      });
+      const profitRow = document.getElementById('od-profit-row');
+      if (profitRow) {
+        if (grossProfit < 0) {
+          profitRow.style.background = '#FEF2F2';
+          profitRow.style.border = '1px dashed #FCA5A5';
+          profitRow.style.color = '#B91C1C';
+        } else {
+          profitRow.style.background = '#F0FDF4';
+          profitRow.style.border = '1px dashed #BBF7D0';
+          profitRow.style.color = '#166534';
+        }
+      }
+    }
+    window.__odRecalculateTotalsLocally = recalculateTotalsLocally;
+
     function bindInput(inp) {
-      if (inp.dataset.bound === '1') return;
-      inp.dataset.bound = '1';
+      if (inp.getAttribute('data-bound') === '1') return;
+      inp.setAttribute('data-bound', '1');
       inp.addEventListener('input', refreshDirty);
+      inp.addEventListener('input', recalculateTotalsLocally);
       // Stock cap warning for qty fields. Visually marks the input red
       // when the typed qty exceeds the cap; save still calls the server
       // for the authoritative answer.
-      if (inp.dataset.field === 'quantity') {
+      if (inp.getAttribute('data-field') === 'quantity') {
         inp.addEventListener('input', () => {
-          const stock = inp.dataset.stock;
-          if (!stock || inp.dataset.oversell === 'true') return;
-          const original = Number(inp.dataset.original || 0);
+          const stock = inp.getAttribute('data-stock');
+          if (!stock || inp.getAttribute('data-oversell') === 'true') return;
+          const original = Number(inp.getAttribute('data-original') || 0);
           const cap = original + Number(stock);
           if (Number(inp.value) > cap) inp.classList.add('over-stock');
           else inp.classList.remove('over-stock');
@@ -1443,8 +1512,8 @@
       // Update max on the qty input.
       const qInput = row.querySelector('input[data-field="quantity"]');
       if (qInput) {
-        if (stock !== null && stock !== undefined) qInput.dataset.stock = String(stock);
-        if (allowOversell !== undefined)           qInput.dataset.oversell = allowOversell ? 'true' : 'false';
+        if (stock !== null && stock !== undefined) qInput.setAttribute('data-stock', String(stock));
+        if (allowOversell !== undefined)           qInput.setAttribute('data-oversell', allowOversell ? 'true' : 'false');
         if (maxQty !== null && maxQty !== undefined && !allowOversell) {
           qInput.setAttribute('max', String(maxQty));
         } else {
@@ -1481,10 +1550,13 @@
 
     function refreshDirty() {
       let dirty = [];
+      const hasNewRows = !!document.querySelector('tr[data-item-row^="new-"]:not([data-item-deleted="true"])');
+      const deletedRows = document.querySelectorAll('tr[data-item-deleted="true"]:not([data-item-row^="new-"])');
       getInputs().forEach(inp => {
         const a = String(inp.value).trim();
-        const b = String(inp.dataset.original || '').trim();
-        if (a !== b) {
+        const b = String(inp.getAttribute('data-original') || '').trim();
+        const isNew = String(inp.getAttribute('data-item-id') || '').startsWith('new-');
+        if (isNew || a !== b) {
           inp.classList.add('dirty');
           dirty.push(inp);
         } else {
@@ -1492,73 +1564,170 @@
         }
       });
       if (notes) {
-        if ((notes.value || '') !== (notes.dataset.original || '')) {
+        if ((notes.value || '') !== (notes.getAttribute('data-original') || '')) {
           notes.classList.add('dirty');
           dirty.push(notes);
         } else {
           notes.classList.remove('dirty');
         }
       }
-      countEl.textContent = dirty.length;
-      pluralEl.style.display = dirty.length === 1 ? 'none' : 'inline';
-      if (dirty.length > 0) {
-        bar.classList.add('show');
+      const totalChanges = dirty.length + deletedRows.length;
+      countEl.textContent = totalChanges;
+      pluralEl.style.display = totalChanges === 1 ? 'none' : 'inline';
+      if (totalChanges > 0 || hasNewRows) {
+        if (bar) bar.classList.add('show');
         document.body.classList.add('has-dirty-savebar');
       } else {
-        bar.classList.remove('show');
+        if (bar) bar.classList.remove('show');
         document.body.classList.remove('has-dirty-savebar');
       }
       return dirty;
     }
 
-    window.__odBindInputs();
     if (notes) notes.addEventListener('input', refreshDirty);
     window.__odRefreshDirty = refreshDirty;
 
     discardBtn.addEventListener('click', () => {
-      getInputs().forEach(inp => { inp.value = inp.dataset.original || ''; });
-      if (notes) notes.value = notes.dataset.original || '';
+      const tbody = document.getElementById('od-items-tbody');
+      if (tbody) {
+        tbody.querySelectorAll('tr[data-item-row^="new-"]').forEach(row => row.remove());
+        // Restore deleted rows
+        tbody.querySelectorAll('tr[data-item-deleted="true"]').forEach(row => {
+          row.removeAttribute('data-item-deleted');
+          row.style.display = '';
+        });
+        if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();
+      }
+      getInputs().forEach(inp => { inp.value = inp.getAttribute('data-original') || ''; });
+      if (notes) notes.value = notes.getAttribute('data-original') || '';
+      recalculateTotalsLocally();
       refreshDirty();
     });
 
     saveBtn.addEventListener('click', async () => {
       const dirty = refreshDirty();
-      if (dirty.length === 0) return;
+      const tbody = document.getElementById('od-items-tbody');
+      const newRows = tbody ? Array.from(tbody.querySelectorAll('tr[data-item-row^="new-"]:not([data-item-deleted="true"])')) : [];
+      const deletedRows = tbody ? Array.from(tbody.querySelectorAll('tr[data-item-deleted="true"]')) : [];
+
+      if (dirty.length === 0 && newRows.length === 0 && deletedRows.length === 0) return;
       saveBtn.disabled = true;
       const origLabel = saveBtn.innerHTML;
       saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
 
       try {
         let latestTotal = null;
-        for (const el of dirty) {
+
+        // 0. Save staged deleted items first
+        for (const delRow of deletedRows) {
+          const id = delRow.getAttribute('data-item-row');
+          if (id && !id.startsWith('new-')) {
+            const r = await postUpdate({ action: 'remove_item', item_id: id });
+            if (!(r && r.ok)) throw new Error(r && r.error || 'Remove failed');
+            if (r.order_total !== undefined) latestTotal = r.order_total;
+            if (r.cari) applyCariSnapshot(r.cari);
+            if (r.profit) applyProfitSnapshot(r.profit);
+          }
+          delRow.remove();
+        }
+
+        // 1. Save new staged items first
+        for (const newRow of newRows) {
+          const tempId = newRow.getAttribute('data-item-row');
+          const qtyInp = newRow.querySelector('input[data-field="quantity"]');
+          const priceInp = newRow.querySelector('input[data-field="price"]');
+          const sku = newRow.getAttribute('data-sku');
+          const isVariant = newRow.getAttribute('data-is-variant');
+
+          const r = await postUpdate({
+            action: 'add_item',
+            sku: sku,
+            is_variant: isVariant,
+            quantity: qtyInp ? qtyInp.value : '1',
+            price: priceInp ? priceInp.value : '0',
+          });
+          if (!(r && r.ok)) throw new Error(r && r.error || 'Add failed');
+
+          const realId = r.item.id;
+          newRow.setAttribute('data-item-row', realId);
+
+          if (qtyInp) {
+            qtyInp.setAttribute('data-item-id', realId);
+            qtyInp.setAttribute('data-original', qtyInp.value);
+            qtyInp.classList.remove('dirty');
+          }
+          if (priceInp) {
+            priceInp.setAttribute('data-item-id', realId);
+            priceInp.setAttribute('data-original', priceInp.value);
+            priceInp.classList.remove('dirty');
+          }
+
+          const delBtn = newRow.querySelector('[data-remove-item]');
+          if (delBtn) delBtn.setAttribute('data-remove-item', realId);
+
+          const costCell = newRow.querySelector('[data-item-cost]');
+          if (costCell) {
+            costCell.setAttribute('data-item-cost', realId);
+            if (r.item.unit_cost && Number(r.item.unit_cost) > 0) {
+              costCell.innerHTML = '<span style="color:var(--gray-700);">$' + Number(r.item.unit_cost).toFixed(2) + '</span>';
+            } else {
+              costCell.innerHTML = '<span class="od-empty-mute" title="No cost set">—</span>';
+            }
+          }
+
+          const subCell = newRow.querySelector('[data-item-subtotal]');
+          if (subCell) {
+            subCell.setAttribute('data-item-subtotal', realId);
+            subCell.innerHTML = '<b>$' + Number(r.item.subtotal).toFixed(2) + '</b>';
+          }
+
+          const stockWrap = newRow.querySelector('[data-row-stock]');
+          if (stockWrap) {
+            stockWrap.setAttribute('data-row-stock', realId);
+          }
+
+          if (r.item.stock !== null && r.item.stock !== undefined) {
+            updateRowStock(realId, r.item.stock, r.item.max_qty, r.item.allow_oversell);
+          }
+
+          if (r.order_total !== undefined) latestTotal = r.order_total;
+          if (r.cari) applyCariSnapshot(r.cari);
+          if (r.profit) applyProfitSnapshot(r.profit);
+        }
+
+        // 2. Save remaining modified items & notes
+        const remainingDirty = refreshDirty();
+        for (const el of remainingDirty) {
           if (el === notes) {
             const r = await postUpdate({ action: 'update_notes', notes: el.value });
             if (!(r && r.ok)) throw new Error(r && r.error || 'Notes save failed');
-            notes.dataset.original = notes.value;
+            notes.setAttribute('data-original', notes.value);
           } else {
             const r = await postUpdate({
               action: 'update_item',
-              item_id: el.dataset.itemId,
-              field:   el.dataset.field,
+              item_id: el.getAttribute('data-item-id'),
+              field:   el.getAttribute('data-field'),
               value:   el.value,
             });
             if (!(r && r.ok)) throw new Error(r && r.error || 'Item save failed');
-            el.dataset.original = el.value;
+            el.setAttribute('data-original', el.value);
             if (r.subtotal !== undefined) {
-              const sub = document.querySelector('[data-item-subtotal="' + el.dataset.itemId + '"]');
+              const sub = document.querySelector('[data-item-subtotal="' + el.getAttribute('data-item-id') + '"]');
               if (sub) sub.innerHTML = '<b>$' + Number(r.subtotal).toFixed(2) + '</b>';
             }
             if (r.order_total !== undefined) latestTotal = r.order_total;
             if (r.cari) applyCariSnapshot(r.cari);
             if (r.profit) applyProfitSnapshot(r.profit);
-            // Refresh the row's stock pill + qty max cap.
-            updateRowStock(el.dataset.itemId, r.stock, r.max_qty, r.allow_oversell);
+            updateRowStock(el.getAttribute('data-item-id'), r.stock, r.max_qty, r.allow_oversell);
           }
         }
         if (latestTotal !== null) {
           document.querySelectorAll('[data-order-total]').forEach(el => {
             el.textContent = '$' + Number(latestTotal).toFixed(2);
           });
+        }
+        if (window.__odExitEditMode) {
+          window.__odExitEditMode();
         }
       } catch (e) {
         alert(e.message || 'Save failed — please refresh.');
@@ -1571,7 +1740,7 @@
 
     // Warn before leaving with unsaved changes.
     window.addEventListener('beforeunload', (e) => {
-      if (bar.classList.contains('show')) {
+      if (bar && bar.classList.contains('show')) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -1606,6 +1775,31 @@
       });
     }
     window.__odApplyReadonly = applyReadonly;
+
+    function updateActiveItemsCount() {
+      if (!tbody) return;
+      const activeCount = tbody.querySelectorAll('tr[data-item-row]:not([data-item-deleted="true"])').length;
+      if (countEl) countEl.textContent = activeCount;
+      if (noItems) {
+        noItems.style.display = activeCount === 0 ? '' : 'none';
+      }
+    }
+    window.__odUpdateActiveItemsCount = updateActiveItemsCount;
+
+    function exitEditMode() {
+      if (card && card.classList.contains('editing')) {
+        card.classList.remove('editing');
+        const lbl = toggle.querySelector('[data-edit-label]');
+        const ico = toggle.querySelector('[data-edit-icon]');
+        if (lbl) lbl.textContent = '{% trans "Edit" %}';
+        if (ico) {
+          ico.classList.add('fa-pen');
+          ico.classList.remove('fa-times');
+        }
+        applyReadonly();
+      }
+    }
+    window.__odExitEditMode = exitEditMode;
     toggle.addEventListener('click', () => {
       const willEdit = !card.classList.contains('editing');
       // When CANCELLING (leaving edit mode), discard any dirty input
@@ -1613,10 +1807,20 @@
       // the save-bar lingered showing "unsaved change" even though the
       // user clearly wanted to back out.
       if (!willEdit) {
+        tbody?.querySelectorAll('tr[data-item-row^="new-"]').forEach(row => row.remove());
+        // Restore deleted rows
+        tbody?.querySelectorAll('tr[data-item-deleted="true"]').forEach(row => {
+          row.removeAttribute('data-item-deleted');
+          row.style.display = '';
+        });
+        if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();
+
         document.querySelectorAll('.od-inline-input[data-item-id]').forEach(inp => {
-          if (inp.dataset.original !== undefined) inp.value = inp.dataset.original;
+          const orig = inp.getAttribute('data-original');
+          if (orig !== null && orig !== undefined) inp.value = orig;
           inp.classList.remove('dirty', 'over-stock');
         });
+        if (window.__odRecalculateTotalsLocally) window.__odRecalculateTotalsLocally();
         if (window.__odRefreshDirty) window.__odRefreshDirty();
       }
       card.classList.toggle('editing');
@@ -1645,7 +1849,7 @@
       const oversellBool = (allowOversell === true || allowOversell === 'true');
       if (addStock)    addStock.value    = (stock === null || stock === undefined) ? '' : String(stock);
       if (addOversell) addOversell.value = oversellBool ? 'true' : 'false';
-      if (addPrice && (!addPrice.value || addPrice.value === '0')) addPrice.value = price || 0;
+      if (addPrice)    addPrice.value    = price || 0;
       if (addPick) {
         addPick.style.display = 'block';
         addPick.innerHTML = '<i class="fa fa-check-circle"></i> ' +
@@ -1684,23 +1888,23 @@
       if (!sku) { alert('{% trans "Pick a product first." %}'); return; }
       const qty = (addQty.value || '0').trim();
       const price = (addPrice.value || '0').trim();
-      // Stock is informational only — back-order is allowed. Stock is
-      // deducted when the order ships, not at add time, so we never
-      // block adding a line for being over/out of stock.
       addBtn.disabled = true;
       const origLabel = addBtn.innerHTML;
       addBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
       try {
         const r = await window.__odPostUpdate({
-          action: 'add_item',
+          action: 'preview_add_item',
           sku, is_variant: addIsV.value, quantity: qty, price,
         });
         if (!(r && r.ok)) throw new Error(r && r.error || 'Add failed');
 
         // Build the new row matching the existing structure.
         const it = r.item;
+        const tempId = 'new-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
         const tr = document.createElement('tr');
-        tr.setAttribute('data-item-row', it.id);
+        tr.setAttribute('data-item-row', tempId);
+        tr.setAttribute('data-sku', sku);
+        tr.setAttribute('data-is-variant', addIsV.value);
         const prodLink = it.product_url
           ? `<a href="${it.product_url}" class="od-prod-link">`
           : '';
@@ -1723,7 +1927,7 @@
           let cls = 'ok';
           if (s <= 0 && !it.allow_oversell) cls = 'out';
           else if (s < 10) cls = 'low';
-          stockPill = '<div class="od-row-stock od-edit-only" data-row-stock="' + it.id + '">' +
+          stockPill = '<div class="od-row-stock od-edit-only" data-row-stock="' + tempId + '">' +
                      '<span class="od-stock-pill ' + cls + '">{% trans "Stock" %}: <b>' + s + '</b></span></div>';
         }
         tr.innerHTML =
@@ -1734,30 +1938,27 @@
           '<td><span class="mono">' + esc(it.product_sku || '—') + '</span></td>' +
           '<td><span class="mono">' + esc(it.variant_sku || '—') + '</span></td>' +
           '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +
-            ' value="' + q + '" data-item-id="' + it.id + '" data-field="quantity"' +
-            ' data-original="' + q + '"' + stockAttr + oversellAttr + maxAttr +
+            ' value="' + q + '" data-item-id="' + tempId + '" data-field="quantity"' +
+            ' data-original=""' + stockAttr + oversellAttr + maxAttr +
             ' onwheel="this.blur()">' + stockPill + '</td>' +
           '<td class="num"><input type="number" class="od-inline-input" step="0.01" min="0"' +
-            ' value="' + p + '" data-item-id="' + it.id + '" data-field="price"' +
-            ' data-original="' + p + '" onwheel="this.blur()"></td>' +
-          '<td class="num" data-item-cost="' + it.id + '">' +
+            ' value="' + p + '" data-item-id="' + tempId + '" data-field="price"' +
+            ' data-original="" onwheel="this.blur()"></td>' +
+          '<td class="num" data-item-cost="' + tempId + '" data-unit-cost="' + (it.unit_cost || 0) + '">' +
             ((it.unit_cost && Number(it.unit_cost) > 0)
               ? '<span style="color:var(--gray-700);">$' + Number(it.unit_cost).toFixed(2) + '</span>'
               : '<span class="od-empty-mute" title="No cost set">—</span>') +
           '</td>' +
-          '<td class="num" data-item-subtotal="' + it.id + '"><b>$' + Number(it.subtotal).toFixed(2) + '</b></td>' +
-          '<td class="od-edit-only"><button type="button" class="od-row-del" data-remove-item="' + it.id + '" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button></td>';
+          '<td class="num" data-item-subtotal="' + tempId + '"><b>$' + Number(it.subtotal).toFixed(2) + '</b></td>' +
+          '<td class="od-edit-only"><button type="button" class="od-row-del" data-remove-item="' + tempId + '" title="{% trans 'Remove' %}"><i class="fa fa-times"></i></button></td>';
         tbody.appendChild(tr);
 
         // Re-bind dirty tracking + update totals.
         if (window.__odBindInputs) window.__odBindInputs();
-        if (countEl) countEl.textContent = tbody.querySelectorAll('tr').length;
-        if (noItems) noItems.style.display = 'none';
-        document.querySelectorAll('[data-order-total]').forEach(el => {
-          el.textContent = '$' + Number(r.order_total).toFixed(2);
-        });
-        if (r.cari && window.__odApplyCari) window.__odApplyCari(r.cari);
-        if (r.profit && window.__odApplyProfit) window.__odApplyProfit(r.profit);
+        if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();
+
+        if (window.__odRecalculateTotalsLocally) window.__odRecalculateTotalsLocally();
+        if (window.__odRefreshDirty) window.__odRefreshDirty();
 
         // Reset the add row.
         addSku.value = ''; addIsV.value = 'false';
@@ -1778,30 +1979,23 @@
     });
 
     // Delegated remove handler
-    tbody?.addEventListener('click', async (e) => {
+    tbody?.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-remove-item]');
       if (!btn) return;
       const id = btn.getAttribute('data-remove-item');
-      if (!confirm('{% trans "Remove this item from the order?" %}')) return;
-      btn.disabled = true;
-      try {
-        const r = await window.__odPostUpdate({ action: 'remove_item', item_id: id });
-        if (!(r && r.ok)) throw new Error(r && r.error || 'Remove failed');
-        const row = tbody.querySelector('[data-item-row="' + id + '"]');
-        if (row) row.remove();
-        if (countEl) countEl.textContent = tbody.querySelectorAll('tr').length;
-        if (tbody.querySelectorAll('tr').length === 0 && noItems) noItems.style.display = '';
-        document.querySelectorAll('[data-order-total]').forEach(el => {
-          el.textContent = '$' + Number(r.order_total).toFixed(2);
-        });
-        if (r.cari && window.__odApplyCari) window.__odApplyCari(r.cari);
-        if (r.profit && window.__odApplyProfit) window.__odApplyProfit(r.profit);
-        if (window.__odRefreshDirty) window.__odRefreshDirty();
-      } catch (err) {
-        alert(err.message || 'Remove failed.');
-      } finally {
-        btn.disabled = false;
+      const row = tbody.querySelector('[data-item-row="' + id + '"]');
+      if (!row) return;
+
+      if (id.startsWith('new-')) {
+        row.remove();
+      } else {
+        row.setAttribute('data-item-deleted', 'true');
+        row.style.display = 'none';
       }
+
+      if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();
+      if (window.__odRecalculateTotalsLocally) window.__odRecalculateTotalsLocally();
+      if (window.__odRefreshDirty) window.__odRefreshDirty();
     });
   })();
 

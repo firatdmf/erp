@@ -200,17 +200,19 @@ def get_user_email(service):
 from email.mime.base import MIMEBase
 from email import encoders
 
-def create_message(sender, to, subject, message_text, html_body=None, cc=None, bcc=None, attachments=None):
+def create_message(sender, to, subject, message_text, html_body=None, cc=None, bcc=None, attachments=None, headers=None):
     """
     Create a message for an email
     attachments: list of tuples (filename, content, content_type)
+    headers: optional dict of extra RFC-822 headers (e.g. Reply-To,
+             List-Unsubscribe) — improves transactional deliverability.
     """
     if attachments:
         message = MIMEMultipart('mixed')
     elif html_body:
         message = MIMEMultipart('alternative')
     else:
-        message = MIMEText(message_text, 'plain')
+        message = MIMEText(message_text, 'plain', 'utf-8')
 
     message['to'] = to
     message['from'] = sender
@@ -219,25 +221,34 @@ def create_message(sender, to, subject, message_text, html_body=None, cc=None, b
         message['cc'] = ", ".join(cc) if isinstance(cc, list) else cc
     if bcc:
         message['bcc'] = ", ".join(bcc) if isinstance(bcc, list) else bcc
+    # Extra headers (Reply-To / List-Unsubscribe / etc.). Never duplicate
+    # the routing headers.
+    if headers:
+        for key, value in headers.items():
+            if not value or key.lower() in ('to', 'from', 'subject', 'cc', 'bcc'):
+                continue
+            del message[key]   # no-op if absent; prevents duplicates
+            message[key] = value
 
-    # Body handling
+    # Body handling. Always declare utf-8 so Turkish characters and
+    # currency symbols (₺ € £) survive instead of garbling.
     if html_body:
         if attachments:
             msg_body = MIMEMultipart('alternative')
-            msg_body.attach(MIMEText(message_text, 'plain'))
-            msg_body.attach(MIMEText(html_body, 'html'))
+            msg_body.attach(MIMEText(message_text or "", 'plain', 'utf-8'))
+            msg_body.attach(MIMEText(html_body, 'html', 'utf-8'))
             message.attach(msg_body)
         else:
              # message is already alternative
-             message.attach(MIMEText(message_text, 'plain'))
-             message.attach(MIMEText(html_body, 'html'))
+             message.attach(MIMEText(message_text or "", 'plain', 'utf-8'))
+             message.attach(MIMEText(html_body, 'html', 'utf-8'))
     else:
         # Plain text
         if attachments:
-             message.attach(MIMEText(message_text, 'plain'))
+             message.attach(MIMEText(message_text or "", 'plain', 'utf-8'))
         else:
              # message is MIMEText, content already set in constructor
-             pass 
+             pass
 
     # Attachments
     if attachments:
@@ -259,11 +270,11 @@ def create_message(sender, to, subject, message_text, html_body=None, cc=None, b
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return {'raw': raw}
 
-def send_email(service, sender, to, subject, message_text, html_body=None, cc=None, bcc=None, attachments=None):
+def send_email(service, sender, to, subject, message_text, html_body=None, cc=None, bcc=None, attachments=None, headers=None):
     """
     Send an email message
     """
-    message = create_message(sender, to, subject, message_text, html_body, cc, bcc, attachments)
+    message = create_message(sender, to, subject, message_text, html_body, cc, bcc, attachments, headers=headers)
     sent_message = service.users().messages().send(
         userId='me', 
         body=message

@@ -1019,3 +1019,77 @@ main:has(.njdash) {
 .njdash .cal-title-icon svg {
   stroke-width: 1.75 !important;
 }
+
+/* New Task Button Modern Styling - Light Teal Outline Design */
+.home-action.primary.nj-new-task-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  height: 38px !important;
+  padding: 0 18px !important;
+  border-radius: 19px !important; /* Modern rounded pill */
+  font: 600 13px var(--font-sans, 'Plus Jakarta Sans') !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(13, 148, 136, 0.3) !important;
+  color: #0d9488 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: none !important;
+}
+.home-action.primary.nj-new-task-btn:hover {
+  transform: translateY(-1.5px) !important;
+  background: #0d9488 !important;
+  border-color: #0d9488 !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2) !important;
+}
+.home-action.primary.nj-new-task-btn:active {
+  transform: translateY(0) !important;
+}
+.home-action.primary.nj-new-task-btn svg {
+  width: 15px !important;
+  height: 15px !important;
+  stroke-width: 2.2 !important;
+  transition: transform 0.2s ease !important;
+}
+.home-action.primary.nj-new-task-btn:hover svg {
+  transform: scale(1.1) !important;
+}
+
+/* Today's Tasks card header layout */
+.today-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* Empty State Action Button */
+.nj-empty-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  margin-top: 14px;
+  border-radius: 18px;
+  font: 600 12.5px var(--font-sans, 'Plus Jakarta Sans');
+  background: linear-gradient(135deg, #0d9488 0%, #008080 100%);
+  border: 1px solid #115e59;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 128, 128, 0.15);
+  transition: all 0.2s ease;
+}
+
+.nj-empty-action-btn:hover {
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 128, 128, 0.25);
+}
+
+.nj-empty-action-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+

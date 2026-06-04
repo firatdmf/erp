@@ -67,11 +67,19 @@
       {% if user_role == 'member' %}
       <button class="btn-create-task" style="opacity: 0.5; cursor: not-allowed; background: #94a3b8;"
         title="Only Admins and Managers can create tasks">
-        <i class="fas fa-lock"></i> Create Task
+        <i class="fas fa-lock"></i> 
+        <span>
+          {% get_current_language as LANGUAGE_CODE %}
+          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Oluştur{% else %}Create Task{% endif %}
+        </span>
       </button>
       {% else %}
       <button onclick="openTaskSidebar('{{ team.id }}', '{{ team.name|escapejs }}')" class="btn-create-task">
-        <i class="fas fa-plus"></i> Create Task
+        <i class="fas fa-plus"></i> 
+        <span>
+          {% get_current_language as LANGUAGE_CODE %}
+          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Oluştur{% else %}Create Task{% endif %}
+        </span>
       </button>
       {% endif %}
     </div>

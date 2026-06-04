@@ -71,33 +71,41 @@ function openVariantAttributesModal(variantIndex, variantSku) {
         transition: opacity 0.2s;
     `;
     
+    const VT = (window.VARIANT_T || {});
+    const T = {
+        title:    VT.m_title         || 'Variant Attributes',
+        help:     VT.m_help          || 'Customize attributes for this specific variant. Leave empty to use product-level defaults.',
+        v_label:  VT.m_variant_label || 'Variant',
+        cancel:   VT.m_cancel        || 'Cancel',
+        save:     VT.m_save          || 'Save',
+    };
     modal.innerHTML = `
         <div style="background: white; border-radius: 12px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111827;">
-                    <i class="fa fa-tags" style="color: #667eea;"></i> Variant Attributes
+                    <i class="fa fa-tags" style="color: #667eea;"></i> ${T.title}
                 </h3>
                 <button onclick="closeVariantAttributesModal(${variantIndex})" style="background: transparent; border: none; font-size: 24px; color: #9ca3af; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827'" onmouseout="this.style.background='transparent'; this.style.color='#9ca3af'">&times;</button>
             </div>
-            
+
             <div style="padding: 14px; background: #f0f9ff; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: start; gap: 10px;">
                 <i class="fa fa-info-circle" style="color: #0ea5e9; margin-top: 2px;"></i>
                 <div style="font-size: 13px; color: #0369a1; line-height: 1.5;">
-                    <strong>Variant: ${variantSku}</strong><br>
-                    Customize attributes for this specific variant. Leave empty to use product-level defaults.
+                    <strong>${T.v_label}: ${variantSku}</strong><br>
+                    ${T.help}
                 </div>
             </div>
-            
+
             <div id="variant_attr_list_${variantIndex}" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
                 <!-- Attributes will be rendered here -->
             </div>
-            
+
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
                 <button onclick="closeVariantAttributesModal(${variantIndex})" style="padding: 10px 18px; background: #fff; color: #6b7280; border: 1px solid #d1d5db; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s;" onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#9ca3af'" onmouseout="this.style.background='#fff'; this.style.borderColor='#d1d5db'">
-                    Cancel
+                    ${T.cancel}
                 </button>
                 <button onclick="saveVariantAttributes(${variantIndex})" style="padding: 10px 18px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2); transition: all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow='0 2px 8px rgba(102, 126, 234, 0.2)'">
-                    <i class="fa fa-check"></i> Save
+                    <i class="fa fa-check"></i> ${T.save}
                 </button>
             </div>
         </div>
@@ -127,25 +135,31 @@ function renderVariantAttributesList(variantIndex, currentProductAttrs) {
     // Show product-level attributes as reference
     let html = '';
     
+    const VT = (window.VARIANT_T || {});
+    const lblAttribute    = VT.m_attribute     || 'Attribute';
+    const lblDefault      = VT.m_default       || 'Default';
+    const lblVariantValue = VT.m_variant_value || 'Variant value';
+    const lblEmpty        = VT.m_empty         || 'No product-level attributes defined. Add attributes in the Product Attributes section above.';
+
     if (prodAttrs && prodAttrs.length > 0) {
         prodAttrs.forEach((prodAttr, idx) => {
             const variantAttr = variantAttrs.find(a => a.name === prodAttr.name);
             const value = variantAttr ? variantAttr.value : '';
-            
+
             html += `
                 <div style="display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; align-items: center;">
                     <div style="min-width: 0;">
-                        <div style="font-size: 12px; font-weight: 500; color: #6b7280; margin-bottom: 4px;">Attribute</div>
+                        <div style="font-size: 12px; font-weight: 500; color: #6b7280; margin-bottom: 4px;">${lblAttribute}</div>
                         <div style="font-weight: 500; color: #111827;">${prodAttr.name}</div>
-                        <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">Default: ${prodAttr.value}</div>
+                        <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">${lblDefault}: ${prodAttr.value}</div>
                     </div>
                     <div style="min-width: 0;">
-                        <label style="display: block; font-size: 12px; font-weight: 500; color: #6b7280; margin-bottom: 4px;">Variant Value</label>
-                        <input type="text" 
-                               class="variant-attr-input" 
+                        <label style="display: block; font-size: 12px; font-weight: 500; color: #6b7280; margin-bottom: 4px;">${lblVariantValue}</label>
+                        <input type="text"
+                               class="variant-attr-input"
                                data-attr-name="${prodAttr.name}"
-                               value="${value}" 
-                               placeholder="${prodAttr.value}" 
+                               value="${value}"
+                               placeholder="${prodAttr.value}"
                                style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
                     </div>
                 </div>
@@ -155,7 +169,7 @@ function renderVariantAttributesList(variantIndex, currentProductAttrs) {
         html = `
             <div style="padding: 20px; text-align: center; color: #9ca3af; font-size: 14px;">
                 <i class="fa fa-info-circle" style="font-size: 24px; margin-bottom: 8px; display: block;"></i>
-                No product-level attributes defined. Add attributes in the Product Attributes section above.
+                ${lblEmpty}
             </div>
         `;
     }
@@ -202,7 +216,7 @@ function saveVariantAttributes(variantIndex) {
     // Close modal
     closeVariantAttributesModal(variantIndex);
     
-    showToast(`✅ Attributes saved for variant`, 'success');
+    showToast(`✅ ${(window.VARIANT_T && window.VARIANT_T.m_saved) || 'Attributes saved for variant'}`, 'success');
 }
 
 // Close variant attributes modal

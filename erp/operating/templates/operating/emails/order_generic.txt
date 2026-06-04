@@ -1,0 +1,43 @@
+{% load i18n %}{% autoescape off %}{{ BRAND_NAME|default:"Nejum" }}
+{% if order.order_number %}{% trans "Order" %} {{ order.order_number }}{% else %}{% trans "Order" %} #{{ order.pk }}{% endif %} — {{ event_label }}
+{% if customer_name %}
+{% blocktrans %}Hi {{ customer_name }},{% endblocktrans %}{% endif %}
+{% if event == 'created' %}
+{% trans "Thanks for your order — we've received it and started processing. A PDF copy is attached for your records." %}
+{% elif event == 'confirmed' %}
+{% trans "Your order has been confirmed and is now in our production queue." %}
+{% elif event == 'preparing' %}
+{% trans "Good news — your order is now being prepared." %}
+{% elif event == 'packaging' %}
+{% trans "Your order is being packaged and will be handed to the carrier shortly." %}
+{% elif event == 'shipped' or event == 'in_transit' or event == 'out_for_delivery' %}
+{% trans "Your order is on its way!" %}{% if carrier %}
+{% trans "Carrier" %}: {{ carrier }}{% endif %}{% if tracking_number %}
+{% trans "Tracking number" %}: {{ tracking_number }}{% endif %}
+{% elif event == 'delivered' %}
+{% trans "Your order has been delivered." %}
+{% elif event == 'cancelled' %}
+{% trans "Your order has been cancelled. If this was unexpected, please reply and we'll sort it out." %}
+{% else %}
+{% trans "Your order status has been updated." %}
+{% endif %}
+{% trans "ORDER SUMMARY" %}
+-----------------------------------------
+{% for it in order_items %}{{ it.product.title|default:it.product|default:"Product" }}{% if it.product_variant and it.product_variant.variant_sku %} [{{ it.product_variant.variant_sku }}]{% endif %}
+  {{ it.quantity|default:0|floatformat:2 }} x {{ currency_symbol|default:"$" }}{{ it.price|default:0|floatformat:2 }} = {{ currency_symbol|default:"$" }}{{ it.line_total_calc|default:0|floatformat:2 }}
+{% endfor %}-----------------------------------------
+{% trans "TOTAL" %}: {{ currency_symbol|default:"$" }}{{ order_total|default:0|floatformat:2 }}
+{% if order.delivery_address or order.delivery_city %}
+{% trans "Delivery address" %}:
+{% if order.delivery_address_title %}{{ order.delivery_address_title }}
+{% endif %}{% if order.delivery_address %}{{ order.delivery_address }}
+{% endif %}{% if order.delivery_city %}{{ order.delivery_city }}{% if order.delivery_country %}, {{ order.delivery_country }}{% endif %}
+{% endif %}{% if order.delivery_phone %}{{ order.delivery_phone }}
+{% endif %}{% endif %}
+{% trans "Questions about your order? Just reply to this email." %}
+
+{{ BRAND_NAME|default:"Nejum" }}{% if BRAND_ADDRESS %}
+{{ BRAND_ADDRESS }}{% endif %}{% if BRAND_PHONE %}
+{{ BRAND_PHONE }}{% endif %}{% if BRAND_EMAIL %}
+{{ BRAND_EMAIL }}{% endif %}
+{% endautoescape %}

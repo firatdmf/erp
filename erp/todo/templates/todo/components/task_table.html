@@ -472,23 +472,23 @@
 <div class="task-table-container">
   <!-- Header -->
   <div class="table-header">
-    <h2>{% if is_assigned_view %}Delegated Tasks{% else %}My Tasks{% endif %}</h2>
-    <p>{% if is_assigned_view %}Track all tasks you've delegated to your team.{% else %}View and manage all tasks
+    <h2>{% if is_future_view %}Task Reports (Future Tasks){% elif is_assigned_view %}Delegated Tasks{% else %}My Tasks{% endif %}</h2>
+    <p>{% if is_future_view %}View all tasks scheduled for future dates.{% elif is_assigned_view %}Track all tasks you've delegated to your team.{% else %}View and manage all tasks
       assigned to you.{% endif %}</p>
   </div>
 
   <!-- Stats Row -->
   <div class="stats-row">
     <div class="stat-card">
-      <div class="stat-label">{% if is_assigned_view %}Total Delegated{% else %}Total Assigned Tasks{% endif %}</div>
+      <div class="stat-label">{% if is_future_view %}Total Future Tasks{% elif is_assigned_view %}Total Delegated{% else %}Total Assigned Tasks{% endif %}</div>
       <div class="stat-value">{{ total_count }}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">{% if is_assigned_view %}Completed This Week{% else %}Completed This Week{% endif %}</div>
+      <div class="stat-label">Completed This Week</div>
       <div class="stat-value">{{ completed_count }}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">{% if is_assigned_view %}In Progress{% else %}Ongoing Tasks{% endif %}</div>
+      <div class="stat-label">{% if is_future_view %}Upcoming Tasks{% elif is_assigned_view %}In Progress{% else %}Ongoing Tasks{% endif %}</div>
       <div class="stat-value">{{ ongoing_count }}</div>
     </div>
   </div>
@@ -503,19 +503,19 @@
         <div class="filter-dropdown">
           <div class="filter-option" onclick="sortTasks(this, 'priority')">
             <i class="fa fa-flag"></i>
-            {% if is_assigned_view %}Sort by Priority{% else %}Sort by Priority{% endif %}
+            Sort by Priority
           </div>
           <div class="filter-option" onclick="sortTasks(this, 'date')">
             <i class="fa fa-calendar"></i>
-            {% if is_assigned_view %}Sort by Date{% else %}Sort by Date{% endif %}
+            Sort by Date
           </div>
           <div class="filter-option" onclick="sortTasks(this, 'name')">
             <i class="fa fa-sort-alpha-down"></i>
-            {% if is_assigned_view %}Sort by Name{% else %}Sort by Name{% endif %}
+            Sort by Name
           </div>
           <div class="filter-option" onclick="sortTasks(this, 'status')">
             <i class="fa fa-check-circle"></i>
-            {% if is_assigned_view %}Sort by Status{% else %}Sort by Status{% endif %}
+            Sort by Status
           </div>
         </div>
       </div>
@@ -524,16 +524,19 @@
       </button>
       <div class="search-wrapper">
         <input type="text" class="search-input"
-          placeholder="{% if is_assigned_view %}Search delegated tasks...{% else %}Search tasks...{% endif %}"
+          placeholder="{% if is_future_view %}Search future tasks...{% elif is_assigned_view %}Search delegated tasks...{% else %}Search tasks...{% endif %}"
           id="taskSearchInput" value="{{ search_query }}" oninput="instantSearchTasks(this)">
         <div id="searchResultCount" style="display: none; margin-top: 0.5rem; font-size: 0.875rem; color: #64748b;">
         </div>
       </div>
     </div>
-    {% if not is_assigned_view %}
+    {% if not is_assigned_view and not is_future_view %}
     <a href="#" onclick="openTaskSidebar(); return false;" class="btn-new-task">
-      <i class="fa fa-plus-circle"></i>
-      Create New Task
+      <i class="fa fa-user-plus"></i>
+      <span>
+        {% get_current_language as LANGUAGE_CODE %}
+        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Ata{% else %}Assign Task{% endif %}
+      </span>
     </a>
     {% endif %}
   </div>
@@ -640,8 +643,8 @@
   {% else %}
   <div class="empty-state-table">
     <i class="fa fa-check-circle"></i>
-    <h3>{% if is_assigned_view %}No delegated tasks{% else %}No tasks yet{% endif %}</h3>
-    <p>{% if is_assigned_view %}You haven't delegated any tasks to your team yet.{% else %}You don't have any tasks
+    <h3>{% if is_future_view %}No future tasks{% elif is_assigned_view %}No delegated tasks{% else %}No tasks yet{% endif %}</h3>
+    <p>{% if is_future_view %}There are no tasks scheduled for future dates.{% elif is_assigned_view %}You haven't delegated any tasks to your team yet.{% else %}You don't have any tasks
       assigned to you.{% endif %}</p>
   </div>
   {% endif %}

@@ -93,6 +93,8 @@
   .pk-pack-meta { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; font-variant-numeric: tabular-nums; }
   .pk-pack-del { background: transparent; border: 1px solid transparent; color: var(--gray-400); cursor: pointer; padding: 4px 7px; border-radius: 6px; transition: all 140ms; }
   .pk-pack-del:hover { color: #B91C1C; background: #FEF2F2; border-color: #FCA5A5; }
+  .pk-pack-view { background: transparent; border: 1px solid transparent; color: var(--nejum-teal-600); cursor: pointer; padding: 4px 7px; border-radius: 6px; transition: all 140ms; margin-left: 6px; }
+  .pk-pack-view:hover { color: var(--nejum-teal-700); background: var(--nejum-teal-50); border-color: var(--nejum-teal-300); }
 
   .pk-pack-body { padding: 8px 12px 12px; min-height: 60px; }
   .pk-drop-hint { padding: 12px; text-align: center; color: var(--gray-500); font: 500 12px var(--font-sans); border: 1.5px dashed #D1D5DB; border-radius: 8px; background: white; }
@@ -125,6 +127,11 @@
       <div class="pk-eyebrow">{% trans "Packing" %}</div>
       <h1 class="pk-title">{% trans "Packages" %}</h1>
       <div class="pk-sub">{% trans "Drag or move items into packages. Each item can be in only one package." %}</div>
+    </div>
+    <div style="display: flex; gap: 8px; align-self: flex-end;">
+      <a href="{% url 'operating:order_packing_list_pdf' order.pk %}" class="pk-back" style="background: white; color: var(--nejum-teal-600); border-color: var(--nejum-teal-300); font-weight: 700;" target="_blank">
+        <i class="fa fa-file-pdf-o"></i> {% trans "PDF List" %}
+      </a>
     </div>
   </div>
 
@@ -182,17 +189,21 @@
       <div class="pk-packs" id="packsList">
         {% for p in packs %}
         <div class="pk-pack" data-pack-id="{{ p.pk }}" data-pack-number="{{ p.pack_number }}"
+             data-pack-code="{{ p.code|default:'' }}" data-pack-qr-url="{{ p.qr_code_url|default:'' }}"
              ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDrop(event)">
           <div class="pk-pack-h">
             <span class="pk-pack-num">{{ p.pack_number }}</span>
             <span class="pk-pack-title">{% trans "Package" %} #{{ p.pack_number }}</span>
             <span class="pk-pack-meta"><span data-count>0</span> {% trans "items" %}</span>
+            <button type="button" class="pk-pack-view" title="{% trans 'View package details' %}" onclick="showPackModal(this)">
+              <i class="fa fa-eye"></i>
+            </button>
             <button type="button" class="pk-pack-del" title="{% trans 'Delete package' %}" onclick="pkDeletePack({{ p.pk }})">
               <i class="fa fa-trash"></i>
             </button>
           </div>
           <div class="pk-pack-body" data-pack-body></div>
-        </div>
+         </div>
         {% endfor %}
       </div>
     </div>
@@ -365,6 +376,8 @@
       wrap.className = 'pk-pack';
       wrap.dataset.packId = data.pack.id;
       wrap.dataset.packNumber = data.pack.number;
+      wrap.dataset.packCode = data.pack.code || '';
+      wrap.dataset.packQrUrl = data.pack.qr_code_url || '';
       wrap.setAttribute('ondragover', 'pkDragOver(event)');
       wrap.setAttribute('ondragleave', 'pkDragLeave(event)');
       wrap.setAttribute('ondrop', 'pkDrop(event)');
@@ -373,6 +386,7 @@
           '<span class="pk-pack-num">' + data.pack.number + '</span>' +
           '<span class="pk-pack-title">{% trans "Package" %} #' + data.pack.number + '</span>' +
           '<span class="pk-pack-meta"><span data-count>0</span> {% trans "items" %}</span>' +
+          '<button type="button" class="pk-pack-view" title="{% trans "View package details" %}" onclick="showPackModal(this)"><i class="fa fa-eye"></i></button>' +
           '<button type="button" class="pk-pack-del" onclick="pkDeletePack(' + data.pack.id + ')"><i class="fa fa-trash"></i></button>' +
         '</div>' +
         '<div class="pk-pack-body" data-pack-body></div>';
@@ -414,5 +428,88 @@
 
   // Initial paint
   pkRender();
+</script>
+
+<!-- Pack Details Modal -->
+<div id="packDetailsModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 20, 25, 0.45); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 500px; width: 100%; overflow: hidden; border: 1px solid #E2E8EE;">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F3F4F6;">
+      <h3 style="margin: 0; font-family: var(--font-sans); font-size: 16px; font-weight: 700; color: var(--ink);" id="modalPackTitle">{% trans "Package Details" %}</h3>
+      <button onclick="closePackModal()" style="background: none; border: none; cursor: pointer; color: var(--gray-500); font-size: 20px;"><i class="fa fa-times"></i></button>
+    </div>
+    <div style="padding: 20px; text-align: center;">
+      <div style="background: #F9FAFB; border-radius: 12px; padding: 20px; display: inline-block; margin-bottom: 18px; border: 1px solid #E5E7EB;">
+        <img id="modalPackQR" src="" alt="QR Code" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />
+        <div id="modalPackCode" style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--gray-700); margin-top: 10px;"></div>
+      </div>
+      <div style="text-align: left;">
+        <h4 style="margin: 0 0 8px; font-family: var(--font-sans); font-size: 13px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.05em;">{% trans "Package Contents" %}</h4>
+        <div id="modalPackItems" style="max-height: 180px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px; background: white; padding: 6px 12px;"></div>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid #F3F4F6; background: #F9FAFB; gap: 8px;">
+      <a id="modalPackPrintBtn" href="" class="pk-pill-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;" target="_blank">
+        <i class="fa fa-print"></i> {% trans "Print Label" %}
+      </a>
+      <button onclick="closePackModal()" class="pk-pill-btn" style="background: var(--nejum-teal-600); color: white; border-color: var(--nejum-teal-700);">{% trans "Close" %}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showPackModal(btn) {
+    const packEl = btn.closest('.pk-pack');
+    const packId = packEl.dataset.packId;
+    const packNum = packEl.dataset.packNumber;
+    const packCode = packEl.dataset.packCode || `PK-{{ order.order_number|default:order.pk }}-${packNum}`;
+    const qrUrl = packEl.dataset.packQrUrl;
+
+    document.getElementById('modalPackTitle').textContent = `{% trans "Package Details" %} #${packNum}`;
+    document.getElementById('modalPackCode').textContent = packCode;
+    
+    const qrImg = document.getElementById('modalPackQR');
+    if (qrUrl) {
+      qrImg.src = qrUrl;
+      qrImg.style.display = 'block';
+    } else {
+      qrImg.style.display = 'none';
+    }
+
+    const itemsContainer = document.getElementById('modalPackItems');
+    itemsContainer.innerHTML = '';
+    const itemEls = packEl.querySelectorAll('.pk-item');
+    if (itemEls.length === 0) {
+      itemsContainer.innerHTML = '<div style="color: var(--gray-500); padding: 8px 0; text-align: center;">{% trans "Empty package" %}</div>';
+    } else {
+      itemEls.forEach(el => {
+        const name = el.querySelector('.pk-item-name').textContent.trim();
+        const meta = el.querySelector('.pk-item-meta').cloneNode(true);
+        const div = document.createElement('div');
+        div.style.padding = '8px 0';
+        div.style.borderBottom = '1px solid #F3F4F6';
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.style.fontWeight = '600';
+        titleDiv.style.color = 'var(--ink)';
+        titleDiv.textContent = name;
+        
+        div.appendChild(titleDiv);
+        div.appendChild(meta);
+        itemsContainer.appendChild(div);
+      });
+      if (itemsContainer.lastElementChild) {
+        itemsContainer.lastElementChild.style.borderBottom = 'none';
+      }
+    }
+
+    const printBtn = document.getElementById('modalPackPrintBtn');
+    printBtn.href = `/operating/packs/${packId}/pdf/`;
+
+    document.getElementById('packDetailsModal').style.display = 'flex';
+  }
+
+  function closePackModal() {
+    document.getElementById('packDetailsModal').style.display = 'none';
+  }
 </script>
 {% endblock %}

@@ -30,6 +30,10 @@
       <i data-lucide="check-circle"></i> Completed
       <span class="tab-count{% if completed_tasks_count == 0 %} zero{% endif %}">{{ completed_tasks_count|default:0 }}</span>
     </button>
+    <button class="home-tab" data-tab="future">
+      <i data-lucide="file-text"></i> Task Reports
+      <span class="tab-count{% if future_tasks_count == 0 %} zero{% endif %}">{{ future_tasks_count|default:0 }}</span>
+    </button>
 
     <div class="home-tabs-spacer"></div>
 
@@ -66,8 +70,12 @@
       </div>
     </div>
 
-    <button class="home-action primary" type="button" onclick="openTaskSidebar(); return false;">
-      <i data-lucide="plus"></i> New Task
+    <button class="home-action primary nj-new-task-btn" type="button" onclick="openTaskSidebar(); return false;">
+      <i data-lucide="user-plus"></i>
+      <span>
+        {% get_current_language as LANGUAGE_CODE %}
+        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Görev Ata{% else %}Assign Task{% endif %}
+      </span>
     </button>
   </div>
 
@@ -184,8 +192,16 @@
             <div class="njdash-empty-icon">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             </div>
-            <div class="njdash-empty-title">No tasks for today</div>
-            <div class="njdash-empty-sub">Add a new task with "+ New Task".</div>
+            <div class="njdash-empty-title">
+              {% get_current_language as LANGUAGE_CODE %}
+              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bugün için görev yok{% else %}No tasks for today{% endif %}
+            </div>
+            <div class="njdash-empty-sub">
+              <button class="nj-empty-action-btn" onclick="openTaskSidebar(); return false;">
+                <i data-lucide="user-plus"></i>
+                {% if LANGUAGE_CODE|slice:":2" == "tr" %}Yeni Bir Görev Ata{% else %}Assign a New Task{% endif %}
+              </button>
+            </div>
           </div>
         {% endif %}
       </div>
@@ -209,6 +225,7 @@
     var tasksByDate = {{ tasks_by_date_json|safe }};        // {date: [tasks]}
     var delegatedTasks = {{ delegated_tasks_json|safe }};   // [tasks] — assigned to me
     var completedTasks = {{ completed_tasks_json|safe }};   // [tasks] — completed history
+    var futureTasks = {{ future_tasks_json|safe }};         // [tasks] — future tasks
     var completedSelection = new Set();                      // task IDs selected for bulk delete
     var current = new Date();
     var selected = new Date();
@@ -372,6 +389,9 @@
         // Already sorted server-side by completed_at desc
         return (completedTasks || []).slice();
       }
+      if (currentTab === 'future') {
+        return (futureTasks || []).slice();
+      }
       // Calendar tab (default)
       var today = new Date();
       var isToday = sameDay(selected, today);
@@ -414,6 +434,11 @@
         if (sub) sub.textContent = count + ' completed · check rows to bulk-delete';
         return;
       }
+      if (currentTab === 'future') {
+        if (title) title.textContent = 'Task Reports (Future Tasks)';
+        if (sub) sub.textContent = count + ' future-dated tasks';
+        return;
+      }
 
       // Calendar tab
       var today = new Date();
@@ -442,27 +467,52 @@
       return s.length > n ? s.slice(0, n - 1) + '…' : s;
     }
     function emptyMarkup() {
-      var title, sub;
+      var title, sub, btnText;
+      var isTr = "{{ LANGUAGE_CODE|slice:':2' }}" === "tr";
+      
       if (currentTab === 'mine') {
-        title = 'No tasks yet';
-        sub = 'Create your first task with "+ New Task".';
+        title = isTr ? 'Görev bulunamadı' : 'No tasks yet';
+        sub = isTr ? 'İlk görevinizi atayarak başlayın.' : 'Get started by assigning your first task.';
+        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
       } else if (currentTab === 'completed') {
-        title = 'No completed tasks yet';
-        sub = 'Tasks you mark as complete show up here.';
+        title = isTr ? 'Tamamlanan görev yok' : 'No completed tasks yet';
+        sub = isTr ? 'Tamamladığınız görevler burada listelenir.' : 'Tasks you mark as complete show up here.';
+        btnText = null;
       } else if (currentTab === 'delegated') {
-        title = 'No assigned tasks';
-        sub = 'Tasks assigned to you by team members will appear here.';
+        title = isTr ? 'Atanan görev yok' : 'No assigned tasks';
+        sub = isTr ? 'Ekip arkadaşlarınıza atadığınız veya size atanan görevler burada listelenir.' : 'Tasks assigned to you or by you will appear here.';
+        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
+      } else if (currentTab === 'future') {
+        title = isTr ? 'Gelecek tarihli görev yok' : 'No future tasks';
+        sub = isTr ? 'Gelecek tarihli planlanan görevler burada listelenir.' : 'Tasks with future due dates will appear here.';
+        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
       } else {
-        title = 'No tasks for this day';
-        sub = 'Add a new task with "+ New Task".';
+        title = isTr ? 'Bugün için görev yok' : 'No tasks for this day';
+        sub = isTr ? 'Bugün için planlanmış bir görev bulunmuyor.' : 'There are no tasks scheduled for this day.';
+        btnText = isTr ? 'Yeni Görev Ata' : 'Assign New Task';
       }
-      return '<div class="njdash-empty">' +
+      
+      var html = '<div class="njdash-empty">' +
         '<div class="njdash-empty-icon">' +
         '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' +
         '</div>' +
         '<div class="njdash-empty-title">' + title + '</div>' +
-        '<div class="njdash-empty-sub">' + sub + '</div>' +
-        '</div>';
+        '<div class="njdash-empty-sub">' + sub + '</div>';
+        
+      if (btnText) {
+        html += '<button class="nj-empty-action-btn" onclick="openTaskSidebar(); return false;">' +
+          '<i data-lucide="user-plus"></i> ' + btnText +
+          '</button>';
+      }
+      
+      html += '</div>';
+      
+      // Reinject lucide icons since we added new elements dynamically
+      setTimeout(function() {
+        if (window.lucide) window.lucide.createIcons();
+      }, 50);
+      
+      return html;
     }
     function taskCardMarkup(t) {
       var done = t.completed ? ' done' : '';

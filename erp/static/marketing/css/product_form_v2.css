@@ -519,64 +519,88 @@
 }
 #campaign_card .cmp-tier {
   display: grid;
-  grid-template-columns: 1fr 1fr 90px 32px;
-  gap: 8px;
+  grid-template-columns: 1fr 1fr 1fr 28px;
+  gap: 10px;
   align-items: end;
-  padding: 10px;
+  padding: 12px 12px 12px;
   background: white;
   border: 1px solid #EAEFF1;
   border-radius: 10px;
   position: relative;
+  transition: border-color 140ms;
 }
+#campaign_card .cmp-tier:hover { border-color: #DDE3E5; }
+/* Remove button sits as the 4th grid cell — quiet, ghost style */
+#campaign_card .cmp-tier-rm {
+  width: 28px; height: 32px;
+  margin-bottom: 0;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94A3B8;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+  outline: 0;
+  transition: background 140ms, border-color 140ms, color 140ms;
+  align-self: end;
+}
+#campaign_card .cmp-tier-rm:hover {
+  background: #FEF2F2;
+  border-color: #FECACA;
+  color: #B91C1C;
+}
+#campaign_card .cmp-tier-rm i,
+#campaign_card .cmp-tier-rm svg { width: 14px; height: 14px; stroke-width: 1.8; }
+
 #campaign_card .cmp-tier-label {
   font: 700 10px 'Plus Jakarta Sans', sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #64748B;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 #campaign_card .cmp-tier input {
   width: 100%;
-  padding: 8px 10px !important;
+  padding: 9px 12px !important;
   background: #FAFBFC !important;
   border: 1px solid #DDE3E5 !important;
   border-radius: 8px !important;
-  font: 500 13px 'Plus Jakarta Sans', sans-serif !important;
+  font: 600 13.5px 'Plus Jakarta Sans', sans-serif !important;
   color: #0F172A !important;
   outline: 0 !important;
   box-sizing: border-box !important;
-  transition: border-color 160ms, box-shadow 160ms;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms;
+  font-variant-numeric: tabular-nums;
+  /* hide native number spinners — they steal width inside narrow sidebar */
+  -moz-appearance: textfield;
+}
+#campaign_card .cmp-tier input::-webkit-outer-spin-button,
+#campaign_card .cmp-tier input::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
 }
 #campaign_card .cmp-tier input:focus {
   background: white !important;
   border-color: #008080 !important;
   box-shadow: 0 0 0 3px rgba(0,128,128,0.10) !important;
 }
-#campaign_card .cmp-tier-rm {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  border: 1px solid #FECACA;
-  background: #FEF2F2;
-  color: #B91C1C;
-  cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  align-self: end;
-  margin-bottom: 0;
-  outline: 0;
-  transition: background 140ms, border-color 140ms;
+#campaign_card .cmp-tier input::placeholder {
+  color: #94A3B8; font-weight: 400;
 }
-#campaign_card .cmp-tier-rm:hover { background: #FEE2E2; border-color: #FCA5A5; }
-#campaign_card .cmp-tier-rm i,
-#campaign_card .cmp-tier-rm svg { width: 14px; height: 14px; stroke-width: 2; }
 #campaign_card .cmp-tier .cmp-tier-input-pct {
   position: relative;
+}
+#campaign_card .cmp-tier .cmp-tier-input-pct input {
+  padding-right: 24px !important;
 }
 #campaign_card .cmp-tier .cmp-tier-input-pct::after {
   content: '%';
   position: absolute;
-  right: 12px; bottom: 9px;
+  right: 10px; top: 50%;
+  transform: translateY(-50%);
+  margin-top: 11px; /* aligns with input center given label above */
   color: #94A3B8;
-  font: 600 12px 'Plus Jakarta Sans', sans-serif;
+  font: 700 11.5px 'Plus Jakarta Sans', sans-serif;
   pointer-events: none;
 }
 
@@ -621,14 +645,13 @@
   }
   #campaign_card .cmp-type small { margin-left: auto; }
   #campaign_card .cmp-tier {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 28px;
     grid-template-areas:
-      "min max"
-      "pct pct"
-      "rm rm";
+      "min max rm"
+      "pct pct pct";
   }
   #campaign_card .cmp-tier > div:nth-child(1) { grid-area: min; }
   #campaign_card .cmp-tier > div:nth-child(2) { grid-area: max; }
   #campaign_card .cmp-tier > div:nth-child(3) { grid-area: pct; }
-  #campaign_card .cmp-tier > .cmp-tier-rm { grid-area: rm; width: 100%; height: 36px; }
+  #campaign_card .cmp-tier > .cmp-tier-rm { grid-area: rm; }
 }

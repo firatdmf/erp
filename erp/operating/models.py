@@ -1073,9 +1073,41 @@ class Pack(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="packs")
     pack_number = models.PositiveIntegerField()
+    code = models.CharField(max_length=100, blank=True, null=True)
+    qr_code_url = models.URLField(max_length=500, blank=True, null=True)
 
     class Meta:
         unique_together = ("order", "pack_number")  # prevent duplicates
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if not self.code:
+            order_num = self.order.order_number or f"ORD{self.order.pk}"
+            self.code = f"PK-{order_num}-{self.pack_number}"
+        super().save(*args, **kwargs)
+        if is_new and not self.qr_code_url:
+            try:
+                import json
+                import tempfile
+                import segno
+                from marketing.utils.bunny_storage import upload_to_bunny
+                
+                payload = {
+                    "pack_id": self.pk,
+                    "code": self.code,
+                    "order_id": self.order.pk,
+                    "pack_number": self.pack_number
+                }
+                qr = segno.make(json.dumps(payload))
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+                    qr.save(temp_file.name, scale=5)
+                    path = f"media/orders/{self.order.pk}/packs/{self.pk}/qr_{self.pk}.png"
+                    with open(temp_file.name, 'rb') as f:
+                        url = upload_to_bunny(f, path)
+                self.qr_code_url = url
+                Pack.objects.filter(pk=self.pk).update(qr_code_url=url)
+            except Exception as e:
+                print(f"Error generating pack QR code: {e}")
 
 
 class PackedItem(models.Model):

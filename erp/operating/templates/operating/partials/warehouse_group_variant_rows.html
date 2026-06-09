@@ -1,0 +1,34 @@
+{% load i18n %}
+{% for p in variants %}
+<tr class="wh-vrow" style="cursor:pointer;"
+    onclick="window.location='{% url 'operating:warehouse_product_detail' warehouse.pk p.pk %}'">
+  <td style="padding-left:34px;">
+    <div class="pname" style="font-weight:600;">{{ p.name }}</div>
+    {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
+  </td>
+  <td>{% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td><span class="mono">{{ p.barcode|default:"—" }}</span></td>
+  <td class="num">
+    <span class="qty">{{ p.quantity|floatformat:2 }} m</span>
+    {% if p.roll_count %}
+      <div class="rolls-pill" title="{% trans 'Rolls (tops / coupons)' %}">
+        <i class="fa fa-layer-group"></i>{{ p.roll_count }} {% blocktrans count counter=p.roll_count %}top{% plural %}top{% endblocktrans %}
+      </div>
+    {% endif %}
+  </td>
+  <td class="num">
+    {% if p.purchase_price %}
+      <span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>
+    {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+  </td>
+  <td class="num">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num">{% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+</tr>
+{% empty %}
+<tr><td colspan="7" style="padding:12px 34px; color:#94A3B8;">{% trans "No variants." %}</td></tr>
+{% endfor %}
+{% if truncated %}
+<tr><td colspan="7" style="padding:10px 34px; color:#94A3B8; background:#FBFCFE;">
+  {% blocktrans %}Showing first {{ shown }} of {{ total }} variants — use search to narrow down.{% endblocktrans %}
+</td></tr>
+{% endif %}

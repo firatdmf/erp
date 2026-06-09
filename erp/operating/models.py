@@ -848,6 +848,19 @@ class WarehouseProduct(models.Model):
         help_text="Unit cost in TRY"
     )
 
+    # The hidden marketing ProductVariant this warehouse item maps to.
+    # A scanned roll is really a *variant* (MRK-coded, with stock); its
+    # parent marketing.Product groups all variants of the same base name.
+    # Lets the warehouse list group by main product and keeps re-scans
+    # de-duplicated. SET_NULL so deleting a catalog variant never wipes stock.
+    catalog_variant = models.ForeignKey(
+        "marketing.ProductVariant",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="warehouse_products",
+        help_text="Hidden marketing ProductVariant auto-created from roll scans.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

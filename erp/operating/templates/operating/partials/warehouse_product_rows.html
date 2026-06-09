@@ -1,49 +1,35 @@
 {% load i18n %}
-{% for p in products %}
-<tr style="cursor: pointer;" onclick="window.location='{% url 'operating:warehouse_product_detail' warehouse.pk p.pk %}'">
+{% for g in groups %}
+{% with gid=forloop.counter %}
+<tr class="wh-grp" style="cursor:pointer; background:#FBFCFE;"
+    onclick="toggleWhGroup(this, {{ gid }}, '{% url 'operating:warehouse_group_variants' warehouse.pk %}?base={{ g.base|urlencode }}')">
   <td>
-    <div class="pname">{{ p.name }}</div>
-    {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
-  </td>
-  <td>
-    {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
-  </td>
-  <td><span class="mono">{{ p.barcode|default:"—" }}</span></td>
-  <td class="num">
-    <span class="qty">{{ p.quantity|floatformat:2 }} m</span>
-    {% with rcount=p.rolls.count %}
-      {% if rcount %}
-        <div class="rolls-pill" title="{% trans 'Rolls (tops)' %}">
-          <i class="fa fa-layer-group"></i>{{ rcount }} {% blocktrans count counter=rcount %}top{% plural %}top{% endblocktrans %}
+    <div style="display:flex; align-items:center; gap:9px;">
+      <i class="fa fa-chevron-right wh-grp-chev" style="color:#94A3B8; transition:transform .15s; width:10px;"></i>
+      <div>
+        <div class="pname">{{ g.title }}</div>
+        <div class="psub">
+          {{ g.variant_count }} {% blocktrans count c=g.variant_count %}variant{% plural %}variants{% endblocktrans %}
+          {% if not g.is_catalog %} · <span style="color:#C5A572;">{% trans "unlinked" %}</span>{% endif %}
         </div>
-      {% endif %}
-    {% endwith %}
+      </div>
+    </div>
   </td>
-  <td class="num">
-    {% if p.purchase_price %}
-      <span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>
-    {% else %}
-      <span style="color:#C5CCD3;">—</span>
-    {% endif %}
-  </td>
-  <td class="num">
-    {% with t=p.total_cost_usd %}
-      {% if t %}<span class="cost-usd">${{ t|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
-    {% endwith %}
-  </td>
-  <td class="num">
-    {% with t=p.total_cost_try %}
-      {% if t %}<span class="cost-try">₺{{ t|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
-    {% endwith %}
-  </td>
+  <td><span style="color:#C5CCD3;">—</span></td>
+  <td><span style="color:#C5CCD3;">—</span></td>
+  <td class="num"><span class="qty">{{ g.total_qty|floatformat:2 }} m</span></td>
+  <td class="num"><span style="color:#C5CCD3;">—</span></td>
+  <td class="num">{% if g.total_usd %}<span class="cost-usd">${{ g.total_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num">{% if g.total_try %}<span class="cost-try">₺{{ g.total_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>
+{% endwith %}
 {% empty %}
 <tr>
   <td colspan="7">
     <div class="od-empty">
       <i class="fa fa-box-open empty-ico"></i>
       <h4>{% trans "No products in this warehouse" %}</h4>
-      <p>{% trans 'Click "Sync Products" to load from an Excel file.' %}</p>
+      <p>{% trans 'Click "Sync Products" to load from an Excel file, or scan a roll.' %}</p>
     </div>
   </td>
 </tr>

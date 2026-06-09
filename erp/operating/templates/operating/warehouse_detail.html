@@ -427,6 +427,7 @@
   .rs-body {
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);   /* cap row to shell height so .rs-side scrolls */
     gap: 0;
     flex: 1; min-height: 0;
   }
@@ -462,6 +463,11 @@
     font: 600 12px var(--font-sans); letter-spacing: 0.02em;
     padding: 4px 10px; border-radius: 999px;
   }
+  /* CRITICAL: elements like .rs-processing/.rs-idle set display:flex, which
+     overrides the browser's [hidden]{display:none}. Force hidden to win so
+     the spinner only shows while it's explicitly un-hidden (during OCR). */
+  .rs-overlay [hidden] { display: none !important; }
+
   .rs-flash {
     position: absolute; inset: 0;
     background: white;
@@ -469,13 +475,19 @@
     transition: opacity 80ms ease;
   }
   .rs-flash.on { opacity: 0.85; }
+  /* Processing: just a small spinner chip on the LIVE camera — no full
+     dark overlay. Appears on capture, hidden when OCR completes. */
   .rs-processing {
     position: absolute; inset: 0;
-    background: rgba(15,23,31,0.75);
-    color: white;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px;
-    font: 600 13px var(--font-sans);
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .rs-proc-chip {
+    display: inline-flex; align-items: center; gap: 9px;
+    background: rgba(15,23,31,0.62); color: white;
+    padding: 9px 16px; border-radius: 999px;
+    font: 600 12.5px var(--font-sans);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
   }
   .rs-cam-foot {
     padding: 12px 16px;
@@ -509,7 +521,8 @@
     display: flex; flex-direction: column;
     background: #FAFBFD;
     border-left: 1px solid #E2E8EE;
-    overflow: hidden;
+    overflow-y: auto;            /* scroll the whole confirm/recent column */
+    min-height: 0;
   }
 
   .rs-confirm, .rs-idle {
@@ -565,6 +578,20 @@
   .rs-match.new {
     background: #FEF3C7; color: #8B5A00; border-color: #F5D78B;
   }
+  /* Catalog main-product autocomplete dropdown */
+  .rs-ac-drop {
+    position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 30;
+    background: white; border: 1px solid #E2E8EE; border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(15,23,31,0.12);
+    max-height: 200px; overflow-y: auto; padding: 4px;
+  }
+  .rs-ac-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 9px; border-radius: 6px; cursor: pointer;
+    font: 600 12.5px var(--font-sans); color: #0F1419;
+  }
+  .rs-ac-item:hover { background: var(--nejum-teal-50); }
+  .rs-ac-item .rs-ac-vc { font: 500 11px var(--font-sans); color: var(--gray-500); flex-shrink: 0; }
   .rs-confirm-actions {
     display: flex; gap: 8px; margin-top: 12px;
   }
@@ -597,7 +624,7 @@
   }
 
   .rs-recent {
-    flex: 1; min-height: 0;
+    flex: 0 0 auto;              /* natural height — scrolls with .rs-side */
     display: flex; flex-direction: column;
   }
   .rs-recent-h {
@@ -645,11 +672,15 @@
     color: var(--gray-400);
   }
 
-  /* Mobile / narrow: stack the panels */
+  /* Mobile / narrow: stack the panels — scroll the whole body instead. */
   @media (max-width: 860px) {
-    .rs-body { grid-template-columns: 1fr; }
+    .rs-body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto;
+      overflow-y: auto;
+    }
     .rs-cam { min-height: 360px; }
-    .rs-side { border-left: none; border-top: 1px solid #E2E8EE; }
+    .rs-side { border-left: none; border-top: 1px solid #E2E8EE; overflow-y: visible; }
   }
 
   /* ── True mobile (<= 720px): full-viewport sheet, scrollable side
@@ -1032,8 +1063,10 @@
           </div>
           <div id="rsFlash" class="rs-flash" hidden></div>
           <div id="rsProcessing" class="rs-processing" hidden>
-            <i class="fa fa-spinner fa-spin fa-2x"></i>
-            <div>{% trans "Reading label…" %}</div>
+            <div class="rs-proc-chip">
+              <i class="fa fa-spinner fa-spin"></i>
+              <span>{% trans "Reading label…" %}</span>
+            </div>
           </div>
         </div>
         <div class="rs-cam-foot">
@@ -1079,6 +1112,43 @@
             <label>{% trans "Lot number (optional)" %}</label>
             <input id="rsLot" type="text" class="rs-input" autocomplete="off">
           </div>
+
+          <!-- Catalog: opt-in (default ON) to also add this roll to the
+               marketing catalog as a hidden variant of a main product. -->
+          <div class="rs-fld" style="border-top:1px dashed #E2E8EE; padding-top:12px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+              <input type="checkbox" id="rsCatSync" checked onchange="toggleCatSync()" style="width:auto; cursor:pointer;">
+              <span>{% trans "Also add to catalog (Products)" %}</span>
+            </label>
+          </div>
+          <div id="rsCatFields">
+            <div class="rs-fld">
+              <label>
+                {% trans "Catalog — main product" %}
+                <span id="rsCatBadge" class="rs-match" style="display:none; margin-left:6px;"></span>
+              </label>
+              <div style="position:relative;">
+                <input id="rsCatBase" type="text" class="rs-input" autocomplete="off"
+                       placeholder="{% trans 'Search or type a main product (e.g. MT-3016)' %}"
+                       oninput="onCatBaseInput()" onfocus="onCatBaseInput()"
+                       onblur="setTimeout(function(){var d=document.getElementById('rsCatDrop'); if(d)d.style.display='none';},160)">
+                <div id="rsCatDrop" class="rs-ac-drop" style="display:none;"></div>
+              </div>
+            </div>
+            <div class="rs-fld">
+              <label>{% trans "Variant attribute" %}</label>
+              <div style="display:flex; gap:6px;">
+                <select id="rsCatAttr" class="rs-input" style="flex:0 0 110px; cursor:pointer;">
+                  <option value="color">{% trans "Color" %}</option>
+                  <option value="model">{% trans "Model" %}</option>
+                </select>
+                <input id="rsCatValue" type="text" class="rs-input" style="flex:1;" autocomplete="off"
+                       placeholder="{% trans 'e.g. SILVER' %}">
+              </div>
+              <div id="rsCatHint" style="font-size:11px; color:var(--gray-500); margin-top:3px;"></div>
+            </div>
+          </div>
+
           <div class="rs-fld">
             <label>
               {% trans "Purchase price" %}
@@ -1136,6 +1206,42 @@
   const csrftoken = '{{ csrf_token }}';
   const importUrl = "{% url 'operating:warehouse_product_import' warehouse.pk %}";
   let whSelectedFile = null;
+
+  // Expand/collapse a main-product group. Variants are lazy-loaded once
+  // (a base can hold thousands), then cached and just shown/hidden.
+  function toggleWhGroup(headerEl, gid, url) {
+    const chev = headerEl.querySelector('.wh-grp-chev');
+    const existing = document.querySelectorAll('.whg-rows-' + gid);
+    if (existing.length) {
+      const hidden = existing[0].style.display === 'none';
+      existing.forEach(function (r) { r.style.display = hidden ? '' : 'none'; });
+      if (chev) chev.style.transform = hidden ? 'rotate(90deg)' : '';
+      return;
+    }
+    if (chev) chev.style.transform = 'rotate(90deg)';
+    headerEl.insertAdjacentHTML('afterend',
+      '<tr class="whg-rows-' + gid + ' whg-loading"><td colspan="7" '
+      + 'style="padding:12px 34px;color:#94A3B8;font:500 12.5px var(--font-sans);">'
+      + '<i class="fa fa-spinner fa-spin"></i> …</td></tr>');
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        document.querySelectorAll('.whg-rows-' + gid + '.whg-loading').forEach(function (r) { r.remove(); });
+        const tmp = document.createElement('tbody');
+        tmp.innerHTML = html;
+        const frag = document.createDocumentFragment();
+        Array.from(tmp.children).forEach(function (tr) {
+          tr.classList.add('whg-rows-' + gid);
+          frag.appendChild(tr);
+        });
+        headerEl.parentNode.insertBefore(frag, headerEl.nextSibling);
+      })
+      .catch(function () {
+        document.querySelectorAll('.whg-rows-' + gid + '.whg-loading').forEach(function (r) {
+          r.querySelector('td').innerHTML = '<span style="color:#B23B12;">Yüklenemedi</span>';
+        });
+      });
+  }
 
   function onWhSortChange() {
     htmx.trigger(document.body, 'whFilterChanged');
@@ -1197,12 +1303,58 @@
 
   // ─── Roll Scanner ─────────────────────────────────────────
   const scanUrl = "{% url 'operating:warehouse_roll_scan' warehouse.pk %}";
+  const catalogSearchUrl = "{% url 'operating:catalog_base_search' warehouse.pk %}";
   let rsStream = null;
   let rsLastSku = null;
   let rsLastSkuAt = 0;
   let rsSession = { count: 0, meters: 0 };
   // Hold the most recent OCR/parse result so saveRoll() can post raw text too.
   let rsPending = null;
+  // Selected existing main product id from the catalog autocomplete ('' = free text).
+  let rsCatBaseId = '';
+  let rsCatSearchTimer = null;
+
+  function rsEscapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function onCatBaseInput() {
+    rsCatBaseId = '';   // typing = free text unless a suggestion is picked
+    const inp = document.getElementById('rsCatBase');
+    const drop = document.getElementById('rsCatDrop');
+    const q = (inp.value || '').trim();
+    clearTimeout(rsCatSearchTimer);
+    if (q.length < 1) { drop.style.display = 'none'; drop.innerHTML = ''; return; }
+    rsCatSearchTimer = setTimeout(function () {
+      fetch(catalogSearchUrl + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          const items = (d && d.results) || [];
+          if (!items.length) { drop.style.display = 'none'; drop.innerHTML = ''; return; }
+          drop.innerHTML = items.map(function (it) {
+            const t = rsEscapeHtml(it.title);
+            return '<div class="rs-ac-item" data-id="' + it.id + '" data-title="' + t + '" '
+              + 'onmousedown="pickCatBase(this)"><span>' + t + '</span>'
+              + '<span class="rs-ac-vc">' + it.variants + ' var.</span></div>';
+          }).join('');
+          drop.style.display = '';
+        }).catch(function () { drop.style.display = 'none'; });
+    }, 250);
+  }
+  function pickCatBase(el) {
+    rsCatBaseId = el.getAttribute('data-id') || '';
+    document.getElementById('rsCatBase').value = el.getAttribute('data-title') || '';
+    document.getElementById('rsCatDrop').style.display = 'none';
+    const cb = document.getElementById('rsCatBadge');
+    if (cb) { cb.style.display = ''; cb.className = 'rs-match'; cb.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "existing" %}'; }
+  }
+  // Show/hide the catalog detail fields when the "add to catalog" box toggles.
+  function toggleCatSync() {
+    const on = document.getElementById('rsCatSync')?.checked;
+    const fields = document.getElementById('rsCatFields');
+    if (fields) fields.style.display = on ? '' : 'none';
+  }
 
   function openRollScanner() {
     const overlay = document.getElementById('rollScannerOverlay');
@@ -1277,18 +1429,8 @@
         document.getElementById('rsProcessing').hidden = true;
         return;
       }
-      // Freeze the captured frame as a still — covers the live video
-      // so the user sees exactly what was sent for OCR. Cleared on
-      // cancelConfirm() or after a successful save.
-      try {
-        const frozen = document.getElementById('rsFrozen');
-        if (frozen) {
-          if (frozen._url) URL.revokeObjectURL(frozen._url);
-          frozen._url = URL.createObjectURL(blob);
-          frozen.src = frozen._url;
-          frozen.classList.add('show');
-        }
-      } catch (_) {}
+      // Keep the LIVE camera running (no dark frozen still) — only the
+      // small spinner chip shows while OCR runs, then disappears.
       const fd = new FormData();
       fd.append('image', blob, 'capture.jpg');
       fd.append('commit', 'false');
@@ -1328,7 +1470,7 @@
     const bcInp = document.getElementById('rsBarcode');
     if (bcInp) bcInp.value = parsed.barcode || '';
     const lotInp = document.getElementById('rsLot');
-    if (lotInp) lotInp.value = parsed.lot_number || '';
+    if (lotInp) lotInp.value = parsed.lot_number || parsed.coupon || '';
     document.getElementById('rsRaw').textContent = data.ocr_raw || '(no text recognised)';
     // Match badge
     const badge = document.getElementById('rsMatchBadge');
@@ -1343,6 +1485,28 @@
       badge.classList.add('new');
       badge.innerHTML = '<i class="fa fa-plus-circle"></i> No match — will create a new product';
     }
+    // Catalog preview: base product (new/existing) + variant attribute.
+    const cp = data.catalog_preview || {};
+    rsCatBaseId = '';  // free text by default — backend matches by title
+    var catSyncEl = document.getElementById('rsCatSync');
+    if (catSyncEl) catSyncEl.checked = true;   // default ON for every new scan
+    toggleCatSync();
+    document.getElementById('rsCatDrop').style.display = 'none';
+    document.getElementById('rsCatBase').value = cp.base_name || '';
+    document.getElementById('rsCatAttr').value = cp.attribute_name || 'color';
+    document.getElementById('rsCatValue').value = cp.attribute_value || '';
+    const cb = document.getElementById('rsCatBadge');
+    if (cp.base_name) {
+      cb.style.display = '';
+      cb.className = 'rs-match' + (cp.base_exists ? '' : ' new');
+      cb.innerHTML = cp.base_exists
+        ? '<i class="fa fa-check-circle"></i> {% trans "existing" %}'
+        : '<i class="fa fa-plus-circle"></i> {% trans "new" %}';
+    } else { cb.style.display = 'none'; }
+    const hint = document.getElementById('rsCatHint');
+    hint.textContent = (cp.is_color && cp.original_token && cp.attribute_value
+        && cp.original_token.toUpperCase() !== cp.attribute_value.toUpperCase())
+      ? ('{% trans "translated from" %} ' + cp.original_token + ' → ' + cp.attribute_value) : '';
     // Auto-focus meters if it came back null, else SKU.
     setTimeout(function () {
       (parsed.meters ? document.getElementById('rsMeters') : document.getElementById('rsMeters')).focus();
@@ -1363,10 +1527,20 @@
       }
     } catch (_) {}
     // Clear the per-roll fields so the next scan doesn't inherit them.
-    ['rsSku','rsName','rsMeters','rsBarcode','rsLot','rsPrice'].forEach(function(id){
+    ['rsSku','rsName','rsMeters','rsBarcode','rsLot','rsPrice','rsCatBase','rsCatValue','rsCatHint'].forEach(function(id){
       var el = document.getElementById(id);
-      if (el) el.value = '';
+      if (el) { if (el.tagName === 'DIV') el.textContent = ''; else el.value = ''; }
     });
+    var attrEl = document.getElementById('rsCatAttr');
+    if (attrEl) attrEl.value = 'color';
+    var cbEl = document.getElementById('rsCatBadge');
+    if (cbEl) cbEl.style.display = 'none';
+    rsCatBaseId = '';
+    var dropEl = document.getElementById('rsCatDrop');
+    if (dropEl) { dropEl.style.display = 'none'; dropEl.innerHTML = ''; }
+    var catSyncEl2 = document.getElementById('rsCatSync');
+    if (catSyncEl2) catSyncEl2.checked = true;   // reset to default ON
+    toggleCatSync();
     // Reset currency to the default (TRY) for the next entry.
     var curEl = document.getElementById('rsCurrency');
     if (curEl) curEl.value = 'TRY';
@@ -1416,6 +1590,12 @@
     if (price)   fd.append('purchase_price', price);
     if (currency) fd.append('purchase_currency', currency);
     fd.append('ocr_raw', rsPending.ocr_raw);
+    // Catalog (main product + variant) overrides from the confirm panel.
+    fd.append('catalog_sync', document.getElementById('rsCatSync')?.checked ? '1' : '0');
+    fd.append('catalog_base_name', (document.getElementById('rsCatBase')?.value || '').trim());
+    fd.append('catalog_attribute', (document.getElementById('rsCatAttr')?.value || '').trim());
+    fd.append('catalog_value', (document.getElementById('rsCatValue')?.value || '').trim());
+    if (rsCatBaseId) fd.append('catalog_base_product_id', rsCatBaseId);
 
     fetch(scanUrl, {
       method: 'POST',
@@ -1435,6 +1615,9 @@
         rsSession.count += 1;
         rsSession.meters += parseFloat(meters);
         updateRecentList(data);
+        if (data.catalog_warning) {
+          alert('{% trans "Saved to warehouse, but catalog sync warning" %}:\n' + data.catalog_warning);
+        }
         // Reset back to camera-ready state.
         cancelConfirm();
       })

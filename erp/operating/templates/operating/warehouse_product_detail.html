@@ -487,6 +487,9 @@
       </div>
     </div>
     <div class="od-head-r">
+      <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
+        <i class="fa fa-qrcode"></i>{% trans "Print label" %}
+      </a>
       <button type="button" class="ord-btn ghost" onclick="document.getElementById('soOverlay').classList.add('show')">
         <i class="fa fa-arrow-up-from-bracket"></i>{% trans "Record stock out" %}
       </button>
@@ -540,7 +543,7 @@
               <th>{% trans "Length" %}</th>
               <th>{% trans "Status" %}</th>
               <th>{% trans "Scanned" %}</th>
-              <th style="width:44px;"></th>
+              <th style="width:78px;"></th>
             </tr>
           </thead>
           <tbody>
@@ -580,15 +583,22 @@
                 <span class="roll-time">{{ r.scanned_at|date:"M d, Y" }}<br><small>{{ r.scanned_at|date:"H:i" }}{% if r.scanned_by %} · {{ r.scanned_by.username }}{% endif %}</small></span>
               </td>
               <td>
-                <button type="button"
-                        class="roll-delete-btn"
-                        title="{% trans 'Delete this roll' %}"
-                        data-roll-id="{{ r.pk }}"
-                        data-roll-label="{% if r.barcode %}{{ r.barcode }}{% else %}#{{ r.pk }}{% endif %}"
-                        data-remaining="{% if r.meters_remaining is not None %}{{ r.meters_remaining }}{% else %}{{ r.meters|default:0 }}{% endif %}"
-                        onclick="openRollDelete(this)">
-                  <i class="fa fa-trash"></i>
-                </button>
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <a class="roll-delete-btn" style="color:var(--gray-600);"
+                     href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}?roll={{ r.pk }}"
+                     target="_blank" rel="noopener" title="{% trans 'Print label' %}">
+                    <i class="fa fa-qrcode"></i>
+                  </a>
+                  <button type="button"
+                          class="roll-delete-btn"
+                          title="{% trans 'Delete this roll' %}"
+                          data-roll-id="{{ r.pk }}"
+                          data-roll-label="{% if r.barcode %}{{ r.barcode }}{% else %}#{{ r.pk }}{% endif %}"
+                          data-remaining="{% if r.meters_remaining is not None %}{{ r.meters_remaining }}{% else %}{{ r.meters|default:0 }}{% endif %}"
+                          onclick="openRollDelete(this)">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </div>
               </td>
             </tr>
             {% endfor %}
@@ -679,6 +689,19 @@
             <span class="info-k">{% trans "Warehouse" %}</span>
             <span class="info-v">{{ warehouse.name }}</span>
           </div>
+        </div>
+        <!-- Scannable codes (QR + Code128), like the physical label -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:16px; padding:14px 12px 4px; border-top:1px solid #EEF1F5; margin-top:6px;">
+          <img src="{% url 'operating:warehouse_product_code' warehouse.pk product.pk %}?kind=qr"
+               alt="QR" loading="lazy" title="{% trans 'Scan to open this product' %}" style="width:120px; height:120px;">
+          <img src="{% url 'operating:warehouse_product_code' warehouse.pk product.pk %}?kind=barcode"
+               alt="Barcode" loading="lazy" style="height:58px; max-width:180px; object-fit:contain;">
+        </div>
+        <div style="text-align:center; padding-bottom:10px;">
+          <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener"
+             style="font:600 12px var(--font-sans); color:var(--nejum-teal-700); text-decoration:none;">
+            <i class="fa fa-qrcode"></i> {% trans "Print label (PDF)" %}
+          </a>
         </div>
       </section>
 

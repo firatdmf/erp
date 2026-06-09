@@ -29,6 +29,15 @@ def _env(key, default=None):
         return default
 
 
+def _tr_upper(s):
+    """Turkish-aware uppercase: i→İ and ı→I (Python's str.upper() turns
+    i→I, dropping the dot). Used for SKUs like 'K48083İ.G93' so the dotted
+    İ survives instead of becoming a dotless I."""
+    if not s:
+        return s
+    return s.replace("ı", "I").replace("i", "İ").upper()
+
+
 def _safe_decimal(value, default=None):
     """Convert any cell value to Decimal, returning default on failure."""
     if value is None or value == '':
@@ -251,28 +260,65 @@ class WarehouseDetail(View):
         sort = (request.GET.get('sort') or 'name_asc').strip()
         page_num = request.GET.get('page', '1')
 
-        products = WarehouseProduct.objects.filter(warehouse=warehouse).annotate(
-            _total_usd=F('quantity') * F('cost_usd'),
-            _total_try=F('quantity') * F('cost_try'),
-        )
+        from django.db.models import Q, Func, Value, CharField
 
+        class _SplitPart(Func):
+            # Postgres split_part(name, ' ', 1) → text before the first space
+            # = the MAIN product code (e.g. "MT-3016 GÜMÜŞ" → "MT-3016").
+            function = "split_part"
+            output_field = CharField()
+
+        base_expr = _SplitPart("name", Value(" "), Value(1))
+
+        base_qs = WarehouseProduct.objects.filter(warehouse=warehouse)
         if search:
-            from django.db.models import Q
-            products = products.filter(
+            base_qs = base_qs.filter(
                 Q(name__icontains=search) | Q(sku__icontains=search) | Q(barcode__icontains=search)
             )
 
-        order_by = SORT_OPTIONS.get(sort, SORT_OPTIONS['name_asc'])[0]
-        products = products.order_by(order_by, 'id')
+        # ── Group in SQL by main product (base name). One row per group →
+        #    cheap to paginate even with thousands of variants. Each group
+        #    expands to its variants (stock / SKU / rolls=tops/coupons). ──
+        grouped = (base_qs.annotate(base=base_expr).values("base").annotate(
+            variant_count=Count("id"),
+            linked=Count("catalog_variant"),
+            total_qty=Coalesce(Sum("quantity"), Decimal("0"),
+                               output_field=DecimalField(max_digits=18, decimal_places=2)),
+            total_usd=Coalesce(Sum(F("quantity") * F("cost_usd")), Decimal("0"),
+                               output_field=DecimalField(max_digits=20, decimal_places=4)),
+            total_try=Coalesce(Sum(F("quantity") * F("cost_try")), Decimal("0"),
+                               output_field=DecimalField(max_digits=20, decimal_places=4)),
+        ))
+        _sort_map = {
+            "name_asc": "base", "name_desc": "-base",
+            "qty_asc": "total_qty", "qty_desc": "-total_qty",
+            "price_asc": "total_usd", "price_desc": "-total_usd",
+            "total_usd_asc": "total_usd", "total_usd_desc": "-total_usd",
+            "total_try_asc": "total_try", "total_try_desc": "-total_try",
+        }
+        grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
 
-        # Paginate AFTER filter+sort, BEFORE rendering
-        paginator = Paginator(products, PAGE_SIZE)
+        # Paginate the GROUPS (main products), not the variant rows.
+        paginator = Paginator(grouped, PAGE_SIZE)
         try:
             page = paginator.page(int(page_num))
         except (PageNotAnInteger, ValueError):
             page = paginator.page(1)
         except EmptyPage:
             page = paginator.page(paginator.num_pages or 1)
+
+        # Only the group HEADERS render up-front — variants load lazily on
+        # expand (a single base can hold thousands of variants, so rendering
+        # them all would freeze the page).
+        groups_render = [{
+            "base": g["base"] or "",
+            "title": g["base"] or "—",
+            "variant_count": g["variant_count"],
+            "total_qty": g["total_qty"],
+            "total_usd": g["total_usd"],
+            "total_try": g["total_try"],
+            "is_catalog": (g.get("linked") or 0) > 0,
+        } for g in page.object_list]
 
         # Aggregate totals across the whole warehouse (independent of
         # filter). Net-worth uses the model methods so products that
@@ -287,13 +333,14 @@ class WarehouseDetail(View):
 
         ctx = {
             'warehouse': warehouse,
-            'products': page.object_list,  # current page only
+            'groups': groups_render,  # main-product groups on this page
             'page': page,
             'paginator': paginator,
             'total_value_usd': total_value_usd,
             'total_value_try': total_value_try,
             'product_count': counts['n'],
             'total_quantity': counts['qty'],
+            'group_count': paginator.count,
             'search': search,
             'sort': sort,
             'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
@@ -305,6 +352,57 @@ class WarehouseDetail(View):
             return render(request, "operating/partials/warehouse_product_table_body.html", ctx)
 
         return render(request, self.template_name, ctx)
+
+
+@login_required
+def warehouse_group_variants(request, pk):
+    """Lazy-load the variant rows for ONE main-product group (base name).
+
+    Returned as raw <tr> rows injected into the group's <tbody> when the
+    user expands it — keeps the initial page light even when a base holds
+    thousands of variants.
+    """
+    from django.db.models import Func, Value, CharField, Count, F
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    base = request.GET.get("base", "")
+
+    class _SplitPart(Func):
+        function = "split_part"
+        output_field = CharField()
+
+    base_expr = _SplitPart("name", Value(" "), Value(1))
+    CAP = 400
+    qs = (WarehouseProduct.objects.filter(warehouse=warehouse)
+          .annotate(base=base_expr, roll_count=Count("rolls"),
+                    line_usd=F("quantity") * F("cost_usd"),
+                    line_try=F("quantity") * F("cost_try"))
+          .filter(base=base).order_by("name", "id"))
+    total = qs.count()
+    variants = list(qs[:CAP])
+    return render(request, "operating/partials/warehouse_group_variant_rows.html", {
+        "warehouse": warehouse,
+        "variants": variants,
+        "truncated": total > CAP,
+        "shown": len(variants),
+        "total": total,
+        "base": base,
+    })
+
+
+@login_required
+def catalog_base_search(request, pk):
+    """Autocomplete for the scan screen's "Catalog — main product" field.
+    Returns hidden catalog products (featured=False) matching the query so
+    staff can attach a scanned variant to an EXISTING main product."""
+    from django.db.models import Count
+    from marketing.models import Product
+    q = (request.GET.get("q") or "").strip()
+    results = []
+    if q:
+        qs = (Product.objects.filter(featured=False, title__icontains=q)
+              .annotate(vc=Count("variants")).order_by("title")[:12])
+        results = [{"id": p.id, "title": p.title, "variants": p.vc} for p in qs]
+    return JsonResponse({"results": results})
 
 
 @method_decorator(login_required, name='dispatch')
@@ -590,18 +688,21 @@ def _ocr_label_claude(image_file):
         "This is a photo of a Turkish fabric roll label. Extract these "
         "fields and return ONLY a single JSON object — no commentary, "
         "no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "meters": 48.5}\n\n'
+        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
         "Field rules:\n"
         "- sku: the product CODE. Usually an uppercase prefix + zeros + digits "
-        "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9'). It is printed on the "
-        "label, NOT the long number under the barcode. If the SKU starts "
-        "with a Turkish letter (İ, Ş, Ğ, etc.), preserve it exactly.\n"
+        "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9', 'K48083İ.G93'). It is "
+        "printed on the label, NOT the long number under the barcode. If the "
+        "SKU contains a Turkish dotted İ, preserve it exactly (İ, not I).\n"
         "- name: the product/fabric name as printed — typically a model "
-        "name + colour (e.g. 'S-LINE 1106 EKRU', 'Kadife Krem'). Do NOT "
+        "name + colour (e.g. 'S-LINE 1106 EKRU', 'GREK TÜL'). Do NOT "
         "include the brand name (KARVEN, etc.) here.\n"
         "- meters: roll length as a decimal number. Turkish labels write "
         "'25,00 Metre' or '48,5 m' — interpret comma as decimal point, so "
-        "'25,00' → 25.0, '48,5' → 48.5. Do not include the unit.\n\n"
+        "'25,00' → 25.0, '48,5' → 48.5. Do not include the unit.\n"
+        "- color: the colour/variant text if printed on its own line "
+        "(e.g. 'AÇIK KREM', 'EKRU', 'GÜMÜŞ'); else null.\n"
+        "- coupon: the value after 'Kupon No' / 'Kupon' if present; else null.\n\n"
         "If a field is illegible or absent, set it to null. "
         "Do not invent values."
     )
@@ -662,7 +763,7 @@ def _ocr_label_claude(image_file):
 
     sku = (data.get("sku") or None)
     if sku:
-        sku = str(sku).strip().upper() or None
+        sku = _tr_upper(str(sku).strip()) or None
     name = (data.get("name") or None)
     if name:
         name = str(name).strip() or None
@@ -677,8 +778,15 @@ def _ocr_label_claude(image_file):
         import re as _re
         cleaned = _re.sub(r"\D", "", str(barcode))
         barcode = cleaned or None
+    color = (data.get("color") or None)
+    if color:
+        color = str(color).strip() or None
+    coupon = (data.get("coupon") or None)
+    if coupon:
+        coupon = str(coupon).strip() or None
 
-    return text_out, {"sku": sku, "name": name, "meters": meters, "barcode": barcode}
+    return text_out, {"sku": sku, "name": name, "meters": meters,
+                      "barcode": barcode, "color": color, "coupon": coupon}
 
 
 def _ocr_label_gemini(image_file):
@@ -720,7 +828,7 @@ def _ocr_label_gemini(image_file):
         "what is printed in THIS image — do not invent, do not "
         "remember anything from previous images. Return ONLY a single "
         "JSON object — no commentary, no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "..."}\n\n'
+        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
         "LABEL STRUCTURE (top → bottom):\n"
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT, BELINO)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
@@ -747,7 +855,10 @@ def _ocr_label_gemini(image_file):
         "- barcode: the code printed directly under the barcode strip. "
         "ALPHANUMERIC — may have a letter prefix like 'KL055555' or be "
         "all digits like '017400000228'. Copy EXACTLY what is printed, "
-        "including any letters at the start. Typically 8 to 16 chars.\n\n"
+        "including any letters at the start. Typically 8 to 16 chars.\n"
+        "- color: a colour/variant printed on its own line if present "
+        "(e.g. 'AÇIK KREM', 'EKRU', 'GÜMÜŞ'); else null.\n"
+        "- coupon: the value after 'Kupon No' / 'Kupon' if present; else null.\n\n"
         "If a field is illegible or absent in THIS image, set it to "
         "null. Do not invent values."
     )
@@ -813,7 +924,7 @@ def _ocr_label_gemini(image_file):
 
     sku = (data.get("sku") or None)
     if sku:
-        sku = str(sku).strip().upper() or None
+        sku = _tr_upper(str(sku).strip()) or None
     name = (data.get("name") or None)
     if name:
         name = str(name).strip() or None
@@ -828,8 +939,15 @@ def _ocr_label_gemini(image_file):
         import re as _re
         cleaned = _re.sub(r"[^A-Za-z0-9]", "", str(barcode)).upper()
         barcode = cleaned or None
+    color = (data.get("color") or None)
+    if color:
+        color = str(color).strip() or None
+    coupon = (data.get("coupon") or None)
+    if coupon:
+        coupon = str(coupon).strip() or None
 
-    return text_out, {"sku": sku, "name": name, "meters": meters, "barcode": barcode}
+    return text_out, {"sku": sku, "name": name, "meters": meters,
+                      "barcode": barcode, "color": color, "coupon": coupon}
 
 
 def _ocr_label_xai(image_file):
@@ -878,7 +996,7 @@ def _ocr_label_xai(image_file):
         "what is printed in THIS image — do not invent, do not "
         "remember anything from previous images. Return ONLY a single "
         "JSON object — no commentary, no markdown fences:\n\n"
-        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "..."}\n\n'
+        '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
         "LABEL STRUCTURE (top → bottom):\n"
         "  1. BRAND   (e.g. KARVEN, DEMFIRAT, BELINO)  ← IGNORE, never extract\n"
         "  2. SKU     (short alphanumeric code)        → goes in 'sku'\n"
@@ -908,7 +1026,10 @@ def _ocr_label_xai(image_file):
         "ALPHANUMERIC — may have a letter prefix like 'KL055555' or "
         "be all digits like '017400000228'. Copy EXACTLY what is "
         "printed, including any letters at the start. Typically 8 to "
-        "16 chars. Different from the sku at the top.\n\n"
+        "16 chars. Different from the sku at the top.\n"
+        "- color: a colour/variant on its own line if present "
+        "(e.g. 'AÇIK KREM', 'EKRU', 'GÜMÜŞ'); else null.\n"
+        "- coupon: the value after 'Kupon No' / 'Kupon' if present; else null.\n\n"
         "If a field is illegible or genuinely not in THIS image, set "
         "it to null. Do not invent values. Do not fall back to "
         "previous-scan values."
@@ -985,7 +1106,7 @@ def _ocr_label_xai(image_file):
 
     sku = (data.get("sku") or None)
     if sku:
-        sku = str(sku).strip().upper() or None
+        sku = _tr_upper(str(sku).strip()) or None
     name = (data.get("name") or None)
     if name:
         name = str(name).strip() or None
@@ -1001,8 +1122,15 @@ def _ocr_label_xai(image_file):
         import re as _re
         cleaned = _re.sub(r"[^A-Za-z0-9]", "", str(barcode)).upper()
         barcode = cleaned or None
+    color = (data.get("color") or None)
+    if color:
+        color = str(color).strip() or None
+    coupon = (data.get("coupon") or None)
+    if coupon:
+        coupon = str(coupon).strip() or None
 
-    return text_out, {"sku": sku, "name": name, "meters": meters, "barcode": barcode}
+    return text_out, {"sku": sku, "name": name, "meters": meters,
+                      "barcode": barcode, "color": color, "coupon": coupon}
 
 
 def _ocr_label_tesseract(image_file):
@@ -1669,10 +1797,10 @@ class WarehouseProductDelete(View):
 
 @method_decorator(login_required, name='dispatch')
 class WarehouseRollDelete(View):
-    """Delete a specific roll. Before removing the row from DB we
-    record a final OUT movement so the timeline shows where the
-    meters went. If the roll still had meters_remaining the parent
-    quantity is decremented accordingly."""
+    """Delete a specific roll. This is a CORRECTION, not a sale: we log an
+    ADJUSTMENT movement (so the timeline still shows the roll was removed)
+    and decrement the parent quantity — but it must NOT count as a stock
+    OUT. Real stock-out happens later, when an order is completed."""
 
     def post(self, request, warehouse_pk, product_pk, roll_pk):
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
@@ -1693,12 +1821,13 @@ class WarehouseRollDelete(View):
             )
             product.save(update_fields=["quantity", "updated_at"])
 
-        # Movement entry. Keep `roll=None` because the FK would dangle
+        # ADJUSTMENT (correction) — NOT an "out", so it never inflates the
+        # Stock OUT total. Keep `roll=None` because the FK would dangle
         # after the delete; embed the roll's identity in the reason.
         StockMovement.objects.create(
             product=product,
             roll=None,
-            movement_type="out",
+            movement_type="adjustment",
             quantity=remaining or Decimal("0"),
             reason=f"{reason} (roll #{roll.pk}"
                    + (f" · {roll.barcode}" if roll.barcode else "")
@@ -1862,9 +1991,29 @@ class WarehouseRollScan(View):
             attempts = parsed.get("_attempts") or [{"backend": backend, "error": None}]
             print(f"[OCR] ── done ── final backend={backend}\n", flush=True)
 
+            # Catalog preview: parse the scanned name into base product +
+            # variant (color/model) and tell the UI whether that base
+            # product already exists in the marketing catalog.
+            from .catalog_sync import derive_catalog
+            from marketing.models import Product as _CatProduct
+            cp = derive_catalog(parsed.get("sku"), parsed.get("name"), parsed.get("color"))
+            base_exists = bool(
+                cp["base_name"]
+                and _CatProduct.objects.filter(title__iexact=cp["base_name"]).exists()
+            )
+            catalog_preview = {
+                "base_name": cp["base_name"],
+                "base_exists": base_exists,
+                "attribute_name": cp["attribute_name"],
+                "attribute_value": cp["attribute_value"],
+                "original_token": cp["original_token"],
+                "is_color": cp["is_color"],
+            }
+
             return JsonResponse({
                 "success": True,
                 "parsed": {k: v for k, v in parsed.items() if not k.startswith("_")},
+                "catalog_preview": catalog_preview,
                 "backend": backend,
                 "attempts": attempts,  # full fallback chain for debug panel
                 "raw": (raw or "")[:4000],  # OCR backend's raw response — for the debug panel
@@ -1896,6 +2045,23 @@ class WarehouseRollScan(View):
             return JsonResponse({"success": False, "error": "Meters must be positive"}, status=400)
         if not sku and not name:
             return JsonResponse({"success": False, "error": "SKU or name is required"}, status=400)
+
+        # Reject a re-scan of the SAME roll: each physical roll's barcode is
+        # unique, so if one already exists in this warehouse it's a duplicate
+        # scan — don't add it again. (Same SKU with a DIFFERENT barcode is a
+        # different roll of the same product and is allowed.)
+        dup_barcode = (request.POST.get("barcode") or "").strip()
+        if dup_barcode:
+            existing_roll = (WarehouseProductRoll.objects
+                             .filter(product__warehouse=warehouse, barcode=dup_barcode)
+                             .select_related("product").first())
+            if existing_roll:
+                return JsonResponse({
+                    "success": False,
+                    "duplicate": True,
+                    "error": "Bu barkod zaten okundu — tekrar eklenmedi (%s)." % (
+                        existing_roll.product.name or existing_roll.product.sku or "?"),
+                })
 
         # Find or create the WarehouseProduct in this warehouse.
         product = None
@@ -1981,6 +2147,66 @@ class WarehouseRollScan(View):
             created_by=request.user if request.user.is_authenticated else None,
         )
 
+        # ── Mirror into the hidden marketing catalog as a variant of a
+        #    main product — ONLY if the user left the "Also add to catalog"
+        #    box ticked (default ON). Unchecked → warehouse-only.
+        #    Never let a catalog hiccup roll back the stock write. ──
+        catalog_info = None
+        catalog_warning = None
+        do_catalog = (request.POST.get("catalog_sync", "1") or "1").strip().lower() not in ("0", "false", "no", "off")
+        variant_sku = (request.POST.get("catalog_variant_sku") or sku or "").strip()
+        if not do_catalog:
+            variant_sku = ""   # skip catalog sync entirely
+        if variant_sku and len(variant_sku) > 20:
+            catalog_warning = f"SKU '{variant_sku}' 20 karakteri aşıyor — katalog varyantı oluşturulmadı."
+        elif variant_sku:
+            try:
+                from .catalog_sync import (
+                    derive_catalog, sync_roll_to_catalog, CatalogSyncConflict,
+                )
+                from marketing.models import Product as _Prod
+                cp = derive_catalog(variant_sku, name, request.POST.get("catalog_color"))
+                base_name = (request.POST.get("catalog_base_name") or cp["base_name"] or name).strip()
+                attribute_name = (request.POST.get("catalog_attribute") or cp["attribute_name"] or "").strip() or None
+                attribute_value = (request.POST.get("catalog_value") or cp["attribute_value"] or "").strip() or None
+
+                existing_base = None
+                manual_pid = (request.POST.get("catalog_base_product_id") or "").strip()
+                if product.catalog_variant_id and product.catalog_variant and product.catalog_variant.product_id:
+                    existing_base = product.catalog_variant.product
+                elif manual_pid.isdigit():
+                    existing_base = _Prod.objects.filter(pk=int(manual_pid)).first()
+
+                cat_product, cat_variant, p_created, v_created = sync_roll_to_catalog(
+                    base_name=base_name,
+                    attribute_name=attribute_name,
+                    attribute_value=attribute_value,
+                    variant_sku=variant_sku,
+                    variant_barcode=barcode,
+                    quantity=product.quantity,   # mirror this variant's warehouse stock
+                    cost=product.cost_usd,
+                    existing_base_product=existing_base,
+                )
+                if not product.catalog_variant_id:
+                    product.catalog_variant = cat_variant
+                    product.save(update_fields=["catalog_variant"])
+                catalog_info = {
+                    "product_id": cat_product.id,
+                    "product_title": cat_product.title,
+                    "product_created": p_created,
+                    "variant_id": cat_variant.id,
+                    "variant_sku": cat_variant.variant_sku,
+                    "variant_created": v_created,
+                    "attribute_name": attribute_name,
+                    "attribute_value": attribute_value,
+                }
+            except CatalogSyncConflict as exc:
+                catalog_warning = str(exc)
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+                catalog_warning = f"Katalog senkron hatası: {exc}"
+
         return JsonResponse({
             "success": True,
             "roll": {
@@ -1996,4 +2222,6 @@ class WarehouseRollScan(View):
                 "quantity": float(product.quantity or 0),
                 "rolls_count": product.rolls.count(),
             },
+            "catalog": catalog_info,
+            "catalog_warning": catalog_warning,
         })

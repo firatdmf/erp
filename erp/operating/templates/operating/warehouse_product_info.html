@@ -1,0 +1,93 @@
+{% load i18n %}<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ base }}{% if variant %} · {{ variant }}{% endif %}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: #EEF2F6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #111; display: flex; align-items: flex-start; justify-content: center;
+      padding: 18px;
+    }
+    .card {
+      width: 100%; max-width: 460px; background: #fff;
+      border: 1px solid #E2E8EE; border-radius: 16px;
+      box-shadow: 0 10px 28px rgba(15,23,31,0.10);
+      padding: 22px 24px 26px;
+    }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+    .brand { font-size: 26px; font-weight: 800; letter-spacing: 2px; color: #944F05; }
+    .qr { width: 96px; height: 96px; flex-shrink: 0; }
+    .rows { margin-top: 14px; }
+    .lbl { font-size: 11px; font-weight: 600; letter-spacing: .5px; color: #6B7280; text-transform: uppercase; margin-top: 12px; }
+    .val { font-size: 19px; font-weight: 700; color: #111; margin-top: 2px; word-break: break-word; }
+    .metre-wrap { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+    .metre { text-align: right; }
+    .metre .val { font-size: 24px; }
+    .bc { margin-top: 22px; text-align: center; border-top: 1px solid #EEF1F5; padding-top: 16px; }
+    .bc img { max-width: 100%; height: 64px; object-fit: contain; }
+    .wh { margin-top: 14px; text-align: center; font-size: 12px; color: #94A3B8; }
+    .actions { margin-top: 16px; text-align: center; }
+    .actions a {
+      display: inline-block; font-size: 13px; font-weight: 600; text-decoration: none;
+      color: #005354; background: #E5F1F0; border: 1px solid #B9DAD6;
+      padding: 8px 16px; border-radius: 999px; margin: 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="top">
+      <div>
+        <div class="brand">{{ brand|upper }}</div>
+      </div>
+      <img class="qr" alt="QR"
+           src="{% url 'operating:warehouse_product_code' product.warehouse_id product.pk %}?kind=qr">
+    </div>
+
+    <div class="rows">
+      <div class="metre-wrap">
+        <div>
+          <div class="lbl">{% trans "Pattern" %}</div>
+          <div class="val">{{ base|default:"—" }}</div>
+        </div>
+      </div>
+
+      {% if variant %}
+      <div class="lbl">{% trans "Variant" %}</div>
+      <div class="val">{{ variant }}</div>
+      {% endif %}
+
+      <div class="metre-wrap">
+        <div style="flex:1;">
+          <div class="lbl">{% trans "SKU" %}</div>
+          <div class="val">{{ product.sku|default:"—" }}</div>
+        </div>
+        <div class="metre">
+          <div class="lbl">{% trans "Meters" %}</div>
+          <div class="val">{{ product.quantity|default:0|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+
+    {% if product.barcode %}
+    <div class="bc">
+      <img alt="{{ product.barcode }}"
+           src="{% url 'operating:warehouse_product_code' product.warehouse_id product.pk %}?kind=barcode">
+    </div>
+    {% endif %}
+
+    <div class="wh"><i></i>{{ product.warehouse.name }}</div>
+
+    {% if request.user.is_authenticated %}
+    <div class="actions">
+      <a href="{% url 'operating:warehouse_product_detail' product.warehouse_id product.pk %}">{% trans "Full details" %}</a>
+      <a href="{% url 'operating:warehouse_product_label' product.warehouse_id product.pk %}" target="_blank" rel="noopener">{% trans "Print label" %}</a>
+    </div>
+    {% endif %}
+  </div>
+</body>
+</html>

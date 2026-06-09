@@ -2,7 +2,8 @@ from django.urls import path
 from . import views
 from . import views_warehouse
 from . import order_excel
-from django.views.generic import TemplateView
+from . import warehouse_label
+from django.views.generic import TemplateView, RedirectView
 
 
 app_name = "operating"
@@ -13,6 +14,13 @@ urlpatterns = [
     path("warehouses/create/", views_warehouse.WarehouseCreate.as_view(), name="create_warehouse"),
     path("warehouses/create/partial/", views_warehouse.WarehouseCreatePartial.as_view(), name="create_warehouse_partial"),
     path("warehouses/<int:pk>/", views_warehouse.WarehouseDetail.as_view(), name="warehouse_detail"),
+    path("warehouses/<int:pk>/group-variants/", views_warehouse.warehouse_group_variants, name="warehouse_group_variants"),
+    path("warehouses/<int:pk>/catalog-search/", views_warehouse.catalog_base_search, name="catalog_base_search"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/", warehouse_label.warehouse_product_label, name="warehouse_product_label"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/code/", warehouse_label.warehouse_product_code, name="warehouse_product_code"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/info/", warehouse_label.warehouse_product_info, name="warehouse_product_info"),
+    # Convenience: a mistyped/stale "label/info" path still lands on the info screen.
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/label/info/", RedirectView.as_view(pattern_name="operating:warehouse_product_info", permanent=False)),
     path("warehouses/<int:pk>/edit/", views_warehouse.WarehouseEdit.as_view(), name="warehouse_edit"),
     path("warehouses/<int:pk>/import/", views_warehouse.WarehouseProductImport.as_view(), name="warehouse_product_import"),
     path("warehouses/<int:pk>/delete/", views_warehouse.WarehouseDelete.as_view(), name="warehouse_delete"),

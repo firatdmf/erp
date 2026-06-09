@@ -2244,8 +2244,9 @@
                 catch (_) {}
               }
             });
-            if (typeof wireTaskActions === 'function') {
-              try { wireTaskActions(); } catch (_) {}
+            const wireFunc = window.wireTaskActions || (typeof wireTaskActions === 'function' ? wireTaskActions : null);
+            if (wireFunc) {
+              try { wireFunc(); } catch (_) {}
             }
             if (typeof window.render === 'function') {
               try { window.render(); } catch (_) {}

@@ -250,6 +250,39 @@ SORT_OPTIONS = {
 PAGE_SIZE = 50
 
 
+def _warehouse_base_expr():
+    """Group key for the warehouse list = the MAIN product.
+
+    Linked rows use the real catalog Product title. Unlinked rows fall
+    back to the SAME rule the catalog uses (see ``derive_catalog``):
+
+      * SKU has a dot  → the part BEFORE the first dot is the main product
+        (``K24892İ.G157`` → ``K24892İ``, ``K24620.G33`` → ``K24620``).
+        This is why GREK TUL / GREK TÜL / GREK TUL FIXE must NOT merge —
+        their SKU bases (K24620 / K24892İ / K24892) differ.
+      * SKU has no dot → the name's first word (``MT-3016 GÜMÜŞ`` → ``MT-3016``).
+
+    The two branches agree with the catalog titles, so a linked roll and
+    an unlinked sibling of the same product still land in one group.
+    """
+    from django.db.models import Func, Value, CharField, Case, When, Q, F
+    from django.db.models.functions import Coalesce
+
+    class _SplitPart(Func):
+        function = "split_part"
+        output_field = CharField()
+
+    return Coalesce(
+        F("catalog_variant__product__title"),
+        Case(
+            When(Q(sku__contains="."), then=_SplitPart("sku", Value("."), Value(1))),
+            default=_SplitPart("name", Value(" "), Value(1)),
+            output_field=CharField(),
+        ),
+        output_field=CharField(),
+    )
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseDetail(View):
     template_name = "operating/warehouse_detail.html"
@@ -260,15 +293,9 @@ class WarehouseDetail(View):
         sort = (request.GET.get('sort') or 'name_asc').strip()
         page_num = request.GET.get('page', '1')
 
-        from django.db.models import Q, Func, Value, CharField
+        from django.db.models import Q
 
-        class _SplitPart(Func):
-            # Postgres split_part(name, ' ', 1) → text before the first space
-            # = the MAIN product code (e.g. "MT-3016 GÜMÜŞ" → "MT-3016").
-            function = "split_part"
-            output_field = CharField()
-
-        base_expr = _SplitPart("name", Value(" "), Value(1))
+        base_expr = _warehouse_base_expr()
 
         base_qs = WarehouseProduct.objects.filter(warehouse=warehouse)
         if search:
@@ -362,15 +389,11 @@ def warehouse_group_variants(request, pk):
     user expands it — keeps the initial page light even when a base holds
     thousands of variants.
     """
-    from django.db.models import Func, Value, CharField, Count, F
+    from django.db.models import Count, F
     warehouse = get_object_or_404(Warehouse, pk=pk)
     base = request.GET.get("base", "")
 
-    class _SplitPart(Func):
-        function = "split_part"
-        output_field = CharField()
-
-    base_expr = _SplitPart("name", Value(" "), Value(1))
+    base_expr = _warehouse_base_expr()
     CAP = 400
     qs = (WarehouseProduct.objects.filter(warehouse=warehouse)
           .annotate(base=base_expr, roll_count=Count("rolls"),

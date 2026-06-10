@@ -1366,6 +1366,13 @@
     document.getElementById('rollScannerOverlay').classList.remove('show');
     document.body.style.overflow = '';
     stopRollCamera();
+    // Reset capture state so a re-open isn't blocked, and bump the
+    // sequence so any in-flight OCR response is dropped (won't populate
+    // the panel after close).
+    rsCapturing = false;
+    rsCaptureSeq++;
+    var procEl = document.getElementById('rsProcessing');
+    if (procEl) procEl.hidden = true;
     // Reset the confirm panel back to idle.
     document.getElementById('rsConfirm').hidden = true;
     document.getElementById('rsIdle').hidden = false;
@@ -1404,11 +1411,23 @@
     document.getElementById('rsVideo').srcObject = null;
   }
 
+  let rsCapturing = false;   // one OCR in flight at a time (no races)
+  let rsCaptureSeq = 0;      // only the LATEST capture's result is applied
+
   function captureRoll() {
+    if (rsCapturing) return;                       // ignore until current OCR finishes
     const video = document.getElementById('rsVideo');
     if (!video || !video.videoWidth) return;
+    rsCapturing = true;
+    const mySeq = ++rsCaptureSeq;
     const captureBtn = document.getElementById('rsCaptureBtn');
     captureBtn.disabled = true;
+
+    function finish() {
+      rsCapturing = false;
+      captureBtn.disabled = false;
+      document.getElementById('rsProcessing').hidden = true;
+    }
 
     // Flash animation
     const flash = document.getElementById('rsFlash');
@@ -1416,21 +1435,30 @@
     flash.classList.add('on');
     setTimeout(function () { flash.classList.remove('on'); flash.hidden = true; }, 160);
 
-    // Snap a frame to canvas
+    // Snap a frame — downscale to ~1100px wide so OCR is fast (smaller
+    // upload + quicker vision model).
     const canvas = document.getElementById('rsCanvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+    const maxW = 1100;
+    const scale = Math.min(1, maxW / video.videoWidth);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     document.getElementById('rsProcessing').hidden = false;
 
     canvas.toBlob(function (blob) {
-      if (!blob) {
-        captureBtn.disabled = false;
-        document.getElementById('rsProcessing').hidden = true;
-        return;
-      }
-      // Keep the LIVE camera running (no dark frozen still) — only the
-      // small spinner chip shows while OCR runs, then disappears.
+      if (!blob) { finish(); return; }
+      // FREEZE the captured still over the live video so the user sees
+      // exactly what was shot while it reads. Cleared on save/cancel.
+      try {
+        const frozen = document.getElementById('rsFrozen');
+        if (frozen) {
+          if (frozen._url) URL.revokeObjectURL(frozen._url);
+          frozen._url = URL.createObjectURL(blob);
+          frozen.src = frozen._url;
+          frozen.classList.add('show');
+        }
+      } catch (_) {}
+
       const fd = new FormData();
       fd.append('image', blob, 'capture.jpg');
       fd.append('commit', 'false');
@@ -1441,8 +1469,8 @@
         headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
       }).then(function (r) { return r.json(); })
         .then(function (data) {
-          captureBtn.disabled = false;
-          document.getElementById('rsProcessing').hidden = true;
+          if (mySeq !== rsCaptureSeq) return;   // a newer capture superseded this — drop stale result
+          finish();
           if (!data.success) {
             alert(data.error || 'OCR failed');
             return;
@@ -1450,11 +1478,11 @@
           showConfirmPanel(data, blob);
         })
         .catch(function () {
-          captureBtn.disabled = false;
-          document.getElementById('rsProcessing').hidden = true;
+          if (mySeq !== rsCaptureSeq) return;
+          finish();
           alert('Network error');
         });
-    }, 'image/jpeg', 0.85);
+    }, 'image/jpeg', 0.7);
   }
 
   function showConfirmPanel(data, imageBlob) {

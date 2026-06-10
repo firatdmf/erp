@@ -641,6 +641,137 @@ class WarehouseDelete(View):
 # Roll scanning — camera-driven OCR of fabric roll labels
 # ────────────────────────────────────────────────────────────────────
 
+_LABEL_PROMPT = (
+    "This is a photo of a Turkish fabric roll label. Extract these "
+    "fields and return ONLY a single JSON object — no commentary, "
+    "no markdown fences:\n\n"
+    '{"sku": "...", "name": "...", "meters": 48.5, "barcode": "...", "color": "...", "coupon": "..."}\n\n'
+    "Field rules:\n"
+    "- sku: the product CODE. Usually an uppercase prefix + zeros + digits "
+    "(e.g. 'İPK0000174', 'K24614', 'RK48060RW9', 'K48083İ.G93'). It is "
+    "printed on the label, NOT the long number under the barcode.\n"
+    "- name: the product/fabric name as printed — typically a model "
+    "name + colour (e.g. 'S-LINE 1106 EKRU', 'GREK TÜL'). Do NOT include "
+    "the brand name (KARVEN, etc.).\n"
+    "- meters: roll length as a decimal number. Turkish labels write "
+    "'25,00 Metre' or '48,5 m' — interpret comma as decimal point, so "
+    "'25,00' → 25.0, '48,5' → 48.5. Do not include the unit.\n"
+    "- color: the colour/variant text if printed on its own line "
+    "(e.g. 'AÇIK KREM', 'EKRU', 'GÜMÜŞ'); else null.\n"
+    "- coupon: the value after 'Kupon No' / 'Kupon' if present; else null.\n\n"
+    "CRITICAL — Turkish letters: reproduce every character EXACTLY as "
+    "printed. The dotted capital 'İ' (a capital I WITH a dot above it) MUST "
+    "be returned as 'İ' (Unicode U+0130), never as the plain dotless 'I'. "
+    "A capital letter with NO dot stays 'I'. Look carefully at whether each "
+    "I-shaped letter has a dot on top. Likewise keep Ş Ğ Ü Ö Ç and the "
+    "dotless lowercase 'ı' exactly as printed. Do NOT transliterate or drop "
+    "any diacritic.\n"
+    "If a field is illegible or absent in THIS image, set it to null. "
+    "Do not invent values."
+)
+
+
+def _ocr_label_openai(image_file):
+    """OpenAI Vision OCR — fast path. Requires OPENAI_API_KEY. Model via
+    the OPENAI_MODEL env var (default 'gpt-4o-mini' — fast + accurate on
+    fabric labels). Uses detail='high' so the tiny dot on a Turkish 'İ'
+    is actually visible to the model. Returns (raw_text, parsed_dict)."""
+    import base64
+    import json as _json
+    import re as _re
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return "", {"error": "OpenAI SDK not installed (pip install openai)"}
+
+    api_key = _env("OPENAI_API_KEY")
+    if not api_key:
+        return "", {"error": "OPENAI_API_KEY env var not set"}
+
+    try:
+        image_file.seek(0)
+    except Exception:
+        pass
+    raw_bytes = image_file.read()
+    if not raw_bytes:
+        return "", {"error": "Empty image"}
+
+    media_type = "image/jpeg"
+    if raw_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        media_type = "image/png"
+    elif raw_bytes[:6] in (b"GIF87a", b"GIF89a"):
+        media_type = "image/gif"
+    elif raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
+        media_type = "image/webp"
+    b64 = base64.b64encode(raw_bytes).decode("ascii")
+    data_uri = f"data:{media_type};base64,{b64}"
+
+    # The fastest OpenAI vision model. Override with OPENAI_MODEL
+    # (e.g. 'gpt-4.1-mini' for a touch more accuracy).
+    model_name = _env("OPENAI_MODEL") or "gpt-4o-mini"
+
+    try:
+        client = OpenAI(api_key=api_key, timeout=30)
+        resp = client.chat.completions.create(
+            model=model_name,
+            temperature=0,
+            max_tokens=400,
+            response_format={"type": "json_object"},
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": _LABEL_PROMPT},
+                    {"type": "image_url",
+                     "image_url": {"url": data_uri, "detail": "high"}},
+                ],
+            }],
+        )
+    except Exception as e:
+        return "", {"error": f"OpenAI call failed: {e}"}
+
+    try:
+        text_out = (resp.choices[0].message.content or "").strip()
+    except Exception:
+        text_out = ""
+
+    start = text_out.find("{")
+    end = text_out.rfind("}")
+    if start == -1 or end == -1:
+        return text_out, {"error": "OpenAI did not return JSON",
+                          "sku": None, "name": None, "meters": None}
+    try:
+        data = _json.loads(text_out[start:end + 1])
+    except Exception:
+        return text_out, {"error": "OpenAI returned malformed JSON",
+                          "sku": None, "name": None, "meters": None}
+
+    sku = (data.get("sku") or None)
+    if sku:
+        sku = _tr_upper(str(sku).strip()) or None
+    name = (data.get("name") or None)
+    if name:
+        name = str(name).strip() or None
+    meters = data.get("meters")
+    try:
+        meters = float(meters) if meters is not None else None
+    except (TypeError, ValueError):
+        meters = None
+    barcode = (data.get("barcode") or None)
+    if barcode:
+        cleaned = _re.sub(r"\D", "", str(barcode))
+        barcode = cleaned or None
+    color = (data.get("color") or None)
+    if color:
+        color = str(color).strip() or None
+    coupon = (data.get("coupon") or None)
+    if coupon:
+        coupon = str(coupon).strip() or None
+
+    return text_out, {"sku": sku, "name": name, "meters": meters,
+                      "barcode": barcode, "color": color, "coupon": coupon}
+
+
 def _ocr_label_claude(image_file):
     """Send the label image to Claude Vision and ask it to extract
     {sku, name, meters} as structured JSON. Far more reliable than
@@ -1254,13 +1385,15 @@ def _ocr_label(image_file):
     overload → falling back to xai").
     """
     backend = (_env("OCR_BACKEND") or "").lower().strip()
+    has_openai = bool(_env("OPENAI_API_KEY"))
     has_gemini = bool(_env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY"))
     has_xai = bool(_env("XAI_API_KEY"))
     has_claude = bool(_env("ANTHROPIC_API_KEY"))
 
     print(
         f"\n[OCR] ── new scan ── preferred={backend or 'auto'} "
-        f"has_xai={has_xai} has_gemini={has_gemini} has_claude={has_claude}",
+        f"has_openai={has_openai} has_xai={has_xai} "
+        f"has_gemini={has_gemini} has_claude={has_claude}",
         flush=True,
     )
 
@@ -1305,14 +1438,20 @@ def _ocr_label(image_file):
     # Tesseract. This is what the user actually wants: never silently
     # downgrade to bad OCR while a paid API is still available.
     #
-    # Auto-order preference: xai → gemini → claude → tesseract.
+    # Auto-order preference: openai → gemini → xai → claude → tesseract.
+    # OpenAI (gpt-4o-mini, detail=high) leads by default — it's fast and
+    # the user is out of Gemini credit. A set OCR_BACKEND still wins
+    # (it's promoted to the front above). If a backend has no key / no
+    # credit it errors and we fall through to the next.
     order = []
-    if backend in ("gemini", "xai", "claude"):
+    if backend in ("openai", "gemini", "xai", "claude"):
         order.append(backend)
-    if has_xai and "xai" not in order:
-        order.append("xai")
+    if has_openai and "openai" not in order:
+        order.append("openai")
     if has_gemini and "gemini" not in order:
         order.append("gemini")
+    if has_xai and "xai" not in order:
+        order.append("xai")
     if has_claude and "claude" not in order:
         order.append("claude")
     if backend == "tesseract":
@@ -1322,6 +1461,7 @@ def _ocr_label(image_file):
         order.append("tesseract")  # always the final fallback
 
     fns = {
+        "openai": _ocr_label_openai,
         "gemini": _ocr_label_gemini,
         "xai": _ocr_label_xai,
         "claude": _ocr_label_claude,

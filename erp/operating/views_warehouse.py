@@ -2227,17 +2227,25 @@ class WarehouseRollScan(View):
                 })
 
         # Find or create the WarehouseProduct in this warehouse.
+        #
+        # Match by SKU ONLY when a SKU is present. Physically different
+        # products often share the same descriptive NAME — "GREK TÜL" is
+        # printed on K24620İ.G52, K24620İ.G47, K24892İ.G157, K24620.G33 …
+        # They are DIFFERENT products, distinguished by their SKU. The old
+        # name fallback merged every "GREK TÜL" roll onto the first one
+        # found (e.g. K24620.G33), so new rolls were saved under the wrong
+        # product. Only use the name as the key when the label has NO SKU.
         product = None
         if sku:
             product = WarehouseProduct.objects.filter(
                 warehouse=warehouse, sku__iexact=sku,
             ).first()
-        if not product and name:
+        elif name:
             product = WarehouseProduct.objects.filter(
                 warehouse=warehouse, name__iexact=name,
             ).first()
         if not product:
-            # Create a fresh one.
+            # No existing product for this SKU (or nameless label) → new one.
             product = WarehouseProduct.objects.create(
                 warehouse=warehouse,
                 name=name or sku,

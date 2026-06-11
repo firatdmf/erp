@@ -141,6 +141,20 @@
   .od-stat.teal .val { color: var(--nejum-teal-700); }
   .od-stat.full { grid-column: 1 / -1; }
 
+  /* Grouped / All-variants view toggle in the product toolbar. */
+  .od-viewtoggle {
+    display: inline-flex; border: 1px solid #E2E8EE; border-radius: 8px;
+    overflow: hidden; background: #fff;
+  }
+  .wh-view-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 12px; font: 600 12px var(--font-sans); color: var(--gray-600);
+    background: #fff; border: none; cursor: pointer; white-space: nowrap;
+  }
+  .wh-view-btn + .wh-view-btn { border-left: 1px solid #E2E8EE; }
+  .wh-view-btn.active { background: var(--nejum-teal-600); color: #fff; }
+  .wh-view-btn:not(.active):hover { background: #F4F7FB; }
+
   /* TOOLBAR (search + sort + sync) */
   .od-toolbar {
     display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -213,6 +227,12 @@
   /* PRODUCTS TABLE */
   .od-prods-wrap { overflow-x: auto; }
   .od-prods { width: 100%; border-collapse: collapse; }
+  /* Metre on top, small lowercase tops count below it (stacked, saves width) */
+  .od-prods .qty { font-variant-numeric: tabular-nums; }
+  .tops-sub {
+    font: 600 10.5px var(--font-sans); color: var(--gray-500);
+    text-transform: lowercase; margin-top: 2px; line-height: 1.1; white-space: nowrap;
+  }
   .od-prods th, .od-prods td {
     padding: 11px 10px; text-align: left;
     border-bottom: 1px solid #EEF1F5; font-size: 12.5px;
@@ -367,7 +387,34 @@
   }
   @media (max-width: 700px) {
     .od-head { flex-direction: column; align-items: stretch; }
-    .od-stats-grid { grid-template-columns: 1fr; }
+    .od-head-r { flex-wrap: wrap; }
+    .od-head-r .ord-btn { flex: 1 1 auto; justify-content: center; }
+    .od-meta { flex-wrap: wrap; row-gap: 4px; }
+    /* keep the 4 count cards 2-up; net-worth cards stay full width */
+    .od-stats-grid { grid-template-columns: 1fr 1fr; }
+    /* Toolbar stacks: search full width, then the view toggle + sort. */
+    .od-toolbar { gap: 8px; }
+    .od-search { flex: 1 1 100%; max-width: none; }
+    .od-viewtoggle { flex: 1 1 100%; }
+    .od-viewtoggle .wh-view-btn { flex: 1 1 0; justify-content: center; }
+    .od-sort { flex: 1 1 100%; }
+    .od-sort select { width: 100%; }
+    /* Quick-filter chips scroll sideways instead of wrapping tall. */
+    .od-chip-row { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .od-chip-row .od-fchip { flex: 0 0 auto; }
+    /* Product table: drop the money columns on phones so the essentials
+       (name / SKU / tops / qty) fit; full figures are one tap away.
+       The wrapper still scrolls sideways as a fallback. */
+    .od-prods th:nth-child(4), .od-prods td:nth-child(4),
+    .od-prods th:nth-child(5), .od-prods td:nth-child(5),
+    .od-prods th:nth-child(6), .od-prods td:nth-child(6) { display: none; }
+    .od-prods th, .od-prods td { padding: 9px 8px; }
+    .od-prods .pname { font-size: 13px; }
+    .od-prods .psub { font-size: 11px; }
+  }
+  @media (max-width: 420px) {
+    .od-stats-grid { grid-template-columns: 1fr 1fr; }
+    .od-prods th, .od-prods td { padding: 8px 6px; font-size: 12px; }
   }
 
   /* ── Roll Scanner (camera-driven label OCR) ──────────────── */
@@ -400,6 +447,32 @@
     display: none;
   }
   #rsFrozen.show { display: block; }
+  /* Live-detected barcode chip (top-left of the camera viewport). */
+  .rs-bc-chip {
+    position: absolute; top: 10px; left: 10px; z-index: 6;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(16,185,129,0.95); color: #fff;
+    padding: 6px 12px; border-radius: 999px;
+    font: 700 12.5px var(--font-mono, monospace); letter-spacing: .4px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.28);
+    max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rs-bc-chip i { font-size: 13px; }
+  /* Instant-detect pulse (fires on each new barcode read). */
+  .rs-bc-chip.rs-bc-hit { animation: rs-bc-pulse 360ms ease; }
+  @keyframes rs-bc-pulse {
+    0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(16,185,129,0.55); }
+    40%  { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+    100% { transform: scale(1);    box-shadow: 0 4px 14px rgba(0,0,0,0.28); }
+  }
+  /* Torch / flashlight toggle (only shown when the camera supports it). */
+  .rs-torch-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22);
+    color: #fff; cursor: pointer; font-size: 16px; margin-left: 10px;
+  }
+  .rs-torch-btn.on { background: #FBBF24; border-color: #F59E0B; color: #1F2937; }
   @keyframes rs-slide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   .rs-head {
     display: flex; align-items: center; justify-content: space-between;
@@ -776,12 +849,20 @@
           <i class="fa fa-map-pin"></i>{{ warehouse.location|default:no_location }}
         </span>
         <span class="od-dot"></span>
-        <span>
-          <i class="fa fa-box"></i>{{ product_count|default:0 }} {% trans "products" %}
+        <span title="{% trans 'Main products (packages)' %}">
+          <i class="fa fa-box"></i>{{ group_count|default:0 }} {% trans "main products" %}
+        </span>
+        <span class="od-dot"></span>
+        <span title="{% trans 'Variants' %}">
+          <i class="fa fa-list-ul"></i>{{ variant_count|default:0 }} {% trans "variants" %}
+        </span>
+        <span class="od-dot"></span>
+        <span title="{% trans 'Rolls (tops)' %}">
+          <i class="fa fa-scroll"></i>{{ roll_count|default:0 }} {% trans "rolls" %}
         </span>
         <span class="od-dot"></span>
         <span>
-          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0 }} {% trans "in stock" %}
+          <i class="fa fa-cubes"></i>{{ total_quantity|floatformat:0 }} m {% trans "in stock" %}
         </span>
         {% if warehouse.created_at %}
           <span class="od-dot"></span>
@@ -794,6 +875,9 @@
     <div class="od-head-r">
       <button type="button" class="ord-btn primary" onclick="openRollScanner()">
         <i class="fa fa-camera"></i>{% trans "Scan roll" %}
+      </button>
+      <button type="button" class="ord-btn" style="background:#E9F5F3;color:#0F766E;border:1px solid rgba(20,127,116,0.28);" onclick="openBarcodeLookup()">
+        <i class="fa fa-barcode"></i>{% trans "Find by barcode" %}
       </button>
       <button type="button" class="ord-btn ghost" onclick="document.getElementById('whImportModal').classList.add('show')">
         <i class="fa fa-file-import"></i>{% trans "Sync Products" %}
@@ -842,8 +926,18 @@
                    hx-get="{% url 'operating:warehouse_detail' warehouse.pk %}"
                    hx-trigger="keyup changed delay:300ms, whFilterChanged from:body"
                    hx-target="#wh-rows"
-                   hx-include="#whSortInput"
+                   hx-include="#whSortInput, #whViewInput"
                    name="search">
+          </div>
+
+          <input type="hidden" id="whViewInput" name="view" value="{{ view_mode|default:'grouped' }}">
+          <div class="od-viewtoggle">
+            <button type="button" class="wh-view-btn {% if view_mode != 'variants' %}active{% endif %}" data-view="grouped" onclick="setWhView('grouped')" title="{% trans 'Group by main product' %}">
+              <i class="fa fa-layer-group"></i> {% trans "Grouped" %}
+            </button>
+            <button type="button" class="wh-view-btn {% if view_mode == 'variants' %}active{% endif %}" data-view="variants" onclick="setWhView('variants')" title="{% trans 'List every variant' %}">
+              <i class="fa fa-list-ul"></i> {% trans "All variants" %}
+            </button>
           </div>
 
           <div class="od-sort">
@@ -879,9 +973,8 @@
           <table class="od-prods">
             <thead>
               <tr>
-                <th>{% trans "Name" %}</th>
                 <th>{% trans "SKU" %}</th>
-                <th>{% trans "Barcode" %}</th>
+                <th>{% trans "Name" %}</th>
                 <th class="num">{% trans "Qty" %}</th>
                 <th class="num">{% trans "Unit cost" %}</th>
                 <th class="num">{% trans "Total (USD)" %}</th>
@@ -972,12 +1065,20 @@
 
         <div class="od-stats-grid">
           <div class="od-stat teal">
-            <div class="val">{{ product_count|default:0 }}</div>
-            <div class="lbl">{% trans "Products" %}</div>
+            <div class="val">{{ group_count|default:0 }}</div>
+            <div class="lbl">{% trans "Main products" %}</div>
           </div>
           <div class="od-stat">
-            <div class="val">{{ total_quantity|floatformat:0 }}</div>
-            <div class="lbl">{% trans "Total qty" %}</div>
+            <div class="val">{{ variant_count|default:0 }}</div>
+            <div class="lbl">{% trans "Variants" %}</div>
+          </div>
+          <div class="od-stat">
+            <div class="val">{{ roll_count|default:0 }}</div>
+            <div class="lbl">{% trans "Rolls (tops)" %}</div>
+          </div>
+          <div class="od-stat">
+            <div class="val">{{ total_quantity|floatformat:0 }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> m</span></div>
+            <div class="lbl">{% trans "Total stock" %}</div>
           </div>
           <div class="od-stat full">
             <div class="val">${{ total_value_usd|floatformat:2 }}</div>
@@ -1047,6 +1148,54 @@
   </div>
 </div>
 
+<!-- ─── BARCODE LOOKUP (find existing product — no add) ───────── -->
+<style>
+  .bl-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(8,12,20,0.74); padding: 16px; }
+  .bl-overlay.show { display: flex; }
+  .bl-shell { width: 100%; max-width: 460px; background: #0F1419; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 94vh; }
+  .bl-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.10); }
+  .bl-title { color: #fff; font: 700 14px var(--font-sans); display: inline-flex; align-items: center; gap: 9px; }
+  .bl-close { background: rgba(255,255,255,0.08); border: none; color: #fff; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 15px; }
+  .bl-cam { position: relative; background: #000; aspect-ratio: 3 / 4; max-height: 58vh; overflow: hidden; }
+  .bl-cam video { width: 100%; height: 100%; object-fit: cover; }
+  .bl-guide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+  .bl-guide-frame { width: 80%; height: 26%; border: 2px solid rgba(255,255,255,0.9); border-radius: 12px; box-shadow: 0 0 0 2000px rgba(0,0,0,0.30); }
+  .bl-hint { margin-top: 14px; color: #fff; font: 600 12.5px var(--font-sans); background: rgba(0,0,0,0.5); padding: 5px 12px; border-radius: 999px; }
+  .bl-result { padding: 20px 18px 22px; color: #fff; overflow-y: auto; }
+  .bl-rc-ico { width: 56px; height: 56px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 10px; }
+  .bl-rc.found .bl-rc-ico { background: rgba(16,185,129,0.16); color: #34D399; }
+  .bl-rc.notfound .bl-rc-ico { background: rgba(244,63,94,0.16); color: #FB7185; }
+  .bl-rc { text-align: center; }
+  .bl-rc h4 { margin: 0 0 4px; font: 700 16px var(--font-sans); }
+  .bl-rc .bl-bc { font: 600 12px monospace; color: #94A3B8; margin-bottom: 14px; word-break: break-all; }
+  .bl-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 4px 14px; text-align: left; }
+  .bl-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font: 500 13px var(--font-sans); }
+  .bl-row:last-child { border-bottom: none; }
+  .bl-row .k { color: #94A3B8; white-space: nowrap; }
+  .bl-row .v { color: #fff; font-weight: 700; text-align: right; word-break: break-word; }
+  .bl-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .bl-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 14px; border-radius: 10px; font: 700 13px var(--font-sans); cursor: pointer; border: none; text-decoration: none; }
+  .bl-btn.primary { background: #0F766E; color: #fff; }
+  .bl-btn.ghost { background: rgba(255,255,255,0.10); color: #fff; }
+  .bl-spin { text-align: center; color: #cbd5e1; font: 600 13px var(--font-sans); padding: 8px; }
+</style>
+<div class="bl-overlay" id="blOverlay">
+  <div class="bl-shell">
+    <div class="bl-head">
+      <div class="bl-title"><i class="fa fa-barcode"></i> {% trans "Find by barcode" %}</div>
+      <button type="button" class="bl-close" onclick="closeBarcodeLookup()"><i class="fa fa-times"></i></button>
+    </div>
+    <div id="blScan" class="bl-cam">
+      <video id="blVideo" autoplay playsinline muted></video>
+      <div class="bl-guide">
+        <div class="bl-guide-frame"></div>
+        <div class="bl-hint">{% trans "Point the barcode at the frame" %}</div>
+      </div>
+    </div>
+    <div id="blResult" class="bl-result" hidden></div>
+  </div>
+</div>
+
 <!-- ─── ROLL SCANNER (camera) ─────────────────────────────────── -->
 <div id="rollScannerOverlay" class="rs-overlay" aria-hidden="true">
   <div class="rs-shell">
@@ -1068,6 +1217,11 @@
           <video id="rsVideo" autoplay playsinline muted></video>
           <canvas id="rsCanvas" hidden></canvas>
           <img id="rsFrozen" alt="">
+          <!-- Live barcode chip: the camera scans the barcode continuously
+               (separate from the AI label OCR) and shows it here. -->
+          <div id="rsBcChip" class="rs-bc-chip" hidden>
+            <i class="fa fa-barcode"></i><span id="rsBcChipVal"></span>
+          </div>
           <div id="rsGuide" class="rs-guide">
             <div class="rs-guide-frame"></div>
             <div class="rs-guide-hint">{% trans "Center the label here" %}</div>
@@ -1084,6 +1238,9 @@
           <button type="button" id="rsCaptureBtn" class="rs-capture-btn" onclick="captureRoll()">
             <i class="fa fa-camera"></i>
             <span>{% trans "Capture" %}</span>
+          </button>
+          <button type="button" id="rsTorchBtn" class="rs-torch-btn" hidden onclick="toggleTorch()" title="{% trans 'Flashlight' %}">
+            <i class="fa fa-bolt"></i>
           </button>
           <div class="rs-cam-hint">
             <i class="fa fa-keyboard"></i> {% trans "Press space to capture" %}
@@ -1268,6 +1425,15 @@
     htmx.trigger(document.body, 'whFilterChanged');
   }
 
+  function setWhView(v) {
+    var inp = document.getElementById('whViewInput');
+    if (inp) inp.value = v;
+    document.querySelectorAll('.wh-view-btn').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.view === v);
+    });
+    htmx.trigger(document.body, 'whFilterChanged');
+  }
+
   function syncWhChipsActive() {
     const sel = document.getElementById('whSortInput');
     if (!sel) return;
@@ -1405,16 +1571,32 @@
       return;
     }
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      // Request a high resolution so barcode bars + the İ dot are sharp
+      // enough to decode (falls back automatically if unsupported).
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false
     }).then(function (stream) {
       rsStream = stream;
       video.srcObject = stream;
+      // Start the LIVE barcode scanner on the same stream (job #2; the
+      // AI label OCR is job #1 on capture). Guarded so it never breaks
+      // the camera if unavailable.
+      try {
+        var _bcStart = function () {
+          if (typeof startBarcodeScanner === 'function') startBarcodeScanner(video);
+        };
+        video.onloadedmetadata = null;          // clear any stale handler first
+        video.onloadedmetadata = _bcStart;
+        // If the stream already has current data, start now (the start-once
+        // guard makes this safe even if onloadedmetadata also fires).
+        if (video.readyState >= 2) _bcStart();
+      } catch (_) {}
     }).catch(function (err) {
       alert('Camera access denied or unavailable: ' + err.message);
     });
   }
   function stopRollCamera() {
+    try { if (typeof stopBarcodeScanner === 'function') stopBarcodeScanner(); } catch (_) {}
     if (rsStream) {
       rsStream.getTracks().forEach(function (t) { t.stop(); });
       rsStream = null;
@@ -1424,6 +1606,190 @@
 
   let rsCapturing = false;   // one OCR in flight at a time (no races)
   let rsCaptureSeq = 0;      // only the LATEST capture's result is applied
+  let rsLiveBarcode = '';    // latest barcode decoded LIVE from the camera
+
+  // Show/clear the live-decoded barcode chip on the camera viewport.
+  function updateLiveBarcodeChip(value) {
+    var chip = document.getElementById('rsBcChip');
+    var val = document.getElementById('rsBcChipVal');
+    if (!chip || !val) return;
+    if (value) { val.textContent = value; chip.hidden = false; }
+    else { val.textContent = ''; chip.hidden = true; }
+  }
+
+  // ── LIVE barcode scanner (job #2 of the camera; AI OCR is job #1) ──
+  // Native BarcodeDetector first (Android Chrome / Edge); ZXing from CDN
+  // as a fallback for iOS Safari & Firefox, which have no BarcodeDetector.
+  // ── Universal barcode scanner — zxing-wasm (ZXing-C++ → WebAssembly).
+  //    ONE code path, identical on every browser/OS (Chrome/Safari/Firefox,
+  //    Android/iOS/desktop). No native BarcodeDetector (missing on iOS/FF).
+  //    Loads from CDN (no build step); the .wasm auto-loads from jsdelivr.
+  let rsZxw = null;          // the readBarcodes(imageData, opts) function
+  let rsZxwLoading = null;
+  let rsBcRaf = null, rsBcRunning = false, rsBcStarted = false;
+  let rsCamTrack = null;     // active video track (for focus / torch)
+  let rsBcDebounce = { val: '', t: 0 };
+  let _rsRoiCanvas = null, _rsRoiCtx = null, _rsBcCanvas = null, _rsAudioCtx = null;
+
+  const ZXW_OPTS = {
+    tryHarder: true, maxNumberOfSymbols: 1,
+    formats: ['Code128', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code39', 'ITF', 'Codabar', 'QRCode']
+  };
+
+  function loadZxw() {
+    if (rsZxw) return Promise.resolve(rsZxw);
+    if (rsZxwLoading) return rsZxwLoading;
+    var urls = [
+      'https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/+esm',
+      'https://esm.sh/zxing-wasm@3.1.0/reader'
+    ];
+    function tryNext(i) {
+      if (i >= urls.length) return Promise.reject(new Error('zxing-wasm load failed'));
+      return import(urls[i]).then(function (mod) {
+        if (mod && mod.readBarcodes) return mod.readBarcodes;
+        throw new Error('no readBarcodes export');
+      }).catch(function () { return tryNext(i + 1); });
+    }
+    rsZxwLoading = tryNext(0).then(function (fn) { rsZxw = fn; return fn; });
+    return rsZxwLoading;
+  }
+
+  function rsGetRoiCanvas() {
+    if (!_rsRoiCanvas) {
+      _rsRoiCanvas = document.createElement('canvas');
+      _rsRoiCtx = _rsRoiCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    return _rsRoiCanvas;
+  }
+  function rsGetBcCanvas() {
+    if (!_rsBcCanvas) _rsBcCanvas = document.createElement('canvas');
+    return _rsBcCanvas;
+  }
+
+  function startBarcodeScanner(video) {
+    if (rsBcStarted) return;          // exactly one scanner per camera session
+    rsBcStarted = true;
+    rsBcRunning = true;
+    rsLiveBarcode = '';
+    rsBcDebounce = { val: '', t: 0 };
+    updateLiveBarcodeChip('');
+    // Grab the track for continuous autofocus + torch (best-effort).
+    try {
+      var stream = video.srcObject;
+      rsCamTrack = (stream && stream.getVideoTracks) ? stream.getVideoTracks()[0] : null;
+      if (rsCamTrack && rsCamTrack.applyConstraints) {
+        rsCamTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
+      }
+      rsSetupTorchButton();
+    } catch (e) {}
+    loadZxw().then(function () { rsBcLoop(video); }).catch(function () {/* decoder unavailable → AI barcode used */});
+  }
+
+  function rsBcLoop(video) {
+    if (!rsBcRunning) return;
+    if (!rsZxw || !video.videoWidth || video.readyState < 2) {
+      rsBcRaf = requestAnimationFrame(function () { rsBcLoop(video); });
+      return;
+    }
+    try {
+      // Center-crop ROI (matches the on-screen guide box) → small canvas for
+      // a fast decode each frame.
+      var vw = video.videoWidth, vh = video.videoHeight;
+      var cropW = Math.round(vw * 0.92), cropH = Math.round(vh * 0.72);
+      var sx = Math.round((vw - cropW) / 2), sy = Math.round((vh - cropH) / 2);
+      var outW = Math.min(1000, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
+      var roi = rsGetRoiCanvas();
+      if (roi.width !== outW) roi.width = outW;
+      if (roi.height !== outH) roi.height = outH;
+      _rsRoiCtx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
+      var img = _rsRoiCtx.getImageData(0, 0, outW, outH);
+      rsZxw(img, ZXW_OPTS).then(function (res) {
+        if (rsBcRunning && res && res.length && res[0].text) rsOnBarcode(res[0].text);
+      }).catch(function () {}).finally(function () {
+        if (rsBcRunning) rsBcRaf = requestAnimationFrame(function () { rsBcLoop(video); });
+      });
+    } catch (e) {
+      if (rsBcRunning) rsBcRaf = requestAnimationFrame(function () { rsBcLoop(video); });
+    }
+  }
+
+  function rsOnBarcode(value) {
+    value = (value || '').toString().trim();
+    if (!value) return;
+    rsLiveBarcode = value;                 // always keep the latest for capture
+    updateLiveBarcodeChip(value);
+    var now = Date.now();
+    // Fire instant feedback once per new code (or after a 1.2s gap) — debounce.
+    if (value !== rsBcDebounce.val || (now - rsBcDebounce.t) > 1200) {
+      rsBcFeedback();
+    }
+    rsBcDebounce = { val: value, t: now };
+  }
+
+  // Shared instant-feedback: a short vibrate + beep (used by both the
+  // add-scanner and the barcode-lookup scanner).
+  function rsBeep(freq) {
+    try { if (navigator.vibrate) navigator.vibrate(55); } catch (e) {}
+    try {
+      _rsAudioCtx = _rsAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (_rsAudioCtx.state === 'suspended') _rsAudioCtx.resume();
+      var o = _rsAudioCtx.createOscillator(), g = _rsAudioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = freq || 880; g.gain.value = 0.07;
+      o.connect(g); g.connect(_rsAudioCtx.destination);
+      o.start(); o.stop(_rsAudioCtx.currentTime + 0.08);
+    } catch (e) {}
+  }
+  function rsBcFeedback() {
+    rsBeep(880);
+    try {
+      var chip = document.getElementById('rsBcChip');
+      if (chip) { chip.classList.remove('rs-bc-hit'); void chip.offsetWidth; chip.classList.add('rs-bc-hit'); }
+    } catch (e) {}
+  }
+
+  function rsSetupTorchButton() {
+    var btn = document.getElementById('rsTorchBtn');
+    if (!btn) return;
+    var ok = false;
+    try {
+      var caps = (rsCamTrack && rsCamTrack.getCapabilities) ? rsCamTrack.getCapabilities() : null;
+      ok = !!(caps && caps.torch);
+    } catch (e) {}
+    btn.hidden = !ok;
+    btn.dataset.on = '';
+    btn.classList.remove('on');
+  }
+  function toggleTorch() {
+    if (!rsCamTrack || !rsCamTrack.applyConstraints) return;
+    var btn = document.getElementById('rsTorchBtn');
+    var on = !(btn && btn.dataset.on === '1');
+    rsCamTrack.applyConstraints({ advanced: [{ torch: on }] }).then(function () {
+      if (btn) { btn.dataset.on = on ? '1' : ''; btn.classList.toggle('on', on); }
+    }).catch(function () {});
+  }
+
+  function stopBarcodeScanner() {
+    rsBcStarted = false;
+    rsBcRunning = false;
+    if (rsBcRaf) { cancelAnimationFrame(rsBcRaf); rsBcRaf = null; }
+    try { if (rsCamTrack && rsCamTrack.applyConstraints) rsCamTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(function () {}); } catch (e) {}
+    rsCamTrack = null;
+    rsLiveBarcode = '';
+    updateLiveBarcodeChip('');
+  }
+
+  // Capture-time one-shot decode of the FULL-RES still — same WASM decoder.
+  function decodeBarcodeFromCanvas(canvas) {
+    var p = loadZxw().then(function () {
+      var ctx = canvas.getContext('2d', { willReadFrequently: true });
+      var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      return rsZxw(img, ZXW_OPTS);
+    }).then(function (res) {
+      return (res && res.length && res[0].text) ? res[0].text.toString().trim() : '';
+    }).catch(function () { return ''; });
+    // Never hang the confirm panel.
+    return Promise.race([p, new Promise(function (r) { setTimeout(function () { r(''); }, 3000); })]);
+  }
 
   function captureRoll() {
     if (rsCapturing) return;                       // ignore until current OCR finishes
@@ -1431,6 +1797,10 @@
     if (!video || !video.videoWidth) return;
     rsCapturing = true;
     const mySeq = ++rsCaptureSeq;
+    // SNAPSHOT the barcode visible at THIS instant. The live scanner keeps
+    // running during the OCR round-trip, so without a snapshot a different
+    // roll's barcode could leak into this roll's confirm panel.
+    const capturedBarcode = rsLiveBarcode;
     const captureBtn = document.getElementById('rsCaptureBtn');
     captureBtn.disabled = true;
 
@@ -1446,8 +1816,21 @@
     flash.classList.add('on');
     setTimeout(function () { flash.classList.remove('on'); flash.hidden = true; }, 160);
 
-    // Snap a frame. Keep it fairly large (≤1500px) so the TINY dot above a
-    // Turkish 'İ' survives — over-shrinking made the model read İ as I.
+    // ── Barcode (job #2): decode it from the FULL-RES captured frame —
+    //    sharp & high-resolution, much more reliable than live video. Runs
+    //    in parallel with the OCR request; its result wins over the live
+    //    and AI barcodes. ──
+    let decodedBarcode = capturedBarcode;        // live value as fallback
+    const bcCanvas = rsGetBcCanvas();
+    bcCanvas.width = video.videoWidth;
+    bcCanvas.height = video.videoHeight;
+    bcCanvas.getContext('2d').drawImage(video, 0, 0);
+    const bcPromise = decodeBarcodeFromCanvas(bcCanvas).then(function (bc) {
+      if (bc) { decodedBarcode = bc; if (mySeq === rsCaptureSeq) updateLiveBarcodeChip(bc); }
+    }).catch(function () {});
+
+    // Snap a DOWNSCALED frame (≤1500px) for the AI OCR. Keep it fairly large
+    // so the TINY dot above a Turkish 'İ' survives.
     const canvas = document.getElementById('rsCanvas');
     const maxW = 1500;
     const scale = Math.min(1, maxW / video.videoWidth);
@@ -1481,12 +1864,19 @@
       }).then(function (r) { return r.json(); })
         .then(function (data) {
           if (mySeq !== rsCaptureSeq) return;   // a newer capture superseded this — drop stale result
-          finish();
           if (!data.success) {
+            finish();
             alert(data.error || 'OCR failed');
             return;
           }
-          showConfirmPanel(data, blob);
+          // Wait for the captured-frame barcode decode (usually already done,
+          // since local decode is faster than the OCR round-trip) so the
+          // confirm panel gets the reliable barcode.
+          bcPromise.then(function () {
+            if (mySeq !== rsCaptureSeq) return;
+            finish();
+            showConfirmPanel(data, blob, decodedBarcode);
+          });
         })
         .catch(function () {
           if (mySeq !== rsCaptureSeq) return;
@@ -1496,7 +1886,7 @@
     }, 'image/jpeg', 0.88);   // higher quality keeps the İ dot crisp
   }
 
-  function showConfirmPanel(data, imageBlob) {
+  function showConfirmPanel(data, imageBlob, capturedBarcode) {
     const parsed = data.parsed || {};
     rsPending = { blob: imageBlob, ocr_raw: data.ocr_raw || '' };
     document.getElementById('rsIdle').hidden = true;
@@ -1504,10 +1894,11 @@
     document.getElementById('rsSku').value = parsed.sku || '';
     document.getElementById('rsName').value = parsed.name || '';
     document.getElementById('rsMeters').value = parsed.meters || '';
-    // Pre-fill barcode from OCR if the label had one — user can edit
-    // before saving. Each scanned roll has its own unique barcode.
+    // Barcode: PREFER the live barcode decoded by the camera scanner
+    // (accurate) over the AI's reading (the AI sometimes misreads it).
+    // Fall back to the AI value if the live scanner caught nothing.
     const bcInp = document.getElementById('rsBarcode');
-    if (bcInp) bcInp.value = parsed.barcode || '';
+    if (bcInp) bcInp.value = (capturedBarcode || rsLiveBarcode || parsed.barcode || '');
     const lotInp = document.getElementById('rsLot');
     if (lotInp) lotInp.value = parsed.lot_number || parsed.coupon || '';
     document.getElementById('rsRaw').textContent = data.ocr_raw || '(no text recognised)';
@@ -1543,12 +1934,18 @@
         : '<i class="fa fa-plus-circle"></i> {% trans "new" %}';
     } else { cb.style.display = 'none'; }
     const hint = document.getElementById('rsCatHint');
-    hint.textContent = (cp.is_color && cp.original_token && cp.attribute_value
-        && cp.original_token.toUpperCase() !== cp.attribute_value.toUpperCase())
-      ? ('{% trans "translated from" %} ' + cp.original_token + ' → ' + cp.attribute_value) : '';
+    if (cp.variant_exists) {
+      // Same variant scanned before — main product + colour/model were
+      // auto-filled from the first time; user may still edit.
+      hint.innerHTML = '<i class="fa fa-wand-magic-sparkles"></i> {% trans "Same variant — details auto-filled from the first scan" %}';
+    } else {
+      hint.textContent = (cp.is_color && cp.original_token && cp.attribute_value
+          && cp.original_token.toUpperCase() !== cp.attribute_value.toUpperCase())
+        ? ('{% trans "translated from" %} ' + cp.original_token + ' → ' + cp.attribute_value) : '';
+    }
     // Auto-focus meters if it came back null, else SKU.
     setTimeout(function () {
-      (parsed.meters ? document.getElementById('rsMeters') : document.getElementById('rsMeters')).focus();
+      (parsed.meters ? document.getElementById('rsSku') : document.getElementById('rsMeters')).focus();
     }, 50);
   }
 
@@ -1556,6 +1953,10 @@
     document.getElementById('rsConfirm').hidden = true;
     document.getElementById('rsIdle').hidden = false;
     rsPending = null;
+    // Reset the live barcode so the NEXT roll is decoded fresh (the
+    // continuous scanner refills it as the new label comes into view).
+    rsLiveBarcode = '';
+    updateLiveBarcodeChip('');
     // Drop the frozen frame so the user sees the live camera again.
     try {
       const frozen = document.getElementById('rsFrozen');
@@ -1821,5 +2222,140 @@
       resultDiv.innerHTML = `<div style="padding:14px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:10px; color:#991B1B; font:600 12.5px var(--font-sans);">{% trans "Upload error:" %} ${e.message}</div>`;
     }
   }
+</script>
+
+<script>
+  // ── Barcode LOOKUP scanner — reuses the zxing-wasm decoder (loadZxw /
+  //    rsZxw / ZXW_OPTS / rsGetRoiCanvas / rsBeep from the add-scanner). ──
+  const barcodeLookupUrl = "{% url 'operating:warehouse_barcode_lookup' warehouse.pk %}";
+  let blStream = null, blRaf = null, blRunning = false, blLastCode = '';
+
+  function openBarcodeLookup() {
+    document.getElementById('blOverlay').classList.add('show');
+    document.body.style.overflow = 'hidden';
+    blShowScan();
+    startLookupCamera();
+  }
+  function closeBarcodeLookup() {
+    document.getElementById('blOverlay').classList.remove('show');
+    document.body.style.overflow = '';
+    stopLookup();
+  }
+  function stopLookup() {
+    blRunning = false;
+    if (blRaf) { cancelAnimationFrame(blRaf); blRaf = null; }
+    if (blStream) { blStream.getTracks().forEach(function (t) { t.stop(); }); blStream = null; }
+    var v = document.getElementById('blVideo'); if (v) v.srcObject = null;
+    blLastCode = '';
+  }
+  function blShowScan() {
+    document.getElementById('blScan').style.display = '';
+    var r = document.getElementById('blResult'); r.hidden = true; r.innerHTML = '';
+  }
+  function startLookupCamera() {
+    var video = document.getElementById('blVideo');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Camera not supported'); return; }
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
+    }).then(function (stream) {
+      blStream = stream; video.srcObject = stream;
+      try { var t = stream.getVideoTracks()[0]; if (t && t.applyConstraints) t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) {}
+      blRunning = true; blLastCode = '';
+      loadZxw().then(function () { blLoop(video); }).catch(function () {});
+    }).catch(function (err) { alert('Camera: ' + err.message); });
+  }
+  function blLoop(video) {
+    if (!blRunning) return;
+    if (!rsZxw || !video.videoWidth || video.readyState < 2) { blRaf = requestAnimationFrame(function () { blLoop(video); }); return; }
+    try {
+      var roi = rsGetRoiCanvas();
+      var vw = video.videoWidth, vh = video.videoHeight;
+      var cropW = Math.round(vw * 0.92), cropH = Math.round(vh * 0.55);
+      var sx = Math.round((vw - cropW) / 2), sy = Math.round((vh - cropH) / 2);
+      var outW = Math.min(1000, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
+      if (roi.width !== outW) roi.width = outW;
+      if (roi.height !== outH) roi.height = outH;
+      var ctx = roi.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
+      var img = ctx.getImageData(0, 0, outW, outH);
+      rsZxw(img, ZXW_OPTS).then(function (res) {
+        if (blRunning && res && res.length && res[0].text) onLookupBarcode(res[0].text);
+      }).catch(function () {}).finally(function () {
+        if (blRunning) blRaf = requestAnimationFrame(function () { blLoop(video); });
+      });
+    } catch (e) {
+      if (blRunning) blRaf = requestAnimationFrame(function () { blLoop(video); });
+    }
+  }
+  function onLookupBarcode(code) {
+    code = (code || '').toString().trim();
+    if (!code || code === blLastCode) return;
+    blLastCode = code;
+    blRunning = false;                          // pause while we look it up
+    if (blRaf) { cancelAnimationFrame(blRaf); blRaf = null; }
+    rsBeep(880);
+    doBarcodeLookup(code);
+  }
+  function doBarcodeLookup(code) {
+    var r = document.getElementById('blResult');
+    document.getElementById('blScan').style.display = 'none';
+    r.hidden = false;
+    r.innerHTML = '<div class="bl-spin"><i class="fa fa-spinner fa-spin"></i> {% trans "Looking up" %} ' + blEsc(code) + '…</div>';
+    fetch(barcodeLookupUrl + '?barcode=' + encodeURIComponent(code), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (resp) { return resp.json(); })
+      .then(function (d) { renderLookup(d, code); })
+      .catch(function () {
+        r.innerHTML = '<div class="bl-rc notfound"><div class="bl-rc-ico"><i class="fa fa-triangle-exclamation"></i></div><h4>{% trans "Network error" %}</h4>' + blAgainBtn() + '</div>';
+      });
+  }
+  function renderLookup(d, code) {
+    var r = document.getElementById('blResult');
+    if (d && d.found && d.product) {
+      var p = d.product, rows = '';
+      rows += blRow('{% trans "SKU" %}', blEsc(p.sku || '—'));
+      rows += blRow('{% trans "Name" %}', blEsc(p.name || '—'));
+      rows += blRow('{% trans "Stock" %}', (p.quantity || 0).toFixed(2) + ' m');
+      rows += blRow('{% trans "Tops" %}', (p.rolls_count || 0) + ' top');
+      if (p.main_product) rows += blRow('{% trans "Main product" %}', blEsc(p.main_product));
+      if (d.roll) rows += blRow('{% trans "This top" %}', (d.roll.meters || 0).toFixed(2) + ' m' + (d.roll.lot_number ? ' · Lot ' + blEsc(d.roll.lot_number) : ''));
+      r.innerHTML =
+        '<div class="bl-rc found">' +
+          '<div class="bl-rc-ico"><i class="fa fa-circle-check"></i></div>' +
+          '<h4>{% trans "Already in this warehouse" %}</h4>' +
+          '<div class="bl-bc">' + blEsc(code) + '</div>' +
+          '<div class="bl-card">' + rows + '</div>' +
+          '<div class="bl-actions">' +
+            '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
+            '<a class="bl-btn primary" href="' + p.detail_url + '"><i class="fa fa-pen-to-square"></i> {% trans "Open / edit" %}</a>' +
+          '</div>' +
+        '</div>';
+    } else {
+      r.innerHTML =
+        '<div class="bl-rc notfound">' +
+          '<div class="bl-rc-ico"><i class="fa fa-circle-xmark"></i></div>' +
+          '<h4>{% trans "Not in this warehouse" %}</h4>' +
+          '<div class="bl-bc">' + blEsc(code) + '</div>' +
+          '<p style="color:#94A3B8; font:500 13px var(--font-sans); margin:0 0 4px;">{% trans "This barcode has not been added yet." %}</p>' +
+          '<div class="bl-actions">' +
+            '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
+            '<button type="button" class="bl-btn primary" onclick="closeBarcodeLookup(); openRollScanner();"><i class="fa fa-camera"></i> {% trans "Add it" %}</button>' +
+          '</div>' +
+        '</div>';
+    }
+  }
+  function lookupScanAgain() {
+    blLastCode = '';
+    blShowScan();
+    var v = document.getElementById('blVideo');
+    if (blStream && v) { blRunning = true; loadZxw().then(function () { blLoop(v); }); }
+    else startLookupCamera();
+  }
+  function blRow(k, v) { return '<div class="bl-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+  function blAgainBtn() { return '<div class="bl-actions"><button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button></div>'; }
+  function blEsc(s) { return (s || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.getElementById('blOverlay').classList.contains('show')) closeBarcodeLookup();
+  });
 </script>
 {% endblock %}

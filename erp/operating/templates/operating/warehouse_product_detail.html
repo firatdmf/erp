@@ -248,6 +248,18 @@
   @keyframes slideUp { from {transform: translateY(12px); opacity:0;} to {transform: translateY(0); opacity:1;} }
   .so-card h3 { font: 800 16px var(--font-sans); color: #0F1419; margin: 0 0 14px; }
   .so-fld { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  /* "Main product" autocomplete dropdown in the edit modal */
+  .pe-ac-drop {
+    display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 50;
+    background: #fff; border: 1px solid #E2E8EE; border-radius: 8px; margin-top: 4px;
+    box-shadow: 0 10px 28px rgba(15,23,31,0.12); max-height: 240px; overflow-y: auto;
+  }
+  .pe-ac-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 12px; cursor: pointer; font: 600 13px var(--font-sans); color: #0F1419;
+  }
+  .pe-ac-item:hover { background: var(--nejum-teal-50, #E9F5F3); }
+  .pe-ac-item .pe-ac-vc { font: 600 11px var(--font-sans); color: var(--gray-500); white-space: nowrap; }
   .so-fld label {
     font: 700 10.5px var(--font-sans); color: var(--gray-700);
     letter-spacing: 0.06em; text-transform: uppercase;
@@ -595,6 +607,16 @@
                     <i class="fa fa-qrcode"></i>
                   </a>
                   <button type="button"
+                          class="roll-delete-btn" style="color:var(--nejum-teal-700);"
+                          title="{% trans 'Edit this roll' %}"
+                          data-roll-id="{{ r.pk }}"
+                          data-barcode="{{ r.barcode|default:'' }}"
+                          data-meters="{% if r.meters is not None %}{{ r.meters|stringformat:'.2f' }}{% endif %}"
+                          data-lot="{{ r.lot_number|default:'' }}"
+                          onclick="openRollEdit(this)">
+                    <i class="fa fa-pen"></i>
+                  </button>
+                  <button type="button"
                           class="roll-delete-btn"
                           title="{% trans 'Delete this roll' %}"
                           data-roll-id="{{ r.pk }}"
@@ -813,9 +835,40 @@
   </div>
 </div>
 
+<!-- Roll edit modal -->
+<div class="so-overlay" id="reOverlay" onclick="if(event.target===this){closeRE();}">
+  <div class="so-card">
+    <h3 style="display:flex; align-items:center; gap:10px;">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--nejum-teal-50);color:var(--nejum-teal-700);">
+        <i class="fa fa-pen"></i>
+      </span>
+      {% trans "Edit roll" %}
+    </h3>
+    <div class="so-fld">
+      <label>{% trans "Barcode" %} <small style="color:var(--gray-500);font-weight:500;">{% trans "(this roll/top)" %}</small></label>
+      <input class="so-input" type="text" id="reBarcode" placeholder="—">
+    </div>
+    <div class="so-fld">
+      <label>{% trans "Meters (m)" %}</label>
+      <input class="so-input" type="number" step="0.01" id="reMeters" placeholder="0.00">
+    </div>
+    <div class="so-fld">
+      <label>{% trans "Lot No" %}</label>
+      <input class="so-input" type="text" id="reLot" placeholder="—">
+    </div>
+    <div class="so-actions">
+      <button type="button" class="ord-btn ghost" onclick="closeRE()">{% trans "Cancel" %}</button>
+      <button type="button" class="ord-btn primary" id="reSubmit" onclick="submitRollEdit()">
+        <i class="fa fa-floppy-disk"></i> {% trans "Save" %}
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
   const stockOutUrl = "{% url 'operating:warehouse_stock_out' warehouse.pk product.pk %}";
   const rollDeleteUrlPattern = "{% url 'operating:warehouse_roll_delete' warehouse.pk product.pk 0 %}";
+  const rollEditUrlPattern = "{% url 'operating:warehouse_roll_edit' warehouse.pk product.pk 0 %}";
   const csrftoken = '{{ csrf_token }}';
 
   // ── Roll delete ──────────────────────────────────────────────
@@ -865,6 +918,45 @@
   document.addEventListener('keydown', function(e){
     if(e.key==='Escape') closeRD();
   });
+
+  // ── Roll edit ────────────────────────────────────────────────
+  let _reRollId = null;
+  function openRollEdit(btn) {
+    _reRollId = btn.dataset.rollId;
+    document.getElementById('reBarcode').value = btn.dataset.barcode || '';
+    document.getElementById('reMeters').value  = btn.dataset.meters || '';
+    document.getElementById('reLot').value     = btn.dataset.lot || '';
+    document.getElementById('reOverlay').classList.add('show');
+  }
+  function closeRE() {
+    document.getElementById('reOverlay').classList.remove('show');
+    _reRollId = null;
+  }
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeRE(); });
+  function submitRollEdit() {
+    if (!_reRollId) return;
+    const btn = document.getElementById('reSubmit');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+    const url = rollEditUrlPattern.replace('/0/', '/' + _reRollId + '/');
+    const fd = new FormData();
+    fd.append('barcode', document.getElementById('reBarcode').value || '');
+    fd.append('meters', document.getElementById('reMeters').value || '');
+    fd.append('lot_number', document.getElementById('reLot').value || '');
+    fetch(url, {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(r => r.json()).then(data => {
+      btn.disabled = false; btn.innerHTML = orig;
+      if (!data.success) { alert(data.error || 'Failed'); return; }
+      closeRE();
+      window.location.reload();
+    }).catch(() => {
+      btn.disabled = false; btn.innerHTML = orig;
+      alert('Network error');
+    });
+  }
 
   function closeSO() {
     document.getElementById('soOverlay').classList.remove('show');
@@ -919,6 +1011,18 @@
       <div class="so-fld">
         <label>{% trans "SKU" %}</label>
         <input class="so-input" type="text" name="sku" value="{{ product.sku|default:'' }}">
+      </div>
+      <div class="so-fld" style="position:relative;">
+        <label>{% trans "Main product (catalog)" %}</label>
+        {% if product.catalog_variant_id and product.catalog_variant.product_id %}
+        <div style="font-size:12px;color:var(--gray-500);margin-bottom:4px;">
+          {% trans "Currently" %}: <b>{{ product.catalog_variant.product.title }}</b>{% if product.catalog_variant.product.sku %} ({{ product.catalog_variant.product.sku }}){% endif %}
+        </div>
+        {% endif %}
+        <input class="so-input" type="text" name="catalog_base_name" id="peCatalogBase" value=""
+               autocomplete="off" oninput="peCatalogSearch()" onblur="setTimeout(peCatalogHide,180)"
+               placeholder="{% trans 'Type to search a main product, or leave blank (auto from SKU)' %}">
+        <div id="peCatalogDrop" class="pe-ac-drop"></div>
       </div>
       <div class="so-fld">
         <label>{% trans "Barcode" %}</label>
@@ -982,6 +1086,41 @@
 <script>
   const productEditUrl = "{% url 'operating:warehouse_product_edit' warehouse.pk product.pk %}";
   const productDeleteUrl = "{% url 'operating:warehouse_product_delete' warehouse.pk product.pk %}";
+  const catalogSearchUrlPE = "{% url 'operating:catalog_base_search' warehouse.pk %}";
+
+  // ── "Main product" autocomplete in the edit modal ──
+  let _peCatTimer = null;
+  function peEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function peCatalogSearch() {
+    clearTimeout(_peCatTimer);
+    const inp = document.getElementById('peCatalogBase');
+    const drop = document.getElementById('peCatalogDrop');
+    const q = (inp.value || '').trim();
+    if (q.length < 1) { peCatalogHide(); return; }
+    _peCatTimer = setTimeout(function () {
+      fetch(catalogSearchUrlPE + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          const items = (d && d.results) || [];
+          if (!items.length) { drop.innerHTML = ''; drop.style.display = 'none'; return; }
+          drop.innerHTML = items.map(function (it) {
+            const t = peEsc(it.title);
+            return '<div class="pe-ac-item" data-title="' + t + '" onmousedown="peCatalogPick(this)">' +
+                   '<span>' + t + '</span><span class="pe-ac-vc">' + (it.variants || 0) + ' var.</span></div>';
+          }).join('');
+          drop.style.display = 'block';
+        }).catch(function () { peCatalogHide(); });
+    }, 250);
+  }
+  function peCatalogPick(el) {
+    const inp = document.getElementById('peCatalogBase');
+    if (inp) inp.value = el.getAttribute('data-title') || '';
+    peCatalogHide();
+  }
+  function peCatalogHide() {
+    const drop = document.getElementById('peCatalogDrop');
+    if (drop) drop.style.display = 'none';
+  }
 
   function closePE(){ document.getElementById('peOverlay').classList.remove('show'); }
   function closePD(){ document.getElementById('pdOverlay').classList.remove('show'); }
@@ -1002,6 +1141,7 @@
     }).then(r => r.json()).then(data => {
       btn.disabled = false; btn.innerHTML = orig;
       if (!data.success) { alert(data.error || 'Failed'); return; }
+      if (data.catalog_warning) { alert('{% trans "Catalog note" %}:\n' + data.catalog_warning); }
       closePE();
       window.location.reload();
     }).catch(() => {

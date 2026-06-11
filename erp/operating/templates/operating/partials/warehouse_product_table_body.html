@@ -3,7 +3,7 @@
 
 {% if paginator.num_pages > 1 %}
 <tr id="wh-pagination-row">
-  <td colspan="7" style="padding: 14px 10px; background:#F8FAFC; border-top:1px solid #E2E8EE;">
+  <td colspan="6" style="padding: 14px 10px; background:#F8FAFC; border-top:1px solid #E2E8EE;">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
       <div style="font:500 12.5px var(--font-sans); color:var(--gray-600);">
         {% trans "Showing" %} <b style="color:#0F1419;">{{ page.start_index }}–{{ page.end_index }}</b>
@@ -14,7 +14,7 @@
       <div class="wh-pager">
         {% if page.has_previous %}
           <button type="button" class="wh-pg-btn"
-                  hx-get="?page={{ page.previous_page_number }}&search={{ search|urlencode }}&sort={{ sort }}"
+                  hx-get="?page={{ page.previous_page_number }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}"
                   hx-target="#wh-rows" hx-swap="innerHTML">
             <i class="fa fa-chevron-left"></i> {% trans "Prev" %}
           </button>
@@ -27,7 +27,7 @@
             <button type="button" class="wh-pg-btn active">{{ n }}</button>
           {% elif n == 1 or n == page.paginator.num_pages or n|add:'-2' <= page.number and n|add:'2' >= page.number %}
             <button type="button" class="wh-pg-btn"
-                    hx-get="?page={{ n }}&search={{ search|urlencode }}&sort={{ sort }}"
+                    hx-get="?page={{ n }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}"
                     hx-target="#wh-rows" hx-swap="innerHTML">{{ n }}</button>
           {% elif n == page.number|add:'-3' or n == page.number|add:'3' %}
             <span style="padding:0 4px; color:var(--gray-400);">…</span>
@@ -36,7 +36,7 @@
 
         {% if page.has_next %}
           <button type="button" class="wh-pg-btn"
-                  hx-get="?page={{ page.next_page_number }}&search={{ search|urlencode }}&sort={{ sort }}"
+                  hx-get="?page={{ page.next_page_number }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}"
                   hx-target="#wh-rows" hx-swap="innerHTML">
             {% trans "Next" %} <i class="fa fa-chevron-right"></i>
           </button>

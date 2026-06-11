@@ -299,53 +299,108 @@ class WarehouseDetail(View):
 
         base_qs = WarehouseProduct.objects.filter(warehouse=warehouse)
         if search:
+            # Search name / SKU / product-barcode, AND each roll's (top's)
+            # own barcode — the real physical barcodes live on the rolls.
+            # Match rolls via a SUBQUERY (not a join) so the grouped-view
+            # Sum() aggregates don't get multiplied by the rolls join.
+            roll_match = WarehouseProductRoll.objects.filter(
+                product__warehouse=warehouse, barcode__icontains=search
+            ).values('product_id')
             base_qs = base_qs.filter(
-                Q(name__icontains=search) | Q(sku__icontains=search) | Q(barcode__icontains=search)
+                Q(name__icontains=search) | Q(sku__icontains=search)
+                | Q(barcode__icontains=search) | Q(id__in=roll_match)
             )
 
-        # ── Group in SQL by main product (base name). One row per group →
-        #    cheap to paginate even with thousands of variants. Each group
-        #    expands to its variants (stock / SKU / rolls=tops/coupons). ──
-        grouped = (base_qs.annotate(base=base_expr).values("base").annotate(
-            variant_count=Count("id"),
-            linked=Count("catalog_variant"),
-            total_qty=Coalesce(Sum("quantity"), Decimal("0"),
-                               output_field=DecimalField(max_digits=18, decimal_places=2)),
-            total_usd=Coalesce(Sum(F("quantity") * F("cost_usd")), Decimal("0"),
-                               output_field=DecimalField(max_digits=20, decimal_places=4)),
-            total_try=Coalesce(Sum(F("quantity") * F("cost_try")), Decimal("0"),
-                               output_field=DecimalField(max_digits=20, decimal_places=4)),
-        ))
-        _sort_map = {
-            "name_asc": "base", "name_desc": "-base",
-            "qty_asc": "total_qty", "qty_desc": "-total_qty",
-            "price_asc": "total_usd", "price_desc": "-total_usd",
-            "total_usd_asc": "total_usd", "total_usd_desc": "-total_usd",
-            "total_try_asc": "total_try", "total_try_desc": "-total_try",
-        }
-        grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
+        # Two list modes: 'grouped' (default — main products, expandable) and
+        # 'variants' (FLAT — every variant/roll-carrier on its own row).
+        view_mode = (request.GET.get('view') or 'grouped').strip()
+        if view_mode not in ('grouped', 'variants'):
+            view_mode = 'grouped'
 
-        # Paginate the GROUPS (main products), not the variant rows.
-        paginator = Paginator(grouped, PAGE_SIZE)
-        try:
-            page = paginator.page(int(page_num))
-        except (PageNotAnInteger, ValueError):
-            page = paginator.page(1)
-        except EmptyPage:
-            page = paginator.page(paginator.num_pages or 1)
+        groups_render = []
+        variants_render = []
 
-        # Only the group HEADERS render up-front — variants load lazily on
-        # expand (a single base can hold thousands of variants, so rendering
-        # them all would freeze the page).
-        groups_render = [{
-            "base": g["base"] or "",
-            "title": g["base"] or "—",
-            "variant_count": g["variant_count"],
-            "total_qty": g["total_qty"],
-            "total_usd": g["total_usd"],
-            "total_try": g["total_try"],
-            "is_catalog": (g.get("linked") or 0) > 0,
-        } for g in page.object_list]
+        if view_mode == 'variants':
+            # ── FLAT: list EVERY variant (WarehouseProduct) individually. ──
+            flat = (base_qs
+                    .select_related('catalog_variant__product')
+                    .annotate(base=base_expr, roll_count=Count('rolls'),
+                              line_usd=F('quantity') * F('cost_usd'),
+                              line_try=F('quantity') * F('cost_try')))
+            # Variant list sorts by SKU first, then name (per request).
+            _flat_sort = {
+                "name_asc": "sku", "name_desc": "-sku",
+                "qty_asc": "quantity", "qty_desc": "-quantity",
+                "price_asc": "cost_usd", "price_desc": "-cost_usd",
+                "total_usd_asc": "line_usd", "total_usd_desc": "-line_usd",
+                "total_try_asc": "line_try", "total_try_desc": "-line_try",
+                "recent": "-updated_at",
+            }
+            flat = flat.order_by(_flat_sort.get(sort, "sku"), "name", "id")
+            paginator = Paginator(flat, PAGE_SIZE)
+            try:
+                page = paginator.page(int(page_num))
+            except (PageNotAnInteger, ValueError):
+                page = paginator.page(1)
+            except EmptyPage:
+                page = paginator.page(paginator.num_pages or 1)
+            variants_render = list(page.object_list)
+        else:
+            # ── Group in SQL by main product (base name). One row per group →
+            #    cheap to paginate even with thousands of variants. Each group
+            #    expands to its variants (stock / SKU / rolls=tops/coupons). ──
+            grouped = (base_qs.annotate(base=base_expr).values("base").annotate(
+                variant_count=Count("id"),
+                linked=Count("catalog_variant"),
+                total_qty=Coalesce(Sum("quantity"), Decimal("0"),
+                                   output_field=DecimalField(max_digits=18, decimal_places=2)),
+                total_usd=Coalesce(Sum(F("quantity") * F("cost_usd")), Decimal("0"),
+                                   output_field=DecimalField(max_digits=20, decimal_places=4)),
+                total_try=Coalesce(Sum(F("quantity") * F("cost_try")), Decimal("0"),
+                                   output_field=DecimalField(max_digits=20, decimal_places=4)),
+            ))
+            _sort_map = {
+                "name_asc": "base", "name_desc": "-base",
+                "qty_asc": "total_qty", "qty_desc": "-total_qty",
+                "price_asc": "total_usd", "price_desc": "-total_usd",
+                "total_usd_asc": "total_usd", "total_usd_desc": "-total_usd",
+                "total_try_asc": "total_try", "total_try_desc": "-total_try",
+            }
+            grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
+
+            # Paginate the GROUPS (main products), not the variant rows.
+            paginator = Paginator(grouped, PAGE_SIZE)
+            try:
+                page = paginator.page(int(page_num))
+            except (PageNotAnInteger, ValueError):
+                page = paginator.page(1)
+            except EmptyPage:
+                page = paginator.page(paginator.num_pages or 1)
+
+            # Total tops (rolls) per group on THIS page — computed in a
+            # SEPARATE query (Count only) so it doesn't multiply the Sum()s
+            # above via the rolls join.
+            _bases = [g["base"] for g in page.object_list]
+            _roll_counts = {}
+            if _bases:
+                _rc = (base_qs.annotate(base=base_expr)
+                       .filter(base__in=_bases).values("base")
+                       .annotate(rc=Count("rolls")))
+                _roll_counts = {r["base"]: r["rc"] for r in _rc}
+
+            # Only the group HEADERS render up-front — variants load lazily on
+            # expand (a single base can hold thousands of variants, so rendering
+            # them all would freeze the page).
+            groups_render = [{
+                "base": g["base"] or "",
+                "title": g["base"] or "—",
+                "variant_count": g["variant_count"],
+                "roll_total": _roll_counts.get(g["base"], 0),
+                "total_qty": g["total_qty"],
+                "total_usd": g["total_usd"],
+                "total_try": g["total_try"],
+                "is_catalog": (g.get("linked") or 0) > 0,
+            } for g in page.object_list]
 
         # Aggregate totals across the whole warehouse (independent of
         # filter). Net-worth uses the model methods so products that
@@ -355,19 +410,27 @@ class WarehouseDetail(View):
             n=Count('id'),
             qty=Coalesce(Sum('quantity'), Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2)),
         )
+        # Header counts: main products (packages), variants, and rolls (tops).
+        group_count = (all_products.annotate(base=base_expr)
+                       .values('base').distinct().count())
+        roll_count = WarehouseProductRoll.objects.filter(product__warehouse=warehouse).count()
         total_value_usd = warehouse.total_value_usd()
         total_value_try = warehouse.total_value_try()
 
         ctx = {
             'warehouse': warehouse,
-            'groups': groups_render,  # main-product groups on this page
+            'groups': groups_render,      # main-product groups on this page
+            'variants': variants_render,  # flat variant rows on this page (view=variants)
+            'view_mode': view_mode,
             'page': page,
             'paginator': paginator,
             'total_value_usd': total_value_usd,
             'total_value_try': total_value_try,
-            'product_count': counts['n'],
+            'product_count': counts['n'],     # variants
+            'variant_count': counts['n'],     # alias — variants
+            'group_count': group_count,       # main products (packages)
+            'roll_count': roll_count,         # rolls (tops)
             'total_quantity': counts['qty'],
-            'group_count': paginator.count,
             'search': search,
             'sort': sort,
             'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
@@ -410,6 +473,64 @@ def warehouse_group_variants(request, pk):
         "shown": len(variants),
         "total": total,
         "base": base,
+    })
+
+
+@login_required
+def warehouse_barcode_lookup(request, pk):
+    """Barcode-only LOOKUP (separate from scanning to ADD). Given a scanned
+    barcode, says whether that product is already in this warehouse — match a
+    roll's (top's) barcode first, else the product barcode / SKU — and returns
+    its info so staff can confirm "did I already add this?" without searching."""
+    from django.db.models import Q
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    code = (request.GET.get("barcode") or "").strip()
+    if not code:
+        return JsonResponse({"found": False, "error": "No barcode"}, status=400)
+
+    matched = None
+    roll = (WarehouseProductRoll.objects
+            .select_related("product", "product__catalog_variant__product")
+            .filter(product__warehouse=warehouse, barcode__iexact=code)
+            .first())
+    if roll:
+        product = roll.product
+        matched = "roll"
+    else:
+        product = (WarehouseProduct.objects
+                   .select_related("catalog_variant__product")
+                   .filter(warehouse=warehouse)
+                   .filter(Q(barcode__iexact=code) | Q(sku__iexact=code))
+                   .first())
+        matched = ("sku" if (product and (product.sku or "").lower() == code.lower())
+                   else "product") if product else None
+
+    if not product:
+        return JsonResponse({"found": False, "barcode": code})
+
+    main = product.catalog_variant.product if product.catalog_variant_id else None
+    return JsonResponse({
+        "found": True,
+        "matched": matched,
+        "barcode": code,
+        "product": {
+            "id": product.pk,
+            "sku": product.sku,
+            "name": product.name,
+            "quantity": float(product.quantity or 0),
+            "rolls_count": product.rolls.count(),
+            "detail_url": reverse("operating:warehouse_product_detail",
+                                  args=[warehouse.pk, product.pk]),
+            "main_product": (main.title if main else None),
+            "main_product_url": (reverse("marketing:product_detail", args=[main.pk]) if main else None),
+        },
+        "roll": ({
+            "id": roll.pk,
+            "barcode": roll.barcode,
+            "meters": float(roll.meters or 0),
+            "meters_remaining": (float(roll.meters_remaining) if roll.meters_remaining is not None else None),
+            "lot_number": roll.lot_number,
+        } if roll else None),
     })
 
 
@@ -1860,6 +1981,9 @@ class WarehouseProductEdit(View):
         purchase_price_raw = (request.POST.get("purchase_price") or "").strip().replace(",", ".")
         purchase_currency = (request.POST.get("purchase_currency") or "USD").strip().upper()
         quantity_raw = (request.POST.get("quantity") or "").strip().replace(",", ".")
+        # Optional: explicitly move this variant under a different catalog
+        # main product (the base title typed/picked in the edit modal).
+        catalog_base = (request.POST.get("catalog_base_name") or "").strip()
 
         changes = []
         update_fields = ["updated_at"]
@@ -1923,9 +2047,36 @@ class WarehouseProductEdit(View):
 
         product.save(update_fields=list(set(update_fields)))
 
+        # Keep the hidden catalog in sync: if the SKU/name changed (or the
+        # user re-pointed the main product), re-link the catalog variant to
+        # the correct main product and rename variant_sku to match.
+        catalog_warning = None
+        catalog_info = None
+        sku_changed = "sku updated" in changes
+        name_changed = any(c.startswith("name →") for c in changes)
+        if (product.catalog_variant_id or catalog_base) and (sku_changed or name_changed or catalog_base):
+            try:
+                from .catalog_sync import resync_warehouse_product
+                variant, catalog_warning = resync_warehouse_product(
+                    product, base_override=catalog_base or None)
+                if variant:
+                    catalog_info = {
+                        "variant_id": variant.id,
+                        "variant_sku": variant.variant_sku,
+                        "product_id": variant.product_id,
+                        "product_title": variant.product.title,
+                        "product_sku": variant.product.sku,
+                    }
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+                catalog_warning = f"Katalog senkron hatası: {exc}"
+
         return JsonResponse({
             "success": True,
             "changes": changes,
+            "catalog": catalog_info,
+            "catalog_warning": catalog_warning,
             "product": {
                 "id": product.pk,
                 "name": product.name,
@@ -2012,6 +2163,102 @@ class WarehouseRollDelete(View):
                 "rolls_count": product.rolls.count(),
                 "active_rolls_count": product.rolls.exclude(status="consumed").count(),
             },
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseRollEdit(View):
+    """Edit ONE roll: barcode, meters, lot_number. Changing meters
+    re-rolls the parent product.quantity (recomputed from all rolls) and
+    logs an adjustment; the linked catalog variant quantity follows."""
+
+    def post(self, request, warehouse_pk, product_pk, roll_pk):
+        from django.db.models import Sum, F
+        from django.db.models.functions import Coalesce
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
+        roll = get_object_or_404(WarehouseProductRoll, pk=roll_pk, product=product)
+
+        changes = []
+        roll_fields = []
+
+        # ── Barcode (unique per roll within the warehouse) ──
+        barcode = (request.POST.get("barcode") or "").strip()
+        if (barcode or "") != (roll.barcode or ""):
+            if barcode and (WarehouseProductRoll.objects
+                            .filter(product__warehouse=warehouse, barcode=barcode)
+                            .exclude(pk=roll.pk).exists()):
+                return JsonResponse({"success": False,
+                                     "error": "Bu barkod zaten başka bir topta kullanılıyor."},
+                                    status=400)
+            roll.barcode = barcode or None
+            roll_fields.append("barcode"); changes.append("barcode")
+
+        # ── Lot number ──
+        lot = (request.POST.get("lot_number") or "").strip()
+        if (lot or "") != (roll.lot_number or ""):
+            roll.lot_number = lot or None
+            roll_fields.append("lot_number"); changes.append("lot")
+
+        # ── Meters (full length); keep any already-consumed amount ──
+        meters_raw = (request.POST.get("meters") or "").strip().replace(",", ".")
+        meters_changed = False
+        if meters_raw:
+            try:
+                new_full = Decimal(meters_raw)
+            except (InvalidOperation, TypeError):
+                return JsonResponse({"success": False, "error": "Geçersiz metre değeri."}, status=400)
+            if new_full <= 0:
+                return JsonResponse({"success": False, "error": "Metre pozitif olmalı."}, status=400)
+            old_full = roll.meters or Decimal("0")
+            consumed = Decimal("0")
+            if roll.meters_remaining is not None and old_full:
+                consumed = max(Decimal("0"), old_full - roll.meters_remaining)
+            if new_full != old_full:
+                roll.meters = new_full
+                roll.meters_remaining = max(Decimal("0"), new_full - consumed)
+                roll_fields.extend(["meters", "meters_remaining"])
+                meters_changed = True
+                changes.append("meters")
+
+        if roll_fields:
+            roll.save(update_fields=list(set(roll_fields)))
+
+        # Recompute the parent quantity authoritatively from its rolls
+        # (current stock = remaining meters, falling back to full meters).
+        if meters_changed:
+            total = product.rolls.aggregate(
+                s=Coalesce(Sum(Coalesce(F("meters_remaining"), F("meters"))),
+                           Decimal("0"),
+                           output_field=DecimalField(max_digits=18, decimal_places=2)))["s"]
+            old_qty = product.quantity or Decimal("0")
+            if total != old_qty:
+                product.quantity = total
+                product.save(update_fields=["quantity", "updated_at"])
+                StockMovement.objects.create(
+                    product=product, roll=roll, movement_type="adjustment",
+                    quantity=abs(total - old_qty),
+                    reason=f"Roll meters edited ({old_qty}m → {total}m)",
+                    reference=roll.barcode or f"Roll #{roll.pk}",
+                    created_by=request.user if request.user.is_authenticated else None,
+                )
+            # Mirror onto the linked catalog variant.
+            if product.catalog_variant_id:
+                v = product.catalog_variant
+                v.variant_quantity = product.quantity
+                v.save(update_fields=["variant_quantity"])
+
+        return JsonResponse({
+            "success": True,
+            "changes": changes,
+            "roll": {
+                "id": roll.pk,
+                "barcode": roll.barcode,
+                "meters": float(roll.meters or 0),
+                "meters_remaining": float(roll.meters_remaining or 0) if roll.meters_remaining is not None else None,
+                "lot_number": roll.lot_number,
+            },
+            "product_quantity": float(product.quantity or 0),
         })
 
 
@@ -2161,19 +2408,49 @@ class WarehouseRollScan(View):
             # variant (color/model) and tell the UI whether that base
             # product already exists in the marketing catalog.
             from .catalog_sync import derive_catalog
-            from marketing.models import Product as _CatProduct
+            from marketing.models import Product as _CatProduct, ProductVariant as _CatVariant
             cp = derive_catalog(parsed.get("sku"), parsed.get("name"), parsed.get("color"))
-            base_exists = bool(
-                cp["base_name"]
-                and _CatProduct.objects.filter(title__iexact=cp["base_name"]).exists()
-            )
+            base_name = cp["base_name"]
+            attribute_name = cp["attribute_name"]
+            attribute_value = cp["attribute_value"]
+
+            # If this EXACT variant_sku already exists in the catalog, this is
+            # the SAME variant being re-scanned (a new roll/barcode of it) —
+            # reuse the main product + colour/model from the FIRST time so the
+            # user doesn't have to refill them (they can still edit). Only the
+            # barcode differs roll-to-roll.
+            variant_exists = False
+            scanned_sku = (parsed.get("sku") or "").strip()
+            try:
+                if scanned_sku:
+                    ev = (_CatVariant.objects.select_related("product")
+                          .filter(variant_sku=scanned_sku).first())
+                    if ev:
+                        variant_exists = True
+                        base_name = ev.product.title or base_name
+                        av = (ev.product_variant_attribute_values
+                              .select_related("product_variant_attribute")
+                              .order_by("-id").first())
+                        if av:
+                            attribute_name = av.product_variant_attribute.name
+                            # de-normalize for display ("dark_cream" → "DARK CREAM")
+                            attribute_value = av.product_variant_attribute_value.replace("_", " ").upper()
+
+                base_exists = bool(
+                    base_name and _CatProduct.objects.filter(title__iexact=base_name).exists()
+                )
+            except Exception as exc:
+                # A catalog hiccup must never break the OCR preview.
+                print(f"[OCR] catalog_preview lookup failed: {exc}", flush=True)
+                base_exists = False
             catalog_preview = {
-                "base_name": cp["base_name"],
+                "base_name": base_name,
                 "base_exists": base_exists,
-                "attribute_name": cp["attribute_name"],
-                "attribute_value": cp["attribute_value"],
+                "attribute_name": attribute_name,
+                "attribute_value": attribute_value,
                 "original_token": cp["original_token"],
                 "is_color": cp["is_color"],
+                "variant_exists": variant_exists,
             }
 
             return JsonResponse({

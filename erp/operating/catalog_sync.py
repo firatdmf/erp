@@ -355,6 +355,66 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
     return product, variant, product_created, variant_created
 
 
+def resync_warehouse_product(wp, base_override=None):
+    """Re-sync ONE warehouse product into the catalog after an edit
+    (sku / name / main-product change).
+
+    Re-links its catalog variant to the base product derived from the
+    CURRENT sku — or to ``base_override`` (an explicit main-product title) —
+    moving it OFF a wrong main product if needed and renaming the variant_sku
+    to match the corrected warehouse sku. The variant's colour/model is
+    preserved. Empty hidden products left behind are removed.
+
+    Returns (variant, warning) — warning is a message string if the change
+    couldn't be applied (e.g. the sku already belongs to another variant),
+    in which case nothing is modified.
+    """
+    from django.db import transaction as _tx
+    from marketing.models import Product, ProductVariant
+
+    sku = (wp.sku or "").strip()
+    if not sku:
+        return None, None
+
+    old = wp.catalog_variant
+    # Refuse if the (possibly new) sku already belongs to a DIFFERENT variant
+    # — don't silently merge or destroy the existing link.
+    clash = (ProductVariant.objects.filter(variant_sku=sku)
+             .exclude(pk=old.pk if old else 0).first())
+    if clash:
+        return None, (f"variant_sku '{sku}' zaten başka bir varyanta ait "
+                      f"(ürün #{clash.product_id}).")
+
+    with _tx.atomic():
+        attr_name = attr_value = None
+        if old:
+            av = (old.product_variant_attribute_values
+                  .select_related("product_variant_attribute").order_by("-id").first())
+            if av:
+                attr_name = av.product_variant_attribute.name
+                attr_value = av.product_variant_attribute_value
+            old_pid = old.product_id
+            wp.catalog_variant = None
+            wp.save(update_fields=["catalog_variant"])
+            old.delete()
+            if (Product.objects.filter(pk=old_pid, featured=False).exists()
+                    and not ProductVariant.objects.filter(product_id=old_pid).exists()):
+                Product.objects.filter(pk=old_pid).delete()
+
+        cat = derive_catalog(sku, wp.name or "")
+        base = (base_override or cat["base_name"] or "").strip()
+        _p, variant, _pc, _vc = sync_roll_to_catalog(
+            base_name=base,
+            attribute_name=attr_name or cat["attribute_name"],
+            attribute_value=attr_value or cat["attribute_value"],
+            variant_sku=sku, variant_barcode=wp.barcode,
+            quantity=wp.quantity, cost=wp.cost_usd,
+        )
+        wp.catalog_variant = variant
+        wp.save(update_fields=["catalog_variant"])
+        return variant, None
+
+
 def rebuild_catalog_from_warehouse(warehouse=None, apply=True):
     """Reconstruct the hidden catalog from the warehouse (the source of truth).
 

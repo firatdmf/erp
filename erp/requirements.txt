@@ -142,3 +142,4 @@ wrapt==1.14.1
 wsproto==1.2.0
 zipp==3.17.0
 zstandard==0.19.0
+openai==2.41.0

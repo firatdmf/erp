@@ -104,8 +104,9 @@ coverage.xml
 # Jupyter Notebook 
 .ipynb_checkpoints 
 
-# pyenv 
-.python-version 
+# pyenv (NOTE: .python-version is intentionally tracked so Railway/Railpack
+# pins the Python version at build time — do not re-ignore it)
+# .python-version
 
 # celery 
 celerybeat-schedule.* 

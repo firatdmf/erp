@@ -242,6 +242,17 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
     qty = _to_decimal(quantity)
     cost_dec = _to_decimal(cost)
 
+    def _safe_sku(base):
+        """The main-product SKU is the base code (K1245.G13 → 'K1245').
+        Product.sku is globally unique, so never collide with another
+        product's SKU — fall back to null if it's already taken."""
+        b = (base or "").strip()[:20]
+        if not b:
+            return None
+        if Product.objects.filter(sku__iexact=b).exists():
+            return None
+        return b
+
     # 1) Resolve / create the hidden base product. Never touch a featured
     #    (website-visible) product — keep the hidden catalog separate.
     product = existing_base_product
@@ -251,12 +262,19 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
                    .order_by("id").first())
     if product is None:
         product = Product.objects.create(
-            title=base_name, sku=None, featured=False,
+            title=base_name, sku=_safe_sku(base_name), featured=False,
             unit_of_measurement="mt", quantity=Decimal("0"),
         )
         product_created = True
     else:
         product_created = False
+        # Backfill the main-product SKU (the base code) on older hidden
+        # products that were created before this without one.
+        if not (product.sku or "").strip():
+            new_sku = _safe_sku(product.title)
+            if new_sku:
+                product.sku = new_sku
+                product.save(update_fields=["sku"])
 
     # 2) Lock the variant row (concurrent scans of the same roll are safe).
     existing = (ProductVariant.objects.select_for_update()
@@ -288,15 +306,42 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         )
         variant_created = True
 
-    # 3) Attribute + value (pre-normalized so get_or_create matches existing rows).
+    # 3) Attribute. A scanned product carries ONE attribute dimension
+    #    (colour OR model) and ONE value. Enforce both:
+    #      • LATEST value wins for THIS variant — re-scanning the same
+    #        variant_sku with a new colour (blue → navy blue) REPLACES the
+    #        old value instead of piling up "blue, navy_blue".
+    #      • LATEST attribute TYPE wins for the whole product — mixing
+    #        "color" and "model" on one product spawns a colour×model matrix
+    #        of phantom variants, so every OTHER variant of the product is
+    #        migrated onto this scan's dimension (each value's text is kept).
     if attribute_name and attribute_value:
-        attr, _ = ProductVariantAttribute.objects.get_or_create(
-            name=_norm_attr(attribute_name))
-        value_obj, _ = ProductVariantAttributeValue.objects.get_or_create(
-            product_variant_attribute=attr,
-            product_variant_attribute_value=_norm_value(attribute_value))
-        # 4) Link M2M (idempotent via the through table).
         Through = ProductVariant.product_variant_attribute_values.through
+        target_attr, _ = ProductVariantAttribute.objects.get_or_create(
+            name=_norm_attr(attribute_name))
+
+        # Migrate OTHER variants of this product off any different dimension.
+        other_links = (Through.objects
+                       .filter(productvariant__product=product)
+                       .exclude(productvariant_id=variant.id)
+                       .select_related("productvariantattributevalue"))
+        for link in other_links:
+            val = link.productvariantattributevalue
+            if val.product_variant_attribute_id == target_attr.id:
+                continue
+            moved, _ = ProductVariantAttributeValue.objects.get_or_create(
+                product_variant_attribute=target_attr,
+                product_variant_attribute_value=val.product_variant_attribute_value)
+            Through.objects.get_or_create(
+                productvariant_id=link.productvariant_id,
+                productvariantattributevalue_id=moved.id)
+            link.delete()
+
+        # THIS variant: drop every old value, keep only the latest one.
+        value_obj, _ = ProductVariantAttributeValue.objects.get_or_create(
+            product_variant_attribute=target_attr,
+            product_variant_attribute_value=_norm_value(attribute_value))
+        Through.objects.filter(productvariant_id=variant.id).delete()
         Through.objects.get_or_create(
             productvariant_id=variant.id,
             productvariantattributevalue_id=value_obj.id)
@@ -308,3 +353,94 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
     product.save(update_fields=["quantity"])
 
     return product, variant, product_created, variant_created
+
+
+def rebuild_catalog_from_warehouse(warehouse=None, apply=True):
+    """Reconstruct the hidden catalog from the warehouse (the source of truth).
+
+    Early scans (before the grouping/İ/name-merge fixes) left the catalog
+    tangled — variants filed under the wrong main product, blank main-product
+    SKUs, garbled variant_skus. This rebuilds it deterministically from each
+    warehouse product's CURRENT sku/name:
+
+      * deletes the old (mis-grouped) catalog variant,
+      * re-creates it under the CORRECT base product derived from the
+        warehouse SKU (``K24620İ.G52`` → main product ``K24620İ``),
+      * variant_sku = the warehouse SKU; main-product SKU = the base code,
+      * the previous colour/model attribute is preserved,
+      * hidden products left empty are removed.
+
+    Idempotent — re-running yields the same result (the warehouse drives it).
+    Pass apply=False for a dry-run that only reports the intended grouping.
+    Returns a summary dict.
+    """
+    from django.db import transaction as _tx
+    from operating.models import WarehouseProduct
+    from marketing.models import Product, ProductVariant
+
+    wps = (WarehouseProduct.objects
+           .filter(catalog_variant__isnull=False)
+           .select_related("catalog_variant__product"))
+    if warehouse is not None:
+        wps = wps.filter(warehouse=warehouse)
+
+    # Snapshot every link BEFORE tearing anything down (so we keep colours).
+    snaps, old_variant_ids, old_product_ids = [], set(), set()
+    for wp in wps:
+        v = wp.catalog_variant
+        av = (v.product_variant_attribute_values
+              .select_related("product_variant_attribute").order_by("-id").first())
+        snaps.append({
+            "wp": wp, "sku": (wp.sku or "").strip(), "name": wp.name or "",
+            "barcode": wp.barcode, "qty": wp.quantity, "cost": wp.cost_usd,
+            "attr_name": av.product_variant_attribute.name if av else None,
+            "attr_value": av.product_variant_attribute_value if av else None,
+        })
+        old_variant_ids.add(v.id)
+        old_product_ids.add(v.product_id)
+
+    summary = {"warehouse_products": len(snaps), "rebuilt": 0,
+               "deleted_variants": 0, "deleted_products": 0, "conflicts": []}
+
+    if not apply:
+        summary["plan"] = [
+            {"variant_sku": s["sku"], "name": s["name"],
+             "main_product": derive_catalog(s["sku"], s["name"])["base_name"]}
+            for s in snaps]
+        return summary
+
+    with _tx.atomic():
+        # 1) Unlink, then tear down the affected HIDDEN products ENTIRELY —
+        #    every variant including orphans no warehouse product points at —
+        #    and rebuild them from the warehouse below. Never touch a featured
+        #    (website-visible) product.
+        WarehouseProduct.objects.filter(
+            pk__in=[s["wp"].pk for s in snaps]).update(catalog_variant=None)
+        hidden_pids = list(Product.objects.filter(
+            id__in=old_product_ids, featured=False).values_list("id", flat=True))
+        if hidden_pids:
+            summary["deleted_variants"] = ProductVariant.objects.filter(
+                product_id__in=hidden_pids).delete()[0]
+            summary["deleted_products"] = Product.objects.filter(
+                id__in=hidden_pids).delete()[0]
+
+        # 2) Re-sync each warehouse product into the correct catalog shape.
+        for s in snaps:
+            if not s["sku"]:
+                continue
+            cat = derive_catalog(s["sku"], s["name"])
+            try:
+                _p, variant, _pc, _vc = sync_roll_to_catalog(
+                    base_name=cat["base_name"],
+                    attribute_name=s["attr_name"] or cat["attribute_name"],
+                    attribute_value=s["attr_value"] or cat["attribute_value"],
+                    variant_sku=s["sku"], variant_barcode=s["barcode"],
+                    quantity=s["qty"], cost=s["cost"],
+                )
+                s["wp"].catalog_variant = variant
+                s["wp"].save(update_fields=["catalog_variant"])
+                summary["rebuilt"] += 1
+            except CatalogSyncConflict as exc:
+                summary["conflicts"].append({"sku": s["sku"], "error": str(exc)})
+
+    return summary

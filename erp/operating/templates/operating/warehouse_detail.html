@@ -659,8 +659,19 @@
   }
   .rs-recent-row .rs-recent-info {
     flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .rs-recent-row .rs-recent-line1 {
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .rs-recent-row .rs-recent-bc {
+    font: 600 11px var(--font-mono, monospace);
+    color: var(--gray-500, #6B7280);
+    letter-spacing: .3px;
+    display: inline-flex; align-items: center; gap: 5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rs-recent-row .rs-recent-bc i { color: #94A3B8; }
   .rs-recent-row .rs-recent-meters {
     font-weight: 800; color: var(--nejum-teal-700);
     font-variant-numeric: tabular-nums;
@@ -1435,10 +1446,10 @@
     flash.classList.add('on');
     setTimeout(function () { flash.classList.remove('on'); flash.hidden = true; }, 160);
 
-    // Snap a frame — downscale to ~1100px wide so OCR is fast (smaller
-    // upload + quicker vision model).
+    // Snap a frame. Keep it fairly large (≤1500px) so the TINY dot above a
+    // Turkish 'İ' survives — over-shrinking made the model read İ as I.
     const canvas = document.getElementById('rsCanvas');
-    const maxW = 1100;
+    const maxW = 1500;
     const scale = Math.min(1, maxW / video.videoWidth);
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
@@ -1482,7 +1493,7 @@
           finish();
           alert('Network error');
         });
-    }, 'image/jpeg', 0.7);
+    }, 'image/jpeg', 0.88);   // higher quality keeps the İ dot crisp
   }
 
   function showConfirmPanel(data, imageBlob) {
@@ -1662,11 +1673,15 @@
     if (empty) empty.remove();
     const row = document.createElement('div');
     row.className = 'rs-recent-row';
+    var bc = (data.roll && data.roll.barcode) ? data.roll.barcode : '';
     row.innerHTML =
       '<span class="rs-recent-ok"><i class="fa fa-check"></i></span>' +
       '<span class="rs-recent-info">' +
-        '<b>' + (data.product.sku || data.product.name) + '</b>' +
-        '<small style="color:var(--gray-500); margin-left:6px;">' + (data.product.name || '') + '</small>' +
+        '<span class="rs-recent-line1">' +
+          '<b>' + rsEscapeHtml(data.product.sku || data.product.name) + '</b>' +
+          '<small style="color:var(--gray-500); margin-left:6px;">' + rsEscapeHtml(data.product.name || '') + '</small>' +
+        '</span>' +
+        (bc ? '<span class="rs-recent-bc"><i class="fa fa-barcode"></i>' + rsEscapeHtml(bc) + '</span>' : '') +
       '</span>' +
       '<span class="rs-recent-meters">' + parseFloat(data.roll.meters).toFixed(2) + ' m</span>';
     list.prepend(row);

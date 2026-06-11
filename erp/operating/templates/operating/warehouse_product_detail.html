@@ -487,6 +487,11 @@
       </div>
     </div>
     <div class="od-head-r">
+      {% if product.catalog_variant_id and product.catalog_variant.product_id %}
+      <a href="{% url 'marketing:product_detail' product.catalog_variant.product_id %}" target="_blank" rel="noopener" class="ord-btn ghost">
+        <i class="fa fa-up-right-from-square"></i>{% trans "Linked product" %}: {{ product.catalog_variant.product.sku|default:product.catalog_variant.product.title }}
+      </a>
+      {% endif %}
       <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-qrcode"></i>{% trans "Print label" %}
       </a>

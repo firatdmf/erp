@@ -396,6 +396,7 @@ def warehouse_group_variants(request, pk):
     base_expr = _warehouse_base_expr()
     CAP = 400
     qs = (WarehouseProduct.objects.filter(warehouse=warehouse)
+          .select_related("catalog_variant__product")
           .annotate(base=base_expr, roll_count=Count("rolls"),
                     line_usd=F("quantity") * F("cost_usd"),
                     line_try=F("quantity") * F("cost_try"))
@@ -682,11 +683,13 @@ _LABEL_PROMPT = (
     "- color: the colour/variant text if printed on its own line "
     "(e.g. 'AÇIK KREM', 'EKRU', 'GÜMÜŞ'); else null.\n"
     "- coupon: the value after 'Kupon No' / 'Kupon' if present; else null.\n\n"
-    "CRITICAL — Turkish letters: reproduce every character EXACTLY as "
-    "printed. The dotted capital 'İ' (a capital I WITH a dot above it) MUST "
-    "be returned as 'İ' (Unicode U+0130), never as the plain dotless 'I'. "
-    "A capital letter with NO dot stays 'I'. Look carefully at whether each "
-    "I-shaped letter has a dot on top. Likewise keep Ş Ğ Ü Ö Ç and the "
+    "CRITICAL — Turkish dotted 'İ' vs plain 'I': these are TURKISH labels and "
+    "the SKU very often contains the dotted capital 'İ' (a capital I WITH a "
+    "dot above it). Real examples: 'K24620İ.G52', 'K25318İ.G38', 'K24828İT', "
+    "'K48083İ'. Inspect EVERY I-shaped letter in the SKU: if it has a dot "
+    "above it you MUST output 'İ' (Unicode U+0130), NEVER the plain dotless "
+    "'I'. Output plain 'I' only when there is clearly no dot. Zoom in mentally "
+    "on the top of each vertical stroke. Likewise keep Ş Ğ Ü Ö Ç and the "
     "dotless lowercase 'ı' exactly as printed. Do NOT transliterate or drop "
     "any diacritic.\n"
     "If a field is illegible or absent in THIS image, set it to null. "

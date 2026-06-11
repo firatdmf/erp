@@ -6,7 +6,17 @@
     <div class="pname" style="font-weight:600;">{{ p.name }}</div>
     {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
   </td>
-  <td>{% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td>
+    {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% if p.catalog_variant_id and p.catalog_variant.product_id %}
+      <a href="{% url 'marketing:product_detail' p.catalog_variant.product_id %}"
+         onclick="event.stopPropagation();" target="_blank" rel="noopener"
+         title="{% trans 'Open linked product' %}: {{ p.catalog_variant.product.title }}"
+         style="margin-left:6px; color:#147F74; text-decoration:none; font-size:12px; white-space:nowrap;">
+        <i class="fa fa-up-right-from-square"></i> {{ p.catalog_variant.product.sku|default:p.catalog_variant.product.title }}
+      </a>
+    {% endif %}
+  </td>
   <td><span class="mono">{{ p.barcode|default:"—" }}</span></td>
   <td class="num">
     <span class="qty">{{ p.quantity|floatformat:2 }} m</span>

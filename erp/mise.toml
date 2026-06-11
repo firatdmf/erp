@@ -1,0 +1,8 @@
+# mise settings for the Railway/Railpack build.
+#
+# python-build-standalone's cpython-3.12.1 (2024-01-07) predates GitHub
+# artifact attestations, so mise's attestation verification fails with
+# "No GitHub artifact attestations found for python@3.12.1". Skip the
+# attestation check for Python so the prebuilt interpreter installs.
+[settings]
+python.github_attestations = false

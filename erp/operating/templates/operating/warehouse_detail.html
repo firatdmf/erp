@@ -1568,27 +1568,52 @@
   // Some phones map facingMode:'environment' to the ultra-wide lens, which
   // focuses poorly on close labels → bad barcode reads. We enumerate the
   // cameras and choose the main lens by excluding those by label.
+  // Exclude non-main lenses: ULTRA-wide, telephoto, macro, depth, fisheye,
+  // 0.5x. NOTE: we keep plain "wide" — the MAIN lens is a wide-angle (~1x);
+  // only the ULTRA-wide (0.5x, fixed-focus) is the problem.
+  var RS_BAD_LENS = /ultra|0\.5|tele|macro|depth|fish/i;
+  function rsCamIndex(label) { var m = /camera2?\s+(\d+)/i.exec(label || ''); return m ? parseInt(m[1], 10) : 1000; }
+  function rsApplyFocus(stream) {
+    try {
+      var t = stream.getVideoTracks()[0];
+      if (t && t.applyConstraints) {
+        var caps = t.getCapabilities ? t.getCapabilities() : null;
+        // Apply continuous autofocus where supported (Android). iOS has no
+        // programmatic focus — it auto-focuses, and picking the main lens
+        // (done above) is what actually fixes close-up focus there.
+        if (!caps || !caps.focusMode || caps.focusMode.indexOf('continuous') !== -1) {
+          t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
+        }
+      }
+    } catch (e) {}
+    return stream;
+  }
   function getRearCameraStream() {
     var W = { ideal: 1920 }, H = { ideal: 1080 };
     function open(c) { return navigator.mediaDevices.getUserMedia({ video: c, audio: false }); }
+    // Open the rear camera first (also grants permission so labels populate).
     return open({ facingMode: { ideal: 'environment' }, width: W, height: H }).then(function (stream) {
-      if (!navigator.mediaDevices.enumerateDevices) return stream;
+      if (!navigator.mediaDevices.enumerateDevices) return rsApplyFocus(stream);
       return navigator.mediaDevices.enumerateDevices().then(function (devices) {
         var cams = devices.filter(function (d) { return d.kind === 'videoinput'; });
-        if (cams.length < 2) return stream;           // only one camera — keep it
+        if (cams.length < 2) return rsApplyFocus(stream);
         var rear = cams.filter(function (d) { return /back|rear|environment|arka|tras|rück/i.test(d.label || ''); });
         if (!rear.length) rear = cams;
-        // Drop ultra-wide / telephoto / macro / depth — keep the main lens.
-        var main = rear.filter(function (d) { return !/wide|ultra|tele|macro|depth|geniş|0\.5/i.test(d.label || ''); });
-        var pick = main[0] || rear[0];
+        var pool = rear.filter(function (d) { return !RS_BAD_LENS.test(d.label || ''); });
+        if (!pool.length) pool = rear;
+        // iOS: the standard 1x lens is exactly "Back Camera".
+        var iosMain = pool.filter(function (d) { return /(^|\b)back camera\b/i.test(d.label || ''); });
+        // Android: the MAIN sensor is the lowest "camera2 N" index.
+        var sorted = pool.slice().sort(function (a, b) { return rsCamIndex(a.label) - rsCamIndex(b.label); });
+        var pick = iosMain[0] || sorted[0];
         var curId = '';
         try { curId = (stream.getVideoTracks()[0].getSettings() || {}).deviceId || ''; } catch (e) {}
         if (pick && pick.deviceId && pick.deviceId !== curId) {
           stream.getTracks().forEach(function (t) { t.stop(); });
-          return open({ deviceId: { exact: pick.deviceId }, width: W, height: H });
+          return open({ deviceId: { exact: pick.deviceId }, width: W, height: H }).then(rsApplyFocus);
         }
-        return stream;
-      }).catch(function () { return stream; });
+        return rsApplyFocus(stream);
+      }).catch(function () { return rsApplyFocus(stream); });
     });
   }
 

@@ -64,7 +64,15 @@
       "WebFetch(domain:bugs.webkit.org)",
       "Bash(awk '{print $5}')",
       "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe -c ' *)",
-      "Bash(node --check \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\wh_scripts.js\")"
+      "Bash(node --check \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\wh_scripts.js\")",
+      "Bash(../vir_env/Scripts/python.exe -m pip install --quiet zxing-cpp)",
+      "Bash(../vir_env/Scripts/python.exe -c \"import zxingcpp, PIL; print\\('zxing-cpp', zxingcpp.__version__ if hasattr\\(zxingcpp,'__version__'\\) else 'ok', '| Pillow ready'\\)\")",
+      "Bash(../vir_env/Scripts/python.exe -c \"import zxingcpp; print\\('zxing-cpp', zxingcpp.__version__ if hasattr\\(zxingcpp,'__version__'\\) else 'ok'\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\decode_barcode.py\")",
+      "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\calib.py\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\enes3\\AppData\\Local\\Temp"
     ]
   }
 }

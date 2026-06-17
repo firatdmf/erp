@@ -1680,8 +1680,8 @@
   let _rsRoiCanvas = null, _rsRoiCtx = null, _rsBcCanvas = null, _rsAudioCtx = null;
 
   const ZXW_OPTS = {
-    tryHarder: true, maxNumberOfSymbols: 1,
-    formats: ['Code128', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code39', 'ITF', 'Codabar', 'QRCode']
+    tryHarder: true, tryRotate: true, tryDownscale: true, maxNumberOfSymbols: 1,
+    formats: ['Code128', 'EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code39', 'Code93', 'ITF', 'Codabar', 'QRCode']
   };
 
   function loadZxw() {
@@ -1745,11 +1745,13 @@
     }
     rsBcLastDecode = now;
     try {
-      // Center-crop ROI → SMALL canvas (≤720px) for a cheap, fast decode.
+      // FULL-WIDTH center strip → ≤1280px. Long Code128 barcodes need the
+      // full width (incl. quiet zones) and enough resolution for their fine
+      // bars; over-cropping/over-shrinking made them undecodable.
       var vw = video.videoWidth, vh = video.videoHeight;
-      var cropW = Math.round(vw * 0.92), cropH = Math.round(vh * 0.6);
-      var sx = Math.round((vw - cropW) / 2), sy = Math.round((vh - cropH) / 2);
-      var outW = Math.min(720, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
+      var cropW = vw, cropH = Math.round(vh * 0.72);
+      var sx = 0, sy = Math.round((vh - cropH) / 2);
+      var outW = Math.min(1280, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
       var roi = rsGetRoiCanvas();
       if (roi.width !== outW) roi.width = outW;
       if (roi.height !== outH) roi.height = outH;
@@ -1881,7 +1883,7 @@
     let bcPromise = Promise.resolve();
     if (!capturedBarcode) {
       const bcCanvas = rsGetBcCanvas();
-      const bcMax = 1280, bcScale = Math.min(1, bcMax / video.videoWidth);
+      const bcMax = 1600, bcScale = Math.min(1, bcMax / video.videoWidth);
       bcCanvas.width = Math.round(video.videoWidth * bcScale);
       bcCanvas.height = Math.round(video.videoHeight * bcScale);
       bcCanvas.getContext('2d', { willReadFrequently: true }).drawImage(video, 0, 0, bcCanvas.width, bcCanvas.height);
@@ -2340,9 +2342,9 @@
     try {
       var roi = rsGetRoiCanvas();
       var vw = video.videoWidth, vh = video.videoHeight;
-      var cropW = Math.round(vw * 0.92), cropH = Math.round(vh * 0.55);
-      var sx = Math.round((vw - cropW) / 2), sy = Math.round((vh - cropH) / 2);
-      var outW = Math.min(720, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
+      var cropW = vw, cropH = Math.round(vh * 0.72);
+      var sx = 0, sy = Math.round((vh - cropH) / 2);
+      var outW = Math.min(1280, cropW), outH = Math.max(1, Math.round(cropH * (outW / cropW)));
       if (roi.width !== outW) roi.width = outW;
       if (roi.height !== outH) roi.height = outH;
       var ctx = roi.getContext('2d', { willReadFrequently: true });

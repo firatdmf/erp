@@ -38,6 +38,20 @@ def _tr_upper(s):
     return s.replace("ı", "I").replace("i", "İ").upper()
 
 
+def _is_admin(user):
+    """Only admins may DELETE warehouses / products — editing stays open to
+    everyone. Admin = Django superuser/staff, or a Member carrying the
+    'admin' permission (authentication.Permission name='admin')."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if user.is_superuser or user.is_staff:
+        return True
+    try:
+        return user.member.permissions.filter(name="admin").exists()
+    except Exception:
+        return False
+
+
 def _safe_decimal(value, default=None):
     """Convert any cell value to Decimal, returning default on failure."""
     if value is None or value == '':
@@ -430,6 +444,7 @@ class WarehouseDetail(View):
             'variant_count': counts['n'],     # alias — variants
             'group_count': group_count,       # main products (packages)
             'roll_count': roll_count,         # rolls (tops)
+            'is_admin': _is_admin(request.user),
             'total_quantity': counts['qty'],
             'search': search,
             'sort': sort,
@@ -776,6 +791,11 @@ class WarehouseProductImport(View):
 class WarehouseDelete(View):
     def post(self, request, pk):
         warehouse = get_object_or_404(Warehouse, pk=pk)
+        if not _is_admin(request.user):
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"success": False, "error": "Sadece admin depo silebilir."}, status=403)
+            messages.error(request, "Sadece admin depo silebilir.")
+            return redirect("operating:warehouse_detail", warehouse.pk)
         name = warehouse.name
         warehouse.delete()
         messages.success(request, f"Warehouse '{name}' deleted")
@@ -1841,6 +1861,7 @@ class WarehouseProductDetail(View):
             "in_total": in_total,
             "out_total": out_total,
             "active_rolls_count": rolls.exclude(status="consumed").count(),
+            "is_admin": _is_admin(request.user),
         })
 
 
@@ -2101,6 +2122,11 @@ class WarehouseProductDelete(View):
     def post(self, request, warehouse_pk, product_pk):
         warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
         product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
+        if not _is_admin(request.user):
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"success": False, "error": "Sadece admin ürün silebilir."}, status=403)
+            messages.error(request, "Sadece admin ürün silebilir.")
+            return redirect("operating:warehouse_product_detail", warehouse.pk, product.pk)
         name = product.name
         product.delete()  # cascades to rolls + movements
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -2664,14 +2690,17 @@ class WarehouseRollScan(View):
                 "id": roll.pk,
                 "meters": float(roll.meters),
                 "barcode": roll.barcode,
+                "lot_number": roll.lot_number,
                 "scanned_at": roll.scanned_at.strftime("%H:%M:%S"),
             },
             "product": {
                 "id": product.pk,
                 "name": product.name,
                 "sku": product.sku,
+                "barcode": product.barcode,
                 "quantity": float(product.quantity or 0),
                 "rolls_count": product.rolls.count(),
+                "main_product": (catalog_info["product_title"] if catalog_info else None),
             },
             "catalog": catalog_info,
             "catalog_warning": catalog_warning,

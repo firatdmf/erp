@@ -69,7 +69,9 @@
       "Bash(../vir_env/Scripts/python.exe -c \"import zxingcpp, PIL; print\\('zxing-cpp', zxingcpp.__version__ if hasattr\\(zxingcpp,'__version__'\\) else 'ok', '| Pillow ready'\\)\")",
       "Bash(../vir_env/Scripts/python.exe -c \"import zxingcpp; print\\('zxing-cpp', zxingcpp.__version__ if hasattr\\(zxingcpp,'__version__'\\) else 'ok'\\)\")",
       "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\decode_barcode.py\")",
-      "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\calib.py\")"
+      "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\calib.py\")",
+      "Bash(awk 'NR>=1830 && NR<=1990 && /render\\\\\\(request|ctx = \\\\{|context = \\\\{|\"warehouse\": warehouse|return render/' erp/operating/views_warehouse.py)",
+      "Bash(awk -F: '$1>=1822 && $1<=2010')"
     ],
     "additionalDirectories": [
       "C:\\Users\\enes3\\AppData\\Local\\Temp"

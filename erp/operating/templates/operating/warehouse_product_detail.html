@@ -513,9 +513,11 @@
       <button type="button" class="ord-btn ghost" onclick="document.getElementById('peOverlay').classList.add('show')">
         <i class="fa fa-pen"></i>{% trans "Edit" %}
       </button>
+      {% if is_admin %}
       <button type="button" class="ord-btn ghost danger" onclick="document.getElementById('pdOverlay').classList.add('show')">
         <i class="fa fa-trash"></i>{% trans "Delete" %}
       </button>
+      {% endif %}
     </div>
   </div>
 

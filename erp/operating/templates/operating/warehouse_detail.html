@@ -233,6 +233,12 @@
     font: 600 10.5px var(--font-sans); color: var(--gray-500);
     text-transform: lowercase; margin-top: 2px; line-height: 1.1; white-space: nowrap;
   }
+  /* Main-product (group) badge — marks the parent vs its variants. */
+  .wh-grp-ico {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 6px; flex: 0 0 auto;
+    background: #E9F5F3; color: #0F766E; font-size: 11px;
+  }
   .od-prods th, .od-prods td {
     padding: 11px 10px; text-align: left;
     border-bottom: 1px solid #EEF1F5; font-size: 12.5px;
@@ -402,19 +408,51 @@
     /* Quick-filter chips scroll sideways instead of wrapping tall. */
     .od-chip-row { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .od-chip-row .od-fchip { flex: 0 0 auto; }
-    /* Product table: drop the money columns on phones so the essentials
-       (name / SKU / tops / qty) fit; full figures are one tap away.
-       The wrapper still scrolls sideways as a fallback. */
-    .od-prods th:nth-child(4), .od-prods td:nth-child(4),
-    .od-prods th:nth-child(5), .od-prods td:nth-child(5),
-    .od-prods th:nth-child(6), .od-prods td:nth-child(6) { display: none; }
-    .od-prods th, .od-prods td { padding: 9px 8px; }
-    .od-prods .pname { font-size: 13px; }
+    /* ── Product list → CARD layout on phones (NO horizontal scroll) ──
+       Each row becomes a card; cells stack as "label: value". */
+    .od-prods-wrap { overflow-x: visible; }
+    .od-prods, .od-prods tbody, .od-prods tr, .od-prods td { display: block; width: auto; }
+    .od-prods thead { display: none; }
+    .od-prods tr.wh-grp, .od-prods tr.wh-vrow {
+      box-sizing: border-box; border: 1px solid #E2E8EE; border-radius: 11px;
+      margin: 0 0 9px; padding: 10px 13px; background: #fff;
+    }
+    .od-prods tr.wh-grp { background: #F8FAFC; }
+    .od-prods tr.wh-grp td, .od-prods tr.wh-vrow td {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 12px; padding: 4px 0; border: none; text-align: right; white-space: normal;
+    }
+    .od-prods td[data-label]::before {
+      content: attr(data-label); flex: 0 0 auto; text-align: left;
+      font: 700 10px var(--font-sans); color: var(--gray-500);
+      text-transform: uppercase; letter-spacing: .05em;
+    }
+    .od-prods td.od-m-hide { display: none !important; }
+    /* SKU is the card TITLE for variants: left-aligned, prominent, no label */
+    .od-prods tr.wh-vrow td[data-label="SKU"] {
+      justify-content: flex-start; padding: 0 0 7px; margin-bottom: 3px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .od-prods tr.wh-vrow td[data-label="SKU"]::before { display: none; }
+    .od-prods td.wh-vrow-sku { padding-left: 0 !important; }   /* drop desktop indent */
+    .od-prods td.wh-grp-head { padding: 0 0 5px; }             /* group title header */
+    .od-prods .pname { font-size: 13.5px; }
     .od-prods .psub { font-size: 11px; }
+    .od-prods .sku-pill { font-size: 12.5px; }
+    /* ── Clear hierarchy: MAIN PRODUCT (group) vs its VARIANTS ── */
+    .od-prods tr.wh-grp { background: #F4F8FC; border-color: #D7E1EC; }
+    .od-prods tr.wh-grp .pname { font-size: 15px; font-weight: 800; }
+    .od-prods tr.wh-grp .wh-grp-chev { width: 12px; font-size: 13px; }
+    /* Expanded variant cards: indented + teal left rail = belongs to the product above */
+    .od-prods tr.wh-vrow-nested {
+      margin-left: 20px; background: #FCFDFE;
+      border-color: #E6ECF3; border-left: 4px solid #16a394;
+      border-radius: 0 10px 10px 0; margin-top: -2px;
+    }
+    .od-prods tr.wh-vrow-nested td[data-label="SKU"] .sku-pill { font-size: 12px; }
   }
   @media (max-width: 420px) {
     .od-stats-grid { grid-template-columns: 1fr 1fr; }
-    .od-prods th, .od-prods td { padding: 8px 6px; font-size: 12px; }
   }
 
   /* ── Roll Scanner (camera-driven label OCR) ──────────────── */
@@ -749,6 +787,14 @@
     font-weight: 800; color: var(--nejum-teal-700);
     font-variant-numeric: tabular-nums;
   }
+  .rs-recent-row .rs-recent-edit {
+    flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px;
+    background: transparent; border: 1px solid #E2E8EE; color: var(--gray-600);
+    cursor: pointer; font-size: 11px; margin-left: 4px;
+  }
+  .rs-recent-row .rs-recent-edit:hover {
+    background: #E9F5F3; color: var(--nejum-teal-700); border-color: rgba(20,127,116,0.3);
+  }
   .rs-recent-empty {
     padding: 20px 16px;
     text-align: center;
@@ -885,9 +931,11 @@
       <a href="{% url 'operating:warehouse_edit' warehouse.pk %}" class="ord-btn ghost">
         <i class="fa fa-edit"></i>{% trans "Edit" %}
       </a>
+      {% if is_admin %}
       <button type="button" class="ord-btn ghost danger" onclick="openDeleteConfirm()">
         <i class="fa fa-trash"></i>{% trans "Delete" %}
       </button>
+      {% endif %}
     </div>
   </div>
 
@@ -1193,6 +1241,51 @@
       </div>
     </div>
     <div id="blResult" class="bl-result" hidden></div>
+  </div>
+</div>
+
+<!-- ─── EDIT a just-added item (from the scan recent list) ─────── -->
+<style>
+  #rsEditOverlay .bl-shell { background: #fff; max-width: 420px; }
+  #rsEditOverlay .bl-head { border-bottom: 1px solid #E2E8EE; }
+  #rsEditOverlay .bl-title { color: #0F1419; }
+  #rsEditOverlay .bl-close { background: #F1F5F9; color: #334155; }
+  .rse-body { padding: 14px 18px 18px; overflow-y: auto; }
+  .rse-fld { display: flex; flex-direction: column; gap: 4px; margin-bottom: 11px; }
+  .rse-fld label { font: 700 10.5px var(--font-sans); color: var(--gray-700); text-transform: uppercase; letter-spacing: .04em; }
+  .rse-fld .hint { font: 500 11px var(--font-sans); color: var(--gray-500); text-transform: none; letter-spacing: 0; }
+  .rse-input { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid #E0E6EE; border-radius: 9px; font: 600 13px var(--font-sans); color: #0F1419; outline: none; }
+  .rse-input:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+  .rse-sep { border: none; border-top: 1px solid #EEF1F5; margin: 12px 0; }
+  .rse-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .rse-actions .bl-btn.ghost { background: #F1F5F9; color: #334155; }
+</style>
+<div class="bl-overlay" id="rsEditOverlay" style="z-index: 1100;">
+  <div class="bl-shell">
+    <div class="bl-head">
+      <div class="bl-title"><i class="fa fa-pen"></i> {% trans "Edit added item" %}</div>
+      <button type="button" class="bl-close" onclick="closeRsEdit()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="rse-body">
+      <div class="rse-fld"><label>{% trans "Product name" %}</label><input id="rseName" class="rse-input" type="text" autocomplete="off"></div>
+      <div class="rse-fld"><label>{% trans "SKU" %}</label><input id="rseSku" class="rse-input" type="text" autocomplete="off"></div>
+      <div class="rse-fld">
+        <label>{% trans "Main product (catalog)" %}</label>
+        <div class="hint" id="rseMainHint"></div>
+        <input id="rseMain" class="rse-input" type="text" autocomplete="off" placeholder="{% trans 'Blank = auto from SKU · or type to move it' %}">
+      </div>
+      <div class="rse-fld"><label>{% trans "Product barcode" %}</label><input id="rseProdBc" class="rse-input" type="text" autocomplete="off"></div>
+      <hr class="rse-sep">
+      <div class="rse-fld"><label>{% trans "Top (roll) barcode" %}</label><input id="rseRollBc" class="rse-input" type="text" autocomplete="off"></div>
+      <div style="display:flex; gap:10px;">
+        <div class="rse-fld" style="flex:1;"><label>{% trans "Meters" %}</label><input id="rseMeters" class="rse-input" type="number" step="0.01"></div>
+        <div class="rse-fld" style="flex:1;"><label>{% trans "Lot No" %}</label><input id="rseLot" class="rse-input" type="text" autocomplete="off"></div>
+      </div>
+      <div class="rse-actions">
+        <button type="button" class="bl-btn ghost" onclick="closeRsEdit()">{% trans "Cancel" %}</button>
+        <button type="button" class="bl-btn primary" id="rseSubmit" onclick="submitRsEdit()"><i class="fa fa-floppy-disk"></i> {% trans "Save" %}</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2137,28 +2230,112 @@
       });
   }
 
+  function rsRenderRecentRow(row) {
+    var it = row._item;
+    var bc = it.rollBarcode || '';
+    row.innerHTML =
+      '<span class="rs-recent-ok"><i class="fa fa-check"></i></span>' +
+      '<span class="rs-recent-info">' +
+        '<span class="rs-recent-line1">' +
+          '<b>' + rsEscapeHtml(it.sku || it.name) + '</b>' +
+          '<small style="color:var(--gray-500); margin-left:6px;">' + rsEscapeHtml(it.name || '') + '</small>' +
+        '</span>' +
+        (bc ? '<span class="rs-recent-bc"><i class="fa fa-barcode"></i>' + rsEscapeHtml(bc) + '</span>' : '') +
+      '</span>' +
+      '<span class="rs-recent-meters">' + parseFloat(it.meters || 0).toFixed(2) + ' m</span>' +
+      '<button type="button" class="rs-recent-edit" title="{% trans "Edit" %}" ' +
+        'onclick="openRsEdit(this.closest(\'.rs-recent-row\'))"><i class="fa fa-pen"></i></button>';
+  }
+
   function updateRecentList(data) {
     const list = document.getElementById('rsRecentList');
     const empty = list.querySelector('.rs-recent-empty');
     if (empty) empty.remove();
     const row = document.createElement('div');
     row.className = 'rs-recent-row';
-    var bc = (data.roll && data.roll.barcode) ? data.roll.barcode : '';
-    row.innerHTML =
-      '<span class="rs-recent-ok"><i class="fa fa-check"></i></span>' +
-      '<span class="rs-recent-info">' +
-        '<span class="rs-recent-line1">' +
-          '<b>' + rsEscapeHtml(data.product.sku || data.product.name) + '</b>' +
-          '<small style="color:var(--gray-500); margin-left:6px;">' + rsEscapeHtml(data.product.name || '') + '</small>' +
-        '</span>' +
-        (bc ? '<span class="rs-recent-bc"><i class="fa fa-barcode"></i>' + rsEscapeHtml(bc) + '</span>' : '') +
-      '</span>' +
-      '<span class="rs-recent-meters">' + parseFloat(data.roll.meters).toFixed(2) + ' m</span>';
+    row._item = {
+      productId: data.product.id, rollId: data.roll.id,
+      name: data.product.name || '', sku: data.product.sku || '',
+      productBarcode: data.product.barcode || '',
+      rollBarcode: (data.roll && data.roll.barcode) || '',
+      meters: data.roll.meters, lot: (data.roll.lot_number || ''),
+      mainProduct: data.product.main_product || ''
+    };
+    rsRenderRecentRow(row);
     list.prepend(row);
     document.getElementById('rsTotalCount').textContent =
       rsSession.count + ' ' + (rsSession.count === 1 ? 'roll' : 'rolls') +
       ' · ' + rsSession.meters.toFixed(2) + ' m';
   }
+
+  // ── Edit a just-added item from the recent list ──
+  const rsProdEditTmpl = "{% url 'operating:warehouse_product_edit' warehouse.pk 0 %}";
+  const rsRollEditTmpl = "{% url 'operating:warehouse_roll_edit' warehouse.pk 0 0 %}";
+  function rsProdEditUrl(pid) { return rsProdEditTmpl.replace('/products/0/edit/', '/products/' + pid + '/edit/'); }
+  function rsRollEditUrl(pid, rid) { return rsRollEditTmpl.replace('/products/0/', '/products/' + pid + '/').replace('/rolls/0/', '/rolls/' + rid + '/'); }
+  let rsEditRow = null;
+  function openRsEdit(row) {
+    if (!row || !row._item) return;
+    rsEditRow = row;
+    var it = row._item;
+    document.getElementById('rseName').value = it.name || '';
+    document.getElementById('rseSku').value = it.sku || '';
+    document.getElementById('rseProdBc').value = it.productBarcode || '';
+    document.getElementById('rseMain').value = '';
+    document.getElementById('rseMainHint').textContent = it.mainProduct ? ('{% trans "Currently" %}: ' + it.mainProduct) : '';
+    document.getElementById('rseRollBc').value = it.rollBarcode || '';
+    document.getElementById('rseMeters').value = it.meters || '';
+    document.getElementById('rseLot').value = it.lot || '';
+    document.getElementById('rsEditOverlay').classList.add('show');
+  }
+  function closeRsEdit() {
+    document.getElementById('rsEditOverlay').classList.remove('show');
+    rsEditRow = null;
+  }
+  function submitRsEdit() {
+    if (!rsEditRow) return;
+    var it = rsEditRow._item;
+    var name = document.getElementById('rseName').value.trim();
+    var sku = document.getElementById('rseSku').value.trim();
+    var pbc = document.getElementById('rseProdBc').value.trim();
+    var main = document.getElementById('rseMain').value.trim();
+    var rbc = document.getElementById('rseRollBc').value.trim();
+    var meters = document.getElementById('rseMeters').value.trim();
+    var lot = document.getElementById('rseLot').value.trim();
+    var btn = document.getElementById('rseSubmit');
+    var orig = btn.innerHTML; btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving…';
+    var hdr = { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' };
+    var pfd = new FormData();
+    pfd.append('csrfmiddlewaretoken', csrftoken);
+    pfd.append('name', name); pfd.append('sku', sku); pfd.append('barcode', pbc);
+    if (main) pfd.append('catalog_base_name', main);
+    fetch(rsProdEditUrl(it.productId), { method: 'POST', body: pfd, headers: hdr, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (pd) {
+        if (!pd || !pd.success) throw new Error((pd && pd.error) || 'Product update failed');
+        if (pd.catalog_warning) alert('{% trans "Catalog note" %}:\n' + pd.catalog_warning);
+        var rfd = new FormData();
+        rfd.append('csrfmiddlewaretoken', csrftoken);
+        rfd.append('barcode', rbc); rfd.append('meters', meters); rfd.append('lot_number', lot);
+        return fetch(rsRollEditUrl(it.productId, it.rollId), { method: 'POST', body: rfd, headers: hdr, credentials: 'same-origin' }).then(function (r) { return r.json(); });
+      })
+      .then(function (rd) {
+        if (rd && !rd.success) throw new Error(rd.error || 'Roll update failed');
+        it.name = name; it.sku = sku; it.productBarcode = pbc;
+        it.rollBarcode = (rd && rd.roll && rd.roll.barcode !== undefined) ? (rd.roll.barcode || '') : rbc;
+        it.meters = (rd && rd.roll && rd.roll.meters !== undefined) ? rd.roll.meters : meters;
+        it.lot = lot;
+        if (main) it.mainProduct = main;
+        rsRenderRecentRow(rsEditRow);
+        btn.disabled = false; btn.innerHTML = orig;
+        closeRsEdit();
+      })
+      .catch(function (e) { btn.disabled = false; btn.innerHTML = orig; alert(e.message || 'Error'); });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && document.getElementById('rsEditOverlay').classList.contains('show')) closeRsEdit();
+  });
 
   // Drop zone
   const whDrop = document.getElementById('whDrop');

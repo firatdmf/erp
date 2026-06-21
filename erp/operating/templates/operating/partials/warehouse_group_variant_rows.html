@@ -1,8 +1,8 @@
 {% load i18n %}
 {% for p in variants %}
-<tr class="wh-vrow" style="cursor:pointer;"
+<tr class="wh-vrow wh-vrow-nested" style="cursor:pointer;"
     onclick="window.location='{% url 'operating:warehouse_product_detail' warehouse.pk p.pk %}'">
-  <td style="padding-left:34px;">
+  <td class="wh-vrow-sku" data-label="SKU" style="padding-left:34px;">
     {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
     {% if p.catalog_variant_id and p.catalog_variant.product_id %}
       <a href="{% url 'marketing:product_detail' p.catalog_variant.product_id %}"
@@ -13,21 +13,21 @@
       </a>
     {% endif %}
   </td>
-  <td>
+  <td data-label="{% trans 'Name' %}">
     <div class="pname" style="font-weight:600;">{{ p.name }}</div>
     {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
   </td>
-  <td class="num">
+  <td class="num" data-label="{% trans 'Stock' %}">
     <div class="qty">{{ p.quantity|floatformat:2 }} m</div>
     {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each top has its own barcode' %}">{{ p.roll_count }} top</div>{% endif %}
   </td>
-  <td class="num">
+  <td class="num od-m-hide">
     {% if p.purchase_price %}
       <span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
-  <td class="num">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
-  <td class="num">{% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="USD">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="TRY">{% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>
 {% empty %}
 <tr><td colspan="6" style="padding:12px 34px; color:#94A3B8;">{% trans "No variants." %}</td></tr>

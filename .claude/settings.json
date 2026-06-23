@@ -71,7 +71,10 @@
       "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\decode_barcode.py\")",
       "Bash(PYTHONIOENCODING=utf-8 ../vir_env/Scripts/python.exe \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\calib.py\")",
       "Bash(awk 'NR>=1830 && NR<=1990 && /render\\\\\\(request|ctx = \\\\{|context = \\\\{|\"warehouse\": warehouse|return render/' erp/operating/views_warehouse.py)",
-      "Bash(awk -F: '$1>=1822 && $1<=2010')"
+      "Bash(awk -F: '$1>=1822 && $1<=2010')",
+      "Bash(grep -nA6 \"\\\\.rs-overlay \\\\{\" erp/operating/templates/operating/warehouse_detail.html)",
+      "Bash(node --check \"C:\\\\Users\\\\enes3\\\\AppData\\\\Local\\\\Temp\\\\wh.js\")",
+      "Bash(git commit -m ' *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\enes3\\AppData\\Local\\Temp"

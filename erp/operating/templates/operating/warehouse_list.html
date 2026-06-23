@@ -423,6 +423,45 @@
     .ord-row > .ord-actions { grid-column: 1 / -1; justify-self: start; }
     .ord-chev { display: none; }
   }
+
+  /* ─── PHONE: stack header + toolbar so nothing overflows ──── */
+  @media (max-width: 700px) {
+    .ord { padding: 16px 16px 90px; }
+
+    /* Title on its own line; Filter + Add split the row below */
+    .ord-head {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .ord-title { font-size: 24px; }
+    .ord-head-r { gap: 10px; }
+    .ord-head-r .ord-btn {
+      flex: 1 1 0;
+      min-width: 0;
+      justify-content: center;
+      padding: 11px 12px;
+    }
+
+    /* Tab pill on top, search full-width below */
+    .ord-tabs-wrap {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    .ord-tabs { align-self: flex-start; }
+    .ord-tabs-r,
+    .ord-search-wrap {
+      margin-left: 0;
+      width: 100%;
+    }
+    input.ord-search-input,
+    .ord-search-input {
+      width: 100% !important;
+      height: 42px !important;
+    }
+  }
 </style>
 {% endblock %}
 

@@ -205,12 +205,13 @@
     flex-direction: column;
     position: fixed;
     top: 0; left: 0; bottom: 0;
-    width: 86vw;
-    max-width: 340px;
-    background: #FAFBFC;
-    box-shadow: 0 16px 48px rgba(15, 23, 31, 0.22);
-    transform: translateX(-105%);
-    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    width: 87vw;
+    max-width: 350px;
+    background: #FFFFFF;
+    border-radius: 0 24px 24px 0;
+    box-shadow: 0 24px 70px -14px rgba(9, 71, 68, 0.42), 0 6px 22px rgba(15, 23, 31, 0.12);
+    transform: translateX(-108%);
+    transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
     z-index: 250;
     overflow: hidden;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -220,67 +221,95 @@
   /* ─── Hero header (gradient brand zone) ───────────────────── */
   .m-drawer-hero {
     position: relative;
-    padding: 22px 18px 16px;
+    padding: 20px 18px 18px;
     background:
-      radial-gradient(120% 120% at 0% 0%, rgba(255,255,255,0.18) 0%, transparent 60%),
-      linear-gradient(135deg, #0F766E 0%, #0B5650 60%, #094947 100%);
+      radial-gradient(140% 130% at 100% 0%, rgba(45, 212, 191, 0.40) 0%, transparent 52%),
+      radial-gradient(120% 120% at 0% 0%, rgba(255,255,255,0.16) 0%, transparent 50%),
+      linear-gradient(150deg, #128A7F 0%, #0C605A 56%, #094744 100%);
     color: white;
     flex-shrink: 0;
-    padding-top: calc(22px + env(safe-area-inset-top, 0));
+    overflow: hidden;
+    padding-top: calc(20px + env(safe-area-inset-top, 0));
   }
-  .m-drawer-hero::before {
+  .m-drawer-hero::after {
     content: '';
     position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(60% 80% at 100% 0%, rgba(20, 184, 184, 0.32) 0%, transparent 60%);
+    left: 0; right: 0; bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.24), transparent);
     pointer-events: none;
   }
+  /* Close button — a clear, proper X. Drawn with CSS bars (no SVG / icon
+     font), so the cross is guaranteed to render in every browser. */
   .m-drawer-close {
     position: absolute;
-    top: calc(14px + env(safe-area-inset-top, 0));
+    top: calc(13px + env(safe-area-inset-top, 0));
     right: 14px;
-    width: 36px; height: 36px;
-    display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(255, 255, 255, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 10px;
-    color: white;
+    width: 40px; height: 40px;
+    padding: 0;
+    display: inline-flex !important;
+    align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.20);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 12px;
     cursor: pointer;
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
-    transition: background 140ms;
-    z-index: 2;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+    transition: background 150ms, transform 160ms cubic-bezier(0.22,1,0.36,1);
+    z-index: 3;
+    -webkit-tap-highlight-color: transparent;
   }
-  .m-drawer-close:active { background: rgba(255, 255, 255, 0.22); }
+  .m-drawer-close:active { background: rgba(255, 255, 255, 0.36); transform: scale(0.92); }
+  .m-drawer-close-x {
+    position: relative;
+    width: 18px; height: 18px;
+    display: block;
+    flex-shrink: 0;
+  }
+  .m-drawer-close-x::before,
+  .m-drawer-close-x::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 19px; height: 2.6px;
+    background: #FFFFFF;
+    border-radius: 2px;
+  }
+  .m-drawer-close-x::before { transform: translate(-50%, -50%) rotate(45deg); }
+  .m-drawer-close-x::after  { transform: translate(-50%, -50%) rotate(-45deg); }
 
   .m-drawer-hero-inner {
-    display: flex; align-items: center; gap: 12px;
-    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 13px;
+    margin-bottom: 15px;
+    padding-right: 46px; /* clear of the close button */
     position: relative;
   }
   .m-drawer-brand-mark {
-    width: 44px; height: 44px;
-    border-radius: 13px;
+    width: 46px; height: 46px;
+    border-radius: 14px;
     display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(255, 255, 255, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.20);
+    background: linear-gradient(135deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.12) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     color: white;
-    font: 800 18px 'Plus Jakarta Sans', sans-serif;
+    font: 800 19px 'Plus Jakarta Sans', sans-serif;
     letter-spacing: -0.02em;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.26), 0 4px 12px rgba(0,0,0,0.12);
+    flex-shrink: 0;
   }
   .m-drawer-brand-name {
-    font: 800 18px 'Plus Jakarta Sans', sans-serif;
-    letter-spacing: -0.014em;
+    font: 800 18.5px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.016em;
     color: white;
-    line-height: 1.1;
+    line-height: 1.12;
   }
   .m-drawer-brand-sub {
-    font: 700 10.5px 'Plus Jakarta Sans', sans-serif;
-    letter-spacing: 0.12em;
+    font: 700 9.5px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: rgba(230, 245, 245, 0.82);
+    color: rgba(216, 246, 243, 0.80);
     margin-top: 4px;
   }
 
@@ -371,64 +400,76 @@
     border-radius: 999px;
   }
 
-  .m-drawer-section { padding: 10px 4px 4px; }
+  .m-drawer-section { padding: 8px 0 2px; }
+  .m-drawer-section + .m-drawer-section {
+    margin-top: 4px;
+    border-top: 1px solid #F1F4F6;
+  }
   .m-drawer-section-title {
-    padding: 4px 12px 8px;
+    padding: 8px 10px 8px;
     font: 700 10px 'Plus Jakarta Sans', sans-serif;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #94A3B8;
+    color: #9AA5AF;
   }
 
   .m-drawer-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 12px;
-    margin: 2px 0;
-    border-radius: 12px;
+    display: flex; align-items: center; gap: 13px;
+    padding: 10px 12px;
+    margin: 3px 0;
+    border-radius: 14px;
     color: #1B2128;
     text-decoration: none;
+    position: relative;
     font-family: 'Plus Jakarta Sans', sans-serif;
-    transition: background 140ms, transform 140ms;
+    transition: background 150ms, transform 150ms;
     -webkit-tap-highlight-color: transparent;
   }
   .m-drawer-item:active {
-    background: rgba(15, 118, 110, 0.08);
-    transform: scale(0.98);
+    background: rgba(15, 118, 110, 0.07);
+    transform: scale(0.985);
   }
   .m-drawer-item.is-active {
-    background: linear-gradient(135deg, #E6F3F3 0%, #D0E8E8 100%);
-    color: #005354;
-    box-shadow: inset 0 0 0 1px rgba(184, 220, 220, 0.6);
+    background: linear-gradient(135deg, #E9F6F5 0%, #D6EDEB 100%);
+    color: #06544E;
+  }
+  /* Accent rail on the active item */
+  .m-drawer-item.is-active::before {
+    content: '';
+    position: absolute;
+    left: 3px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 20px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #14B8A6, #0F766E);
   }
   .m-drawer-ico {
     width: 38px; height: 38px;
     border-radius: 11px;
-    background: white;
-    border: 1px solid #EAEFF1;
+    background: #F4F6F8;
+    border: 1px solid #EDF1F3;
     color: #4D5760;
     display: inline-flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 1px 2px rgba(15, 23, 31, 0.04), inset 0 1px 0 rgba(255,255,255,1);
     transition: all 160ms;
   }
   .m-drawer-ico svg {
-    width: 17px; height: 17px;
-    stroke-width: 1.6 !important;
+    width: 18px; height: 18px;
+    stroke-width: 1.7 !important;
     fill: none !important;
     stroke: currentColor !important;
   }
   .m-drawer-ico svg * { fill: none !important; stroke: currentColor !important; }
-  .m-drawer-chev svg { stroke-width: 1.5 !important; }
+  .m-drawer-chev svg { stroke-width: 1.6 !important; }
   .m-drawer-item.is-active .m-drawer-ico {
-    background: linear-gradient(135deg, #FFFFFF 0%, #F0FAFA 100%);
-    border-color: #B8DCDC;
+    background: linear-gradient(135deg, #FFFFFF 0%, #ECFAF9 100%);
+    border-color: #B3DEDA;
     color: #0F766E;
-    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.18);
+    box-shadow: 0 6px 14px -4px rgba(15, 118, 110, 0.30);
   }
   .m-drawer-label {
     flex: 1;
     font: 600 14px 'Plus Jakarta Sans', sans-serif;
-    letter-spacing: -0.005em;
+    letter-spacing: -0.006em;
   }
   .m-drawer-chev {
     color: #C5CDD3;
@@ -488,6 +529,7 @@
   }
   [data-theme="dark"] .m-drawer-search::placeholder { color: #6B7680; }
   [data-theme="dark"] .m-drawer-section-title { color: #6B7680; }
+  [data-theme="dark"] .m-drawer-section + .m-drawer-section { border-top-color: #232930; }
   [data-theme="dark"] .m-drawer-item { color: #F1F5F8; }
   [data-theme="dark"] .m-drawer-item.is-active {
     background: linear-gradient(135deg, rgba(0,128,128,0.22), rgba(0,128,128,0.14));

@@ -371,7 +371,8 @@
       grid-template-columns: 1fr auto;
       grid-template-areas:
         "barcode delete"
-        "meters  delete"
+        "status  delete"
+        "meters  meters"
         "time    time";
       gap: 6px 10px;
       padding: 12px;
@@ -397,16 +398,20 @@
       font-size: 18px;
     }
     .rolls-table tbody td:nth-child(3) .roll-bar { width: 100%; margin-top: 6px; }
+    /* Status pill: its OWN row beneath the barcode (was overlapping the
+       barcode's right side and hiding its end). */
     .rolls-table tbody td:nth-child(4) {
-      display: inline-block;
-      grid-area: barcode;
-      justify-self: end;
-      align-self: start;
+      display: inline-flex;
+      grid-area: status;
+      justify-self: start;
+      align-self: center;
     }
-    /* Place status pill underneath barcode line by using flex on cell 2 */
+    /* Barcode cell: full first row so the whole code is visible; wrap lot below */
     .rolls-table tbody td:nth-child(2) {
       display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      min-width: 0;
     }
+    .rolls-table tbody td:nth-child(2) .roll-barcode { white-space: nowrap; }
     .rolls-table tbody td:nth-child(5) {
       grid-area: time; font-size: 11px;
     }

@@ -40,22 +40,31 @@
   }
 
   /* ─── Tabs row (Calendar / My Tasks / Assigned) ───────── */
+  /* Wrap to multiple rows instead of a fixed 3-col grid: grid tracks
+     have min-width:auto and refuse to shrink below the nowrap label
+     width, which overflowed the viewport. Flex-wrap + min-width:0 lets
+     every tab stay visible and the row never overflows horizontally. */
   .njdash .home-tabs {
-    display: grid !important;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
     padding: 5px !important;
     background: white !important;
     border: 1px solid #EAEFF1 !important;
     border-radius: 14px !important;
     box-shadow: 0 1px 2px rgba(15,23,31,0.04) !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
   .njdash .home-tab {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 6px !important;
+    gap: 5px !important;
     height: 38px !important;
     padding: 0 8px !important;
     border-radius: 10px !important;
@@ -66,9 +75,9 @@
     letter-spacing: -0.005em !important;
     cursor: pointer !important;
     transition: background 160ms, color 160ms !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
   .njdash .home-tab svg,
   .njdash .home-tab i[data-lucide] {
@@ -181,13 +190,36 @@
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding: 0 4px 12px !important;
+    gap: 8px !important;
+    padding: 0 2px 12px !important;
     margin: 0 !important;
   }
+  /* Left (icon + "Calendar") may shrink/ellipsize; the nav keeps its size
+     so the › button never spills past the card edge. */
+  .njdash .cal-title-wrap { min-width: 0 !important; flex: 0 1 auto !important; }
+  .njdash .cal-title-icon { width: 26px !important; height: 26px !important; flex-shrink: 0 !important; }
   .njdash .cal-title {
     font: 700 14px 'Plus Jakarta Sans', sans-serif !important;
     letter-spacing: -0.012em !important;
     color: #0F172A !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  /* Compact month navigator — the desktop 110px min-width on the label
+     plus full-size chevron buttons overflowed the card on phones. */
+  .njdash .cal-nav { flex: 0 0 auto !important; gap: 3px !important; }
+  .njdash .cal-nav-btn {
+    width: 30px !important;
+    height: 30px !important;
+    flex-shrink: 0 !important;
+    border-radius: 9px !important;
+  }
+  .njdash .cal-month-label {
+    min-width: 0 !important;
+    font: 600 13px 'Plus Jakarta Sans', sans-serif !important;
+    padding: 0 2px !important;
+    white-space: nowrap !important;
   }
   .njdash .cal-row {
     display: grid !important;
@@ -360,18 +392,27 @@
   }
   .task-date svg { width: 11px !important; height: 11px !important; }
 
-  /* Action row — tappable, branded */
+  /* Action row — tappable, branded. All three buttons share the row as
+     equal flex items (Complete a touch wider as the primary action) so
+     Delete is never pushed off the right edge. min-width:0 + overflow
+     hidden guarantee they shrink to fit narrow phones without overflow. */
   .task-actions {
     display: flex !important;
+    flex-wrap: nowrap !important;
     gap: 8px !important;
     margin-top: 12px !important;
     padding-top: 12px !important;
     border-top: 1px solid #F1F4F6 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   .task-actions .btn-complete,
-  .task-actions .btn-view {
-    flex: 1 !important;
+  .task-actions .btn-view,
+  .task-actions .btn-delete {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
     height: 40px !important;
+    padding: 0 8px !important;
     border-radius: 11px !important;
     font: 600 12.5px 'Plus Jakarta Sans', sans-serif !important;
     letter-spacing: -0.005em !important;
@@ -382,7 +423,13 @@
     border: 1px solid !important;
     cursor: pointer;
     text-decoration: none;
+    white-space: nowrap !important;
+    overflow: hidden !important;
   }
+  .task-actions .btn-complete { flex-grow: 1.25 !important; }
+  .task-actions .btn-complete svg,
+  .task-actions .btn-view svg,
+  .task-actions .btn-delete svg { flex-shrink: 0 !important; }
   .task-actions .btn-complete {
     background: linear-gradient(180deg, #0F766E 0%, #0B5650 100%) !important;
     border-color: #0B5650 !important;
@@ -399,6 +446,11 @@
     background: white !important;
     border-color: #EAEFF1 !important;
     color: #475569 !important;
+  }
+  .task-actions .btn-delete {
+    background: #FFF5F5 !important;
+    border-color: #FECACA !important;
+    color: #DC2626 !important;
   }
 
   /* Empty state */
@@ -480,5 +532,10 @@
     background: #11161C !important;
     border-color: #33393F !important;
     color: #C5CDD3 !important;
+  }
+  [data-theme="dark"] .task-actions .btn-delete {
+    background: #2A1416 !important;
+    border-color: #5B2326 !important;
+    color: #F87171 !important;
   }
 }

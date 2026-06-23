@@ -391,7 +391,7 @@
     .od-grid { grid-template-columns: 1fr; }
     .od-right { position: static; }
   }
-  @media (max-width: 700px) {
+  @media (max-width: 1024px) {
     .od-head { flex-direction: column; align-items: stretch; }
     .od-head-r { flex-wrap: wrap; }
     .od-head-r .ord-btn { flex: 1 1 auto; justify-content: center; }
@@ -435,7 +435,17 @@
     }
     .od-prods tr.wh-vrow td[data-label="SKU"]::before { display: none; }
     .od-prods td.wh-vrow-sku { padding-left: 0 !important; }   /* drop desktop indent */
-    .od-prods td.wh-grp-head { padding: 0 0 5px; }             /* group title header */
+    /* Group title header: left-aligned (name sits right after the icon).
+       Without this it inherits text-align:right from the wh-grp td rule and
+       the short title gets pushed to the right edge of its block, so titles
+       across cards line up at different x-positions. */
+    .od-prods td.wh-grp-head {
+      padding: 0 0 5px;
+      justify-content: flex-start;
+      text-align: left;
+    }
+    .od-prods td.wh-grp-head .pname,
+    .od-prods td.wh-grp-head .psub { text-align: left; }
     .od-prods .pname { font-size: 13.5px; }
     .od-prods .psub { font-size: 11px; }
     .od-prods .sku-pill { font-size: 12.5px; }
@@ -802,8 +812,21 @@
     color: var(--gray-400);
   }
 
-  /* Mobile / narrow: stack the panels — scroll the whole body instead. */
-  @media (max-width: 860px) {
+  /* Mobile / narrow (incl. large phones like iPhone Air): full-bleed sheet
+     that fills the viewport exactly. Uses 100% (not 100vw/100vh) so a
+     scrollbar or the address bar can't make it wider than the screen and
+     shift it sideways. Stack the panels and scroll the whole body. */
+  @media (max-width: 1024px) {
+    .rs-overlay {
+      padding: 0;
+      align-items: stretch;
+      justify-content: stretch;
+    }
+    .rs-shell {
+      width: 100%; max-width: 100%;
+      height: 100%; max-height: 100%;
+      border-radius: 0;
+    }
     .rs-body {
       grid-template-columns: 1fr;
       grid-template-rows: auto auto;
@@ -818,11 +841,11 @@
         @media stack still applies; this just refines the layout for
         small touch screens so the user can scroll through every
         field after a scan. */
-  @media (max-width: 720px) {
-    .rs-overlay { padding: 0; }
+  @media (max-width: 1024px) {
+    .rs-overlay { padding: 0; align-items: stretch; justify-content: stretch; }
     .rs-shell {
-      max-width: 100vw; max-height: 100vh;
-      width: 100vw; height: 100vh;
+      max-width: 100%; max-height: 100%;
+      width: 100%; height: 100%;
       border-radius: 0;
     }
     .rs-body {
@@ -860,7 +883,7 @@
     .rs-capture-btn { width: 100%; justify-content: center; padding: 13px 18px; font-size: 14px; }
     .rs-title { font-size: 14px; }
   }
-  @media (max-width: 720px) and (orientation: landscape) {
+  @media (max-width: 1024px) and (orientation: landscape) {
     .rs-cam { height: 70vh; }
   }
 </style>
@@ -1259,8 +1282,19 @@
   .rse-sep { border: none; border-top: 1px solid #EEF1F5; margin: 12px 0; }
   .rse-actions { display: flex; gap: 10px; margin-top: 14px; }
   .rse-actions .bl-btn.ghost { background: #F1F5F9; color: #334155; }
+  .rse-ac-drop {
+    display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 5;
+    background: #fff; border: 1px solid #E2E8EE; border-radius: 9px; margin-top: 4px;
+    box-shadow: 0 10px 26px rgba(15,23,31,0.14); max-height: 210px; overflow-y: auto;
+  }
+  .rse-ac-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 12px; cursor: pointer; font: 600 13px var(--font-sans); color: #0F1419;
+  }
+  .rse-ac-item:hover { background: #E9F5F3; }
+  .rse-ac-item .vc { font: 600 11px var(--font-sans); color: var(--gray-500); white-space: nowrap; }
 </style>
-<div class="bl-overlay" id="rsEditOverlay" style="z-index: 1100;">
+<div class="bl-overlay" id="rsEditOverlay" style="z-index: 10010;">
   <div class="bl-shell">
     <div class="bl-head">
       <div class="bl-title"><i class="fa fa-pen"></i> {% trans "Edit added item" %}</div>
@@ -1269,10 +1303,12 @@
     <div class="rse-body">
       <div class="rse-fld"><label>{% trans "Product name" %}</label><input id="rseName" class="rse-input" type="text" autocomplete="off"></div>
       <div class="rse-fld"><label>{% trans "SKU" %}</label><input id="rseSku" class="rse-input" type="text" autocomplete="off"></div>
-      <div class="rse-fld">
+      <div class="rse-fld" style="position:relative;">
         <label>{% trans "Main product (catalog)" %}</label>
-        <div class="hint" id="rseMainHint"></div>
-        <input id="rseMain" class="rse-input" type="text" autocomplete="off" placeholder="{% trans 'Blank = auto from SKU · or type to move it' %}">
+        <input id="rseMain" class="rse-input" type="text" autocomplete="off"
+               oninput="rseMainSearch()" onblur="setTimeout(rseMainHide, 180)"
+               placeholder="{% trans 'Type to search · clear = auto from SKU' %}">
+        <div id="rseMainDrop" class="rse-ac-drop"></div>
       </div>
       <div class="rse-fld"><label>{% trans "Product barcode" %}</label><input id="rseProdBc" class="rse-input" type="text" autocomplete="off"></div>
       <hr class="rse-sep">
@@ -2281,8 +2317,8 @@
     document.getElementById('rseName').value = it.name || '';
     document.getElementById('rseSku').value = it.sku || '';
     document.getElementById('rseProdBc').value = it.productBarcode || '';
-    document.getElementById('rseMain').value = '';
-    document.getElementById('rseMainHint').textContent = it.mainProduct ? ('{% trans "Currently" %}: ' + it.mainProduct) : '';
+    document.getElementById('rseMain').value = it.mainProduct || '';
+    rseMainHide();
     document.getElementById('rseRollBc').value = it.rollBarcode || '';
     document.getElementById('rseMeters').value = it.meters || '';
     document.getElementById('rseLot').value = it.lot || '';
@@ -2332,6 +2368,38 @@
         closeRsEdit();
       })
       .catch(function (e) { btn.disabled = false; btn.innerHTML = orig; alert(e.message || 'Error'); });
+  }
+  // Main-product autocomplete inside the recent-item edit modal.
+  let _rseMainTimer = null;
+  function rseMainSearch() {
+    clearTimeout(_rseMainTimer);
+    var inp = document.getElementById('rseMain');
+    var drop = document.getElementById('rseMainDrop');
+    var q = (inp.value || '').trim();
+    if (q.length < 1) { rseMainHide(); return; }
+    _rseMainTimer = setTimeout(function () {
+      fetch(catalogSearchUrl + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var items = (d && d.results) || [];
+          if (!items.length) { drop.innerHTML = ''; drop.style.display = 'none'; return; }
+          drop.innerHTML = items.map(function (it) {
+            var t = rsEscapeHtml(it.title);
+            return '<div class="rse-ac-item" data-title="' + t + '" onmousedown="rseMainPick(this)">' +
+                   '<span>' + t + '</span><span class="vc">' + (it.variants || 0) + ' var.</span></div>';
+          }).join('');
+          drop.style.display = 'block';
+        }).catch(function () { rseMainHide(); });
+    }, 250);
+  }
+  function rseMainPick(el) {
+    var inp = document.getElementById('rseMain');
+    if (inp) inp.value = el.getAttribute('data-title') || '';
+    rseMainHide();
+  }
+  function rseMainHide() {
+    var drop = document.getElementById('rseMainDrop');
+    if (drop) drop.style.display = 'none';
   }
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && document.getElementById('rsEditOverlay').classList.contains('show')) closeRsEdit();

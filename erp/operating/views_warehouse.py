@@ -77,6 +77,79 @@ def _get_usd_try_rate():
     return Decimal('1')
 
 
+def _consonant_prefix(name):
+    """Barcode prefix = the first 3 CONSONANTS of a supplier name, upper-cased
+    and ASCII-folded (Turkish-aware). "Kızılırmak" -> "KZL", "Acme" -> "CM".
+    Falls back to "GEN" when a name has no usable consonants."""
+    from .catalog_sync import _fold
+    folded = _fold(name or "")               # Turkish-aware UPPER + ASCII fold
+    vowels = set("AEIOU")
+    cons = [c for c in folded if c.isalpha() and c not in vowels]
+    return ("".join(cons[:3]) or "GEN")[:6]
+
+
+def _barcode_minter(prefix):
+    """Return a closure that mints fresh, GLOBALLY-UNIQUE barcodes of the form
+    PREFIX + 6 digits (e.g. KZL000123). Uniqueness is checked against every
+    existing roll AND product barcode, plus the ones minted in this batch, so
+    each top across the whole system gets a one-of-a-kind code."""
+    import re as _re
+    prefix = (prefix or "GEN").upper()[:6] or "GEN"
+    existing = set()
+    for qs in (
+        WarehouseProductRoll.objects.filter(barcode__startswith=prefix)
+        .values_list("barcode", flat=True),
+        WarehouseProduct.objects.filter(barcode__startswith=prefix)
+        .values_list("barcode", flat=True),
+    ):
+        existing.update(b for b in qs if b)
+    # Seed the counter only from OUR own clean "PREFIX######" sequence — never
+    # from unrelated long codes that merely start with the same letters (e.g.
+    # a supplier whose consonants match an existing SKU prefix). Uniqueness is
+    # still enforced against EVERY existing barcode via the `existing` set.
+    seq_pat = _re.compile(r"^" + _re.escape(prefix) + r"(\d{6,})$")
+    maxn = 0
+    for b in existing:
+        m = seq_pat.match(b or "")
+        if m and len(m.group(1)) == 6:
+            try:
+                maxn = max(maxn, int(m.group(1)))
+            except ValueError:
+                pass
+    state = {"n": maxn}
+
+    def mint():
+        while True:
+            state["n"] += 1
+            code = f"{prefix}{state['n']:06d}"
+            if code not in existing:
+                existing.add(code)
+                return code
+
+    return mint
+
+
+def _slug_token(text):
+    """Compact ASCII-upper alnum token for an auto variant-SKU suffix:
+    'Açık Mavi' -> 'ACIKMAVI'."""
+    from .catalog_sync import _fold
+    folded = _fold(text or "")
+    return "".join(ch for ch in folded if ch.isalnum())[:10]
+
+
+def _supplier_choices():
+    """Suppliers for the manual-add dropdown, each with its derived barcode
+    prefix so the UI can preview it instantly."""
+    try:
+        from crm.models import Supplier
+        rows = (Supplier.objects.all()
+                .order_by("company_name", "contact_name")[:500])
+        return [{"id": s.id, "name": str(s), "prefix": _consonant_prefix(str(s))}
+                for s in rows]
+    except Exception:
+        return []
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseList(View):
     template_name = "operating/warehouse_list.html"
@@ -445,6 +518,7 @@ class WarehouseDetail(View):
             'group_count': group_count,       # main products (packages)
             'roll_count': roll_count,         # rolls (tops)
             'is_admin': _is_admin(request.user),
+            'suppliers': _supplier_choices(),   # manual-add dropdown
             'total_quantity': counts['qty'],
             'search': search,
             'sort': sort,
@@ -563,6 +637,176 @@ def catalog_base_search(request, pk):
               .annotate(vc=Count("variants")).order_by("title")[:12])
         results = [{"id": p.id, "title": p.title, "variants": p.vc} for p in qs]
     return JsonResponse({"results": results})
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseManualAdd(View):
+    """Create a brand-new (un-labelled) product straight into the warehouse:
+    ONE main product (group) → its VARIANTS → each variant's TOPS (rolls),
+    every top getting an auto-generated, globally-unique barcode whose prefix
+    is the supplier's consonants ("Kızılırmak" → KZL000001). Unit-agnostic so
+    it fits fabric (m), bedding (pcs), etc. Whole thing is one atomic POST.
+
+    JSON body:
+      {
+        "supplier_id": 5,                 # optional → barcode prefix
+        "barcode_prefix": "KZL",          # optional explicit override
+        "unit": "mt",                     # mt | adet | kg | paket | ...
+        "main_product": {"mode": "new"|"existing", "id": 12,
+                          "name": "GREK", "sku": "GREK"},
+        "variants": [
+          {"name": "Beyaz", "sku": "GREK-BEYAZ",
+           "tops": [{"qty": 160}, {"qty": 150}]}
+        ]
+      }
+    """
+
+    def post(self, request, pk):
+        from django.db import transaction
+        from .catalog_sync import (
+            translate_color, sync_roll_to_catalog, CatalogSyncConflict,
+        )
+        from marketing.models import Product as _Prod
+
+        warehouse = get_object_or_404(Warehouse, pk=pk)
+        try:
+            data = json.loads((request.body or b"").decode("utf-8") or "{}")
+        except (ValueError, UnicodeDecodeError):
+            return JsonResponse({"success": False, "error": "Geçersiz veri."}, status=400)
+
+        unit = (data.get("unit") or "mt").strip()[:20] or "mt"
+        variants_in = data.get("variants") or []
+        if not isinstance(variants_in, list) or not variants_in:
+            return JsonResponse({"success": False, "error": "En az bir varyant ekleyin."}, status=400)
+
+        # ── Supplier → barcode prefix ──
+        supplier_name = ""
+        supplier_id = data.get("supplier_id")
+        if supplier_id:
+            try:
+                from crm.models import Supplier
+                s = Supplier.objects.filter(pk=int(supplier_id)).first()
+                if s:
+                    supplier_name = str(s)
+            except Exception:
+                pass
+        prefix = (data.get("barcode_prefix") or "").strip().upper()
+        if not prefix:
+            prefix = _consonant_prefix(supplier_name) if supplier_name else "GEN"
+        prefix = (prefix[:6] or "GEN")
+
+        # ── Resolve / create the MAIN product (hidden marketing.Product) ──
+        mp = data.get("main_product") or {}
+        mode = (mp.get("mode") or "new").strip()
+        main_product = None
+        if mode == "existing" and str(mp.get("id") or "").isdigit():
+            main_product = _Prod.objects.filter(pk=int(mp["id"]), featured=False).first()
+        base_name = (mp.get("name") or "").strip()
+        base_sku = (mp.get("sku") or "").strip()
+        if main_product is not None:
+            base_name = main_product.title
+        elif not base_name:
+            return JsonResponse({"success": False, "error": "Ana ürün adı gerekli."}, status=400)
+
+        created = {"main_product": None, "variants": 0, "tops": 0, "barcodes": []}
+        warnings = []
+        mint = _barcode_minter(prefix)
+        user = request.user if request.user.is_authenticated else None
+
+        try:
+            with transaction.atomic():
+                if main_product is None:
+                    safe_sku = base_sku[:64] or None
+                    if safe_sku and _Prod.objects.filter(sku__iexact=safe_sku).exists():
+                        warnings.append(f"Ana ürün SKU '{safe_sku}' zaten kullanımda — boş bırakıldı.")
+                        safe_sku = None
+                    main_product = _Prod.objects.create(
+                        title=base_name, sku=safe_sku, featured=False,
+                        unit_of_measurement=unit, quantity=Decimal("0"),
+                    )
+                created["main_product"] = {"id": main_product.id, "title": main_product.title}
+
+                seen_skus = set()
+                for idx, v in enumerate(variants_in, start=1):
+                    v_name = (v.get("name") or "").strip()
+                    v_sku = (v.get("sku") or "").strip()[:20]
+                    tops = v.get("tops") or []
+                    if not v_name and not v_sku and not tops:
+                        continue
+                    if not v_sku:
+                        root = (base_sku or base_name or "SKU").strip()
+                        suffix = _slug_token(v_name) or str(idx)
+                        v_sku = f"{root}-{suffix}"[:20]
+                    base_v = v_sku
+                    dup = 1
+                    while v_sku in seen_skus:
+                        dup += 1
+                        v_sku = f"{base_v[:18]}{dup}"
+                    seen_skus.add(v_sku)
+
+                    # Colour vs model attribute, derived from the variant name.
+                    eng = translate_color(v_name) if v_name else None
+                    attr_name = ("color" if eng else ("model" if v_name else None))
+                    attr_value = (eng or v_name) or None
+
+                    wp_name = (f"{base_name} {v_name}".strip()) or v_sku
+                    wp = WarehouseProduct.objects.create(
+                        warehouse=warehouse, name=wp_name, sku=v_sku,
+                        quantity=Decimal("0"),
+                    )
+
+                    first_barcode = None
+                    total = Decimal("0")
+                    for t in tops:
+                        qty = _safe_decimal(t.get("qty"))
+                        if qty is None or qty <= 0:
+                            continue
+                        code = mint()
+                        if first_barcode is None:
+                            first_barcode = code
+                        roll = WarehouseProductRoll.objects.create(
+                            product=wp, meters=qty, meters_remaining=qty,
+                            barcode=code,
+                            notes=(f"Supplier: {supplier_name}" if supplier_name else None),
+                            scanned_by=user,
+                        )
+                        StockMovement.objects.create(
+                            product=wp, roll=roll, movement_type="in",
+                            quantity=qty, reason="Manual add",
+                            reference=code, created_by=user,
+                        )
+                        total += qty
+                        created["tops"] += 1
+                        created["barcodes"].append(code)
+
+                    wp.quantity = total
+                    if first_barcode and not wp.barcode:
+                        wp.barcode = first_barcode[:64]
+                    wp.save(update_fields=["quantity", "barcode", "updated_at"])
+
+                    try:
+                        _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
+                            base_name=base_name,
+                            attribute_name=attr_name,
+                            attribute_value=attr_value,
+                            variant_sku=v_sku, variant_barcode=first_barcode,
+                            quantity=total, cost=None,
+                            existing_base_product=main_product,
+                        )
+                        wp.catalog_variant = cat_variant
+                        wp.save(update_fields=["catalog_variant"])
+                    except CatalogSyncConflict as exc:
+                        warnings.append(f"{v_sku}: {exc}")
+                    created["variants"] += 1
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
+
+        return JsonResponse({
+            "success": True, "created": created,
+            "warnings": warnings, "prefix": prefix,
+        })
 
 
 @method_decorator(login_required, name='dispatch')

@@ -886,6 +886,133 @@
   @media (max-width: 1024px) and (orientation: landscape) {
     .rs-cam { height: 70vh; }
   }
+
+  /* ─────────────────────────────────────────────────────────────
+     NEW PRODUCT — right-side quick-add panel (manual entry)
+     ───────────────────────────────────────────────────────────── */
+  .np-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    display: none; opacity: 0; transition: opacity 180ms ease;
+  }
+  .np-overlay.show { display: block; opacity: 1; }
+  .np-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(15, 23, 31, 0.45); backdrop-filter: blur(3px);
+  }
+  .np-panel {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: 460px; max-width: 94vw;
+    background: #F7F9FB;
+    box-shadow: -18px 0 48px rgba(15, 23, 31, 0.22);
+    display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform 280ms cubic-bezier(0.22,1,0.36,1);
+    font-family: var(--font-sans);
+  }
+  .np-overlay.show .np-panel { transform: translateX(0); }
+  .np-head {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px;
+    background: linear-gradient(180deg, #FFFFFF, #F3F6F8);
+    border-bottom: 1px solid #E2E8EE;
+  }
+  .np-title { display: inline-flex; align-items: center; gap: 9px; font: 800 16px var(--font-sans); color: #0F1419; }
+  .np-title i { color: #A9852F; }
+  .np-close {
+    width: 36px; height: 36px; border-radius: 9px;
+    border: 1px solid #E2E8EE; background: white; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .np-close:hover { background: #F1F5F9; }
+  .np-x { position: relative; width: 16px; height: 16px; display: block; }
+  .np-x::before, .np-x::after {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    width: 17px; height: 2.2px; background: #475569; border-radius: 2px;
+  }
+  .np-x::before { transform: translate(-50%,-50%) rotate(45deg); }
+  .np-x::after  { transform: translate(-50%,-50%) rotate(-45deg); }
+
+  .np-body { flex: 1; overflow-y: auto; padding: 16px 18px 8px; }
+  .np-field { margin-bottom: 16px; }
+  .np-field > label {
+    display: block; font: 700 11px var(--font-sans); letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--gray-500); margin-bottom: 6px;
+  }
+  .np-input, .np-select {
+    width: 100%; height: 40px; box-sizing: border-box;
+    padding: 0 12px; border: 1px solid #DDE3EA; border-radius: 9px;
+    background: white; font: 500 13.5px var(--font-sans); color: #0F1419; outline: none;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .np-input:focus, .np-select:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+  .np-hint { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 6px; }
+  .np-hint b { color: #A9852F; font: 700 12px var(--font-mono); letter-spacing: .5px; }
+  .np-row { display: flex; gap: 10px; }
+  .np-row > * { flex: 1; min-width: 0; }
+
+  .np-seg { display: inline-flex; background: #ECF1F5; border-radius: 9px; padding: 3px; margin-bottom: 10px; }
+  .np-seg-btn {
+    border: 0; background: transparent; cursor: pointer;
+    padding: 6px 16px; border-radius: 7px; font: 600 12.5px var(--font-sans); color: var(--gray-600);
+  }
+  .np-seg-btn.active { background: white; color: var(--nejum-teal-700); box-shadow: 0 1px 2px rgba(15,23,31,0.08); }
+
+  .np-ac-wrap { position: relative; }
+  .np-ac-drop {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5;
+    background: white; border: 1px solid #E2E8EE; border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(15,23,31,0.12); overflow: hidden; display: none;
+  }
+  .np-ac-drop.show { display: block; }
+  .np-ac-item { padding: 9px 12px; cursor: pointer; font: 500 13px var(--font-sans); color: #0F1419; }
+  .np-ac-item:hover { background: #F1F7F6; }
+  .np-ac-item small { color: var(--gray-500); margin-left: 6px; }
+
+  /* Variant cards */
+  .np-variants { display: flex; flex-direction: column; gap: 12px; }
+  .np-variant {
+    background: white; border: 1px solid #E2E8EE; border-radius: 12px;
+    padding: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+  }
+  .np-variant-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+  .np-variant-no { font: 700 12px var(--font-sans); color: var(--nejum-teal-700); letter-spacing: 0.02em; }
+  .np-variant-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .np-variant-row .np-input { height: 38px; }
+  .np-v-name { flex: 1.4; }
+  .np-v-sku  { flex: 1; }
+  .np-tops { display: flex; flex-direction: column; gap: 7px; }
+  .np-top { display: flex; align-items: center; gap: 8px; }
+  .np-top-no { font: 600 11px var(--font-sans); color: var(--gray-500); min-width: 42px; }
+  .np-top-qty { flex: 1; height: 36px; }
+  .np-top-unit { font: 600 12px var(--font-sans); color: var(--gray-600); min-width: 30px; }
+  .np-mini-x {
+    width: 28px; height: 28px; flex-shrink: 0; border: 1px solid #EEE1E1; background: #FEF6F6;
+    color: #C0473F; border-radius: 7px; cursor: pointer; font-size: 14px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .np-mini-x:hover { background: #FDE7E7; }
+  .np-add-top, .np-add-variant {
+    margin-top: 9px; width: 100%; border: 1px dashed #BFD6D2; background: #F2F8F7;
+    color: var(--nejum-teal-700); border-radius: 9px; padding: 9px; cursor: pointer;
+    font: 600 12.5px var(--font-sans); display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .np-add-top { padding: 7px; font-size: 12px; background: #F6FAFA; }
+  .np-add-variant { margin-top: 12px; }
+  .np-add-top:hover, .np-add-variant:hover { background: #E9F5F3; border-color: var(--nejum-teal-500); }
+
+  .np-foot {
+    flex-shrink: 0; border-top: 1px solid #E2E8EE; background: white;
+    padding: 12px 18px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .np-summary { font: 500 12px var(--font-sans); color: var(--gray-600); min-height: 16px; }
+  .np-summary b { color: #0F1419; }
+  .np-actions { display: flex; gap: 8px; }
+  .np-actions .ord-btn { flex: 1; justify-content: center; }
+  .np-actions .ord-btn[disabled] { opacity: 0.55; pointer-events: none; }
+
+  @media (max-width: 560px) {
+    .np-panel { width: 100%; max-width: 100%; }
+  }
 </style>
 {% endblock %}
 
@@ -942,6 +1069,9 @@
       </div>
     </div>
     <div class="od-head-r">
+      <button type="button" class="ord-btn" style="background:linear-gradient(180deg,#C9A75A,#A9852F);color:#fff;border:1px solid #8A6B22;box-shadow:0 1px 2px rgba(15,23,31,0.10),inset 0 1px 0 rgba(255,255,255,0.18);" onclick="openNewProduct()">
+        <i class="fa fa-plus"></i>{% trans "New product" %}
+      </button>
       <button type="button" class="ord-btn primary" onclick="openRollScanner()">
         <i class="fa fa-camera"></i>{% trans "Scan roll" %}
       </button>
@@ -1326,6 +1456,306 @@
 </div>
 
 <!-- ─── ROLL SCANNER (camera) ─────────────────────────────────── -->
+<!-- NEW PRODUCT — quick-add side panel (manual entry, no scan) -->
+<div id="newProductOverlay" class="np-overlay" aria-hidden="true">
+  <div class="np-backdrop" onclick="closeNewProduct()"></div>
+  <aside class="np-panel" role="dialog" aria-label="{% trans 'New product' %}">
+    <div class="np-head">
+      <div class="np-title"><i class="fa fa-box-open"></i> {% trans "New product" %}</div>
+      <button type="button" class="np-close" onclick="closeNewProduct()" aria-label="{% trans 'Close' %}"><span class="np-x"></span></button>
+    </div>
+
+    <div class="np-body">
+      <!-- Supplier → barcode prefix -->
+      <div class="np-field">
+        <label>{% trans "Supplier" %}</label>
+        <select id="npSupplier" class="np-select" onchange="npUpdatePrefix()">
+          <option value="">{% trans "Select supplier…" %}</option>
+          {% for s in suppliers %}
+            <option value="{{ s.id }}" data-prefix="{{ s.prefix }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="np-hint">{% trans "Barcode prefix" %}: <b id="npPrefix">GEN</b> · {% trans "each top gets its own unique barcode" %}</div>
+      </div>
+
+      <!-- Main product: new or existing -->
+      <div class="np-field">
+        <label>{% trans "Main product" %}</label>
+        <div class="np-seg">
+          <button type="button" class="np-seg-btn active" data-mode="new" onclick="npSetMode('new')">{% trans "New" %}</button>
+          <button type="button" class="np-seg-btn" data-mode="existing" onclick="npSetMode('existing')">{% trans "Existing" %}</button>
+        </div>
+        <div id="npNewMain">
+          <div class="np-row">
+            <input id="npMainName" class="np-input" placeholder="{% trans 'Name (e.g. GREK)' %}" oninput="npOnNameInput()">
+            <input id="npMainSku" class="np-input" placeholder="{% trans 'Product SKU' %}" oninput="this.dataset.touched='1'; npRefreshVariantSkus()">
+          </div>
+        </div>
+        <div id="npExistingMain" class="np-ac-wrap" style="display:none;">
+          <input id="npMainSearch" class="np-input" placeholder="{% trans 'Search existing main product…' %}" autocomplete="off" oninput="npSearchMain(this.value)">
+          <input type="hidden" id="npMainId">
+          <div id="npMainDrop" class="np-ac-drop"></div>
+        </div>
+      </div>
+
+      <!-- Unit (generic: fabric=m, bedding=pcs, …) -->
+      <div class="np-field">
+        <label>{% trans "Unit" %}</label>
+        <select id="npUnit" class="np-select" onchange="npRelabelUnits(); npSummaryUpdate();">
+          <option value="mt">{% trans "Meter (m)" %}</option>
+          <option value="adet">{% trans "Piece (pcs)" %}</option>
+          <option value="kg">kg</option>
+          <option value="paket">{% trans "Package" %}</option>
+        </select>
+      </div>
+
+      <!-- Variants & their tops -->
+      <div class="np-field" style="margin-bottom:6px;"><label>{% trans "Variants & tops" %}</label></div>
+      <div class="np-variants" id="npVariants"></div>
+      <button type="button" class="np-add-variant" onclick="npAddVariant()"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>
+    </div>
+
+    <div class="np-foot">
+      <div class="np-summary" id="npSummary"></div>
+      <div class="np-actions">
+        <button type="button" class="ord-btn ghost" onclick="closeNewProduct()">{% trans "Cancel" %}</button>
+        <button type="button" class="ord-btn primary" id="npSaveBtn" onclick="npSave()"><i class="fa fa-check"></i> {% trans "Save" %}</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function () {
+  const NP_URL = "{% url 'operating:warehouse_manual_add' warehouse.pk %}";
+  const NP_SEARCH = "{% url 'operating:catalog_base_search' warehouse.pk %}";
+  const NP_CSRF = "{{ csrf_token }}";
+  let npVid = 0;
+  let npMode = 'new';
+
+  function unitShort() {
+    const u = (document.getElementById('npUnit') || {}).value || 'mt';
+    return ({ mt: 'm', adet: 'ad', kg: 'kg', paket: 'pkt' })[u] || u;
+  }
+  function slug(s) {
+    return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '').slice(0, 10);
+  }
+  function npBaseSku() {
+    if (npMode === 'existing') return slug((document.getElementById('npMainSearch') || {}).value || '');
+    const sk = (document.getElementById('npMainSku') || {}).value || '';
+    const nm = (document.getElementById('npMainName') || {}).value || '';
+    return (sk || nm).toUpperCase().replace(/\s+/g, '');
+  }
+
+  window.openNewProduct = function () {
+    const ov = document.getElementById('newProductOverlay');
+    if (!ov) return;
+    if (!document.querySelectorAll('#npVariants .np-variant').length) npAddVariant();
+    ov.classList.add('show');
+    ov.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    npUpdatePrefix();
+    npSummaryUpdate();
+  };
+  window.closeNewProduct = function () {
+    const ov = document.getElementById('newProductOverlay');
+    if (!ov) return;
+    ov.classList.remove('show');
+    ov.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  };
+
+  window.npSetMode = function (mode) {
+    npMode = mode;
+    document.querySelectorAll('#newProductOverlay .np-seg-btn').forEach(function (b) {
+      b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+    });
+    document.getElementById('npNewMain').style.display = (mode === 'new') ? '' : 'none';
+    document.getElementById('npExistingMain').style.display = (mode === 'existing') ? '' : 'none';
+    npRefreshVariantSkus();
+  };
+
+  window.npUpdatePrefix = function () {
+    const sel = document.getElementById('npSupplier');
+    const opt = sel && sel.options[sel.selectedIndex];
+    const px = (opt && opt.getAttribute('data-prefix')) || 'GEN';
+    document.getElementById('npPrefix').textContent = px || 'GEN';
+  };
+
+  window.npOnNameInput = function () {
+    const nm = document.getElementById('npMainName');
+    const sk = document.getElementById('npMainSku');
+    if (sk && !sk.dataset.touched) sk.value = (nm.value || '').toUpperCase().replace(/\s+/g, '');
+    npRefreshVariantSkus();
+  };
+  window.npRefreshVariantSkus = function () {
+    document.querySelectorAll('#npVariants .np-variant').forEach(function (v) { npSuggestVariantSku(v); });
+  };
+  window.npSuggestVariantSku = function (vEl) {
+    const nameI = vEl.querySelector('.np-v-name');
+    const skuI = vEl.querySelector('.np-v-sku');
+    if (!skuI || skuI.dataset.touched) return;
+    const root = npBaseSku();
+    const sfx = slug(nameI.value) || vEl.dataset.vid;
+    skuI.value = root ? (root + '-' + sfx).slice(0, 20) : '';
+  };
+
+  window.npAddVariant = function () {
+    npVid += 1;
+    const el = document.createElement('div');
+    el.className = 'np-variant';
+    el.dataset.vid = npVid;
+    el.innerHTML =
+      '<div class="np-variant-head">' +
+        '<span class="np-variant-no">{% trans "Variant" %} ' + npVid + '</span>' +
+        '<button type="button" class="np-mini-x" title="{% trans "Remove" %}" onclick="npRemoveVariant(this)">&times;</button>' +
+      '</div>' +
+      '<div class="np-variant-row">' +
+        '<input class="np-input np-v-name" placeholder="{% trans "Color / model (e.g. Beyaz)" %}" oninput="npSuggestVariantSku(this.closest(\'.np-variant\'))">' +
+        '<input class="np-input np-v-sku" placeholder="SKU" oninput="this.dataset.touched=\'1\'">' +
+      '</div>' +
+      '<div class="np-tops"></div>' +
+      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>';
+    document.getElementById('npVariants').appendChild(el);
+    npSuggestVariantSku(el);
+    npAddTop(el);
+    npSummaryUpdate();
+  };
+  window.npRemoveVariant = function (btn) {
+    const v = btn.closest('.np-variant');
+    if (v) v.remove();
+    if (!document.querySelectorAll('#npVariants .np-variant').length) npAddVariant();
+    npSummaryUpdate();
+  };
+
+  window.npAddTop = function (vEl) {
+    const tops = vEl.querySelector('.np-tops');
+    const n = tops.children.length + 1;
+    const row = document.createElement('div');
+    row.className = 'np-top';
+    row.innerHTML =
+      '<span class="np-top-no">{% trans "Top" %} ' + n + '</span>' +
+      '<input class="np-input np-top-qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
+      '<span class="np-top-unit">' + unitShort() + '</span>' +
+      '<button type="button" class="np-mini-x" title="{% trans "Remove" %}" onclick="npRemoveTop(this)">&times;</button>';
+    tops.appendChild(row);
+    npSummaryUpdate();
+  };
+  window.npRemoveTop = function (btn) {
+    const t = btn.closest('.np-top');
+    const tops = t && t.parentElement;
+    if (t) t.remove();
+    if (tops) Array.prototype.forEach.call(tops.children, function (r, i) {
+      const no = r.querySelector('.np-top-no'); if (no) no.textContent = '{% trans "Top" %} ' + (i + 1);
+    });
+    npSummaryUpdate();
+  };
+  window.npRelabelUnits = function () {
+    const u = unitShort();
+    document.querySelectorAll('#newProductOverlay .np-top-unit').forEach(function (s) { s.textContent = u; });
+  };
+
+  window.npSummaryUpdate = function () {
+    let vcount = 0, tcount = 0, total = 0;
+    document.querySelectorAll('#npVariants .np-variant').forEach(function (v) {
+      vcount++;
+      v.querySelectorAll('.np-top-qty').forEach(function (q) {
+        const val = parseFloat((q.value || '').replace(',', '.'));
+        if (!isNaN(val) && val > 0) { tcount++; total += val; }
+      });
+    });
+    const el = document.getElementById('npSummary');
+    if (el) el.innerHTML = '<b>' + vcount + '</b> {% trans "variants" %} · <b>' + tcount +
+      '</b> {% trans "tops" %} · <b>' + (Math.round(total * 100) / 100) + '</b> ' + unitShort();
+  };
+
+  let npSearchTimer = null;
+  window.npSearchMain = function (q) {
+    document.getElementById('npMainId').value = '';
+    const drop = document.getElementById('npMainDrop');
+    clearTimeout(npSearchTimer);
+    q = (q || '').trim();
+    if (q.length < 2) { drop.classList.remove('show'); drop.innerHTML = ''; return; }
+    npSearchTimer = setTimeout(function () {
+      fetch(NP_SEARCH + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          const items = d.results || [];
+          if (!items.length) { drop.innerHTML = '<div class="np-ac-item" style="color:#94A3B8;">{% trans "No match" %}</div>'; drop.classList.add('show'); return; }
+          drop.innerHTML = items.map(function (it) {
+            return '<div class="np-ac-item" data-id="' + it.id + '" data-title="' + (it.title || '').replace(/"/g, '&quot;') + '">' +
+              (it.title || '') + '<small>' + (it.variants || 0) + ' var.</small></div>';
+          }).join('');
+          drop.classList.add('show');
+          drop.querySelectorAll('.np-ac-item[data-id]').forEach(function (row) {
+            row.addEventListener('click', function () {
+              document.getElementById('npMainId').value = row.getAttribute('data-id');
+              document.getElementById('npMainSearch').value = row.getAttribute('data-title');
+              drop.classList.remove('show');
+              npRefreshVariantSkus();
+            });
+          });
+        }).catch(function () { drop.classList.remove('show'); });
+    }, 250);
+  };
+
+  window.npSave = function () {
+    const btn = document.getElementById('npSaveBtn');
+    const main = (npMode === 'existing')
+      ? { mode: 'existing', id: document.getElementById('npMainId').value || '' }
+      : { mode: 'new', name: (document.getElementById('npMainName').value || '').trim(),
+          sku: (document.getElementById('npMainSku').value || '').trim() };
+    if (npMode === 'existing' && !main.id) { alert('{% trans "Select an existing main product." %}'); return; }
+    if (npMode === 'new' && !main.name) { alert('{% trans "Enter a main product name." %}'); return; }
+
+    const variants = [];
+    document.querySelectorAll('#npVariants .np-variant').forEach(function (v) {
+      const name = (v.querySelector('.np-v-name').value || '').trim();
+      const sku = (v.querySelector('.np-v-sku').value || '').trim();
+      const tops = [];
+      v.querySelectorAll('.np-top-qty').forEach(function (q) {
+        const val = parseFloat((q.value || '').replace(',', '.'));
+        if (!isNaN(val) && val > 0) tops.push({ qty: val });
+      });
+      if (name || sku || tops.length) variants.push({ name: name, sku: sku, tops: tops });
+    });
+    if (!variants.length) { alert('{% trans "Add at least one variant with a top." %}'); return; }
+
+    const sel = document.getElementById('npSupplier');
+    const opt = sel && sel.options[sel.selectedIndex];
+    const payload = {
+      supplier_id: (sel && sel.value) || null,
+      barcode_prefix: (opt && opt.getAttribute('data-prefix')) || '',
+      unit: document.getElementById('npUnit').value || 'mt',
+      main_product: main,
+      variants: variants
+    };
+
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
+    fetch(NP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.success) { window.location.reload(); }
+        else { alert((d && d.error) || '{% trans "Could not save." %}'); btn.disabled = false; btn.innerHTML = orig; }
+      }).catch(function () {
+        alert('{% trans "Network error." %}'); btn.disabled = false; btn.innerHTML = orig;
+      });
+  };
+
+  document.addEventListener('click', function (e) {
+    const drop = document.getElementById('npMainDrop');
+    if (drop && drop.classList.contains('show') && !e.target.closest('#npExistingMain')) {
+      drop.classList.remove('show');
+    }
+  });
+})();
+</script>
+
 <div id="rollScannerOverlay" class="rs-overlay" aria-hidden="true">
   <div class="rs-shell">
     <div class="rs-head">

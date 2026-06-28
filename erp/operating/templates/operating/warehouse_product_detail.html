@@ -175,6 +175,28 @@
   .roll-status.partial { background: #FEF3C7; color: #8B5A00; }
   .roll-status.consumed { background: #E5E7EB; color: var(--gray-600); }
   .roll-time { font: 500 11px var(--font-sans); color: var(--gray-500); }
+  /* Bulk top selection toolbar + per-row checkbox */
+  .rolls-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; padding: 2px 2px 12px;
+  }
+  .rolls-selall {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    font: 600 12.5px var(--font-sans); color: var(--gray-700);
+  }
+  .roll-cb, .rolls-selall input[type="checkbox"] {
+    width: 17px; height: 17px; margin: 0; flex-shrink: 0;
+    accent-color: var(--nejum-teal-600); cursor: pointer; vertical-align: middle;
+  }
+  .roll-cb { margin-right: 4px; }
+  .rolls-bulk-del {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 9px; cursor: pointer;
+    border: 1px solid #FECACA; background: #FEF2F2; color: #DC2626;
+    font: 600 12.5px var(--font-sans); transition: all 140ms;
+  }
+  .rolls-bulk-del:hover:not(:disabled) { background: #FDE7E7; border-color: #FCA5A5; }
+  .rolls-bulk-del:disabled { opacity: .5; cursor: default; border-color: #E2E8EE; background: #F8FAFC; color: var(--gray-400); }
   .roll-delete-btn {
     width: 30px; height: 30px;
     display: inline-flex; align-items: center; justify-content: center;
@@ -559,6 +581,18 @@
           <span class="od-card-sub">{{ rolls_count }} {% blocktrans count counter=rolls_count %}roll{% plural %}rolls{% endblocktrans %}</span>
         </div>
         {% if rolls %}
+        {% get_current_language as LANGUAGE_CODE %}
+        <div class="rolls-toolbar">
+          <label class="rolls-selall">
+            <input type="checkbox" id="rollSelectAll" onchange="toggleAllRolls(this)">
+            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tümünü seç{% else %}Select all{% endif %}
+          </label>
+          <button type="button" id="rollBulkDelBtn" class="rolls-bulk-del" disabled onclick="openBulkRollDelete()">
+            <i class="fa fa-trash"></i>
+            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Seçilenleri sil{% else %}Delete selected{% endif %}
+            (<span id="rollSelCount">0</span>)
+          </button>
+        </div>
         <table class="rolls-table">
           <thead>
             <tr>
@@ -575,6 +609,7 @@
             <tr id="roll-row-{{ r.pk }}">
               <td><b>{{ r.pk }}</b></td>
               <td>
+                <input type="checkbox" class="roll-cb" value="{{ r.pk }}" onchange="rollPickChanged()" aria-label="{% trans 'Select roll' %}">
                 {% if r.barcode %}
                   <span class="roll-barcode">{{ r.barcode }}</span>
                 {% else %}
@@ -876,10 +911,43 @@
   const stockOutUrl = "{% url 'operating:warehouse_stock_out' warehouse.pk product.pk %}";
   const rollDeleteUrlPattern = "{% url 'operating:warehouse_roll_delete' warehouse.pk product.pk 0 %}";
   const rollEditUrlPattern = "{% url 'operating:warehouse_roll_edit' warehouse.pk product.pk 0 %}";
+  const rollBulkDeleteUrl = "{% url 'operating:warehouse_roll_bulk_delete' warehouse.pk product.pk %}";
   const csrftoken = '{{ csrf_token }}';
+  const _isTR = "{% get_current_language as LC %}{{ LC|slice:':2' }}" === "tr";
+
+  // ── Bulk top selection ───────────────────────────────────────
+  function rollPickChanged() {
+    const all = document.querySelectorAll('.roll-cb');
+    const sel = document.querySelectorAll('.roll-cb:checked');
+    const cnt = document.getElementById('rollSelCount');
+    const del = document.getElementById('rollBulkDelBtn');
+    if (cnt) cnt.textContent = sel.length;
+    if (del) del.disabled = sel.length === 0;
+    const selAll = document.getElementById('rollSelectAll');
+    if (selAll) {
+      selAll.checked = all.length > 0 && sel.length === all.length;
+      selAll.indeterminate = sel.length > 0 && sel.length < all.length;
+    }
+  }
+  function toggleAllRolls(cb) {
+    document.querySelectorAll('.roll-cb').forEach(function (x) { x.checked = cb.checked; });
+    rollPickChanged();
+  }
+  function openBulkRollDelete() {
+    _rdBulkIds = Array.prototype.map.call(
+      document.querySelectorAll('.roll-cb:checked'), function (x) { return x.value; });
+    if (!_rdBulkIds.length) return;
+    _rdBulk = true;
+    document.getElementById('rdRollInfo').innerHTML =
+      '<b>' + _rdBulkIds.length + '</b> ' + (_isTR ? 'top silinecek' : 'tops will be deleted');
+    document.getElementById('rdReason').value = '';
+    document.getElementById('rdOverlay').classList.add('show');
+  }
 
   // ── Roll delete ──────────────────────────────────────────────
   let _rdRollId = null;
+  let _rdBulk = false;
+  let _rdBulkIds = [];
   function openRollDelete(btn) {
     _rdRollId = btn.dataset.rollId;
     const label = btn.dataset.rollLabel || '#' + _rdRollId;
@@ -894,11 +962,30 @@
   function closeRD() {
     document.getElementById('rdOverlay').classList.remove('show');
     _rdRollId = null;
+    _rdBulk = false;
+    _rdBulkIds = [];
   }
   function submitRollDelete() {
-    if (!_rdRollId) return;
     const btn = document.getElementById('rdSubmit');
     const orig = btn.innerHTML;
+    if (_rdBulk) {
+      if (!_rdBulkIds.length) return;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting…';
+      const bfd = new FormData();
+      bfd.append('reason', document.getElementById('rdReason').value || '');
+      _rdBulkIds.forEach(function (id) { bfd.append('roll_ids', id); });
+      fetch(rollBulkDeleteUrl, {
+        method: 'POST', body: bfd, credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
+      }).then(r => r.json()).then(data => {
+        btn.disabled = false; btn.innerHTML = orig;
+        if (!data.success) { alert(data.error || 'Delete failed'); return; }
+        closeRD(); window.location.reload();
+      }).catch(() => { btn.disabled = false; btn.innerHTML = orig; alert('Network error'); });
+      return;
+    }
+    if (!_rdRollId) return;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting…';
     const url = rollDeleteUrlPattern.replace('/0/', '/' + _rdRollId + '/');

@@ -2589,6 +2589,73 @@ class WarehouseRollDelete(View):
 
 
 @method_decorator(login_required, name='dispatch')
+class WarehouseRollBulkDelete(View):
+    """Delete MANY rolls (tops) at once — same CORRECTION semantics as the
+    single delete: each removed roll logs an ADJUSTMENT movement and decrements
+    the parent quantity once, all in one transaction. Accepts `roll_ids` as a
+    repeated form field or a JSON list."""
+
+    def post(self, request, warehouse_pk, product_pk):
+        from django.db import transaction
+        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
+
+        raw_ids = request.POST.getlist("roll_ids")
+        # Only touch request.body for a JSON payload — reading it after the form
+        # POST stream was parsed raises RawPostDataException.
+        if not raw_ids and "application/json" in (request.content_type or ""):
+            try:
+                payload = json.loads((request.body or b"").decode("utf-8") or "{}")
+                raw_ids = payload.get("roll_ids") or []
+            except (ValueError, UnicodeDecodeError):
+                raw_ids = []
+        ids = []
+        for x in raw_ids:
+            try:
+                ids.append(int(x))
+            except (TypeError, ValueError):
+                pass
+        if not ids:
+            return JsonResponse({"success": False, "error": "Silinecek top seçilmedi."}, status=400)
+
+        reason = (request.POST.get("reason") or "").strip() or "Bulk roll delete"
+        rolls = list(WarehouseProductRoll.objects.filter(pk__in=ids, product=product))
+        if not rolls:
+            return JsonResponse({"success": False, "error": "Seçilen toplar bulunamadı."}, status=404)
+
+        deleted = 0
+        with transaction.atomic():
+            qty = product.quantity or Decimal("0")
+            for roll in rolls:
+                remaining = (roll.meters_remaining if roll.meters_remaining is not None
+                             else (roll.meters or Decimal("0")))
+                if remaining and remaining > 0:
+                    qty = max(Decimal("0"), qty - remaining)
+                StockMovement.objects.create(
+                    product=product, roll=None, movement_type="adjustment",
+                    quantity=remaining or Decimal("0"),
+                    reason=f"{reason} (roll #{roll.pk}"
+                           + (f" · {roll.barcode}" if roll.barcode else "") + ")",
+                    reference=roll.barcode or f"roll#{roll.pk}",
+                    created_by=request.user if request.user.is_authenticated else None,
+                )
+                roll.delete()
+                deleted += 1
+            product.quantity = qty
+            product.save(update_fields=["quantity", "updated_at"])
+
+        return JsonResponse({
+            "success": True, "deleted": deleted,
+            "product": {
+                "id": product.pk,
+                "quantity": float(product.quantity or 0),
+                "rolls_count": product.rolls.count(),
+                "active_rolls_count": product.rolls.exclude(status="consumed").count(),
+            },
+        })
+
+
+@method_decorator(login_required, name='dispatch')
 class WarehouseRollEdit(View):
     """Edit ONE roll: barcode, meters, lot_number. Changing meters
     re-rolls the parent product.quantity (recomputed from all rolls) and

@@ -33,6 +33,7 @@ urlpatterns = [
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/delete/", views_warehouse.WarehouseProductDelete.as_view(), name="warehouse_product_delete"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/stock-out/", views_warehouse.WarehouseStockOut.as_view(), name="warehouse_stock_out"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/delete/", views_warehouse.WarehouseRollDelete.as_view(), name="warehouse_roll_delete"),
+    path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/bulk-delete/", views_warehouse.WarehouseRollBulkDelete.as_view(), name="warehouse_roll_bulk_delete"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/rolls/<int:roll_pk>/edit/", views_warehouse.WarehouseRollEdit.as_view(), name="warehouse_roll_edit"),
     path("warehouses/<int:warehouse_pk>/movements/", views_warehouse.WarehouseMovements.as_view(), name="warehouse_movements"),
     path("orders/create/", views.create_web_order, name="create_web_order"),

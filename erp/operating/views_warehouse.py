@@ -208,6 +208,72 @@ def _variant_sku_exists(sku):
         return False
 
 
+def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
+    """Consolidate every WarehouseProduct in `warehouse` that shares `sku`
+    (case-insensitive) into ONE record — the same SKU is the same variant and
+    must never show as two rows. Moves the duplicates' rolls (tops) + stock
+    movements onto the survivor, recomputes its quantity from all its rolls,
+    keeps a single catalog variant (deleting any now-orphaned hidden ones +
+    their emptied parent), and deletes the emptied duplicates. Survivor = `keep`
+    when given, else the lowest-id match. Returns (survivor, merged_count)."""
+    from django.db import transaction as _tx
+    sku = (sku or "").strip()
+    if not sku:
+        return keep, 0
+    dupes = list(WarehouseProduct.objects
+                 .filter(warehouse=warehouse, sku__iexact=sku).order_by("id"))
+    if len(dupes) <= 1:
+        return (keep or (dupes[0] if dupes else None)), 0
+    survivor = keep if (keep and any(d.pk == keep.pk for d in dupes)) else dupes[0]
+    orphan_variant_ids = set()
+    merged = 0
+    with _tx.atomic():
+        for dup in dupes:
+            if dup.pk == survivor.pk:
+                continue
+            WarehouseProductRoll.objects.filter(product=dup).update(product=survivor)
+            StockMovement.objects.filter(product=dup).update(product=survivor)
+            if not survivor.catalog_variant_id and dup.catalog_variant_id:
+                survivor.catalog_variant_id = dup.catalog_variant_id
+            elif dup.catalog_variant_id and dup.catalog_variant_id != survivor.catalog_variant_id:
+                orphan_variant_ids.add(dup.catalog_variant_id)
+            dup.delete()
+            merged += 1
+        # Survivor quantity = sum of remaining metres across ALL its rolls.
+        total = Decimal("0")
+        for r in survivor.rolls.all():
+            rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
+            total += rem or Decimal("0")
+        survivor.quantity = total
+        survivor.save(update_fields=["quantity", "catalog_variant", "updated_at"])
+        # Catalog cleanup: drop variants no warehouse product points at anymore,
+        # then mirror the survivor's stock onto its variant + parent product.
+        try:
+            from marketing.models import ProductVariant, Product as _Prod
+            from django.db.models import Sum as _Sum
+            for vid in orphan_variant_ids:
+                if WarehouseProduct.objects.filter(catalog_variant_id=vid).exists():
+                    continue
+                v = ProductVariant.objects.filter(pk=vid).first()
+                if not v:
+                    continue
+                pid = v.product_id
+                v.delete()
+                if (_Prod.objects.filter(pk=pid, featured=False).exists()
+                        and not ProductVariant.objects.filter(product_id=pid).exists()):
+                    _Prod.objects.filter(pk=pid).delete()
+            if survivor.catalog_variant_id:
+                ProductVariant.objects.filter(pk=survivor.catalog_variant_id).update(variant_quantity=total)
+                pv = ProductVariant.objects.filter(pk=survivor.catalog_variant_id).first()
+                if pv:
+                    agg = ProductVariant.objects.filter(product_id=pv.product_id).aggregate(s=_Sum("variant_quantity"))
+                    _Prod.objects.filter(pk=pv.product_id).update(quantity=agg["s"] or Decimal("0"))
+        except Exception:
+            import traceback
+            traceback.print_exc()
+    return survivor, merged
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseList(View):
     template_name = "operating/warehouse_list.html"
@@ -577,6 +643,7 @@ class WarehouseDetail(View):
             'roll_count': roll_count,         # rolls (tops)
             'is_admin': _is_admin(request.user),
             'suppliers': _supplier_choices(),   # manual-add dropdown
+            'dup_count': _warehouse_dup_sku_count(warehouse),  # duplicate-SKU variant groups
             'total_quantity': counts['qty'],
             'search': search,
             'sort': sort,
@@ -710,6 +777,40 @@ def warehouse_next_sku(request, pk):
     except Exception:
         sku = f"{prefix}001"
     return JsonResponse({"prefix": prefix, "sku": sku})
+
+
+def _warehouse_dup_sku_count(warehouse):
+    """How many SKUs in the warehouse are carried by >1 WarehouseProduct
+    (i.e. duplicate variant rows that should be merged). Case-insensitive."""
+    from django.db.models import Count
+    from django.db.models.functions import Lower
+    return (WarehouseProduct.objects.filter(warehouse=warehouse)
+            .exclude(sku__isnull=True).exclude(sku="")
+            .annotate(lsku=Lower("sku")).values("lsku")
+            .annotate(n=Count("id")).filter(n__gt=1).count())
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseMergeDuplicates(View):
+    """One-click cleanup: merge every same-SKU duplicate variant in the warehouse
+    into a single record (see _merge_warehouse_dupes_by_sku)."""
+
+    def post(self, request, pk):
+        from django.db.models import Count
+        from django.db.models.functions import Lower
+        warehouse = get_object_or_404(Warehouse, pk=pk)
+        dup_rows = (WarehouseProduct.objects.filter(warehouse=warehouse)
+                    .exclude(sku__isnull=True).exclude(sku="")
+                    .annotate(lsku=Lower("sku")).values("lsku")
+                    .annotate(n=Count("id")).filter(n__gt=1))
+        groups = 0
+        merged_total = 0
+        for row in list(dup_rows):
+            _surv, m = _merge_warehouse_dupes_by_sku(warehouse, row["lsku"])
+            if m:
+                groups += 1
+                merged_total += m
+        return JsonResponse({"success": True, "groups": groups, "merged": merged_total})
 
 
 @method_decorator(login_required, name='dispatch')
@@ -898,13 +999,25 @@ class WarehouseManualAdd(View):
                             cost_usd = price   # coarse EUR≈USD for the rollup
 
                     wp_name = (f"{base_name} {v_name}".strip()) or v_sku
-                    wp = WarehouseProduct.objects.create(
-                        warehouse=warehouse, name=wp_name, sku=v_sku,
-                        quantity=Decimal("0"),
-                        purchase_price=(price if (price and price > 0) else None),
-                        purchase_currency=currency,
-                        cost_usd=cost_usd, cost_try=cost_try,
-                    )
+                    # Reuse an existing same-SKU product in this warehouse rather
+                    # than creating a duplicate row (same SKU = same variant).
+                    wp = (WarehouseProduct.objects
+                          .filter(warehouse=warehouse, sku__iexact=v_sku).first())
+                    if wp is None:
+                        wp = WarehouseProduct.objects.create(
+                            warehouse=warehouse, name=wp_name, sku=v_sku,
+                            quantity=Decimal("0"),
+                            purchase_price=(price if (price and price > 0) else None),
+                            purchase_currency=currency,
+                            cost_usd=cost_usd, cost_try=cost_try,
+                        )
+                    elif price and price > 0:
+                        wp.purchase_price = price
+                        wp.purchase_currency = currency
+                        wp.cost_usd = cost_usd
+                        wp.cost_try = cost_try
+                        wp.save(update_fields=["purchase_price", "purchase_currency",
+                                               "cost_usd", "cost_try", "updated_at"])
 
                     first_barcode = None
                     total = Decimal("0")
@@ -926,10 +1039,15 @@ class WarehouseManualAdd(View):
                             quantity=qty, reason="Manual add",
                             reference=code, created_by=user,
                         )
-                        total += qty
                         created["tops"] += 1
                         created["barcodes"].append(code)
 
+                    # Quantity = sum of remaining metres across ALL rolls (covers
+                    # reusing an existing same-SKU product, not just the new tops).
+                    total = Decimal("0")
+                    for rr in wp.rolls.all():
+                        rem = rr.meters_remaining if rr.meters_remaining is not None else (rr.meters or Decimal("0"))
+                        total += rem or Decimal("0")
                     wp.quantity = total
                     if first_barcode and not wp.barcode:
                         wp.barcode = first_barcode[:64]
@@ -2489,9 +2607,18 @@ class WarehouseProductEdit(View):
                 traceback.print_exc()
                 catalog_warning = f"Katalog senkron hatası: {exc}"
 
+        # Same SKU = same variant: if editing made this product's SKU match
+        # OTHER products in the warehouse, merge them into this one so they stop
+        # appearing as duplicate rows (tops + movements moved here, qty re-rolled).
+        merged_dupes = 0
+        if product.sku:
+            product, merged_dupes = _merge_warehouse_dupes_by_sku(
+                warehouse, product.sku, keep=product)
+
         return JsonResponse({
             "success": True,
             "changes": changes,
+            "merged_duplicates": merged_dupes,
             "catalog": catalog_info,
             "catalog_warning": catalog_warning,
             "product": {

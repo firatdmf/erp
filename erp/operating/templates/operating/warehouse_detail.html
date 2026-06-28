@@ -1079,6 +1079,12 @@
       </div>
     </div>
     <div class="od-head-r">
+      {% if dup_count %}
+      {% get_current_language as LANGUAGE_CODE %}
+      <button type="button" class="ord-btn" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" onclick="mergeDuplicates(this)" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Aynı SKU'lu tekrar varyantları tek kayıtta birleştir{% else %}Merge duplicate-SKU variants into one{% endif %}">
+        <i class="fa fa-object-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tekrarları birleştir{% else %}Merge duplicates{% endif %} ({{ dup_count }})
+      </button>
+      {% endif %}
       <button type="button" class="ord-btn" style="background:linear-gradient(180deg,#C9A75A,#A9852F);color:#fff;border:1px solid #8A6B22;box-shadow:0 1px 2px rgba(15,23,31,0.10),inset 0 1px 0 rgba(255,255,255,0.18);" onclick="openNewProduct()">
         <i class="fa fa-plus"></i>{% trans "New product" %}
       </button>
@@ -1918,6 +1924,23 @@
       drop.classList.remove('show');
     }
   });
+
+  // Merge duplicate same-SKU variants into one record.
+  window.mergeDuplicates = function (btn) {
+    const tr = "{% get_current_language as LC2 %}{{ LC2|slice:':2' }}" === "tr";
+    if (!confirm(tr
+        ? "Aynı SKU'ya sahip tekrar eden varyantlar tek kayıtta birleştirilecek (toplar ve hareketler korunur). Devam edilsin mi?"
+        : "Duplicate variants sharing a SKU will be merged into one (tops and movements are preserved). Continue?")) return;
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+    fetch("{% url 'operating:warehouse_merge_duplicates' warehouse.pk %}", {
+      method: 'POST',
+      headers: { 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.success) { window.location.reload(); }
+        else { alert((d && d.error) || 'Merge failed'); if (btn) { btn.disabled = false; btn.style.opacity = ''; } }
+      }).catch(function () { alert('Network error'); if (btn) { btn.disabled = false; btn.style.opacity = ''; } });
+  };
 })();
 </script>
 

@@ -699,6 +699,19 @@ def catalog_base_search(request, pk):
     return JsonResponse({"results": results})
 
 
+@login_required
+def warehouse_next_sku(request, pk):
+    """Preview the next auto product SKU for a supplier prefix so the New-product
+    panel can show it (and root the variant SKUs on it) BEFORE saving. Indicative
+    only — the final SKU is minted authoritatively on save."""
+    prefix = (request.GET.get("prefix") or "").strip().upper()[:6] or "GEN"
+    try:
+        sku = _product_sku_minter(prefix)()
+    except Exception:
+        sku = f"{prefix}001"
+    return JsonResponse({"prefix": prefix, "sku": sku})
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseManualAdd(View):
     """Create a brand-new (un-labelled) product straight into the warehouse:
@@ -767,25 +780,40 @@ class WarehouseManualAdd(View):
         elif not base_name:
             return JsonResponse({"success": False, "error": "Ana ürün adı gerekli."}, status=400)
 
+        import re as _re_sku
+        has_variants = data.get("has_variants")
+        if has_variants is None:
+            has_variants = True
+        # Previewed auto SKU the panel showed (so what the user sees is what gets
+        # saved). Honoured only if it's a valid prefix+digits auto-code AND still
+        # free; otherwise we mint the next one.
+        desired_sku = (mp.get("sku") or "").strip().upper()
+        if not _re_sku.match(r"^" + _re_sku.escape(prefix) + r"\d{3,}$", desired_sku or ""):
+            desired_sku = ""
+
         created = {"main_product": None, "variants": 0, "tops": 0,
                    "barcodes": [], "variant_skus": []}
         warnings = []
         mint = _barcode_minter(prefix)
         prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
+        usd_try = _get_usd_try_rate() or Decimal("1")
         user = request.user if request.user.is_authenticated else None
 
         try:
             with transaction.atomic():
                 # NEW main product → AUTO, globally-unique SKU = supplier prefix
-                # + number (e.g. KZL004), same prefix as the barcodes. Mint +
-                # create with an IntegrityError retry so a concurrent request
-                # can't win the DB-unique Product.sku race. We always pre-create
-                # WITH the sku and pass existing_base_product below, so
-                # sync_roll_to_catalog never re-derives or nulls it.
+                # + number (e.g. KZL004). Try the previewed code first, then mint;
+                # create with an IntegrityError retry so a concurrent request can't
+                # win the DB-unique Product.sku race. We always pre-create WITH the
+                # sku and pass existing_base_product below, so sync_roll_to_catalog
+                # never re-derives or nulls it.
                 if main_product is None:
                     sku_mint = _product_sku_minter(prefix)
                     for _attempt in range(8):
-                        candidate = sku_mint()
+                        if _attempt == 0 and desired_sku and not _Prod.objects.filter(sku__iexact=desired_sku).exists():
+                            candidate = desired_sku
+                        else:
+                            candidate = sku_mint()
                         try:
                             with transaction.atomic():   # savepoint
                                 main_product = _Prod.objects.create(
@@ -802,6 +830,16 @@ class WarehouseManualAdd(View):
                     "id": main_product.id, "title": main_product.title,
                     "sku": main_product.sku,
                 }
+
+                # No-variant ("simple product") mode → collapse to ONE implicit
+                # variant that IS the product (no colour/model, sku = main sku).
+                if not has_variants:
+                    src = variants_in[0] if variants_in else {}
+                    variants_in = [{
+                        "name": "", "sku": main_product.sku or "",
+                        "tops": src.get("tops") or [],
+                        "price": src.get("price"), "currency": src.get("currency"),
+                    }]
 
                 seen_skus = set()
                 for idx, v in enumerate(variants_in, start=1):
@@ -841,10 +879,31 @@ class WarehouseManualAdd(View):
                     attr_name = ("color" if eng else ("model" if v_name else None))
                     attr_value = (eng or v_name) or None
 
+                    # Purchase price (alış fiyatı) → unit cost in USD/TRY so the
+                    # warehouse value rollup reflects it.
+                    price = _safe_decimal(v.get("price"))
+                    currency = (v.get("currency") or "USD").strip().upper()
+                    if currency not in ("USD", "TRY", "EUR"):
+                        currency = "USD"
+                    cost_usd = cost_try = None
+                    if price is not None and price > 0:
+                        if currency == "USD":
+                            cost_usd = price
+                            cost_try = (price * usd_try) if usd_try else None
+                        elif currency == "TRY":
+                            cost_try = price
+                            if usd_try and usd_try > 0:
+                                cost_usd = (price / usd_try).quantize(Decimal("0.0001"))
+                        elif currency == "EUR":
+                            cost_usd = price   # coarse EUR≈USD for the rollup
+
                     wp_name = (f"{base_name} {v_name}".strip()) or v_sku
                     wp = WarehouseProduct.objects.create(
                         warehouse=warehouse, name=wp_name, sku=v_sku,
                         quantity=Decimal("0"),
+                        purchase_price=(price if (price and price > 0) else None),
+                        purchase_currency=currency,
+                        cost_usd=cost_usd, cost_try=cost_try,
                     )
 
                     first_barcode = None
@@ -882,7 +941,7 @@ class WarehouseManualAdd(View):
                             attribute_name=attr_name,
                             attribute_value=attr_value,
                             variant_sku=v_sku, variant_barcode=first_barcode,
-                            quantity=total, cost=None,
+                            quantity=total, cost=cost_usd,
                             existing_base_product=main_product,
                         )
                         wp.catalog_variant = cat_variant

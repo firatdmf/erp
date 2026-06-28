@@ -1023,6 +1023,38 @@
   @media (max-width: 560px) {
     .np-panel { width: 100%; max-width: 100%; }
   }
+
+  /* ── Merge-duplicates preview modal ───────────────────────── */
+  .mg-overlay { position: fixed; inset: 0; z-index: 10050; display: none; }
+  .mg-overlay.show { display: block; }
+  .mg-backdrop { position: absolute; inset: 0; background: rgba(15,23,31,0.5); backdrop-filter: blur(3px); }
+  .mg-card {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 560px; max-width: 94vw; max-height: 86vh; display: flex; flex-direction: column;
+    background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(15,23,31,0.28);
+    overflow: hidden; font-family: var(--font-sans);
+  }
+  .mg-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #E2E8EE; }
+  .mg-head h3 { display: inline-flex; align-items: center; gap: 9px; font: 800 16px var(--font-sans); color: #0F1419; margin: 0; }
+  .mg-head h3 i { color: #D97706; }
+  .mg-x { width: 34px; height: 34px; border: 1px solid #E2E8EE; background: #fff; border-radius: 8px; color: var(--gray-600); cursor: pointer; font-size: 18px; line-height: 1; }
+  .mg-x:hover { background: #F8FAFC; }
+  .mg-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
+  .mg-intro { font: 500 12.5px var(--font-sans); color: var(--gray-600); margin: 0 0 12px; }
+  .mg-group { border: 1px solid #E6ECEE; border-radius: 11px; padding: 11px 12px; margin-bottom: 11px; background: #FCFDFE; }
+  .mg-group-h { font: 700 13px var(--font-sans); color: #0F1419; margin-bottom: 8px; }
+  .mg-group-h .mg-sku { font: 700 12px var(--font-mono); color: #92400E; background: #FEF3C7; border-radius: 6px; padding: 2px 7px; }
+  .mg-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px dashed #EEF1F5; font: 500 12.5px var(--font-sans); color: var(--gray-700); }
+  .mg-row:first-of-type { border-top: none; }
+  .mg-tag { font: 700 9.5px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; }
+  .mg-row.keep .mg-tag { background: #DCFCE7; color: #15803D; }
+  .mg-row:not(.keep) .mg-tag { background: #FEE2E2; color: #B91C1C; }
+  .mg-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0F1419; }
+  .mg-tops { font: 700 12px var(--font-sans); color: var(--nejum-teal-700); flex-shrink: 0; }
+  .mg-qty { font: 500 11.5px var(--font-sans); color: var(--gray-500); flex-shrink: 0; min-width: 64px; text-align: right; }
+  .mg-group-f { margin-top: 8px; font: 600 11.5px var(--font-sans); color: #0E6E4A; }
+  .mg-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid #E2E8EE; background: #FAFBFD; }
+  .mg-foot .ord-btn[disabled] { opacity: .55; pointer-events: none; }
 </style>
 {% endblock %}
 
@@ -1496,6 +1528,28 @@
 
 <!-- ─── ROLL SCANNER (camera) ─────────────────────────────────── -->
 <!-- NEW PRODUCT — quick-add side panel (manual entry, no scan) -->
+<!-- Merge-duplicates preview modal -->
+{% get_current_language as LANGUAGE_CODE %}
+<div id="mergeOverlay" class="mg-overlay" aria-hidden="true">
+  <div class="mg-backdrop" onclick="closeMerge()"></div>
+  <div class="mg-card" role="dialog" aria-label="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Tekrarları birleştir{% else %}Merge duplicates{% endif %}">
+    <div class="mg-head">
+      <h3><i class="fa fa-object-group"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tekrarları birleştir{% else %}Merge duplicates{% endif %}</h3>
+      <button type="button" class="mg-x" onclick="closeMerge()" aria-label="Close">&times;</button>
+    </div>
+    <div class="mg-body">
+      <p class="mg-intro">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Aşağıdaki aynı SKU'lu kayıtlar tek üründe birleştirilecek. Toplar ve hareketler korunur. Onaylıyor musun?{% else %}The same-SKU records below will be merged into one. Tops and movements are preserved. Confirm?{% endif %}</p>
+      <div id="mergeBody"></div>
+    </div>
+    <div class="mg-foot">
+      <button type="button" class="ord-btn ghost" onclick="closeMerge()">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Vazgeç{% else %}Cancel{% endif %}</button>
+      <button type="button" class="ord-btn" id="mergeConfirmBtn" style="background:linear-gradient(180deg,#F5B544,#D97706);color:#fff;border:1px solid #B45309;" onclick="confirmMerge(this)">
+        <i class="fa fa-object-group"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştir{% else %}Merge{% endif %}
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="newProductOverlay" class="np-overlay" aria-hidden="true">
   <div class="np-backdrop" onclick="closeNewProduct()"></div>
   <aside class="np-panel" role="dialog" aria-label="{% trans 'New product' %}">
@@ -1925,21 +1979,53 @@
     }
   });
 
-  // Merge duplicate same-SKU variants into one record.
-  window.mergeDuplicates = function (btn) {
-    const tr = "{% get_current_language as LC2 %}{{ LC2|slice:':2' }}" === "tr";
-    if (!confirm(tr
-        ? "Aynı SKU'ya sahip tekrar eden varyantlar tek kayıtta birleştirilecek (toplar ve hareketler korunur). Devam edilsin mi?"
-        : "Duplicate variants sharing a SKU will be merged into one (tops and movements are preserved). Continue?")) return;
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
-    fetch("{% url 'operating:warehouse_merge_duplicates' warehouse.pk %}", {
+  // Merge duplicate same-SKU variants — PREVIEW which tops/products merge, then confirm.
+  const MERGE_URL = "{% url 'operating:warehouse_merge_duplicates' warehouse.pk %}";
+  const _mgTR = "{% get_current_language as LC2 %}{{ LC2|slice:':2' }}" === "tr";
+  function mgEsc(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+  window.mergeDuplicates = function () {
+    fetch(MERGE_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.success || !d.groups || !d.groups.length) {
+          alert(_mgTR ? 'Birleştirilecek tekrar bulunamadı.' : 'No duplicates to merge.');
+          return;
+        }
+        let html = '';
+        d.groups.forEach(function (g) {
+          html += '<div class="mg-group">';
+          html += '<div class="mg-group-h"><span class="mg-sku">' + mgEsc(g.sku) + '</span>' +
+                  (g.main_product ? ' · ' + mgEsc(g.main_product) : '') +
+                  ' — ' + g.count + (_mgTR ? ' kayıt → 1' : ' records → 1') + '</div>';
+          g.products.forEach(function (p) {
+            html += '<div class="mg-row' + (p.survivor ? ' keep' : '') + '">' +
+              '<span class="mg-tag">' + (p.survivor ? (_mgTR ? 'kalır' : 'keeps') : (_mgTR ? 'taşınır' : 'moves')) + '</span>' +
+              '<span class="mg-name">' + mgEsc(p.name) + '</span>' +
+              '<span class="mg-tops">' + p.tops + ' ' + (_mgTR ? 'top' : 'tops') + '</span>' +
+              '<span class="mg-qty">' + (p.quantity || 0).toFixed(2) + ' m</span>' +
+            '</div>';
+          });
+          html += '<div class="mg-group-f"><i class="fa fa-arrow-down-long"></i> ' + g.total_tops + ' ' +
+                  (_mgTR ? 'top tek üründe toplanacak' : 'tops will be combined into one') + '</div>';
+          html += '</div>';
+        });
+        document.getElementById('mergeBody').innerHTML = html;
+        document.getElementById('mergeOverlay').classList.add('show');
+      }).catch(function () { alert(_mgTR ? 'Ağ hatası' : 'Network error'); });
+  };
+  window.closeMerge = function () { document.getElementById('mergeOverlay').classList.remove('show'); };
+  window.confirmMerge = function (btn) {
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (_mgTR ? 'Birleştiriliyor…' : 'Merging…');
+    fetch(MERGE_URL, {
       method: 'POST',
       headers: { 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' }
     }).then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.success) { window.location.reload(); }
-        else { alert((d && d.error) || 'Merge failed'); if (btn) { btn.disabled = false; btn.style.opacity = ''; } }
-      }).catch(function () { alert('Network error'); if (btn) { btn.disabled = false; btn.style.opacity = ''; } });
+        else { alert((d && d.error) || 'Merge failed'); btn.disabled = false; btn.innerHTML = orig; }
+      }).catch(function () { alert(_mgTR ? 'Ağ hatası' : 'Network error'); btn.disabled = false; btn.innerHTML = orig; });
   };
 })();
 </script>

@@ -792,8 +792,45 @@ def _warehouse_dup_sku_count(warehouse):
 
 @method_decorator(login_required, name='dispatch')
 class WarehouseMergeDuplicates(View):
-    """One-click cleanup: merge every same-SKU duplicate variant in the warehouse
-    into a single record (see _merge_warehouse_dupes_by_sku)."""
+    """Merge every same-SKU duplicate variant in the warehouse into one record.
+    GET = dry-run PREVIEW (which products/tops would merge, which survives) so
+    the user can approve; POST = actually merge (see _merge_warehouse_dupes_by_sku)."""
+
+    def get(self, request, pk):
+        from django.db.models import Count
+        from django.db.models.functions import Lower
+        warehouse = get_object_or_404(Warehouse, pk=pk)
+        dup_skus = (WarehouseProduct.objects.filter(warehouse=warehouse)
+                    .exclude(sku__isnull=True).exclude(sku="")
+                    .annotate(lsku=Lower("sku")).values("lsku")
+                    .annotate(n=Count("id")).filter(n__gt=1)
+                    .values_list("lsku", flat=True))
+        groups = []
+        for lsku in list(dup_skus):
+            prods = list(WarehouseProduct.objects
+                         .filter(warehouse=warehouse, sku__iexact=lsku)
+                         .select_related("catalog_variant__product").order_by("id"))
+            if len(prods) <= 1:
+                continue
+            items, total_tops, total_qty, main = [], 0, Decimal("0"), ""
+            for i, p in enumerate(prods):
+                tc = p.rolls.count()
+                total_tops += tc
+                total_qty += (p.quantity or Decimal("0"))
+                if not main and p.catalog_variant_id and p.catalog_variant and p.catalog_variant.product_id:
+                    main = p.catalog_variant.product.title or ""
+                items.append({
+                    "id": p.id, "name": p.name, "sku": p.sku,
+                    "quantity": float(p.quantity or 0), "tops": tc,
+                    "survivor": i == 0,
+                })
+            groups.append({
+                "sku": prods[0].sku, "main_product": main,
+                "variant_name": prods[0].name, "count": len(prods),
+                "total_tops": total_tops, "total_quantity": float(total_qty),
+                "products": items,
+            })
+        return JsonResponse({"success": True, "groups": groups})
 
     def post(self, request, pk):
         from django.db.models import Count

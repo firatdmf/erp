@@ -1389,6 +1389,15 @@
   .bl-btn.primary { background: #0F766E; color: #fff; }
   .bl-btn.ghost { background: rgba(255,255,255,0.10); color: #fff; }
   .bl-spin { text-align: center; color: #cbd5e1; font: 600 13px var(--font-sans); padding: 8px; }
+  .bl-manual { padding: 14px 16px 16px; }
+  .bl-or { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
+  .bl-or::before, .bl-or::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.12); }
+  .bl-or span { color: #94A3B8; font: 700 11px var(--font-sans); text-transform: uppercase; letter-spacing: .06em; }
+  .bl-manual-row { display: flex; gap: 8px; }
+  .bl-manual-input { flex: 1; min-width: 0; box-sizing: border-box; padding: 11px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #fff; font: 600 14px var(--font-sans); outline: none; }
+  .bl-manual-input::placeholder { color: #94A3B8; font-weight: 500; }
+  .bl-manual-input:focus { border-color: #0F766E; box-shadow: 0 0 0 3px rgba(20,127,116,0.25); }
+  .bl-manual-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 11px 16px; border-radius: 10px; border: none; background: #0F766E; color: #fff; font: 700 13px var(--font-sans); cursor: pointer; white-space: nowrap; }
 </style>
 <div class="bl-overlay" id="blOverlay">
   <div class="bl-shell">
@@ -1396,11 +1405,25 @@
       <div class="bl-title"><i class="fa fa-barcode"></i> {% trans "Find by barcode" %}</div>
       <button type="button" class="bl-close" onclick="closeBarcodeLookup()"><i class="fa fa-times"></i></button>
     </div>
-    <div id="blScan" class="bl-cam">
-      <video id="blVideo" autoplay playsinline muted></video>
-      <div class="bl-guide">
-        <div class="bl-guide-frame"></div>
-        <div class="bl-hint">{% trans "Point the barcode at the frame" %}</div>
+    <div id="blScan">
+      <div class="bl-cam">
+        <video id="blVideo" autoplay playsinline muted></video>
+        <div class="bl-guide">
+          <div class="bl-guide-frame"></div>
+          <div class="bl-hint">{% trans "Point the barcode at the frame" %}</div>
+        </div>
+      </div>
+      {% get_current_language as LANGUAGE_CODE %}
+      <div class="bl-manual">
+        <div class="bl-or"><span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}ya da{% else %}or{% endif %}</span></div>
+        <div class="bl-manual-row">
+          <input type="text" id="blManualInput" class="bl-manual-input" autocomplete="off"
+                 inputmode="text" enterkeyhint="search"
+                 placeholder="{% if LANGUAGE_CODE|slice:":2" == "tr" %}Barkodu elle gir…{% else %}Enter barcode manually…{% endif %}">
+          <button type="button" id="blManualBtn" class="bl-manual-btn" onclick="lookupManualBarcode()">
+            <i class="fa fa-magnifying-glass"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Ara{% else %}Look up{% endif %}
+          </button>
+        </div>
       </div>
     </div>
     <div id="blResult" class="bl-result" hidden></div>
@@ -3137,6 +3160,7 @@
   function blShowScan() {
     document.getElementById('blScan').style.display = '';
     var r = document.getElementById('blResult'); r.hidden = true; r.innerHTML = '';
+    var mi = document.getElementById('blManualInput'); if (mi) mi.value = '';
   }
   function startLookupCamera() {
     var video = document.getElementById('blVideo');
@@ -3184,6 +3208,15 @@
     if (blRaf) { cancelAnimationFrame(blRaf); blRaf = null; }
     rsBeep(880);
     doBarcodeLookup(code);
+  }
+  function lookupManualBarcode() {
+    var inp = document.getElementById('blManualInput');
+    var code = (inp && inp.value || '').toString().trim();
+    if (!code) { if (inp) inp.focus(); return; }   // ignore empty
+    blLastCode = code;
+    blRunning = false;                              // pause the camera loop
+    if (blRaf) { cancelAnimationFrame(blRaf); blRaf = null; }
+    doBarcodeLookup(code);                          // SAME path as the camera scan
   }
   function doBarcodeLookup(code) {
     var r = document.getElementById('blResult');
@@ -3246,5 +3279,11 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && document.getElementById('blOverlay').classList.contains('show')) closeBarcodeLookup();
   });
+  (function () {
+    var mi = document.getElementById('blManualInput');
+    if (mi) mi.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); lookupManualBarcode(); }
+    });
+  })();
 </script>
 {% endblock %}

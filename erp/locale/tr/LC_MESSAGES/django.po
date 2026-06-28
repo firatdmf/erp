@@ -6669,3 +6669,101 @@ msgstr "Diğer durumlar (iptal, iade, teslim edildi…)"
 
 msgid "Save"
 msgstr "Kaydet"
+
+# Warehouse new-product panel (i18n)
+msgid "New product"
+msgstr "Yeni ürün"
+
+msgid "Select supplier…"
+msgstr "Tedarikçi seçin…"
+
+msgid "Barcode prefix"
+msgstr "Barkod öneki"
+
+msgid "each top gets its own unique barcode"
+msgstr "her top kendi benzersiz barkodunu alır"
+
+msgid "Main product"
+msgstr "Ana ürün"
+
+msgid "Existing"
+msgstr "Mevcut"
+
+msgid "Name (e.g. GREK)"
+msgstr "Ad (örn. GREK)"
+
+msgid "Product SKU"
+msgstr "Ürün SKU"
+
+msgid "auto, unique. Groups the variants below."
+msgstr "otomatik, benzersiz. Aşağıdaki varyantları gruplar."
+
+msgid "Search existing main product (name or SKU)…"
+msgstr "Mevcut ana ürünü ara (ad veya SKU)…"
+
+msgid "Meter (m)"
+msgstr "Metre (m)"
+
+msgid "Piece (pcs)"
+msgstr "Adet"
+
+msgid "Package"
+msgstr "Paket"
+
+msgid "Variants & tops"
+msgstr "Varyantlar ve toplar"
+
+msgid "No variant"
+msgstr "Varyantsız"
+
+msgid "Has variants"
+msgstr "Varyantlı"
+
+msgid "Purchase price"
+msgstr "Alış fiyatı"
+
+msgid "Add top"
+msgstr "Top ekle"
+
+msgid "Color / model (e.g. Beyaz)"
+msgstr "Renk / model (örn. Beyaz)"
+
+msgid "SKU (auto)"
+msgstr "SKU (otomatik)"
+
+msgid "Top"
+msgstr "Top"
+
+msgid "tops"
+msgstr "top"
+
+msgid "No match"
+msgstr "Eşleşme yok"
+
+msgid "Select an existing main product."
+msgstr "Mevcut bir ana ürün seçin."
+
+msgid "Enter a main product name."
+msgstr "Bir ana ürün adı girin."
+
+msgid "Add at least one variant with a top."
+msgstr "En az bir top içeren bir varyant ekleyin."
+
+msgid "Enter at least one quantity."
+msgstr "En az bir miktar girin."
+
+msgid "Saving…"
+msgstr "Kaydediliyor…"
+
+msgid "Saved"
+msgstr "Kaydedildi"
+
+msgid "Main SKU"
+msgstr "Ana SKU"
+
+msgid "Could not save."
+msgstr "Kaydedilemedi."
+
+msgid "Network error."
+msgstr "Ağ hatası."
+

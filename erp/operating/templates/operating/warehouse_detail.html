@@ -1111,7 +1111,9 @@
       </div>
     </div>
     <div class="od-head-r">
-      {% if dup_count %}
+      {% comment %} Merge-duplicates button hidden for now (cleanup done). The
+      preview modal, JS and endpoint stay in place; re-enable by uncommenting. {% endcomment %}
+      {% if False and dup_count %}
       {% get_current_language as LANGUAGE_CODE %}
       <button type="button" class="ord-btn" style="background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;" onclick="mergeDuplicates(this)" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Aynı SKU'lu tekrar varyantları tek kayıtta birleştir{% else %}Merge duplicate-SKU variants into one{% endif %}">
         <i class="fa fa-object-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tekrarları birleştir{% else %}Merge duplicates{% endif %} ({{ dup_count }})

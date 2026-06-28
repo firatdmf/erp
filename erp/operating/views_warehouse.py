@@ -150,6 +150,64 @@ def _supplier_choices():
         return []
 
 
+# Manual-add unit → a valid marketing.Product.unit_of_measurement choice
+# (the model only allows units/mt/kg; the real per-roll quantity is generic).
+_PRODUCT_UNIT_MAP = {"mt": "mt", "kg": "kg", "adet": "units", "paket": "units", "units": "units"}
+
+
+def _product_sku_minter(prefix):
+    """Closure that mints GLOBALLY-UNIQUE marketing.Product SKUs of the form
+    PREFIX + 3+ digits (e.g. KZL004) — same supplier prefix as the barcodes.
+    Mirrors _barcode_minter but targets the DB-unique Product.sku column,
+    case-insensitively (matching catalog_sync._safe_sku's sku__iexact). Seeds
+    the counter from our own clean "PREFIX###" sequence so unrelated typed SKUs
+    that merely share the prefix don't inflate it, while collision-checking
+    against EVERY existing Product.sku so a minted code never equals one. The
+    caller must STILL guard create() with an IntegrityError retry — the DB
+    UNIQUE constraint is the final arbiter under concurrency."""
+    import re as _re
+    from marketing.models import Product as _Prod
+    prefix = (prefix or "GEN").upper()[:6] or "GEN"
+    existing = set()
+    for s in _Prod.objects.filter(sku__istartswith=prefix).values_list("sku", flat=True):
+        if s:
+            existing.add(s.upper())
+    # Seed ONLY from OUR own clean "PREFIX" + 3..5-digit sequence (e.g. KZL004),
+    # never from long real product codes that merely share the prefix (the
+    # warehouse already has 8-digit "KZL36900959"-style SKUs). Uniqueness is
+    # still enforced against EVERY existing sku via the `existing` set.
+    seq_pat = _re.compile(r"^" + _re.escape(prefix) + r"(\d{3,5})$")
+    maxn = 0
+    for s in existing:
+        m = seq_pat.match(s)
+        if m:
+            try:
+                maxn = max(maxn, int(m.group(1)))
+            except ValueError:
+                pass
+    state = {"n": maxn}
+
+    def mint():
+        while True:
+            state["n"] += 1
+            code = f"{prefix}{state['n']:03d}"[:20]
+            if code.upper() not in existing:
+                existing.add(code.upper())
+                return code
+
+    return mint
+
+
+def _variant_sku_exists(sku):
+    """True if a marketing ProductVariant already owns this (globally-unique)
+    variant_sku — used to keep AUTO-generated variant SKUs collision-free."""
+    try:
+        from marketing.models import ProductVariant
+        return ProductVariant.objects.filter(variant_sku__iexact=sku).exists()
+    except Exception:
+        return False
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseList(View):
     template_name = "operating/warehouse_list.html"
@@ -628,14 +686,16 @@ def catalog_base_search(request, pk):
     """Autocomplete for the scan screen's "Catalog — main product" field.
     Returns hidden catalog products (featured=False) matching the query so
     staff can attach a scanned variant to an EXISTING main product."""
-    from django.db.models import Count
+    from django.db.models import Count, Q
     from marketing.models import Product
     q = (request.GET.get("q") or "").strip()
     results = []
     if q:
-        qs = (Product.objects.filter(featured=False, title__icontains=q)
+        qs = (Product.objects.filter(featured=False)
+              .filter(Q(title__icontains=q) | Q(sku__icontains=q))
               .annotate(vc=Count("variants")).order_by("title")[:12])
-        results = [{"id": p.id, "title": p.title, "variants": p.vc} for p in qs]
+        results = [{"id": p.id, "title": p.title, "sku": p.sku or "", "variants": p.vc}
+                   for p in qs]
     return JsonResponse({"results": results})
 
 
@@ -662,7 +722,7 @@ class WarehouseManualAdd(View):
     """
 
     def post(self, request, pk):
-        from django.db import transaction
+        from django.db import transaction, IntegrityError
         from .catalog_sync import (
             translate_color, sync_roll_to_catalog, CatalogSyncConflict,
         )
@@ -702,46 +762,78 @@ class WarehouseManualAdd(View):
         if mode == "existing" and str(mp.get("id") or "").isdigit():
             main_product = _Prod.objects.filter(pk=int(mp["id"]), featured=False).first()
         base_name = (mp.get("name") or "").strip()
-        base_sku = (mp.get("sku") or "").strip()
         if main_product is not None:
             base_name = main_product.title
         elif not base_name:
             return JsonResponse({"success": False, "error": "Ana ürün adı gerekli."}, status=400)
 
-        created = {"main_product": None, "variants": 0, "tops": 0, "barcodes": []}
+        created = {"main_product": None, "variants": 0, "tops": 0,
+                   "barcodes": [], "variant_skus": []}
         warnings = []
         mint = _barcode_minter(prefix)
+        prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
         user = request.user if request.user.is_authenticated else None
 
         try:
             with transaction.atomic():
+                # NEW main product → AUTO, globally-unique SKU = supplier prefix
+                # + number (e.g. KZL004), same prefix as the barcodes. Mint +
+                # create with an IntegrityError retry so a concurrent request
+                # can't win the DB-unique Product.sku race. We always pre-create
+                # WITH the sku and pass existing_base_product below, so
+                # sync_roll_to_catalog never re-derives or nulls it.
                 if main_product is None:
-                    safe_sku = base_sku[:64] or None
-                    if safe_sku and _Prod.objects.filter(sku__iexact=safe_sku).exists():
-                        warnings.append(f"Ana ürün SKU '{safe_sku}' zaten kullanımda — boş bırakıldı.")
-                        safe_sku = None
-                    main_product = _Prod.objects.create(
-                        title=base_name, sku=safe_sku, featured=False,
-                        unit_of_measurement=unit, quantity=Decimal("0"),
-                    )
-                created["main_product"] = {"id": main_product.id, "title": main_product.title}
+                    sku_mint = _product_sku_minter(prefix)
+                    for _attempt in range(8):
+                        candidate = sku_mint()
+                        try:
+                            with transaction.atomic():   # savepoint
+                                main_product = _Prod.objects.create(
+                                    title=base_name, sku=candidate, featured=False,
+                                    unit_of_measurement=prod_unit, quantity=Decimal("0"),
+                                )
+                            break
+                        except IntegrityError:
+                            main_product = None
+                            continue
+                    if main_product is None:
+                        raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
+                created["main_product"] = {
+                    "id": main_product.id, "title": main_product.title,
+                    "sku": main_product.sku,
+                }
 
                 seen_skus = set()
                 for idx, v in enumerate(variants_in, start=1):
                     v_name = (v.get("name") or "").strip()
-                    v_sku = (v.get("sku") or "").strip()[:20]
+                    typed_sku = (v.get("sku") or "").strip()[:20]
+                    v_sku = typed_sku
                     tops = v.get("tops") or []
                     if not v_name and not v_sku and not tops:
                         continue
                     if not v_sku:
-                        root = (base_sku or base_name or "SKU").strip()
+                        # AUTO variant SKU rooted on the (minted) main product SKU.
+                        root = (main_product.sku or base_name or "SKU").strip()
                         suffix = _slug_token(v_name) or str(idx)
                         v_sku = f"{root}-{suffix}"[:20]
+
+                    def _bump(s, n):
+                        tail = str(n)
+                        return f"{s[:max(1, 20 - len(tail))]}{tail}"
+
                     base_v = v_sku
                     dup = 1
-                    while v_sku in seen_skus:
-                        dup += 1
-                        v_sku = f"{base_v[:18]}{dup}"
+                    if typed_sku:
+                        # Respect a typed SKU; only avoid clashing within THIS batch
+                        # (a global clash surfaces as a CatalogSyncConflict warning).
+                        while v_sku in seen_skus:
+                            dup += 1
+                            v_sku = _bump(base_v, dup)
+                    else:
+                        # AUTO SKU: keep it unique batch-wide AND globally.
+                        while v_sku in seen_skus or _variant_sku_exists(v_sku):
+                            dup += 1
+                            v_sku = _bump(base_v, dup)
                     seen_skus.add(v_sku)
 
                     # Colour vs model attribute, derived from the variant name.
@@ -798,6 +890,7 @@ class WarehouseManualAdd(View):
                     except CatalogSyncConflict as exc:
                         warnings.append(f"{v_sku}: {exc}")
                     created["variants"] += 1
+                    created["variant_skus"].append(v_sku)
         except Exception as exc:
             import traceback
             traceback.print_exc()

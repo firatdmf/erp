@@ -1486,14 +1486,13 @@
           <button type="button" class="np-seg-btn" data-mode="existing" onclick="npSetMode('existing')">{% trans "Existing" %}</button>
         </div>
         <div id="npNewMain">
-          <div class="np-row">
-            <input id="npMainName" class="np-input" placeholder="{% trans 'Name (e.g. GREK)' %}" oninput="npOnNameInput()">
-            <input id="npMainSku" class="np-input" placeholder="{% trans 'Product SKU' %}" oninput="this.dataset.touched='1'; npRefreshVariantSkus()">
-          </div>
+          <input id="npMainName" class="np-input" placeholder="{% trans 'Name (e.g. GREK)' %}" oninput="npOnNameInput()">
+          <div class="np-hint" style="margin-top:6px;">{% trans "Product SKU" %}: <b id="npMainSkuHint">GEN###</b> · {% trans "auto, unique. Groups the variants below." %}</div>
         </div>
         <div id="npExistingMain" class="np-ac-wrap" style="display:none;">
-          <input id="npMainSearch" class="np-input" placeholder="{% trans 'Search existing main product…' %}" autocomplete="off" oninput="npSearchMain(this.value)">
+          <input id="npMainSearch" class="np-input" placeholder="{% trans 'Search existing main product (name or SKU)…' %}" autocomplete="off" oninput="npSearchMain(this.value)">
           <input type="hidden" id="npMainId">
+          <input type="hidden" id="npMainExistingSku">
           <div id="npMainDrop" class="np-ac-drop"></div>
         </div>
       </div>
@@ -1541,10 +1540,14 @@
     return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '').slice(0, 10);
   }
   function npBaseSku() {
-    if (npMode === 'existing') return slug((document.getElementById('npMainSearch') || {}).value || '');
-    const sk = (document.getElementById('npMainSku') || {}).value || '';
-    const nm = (document.getElementById('npMainName') || {}).value || '';
-    return (sk || nm).toUpperCase().replace(/\s+/g, '');
+    if (npMode === 'existing') {
+      const ex = (document.getElementById('npMainExistingSku') || {}).value || '';
+      if (ex) return ex.toUpperCase();
+      return slug((document.getElementById('npMainSearch') || {}).value || '');
+    }
+    // NEW mode: the main SKU is minted server-side (prefix + number), so we
+    // can't preview a root here — leave variant SKUs blank → server assigns.
+    return '';
   }
 
   window.openNewProduct = function () {
@@ -1578,14 +1581,12 @@
   window.npUpdatePrefix = function () {
     const sel = document.getElementById('npSupplier');
     const opt = sel && sel.options[sel.selectedIndex];
-    const px = (opt && opt.getAttribute('data-prefix')) || 'GEN';
-    document.getElementById('npPrefix').textContent = px || 'GEN';
+    const p = ((opt && opt.getAttribute('data-prefix')) || 'GEN') || 'GEN';
+    const a = document.getElementById('npPrefix'); if (a) a.textContent = p;
+    const b = document.getElementById('npMainSkuHint'); if (b) b.textContent = p + '###';
   };
 
   window.npOnNameInput = function () {
-    const nm = document.getElementById('npMainName');
-    const sk = document.getElementById('npMainSku');
-    if (sk && !sk.dataset.touched) sk.value = (nm.value || '').toUpperCase().replace(/\s+/g, '');
     npRefreshVariantSkus();
   };
   window.npRefreshVariantSkus = function () {
@@ -1612,7 +1613,7 @@
       '</div>' +
       '<div class="np-variant-row">' +
         '<input class="np-input np-v-name" placeholder="{% trans "Color / model (e.g. Beyaz)" %}" oninput="npSuggestVariantSku(this.closest(\'.np-variant\'))">' +
-        '<input class="np-input np-v-sku" placeholder="SKU" oninput="this.dataset.touched=\'1\'">' +
+        '<input class="np-input np-v-sku" placeholder="{% trans "SKU (auto)" %}" oninput="this.dataset.touched=\'1\'">' +
       '</div>' +
       '<div class="np-tops"></div>' +
       '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>';
@@ -1672,6 +1673,7 @@
   let npSearchTimer = null;
   window.npSearchMain = function (q) {
     document.getElementById('npMainId').value = '';
+    const exReset = document.getElementById('npMainExistingSku'); if (exReset) exReset.value = '';
     const drop = document.getElementById('npMainDrop');
     clearTimeout(npSearchTimer);
     q = (q || '').trim();
@@ -1683,14 +1685,16 @@
           const items = d.results || [];
           if (!items.length) { drop.innerHTML = '<div class="np-ac-item" style="color:#94A3B8;">{% trans "No match" %}</div>'; drop.classList.add('show'); return; }
           drop.innerHTML = items.map(function (it) {
-            return '<div class="np-ac-item" data-id="' + it.id + '" data-title="' + (it.title || '').replace(/"/g, '&quot;') + '">' +
-              (it.title || '') + '<small>' + (it.variants || 0) + ' var.</small></div>';
+            return '<div class="np-ac-item" data-id="' + it.id + '" data-title="' + (it.title || '').replace(/"/g, '&quot;') + '" data-sku="' + (it.sku || '').replace(/"/g, '&quot;') + '">' +
+              (it.title || '') + (it.sku ? ' <small style="color:#A9852F;">' + it.sku + '</small>' : '') +
+              '<small>' + (it.variants || 0) + ' var.</small></div>';
           }).join('');
           drop.classList.add('show');
           drop.querySelectorAll('.np-ac-item[data-id]').forEach(function (row) {
             row.addEventListener('click', function () {
               document.getElementById('npMainId').value = row.getAttribute('data-id');
               document.getElementById('npMainSearch').value = row.getAttribute('data-title');
+              document.getElementById('npMainExistingSku').value = row.getAttribute('data-sku') || '';
               drop.classList.remove('show');
               npRefreshVariantSkus();
             });
@@ -1703,8 +1707,7 @@
     const btn = document.getElementById('npSaveBtn');
     const main = (npMode === 'existing')
       ? { mode: 'existing', id: document.getElementById('npMainId').value || '' }
-      : { mode: 'new', name: (document.getElementById('npMainName').value || '').trim(),
-          sku: (document.getElementById('npMainSku').value || '').trim() };
+      : { mode: 'new', name: (document.getElementById('npMainName').value || '').trim() };
     if (npMode === 'existing' && !main.id) { alert('{% trans "Select an existing main product." %}'); return; }
     if (npMode === 'new' && !main.name) { alert('{% trans "Enter a main product name." %}'); return; }
 
@@ -1740,7 +1743,20 @@
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d && d.success) { window.location.reload(); }
+        if (d && d.success) {
+          const c = d.created || {};
+          const mp = c.main_product || {};
+          const summary = document.getElementById('npSummary');
+          if (summary) {
+            summary.style.color = '#0E6E4A';
+            summary.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "Saved" %} · ' +
+              '{% trans "Main SKU" %} <b>' + (mp.sku || '—') + '</b> · <b>' + (c.variants || 0) +
+              '</b> {% trans "variants" %} · <b>' + (c.tops || 0) + '</b> {% trans "tops" %}';
+          }
+          (d.warnings || []).forEach(function (w) { console.warn('catalog:', w); });
+          btn.innerHTML = '<i class="fa fa-check"></i> {% trans "Done" %}';
+          setTimeout(function () { window.location.reload(); }, 1400);
+        }
         else { alert((d && d.error) || '{% trans "Could not save." %}'); btn.disabled = false; btn.innerHTML = orig; }
       }).catch(function () {
         alert('{% trans "Network error." %}'); btn.disabled = false; btn.innerHTML = orig;

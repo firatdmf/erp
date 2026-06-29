@@ -701,6 +701,38 @@
     table { width: 100% !important; border-collapse: collapse !important; }
     th, td { color: #000 !important; }
   }
+
+  /* ── PDF header editor (sits in the order action row) ───────── */
+  .oph {
+    display: inline-flex; align-items: center; height: 36px;
+    background: #fff; border: 1px solid #E0E6EE; border-radius: 10px;
+    padding-left: 11px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,31,0.04);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .oph:focus-within { border-color: #147F74; box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+  .oph-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: 700 10px 'Plus Jakarta Sans', sans-serif; letter-spacing: .04em;
+    text-transform: uppercase; color: #94A3B8; white-space: nowrap;
+    padding-right: 10px; margin-right: 10px; border-right: 1px solid #EEF1F4;
+  }
+  .oph-label i { font-size: 11px; color: #B4BCC6; }
+  .oph-input {
+    border: 0; outline: 0; background: transparent;
+    font: 600 13px 'Plus Jakarta Sans', sans-serif; color: #0F1419;
+    width: 150px; padding: 0;
+  }
+  .oph-input::placeholder { color: #B4BCC6; font-weight: 500; }
+  .oph-save {
+    align-self: stretch; width: 40px; margin-left: 10px; border: 0; padding: 0;
+    background: #F1F5F9; color: #64748B; cursor: pointer; font-size: 13px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s;
+  }
+  .oph-save:hover { background: #147F74; color: #fff; }
+  .oph-save.ok { background: #16A34A; color: #fff; }
+  @media (max-width: 640px) { .oph { width: 100%; } .oph-input { width: 100%; flex: 1; } }
 </style>
 {% endblock %}
 
@@ -765,16 +797,14 @@
       </div>
     </div>
     <div class="od-head-r">
-      <div id="ophWrap" class="no-print" title="{% trans 'Top-left title shown on the printed PDF (blank = brand)' %}"
-           style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 4px 0 10px;border:1px solid #E0E6EE;border-radius:10px;background:#fff;">
-        <i class="fa fa-heading" style="color:#9AA5AF;font-size:12px;"></i>
-        <input id="ophInput" type="text" maxlength="120"
+      {% get_current_language as LANGUAGE_CODE %}
+      <div id="ophWrap" class="oph no-print" title="{% trans 'Top-left title shown on the printed PDF (blank = brand)' %}">
+        <span class="oph-label"><i class="fa fa-heading"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}PDF Başlık{% else %}PDF header{% endif %}</span>
+        <input id="ophInput" class="oph-input" type="text" maxlength="120"
                placeholder="{{ BRAND_NAME|default:'Nejum' }}"
                value="{{ order.print_header|default:'' }}"
-               onkeydown="if(event.key==='Enter'){event.preventDefault();saveOrderPrintHeader(this.nextElementSibling);}"
-               style="border:0;outline:0;background:transparent;font:500 13px sans-serif;color:#0F1419;width:150px;">
-        <button type="button" onclick="saveOrderPrintHeader(this)" title="{% trans 'Save PDF header' %}"
-                style="border:0;background:#E5F1F0;color:#005354;width:26px;height:26px;border-radius:7px;cursor:pointer;flex-shrink:0;"><i class="fa fa-check"></i></button>
+               onkeydown="if(event.key==='Enter'){event.preventDefault();saveOrderPrintHeader(this.nextElementSibling);}">
+        <button type="button" class="oph-save" onclick="saveOrderPrintHeader(this)" title="{% trans 'Save PDF header' %}"><i class="fa fa-check"></i></button>
       </div>
       <a href="{% url 'operating:order_print' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-print"></i>{% trans "Print" %}
@@ -1310,10 +1340,11 @@
       headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' }
     }).then(function (r) { return r.json(); }).then(function (d) {
       btn.disabled = false;
+      btn.innerHTML = orig;
       if (d && d.success) {
-        btn.innerHTML = '<i class="fa fa-check" style="color:#15803D;"></i>';
-        setTimeout(function () { btn.innerHTML = orig; }, 1200);
-      } else { btn.innerHTML = orig; alert((d && d.error) || 'Error'); }
+        btn.classList.add('ok');
+        setTimeout(function () { btn.classList.remove('ok'); }, 1300);
+      } else { alert((d && d.error) || 'Error'); }
     }).catch(function () { btn.disabled = false; btn.innerHTML = orig; alert('Network error'); });
   }
 

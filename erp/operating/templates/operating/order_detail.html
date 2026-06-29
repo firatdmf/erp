@@ -765,6 +765,17 @@
       </div>
     </div>
     <div class="od-head-r">
+      <div id="ophWrap" class="no-print" title="{% trans 'Top-left title shown on the printed PDF (blank = brand)' %}"
+           style="display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 4px 0 10px;border:1px solid #E0E6EE;border-radius:10px;background:#fff;">
+        <i class="fa fa-heading" style="color:#9AA5AF;font-size:12px;"></i>
+        <input id="ophInput" type="text" maxlength="120"
+               placeholder="{{ BRAND_NAME|default:'Nejum' }}"
+               value="{{ order.print_header|default:'' }}"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();saveOrderPrintHeader(this.nextElementSibling);}"
+               style="border:0;outline:0;background:transparent;font:500 13px sans-serif;color:#0F1419;width:150px;">
+        <button type="button" onclick="saveOrderPrintHeader(this)" title="{% trans 'Save PDF header' %}"
+                style="border:0;background:#E5F1F0;color:#005354;width:26px;height:26px;border-radius:7px;cursor:pointer;flex-shrink:0;"><i class="fa fa-check"></i></button>
+      </div>
       <a href="{% url 'operating:order_print' order.pk %}" target="_blank" rel="noopener" class="ord-btn ghost">
         <i class="fa fa-print"></i>{% trans "Print" %}
       </a>
@@ -1286,6 +1297,26 @@
 </div>
 
 <script>
+  // Save the custom top-left PDF header (blank clears → falls back to brand).
+  function saveOrderPrintHeader(btn) {
+    var input = document.getElementById('ophInput');
+    if (!input) return;
+    var orig = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    var fd = new FormData();
+    fd.append('print_header', (input.value || '').trim());
+    fetch("{% url 'operating:order_print_header' order.pk %}", {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      btn.disabled = false;
+      if (d && d.success) {
+        btn.innerHTML = '<i class="fa fa-check" style="color:#15803D;"></i>';
+        setTimeout(function () { btn.innerHTML = orig; }, 1200);
+      } else { btn.innerHTML = orig; alert((d && d.error) || 'Error'); }
+    }).catch(function () { btn.disabled = false; btn.innerHTML = orig; alert('Network error'); });
+  }
+
   // Status picker: each stage button + the legacy mini buttons update
   // the hidden input and submit. The carrier/tracking inputs ride
   // along since they're part of the same form.

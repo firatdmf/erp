@@ -102,7 +102,7 @@
   <table class="hdr" cellspacing="0" cellpadding="0">
     <tr>
       <td>
-        <div class="brand">{{ BRAND_NAME|default:"Nejum ERP"|upper }}</div>
+        <div class="brand">{% if order.print_header %}{{ order.print_header }}{% else %}{{ BRAND_NAME|default:"Nejum ERP"|upper }}{% endif %}</div>
         <div class="doc-type">{% trans "Order" %}</div>
       </td>
       <td align="right">
@@ -245,7 +245,7 @@
   <!-- FOOTER -->
   <table class="foot" cellspacing="0" cellpadding="0">
     <tr>
-      <td>{{ BRAND_NAME|default:"Nejum ERP"|upper }} · {% trans "Order" %} #{{ order.pk }}</td>
+      <td>{% if order.print_header %}{{ order.print_header }}{% else %}{{ BRAND_NAME|default:"Nejum ERP"|upper }}{% endif %} · {% trans "Order" %} #{{ order.pk }}</td>
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>

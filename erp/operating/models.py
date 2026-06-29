@@ -338,6 +338,9 @@ class Order(models.Model):
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     notes = models.TextField(blank=True, null=True)
     qr_code_url = models.URLField(blank=True, null=True)
+    # Custom top-left header text on the printable PDF. Blank → falls back to
+    # the global BRAND_NAME. Set per-order from the order detail page.
+    print_header = models.CharField(max_length=120, blank=True, null=True)
     
     # Payment Information (for web orders)
     payment_id = models.CharField(max_length=100, blank=True, null=True)

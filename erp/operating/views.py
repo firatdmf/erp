@@ -838,6 +838,19 @@ def order_customer_card_view(request, pk):
     })
 
 
+@require_POST
+def update_order_print_header(request, pk):
+    """Save the custom top-left header text shown on the order's printable PDF.
+    Empty clears it (falls back to the global brand)."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"success": False, "error": "auth"}, status=403)
+    order = get_object_or_404(Order, pk=pk)
+    header = (request.POST.get("print_header") or "").strip()[:120]
+    order.print_header = header or None
+    order.save(update_fields=["print_header", "updated_at"])
+    return JsonResponse({"success": True, "print_header": order.print_header or ""})
+
+
 class OrderPrint(DetailView):
     """Printable order view.
 

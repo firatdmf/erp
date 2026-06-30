@@ -40,28 +40,39 @@ def _fetch_rate(from_currency: str, to_currency: str) -> Decimal:
     raise RuntimeError(f"no FX source returned {fc}->{tc} ({last_err})")
 
 
+# Process-level memo so a single request that needs the rate for hundreds of
+# products (e.g. a warehouse value rollup) doesn't hit the DB/API once per
+# product. Keyed by (from, to, day); cleared naturally when the worker restarts.
+_RATE_MEMO = {}
+
+
 def get_exchange_rate(from_currency: str, to_currency: str) -> Decimal:
     today = date.today()
+    ck = (from_currency, to_currency, today)
+    if ck in _RATE_MEMO:
+        return _RATE_MEMO[ck]
 
-    # Check cache first, if exists in db, do not fetch again.
-    try:
-        rate_obj = CurrencyExchangeRate.objects.get(
-            from_currency=from_currency, to_currency=to_currency, date=today
-        )
-        print(f"from {from_currency} to {to_currency} rate is: {rate_obj.rate} ")
+    # Daily DB cache (filter().first() tolerates accidental duplicate rows).
+    rate_obj = (CurrencyExchangeRate.objects
+                .filter(from_currency=from_currency, to_currency=to_currency, date=today)
+                .first())
+    if rate_obj is not None:
+        _RATE_MEMO[ck] = rate_obj.rate
         return rate_obj.rate
-    except CurrencyExchangeRate.DoesNotExist:
-        try:
-            rate = _fetch_rate(from_currency, to_currency)
-            print(f"from {from_currency} to {to_currency} rate is: {rate} ")
-            # Save to cache
-            CurrencyExchangeRate.objects.create(
-                from_currency=from_currency, to_currency=to_currency, rate=rate
-            )
-            return rate
-        except Exception as e:
-            print(f"Error fetching exchange rate: {e}")
-            return None
+
+    try:
+        rate = _fetch_rate(from_currency, to_currency)
+        CurrencyExchangeRate.objects.create(
+            from_currency=from_currency, to_currency=to_currency, rate=rate
+        )
+        _RATE_MEMO[ck] = rate
+        return rate
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "FX rate %s->%s failed: %s", from_currency, to_currency, e)
+        _RATE_MEMO[ck] = None   # don't re-hammer the API for this process
+        return None
 
 
 def update_cash_transaction_entry_total_base_currency_balance(book_pk):

@@ -100,17 +100,6 @@
       data-mode="{% if order %}edit{% else %}create{% endif %}"
       data-order-id="{% if order %}{{ order.pk }}{% endif %}">
   {% csrf_token %}
-  {% if not order %}
-  {% get_current_language as LANGUAGE_CODE %}
-  <div style="display:flex;gap:8px;margin-bottom:14px;">
-    <div style="flex:1;padding:9px;text-align:center;border:1.5px solid #1e293b;background:#f8fafc;color:#1e293b;border-radius:8px;font:700 12.5px var(--font-sans,sans-serif);">
-      <i class="fa fa-file-invoice"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Normal sipariş{% else %}Standard order{% endif %}
-    </div>
-    <a href="{% url 'operating:retail_new' %}" style="flex:1;padding:9px;text-align:center;border:1.5px solid #BFD6D2;background:#F2F8F7;color:#005354;border-radius:8px;font:700 12.5px var(--font-sans,sans-serif);text-decoration:none;">
-      <i class="fa fa-cash-register"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende{% else %}Retail{% endif %}
-    </a>
-  </div>
-  {% endif %}
   {% if order %}
     {# Hydration payload for edit mode — read by the script below. #}
     {{ order_items_payload|json_script:"existing-order-items" }}

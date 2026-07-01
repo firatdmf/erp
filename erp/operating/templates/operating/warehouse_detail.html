@@ -1122,10 +1122,6 @@
       <button type="button" class="ord-btn" style="background:linear-gradient(180deg,#C9A75A,#A9852F);color:#fff;border:1px solid #8A6B22;box-shadow:0 1px 2px rgba(15,23,31,0.10),inset 0 1px 0 rgba(255,255,255,0.18);" onclick="openNewProduct()">
         <i class="fa fa-plus"></i>{% trans "New product" %}
       </button>
-      {% get_current_language as LANGUAGE_CODE %}
-      <a href="{% url 'operating:retail_new' %}" class="ord-btn" style="background:linear-gradient(180deg,#0E8A5F,#0A6B49);color:#fff;border:1px solid #075E3E;">
-        <i class="fa fa-cash-register"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende{% else %}Retail{% endif %}
-      </a>
       <button type="button" class="ord-btn primary" onclick="openRollScanner()">
         <i class="fa fa-camera"></i>{% trans "Scan roll" %}
       </button>

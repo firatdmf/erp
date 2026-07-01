@@ -205,12 +205,6 @@ def sync_catalog_stock_on_order_status_change(sender, instance, created, **kwarg
     from django.utils import timezone
     from .models import STOCK_DEDUCT_STATUSES
 
-    # Perakende (retail) orders manage their OWN stock-out by scanning physical
-    # tops (see views_retail.retail_complete) — never run the catalog-quantity
-    # deduction for them or stock would be double-counted.
-    if getattr(instance, "order_type", None) == "retail":
-        return
-
     new_status = instance.order_status
     old_status = getattr(instance, "_old_status", None) if not created else None
 

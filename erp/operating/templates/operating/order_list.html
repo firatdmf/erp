@@ -370,11 +370,6 @@
       <span>{% trans "B2C / Web" %}</span>
       <span class="ord-tab-count">{{ b2c_count }}</span>
     </button>
-    <button type="button" class="ord-tab" data-tab="retail">
-      <i class="fa fa-cash-register"></i>
-      <span>{% get_current_language as LANGUAGE_CODE %}{% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende{% else %}Retail{% endif %}</span>
-      <span class="ord-tab-count">{{ retail_count }}</span>
-    </button>
     <div class="ord-tabs-r">
       <input id="ord-search-input" class="ord-search-input" type="text"
              placeholder="{% trans 'Search order no, customer, product…' %}"/>
@@ -622,57 +617,6 @@
       <div class="ico"><i class="fa fa-globe"></i></div>
       <h3>{% trans "No web orders" %}</h3>
       <p>{% trans "Orders from your website will appear here" %}</p>
-    </div>
-    {% endif %}
-  </div>
-
-  {# ===================== RETAIL (Perakende) ORDERS ===================== #}
-  {% get_current_language as LANGUAGE_CODE %}
-  <div class="ord-list-wrap" data-pane="retail">
-    {% if retail_orders %}
-    <div class="ord-list">
-      <div class="ord-list-head">
-        <span></span>
-        <span>{% trans "Order" %}</span>
-        <span>{% trans "Customer" %}</span>
-        <span>{% trans "Payment" %}</span>
-        <span class="num">{% trans "Total" %}</span>
-        <span>{% trans "Status" %}</span>
-        <span></span>
-      </div>
-      {% for order in retail_orders %}
-      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}">
-        <label class="ord-select">
-          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
-        </label>
-        <span class="ord-kind int">{% if LANGUAGE_CODE|slice:":2" == "tr" %}PRK{% else %}RTL{% endif %}</span>
-        <div class="ord-id">
-          <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
-          <span class="ord-date">{{ order.created_at|date:"d M Y · H:i" }}</span>
-        </div>
-        <div class="ord-cust">
-          <div class="ord-cust-avatar" style="background:#0E6E4A;"><i class="fa fa-cash-register" style="color:#fff;font-size:12px;"></i></div>
-          <div>
-            <div class="ord-cust-n">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende satış{% else %}Retail sale{% endif %}</div>
-            <div class="ord-cust-c">{{ order.items.count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}kalem{% else %}items{% endif %}</div>
-          </div>
-        </div>
-        <div><span style="color:var(--gray-400);">—</span></div>
-        <div class="num ord-total">{{ order.total_value|floatformat:2 }} <span>TRY</span></div>
-        <span class="ord-status {{ order.status }}">
-          <span class="ord-status-dot"></span>
-          {{ order.get_status_display }}
-        </span>
-        <i class="fa fa-chevron-right ord-chev"></i>
-      </a>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="ord-empty">
-      <div class="ico"><i class="fa fa-cash-register"></i></div>
-      <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende sipariş yok{% else %}No retail orders{% endif %}</h3>
-      <p>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Hızlı sipariş oluşturunca burada görünür.{% else %}Quick orders appear here.{% endif %}</p>
-      <a href="{% url 'operating:retail_new' %}" class="ord-btn primary" style="margin-top:14px;display:inline-flex;"><i class="fa fa-plus"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Hızlı sipariş{% else %}Quick order{% endif %}</a>
     </div>
     {% endif %}
   </div>

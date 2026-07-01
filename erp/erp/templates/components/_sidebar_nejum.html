@@ -330,6 +330,11 @@
             <span class="nj-fi-icon"><i data-lucide="list"></i></span>
             <span class="nj-fi-label">{% trans "Order list" %}</span>
           </a>
+          {% get_current_language as LANGUAGE_CODE %}
+          <a class="nj-fly-item" href="{% url 'operating:retail_new' %}">
+            <span class="nj-fi-icon"><i data-lucide="zap"></i></span>
+            <span class="nj-fi-label">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende sipariş{% else %}Retail order{% endif %}</span>
+          </a>
         </div>
         <div class="nj-fly-group">
           <div class="nj-fly-group-title">{% trans "WAREHOUSE" %}</div>

@@ -17,11 +17,11 @@ from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render, redirect
 
 from .models import (
-    Order, OrderItem, RetailScan, WarehouseProduct, WarehouseProductRoll,
-    StockMovement,
+    Order, OrderItem, RetailScan, Warehouse, WarehouseProduct,
+    WarehouseProductRoll, StockMovement,
 )
 
 _FOLD = str.maketrans({
@@ -51,6 +51,22 @@ def _dec(v):
 def _roll_remaining(roll):
     rem = roll.meters_remaining if roll.meters_remaining is not None else (roll.meters or Decimal("0"))
     return rem or Decimal("0")
+
+
+def retail_new(request):
+    """Page: create a Perakende order — pick warehouse products + set prices."""
+    if not _auth(request):
+        return redirect("authentication:signin")
+    warehouses = list(Warehouse.objects.order_by("name").values("id", "name"))
+    return render(request, "operating/retail_new.html", {"warehouses": warehouses})
+
+
+def retail_scan_page(request, order_pk):
+    """Page: scan the physical tops for a Perakende order and complete it."""
+    if not _auth(request):
+        return redirect("authentication:signin")
+    order = get_object_or_404(Order, pk=order_pk, order_type="retail")
+    return render(request, "operating/retail_scan.html", {"order": order})
 
 
 def retail_product_list(request):

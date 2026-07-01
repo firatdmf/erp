@@ -49,6 +49,8 @@ urlpatterns = [
     path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
     # Perakende (retail / quick POS) orders
+    path("retail/new/", views_retail.retail_new, name="retail_new"),
+    path("retail/orders/<int:order_pk>/scan-page/", views_retail.retail_scan_page, name="retail_scan_page"),
     path("retail/products/", views_retail.retail_product_list, name="retail_product_list"),
     path("retail/create/", views_retail.retail_order_create, name="retail_order_create"),
     path("retail/orders/<int:order_pk>/scans/", views_retail.retail_order_scans, name="retail_order_scans"),

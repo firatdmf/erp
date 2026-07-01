@@ -288,9 +288,15 @@ ORDER_STATUS_CHOICES = [
     ("cancelled",        _("Cancelled")),
     ("returned",         _("Returned")),
 ]
-# The four stages we surface on the order detail page as a progress
-# bar. Order matters — left to right is the natural flow.
-ORDER_PRIMARY_STAGES = ("pending", "preparing", "packaging", "shipped")
+# The three stages we surface on the order detail page as a progress
+# bar. Order matters — left to right is the natural flow:
+#   pending  → Açık / Open       (order just created, nothing deducted)
+#   packaging→ Paketleniyor      (rolls scanned & reserved during packing)
+#   shipped  → Gönderildi        (cargo info entered → stock actually cut)
+# The other status keys (confirmed, preparing, in_transit, …) stay in
+# ORDER_STATUS_CHOICES for backward-compat / web-checkout but are no
+# longer part of the manual 3-step flow.
+ORDER_PRIMARY_STAGES = ("pending", "packaging", "shipped")
 
 # Statuses that "consume" catalog stock. While an order sits in these
 # states the catalog `quantity` / `variant_quantity` for each item is
@@ -1050,6 +1056,65 @@ class StockMovement(models.Model):
     def __str__(self):
         sign = "+" if self.movement_type == "in" else ("-" if self.movement_type == "out" else "±")
         return f"{sign}{self.quantity}m · {self.product.sku or self.product.name} · {self.created_at:%Y-%m-%d}"
+
+
+class OrderRollReservation(models.Model):
+    """A soft hold on a specific physical roll (top) for an order,
+    created during the packing-scan step.
+
+    It does NOT touch physical stock: the roll's meters_remaining and
+    the WarehouseProduct.quantity stay exactly as they are. The scanned
+    metres are only *reserved* (shown as "Rezerv" on the warehouse
+    pages). Physical deduction happens ONLY when the order is shipped
+    (cargo info entered + "Siparişi Tamamla" pressed): each active
+    reservation is then converted into a real StockMovement(out) that
+    finally cuts the roll. Removing a reservation before shipping just
+    releases the hold — nothing else to undo.
+
+    Applies to BOTH manual and retail (Perakende) orders."""
+
+    order = models.ForeignKey(
+        Order, related_name="roll_reservations", on_delete=models.CASCADE,
+    )
+    order_item = models.ForeignKey(
+        OrderItem, related_name="roll_reservations",
+        on_delete=models.SET_NULL, null=True, blank=True,
+        help_text="The order line this roll helps fulfil (best-effort).",
+    )
+    roll = models.ForeignKey(
+        WarehouseProductRoll, related_name="reservations",
+        on_delete=models.CASCADE,
+    )
+    # Denormalised so the warehouse list + detail pages can roll up
+    # reserved metres per product/warehouse without walking rolls.
+    warehouse_product = models.ForeignKey(
+        WarehouseProduct, related_name="reservations",
+        on_delete=models.CASCADE,
+    )
+    meters = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text="Metres reserved (cut) from this roll for the order.",
+    )
+    # True once the reservation has become a real stock-out at ship
+    # time. Guards against double-deduction (idempotent shipping).
+    consumed = models.BooleanField(default=False, db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="roll_reservations",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["order", "consumed"]),
+            models.Index(fields=["warehouse_product", "consumed"]),
+            models.Index(fields=["roll", "consumed"]),
+        ]
+
+    def __str__(self):
+        return f"Reserve {self.meters}m · roll #{self.roll_id} · order #{self.order_id}"
 
 
 # A machine is a physical or virtual device that performs tasks in a workstation.

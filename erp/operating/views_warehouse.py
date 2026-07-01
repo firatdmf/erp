@@ -537,7 +537,8 @@ class WarehouseDetail(View):
                     .select_related('catalog_variant__product')
                     .annotate(base=base_expr, roll_count=Count('rolls'),
                               line_usd=F('quantity') * F('cost_usd'),
-                              line_try=F('quantity') * F('cost_try')))
+                              line_try=F('quantity') * F('cost_try'),
+                              reserved=reserved_meters_subquery()))
             # Variant list sorts by SKU first, then name (per request).
             _flat_sort = {
                 "name_asc": "sku", "name_desc": "-sku",
@@ -593,11 +594,22 @@ class WarehouseDetail(View):
             # above via the rolls join.
             _bases = [g["base"] for g in page.object_list]
             _roll_counts = {}
+            _reserved_by_base = {}
             if _bases:
                 _rc = (base_qs.annotate(base=base_expr)
                        .filter(base__in=_bases).values("base")
                        .annotate(rc=Count("rolls")))
                 _roll_counts = {r["base"]: r["rc"] for r in _rc}
+
+                # Active reserved metres per group — computed separately
+                # (product-id keyed) so it doesn't multiply the Sum()s.
+                _prod_rows = (base_qs.annotate(base=base_expr)
+                              .filter(base__in=_bases).values("id", "base"))
+                _pid_to_base = {row["id"]: row["base"] for row in _prod_rows}
+                _res_by_pid = reserved_meters_for_products(list(_pid_to_base.keys()))
+                for _pid, _m in _res_by_pid.items():
+                    _b = _pid_to_base.get(_pid)
+                    _reserved_by_base[_b] = _reserved_by_base.get(_b, Decimal("0")) + _m
 
             # Only the group HEADERS render up-front — variants load lazily on
             # expand (a single base can hold thousands of variants, so rendering
@@ -608,6 +620,7 @@ class WarehouseDetail(View):
                 "variant_count": g["variant_count"],
                 "roll_total": _roll_counts.get(g["base"], 0),
                 "total_qty": g["total_qty"],
+                "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "total_try": g["total_try"],
                 "is_catalog": (g.get("linked") or 0) > 0,
@@ -676,7 +689,8 @@ def warehouse_group_variants(request, pk):
           .select_related("catalog_variant__product")
           .annotate(base=base_expr, roll_count=Count("rolls"),
                     line_usd=F("quantity") * F("cost_usd"),
-                    line_try=F("quantity") * F("cost_try"))
+                    line_try=F("quantity") * F("cost_try"),
+                    reserved=reserved_meters_subquery())
           .filter(base=base).order_by("name", "id"))
     total = qs.count()
     variants = list(qs[:CAP])
@@ -2375,6 +2389,234 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
     return results
 
 
+# ────────────────────────────────────────────────────────────────────
+#  Packing reservations — the order lifecycle. Rolls are scanned during
+#  the packing step and RESERVED (a soft hold: no physical cut). The
+#  physical stock is only cut when the order ships (cargo info entered).
+# ────────────────────────────────────────────────────────────────────
+def reserved_meters_for_products(product_ids):
+    """Return {warehouse_product_id: reserved_meters(Decimal)} for the
+    given products, summing only ACTIVE (unconsumed) reservations."""
+    from django.db.models import Sum
+    from .models import OrderRollReservation
+    ids = [p for p in (product_ids or []) if p]
+    if not ids:
+        return {}
+    rows = (OrderRollReservation.objects
+            .filter(consumed=False, warehouse_product_id__in=ids)
+            .values("warehouse_product_id")
+            .annotate(s=Sum("meters")))
+    return {r["warehouse_product_id"]: (r["s"] or Decimal("0")) for r in rows}
+
+
+def reserved_meters_subquery():
+    """A Coalesced Subquery summing active reserved metres per
+    WarehouseProduct — safe to .annotate() alongside Sum()/Count() over
+    the rolls join without multiplying those aggregates."""
+    from django.db.models import OuterRef, Subquery, Sum, DecimalField as _DF
+    from .models import OrderRollReservation
+    sq = (OrderRollReservation.objects
+          .filter(warehouse_product_id=OuterRef("pk"), consumed=False)
+          .values("warehouse_product_id")
+          .annotate(s=Sum("meters"))
+          .values("s")[:1])
+    return Coalesce(
+        Subquery(sq, output_field=_DF(max_digits=18, decimal_places=2)),
+        Decimal("0"), output_field=_DF(max_digits=18, decimal_places=2),
+    )
+
+
+def consume_reservations_for_order(order, user=None, reason_prefix="Order ship"):
+    """Convert every ACTIVE reservation on `order` into a real
+    stock-out: cut the reserved metres from the exact scanned roll, drop
+    WarehouseProduct.quantity, write StockMovement(out), and mark the
+    reservation consumed. Idempotent — already-consumed reservations are
+    skipped, so re-saving 'shipped' never double-cuts. Returns a list
+    describing each cut."""
+    from django.db import transaction as _tx
+    from django.utils import timezone as _tz
+    from .models import OrderRollReservation
+    results = []
+    if not order:
+        return results
+    order_ref = getattr(order, "order_number", None) or f"Order #{order.pk}"
+    with _tx.atomic():
+        resv = (OrderRollReservation.objects
+                .select_for_update()
+                .filter(order=order, consumed=False)
+                .select_related("roll", "warehouse_product"))
+        for r in resv:
+            roll = r.roll
+            wp = r.warehouse_product
+            take = Decimal(str(r.meters or 0))
+            if take <= 0 or roll is None or wp is None:
+                r.consumed = True
+                r.consumed_at = _tz.now()
+                r.save(update_fields=["consumed", "consumed_at"])
+                continue
+            avail = (roll.meters_remaining if roll.meters_remaining is not None else roll.meters) or Decimal("0")
+            actual = take if take <= avail else avail  # clamp — never negative
+            roll.meters_remaining = avail - actual
+            if roll.meters_remaining <= 0:
+                roll.status = "consumed"
+            elif roll.meters_remaining < (roll.meters or Decimal("0")):
+                roll.status = "partial"
+            roll.save(update_fields=["meters_remaining", "status"])
+
+            wp.quantity = (wp.quantity or Decimal("0")) - actual
+            wp.save(update_fields=["quantity", "updated_at"])
+
+            StockMovement.objects.create(
+                product=wp, roll=roll, movement_type="out",
+                quantity=actual, reason=f"{reason_prefix} {order_ref}",
+                reference=str(order_ref),
+                created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+            )
+            # If the roll physically had less than was reserved (it got cut
+            # elsewhere after reservation), record the shortfall so it's
+            # visible on the timeline instead of silently swallowed.
+            if actual < take:
+                StockMovement.objects.create(
+                    product=wp, roll=None, movement_type="adjustment",
+                    quantity=(take - actual),
+                    reason=f"⚠️ Shortage: {reason_prefix} {order_ref} reserved {take}m but only {actual}m was available",
+                    reference=str(order_ref),
+                    created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+                )
+            # Pin the reservation to what was ACTUALLY cut so an un-ship
+            # restores exactly that amount (never inflating the roll).
+            r.meters = actual
+            r.consumed = True
+            r.consumed_at = _tz.now()
+            r.save(update_fields=["meters", "consumed", "consumed_at"])
+            results.append({"product": wp.id, "roll": roll.id, "taken": float(actual)})
+    return results
+
+
+def restore_reservations_for_order(order, user=None, reason_prefix="Order un-ship"):
+    """Reverse a shipped order's stock-out: add the consumed metres back
+    to each roll + WarehouseProduct, write StockMovement(in), and flip
+    the reservation back to active (unconsumed). Used when an order
+    moves OUT of 'shipped' (e.g. reverted to packing / cancelled)."""
+    from django.db import transaction as _tx
+    from .models import OrderRollReservation
+    restored = []
+    if not order:
+        return restored
+    order_ref = getattr(order, "order_number", None) or f"Order #{order.pk}"
+    with _tx.atomic():
+        resv = (OrderRollReservation.objects
+                .select_for_update()
+                .filter(order=order, consumed=True)
+                .select_related("roll", "warehouse_product"))
+        for r in resv:
+            roll = r.roll
+            wp = r.warehouse_product
+            qty = Decimal(str(r.meters or 0))
+            if qty > 0 and roll is not None and wp is not None:
+                curr = roll.meters_remaining if roll.meters_remaining is not None else Decimal("0")
+                new_remaining = curr + qty
+                # Never restore a roll above its original length.
+                cap = roll.meters if roll.meters is not None else new_remaining
+                if new_remaining > cap:
+                    new_remaining = cap
+                roll.meters_remaining = new_remaining
+                if roll.meters_remaining >= (roll.meters or Decimal("0")):
+                    roll.status = "in_stock"
+                else:
+                    roll.status = "partial"
+                roll.save(update_fields=["meters_remaining", "status"])
+                wp.quantity = (wp.quantity or Decimal("0")) + qty
+                wp.save(update_fields=["quantity", "updated_at"])
+                StockMovement.objects.create(
+                    product=wp, roll=roll, movement_type="in",
+                    quantity=qty, reason=f"{reason_prefix} {order_ref}",
+                    reference=str(order_ref),
+                    created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+                )
+            r.consumed = False
+            r.consumed_at = None
+            r.save(update_fields=["consumed", "consumed_at"])
+            restored.append({"product": wp.id if wp else None, "roll": roll.id if roll else None, "qty": float(qty)})
+    return restored
+
+
+SHIPPED_CLASS = frozenset({"shipped", "in_transit", "out_for_delivery", "delivered"})
+
+
+def apply_order_status_change(order, new_status, carrier=None, tracking=None,
+                             user=None, require_cargo_for_ship=True):
+    """THE single funnel for changing an order's order_status. Every
+    write path (order detail page, JSON API, web-order edit) must go
+    through here so the lifecycle rules can't diverge:
+
+      * entering a shipped-class status requires carrier + tracking
+        (unless require_cargo_for_ship=False) — else nothing changes;
+      * entering 'packaging' requires at least one active reservation
+        (rolls scanned during packing);
+      * the status change, its catalog-stock signal, AND the warehouse
+        reservation → stock-out conversion all happen inside ONE
+        transaction, so a roll-cut failure rolls the whole thing back
+        (no half-shipped, catalog-cut-but-warehouse-not state).
+
+    Returns (ok: bool, code: str|None). code is a machine-readable
+    reason on failure: 'cargo_required' | 'packing_requires_scan' |
+    'error:<detail>'."""
+    from django.db import transaction as _tx
+    from django.utils import timezone as _tz
+    from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
+
+    valid_statuses = {k for k, _ in ORDER_STATUS_CHOICES}
+    valid_carriers = {k for k, _ in CARRIER_CHOICES}
+    old_status = order.order_status
+
+    # Stash any cargo info the caller carried.
+    if carrier is not None:
+        c = (carrier or "").strip()
+        if c:
+            order.carrier = c if c in valid_carriers else None
+    if tracking is not None:
+        tstr = (tracking or "").strip()
+        if tstr:
+            order.tracking_number = tstr
+
+    changing = bool(new_status) and new_status in valid_statuses and new_status != old_status
+    entering_ship = changing and new_status in SHIPPED_CLASS and old_status not in SHIPPED_CLASS
+    leaving_ship = (old_status in SHIPPED_CLASS and new_status in valid_statuses
+                    and new_status not in SHIPPED_CLASS and new_status != old_status)
+
+    # Gate: shipping needs cargo info.
+    if entering_ship and require_cargo_for_ship:
+        if not (order.carrier or "").strip() or not (order.tracking_number or "").strip():
+            order.save(update_fields=["carrier", "tracking_number", "updated_at"])
+            return False, "cargo_required"
+
+    # Gate: packaging must be backed by at least one scanned roll.
+    if changing and new_status == "packaging" and old_status != "packaging":
+        if not order.roll_reservations.filter(consumed=False).exists():
+            # Persist any cargo edits but don't advance the status.
+            order.save(update_fields=["carrier", "tracking_number", "updated_at"])
+            return False, "packing_requires_scan"
+
+    try:
+        with _tx.atomic():
+            if changing:
+                order.order_status = new_status
+                if new_status == "shipped" and not order.shipped_at:
+                    order.shipped_at = _tz.now()
+                if new_status == "delivered" and not order.delivered_at:
+                    order.delivered_at = _tz.now()
+            order.save(update_fields=["order_status", "carrier", "tracking_number",
+                                      "shipped_at", "delivered_at", "updated_at"])
+            if entering_ship:
+                consume_reservations_for_order(order, user=user)
+            elif leaving_ship:
+                restore_reservations_for_order(order, user=user)
+    except Exception as _e:
+        return False, f"error:{_e}"
+    return True, None
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseProductDetail(View):
     """Product detail under a warehouse — shows the product header
@@ -2388,12 +2630,13 @@ class WarehouseProductDetail(View):
         product = get_object_or_404(
             WarehouseProduct, pk=product_pk, warehouse=warehouse,
         )
-        rolls = product.rolls.all().order_by("-scanned_at")
+        rolls = list(product.rolls.all().order_by("-scanned_at"))
         movements = product.movements.all().select_related("roll", "created_by")[:200]
 
         # Aggregate quick stats
         from django.db.models import Sum
         from decimal import Decimal as _Dec
+        from .models import OrderRollReservation
         in_total = (
             product.movements.filter(movement_type="in").aggregate(s=Sum("quantity"))["s"]
             or _Dec("0")
@@ -2403,15 +2646,27 @@ class WarehouseProductDetail(View):
             or _Dec("0")
         )
 
+        # Active (unconsumed) reservations = packed-but-not-shipped metres
+        # held against this product's rolls. Shown as a "Rezerv stok" card
+        # and per-roll on the rolls list.
+        _resv = (OrderRollReservation.objects
+                 .filter(warehouse_product=product, consumed=False)
+                 .values("roll_id").annotate(s=Sum("meters")))
+        reserved_by_roll = {r["roll_id"]: (r["s"] or _Dec("0")) for r in _resv}
+        reserved_total = sum(reserved_by_roll.values(), _Dec("0"))
+        for r in rolls:
+            r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
+
         return render(request, self.template_name, {
             "warehouse": warehouse,
             "product": product,
             "rolls": rolls,
             "movements": movements,
-            "rolls_count": rolls.count(),
+            "rolls_count": len(rolls),
             "in_total": in_total,
             "out_total": out_total,
-            "active_rolls_count": rolls.exclude(status="consumed").count(),
+            "reserved_total": reserved_total,
+            "active_rolls_count": sum(1 for r in rolls if r.status != "consumed"),
             "is_admin": _is_admin(request.user),
         })
 
@@ -2710,6 +2965,12 @@ class WarehouseRollDelete(View):
         product = get_object_or_404(WarehouseProduct, pk=product_pk, warehouse=warehouse)
         roll = get_object_or_404(WarehouseProductRoll, pk=roll_pk, product=product)
 
+        # Don't delete a roll that's actively reserved for an order.
+        from .models import OrderRollReservation
+        if OrderRollReservation.objects.filter(roll=roll, consumed=False).exists():
+            return JsonResponse({"success": False,
+                "error": "Bu top aktif bir siparişte rezerve edilmiş — önce ilgili siparişin paketlemesinden kaldırın."}, status=409)
+
         reason = (request.POST.get("reason") or "").strip() or "Roll deleted"
         remaining = (
             roll.meters_remaining
@@ -2787,6 +3048,18 @@ class WarehouseRollBulkDelete(View):
         if not rolls:
             return JsonResponse({"success": False, "error": "Seçilen toplar bulunamadı."}, status=404)
 
+        # Don't delete rolls actively reserved for an order — their hold
+        # would be silently lost. Skip them and report the count.
+        from .models import OrderRollReservation
+        reserved_ids = set(OrderRollReservation.objects
+                           .filter(roll__in=rolls, consumed=False)
+                           .values_list("roll_id", flat=True))
+        skipped = len(reserved_ids)
+        rolls = [r for r in rolls if r.id not in reserved_ids]
+        if not rolls:
+            return JsonResponse({"success": False, "skipped": skipped,
+                "error": "Seçilen toplar aktif siparişlerde rezerve — silinemedi. Önce paketlemeden kaldırın."}, status=409)
+
         deleted = 0
         with transaction.atomic():
             qty = product.quantity or Decimal("0")
@@ -2809,7 +3082,7 @@ class WarehouseRollBulkDelete(View):
             product.save(update_fields=["quantity", "updated_at"])
 
         return JsonResponse({
-            "success": True, "deleted": deleted,
+            "success": True, "deleted": deleted, "skipped": skipped,
             "product": {
                 "id": product.pk,
                 "quantity": float(product.quantity or 0),

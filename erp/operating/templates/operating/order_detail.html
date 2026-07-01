@@ -205,6 +205,14 @@
     font: 700 16px var(--font-sans);
     flex-shrink: 0;
   }
+  .od-stage-arrow.filled { color: var(--nejum-teal-600, #00696A); }
+  .od-stage-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 4px;
+    border-radius: 9px; background: #F59E0B; color: #fff;
+    font: 700 10px var(--font-sans); vertical-align: middle;
+  }
+  .od-stage.now .od-stage-badge { background: #fff; color: #B45309; }
   @media (max-width: 720px) {
     .od-stages { flex-direction: column; align-items: stretch; }
     .od-stage-arrow { display: none; }
@@ -790,8 +798,8 @@
         <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-industry"></i>{% trans "Production" %}
         </a>
-        <a href="{% url 'operating:order_packing_list' order.pk %}" class="ord-btn primary">
-          <i class="fa fa-box"></i>{% trans "Packing" %}
+        <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn primary">
+          <i class="fa fa-barcode"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketle (Top Okut){% else %}Pack (Scan rolls){% endif %}
         </a>
       {% endif %}
     </div>
@@ -815,23 +823,53 @@
           <input type="hidden" name="action" value="update_status">
           <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}">
 
-          {# 4-stage progress bar — pending → preparing → packaging → shipped #}
-          <div class="od-stages">
+          {# 3-stage flow — Açık → Paketleniyor → Gönderildi.
+             Paketleniyor opens the packing-scan page (confirmed only
+             once packing is completed there); Gönderildi requires cargo
+             info and cuts the reserved rolls from stock. #}
+          <div class="od-stages od-stages-3">
             {% for s in status_stages %}
-            <button type="button"
-                    class="od-stage {% if s.filled %}filled{% endif %} {% if s.key == order.order_status %}now{% endif %}"
-                    data-status="{{ s.key }}">
-              <span class="od-stage-n">{{ forloop.counter }}</span>
-              <span class="od-stage-l">{{ s.label }}</span>
-            </button>
-            {% if not forloop.last %}<span class="od-stage-arrow {% if status_stages|slice:forloop.counter|first|default:0 %}filled{% endif %}">→</span>{% endif %}
+              {% if s.key == 'packaging' %}
+                <a href="{% url 'operating:order_pack_scan' order.pk %}"
+                   class="od-stage od-stage-link {% if s.filled %}filled{% endif %} {% if order.order_status == 'packaging' %}now{% endif %}"
+                   style="text-decoration:none;">
+                  <span class="od-stage-n">{{ forloop.counter }}</span>
+                  <span class="od-stage-l">
+                    {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleniyor{% else %}Packing{% endif %}
+                    {% if reservation_count %}<span class="od-stage-badge">{{ reservation_count }}</span>{% endif %}
+                  </span>
+                </a>
+              {% elif s.key == 'shipped' %}
+                <button type="button"
+                        class="od-stage {% if s.filled %}filled{% endif %} {% if order.order_status == 'shipped' %}now{% endif %}"
+                        data-status="shipped">
+                  <span class="od-stage-n">{{ forloop.counter }}</span>
+                  <span class="od-stage-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Gönderildi{% else %}Shipped{% endif %}</span>
+                </button>
+              {% else %}
+                <button type="button"
+                        class="od-stage {% if s.filled %}filled{% endif %} {% if order.order_status == s.key %}now{% endif %}"
+                        data-status="{{ s.key }}">
+                  <span class="od-stage-n">{{ forloop.counter }}</span>
+                  <span class="od-stage-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Açık{% else %}Open{% endif %}</span>
+                </button>
+              {% endif %}
+              {% if not forloop.last %}<span class="od-stage-arrow {% if s.filled %}filled{% endif %}">→</span>{% endif %}
             {% endfor %}
           </div>
 
           <div class="od-ship">
+            <div class="od-ship-hint" style="font-size:12px;color:#64748B;margin-bottom:8px;">
+              <i class="fa fa-circle-info"></i>
+              {% if LANGUAGE_CODE|slice:":2" == "tr" %}
+                Sipariş “Gönderildi” olana ve <b>Siparişi Tamamla</b> denene kadar stok düşmez. Tamamlamak için kargo şirketi ve takip numarası zorunludur.
+              {% else %}
+                No stock is deducted until the order is shipped via <b>Complete order</b>. Carrier + tracking number are required.
+              {% endif %}
+            </div>
             <div class="od-ship-grid">
               <label class="od-ship-f">
-                <span class="od-ship-l">{% trans "Carrier" %}</span>
+                <span class="od-ship-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kargo şirketi{% else %}Carrier{% endif %}</span>
                 <select name="carrier">
                   <option value="">{% trans "— Select —" %}</option>
                   {% for code, label in carrier_choices %}
@@ -840,7 +878,7 @@
                 </select>
               </label>
               <label class="od-ship-f">
-                <span class="od-ship-l">{% trans "Tracking number" %}</span>
+                <span class="od-ship-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Takip numarası{% else %}Tracking number{% endif %}</span>
                 <input type="text" name="tracking_number" value="{{ order.tracking_number|default:'' }}"
                        placeholder="{% trans 'e.g. 1234567890' %}">
               </label>
@@ -850,9 +888,16 @@
                 {% if order.shipped_at %}<i class="fa fa-truck"></i> {% trans "Shipped" %}: {{ order.shipped_at|date:"d M Y · H:i" }}{% endif %}
                 {% if order.delivered_at %} · <i class="fa fa-check-circle"></i> {% trans "Delivered" %}: {{ order.delivered_at|date:"d M Y · H:i" }}{% endif %}
               </span>
-              <button type="submit" class="ord-btn primary">
-                <i class="fa fa-save"></i> {% trans "Save" %}
-              </button>
+              <div style="display:flex; gap:8px;">
+                <button type="submit" class="ord-btn ghost" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Sadece kargo bilgisini kaydet{% else %}Save cargo info only{% endif %}">
+                  <i class="fa fa-save"></i> {% trans "Save" %}
+                </button>
+                {% if order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
+                <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped">
+                  <i class="fa fa-truck-fast"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişi Tamamla{% else %}Complete order{% endif %}
+                </button>
+                {% endif %}
+              </div>
             </div>
           </div>
         </form>
@@ -861,11 +906,16 @@
           <summary>{% trans "More statuses (cancelled, returned, delivered…)" %}</summary>
           <div class="od-more-grid">
             {% for code, label in status_choices %}
+            {# 'packaging' is only reachable via the packing-scan flow and
+               'shipped' via the cargo-gated Complete button — don't expose
+               them here as one-click shortcuts that bypass those gates. #}
+            {% if code != 'packaging' and code != 'shipped' %}
             <button type="button" form="od-status-form"
                     class="od-stage-mini {% if order.order_status == code %}active{% endif %}"
                     data-status="{{ code }}">
               {{ label }}
             </button>
+            {% endif %}
             {% endfor %}
           </div>
         </details>
@@ -1327,13 +1377,31 @@
   const statusForm = document.getElementById('od-status-form');
   const statusInput = document.getElementById('od-status-input');
   if (statusForm && statusInput) {
-    document.querySelectorAll('.od-stage, .od-stage-mini, .od-spk-btn').forEach(btn => {
+    const carrierSel  = statusForm.querySelector('[name="carrier"]');
+    const trackingInp = statusForm.querySelector('[name="tracking_number"]');
+    const SHIPPED = ['shipped', 'in_transit', 'out_for_delivery', 'delivered'];
+    const NEED_CARGO_MSG = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Siparişi tamamlamak için kargo şirketi ve takip numarası girin.'{% else %}'Enter carrier and tracking number to complete the order.'{% endif %};
+    const CONFIRM_SHIP = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Sipariş tamamlanacak ve paketlemede rezerve edilen toplar stoktan düşülecek. Onaylıyor musunuz?'{% else %}'The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?'{% endif %};
+    function submitStatus(s) {
+      if (SHIPPED.indexOf(s) !== -1) {
+        const c = ((carrierSel && carrierSel.value) || '').trim();
+        const t = ((trackingInp && trackingInp.value) || '').trim();
+        if (!c || !t) {
+          alert(NEED_CARGO_MSG);
+          if (!c && carrierSel) { carrierSel.focus(); } else if (trackingInp) { trackingInp.focus(); }
+          return;
+        }
+        if (!confirm(CONFIRM_SHIP)) return;
+      }
+      statusInput.value = s;
+      statusForm.submit();
+    }
+    document.querySelectorAll('.od-stage[data-status], .od-stage-mini[data-status], .od-spk-btn[data-status], #od-complete-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const s = btn.dataset.status;
         if (!s) return;
-        statusInput.value = s;
-        statusForm.submit();
+        submitStatus(s);
       });
     });
   }

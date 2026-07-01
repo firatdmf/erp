@@ -45,6 +45,12 @@ urlpatterns = [
     path("orders/<int:pk>/customer/", views.order_customer_card_view, name="order_customer_card"),
     path("orders/<int:pk>/print/", views.OrderPrint.as_view(), name="order_print"),
     path("orders/<int:pk>/print-header/", views.update_order_print_header, name="order_print_header"),
+    # Packing-scan flow (reserve warehouse rolls before shipping)
+    path("orders/<int:pk>/pack/", views.order_pack_scan, name="order_pack_scan"),
+    path("orders/<int:pk>/pack/add/", views.order_pack_reserve_add, name="order_pack_reserve_add"),
+    path("orders/<int:pk>/pack/update/", views.order_pack_reserve_update, name="order_pack_reserve_update"),
+    path("orders/<int:pk>/pack/remove/", views.order_pack_reserve_remove, name="order_pack_reserve_remove"),
+    path("orders/<int:pk>/pack/complete/", views.order_pack_complete, name="order_pack_complete"),
     path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),

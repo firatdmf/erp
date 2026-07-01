@@ -549,10 +549,15 @@
   </div>
 
   <!-- Stats -->
+  {% get_current_language as LANGUAGE_CODE %}
   <div class="od-stats">
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-warehouse"></i>{% trans "Current stock" %}</div>
       <div class="od-stat-value">{{ product.quantity|default:0|floatformat:2 }}<span class="unit">m</span></div>
+    </div>
+    <div class="od-stat">
+      <div class="od-stat-label"><i class="fa fa-lock" style="color:#B45309;"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv stok{% else %}Reserved{% endif %}</div>
+      <div class="od-stat-value" style="color:#B45309;">{{ reserved_total|default:0|floatformat:2 }}<span class="unit">m</span></div>
     </div>
     <div class="od-stat">
       <div class="od-stat-label"><i class="fa fa-layer-group"></i>{% trans "Active rolls" %}</div>
@@ -629,6 +634,9 @@
                 {% if r.meters and r.meters_remaining is not None %}
                   <div class="roll-bar"><span style="width:{% widthratio r.meters_remaining r.meters 100 %}%;"></span></div>
                   <div style="font-size:10.5px; color:var(--gray-500); margin-top:2px;">{% trans "of" %} {{ r.meters|floatformat:2 }} m</div>
+                {% endif %}
+                {% if r.reserved_m %}
+                  <div style="font-size:10.5px;color:#B45309;font-weight:700;margin-top:3px;"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:2 }} m</div>
                 {% endif %}
               </td>
               <td>

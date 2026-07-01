@@ -53,6 +53,25 @@ def _adjust_catalog_stock(product_id, variant_id, delta):
         pass
 
 
+def _warehouse_managed_variant_ids(variant_ids):
+    """Subset of the given variant ids that are stocked in a warehouse
+    (i.e. some WarehouseProduct.catalog_variant points at them). For
+    those variants the physical rolls are the single stock authority —
+    the reservation system cuts them at ship and re-mirrors the catalog
+    quantity — so the catalog-stock signals must NOT also deduct them,
+    or the variant is double-counted."""
+    ids = [v for v in (variant_ids or []) if v]
+    if not ids:
+        return set()
+    try:
+        from .models import WarehouseProduct
+        return set(WarehouseProduct.objects
+                   .filter(catalog_variant_id__in=ids)
+                   .values_list("catalog_variant_id", flat=True))
+    except Exception:
+        return set()
+
+
 @receiver(pre_save, sender=OrderItem)
 def _capture_orderitem_stock_state(sender, instance, **kwargs):
     """Stash the pre-save (quantity, product_id, variant_id) on the
@@ -224,9 +243,18 @@ def sync_catalog_stock_on_order_status_change(sender, instance, created, **kwarg
 
     should_deduct = new_status in STOCK_DEDUCT_STATUSES
 
+    items = list(instance.items.all().only("product_id", "product_variant_id", "quantity"))
+    # Variants that are stocked in a warehouse (WarehouseProduct.catalog_variant)
+    # are cut from their physical ROLLS at ship time by the reservation
+    # system — the catalog quantity is then re-mirrored from the warehouse.
+    # Deducting them here as well would double-count them. Skip.
+    managed = _warehouse_managed_variant_ids([it.product_variant_id for it in items])
+
     # Going INTO a deduct state and haven't deducted yet → consume.
     if should_deduct and not is_consumed:
-        for it in instance.items.all().only("product_id", "product_variant_id", "quantity"):
+        for it in items:
+            if it.product_variant_id and it.product_variant_id in managed:
+                continue
             qty = Decimal(str(it.quantity or 0))
             if qty > 0:
                 _adjust_catalog_stock(it.product_id, it.product_variant_id, -qty)
@@ -237,7 +265,9 @@ def sync_catalog_stock_on_order_status_change(sender, instance, created, **kwarg
 
     # Going OUT of a deduct state and already deducted → restore.
     if not should_deduct and is_consumed:
-        for it in instance.items.all().only("product_id", "product_variant_id", "quantity"):
+        for it in items:
+            if it.product_variant_id and it.product_variant_id in managed:
+                continue
             qty = Decimal(str(it.quantity or 0))
             if qty > 0:
                 _adjust_catalog_stock(it.product_id, it.product_variant_id, qty)

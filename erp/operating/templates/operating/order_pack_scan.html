@@ -1,0 +1,482 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load static %}
+
+{% block css %}
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pk-teal:#147F74; --pk-teal-600:#00696A; --pk-teal-700:#005354;
+    --pk-teal-50:#E5F1F0; --pk-amber:#F59E0B; --pk-red:#DC2626;
+    --pk-ink:#0F1419; --pk-gray:#64748B; --pk-line:#E2E8F0;
+    --pk-font:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;
+  }
+  .pk-wrap{max-width:1100px;margin:0 auto;padding:18px 16px 120px;font-family:var(--pk-font);color:var(--pk-ink);}
+  .pk-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+  .pk-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--pk-gray);
+    border:1.5px solid var(--pk-line);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13px;}
+  .pk-back:hover{border-color:#9AA3AC;color:var(--pk-ink);}
+  .pk-title{font-size:20px;font-weight:800;margin:0;}
+  .pk-title small{display:block;font-size:12.5px;font-weight:600;color:var(--pk-gray);margin-top:2px;}
+  .pk-banner{display:flex;gap:10px;align-items:flex-start;background:var(--pk-teal-50);
+    border:1px solid #BFE0DD;border-radius:12px;padding:12px 14px;color:var(--pk-teal-700);
+    font-size:13px;line-height:1.5;margin-bottom:16px;}
+  .pk-banner i{margin-top:2px;}
+  .pk-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start;}
+  @media(max-width:820px){.pk-grid{grid-template-columns:1fr;}}
+  .pk-card{background:#fff;border:1.5px solid var(--pk-line);border-radius:14px;overflow:hidden;}
+  .pk-card-h{padding:13px 16px;border-bottom:1px solid var(--pk-line);display:flex;align-items:center;
+    justify-content:space-between;gap:10px;}
+  .pk-card-h h3{margin:0;font-size:14px;font-weight:700;}
+  .pk-card-h .pk-sub{font-size:12px;color:var(--pk-gray);font-weight:600;}
+  .pk-card-b{padding:14px 16px;}
+
+  /* Order items reference list */
+  .pk-item{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:9px 0;border-bottom:1px dashed var(--pk-line);}
+  .pk-item:last-child{border-bottom:0;}
+  .pk-item-name{font-weight:600;font-size:13.5px;}
+  .pk-item-sku{font-size:11.5px;color:var(--pk-gray);font-family:ui-monospace,monospace;}
+  .pk-item-qty{font-weight:700;font-size:13px;color:var(--pk-teal-700);white-space:nowrap;}
+
+  /* Scan controls */
+  .pk-scan-row{display:flex;gap:8px;margin-bottom:10px;}
+  .pk-scan-row input{flex:1;min-width:0;padding:11px 12px;border:1.5px solid var(--pk-line);
+    border-radius:10px;font:600 14px var(--pk-font);}
+  .pk-scan-row input:focus{outline:none;border-color:var(--pk-teal);box-shadow:0 0 0 3px rgba(20,127,116,.15);}
+  .pk-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;
+    border-radius:10px;padding:11px 15px;font:700 13.5px var(--pk-font);border:1.5px solid transparent;white-space:nowrap;}
+  .pk-btn.primary{background:var(--pk-teal-600);color:#fff;}
+  .pk-btn.primary:hover{background:var(--pk-teal-700);}
+  .pk-btn.ghost{background:#fff;color:var(--pk-ink);border-color:var(--pk-line);}
+  .pk-btn.ghost:hover{border-color:#9AA3AC;}
+  .pk-btn.cam{width:100%;background:var(--pk-teal-50);color:var(--pk-teal-700);border-color:#BFE0DD;}
+  .pk-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* Reserved rolls list */
+  .pk-empty{text-align:center;color:var(--pk-gray);font-size:13px;padding:26px 10px;}
+  .pk-empty i{font-size:26px;display:block;margin-bottom:8px;opacity:.4;}
+  .pk-row{border:1.5px solid var(--pk-line);border-radius:12px;padding:11px 12px;margin-bottom:9px;
+    animation:pkIn .18s ease;}
+  .pk-row.flash{border-color:var(--pk-amber);box-shadow:0 0 0 3px rgba(245,158,11,.18);}
+  @keyframes pkIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+  .pk-row-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .pk-row-name{font-weight:700;font-size:13.5px;line-height:1.3;}
+  .pk-row-meta{font-size:11.5px;color:var(--pk-gray);margin-top:2px;}
+  .pk-row-bc{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--pk-ink);
+    background:#F1F5F9;border-radius:6px;padding:1px 6px;display:inline-block;margin-top:4px;}
+  .pk-x{background:none;border:0;color:var(--pk-red);cursor:pointer;font-size:16px;padding:2px 5px;border-radius:6px;flex-shrink:0;}
+  .pk-x:hover{background:#FEE2E2;}
+  .pk-row-cut{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap;}
+  .pk-row-cut label{font-size:12px;font-weight:600;color:var(--pk-gray);}
+  .pk-m-inp{width:92px;padding:8px 10px;border:1.5px solid var(--pk-line);border-radius:9px;
+    font:700 14px var(--pk-font);text-align:right;}
+  .pk-m-inp:focus{outline:none;border-color:var(--pk-teal);box-shadow:0 0 0 3px rgba(20,127,116,.15);}
+  .pk-note{font-size:12px;font-weight:600;color:var(--pk-amber);}
+  .pk-avail{font-size:11px;color:var(--pk-gray);}
+
+  /* Sticky footer */
+  .pk-foot{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;
+    border-top:1px solid var(--pk-line);box-shadow:0 -6px 20px rgba(15,20,25,.06);
+    padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .pk-foot-info{font-size:13px;color:var(--pk-gray);font-weight:600;}
+  .pk-foot-info b{color:var(--pk-teal-700);font-size:15px;}
+
+  /* Toast */
+  .pk-toast{position:fixed;left:50%;top:20px;transform:translateX(-50%) translateY(-16px);
+    background:var(--pk-ink);color:#fff;padding:11px 16px;border-radius:11px;font-size:13.5px;font-weight:600;
+    z-index:80;opacity:0;pointer-events:none;transition:all .22s;max-width:92vw;text-align:center;}
+  .pk-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .pk-toast.err{background:var(--pk-red);}
+  .pk-toast.warn{background:var(--pk-amber);}
+
+  /* Camera overlay */
+  .pk-cam{position:fixed;inset:0;z-index:90;background:#000;display:none;flex-direction:column;}
+  .pk-cam.show{display:flex;}
+  .pk-cam video{flex:1;width:100%;object-fit:cover;background:#000;}
+  .pk-cam-bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px;color:#fff;background:linear-gradient(#000a,transparent);}
+  .pk-cam-bar b{font-size:15px;}
+  .pk-cam-close{background:#ffffff22;border:0;color:#fff;width:38px;height:38px;border-radius:50%;font-size:18px;cursor:pointer;}
+  .pk-cam-guide{position:absolute;left:8%;right:8%;top:50%;transform:translateY(-50%);height:26%;
+    border:2px solid #ffffffcc;border-radius:14px;box-shadow:0 0 0 100vmax #00000055;}
+  .pk-cam-hit{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);color:#fff;background:#00000088;
+    padding:8px 14px;border-radius:20px;font-size:13px;font-weight:600;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pk-wrap"
+     data-add-url="{% url 'operating:order_pack_reserve_add' order.pk %}"
+     data-upd-url="{% url 'operating:order_pack_reserve_update' order.pk %}"
+     data-rem-url="{% url 'operating:order_pack_reserve_remove' order.pk %}"
+     data-done-url="{% url 'operating:order_pack_complete' order.pk %}"
+     data-detail-url="{% url 'operating:order_detail' order.pk %}"
+     data-shipped="{{ shipped|yesno:'1,0' }}">
+
+  <div class="pk-top">
+    <a class="pk-back" href="{% url 'operating:order_detail' order.pk %}">
+      <i class="fa fa-arrow-left"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişe dön{% else %}Back to order{% endif %}
+    </a>
+    <h1 class="pk-title">
+      {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleme — Top Okut{% else %}Packing — Scan rolls{% endif %}
+      <small>{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</small>
+    </h1>
+  </div>
+
+  {% if shipped %}
+  <div class="pk-banner" style="background:#FEF2F2;border-color:#FCA5A5;color:#B91C1C;">
+    <i class="fa fa-lock"></i>
+    <div>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu sipariş gönderildi — paketleme kilitli. Rezerve edilen toplar stoktan düşüldü.{% else %}This order is shipped — packing is locked. Reserved rolls were deducted from stock.{% endif %}</div>
+  </div>
+  {% else %}
+  <div class="pk-banner">
+    <i class="fa fa-circle-info"></i>
+    <div>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişin ürünlerine ait <b>topları okutun</b>. Her top için girilen metre o kupondan <b>rezerve</b> edilir — <b>stok ancak sipariş gönderildiğinde düşer</b>. Başka ürüne ait barkod eklenmez. Toplar sonradan düzenlenebilir/kaldırılabilir.{% else %}Scan the <b>rolls</b> of this order's products. The metres you enter are <b>reserved</b> from that roll — <b>stock is deducted only when the order ships</b>. Barcodes of other products are rejected. Rolls can be edited/removed later.{% endif %}</div>
+  </div>
+  {% endif %}
+
+  <div class="pk-grid">
+
+    <!-- LEFT: reserved rolls -->
+    <div class="pk-card">
+      <div class="pk-card-h">
+        <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Okutulan toplar{% else %}Scanned rolls{% endif %}</h3>
+        <span class="pk-sub"><span id="pkCount">0</span> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top · <span id="pkTotal">0</span> m rezerv{% else %}rolls · <span id="pkTotal">0</span> m reserved{% endif %}</span>
+      </div>
+      <div class="pk-card-b">
+        <div id="pkList">
+          {% for r in reservations %}
+          <div class="pk-row" data-id="{{ r.id }}"
+               data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+            <div class="pk-row-top">
+              <div>
+                <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
+                <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
+                <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+              </div>
+              {% if not shipped %}<button type="button" class="pk-x" data-remove="{{ r.id }}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Kaldır{% else %}Remove{% endif %}"><i class="fa fa-xmark"></i></button>{% endif %}
+            </div>
+            <div class="pk-row-cut">
+              <label>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kesilecek{% else %}Cut{% endif %}:</label>
+              <input type="number" step="0.01" min="0" class="pk-m-inp" value="{{ r.meters|floatformat:2 }}"
+                     data-mid="{{ r.id }}" {% if shipped %}disabled{% endif %}>
+              <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+              <span class="pk-note" data-note="{{ r.id }}">→ {% if LANGUAGE_CODE|slice:":2" == "tr" %}bu kupondan {{ r.meters|floatformat:2 }} m düşülecektir{% else %}{{ r.meters|floatformat:2 }} m will be deducted from this roll{% endif %}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="pk-empty" id="pkEmpty" {% if reservations %}style="display:none;"{% endif %}>
+          <i class="fa fa-barcode"></i>
+          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Henüz top okutulmadı.{% else %}No rolls scanned yet.{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: scan + items -->
+    <div>
+      {% if not shipped %}
+      <div class="pk-card" style="margin-bottom:16px;">
+        <div class="pk-card-h"><h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Top ekle{% else %}Add a roll{% endif %}</h3></div>
+        <div class="pk-card-b">
+          <div class="pk-scan-row">
+            <input type="text" id="pkManual" inputmode="text" autocomplete="off"
+                   placeholder="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Barkodu elle gir…{% else %}Enter barcode…{% endif %}">
+            <button type="button" class="pk-btn primary" id="pkAdd"><i class="fa fa-plus"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Ekle{% else %}Add{% endif %}</button>
+          </div>
+          <button type="button" class="pk-btn cam" id="pkOpenCam"><i class="fa fa-camera"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kamerayla Okut{% else %}Scan with camera{% endif %}</button>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="pk-card">
+        <div class="pk-card-h">
+          <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Sipariş ürünleri{% else %}Order products{% endif %}</h3>
+          <span class="pk-sub">{{ items|length }}</span>
+        </div>
+        <div class="pk-card-b">
+          {% for it in items %}
+          <div class="pk-item">
+            <div>
+              <div class="pk-item-name">{{ it.display_name }}</div>
+              <div class="pk-item-sku">{{ it.display_sku|default:'—' }}</div>
+            </div>
+            <div class="pk-item-qty">{{ it.quantity|floatformat:2 }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}m{% else %}m{% endif %}</div>
+          </div>
+          {% empty %}
+          <div class="pk-empty" style="padding:14px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişte ürün yok.{% else %}No products.{% endif %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if not shipped %}
+  <div class="pk-foot">
+    <div class="pk-foot-info">
+      <b id="pkCount2">0</b> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top rezerve edildi{% else %}rolls reserved{% endif %}
+    </div>
+    <button type="button" class="pk-btn primary" id="pkComplete" disabled>
+      <i class="fa fa-check"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketlemeyi Tamamla{% else %}Complete packing{% endif %}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Camera overlay -->
+<div class="pk-cam" id="pkCam">
+  <div class="pk-cam-bar">
+    <b>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Top barkodu okut{% else %}Scan roll barcode{% endif %}</b>
+    <button type="button" class="pk-cam-close" id="pkCloseCam"><i class="fa fa-xmark"></i></button>
+  </div>
+  <video id="pkVideo" playsinline muted autoplay></video>
+  <div class="pk-cam-guide"></div>
+  <div class="pk-cam-hit" id="pkHit">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Barkodu çerçeveye getirin{% else %}Point at a barcode{% endif %}</div>
+</div>
+
+<div class="pk-toast" id="pkToast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var TR = ('{{ LANGUAGE_CODE|slice:":2" }}' === 'tr');
+  var wrap = document.querySelector('.pk-wrap');
+  var CSRF = '{{ csrf_token }}';
+  var ADD = wrap.dataset.addUrl, UPD = wrap.dataset.updUrl, REM = wrap.dataset.remUrl,
+      DONE = wrap.dataset.doneUrl, DETAIL = wrap.dataset.detailUrl;
+  var SHIPPED = wrap.dataset.shipped === '1';
+
+  var listEl = document.getElementById('pkList');
+  var emptyEl = document.getElementById('pkEmpty');
+  var toastEl = document.getElementById('pkToast');
+  var toastT = null;
+
+  function t(tr, en){ return TR ? tr : en; }
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function toast(msg, kind){
+    toastEl.textContent = msg; toastEl.className = 'pk-toast show' + (kind ? ' ' + kind : '');
+    if (toastT) clearTimeout(toastT);
+    toastT = setTimeout(function(){ toastEl.className = 'pk-toast'; }, 2600);
+  }
+  function post(url, data){
+    var body = new URLSearchParams(data); body.append('csrfmiddlewaretoken', CSRF);
+    return fetch(url, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}, body:body})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); });
+  }
+
+  function noteText(m){ return '→ ' + t('bu kupondan ' + m.toFixed(2) + ' m düşülecektir', m.toFixed(2) + ' m will be deducted from this roll'); }
+
+  function rowHtml(res){
+    var rem = (res.roll_remaining != null ? res.roll_remaining : (res.roll_meters || 0));
+    var m = Number(res.meters || 0);
+    return ''+
+      '<div class="pk-row" data-id="'+res.id+'" data-remaining="'+rem+'">'+
+        '<div class="pk-row-top"><div>'+
+          '<div class="pk-row-name">'+esc(res.product_name)+'</div>'+
+          '<div class="pk-row-meta">'+esc(res.sku||'—')+(res.warehouse?(' · '+esc(res.warehouse)):'')+'</div>'+
+          '<span class="pk-row-bc">'+esc(res.barcode||'—')+'</span>'+
+        '</div>'+
+        (SHIPPED?'':'<button type="button" class="pk-x" data-remove="'+res.id+'" title="'+t('Kaldır','Remove')+'"><i class="fa fa-xmark"></i></button>')+
+        '</div>'+
+        '<div class="pk-row-cut">'+
+          '<label>'+t('Kesilecek','Cut')+':</label>'+
+          '<input type="number" step="0.01" min="0" class="pk-m-inp" value="'+m.toFixed(2)+'" data-mid="'+res.id+'"'+(SHIPPED?' disabled':'')+'>'+
+          '<span class="pk-avail">/ '+Number(rem).toFixed(2)+' m</span>'+
+          '<span class="pk-note" data-note="'+res.id+'">'+noteText(m)+'</span>'+
+        '</div>'+
+      '</div>';
+  }
+
+  function refreshCount(){
+    var rows = listEl.querySelectorAll('.pk-row');
+    var n = rows.length, tot = 0;
+    rows.forEach(function(row){
+      var inp = row.querySelector('.pk-m-inp'); tot += Number(inp && inp.value || 0);
+    });
+    var c1=document.getElementById('pkCount'), c2=document.getElementById('pkCount2'),
+        tt=document.getElementById('pkTotal'), done=document.getElementById('pkComplete');
+    if (c1) c1.textContent = n; if (c2) c2.textContent = n;
+    if (tt) tt.textContent = tot.toFixed(2);
+    if (done) done.disabled = (n < 1);
+    if (emptyEl) emptyEl.style.display = n ? 'none' : '';
+  }
+
+  function addRow(res, flash){
+    var tmp = document.createElement('div'); tmp.innerHTML = rowHtml(res).trim();
+    var el = tmp.firstChild;
+    listEl.insertBefore(el, listEl.firstChild);
+    if (flash){ el.classList.add('flash'); setTimeout(function(){ el.classList.remove('flash'); }, 900); }
+    refreshCount();
+  }
+
+  // ── add a barcode (manual or camera) ──────────────────────────────
+  var addBusy = false;
+  function addBarcode(code, meters){
+    code = (code||'').toString().trim();
+    if (!code || addBusy) return Promise.resolve();
+    addBusy = true;
+    var payload = {barcode: code}; if (meters) payload.meters = meters;
+    return post(ADD, payload).then(function(rr){
+      var d = rr.j || {};
+      if (!d.ok){
+        if (d.kind === 'wrong_product') toast(d.error || t('Bu top bu siparişe ait değil.','Roll not in this order.'), 'err');
+        else if (d.kind === 'not_found') toast(d.error || t('Top bulunamadı.','Roll not found.'), 'err');
+        else toast(d.error || t('Eklenemedi.','Could not add.'), 'err');
+        return;
+      }
+      if (d.duplicate){
+        toast(t('Bu top zaten ekli.','This roll is already added.'), 'warn');
+        var ex = listEl.querySelector('.pk-row[data-id="'+d.reservation.id+'"]');
+        if (ex){ ex.classList.add('flash'); setTimeout(function(){ ex.classList.remove('flash'); }, 900); ex.scrollIntoView({block:'center',behavior:'smooth'}); }
+        return;
+      }
+      addRow(d.reservation, true);
+      if (d.capped) toast(t('Girilen metre topta kalanla sınırlandı.','Metres capped to what remains on the roll.'), 'warn');
+      else toast(t('Top eklendi.','Roll added.'));
+    }).catch(function(){ toast(t('Ağ hatası.','Network error.'), 'err'); })
+      .finally(function(){ addBusy = false; });
+  }
+
+  // ── manual add ────────────────────────────────────────────────────
+  var manual = document.getElementById('pkManual'), addBtn = document.getElementById('pkAdd');
+  function doManual(){ var v = (manual.value||'').trim(); if(!v){ manual.focus(); return; } addBarcode(v).then(function(){ manual.value=''; manual.focus(); }); }
+  if (addBtn) addBtn.addEventListener('click', doManual);
+  if (manual) manual.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doManual(); } });
+
+  // ── edit meters + remove (event delegation) ───────────────────────
+  var updTimers = {};
+  listEl.addEventListener('input', function(e){
+    var inp = e.target.closest('.pk-m-inp'); if(!inp) return;
+    var id = inp.dataset.mid;
+    var note = listEl.querySelector('.pk-note[data-note="'+id+'"]');
+    var m = Number(inp.value || 0);
+    if (note) note.textContent = noteText(m > 0 ? m : 0);
+    refreshCount();
+    if (updTimers[id]) clearTimeout(updTimers[id]);
+    updTimers[id] = setTimeout(function(){
+      if (!(m > 0)) return;
+      post(UPD, {reservation_id:id, meters:m}).then(function(rr){
+        var d = rr.j || {}; if(!d.ok){ toast(d.error||t('Güncellenemedi.','Update failed.'),'err'); return; }
+        var real = Number(d.reservation.meters);
+        if (d.capped){ inp.value = real.toFixed(2); if(note) note.textContent = noteText(real);
+          toast(t('Metre topta kalanla sınırlandı.','Capped to roll remainder.'),'warn'); refreshCount(); }
+      }).catch(function(){});
+    }, 550);
+  });
+  listEl.addEventListener('click', function(e){
+    var x = e.target.closest('.pk-x'); if(!x) return;
+    var id = x.dataset.remove;
+    if (!confirm(t('Bu topu kaldırmak istiyor musunuz?','Remove this roll?'))) return;
+    post(REM, {reservation_id:id}).then(function(rr){
+      var d = rr.j || {}; if(!d.ok){ toast(d.error||t('Kaldırılamadı.','Remove failed.'),'err'); return; }
+      var row = listEl.querySelector('.pk-row[data-id="'+id+'"]'); if(row) row.remove();
+      refreshCount(); toast(t('Top kaldırıldı.','Roll removed.'));
+    }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); });
+  });
+
+  // ── complete packing ──────────────────────────────────────────────
+  var doneBtn = document.getElementById('pkComplete');
+  if (doneBtn) doneBtn.addEventListener('click', function(){
+    doneBtn.disabled = true;
+    post(DONE, {}).then(function(rr){
+      var d = rr.j || {};
+      if (!d.ok){ toast(d.error||t('Tamamlanamadı.','Could not complete.'),'err'); doneBtn.disabled=false; return; }
+      window.location.href = d.redirect || DETAIL;
+    }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); doneBtn.disabled=false; });
+  });
+
+  refreshCount();
+
+  // ══════════════════════ camera (zxing-wasm) ══════════════════════
+  var zx = null, zxLoading = null, camStream = null, camRaf = null, camRunning = false, lastDecode = 0;
+  var camDebounce = {val:'', t:0};
+  var roiCanvas = null, audioCtx = null;
+  var ZXW_OPTS = {tryHarder:true, tryRotate:true, tryDownscale:true, maxNumberOfSymbols:1,
+    formats:['Code128','EAN-13','EAN-8','UPC-A','UPC-E','Code39','Code93','ITF','Codabar','QRCode']};
+  var RS_BAD_LENS = /ultra|wide|tele|depth|truedepth|infrared/i;
+  function camIndex(label){ var m=(label||'').match(/camera2?\s*(\d+)/i); return m?parseInt(m[1],10):999; }
+  function applyFocus(stream){ try{ var tk=stream.getVideoTracks()[0]; if(tk&&tk.applyConstraints) tk.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(function(){}); }catch(e){} return stream; }
+  function beep(){ try{ if(navigator.vibrate) navigator.vibrate(55); }catch(e){}
+    try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended') audioCtx.resume();
+      var o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='sine'; o.frequency.value=880; g.gain.value=0.07;
+      o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.08); }catch(e){} }
+  function loadZxw(){
+    if (zx) return Promise.resolve(zx);
+    if (zxLoading) return zxLoading;
+    var urls=['https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.0/+esm','https://esm.sh/zxing-wasm@3.1.0/reader'];
+    function tryNext(i){ if(i>=urls.length) return Promise.reject(new Error('zxing load failed'));
+      return import(urls[i]).then(function(mod){ if(mod&&mod.readBarcodes) return mod.readBarcodes; throw new Error('no export'); }).catch(function(){ return tryNext(i+1); }); }
+    zxLoading = tryNext(0).then(function(fn){ zx=fn; return fn; });
+    return zxLoading;
+  }
+  function getRearStream(){
+    var W={ideal:1920}, H={ideal:1080};
+    function open(c){ return navigator.mediaDevices.getUserMedia({video:c,audio:false}); }
+    return open({facingMode:{ideal:'environment'},width:W,height:H}).then(function(stream){
+      if (!navigator.mediaDevices.enumerateDevices) return applyFocus(stream);
+      return navigator.mediaDevices.enumerateDevices().then(function(devices){
+        var cams=devices.filter(function(d){return d.kind==='videoinput';});
+        if (cams.length<2) return applyFocus(stream);
+        var rear=cams.filter(function(d){return /back|rear|environment|arka|tras|rück/i.test(d.label||'');});
+        if(!rear.length) rear=cams;
+        var pool=rear.filter(function(d){return !RS_BAD_LENS.test(d.label||'');}); if(!pool.length) pool=rear;
+        var iosMain=pool.filter(function(d){return /(^|\b)back camera\b/i.test(d.label||'');});
+        var sorted=pool.slice().sort(function(a,b){return camIndex(a.label)-camIndex(b.label);});
+        var pick=iosMain[0]||sorted[0], curId='';
+        try{ curId=(stream.getVideoTracks()[0].getSettings()||{}).deviceId||''; }catch(e){}
+        if (pick&&pick.deviceId&&pick.deviceId!==curId){ stream.getTracks().forEach(function(t){t.stop();});
+          return open({deviceId:{exact:pick.deviceId},width:W,height:H}).then(applyFocus); }
+        return applyFocus(stream);
+      }).catch(function(){ return applyFocus(stream); });
+    });
+  }
+  function roi(){ if(!roiCanvas){ roiCanvas=document.createElement('canvas'); roiCanvas.getContext('2d',{willReadFrequently:true}); } return roiCanvas; }
+
+  var camEl = document.getElementById('pkCam'), video = document.getElementById('pkVideo');
+  var openBtn = document.getElementById('pkOpenCam'), closeBtn = document.getElementById('pkCloseCam');
+  function openCam(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast(t('Kamera desteklenmiyor.','Camera not supported.'),'err'); return; }
+    camEl.classList.add('show'); document.body.style.overflow='hidden';
+    getRearStream().then(function(stream){ camStream=stream; video.srcObject=stream; camRunning=true; lastDecode=0;
+      loadZxw().then(function(){ camLoop(); }).catch(function(){ toast(t('Tarayıcı yüklenemedi.','Scanner failed to load.'),'err'); });
+    }).catch(function(err){ toast('Camera: '+(err&&err.message||err),'err'); closeCam(); });
+  }
+  function closeCam(){
+    camRunning=false; if(camRaf){ cancelAnimationFrame(camRaf); camRaf=null; }
+    if(camStream){ camStream.getTracks().forEach(function(t){t.stop();}); camStream=null; }
+    if(video) video.srcObject=null;
+    camEl.classList.remove('show'); document.body.style.overflow='';
+  }
+  function onDecode(code){
+    var now = (window.performance&&performance.now)?performance.now():Date.now();
+    code = (code||'').toString().trim();
+    if (!code) return;
+    if (code === camDebounce.val && (now - camDebounce.t) < 1600) return;   // ignore same code within 1.6s
+    camDebounce = {val:code, t:now};
+    beep();
+    var hit=document.getElementById('pkHit'); if(hit){ hit.textContent = code; }
+    addBarcode(code);   // default meters = roll remainder (server side)
+  }
+  function camLoop(){
+    if (!camRunning) return;
+    var now=(window.performance&&performance.now)?performance.now():Date.now();
+    if (!zx || !video.videoWidth || video.readyState<2 || (now-lastDecode)<120){ camRaf=requestAnimationFrame(camLoop); return; }
+    lastDecode=now;
+    try{
+      var c=roi(), vw=video.videoWidth, vh=video.videoHeight;
+      var cropW=vw, cropH=Math.round(vh*0.60), sx=0, sy=Math.round((vh-cropH)/2);
+      var outW=Math.min(1280,cropW), outH=Math.max(1,Math.round(cropH*(outW/cropW)));
+      if(c.width!==outW) c.width=outW; if(c.height!==outH) c.height=outH;
+      var cx=c.getContext('2d',{willReadFrequently:true});
+      cx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outW, outH);
+      var img=cx.getImageData(0,0,outW,outH);
+      zx(img, ZXW_OPTS).then(function(res){ if(camRunning && res && res.length && res[0].text) onDecode(res[0].text); })
+        .catch(function(){}).finally(function(){ if(camRunning) camRaf=requestAnimationFrame(camLoop); });
+    }catch(e){ if(camRunning) camRaf=requestAnimationFrame(camLoop); }
+  }
+  if (openBtn) openBtn.addEventListener('click', openCam);
+  if (closeBtn) closeBtn.addEventListener('click', closeCam);
+})();
+</script>
+{% endblock %}

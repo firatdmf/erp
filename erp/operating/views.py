@@ -46,6 +46,7 @@ from .models import (
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.contrib import messages
 from django.urls import reverse, reverse_lazy
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
@@ -263,11 +264,12 @@ class OrderDetail(DetailView):
             inv.status != "cancelled" for inv in order_invoices
         )
 
-        # Status flow widget on the detail page — 4 ordered primary
-        # stages with an "active up to" highlight. We compare against
-        # ORDER_PRIMARY_STAGES so the bar still reads correctly even
-        # if order_status is a legacy value (e.g. "delivered" — that
-        # comes after "shipped", so all 4 are highlighted).
+        # Status flow widget on the detail page — 3 ordered primary
+        # stages (Açık → Paketleniyor → Gönderildi) with an "active up
+        # to" highlight. We compare against ORDER_PRIMARY_STAGES so the
+        # bar still reads correctly even if order_status is a legacy
+        # value (e.g. "delivered" — that comes after "shipped", so all
+        # stages are highlighted).
         from .models import ORDER_PRIMARY_STAGES, ORDER_STATUS_CHOICES, CARRIER_CHOICES
         primary = list(ORDER_PRIMARY_STAGES)
         current = self.object.order_status or "pending"
@@ -276,11 +278,11 @@ class OrderDetail(DetailView):
         if current in primary:
             active_idx = primary.index(current)
         elif current in {"in_transit", "out_for_delivery", "delivered"}:
-            active_idx = len(primary) - 1   # shipped + later → fill all 4
+            active_idx = len(primary) - 1   # shipped + later → fill all
         elif current in {"cancelled", "returned"}:
             active_idx = -1                  # nothing filled
         else:
-            active_idx = 0                   # default at first stage
+            active_idx = 0                   # legacy pre-ship (confirmed/preparing) → Açık
 
         ctx["status_stages"] = [
             {"key": k, "label": dict(ORDER_STATUS_CHOICES).get(k, k), "filled": i <= active_idx}
@@ -289,6 +291,10 @@ class OrderDetail(DetailView):
         ctx["status_choices"]  = ORDER_STATUS_CHOICES
         ctx["carrier_choices"] = CARRIER_CHOICES
         ctx["is_terminal"] = current in {"cancelled", "returned"}
+        # Reserved rolls scanned during packing (for the "Gönderildi"
+        # gate + a summary on the detail page). Unconsumed = still held.
+        ctx["reservation_count"] = self.object.roll_reservations.filter(consumed=False).count()
+        ctx["has_cargo_info"] = bool((self.object.carrier or "").strip() and (self.object.tracking_number or "").strip())
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -647,27 +653,313 @@ class OrderDetail(DetailView):
             return self.get(request, *args, **kwargs)
 
         new_status = (request.POST.get("order_status") or "").strip()
-        carrier = (request.POST.get("carrier") or "").strip()
-        tracking = (request.POST.get("tracking_number") or "").strip()
+        carrier = request.POST.get("carrier")
+        tracking = request.POST.get("tracking_number")
 
-        valid_statuses = {k for k, _ in ORDER_STATUS_CHOICES}
-        valid_carriers = {k for k, _ in CARRIER_CHOICES}
-
-        old_status = order.order_status
-        if new_status and new_status in valid_statuses:
-            order.order_status = new_status
-            # Stamp shipped_at automatically when transitioning to shipped.
-            if new_status == "shipped" and not order.shipped_at:
-                order.shipped_at = timezone.now()
-            if new_status == "delivered" and not order.delivered_at:
-                order.delivered_at = timezone.now()
-        if carrier:
-            order.carrier = carrier if carrier in valid_carriers else None
-        order.tracking_number = tracking or None
-        order.save(update_fields=["order_status", "carrier", "tracking_number",
-                                   "shipped_at", "delivered_at", "updated_at"])
+        # All status changes funnel through the single atomic helper so
+        # the ship gate (cargo required) + the reservation → stock-out
+        # conversion can never be bypassed or partially applied.
+        from .views_warehouse import apply_order_status_change
+        ok, code = apply_order_status_change(
+            order, new_status, carrier=carrier, tracking=tracking, user=request.user,
+        )
+        if not ok:
+            if code == "cargo_required":
+                messages.error(request, "Siparişi tamamlamak (Gönderildi) için kargo şirketi ve takip numarası gerekli.")
+            elif code == "packing_requires_scan":
+                messages.error(request, "Paketleniyor'a geçmek için önce en az bir top okutun.")
+            else:
+                messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
+            return redirect("operating:order_detail", pk=order.pk)
         messages.success(request, "Order updated.")
         return redirect("operating:order_detail", pk=order.pk)
+
+
+# ---------------------------------------------------------------------------
+# Packing-scan flow — reserve warehouse rolls for an order.
+#
+# The middle stage of the 3-step lifecycle (Açık → Paketleniyor →
+# Gönderildi). Staff open the packing page and scan the barcodes of the
+# physical rolls (tops) being packed. Each scanned roll must belong to
+# one of the order's products (else it's rejected) and reserves its
+# metres — editable, so a partial cut reserves less and leaves the rest
+# on the roll. Reservations are a SOFT hold: NO stock is physically cut
+# until the order ships. The page is re-openable — reservations can be
+# added, edited or removed any time before shipping.
+# ---------------------------------------------------------------------------
+from decimal import Decimal as _PDecimal
+
+_SHIPPED_CLASS = {"shipped", "in_transit", "out_for_delivery", "delivered"}
+
+
+def _order_item_match_maps(order):
+    """Lookup sets from an order's items so we can decide whether a
+    scanned roll belongs to this order."""
+    variant_ids, product_ids, skus = set(), set(), set()
+    items = list(order.items.all().select_related("product", "product_variant"))
+    for it in items:
+        if it.product_variant_id:
+            variant_ids.add(it.product_variant_id)
+            vs = getattr(it.product_variant, "variant_sku", None)
+            if vs:
+                skus.add(vs.strip().lower())
+        if it.product_id:
+            product_ids.add(it.product_id)
+            ps = getattr(it.product, "sku", None)
+            if ps:
+                skus.add(ps.strip().lower())
+    return items, variant_ids, product_ids, skus
+
+
+def _match_roll_to_order(roll, items, variant_ids, product_ids, skus):
+    """Return the best-matching OrderItem for a scanned roll, or None if
+    the roll's product is not part of the order. Precedence:
+    catalog variant → catalog product → SKU."""
+    wp = roll.product
+    if wp is None:
+        return None
+    cv_id = wp.catalog_variant_id
+    cv = wp.catalog_variant if cv_id else None
+    cv_product_id = cv.product_id if cv else None
+    wp_sku = (wp.sku or "").strip().lower()
+
+    def _pick(pred):
+        for it in items:
+            if pred(it):
+                return it
+        return None
+
+    if cv_id and cv_id in variant_ids:
+        hit = _pick(lambda it: it.product_variant_id == cv_id)
+        if hit:
+            return hit
+    if cv_product_id and cv_product_id in product_ids:
+        # Only bind the parent-product to a VARIANT-LESS order line. A
+        # line that names a specific variant must match at the variant
+        # level (branch above) — otherwise a sibling variant's roll
+        # (same base product) would wrongly satisfy it.
+        hit = _pick(lambda it: it.product_id == cv_product_id and it.product_variant_id is None)
+        if hit:
+            return hit
+    if wp_sku and wp_sku in skus:
+        hit = _pick(lambda it: (
+            (it.product_variant and (getattr(it.product_variant, "variant_sku", "") or "").strip().lower() == wp_sku)
+            or (it.product and (getattr(it.product, "sku", "") or "").strip().lower() == wp_sku)
+        ))
+        if hit:
+            return hit
+        return items[0] if items else None  # sku matched but couldn't bind a specific line
+    return None
+
+
+def _roll_available_meters(roll, exclude_reservation_id=None):
+    """Physical metres on the roll minus what OTHER active reservations
+    already hold — the ceiling so a roll can't be over-committed."""
+    from .models import OrderRollReservation
+    from django.db.models import Sum
+    phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+    phys = phys or _PDecimal("0")
+    other = (OrderRollReservation.objects
+             .filter(roll=roll, consumed=False)
+             .exclude(pk=exclude_reservation_id)
+             .aggregate(s=Sum("meters"))["s"] or _PDecimal("0"))
+    avail = phys - other
+    return avail if avail > 0 else _PDecimal("0")
+
+
+def _reservation_payload(r):
+    wp = r.warehouse_product
+    return {
+        "id": r.id,
+        "roll_id": r.roll_id,
+        "barcode": (r.roll.barcode if r.roll else None),
+        "product_id": r.warehouse_product_id,
+        "product_name": (wp.name if wp else ""),
+        "sku": (wp.sku if wp else ""),
+        "warehouse": (wp.warehouse.name if (wp and wp.warehouse_id) else ""),
+        "meters": float(r.meters or 0),
+        "roll_meters": (float(r.roll.meters or 0) if r.roll else None),
+        "roll_remaining": (float(r.roll.meters_remaining) if (r.roll and r.roll.meters_remaining is not None) else None),
+        "consumed": r.consumed,
+    }
+
+
+@login_required
+def order_pack_scan(request, pk):
+    """The packing page for an order — item checklist + roll scanner +
+    live list of reserved rolls."""
+    order = get_object_or_404(Order, pk=pk)
+    reservations = list(
+        order.roll_reservations
+        .select_related("roll", "warehouse_product", "warehouse_product__warehouse")
+        .order_by("-created_at")
+    )
+    items = list(order.items.all().select_related("product", "product_variant"))
+    return render(request, "operating/order_pack_scan.html", {
+        "order": order,
+        "items": items,
+        "reservations": reservations,
+        "reservation_count": sum(1 for r in reservations if not r.consumed),
+        "shipped": order.order_status in _SHIPPED_CLASS,
+    })
+
+
+@login_required
+@require_POST
+def order_pack_reserve_add(request, pk):
+    """Scan/enter a roll barcode → reserve it for this order. Rejects
+    rolls whose product is not part of the order."""
+    from .models import WarehouseProductRoll, OrderRollReservation
+    order = get_object_or_404(Order, pk=pk)
+    if order.order_status in _SHIPPED_CLASS:
+        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+
+    code = (request.POST.get("barcode") or "").strip()
+    if not code:
+        return JsonResponse({"ok": False, "error": "Barkod boş."}, status=400)
+
+    items, variant_ids, product_ids, skus = _order_item_match_maps(order)
+    if not items:
+        return JsonResponse({"ok": False, "error": "Siparişte ürün yok."}, status=400)
+
+    rolls = list(WarehouseProductRoll.objects
+                 .select_related("product", "product__catalog_variant", "product__warehouse")
+                 .filter(barcode__iexact=code))
+    if not rolls:
+        return JsonResponse({"ok": False, "kind": "not_found",
+                             "error": "Bu barkodla bir top (roll) bulunamadı."}, status=404)
+
+    # All rolls sharing this barcode whose product belongs to the order
+    # (a barcode is code-unique but not DB-unique, so there can be more
+    # than one across warehouses).
+    matched = []
+    for roll in rolls:
+        mi = _match_roll_to_order(roll, items, variant_ids, product_ids, skus)
+        if mi is not None:
+            matched.append((roll, mi))
+    if not matched:
+        return JsonResponse({
+            "ok": False, "kind": "wrong_product",
+            "error": "Bu top bu siparişteki ürünlere ait değil — eklenmedi.",
+            "product_name": (rolls[0].product.name if rolls[0].product else ""),
+        }, status=409)
+
+    # Already reserved for this order? Re-scan is a no-op (no duplicate).
+    for roll, _mi in matched:
+        existing = OrderRollReservation.objects.filter(order=order, roll=roll, consumed=False).first()
+        if existing:
+            return JsonResponse({"ok": True, "duplicate": True,
+                                 "reservation": _reservation_payload(existing)})
+
+    # Prefer the first matching roll that still has reservable metres.
+    pick = next(((roll, mi) for (roll, mi) in matched if _roll_available_meters(roll) > 0), None)
+    if pick is None:
+        return JsonResponse({"ok": False, "kind": "no_stock",
+                             "error": "Bu topta uygun/rezerv edilebilir metre kalmadı."}, status=409)
+    roll_pick, matched_item = pick
+    wp = roll_pick.product
+
+    # Parse the requested metres (validation errors before we lock).
+    raw = (request.POST.get("meters") or "").strip()
+    req_meters = None
+    if raw:
+        try:
+            req_meters = _PDecimal(raw)
+        except Exception:
+            return JsonResponse({"ok": False, "error": "Geçersiz metre."}, status=400)
+        if req_meters <= 0:
+            return JsonResponse({"ok": False, "error": "Metre sıfırdan büyük olmalı."}, status=400)
+
+    # Lock the roll row and re-check availability inside the lock so two
+    # concurrent scans of the same roll can't over-commit it.
+    from django.db import transaction as _tx
+    capped = False
+    with _tx.atomic():
+        locked = WarehouseProductRoll.objects.select_for_update().get(pk=roll_pick.pk)
+        avail = _roll_available_meters(locked)
+        if avail <= 0:
+            return JsonResponse({"ok": False, "kind": "no_stock",
+                                 "error": "Bu topta uygun/rezerv edilebilir metre kalmadı."}, status=409)
+        if req_meters is not None:
+            meters = req_meters
+            if meters > avail:
+                meters = avail
+                capped = True
+        else:
+            meters = avail
+        r = OrderRollReservation.objects.create(
+            order=order, order_item=matched_item, roll=locked, warehouse_product=wp,
+            meters=meters, created_by=request.user if request.user.is_authenticated else None,
+        )
+    return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
+
+
+@login_required
+@require_POST
+def order_pack_reserve_update(request, pk):
+    """Edit the reserved metres of one reservation (partial cut)."""
+    from .models import OrderRollReservation
+    order = get_object_or_404(Order, pk=pk)
+    if order.order_status in _SHIPPED_CLASS:
+        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    rid = (request.POST.get("reservation_id") or "").strip()
+    if not rid.isdigit():
+        return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
+    r = OrderRollReservation.objects.filter(pk=rid, order=order, consumed=False).first()
+    if r is None:
+        return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
+    raw = (request.POST.get("meters") or "").strip()
+    try:
+        meters = _PDecimal(raw)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Geçersiz metre."}, status=400)
+    if meters <= 0:
+        return JsonResponse({"ok": False, "error": "Metre sıfırdan büyük olmalı."}, status=400)
+    avail = _roll_available_meters(r.roll, exclude_reservation_id=r.pk)
+    capped = meters > avail
+    if capped:
+        meters = avail
+    r.meters = meters
+    r.save(update_fields=["meters"])
+    return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
+
+
+@login_required
+@require_POST
+def order_pack_reserve_remove(request, pk):
+    """Release a reservation (remove a scanned roll) before shipping."""
+    from .models import OrderRollReservation
+    order = get_object_or_404(Order, pk=pk)
+    if order.order_status in _SHIPPED_CLASS:
+        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    rid = (request.POST.get("reservation_id") or "").strip()
+    if not rid.isdigit():
+        return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
+    r = OrderRollReservation.objects.filter(pk=rid, order=order, consumed=False).first()
+    if r is None:
+        return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
+    removed = r.id
+    r.delete()
+    return JsonResponse({"ok": True, "removed": removed})
+
+
+@login_required
+@require_POST
+def order_pack_complete(request, pk):
+    """Confirm packing — needs at least one reserved roll. Moves the
+    order to 'packaging' (Paketleniyor). Re-runnable; no stock cut."""
+    order = get_object_or_404(Order, pk=pk)
+    if order.order_status in _SHIPPED_CLASS:
+        return JsonResponse({"ok": False, "error": "Sipariş zaten gönderildi."}, status=400)
+    n = order.roll_reservations.filter(consumed=False).count()
+    if n < 1:
+        return JsonResponse({"ok": False,
+                             "error": "Paketlemeyi tamamlamak için en az bir top okutmalısınız."}, status=400)
+    if order.order_status != "packaging":
+        order.order_status = "packaging"
+        order.save(update_fields=["order_status", "updated_at"])
+    return JsonResponse({"ok": True, "status": "packaging",
+                         "redirect": reverse("operating:order_detail", args=[order.pk])})
 
 
 # ---------------------------------------------------------------------------
@@ -1026,17 +1318,12 @@ class OrderCreate(View):
                     # Generate QR code
                     generate_machine_qr_for_order(order)
 
-                # ── Auto consume warehouse stock for every line item ──
-                # FIFO across warehouses, oldest roll first. Movements
-                # are logged to each affected WarehouseProduct timeline
-                # with the order number as the reference.
-                try:
-                    from .views_warehouse import consume_for_order_items
-                    consume_for_order_items(order, user=request.user, reason_prefix="Order")
-                except Exception as _e:
-                    # Don't break the order save if stock-out hits an
-                    # edge case — surface as a non-fatal message.
-                    messages.warning(request, f"Order saved but stock-out had an issue: {_e}")
+                # ── NO warehouse stock-out at create ──────────────────
+                # New orders start "Açık" (Open) and reserve/deduct
+                # nothing. Warehouse rolls are reserved during the
+                # packing-scan step and only physically cut when the
+                # order is shipped (cargo info entered). See
+                # views_warehouse.consume_reservations_for_order.
 
                 # ── Auto-link to a CariAccount + log the sales-order
                 # movement so the customer's ledger reflects this
@@ -1129,6 +1416,13 @@ class OrderEdit(UpdateView):
         if self.object.status == "completed":
             messages.error(request, "Completed orders cannot be edited.")
             return HttpResponseForbidden("You cannot edit a completed order.")
+        # Once an order is shipped its rolls are already cut and its
+        # reservations consumed. Editing items then would desync catalog
+        # vs warehouse stock (the item signals adjust catalog while the
+        # consumed reservations are never revisited), so block it.
+        if self.object.order_status in {"shipped", "in_transit", "out_for_delivery", "delivered"}:
+            messages.error(request, "Gönderilen siparişler düzenlenemez.")
+            return redirect("operating:order_detail", pk=self.object.pk)
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -1331,19 +1625,11 @@ class OrderEdit(UpdateView):
                         return self.form_invalid(form)
                 self.object.save()
 
-                # Order has been mutated — reverse the previous
-                # consumption then apply fresh consumption based on
-                # the current item set. This keeps stock movements
-                # idempotent against repeated edits.
-                try:
-                    from .views_warehouse import (
-                        reverse_consumption_for_order,
-                        consume_for_order_items,
-                    )
-                    reverse_consumption_for_order(self.object, user=self.request.user)
-                    consume_for_order_items(self.object, user=self.request.user, reason_prefix="Order")
-                except Exception as _e:
-                    messages.warning(self.request, f"Order updated but stock movement sync had an issue: {_e}")
+                # ── NO warehouse stock movement on edit ───────────────
+                # Editing an Açık/Paketleniyor order never touches
+                # warehouse rolls. Physical stock is only cut at ship
+                # time from the reservations scanned during packing, so
+                # there is nothing to reverse/reapply here.
 
                 # ── Sync cari + movement after edit. If the customer
                 # was swapped, the order moves to the new cari and
@@ -2673,20 +2959,11 @@ def create_web_order(request):
                         custom_fabric_used_meters=item_data.get('custom_fabric_used_meters') if is_custom else None,
                     )
 
-            # ── Auto consume warehouse stock for every line item ──
-            # Web orders always trigger immediate stock-out (FIFO across
-            # warehouses). Order edits later will reverse + reapply.
-            try:
-                from .views_warehouse import consume_for_order_items
-                consume_for_order_items(
-                    order,
-                    user=request.user if request.user.is_authenticated else None,
-                    reason_prefix="Web order",
-                )
-            except Exception as _e:
-                # Don't fail the checkout if stock-out errored — log
-                # silently and let the admin reconcile in the timeline.
-                print(f"[WEB ORDER STOCK] consume failed: {_e}")
+            # ── NO warehouse stock-out at web-order create ────────────
+            # Web orders also start "Açık" and reserve nothing. Staff
+            # process them through packing (scan rolls → reserve) and
+            # shipping (cargo info → real cut) in the ERP, same as
+            # manual orders.
 
             return JsonResponse({
                 'success': True,
@@ -2833,31 +3110,26 @@ def update_order_status(request, order_id):
     
     try:
         order = Order.objects.get(pk=order_id)
-        
+
         data = json.loads(request.body)
-        
-        # Update order status
-        if 'order_status' in data:
-            order.order_status = data['order_status']
-            
-            # Auto-set shipped_at when status changes to shipped
-            if data['order_status'] == 'shipped' and not order.shipped_at:
-                order.shipped_at = timezone.now()
-            
-            # Auto-set delivered_at when status changes to delivered
-            if data['order_status'] == 'delivered' and not order.delivered_at:
-                order.delivered_at = timezone.now()
-        
-        # Update carrier
-        if 'carrier' in data:
-            order.carrier = data['carrier']
-        
-        # Update tracking number
-        if 'tracking_number' in data:
-            order.tracking_number = data['tracking_number']
-        
-        order.save()
-        
+
+        # Funnel through the shared atomic helper so this API can't ship
+        # an order without cutting its reserved rolls or without cargo.
+        from .views_warehouse import apply_order_status_change
+        ok, code = apply_order_status_change(
+            order,
+            (data.get('order_status') or order.order_status),
+            carrier=data.get('carrier'),
+            tracking=data.get('tracking_number'),
+            user=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+        )
+        if not ok:
+            if code == "cargo_required":
+                return JsonResponse({'error': 'Kargo şirketi ve takip numarası gerekli'}, status=400)
+            if code == "packing_requires_scan":
+                return JsonResponse({'error': 'Paketlemeye geçmek için en az bir top okutulmalı'}, status=400)
+            return JsonResponse({'error': 'Durum güncelleme hatası', 'details': (code or '').replace('error:', '')}, status=500)
+
         return JsonResponse({
             'success': True,
             'message': 'Sipariş durumu güncellendi',
@@ -2866,7 +3138,7 @@ def update_order_status(request, order_id):
             'carrier': order.carrier,
             'tracking_number': order.tracking_number
         })
-        
+
     except Order.DoesNotExist:
         return JsonResponse({
             'error': 'Sipariş bulunamadı'
@@ -3228,28 +3500,23 @@ class WebOrderStatusEdit(View):
         new_status = request.POST.get('order_status')
         carrier = request.POST.get('carrier')
         tracking_number = request.POST.get('tracking_number')
-        
-        old_status = order.order_status
-        
-        # Update order fields
-        if new_status:
-            order.order_status = new_status
-            
-            # Auto-set shipped_at when status changes to shipped
-            if new_status == 'shipped' and old_status != 'shipped' and not order.shipped_at:
-                order.shipped_at = timezone.now()
-            
-            # Auto-set delivered_at when status changes to delivered
-            if new_status == 'delivered' and old_status != 'delivered' and not order.delivered_at:
-                order.delivered_at = timezone.now()
-        
-        if carrier:
-            order.carrier = carrier
-        
-        if tracking_number:
-            order.tracking_number = tracking_number
-        
-        order.save()
+
+        # Same atomic funnel as the detail page + JSON API: cargo gate +
+        # reservation → stock-out conversion can't be bypassed here.
+        from .views_warehouse import apply_order_status_change
+        ok, code = apply_order_status_change(
+            order, (new_status or order.order_status),
+            carrier=carrier, tracking=tracking_number, user=request.user,
+        )
+        if not ok:
+            if code == "cargo_required":
+                messages.error(request, "Siparişi tamamlamak için kargo şirketi ve takip numarası gerekli.")
+            elif code == "packing_requires_scan":
+                messages.error(request, "Paketlemeye geçmek için önce en az bir top okutun.")
+            else:
+                messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
+            next_url = request.POST.get('next') or request.GET.get('next')
+            return redirect(next_url or reverse('operating:order_detail', kwargs={'pk': order.pk}))
 
         status_label = dict(status_choices_en).get(new_status, new_status)
         messages.success(request, f"Order status updated successfully: {status_label}")

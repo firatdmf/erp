@@ -1,4 +1,5 @@
 {% load i18n %}
+{% get_current_language as LANGUAGE_CODE %}
 <style>
 .co-section-header{display:flex;align-items:center;gap:10px;padding:12px 0;cursor:pointer;user-select:none;font-weight:600;font-size:.875rem;color:var(--text-primary);border-bottom:1px solid var(--border-color)}
 .co-section-header:hover{color:#1e293b}
@@ -128,6 +129,11 @@
           <label class="co-type-btn">
             <input type="radio" name="order_type" value="manual" checked>
             <i class="fas fa-store"></i> Manual
+          </label>
+          <label class="co-type-btn">
+            <input type="radio" name="order_type" value="perakende"
+              onchange="(function(){var g=document.querySelector('input[name=customer_source][value=guest]'); if(g){g.checked=true;} if(window.coCustomerSource){coCustomerSource('guest');}})()">
+            <i class="fas fa-cash-register"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende{% else %}Retail{% endif %}
           </label>
         </div>
       </div>

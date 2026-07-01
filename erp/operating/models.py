@@ -336,6 +336,12 @@ class Order(models.Model):
     )
     
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
+    # Order channel: manual = staff/B2B, web = storefront/B2C, retail = Perakende
+    # (quick POS: pick products + price, then scan physical tops to fulfil).
+    ORDER_TYPE_CHOICES = [("manual", "Manual"), ("web", "Web"), ("retail", "Perakende")]
+    order_type = models.CharField(
+        max_length=10, choices=ORDER_TYPE_CHOICES, default="manual", db_index=True
+    )
     notes = models.TextField(blank=True, null=True)
     qr_code_url = models.URLField(blank=True, null=True)
     # Custom top-left header text on the printable PDF. Blank → falls back to
@@ -575,9 +581,17 @@ class OrderItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    # Nullable so retail lines can reference warehouse stock that isn't linked
+    # to a marketing catalog product.
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, null=True, blank=True)
     product_variant = models.ForeignKey(
         ProductVariant, on_delete=models.PROTECT, blank=True, null=True
+    )
+    # Retail: the warehouse stock line this sale item draws from, so scanned
+    # tops are matched to the correct order line and stocked out from it.
+    warehouse_product = models.ForeignKey(
+        "operating.WarehouseProduct", on_delete=models.SET_NULL,
+        related_name="retail_order_items", blank=True, null=True,
     )
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
@@ -721,9 +735,37 @@ class OrderItem(models.Model):
     #         return f"Order #{self.pk} - {self.company.name}"
     #     return f"Order #{self.pk}"
     def __str__(self):
+        name = self.product.title if self.product else (self.description or "item")
         if self.product_variant:
-            return f"{self.product.title} [{self.product_variant.variant_sku}] - {self.quantity} pcs"
-        return f"{self.product.title} - {self.quantity} pcs"
+            return f"{name} [{self.product_variant.variant_sku}] - {self.quantity} pcs"
+        return f"{name} - {self.quantity} pcs"
+
+
+class RetailScan(models.Model):
+    """A physical top/roll scanned into a Perakende (retail) order before it's
+    completed. Each scan targets ONE WarehouseProductRoll and records how many
+    metres to deduct — defaults to the roll's remaining length, editable down
+    for a partial cut (the roll keeps the remainder, it is NOT fully consumed).
+    On completion these are applied as stock-outs against their rolls."""
+
+    order = models.ForeignKey(Order, related_name="retail_scans", on_delete=models.CASCADE)
+    order_item = models.ForeignKey(
+        OrderItem, related_name="retail_scans", on_delete=models.SET_NULL, null=True, blank=True)
+    roll = models.ForeignKey(
+        "operating.WarehouseProductRoll", related_name="retail_scans",
+        on_delete=models.SET_NULL, null=True, blank=True)
+    warehouse_product = models.ForeignKey(
+        "operating.WarehouseProduct", related_name="retail_scans",
+        on_delete=models.SET_NULL, null=True, blank=True)
+    meters = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    applied = models.BooleanField(default=False)   # stock-out done at completion
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"RetailScan order#{self.order_id} roll#{self.roll_id} {self.meters}m"
 
 
 # This will be created when the machining starts

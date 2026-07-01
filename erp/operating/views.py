@@ -1416,13 +1416,18 @@ class OrderList(ListView):
             if order.web_client
         ]
         
+        # Perakende (retail / quick POS) orders — their own tab.
+        retail_orders = [o for o in all_orders if getattr(o, 'order_type', '') == 'retail']
+
         # Add to context
         context['b2b_orders'] = b2b_orders
         context['b2c_orders'] = b2c_orders
+        context['retail_orders'] = retail_orders
         context['total_count'] = len(all_orders)
         context['b2b_count'] = len(b2b_orders)
         context['b2c_count'] = len(b2c_orders)
-        
+        context['retail_count'] = len(retail_orders)
+
         return context
 
 

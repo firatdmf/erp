@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import views_warehouse
+from . import views_retail
 from . import order_excel
 from . import warehouse_label
 from django.views.generic import TemplateView, RedirectView
@@ -47,6 +48,14 @@ urlpatterns = [
     path("orders/<int:pk>/print-header/", views.update_order_print_header, name="order_print_header"),
     path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
+    # Perakende (retail / quick POS) orders
+    path("retail/products/", views_retail.retail_product_list, name="retail_product_list"),
+    path("retail/create/", views_retail.retail_order_create, name="retail_order_create"),
+    path("retail/orders/<int:order_pk>/scans/", views_retail.retail_order_scans, name="retail_order_scans"),
+    path("retail/orders/<int:order_pk>/scan/", views_retail.retail_scan_add, name="retail_scan_add"),
+    path("retail/scan/<int:scan_pk>/update/", views_retail.retail_scan_update, name="retail_scan_update"),
+    path("retail/scan/<int:scan_pk>/remove/", views_retail.retail_scan_remove, name="retail_scan_remove"),
+    path("retail/orders/<int:order_pk>/complete/", views_retail.retail_complete, name="retail_complete"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),
     path("orders/delete/<int:pk>/", views.delete_order, name="delete_order"),
     path("orders/bulk-delete/", views.bulk_delete_orders, name="bulk_delete_orders"),

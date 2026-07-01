@@ -1181,13 +1181,13 @@
                    name="search">
           </div>
 
-          <input type="hidden" id="whViewInput" name="view" value="{{ view_mode|default:'grouped' }}">
+          <input type="hidden" id="whViewInput" name="view" value="{{ view_mode|default:'variants' }}">
           <div class="od-viewtoggle">
-            <button type="button" class="wh-view-btn {% if view_mode != 'variants' %}active{% endif %}" data-view="grouped" onclick="setWhView('grouped')" title="{% trans 'Group by main product' %}">
-              <i class="fa fa-layer-group"></i> {% trans "Grouped" %}
-            </button>
-            <button type="button" class="wh-view-btn {% if view_mode == 'variants' %}active{% endif %}" data-view="variants" onclick="setWhView('variants')" title="{% trans 'List every variant' %}">
+            <button type="button" class="wh-view-btn {% if view_mode != 'grouped' %}active{% endif %}" data-view="variants" onclick="setWhView('variants')" title="{% trans 'List every variant' %}">
               <i class="fa fa-list-ul"></i> {% trans "All variants" %}
+            </button>
+            <button type="button" class="wh-view-btn {% if view_mode == 'grouped' %}active{% endif %}" data-view="grouped" onclick="setWhView('grouped')" title="{% trans 'Group by main product' %}">
+              <i class="fa fa-layer-group"></i> {% trans "Grouped" %}
             </button>
           </div>
 

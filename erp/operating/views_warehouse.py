@@ -494,6 +494,32 @@ def _warehouse_base_expr():
     )
 
 
+def _tr_ci_variants(term):
+    """Cased variants of a search term for case-insensitive matching that
+    also covers Turkish dotted/dotless I (İ/ı), which ILIKE does NOT fold
+    reliably across DB locales. Returns a de-duplicated list to OR
+    together with __icontains. Standard letters (ü/Ü, ş/Ş, ç/Ç, ö/Ö, ğ/Ğ)
+    already fold under Unicode ILIKE — only the I-family needs help."""
+    term = (term or "").strip()
+    if not term:
+        return []
+
+    def tr_upper(s):
+        # Turkish upper: i→İ, ı→I (do these first, then upper the rest).
+        return s.replace("ı", "I").replace("i", "İ").upper()
+
+    def tr_lower(s):
+        # Turkish lower: I→ı, İ→i (do these first, then lower the rest).
+        return s.replace("I", "ı").replace("İ", "i").lower()
+
+    seen, out = set(), []
+    for v in (term, term.lower(), term.upper(), tr_lower(term), tr_upper(term)):
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseDetail(View):
     template_name = "operating/warehouse_detail.html"
@@ -510,23 +536,33 @@ class WarehouseDetail(View):
 
         base_qs = WarehouseProduct.objects.filter(warehouse=warehouse)
         if search:
-            # Search name / SKU / product-barcode, AND each roll's (top's)
-            # own barcode — the real physical barcodes live on the rolls.
-            # Match rolls via a SUBQUERY (not a join) so the grouped-view
-            # Sum() aggregates don't get multiplied by the rolls join.
-            roll_match = WarehouseProductRoll.objects.filter(
-                product__warehouse=warehouse, barcode__icontains=search
-            ).values('product_id')
+            # Case-insensitive across name / SKU / product-barcode AND each
+            # roll's (top's) own barcode. We OR a few Turkish-aware cased
+            # variants of the term so dotted/dotless İ/ı match no matter how
+            # the data was typed. Rolls are matched via a SUBQUERY (not a
+            # join) so the grouped-view Sum() aggregates aren't multiplied.
+            from functools import reduce
+            import operator
+            variants = _tr_ci_variants(search)
+
+            def _field_q(field):
+                return reduce(operator.or_,
+                              (Q(**{f"{field}__icontains": v}) for v in variants))
+
+            roll_match = (WarehouseProductRoll.objects
+                          .filter(product__warehouse=warehouse)
+                          .filter(_field_q("barcode"))
+                          .values('product_id'))
             base_qs = base_qs.filter(
-                Q(name__icontains=search) | Q(sku__icontains=search)
-                | Q(barcode__icontains=search) | Q(id__in=roll_match)
+                _field_q("name") | _field_q("sku") | _field_q("barcode")
+                | Q(id__in=roll_match)
             )
 
-        # Two list modes: 'grouped' (default — main products, expandable) and
-        # 'variants' (FLAT — every variant/roll-carrier on its own row).
-        view_mode = (request.GET.get('view') or 'grouped').strip()
+        # Two list modes: 'variants' (FLAT — every variant/roll-carrier on
+        # its own row, the DEFAULT) and 'grouped' (main products, expandable).
+        view_mode = (request.GET.get('view') or 'variants').strip()
         if view_mode not in ('grouped', 'variants'):
-            view_mode = 'grouped'
+            view_mode = 'variants'
 
         groups_render = []
         variants_render = []

@@ -323,17 +323,46 @@
   @media (max-width: 1100px) {
     .ord-list-head, .ord-row { grid-template-columns: 28px 56px 1.2fr 1.4fr 0.8fr 0.9fr 130px 20px; }
   }
-  @media (max-width: 900px) {
-    .ord-search-input { width: 200px; }
+  /* ─── MOBILE: head/tabs stack, rows become cards ─────── */
+  @media (max-width: 820px) {
+    .ord { padding: 16px 14px 96px; }
+    .ord-title { font-size: 23px; }
+    .ord-head { flex-direction: column; align-items: stretch; gap: 12px; }
+    .ord-head-r { display: flex; }
+    .ord-head-r .ord-btn { flex: 1; justify-content: center; }
+
+    .ord-tabs { flex-wrap: wrap; row-gap: 8px; }
+    .ord-tab { padding: 8px 11px; font-size: 12.5px; }
+    .ord-tabs-r { margin-left: 0; width: 100%; }
+    .ord-search-input { width: 100%; }
+
+    /* Each row reflows from an 8-col grid into a compact stacked card. */
     .ord-list-head { display: none; }
     .ord-row {
-      grid-template-columns: 56px 1fr auto;
-      gap: 10px;
-      padding: 14px;
+      display: flex; flex-wrap: wrap; align-items: center;
+      gap: 6px 10px; padding: 13px 14px;
     }
-    .ord-row > .ord-cust, .ord-row > .num.ord-total { grid-column: 2 / -2; }
-    .ord-row > .ord-status { grid-column: 1 / -1; }
+    .ord-row > .ord-select { order: 1; flex: 0 0 auto; }
+    .ord-row > .ord-kind   { order: 2; flex: 0 0 auto; }
+    .ord-row > .ord-id     { order: 3; flex: 1 1 auto; min-width: 0; }
+    .ord-row > .ord-status { order: 4; flex: 0 0 auto; margin-left: auto; }
+    .ord-row > .ord-cust   { order: 5; flex: 1 1 100%; }
+    .ord-row > div:nth-child(5) { display: none; }   /* Source (Website/ERP) col */
+    .ord-row > .ord-total  { order: 6; flex: 1 1 100%; text-align: left; }
+    .ord-total { font-size: 14px; }
+    .ord-cust-n { max-width: none; }
     .ord-chev { display: none; }
+
+    .ord-bulk-bar {
+      left: 12px; right: 12px; min-width: 0;
+      transform: translate(0, calc(100% + 40px));
+    }
+    .ord-bulk-bar.show { transform: translate(0, 0); }
+  }
+  @media (max-width: 420px) {
+    .ord-head-r .ord-btn { font-size: 12px; padding: 8px 10px; }
+    .ord-tab { padding: 8px 10px; font-size: 12px; }
+    .ord-tab i { display: none; }   /* drop icons to fit labels + counts */
   }
 </style>
 {% endblock %}

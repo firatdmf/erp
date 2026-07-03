@@ -644,9 +644,34 @@
     .od-grid { grid-template-columns: 1fr; }
     .od-tl { grid-template-columns: repeat(2, 1fr); }
   }
+  @media (max-width: 900px) {
+    .od-head-r { width: 100%; justify-content: flex-start; }
+    .od-head-r .ord-btn { flex: 1 1 auto; justify-content: center; }
+  }
   @media (max-width: 700px) {
+    .ord { padding: 16px 12px 96px; }
     .od-head { flex-direction: column; align-items: stretch; }
     .od-form { grid-template-columns: 1fr; }
+    .od-tl { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    /* Products table: hide the secondary columns and tighten the rest
+       so it never overflows on a phone. Keeps Product/Qty/Price/Amount. */
+    .od-prods th:nth-child(2), .od-prods td:nth-child(2),   /* SKU */
+    .od-prods th:nth-child(3), .od-prods td:nth-child(3),   /* Variant */
+    .od-prods th:nth-child(6), .od-prods td:nth-child(6) {  /* Cost */
+      display: none;
+    }
+    .od-prods th, .od-prods td { padding: 8px 6px; }
+    .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 66px; }   /* Qty */
+    .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 72px; }   /* Price */
+    .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 76px; }   /* Amount */
+    .od-prod-img { width: 28px; height: 28px; flex-shrink: 0; }
+    .od-prod span:last-child { font-size: 12px; }
+    /* Add-item editor stacks: product full width, qty|price, then Add. */
+    #od-add-item-row > div { grid-template-columns: 1fr 1fr !important; }
+    #od-add-item-row > div > div:first-child,
+    #od-add-item-btn { grid-column: 1 / -1 !important; }
   }
 
   /* ============================== PRINT ==============================

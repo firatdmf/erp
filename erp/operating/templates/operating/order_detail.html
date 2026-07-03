@@ -1143,50 +1143,7 @@
         </div>
       </section>
 
-      {% if order.web_client or order.is_guest_order %}
-      <!-- SHIPPING FORM -->
-      <section class="od-card">
-        <div class="od-card-h">
-          <h3>{% trans "Shipping" %}</h3>
-          <span class="od-card-sub">{% trans "Status auto-updates when a tracking number is entered" %}</span>
-        </div>
-        <form method="post" action="{% url 'operating:web_order_status' order.pk %}">
-          {% csrf_token %}
-          {# preserve current order_status when only updating carrier/tracking #}
-          <input type="hidden" name="order_status" value="{{ order.order_status|default:'pending' }}"/>
-          <div class="od-form">
-            <label>
-              <span>{% trans "Carrier" %}</span>
-              <select name="carrier" class="od-select">
-                <option value="">{% trans "Select…" %}</option>
-                <option value="yurtici" {% if order.carrier == 'yurtici' %}selected{% endif %}>Yurtiçi Kargo</option>
-                <option value="mng"     {% if order.carrier == 'mng' %}selected{% endif %}>MNG Kargo</option>
-                <option value="aras"    {% if order.carrier == 'aras' %}selected{% endif %}>Aras Kargo</option>
-                <option value="ptt"     {% if order.carrier == 'ptt' %}selected{% endif %}>PTT Kargo</option>
-                <option value="ups"     {% if order.carrier == 'ups' %}selected{% endif %}>UPS</option>
-                <option value="other"   {% if order.carrier == 'other' %}selected{% endif %}>Other</option>
-              </select>
-            </label>
-            <label>
-              <span>{% trans "Tracking number" %}</span>
-              <input type="text" name="tracking_number" class="od-input"
-                     value="{{ order.tracking_number|default:'' }}"
-                     placeholder="örn. 4012589631"/>
-            </label>
-            <label>
-              <span>{% trans "Save" %}</span>
-              <button type="submit" class="ord-btn primary" style="height: 38px;"><i class="fa fa-check"></i>{% trans "Save shipping info" %}</button>
-            </label>
-          </div>
-        </form>
-        {% if order.shipped_at or order.delivered_at %}
-        <div class="od-form-foot">
-          {% if order.shipped_at %}<span style="font: 500 12px var(--font-sans); color: var(--gray-600);"><i class="fa fa-truck" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "Shipped at:" %} <b>{{ order.shipped_at|date:"d M Y · H:i" }}</b></span>{% endif %}
-          {% if order.delivered_at %}<span style="font: 500 12px var(--font-sans); color: var(--gray-600);"><i class="fa fa-flag-checkered" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "Delivered at:" %} <b>{{ order.delivered_at|date:"d M Y · H:i" }}</b></span>{% endif %}
-        </div>
-        {% endif %}
-      </section>
-      {% endif %}
+      {% comment %}Legacy web-order Shipping form removed — carrier + tracking now live in the single status card above (used for both manual and web/guest orders).{% endcomment %}
     </div>
 
     {# ============== RIGHT ============== #}

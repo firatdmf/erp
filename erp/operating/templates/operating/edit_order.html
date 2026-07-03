@@ -104,8 +104,7 @@
 </div>
 
 {% block js %}
-{# Server-side JSON payload for existing order items. Using a json_script
-   block keeps the page parseable regardless of weird chars in titles. #}
+{% comment %}Server-side JSON payload for existing order items. Using a json_script block keeps the page parseable regardless of weird chars in titles.{% endcomment %}
 {{ order_items_payload|json_script:"existing-order-items" }}
 
 <script src="{% static 'operating/js/create_edit_order.js' %}"></script>

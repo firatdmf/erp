@@ -151,8 +151,7 @@
     </div>
     <div class="co-section-body">
       {% if order %}
-        {# Hidden anchor with preset customer info — read by the
-           edit-mode bootstrap below to switch tabs and prefill. #}
+        {% comment %}Hidden anchor with preset customer info — read by the edit-mode bootstrap below to switch tabs and prefill.{% endcomment %}
         {% if order.contact %}
           <span id="co-customer-preset" hidden
                 data-source="crm" data-type="contact"

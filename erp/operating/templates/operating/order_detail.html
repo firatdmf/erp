@@ -848,10 +848,7 @@
           <input type="hidden" name="action" value="update_status">
           <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}">
 
-          {# 3-stage flow — Açık → Paketleniyor → Gönderildi.
-             Paketleniyor opens the packing-scan page (confirmed only
-             once packing is completed there); Gönderildi requires cargo
-             info and cuts the reserved rolls from stock. #}
+          {% comment %}3-stage flow — Açık → Paketleniyor (opens the packing-scan page) → Gönderildi (needs cargo info, cuts reserved rolls).{% endcomment %}
           <div class="od-stages od-stages-3">
             {% for s in status_stages %}
               {% if s.key == 'packaging' %}
@@ -931,9 +928,7 @@
           <summary>{% trans "More statuses (cancelled, returned, delivered…)" %}</summary>
           <div class="od-more-grid">
             {% for code, label in status_choices %}
-            {# 'packaging' is only reachable via the packing-scan flow and
-               'shipped' via the cargo-gated Complete button — don't expose
-               them here as one-click shortcuts that bypass those gates. #}
+            {% comment %}packaging → packing-scan flow, shipped → cargo-gated Complete button; keep them out of these one-click shortcuts.{% endcomment %}
             {% if code != 'packaging' and code != 'shipped' %}
             <button type="button" form="od-status-form"
                     class="od-stage-mini {% if order.order_status == code %}active{% endif %}"

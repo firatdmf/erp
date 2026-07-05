@@ -619,6 +619,7 @@ class WarehouseDetail(View):
                                    output_field=DecimalField(max_digits=20, decimal_places=4)),
                 updated=Max("updated_at"),
                 avg_cost=Avg("cost_usd"),
+                avg_cost_try=Avg("cost_try"),
             ))
             _sort_map = {
                 "name_asc": "base", "name_desc": "-base",
@@ -676,6 +677,8 @@ class WarehouseDetail(View):
                 "reserved_total": _reserved_by_base.get(g["base"], Decimal("0")),
                 "total_usd": g["total_usd"],
                 "total_try": g["total_try"],
+                "avg_cost_usd": g["avg_cost"],
+                "avg_cost_try": g["avg_cost_try"],
                 "is_catalog": (g.get("linked") or 0) > 0,
             } for g in page.object_list]
 

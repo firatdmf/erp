@@ -62,7 +62,9 @@
     {% if g.roll_total %}<div class="tops-sub">{{ g.roll_total }} top</div>{% endif %}
     {% if g.reserved_total %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ g.reserved_total|floatformat:2 }} m</div>{% endif %}
   </td>
-  <td class="num od-m-hide"><span style="color:#C5CCD3;">—</span></td>
+  <td class="num od-m-hide" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Varyantların ortalama birim maliyeti{% else %}Average unit cost across variants{% endif %}">
+    {% if g.avg_cost_usd %}<span class="mono">~{{ g.avg_cost_usd|floatformat:2 }}</span><span class="curr-pill">USD</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+  </td>
   <td class="num" data-label="USD">{% if g.total_usd %}<span class="cost-usd">${{ g.total_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
   <td class="num" data-label="TRY">{% if g.total_try %}<span class="cost-try">₺{{ g.total_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>

@@ -694,8 +694,21 @@ class WarehouseDetail(View):
         total_value_usd = warehouse.total_value_usd()
         total_value_try = warehouse.total_value_try()
 
+        # "Son Hareketler" preview — the latest activity in THIS warehouse
+        # (all products), linking to the full filterable ledger. Skipped on
+        # HTMX partial refreshes (search/sort) which only re-render rows.
+        recent_movements = []
+        if not request.headers.get('HX-Request'):
+            recent_movements = _decorate_movements(list(
+                StockMovement.objects
+                .filter(product__warehouse=warehouse)
+                .select_related("product", "created_by")
+                .order_by("-created_at")[:6]
+            ))
+
         ctx = {
             'warehouse': warehouse,
+            'recent_movements': recent_movements,
             'groups': groups_render,      # main-product groups on this page
             'variants': variants_render,  # flat variant rows on this page (view=variants)
             'view_mode': view_mode,
@@ -2986,13 +2999,24 @@ class WarehouseMovements(View):
         except Exception:
             pass
 
-        # Quick stats — computed BEFORE the type filter so picking
-        # type=out doesn't zero the "Stock in" card (and vice versa).
+        # Quick stats — computed BEFORE the category/type filter so
+        # picking a category doesn't zero the other cards.
         from django.db.models import Sum
         in_total = qs.filter(movement_type="in").aggregate(s=Sum("quantity"))["s"] or 0
         out_total = qs.filter(movement_type="out").aggregate(s=Sum("quantity"))["s"] or 0
         net = (in_total or 0) - (out_total or 0)
+        order_count = qs.filter(_order_movement_q()).count()
 
+        # Category filter — same semantics as the global feed: order
+        # movements are isolated by their reason/reference shapes and
+        # excluded from the raw in/out/adjustment buckets.
+        kind = (request.GET.get("kind") or "").strip()
+        if kind == "order":
+            qs = qs.filter(_order_movement_q())
+        elif kind in ("in", "out", "adjustment"):
+            qs = qs.filter(movement_type=kind).exclude(_order_movement_q())
+
+        # Legacy raw type filter (kept for old bookmarked URLs).
         if types_param:
             wanted = [t.strip() for t in types_param.split(",") if t.strip()]
             qs = qs.filter(movement_type__in=wanted)
@@ -3017,14 +3041,16 @@ class WarehouseMovements(View):
             "warehouse": warehouse,
             "page_obj": page,
             "paginator": paginator,
-            "movements": page.object_list,
+            "movements": _decorate_movements(list(page.object_list)),
             "in_total": in_total,
             "out_total": out_total,
             "net": net,
+            "order_count": order_count,
             "products": list(products),
             "filter_qs": filter_qs,
             "filters": {
                 "type": types_param,
+                "kind": kind,
                 "from": date_from,
                 "to": date_to,
                 "product": product_pk,

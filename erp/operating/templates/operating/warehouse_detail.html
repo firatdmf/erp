@@ -1237,6 +1237,43 @@
           </table>
         </div>
       </section>
+
+      <!-- SON HAREKETLER — latest activity in THIS warehouse (all products) -->
+      {% if recent_movements %}
+      <section class="od-card" style="padding:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 16px; border-bottom:1px solid #EEF1F5;">
+          <div style="display:flex; align-items:center; gap:9px;">
+            <i class="fa fa-clock-rotate-left" style="color:#147F74;"></i>
+            <h3 style="margin:0; font:700 14.5px var(--font-sans, sans-serif); color:#0F1419;">{% trans "Recent activity" %}</h3>
+          </div>
+          <a href="{% url 'operating:warehouse_movements' warehouse.pk %}"
+             style="display:inline-flex; align-items:center; gap:6px; font:600 12.5px var(--font-sans, sans-serif); color:#00696A; text-decoration:none;">
+            {% trans "View & filter all" %} <i class="fa fa-arrow-right" style="font-size:11px;"></i>
+          </a>
+        </div>
+        {% for m in recent_movements %}
+        <a href="{% url 'operating:warehouse_movements' warehouse.pk %}"
+           style="display:flex; align-items:center; gap:12px; padding:10px 16px; text-decoration:none; color:inherit; border-bottom:1px solid #F4F7FA; {% if forloop.last %}border-bottom:none;{% endif %}"
+           onmouseover="this.style.background='#FAFBFD';" onmouseout="this.style.background='';">
+          <span style="flex-shrink:0; display:inline-flex; align-items:center; gap:5px; padding:3px 10px 3px 8px; border-radius:999px; font:700 10.5px var(--font-sans, sans-serif);
+            {% if m.kind == 'order' %}background:#DBEAFE; color:#1D4ED8;{% elif m.kind == 'in' %}background:#D1FAE5; color:#065F46;{% elif m.kind == 'out' %}background:#FEE2E2; color:#B91C1C;{% else %}background:#FEF3C7; color:#8B5A00;{% endif %}">
+            {% if m.kind == 'order' %}<i class="fa fa-cart-shopping"></i>{% trans "Order" %}{% elif m.kind == 'in' %}<i class="fa fa-arrow-down"></i>{% trans "IN" %}{% elif m.kind == 'out' %}<i class="fa fa-arrow-up"></i>{% trans "OUT" %}{% else %}<i class="fa fa-pen"></i>{% trans "ADJ" %}{% endif %}
+          </span>
+          <span style="flex:1; min-width:0; font:600 12.5px var(--font-sans, sans-serif); color:#0F1419; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            {{ m.product.name }}
+            <span style="font-weight:500; color:#6B7280;">· {{ m.reason_display|default:"—"|truncatechars:56 }}</span>
+          </span>
+          {% if m.quantity != 0 %}
+          <span style="flex-shrink:0; font:800 12.5px var(--font-sans, sans-serif); font-variant-numeric:tabular-nums; white-space:nowrap;
+            {% if m.movement_type == 'in' %}color:#0E6E4A;{% elif m.movement_type == 'out' %}color:#DC2626;{% else %}color:#6B7280;{% endif %}">
+            {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m
+          </span>
+          {% endif %}
+          <span style="flex-shrink:0; font:500 11px var(--font-sans, sans-serif); color:#A0A8B0; white-space:nowrap;">{{ m.created_at|date:"d M · H:i" }}</span>
+        </a>
+        {% endfor %}
+      </section>
+      {% endif %}
     </div>
 
     {# ============== RIGHT ============== #}

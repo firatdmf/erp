@@ -146,6 +146,7 @@
   .mv-pill.in { background: #D1FAE5; color: #065F46; }
   .mv-pill.out { background: #FEE2E2; color: #B91C1C; }
   .mv-pill.adjustment { background: #FEF3C7; color: #8B5A00; }
+  .mv-pill.order { background: #DBEAFE; color: #1D4ED8; }
 
   .prod-cell { min-width: 0; }
   .prod-name {
@@ -166,7 +167,10 @@
     padding: 1px 7px; border-radius: 4px;
     background: #F1F5F9; color: var(--gray-600);
     font: 600 10.5px var(--font-mono);
+    text-decoration: none;
   }
+  .reason-cell a.ref { background: #DBEAFE; color: #1D4ED8; }
+  .reason-cell a.ref:hover { background: #BFDBFE; }
   .reason-cell .roll-tag {
     display: inline-block; margin-left: 6px;
     padding: 1px 7px; border-radius: 999px;
@@ -390,8 +394,8 @@
       <div class="mv-stat-value out">{{ out_total|default:0|floatformat:2 }}<span class="unit">m</span></div>
     </div>
     <div class="mv-stat">
-      <div class="mv-stat-label"><i class="fa fa-balance-scale"></i>{% trans "Net" %}</div>
-      <div class="mv-stat-value">{{ net|default:0|floatformat:2 }}<span class="unit">m</span></div>
+      <div class="mv-stat-label"><i class="fa fa-cart-shopping" style="color:#1D4ED8;"></i>{% trans "Orders" %}</div>
+      <div class="mv-stat-value" style="color:#1D4ED8;">{{ order_count|default:0 }}</div>
     </div>
   </div>
 
@@ -406,12 +410,13 @@
       <input type="date" name="to" value="{{ filters.to }}">
     </div>
     <div class="fld">
-      <label>{% trans "Type" %}</label>
-      <select name="type">
+      <label>{% trans "Category" %}</label>
+      <select name="kind">
         <option value="">{% trans "All" %}</option>
-        <option value="in" {% if filters.type == 'in' %}selected{% endif %}>{% trans "IN" %}</option>
-        <option value="out" {% if filters.type == 'out' %}selected{% endif %}>{% trans "OUT" %}</option>
-        <option value="adjustment" {% if filters.type == 'adjustment' %}selected{% endif %}>{% trans "Adjustment" %}</option>
+        <option value="order" {% if filters.kind == 'order' %}selected{% endif %}>{% trans "Orders" %}</option>
+        <option value="in" {% if filters.kind == 'in' %}selected{% endif %}>{% trans "Product intake" %}</option>
+        <option value="out" {% if filters.kind == 'out' %}selected{% endif %}>{% trans "Stock out" %}</option>
+        <option value="adjustment" {% if filters.kind == 'adjustment' %}selected{% endif %}>{% trans "Adjustment" %}</option>
       </select>
     </div>
     <div class="fld">
@@ -454,7 +459,7 @@
       <thead>
         <tr>
           <th style="width: 100px;">{% trans "When" %}</th>
-          <th style="width: 90px;">{% trans "Type" %}</th>
+          <th style="width: 110px;">{% trans "Category" %}</th>
           <th>{% trans "Product" %}</th>
           <th>{% trans "Reason / reference" %}</th>
           <th style="width: 110px; text-align: right;">{% trans "Qty" %}</th>
@@ -469,10 +474,11 @@
             <small>{{ m.created_at|date:"H:i:s" }}</small>
           </td>
           <td>
-            <span class="mv-pill {{ m.movement_type }}">
-              {% if m.movement_type == 'in' %}<i class="fa fa-arrow-down"></i>IN
-              {% elif m.movement_type == 'out' %}<i class="fa fa-arrow-up"></i>OUT
-              {% else %}<i class="fa fa-pen"></i>ADJ{% endif %}
+            <span class="mv-pill {{ m.kind }}">
+              {% if m.kind == 'order' %}<i class="fa fa-cart-shopping"></i>{% trans "Order" %}
+              {% elif m.kind == 'in' %}<i class="fa fa-arrow-down"></i>{% trans "IN" %}
+              {% elif m.kind == 'out' %}<i class="fa fa-arrow-up"></i>{% trans "OUT" %}
+              {% else %}<i class="fa fa-pen"></i>{% trans "ADJ" %}{% endif %}
             </span>
           </td>
           <td class="prod-cell">
@@ -482,12 +488,20 @@
             {% if m.product.sku %}<span class="prod-sku">{{ m.product.sku }}</span>{% endif %}
           </td>
           <td class="reason-cell">
-            {{ m.reason|default:"—" }}
-            {% if m.roll %}<span class="roll-tag">roll #{{ m.roll.pk }}{% if m.roll.barcode %} · {{ m.roll.barcode }}{% endif %}</span>{% endif %}
-            {% if m.reference %}<span class="ref">{{ m.reference }}</span>{% endif %}
+            {{ m.reason_display|default:"—" }}
+            {% if m.roll %}<span class="roll-tag">top #{{ m.roll.pk }}{% if m.roll.barcode %} · {{ m.roll.barcode }}{% endif %}</span>{% endif %}
+            {% if m.reference %}
+              {% if m.order_pk %}
+                <a class="ref" href="{% url 'operating:order_detail' m.order_pk %}" title="{% trans 'Open order' %}">
+                  <i class="fa fa-up-right-from-square" style="font-size:9px;"></i> {{ m.reference }}
+                </a>
+              {% else %}
+                <span class="ref">{{ m.reference }}</span>
+              {% endif %}
+            {% endif %}
           </td>
           <td class="qty {{ m.movement_type }}">
-            {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m
+            {% if m.quantity == 0 %}—{% else %}{% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m{% endif %}
           </td>
           <td class="user-cell">
             {% if m.created_by %}{{ m.created_by.username }}{% else %}<span style="color:#C5CCD3;">{% trans "system" %}</span>{% endif %}

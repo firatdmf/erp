@@ -1122,9 +1122,12 @@
       <button type="button" class="ord-btn" style="background:linear-gradient(180deg,#C9A75A,#A9852F);color:#fff;border:1px solid #8A6B22;box-shadow:0 1px 2px rgba(15,23,31,0.10),inset 0 1px 0 rgba(255,255,255,0.18);" onclick="openNewProduct()">
         <i class="fa fa-plus"></i>{% trans "New product" %}
       </button>
+      {% comment %}Scan roll button hidden for now. Scanner modal, JS and endpoint stay in place; re-enable by uncommenting.{% endcomment %}
+      {% if False %}
       <button type="button" class="ord-btn primary" onclick="openRollScanner()">
         <i class="fa fa-camera"></i>{% trans "Scan roll" %}
       </button>
+      {% endif %}
       <button type="button" class="ord-btn" style="background:#E9F5F3;color:#0F766E;border:1px solid rgba(20,127,116,0.28);" onclick="openBarcodeLookup()">
         <i class="fa fa-barcode"></i>{% trans "Find by barcode" %}
       </button>
@@ -1191,8 +1194,7 @@
             </button>
           </div>
 
-          {# Sort is driven by the quick-filter chips below; this hidden
-             field holds the active key for the HTMX request. #}
+          {% comment %}Sort is driven by the quick-filter chips below; this hidden field holds the active key for the HTMX request.{% endcomment %}
           <input type="hidden" id="whSortInput" name="sort" value="{{ sort|default:'name_asc' }}">
         </div>
 

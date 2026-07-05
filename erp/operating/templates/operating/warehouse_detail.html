@@ -1537,7 +1537,7 @@
   <div class="mg-card" role="dialog" aria-label="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Tekrarları birleştir{% else %}Merge duplicates{% endif %}">
     <div class="mg-head">
       <h3><i class="fa fa-object-group"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tekrarları birleştir{% else %}Merge duplicates{% endif %}</h3>
-      <button type="button" class="mg-x" onclick="closeMerge()" aria-label="Close">&times;</button>
+      <button type="button" class="mg-x" onclick="closeMerge()" aria-label="{% trans 'Close' %}">&times;</button>
     </div>
     <div class="mg-body">
       <p class="mg-intro">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Aşağıdaki aynı SKU'lu kayıtlar tek üründe birleştirilecek. Toplar ve hareketler korunur. Onaylıyor musun?{% else %}The same-SKU records below will be merged into one. Tops and movements are preserved. Confirm?{% endif %}</p>
@@ -2026,7 +2026,7 @@
     }).then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.success) { window.location.reload(); }
-        else { alert((d && d.error) || 'Merge failed'); btn.disabled = false; btn.innerHTML = orig; }
+        else { alert((d && d.error) || '{% trans "Merge failed" %}'); btn.disabled = false; btn.innerHTML = orig; }
       }).catch(function () { alert(_mgTR ? 'Ağ hatası' : 'Network error'); btn.disabled = false; btn.innerHTML = orig; });
   };
 })();
@@ -2455,7 +2455,7 @@
   function startRollCamera() {
     const video = document.getElementById('rsVideo');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert('Camera API not supported in this browser.');
+      alert('{% trans "Camera not supported in this browser." %}');
       return;
     }
     getRearCameraStream().then(function (stream) {
@@ -2475,7 +2475,7 @@
         if (video.readyState >= 2) _bcStart();
       } catch (_) {}
     }).catch(function (err) {
-      alert('Camera access denied or unavailable: ' + err.message);
+      alert('{% trans "Camera access denied or unavailable:" %} ' + err.message);
     });
   }
   function stopRollCamera() {
@@ -2764,7 +2764,7 @@
           if (mySeq !== rsCaptureSeq) return;   // a newer capture superseded this — drop stale result
           if (!data.success) {
             finish();
-            alert(data.error || 'OCR failed');
+            alert(data.error || '{% trans "OCR failed" %}');
             return;
           }
           // Wait for the captured-frame barcode decode (usually already done,
@@ -2779,7 +2779,7 @@
         .catch(function () {
           if (mySeq !== rsCaptureSeq) return;
           finish();
-          alert('Network error');
+          alert('{% trans "Network error" %}');
         });
     }, 'image/jpeg', 0.88);   // higher quality keeps the İ dot crisp
   }
@@ -2905,7 +2905,7 @@
     const price = (document.getElementById('rsPrice')?.value || '').trim();
     const currency = (document.getElementById('rsCurrency')?.value || '').trim() || 'TRY';
     if (!meters || parseFloat(meters) <= 0) {
-      alert('Please enter a positive meters value');
+      alert('{% trans "Please enter a positive meters value" %}');
       saveBtn.disabled = false;
       saveBtn.innerHTML = origLabel;
       return;
@@ -2916,7 +2916,7 @@
     const now = Date.now();
     const dupKey = (sku || '') + '|' + (barcode || '');
     if (barcode && dupKey === rsLastSku && (now - rsLastSkuAt) < 3000) {
-      if (!confirm('Same SKU + barcode was just added — proceed anyway?')) {
+      if (!confirm('{% trans "Same SKU + barcode was just added — proceed anyway?" %}')) {
         saveBtn.disabled = false;
         saveBtn.innerHTML = origLabel;
         return;
@@ -2951,7 +2951,7 @@
         saveBtn.disabled = false;
         saveBtn.innerHTML = origLabel;
         if (!data.success) {
-          alert(data.error || 'Save failed');
+          alert(data.error || '{% trans "Save failed" %}');
           return;
         }
         rsLastSku = dupKey;  // composite SKU+barcode key
@@ -2968,7 +2968,7 @@
       .catch(function () {
         saveBtn.disabled = false;
         saveBtn.innerHTML = origLabel;
-        alert('Network error');
+        alert('{% trans "Network error" %}');
       });
   }
 
@@ -3055,7 +3055,7 @@
     fetch(rsProdEditUrl(it.productId), { method: 'POST', body: pfd, headers: hdr, credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (pd) {
-        if (!pd || !pd.success) throw new Error((pd && pd.error) || 'Product update failed');
+        if (!pd || !pd.success) throw new Error((pd && pd.error) || '{% trans "Product update failed" %}');
         if (pd.catalog_warning) alert('{% trans "Catalog note" %}:\n' + pd.catalog_warning);
         var rfd = new FormData();
         rfd.append('csrfmiddlewaretoken', csrftoken);
@@ -3063,7 +3063,7 @@
         return fetch(rsRollEditUrl(it.productId, it.rollId), { method: 'POST', body: rfd, headers: hdr, credentials: 'same-origin' }).then(function (r) { return r.json(); });
       })
       .then(function (rd) {
-        if (rd && !rd.success) throw new Error(rd.error || 'Roll update failed');
+        if (rd && !rd.success) throw new Error(rd.error || '{% trans "Roll update failed" %}');
         it.name = name; it.sku = sku; it.productBarcode = pbc;
         it.rollBarcode = (rd && rd.roll && rd.roll.barcode !== undefined) ? (rd.roll.barcode || '') : rbc;
         it.meters = (rd && rd.roll && rd.roll.meters !== undefined) ? rd.roll.meters : meters;
@@ -3073,7 +3073,7 @@
         btn.disabled = false; btn.innerHTML = orig;
         closeRsEdit();
       })
-      .catch(function (e) { btn.disabled = false; btn.innerHTML = orig; alert(e.message || 'Error'); });
+      .catch(function (e) { btn.disabled = false; btn.innerHTML = orig; alert(e.message || '{% trans "Error" %}'); });
   }
   // Main-product autocomplete inside the recent-item edit modal.
   let _rseMainTimer = null;
@@ -3275,14 +3275,14 @@
   }
   function startLookupCamera() {
     var video = document.getElementById('blVideo');
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Camera not supported'); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('{% trans "Camera not supported" %}'); return; }
     // Use the MAIN rear camera (shared picker — avoids ultra-wide).
     getRearCameraStream().then(function (stream) {
       blStream = stream; video.srcObject = stream;
       try { var t = stream.getVideoTracks()[0]; if (t && t.applyConstraints) t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) {}
       blRunning = true; blLastCode = '';
       loadZxw().then(function () { blLoop(video); }).catch(function () {});
-    }).catch(function (err) { alert('Camera: ' + (err && err.message || err)); });
+    }).catch(function (err) { alert('{% trans "Camera:" %} ' + (err && err.message || err)); });
   }
   function blLoop(video) {
     if (!blRunning) return;

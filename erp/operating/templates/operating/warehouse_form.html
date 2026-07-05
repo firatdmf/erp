@@ -182,8 +182,8 @@
 
 <div class="wh-form-page">
   <div class="wh-form-card">
-    <h1>{% if warehouse %}Edit Warehouse{% else %}Add Warehouse{% endif %}</h1>
-    <p>{% if warehouse %}Update warehouse details and accounting link.{% else %}Define a new storage location for your inventory.{% endif %}</p>
+    <h1>{% if warehouse %}{% trans "Edit Warehouse" %}{% else %}{% trans "Add Warehouse" %}{% endif %}</h1>
+    <p>{% if warehouse %}{% trans "Update warehouse details and accounting link." %}{% else %}{% trans "Define a new storage location for your inventory." %}{% endif %}</p>
 
     {% if messages %}
       {% for m in messages %}
@@ -194,32 +194,32 @@
     <form method="post">
       {% csrf_token %}
       <div class="wh-form-field">
-        <label>Name <span style="color:#ef4444;">*</span></label>
-        <input type="text" name="name" required autofocus placeholder="Main Warehouse, Branch A..." value="{{ warehouse.name|default:'' }}">
+        <label>{% trans "Name" %} <span style="color:#ef4444;">*</span></label>
+        <input type="text" name="name" required autofocus placeholder="{% trans 'Main Warehouse, Branch A...' %}" value="{{ warehouse.name|default:'' }}">
       </div>
       <div class="wh-form-field">
         <label>{% trans "Location" %}</label>
-        <input type="text" name="location" placeholder="Istanbul, Turkey" value="{{ warehouse.location|default:'' }}">
+        <input type="text" name="location" placeholder="{% trans 'Istanbul, Turkey' %}" value="{{ warehouse.location|default:'' }}">
       </div>
       <div class="wh-form-field">
-        <label>Accounting Book <span style="color:#94a3b8; font-weight:500;">(optional)</span></label>
+        <label>{% trans "Accounting book" %} <span style="color:#94a3b8; font-weight:500;">({% trans "optional" %})</span></label>
         <select name="accounting_book">
-          <option value="">— No accounting link —</option>
+          <option value="">{% trans "— No accounting link —" %}</option>
           {% for book in books %}
             <option value="{{ book.pk }}" {% if warehouse.accounting_book_id == book.pk %}selected{% endif %}>{{ book.name }}</option>
           {% endfor %}
         </select>
-        <div class="hint">Link this warehouse's net worth to a specific accounting book.</div>
+        <div class="hint">{% trans "Link this warehouse's net worth to a specific accounting book." %}</div>
       </div>
       <div class="wh-form-field">
         <label>{% trans "Description" %}</label>
-        <textarea name="description" rows="3" placeholder="Optional notes about this warehouse">{{ warehouse.description|default:'' }}</textarea>
+        <textarea name="description" rows="3" placeholder="{% trans 'Optional notes about this warehouse' %}">{{ warehouse.description|default:'' }}</textarea>
       </div>
       <div class="wh-form-actions">
-        <a href="{% if warehouse %}{% url 'operating:warehouse_detail' warehouse.pk %}{% else %}{% url 'operating:warehouse_list' %}{% endif %}" class="wh-btn wh-btn-secondary">Cancel</a>
+        <a href="{% if warehouse %}{% url 'operating:warehouse_detail' warehouse.pk %}{% else %}{% url 'operating:warehouse_list' %}{% endif %}" class="wh-btn wh-btn-secondary">{% trans "Cancel" %}</a>
         <button type="submit" class="wh-btn wh-btn-primary">
           <i class="fa fa-check"></i>
-          {% if warehouse %}Save Changes{% else %}Create Warehouse{% endif %}
+          {% if warehouse %}{% trans "Save Changes" %}{% else %}{% trans "Create Warehouse" %}{% endif %}
         </button>
       </div>
     </form>

@@ -772,7 +772,7 @@
           <img src="{% url 'operating:warehouse_product_code' warehouse.pk product.pk %}?kind=qr"
                alt="QR" loading="lazy" title="{% trans 'Scan to open this product' %}" style="width:120px; height:120px;">
           <img src="{% url 'operating:warehouse_product_code' warehouse.pk product.pk %}?kind=barcode"
-               alt="Barcode" loading="lazy" style="height:58px; max-width:180px; object-fit:contain;">
+               alt="{% trans 'Barcode' %}" loading="lazy" style="height:58px; max-width:180px; object-fit:contain;">
         </div>
         <div style="text-align:center; padding-bottom:10px;">
           <a href="{% url 'operating:warehouse_product_label' warehouse.pk product.pk %}" target="_blank" rel="noopener"
@@ -988,9 +988,9 @@
         headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
       }).then(r => r.json()).then(data => {
         btn.disabled = false; btn.innerHTML = orig;
-        if (!data.success) { alert(data.error || 'Delete failed'); return; }
+        if (!data.success) { alert(data.error || '{% trans "Delete failed" %}'); return; }
         closeRD(); window.location.reload();
-      }).catch(() => { btn.disabled = false; btn.innerHTML = orig; alert('Network error'); });
+      }).catch(() => { btn.disabled = false; btn.innerHTML = orig; alert('{% trans "Network error" %}'); });
       return;
     }
     if (!_rdRollId) return;
@@ -1007,14 +1007,14 @@
     }).then(r => r.json()).then(data => {
       btn.disabled = false; btn.innerHTML = orig;
       if (!data.success) {
-        alert(data.error || 'Delete failed');
+        alert(data.error || '{% trans "Delete failed" %}');
         return;
       }
       closeRD();
       window.location.reload();
     }).catch(() => {
       btn.disabled = false; btn.innerHTML = orig;
-      alert('Network error');
+      alert('{% trans "Network error" %}');
     });
   }
   document.addEventListener('keydown', function(e){
@@ -1051,12 +1051,12 @@
       headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
     }).then(r => r.json()).then(data => {
       btn.disabled = false; btn.innerHTML = orig;
-      if (!data.success) { alert(data.error || 'Failed'); return; }
+      if (!data.success) { alert(data.error || '{% trans "Failed" %}'); return; }
       closeRE();
       window.location.reload();
     }).catch(() => {
       btn.disabled = false; btn.innerHTML = orig;
-      alert('Network error');
+      alert('{% trans "Network error" %}');
     });
   }
 
@@ -1082,7 +1082,7 @@
       .then(data => {
         btn.disabled = false; btn.innerHTML = orig;
         if (!data.success) {
-          alert(data.error || 'Failed');
+          alert(data.error || '{% trans "Failed" %}');
           return;
         }
         closeSO();
@@ -1090,7 +1090,7 @@
       })
       .catch(() => {
         btn.disabled = false; btn.innerHTML = orig;
-        alert('Network error');
+        alert('{% trans "Network error" %}');
       });
   }
 </script>
@@ -1242,13 +1242,13 @@
       headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
     }).then(r => r.json()).then(data => {
       btn.disabled = false; btn.innerHTML = orig;
-      if (!data.success) { alert(data.error || 'Failed'); return; }
+      if (!data.success) { alert(data.error || '{% trans "Failed" %}'); return; }
       if (data.catalog_warning) { alert('{% trans "Catalog note" %}:\n' + data.catalog_warning); }
       closePE();
       window.location.reload();
     }).catch(() => {
       btn.disabled = false; btn.innerHTML = orig;
-      alert('Network error');
+      alert('{% trans "Network error" %}');
     });
   }
 
@@ -1267,11 +1267,11 @@
         window.location.href = data.redirect_url || '{% url "operating:warehouse_detail" warehouse.pk %}';
       } else {
         btn.disabled = false; btn.innerHTML = orig;
-        alert(data.error || 'Failed');
+        alert(data.error || '{% trans "Failed" %}');
       }
     }).catch(() => {
       btn.disabled = false; btn.innerHTML = orig;
-      alert('Network error');
+      alert('{% trans "Network error" %}');
     });
   }
 </script>

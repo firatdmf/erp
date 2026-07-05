@@ -409,9 +409,9 @@
       <label>{% trans "Type" %}</label>
       <select name="type">
         <option value="">{% trans "All" %}</option>
-        <option value="in" {% if filters.type == 'in' %}selected{% endif %}>IN</option>
-        <option value="out" {% if filters.type == 'out' %}selected{% endif %}>OUT</option>
-        <option value="adjustment" {% if filters.type == 'adjustment' %}selected{% endif %}>ADJUSTMENT</option>
+        <option value="in" {% if filters.type == 'in' %}selected{% endif %}>{% trans "IN" %}</option>
+        <option value="out" {% if filters.type == 'out' %}selected{% endif %}>{% trans "OUT" %}</option>
+        <option value="adjustment" {% if filters.type == 'adjustment' %}selected{% endif %}>{% trans "Adjustment" %}</option>
       </select>
     </div>
     <div class="fld">
@@ -435,7 +435,7 @@
     </div>
     <div class="fld search">
       <label>{% trans "Search reason / reference / SKU / barcode" %}</label>
-      <input type="text" name="q" value="{{ filters.q }}" placeholder="Order #, roll #, reason text...">
+      <input type="text" name="q" value="{{ filters.q }}" placeholder="{% trans 'Order #, roll #, reason text...' %}">
     </div>
     <div class="actions">
       <a href="{% url 'operating:warehouse_movements' warehouse.pk %}" class="ord-btn ghost">
@@ -490,7 +490,7 @@
             {% if m.movement_type == 'in' %}+{% elif m.movement_type == 'out' %}-{% else %}±{% endif %}{{ m.quantity|floatformat:2 }} m
           </td>
           <td class="user-cell">
-            {% if m.created_by %}{{ m.created_by.username }}{% else %}<span style="color:#C5CCD3;">system</span>{% endif %}
+            {% if m.created_by %}{{ m.created_by.username }}{% else %}<span style="color:#C5CCD3;">{% trans "system" %}</span>{% endif %}
           </td>
         </tr>
         {% endfor %}

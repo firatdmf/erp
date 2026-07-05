@@ -6091,7 +6091,7 @@ msgid "days"
 msgstr "gün"
 
 msgid "filtered"
-msgstr ""
+msgstr "filtrelenmiş"
 
 msgid "on the account."
 msgstr ""
@@ -6767,3 +6767,690 @@ msgstr "Kaydedilemedi."
 msgid "Network error."
 msgstr "Ağ hatası."
 
+msgid "(manual override — adjustment recorded)"
+msgstr "(manuel geçersiz kılma — düzeltme kaydedildi)"
+
+msgid "(not on label — enter manually)"
+msgstr "(etikette yok — elle girin)"
+
+msgid "(order #, doc id...)"
+msgstr "(sipariş no, belge no...)"
+
+msgid "(per-roll — same product, different bar code)"
+msgstr "(top başına — aynı ürün, farklı barkod)"
+
+msgid "(this roll/top)"
+msgstr "(bu top)"
+
+msgid "ADJ"
+msgstr "DÜZ."
+
+msgid "Accounting book"
+msgstr "Muhasebe defteri"
+
+msgid "Active rolls"
+msgstr "Aktif toplar"
+
+msgid "Add a warehouse"
+msgstr "Depo ekle"
+
+msgid "Add it"
+msgstr "Ekle"
+
+msgid "Added"
+msgstr "Eklendi"
+
+msgid "All products"
+msgstr "Tüm ürünler"
+
+msgid "All variants"
+msgstr "Tüm varyantlar"
+
+msgid "All warehouses"
+msgstr "Tüm depolar"
+
+msgid "Already in this warehouse"
+msgstr "Bu depoda zaten var"
+
+msgid "Also add to catalog (Products)"
+msgstr "Kataloğa da ekle (Ürünler)"
+
+msgid "Amount (meters)"
+msgstr "Miktar (metre)"
+
+msgid "Any (decrement from total)"
+msgstr "Herhangi (toplamdan düş)"
+
+msgid "Apply filters"
+msgstr "Filtreleri uygula"
+
+msgid "Are you sure you want to delete"
+msgstr "Silmek istediğinize emin misiniz"
+
+msgid "Back to warehouses"
+msgstr "Depolara dön"
+
+msgid "Capture"
+msgstr "Yakala"
+
+msgid "Capture a label to start"
+msgstr "Başlamak için bir etiket yakalayın"
+
+msgid "Catalog note"
+msgstr "Katalog notu"
+
+msgid "Catalog — main product"
+msgstr "Katalog — ana ürün"
+
+msgid "Center the label here"
+msgstr "Etiketi buraya ortalayın"
+
+msgid "Click \"Sync Products\" to load from an Excel file, or scan a roll."
+msgstr ""
+"Excel dosyasından yüklemek için \"Ürünleri Senkronize Et\"e tıklayın veya "
+"bir top okutun."
+
+msgid "Confirm & save"
+msgstr "Onayla ve kaydet"
+
+msgid "Consumed"
+msgstr "Tükendi"
+
+msgid "Create your first warehouse to start tracking inventory"
+msgstr "Envanteri takip etmeye başlamak için ilk deponuzu oluşturun"
+
+msgid "Created:"
+msgstr "Oluşturuldu:"
+
+msgid "Current stock"
+msgstr "Mevcut stok"
+
+msgid "Currently"
+msgstr "Şu anda"
+
+msgid "Damaged, lost, returned to supplier…"
+msgstr "Hasarlı, kayıp, tedarikçiye iade…"
+
+msgid "Delete Warehouse"
+msgstr "Depoyu Sil"
+
+msgid "Delete product"
+msgstr "Ürünü sil"
+
+msgid "Delete product?"
+msgstr "Ürün silinsin mi?"
+
+msgid "Delete roll"
+msgstr "Topu sil"
+
+msgid "Delete this roll"
+msgstr "Bu topu sil"
+
+msgid "Delete this warehouse?"
+msgstr "Bu depo silinsin mi?"
+
+msgid "Delete warehouse"
+msgstr "Depoyu sil"
+
+msgid "Detected headers:"
+msgstr "Algılanan başlıklar:"
+
+msgid "Drag & drop Excel file here, or click to browse"
+msgstr ""
+"Excel dosyasını buraya sürükleyip bırakın veya göz atmak için tıklayın"
+
+msgid "Each top has its own barcode"
+msgstr "Her topun kendi barkodu vardır"
+
+msgid "Edit added item"
+msgstr "Eklenen kalemi düzenle"
+
+msgid "Edit product"
+msgstr "Ürünü düzenle"
+
+msgid "Edit roll"
+msgstr "Topu düzenle"
+
+msgid "Edit this roll"
+msgstr "Bu topu düzenle"
+
+msgid "Find by barcode"
+msgstr "Barkodla bul"
+
+msgid "Flashlight"
+msgstr "Fener"
+
+msgid "From roll (optional)"
+msgstr "Toptan (isteğe bağlı)"
+
+msgid "Full details"
+msgstr "Tüm detaylar"
+
+msgid "Group by main product"
+msgstr "Ana ürüne göre grupla"
+
+msgid "Grouped"
+msgstr "Gruplu"
+
+msgid "IN"
+msgstr "GİRİŞ"
+
+msgid "Import complete"
+msgstr "İçe aktarma tamamlandı"
+
+msgid "Import did not complete cleanly"
+msgstr "İçe aktarma sorunsuz tamamlanmadı"
+
+msgid "Import failed"
+msgstr "İçe aktarma başarısız"
+
+msgid "Import products"
+msgstr "Ürünleri içe aktar"
+
+msgid "Importing"
+msgstr "İçe aktarılıyor"
+
+msgid "Importing..."
+msgstr "İçe aktarılıyor..."
+
+msgid "Inventory ledger"
+msgstr "Envanter defteri"
+
+msgid "Istanbul, Turkey"
+msgstr "İstanbul, Türkiye"
+
+msgid "Last updated"
+msgstr "Son güncelleme"
+
+msgid "Length"
+msgstr "Uzunluk"
+
+msgid "Linked product"
+msgstr "Bağlı ürün"
+
+msgid "List every variant"
+msgstr "Her varyantı listele"
+
+msgid "Looking up"
+msgstr "Aranıyor"
+
+msgid "Lot No"
+msgstr "Parti No"
+
+msgid "Lot number (optional)"
+msgstr "Parti numarası (isteğe bağlı)"
+
+msgid "Main product (catalog)"
+msgstr "Ana ürün (katalog)"
+
+msgid "Main products"
+msgstr "Ana ürünler"
+
+msgid "Main products (packages)"
+msgstr "Ana ürünler (paketler)"
+
+msgid "Main warehouse, Branch A…"
+msgstr "Ana depo, Şube A…"
+
+msgid "Max qty (m)"
+msgstr "Maks miktar (m)"
+
+msgid "Meters"
+msgstr "Metre"
+
+msgid "Meters (m)"
+msgstr "Metre (m)"
+
+msgid "Min qty (m)"
+msgstr "Min miktar (m)"
+
+msgid "Model"
+msgstr "Model"
+
+msgid "Most expensive"
+msgstr "En pahalı"
+
+msgid "Most valuable (TRY)"
+msgstr "En değerli (TRY)"
+
+msgid "Most valuable (USD)"
+msgstr "En değerli (USD)"
+
+msgid "Net worth"
+msgstr "Net değer"
+
+msgid "Net worth (TRY)"
+msgstr "Net değer (TRY)"
+
+msgid "Net worth (USD)"
+msgstr "Net değer (USD)"
+
+msgid "Network error"
+msgstr "Ağ hatası"
+
+msgid "No location"
+msgstr "Konum yok"
+
+msgid "No rolls scanned for this product yet."
+msgstr "Bu ürün için henüz top okutulmadı."
+
+msgid "No rolls yet."
+msgstr "Henüz top yok."
+
+msgid "No stock movements match your filters."
+msgstr "Filtrelerinize uyan stok hareketi yok."
+
+msgid "No stock movements recorded yet."
+msgstr "Henüz stok hareketi kaydedilmedi."
+
+msgid "No variants in this warehouse"
+msgstr "Bu depoda varyant yok"
+
+msgid "No variants."
+msgstr "Varyant yok."
+
+msgid "Not in this warehouse"
+msgstr "Bu depoda değil"
+
+msgid "Not set"
+msgstr "Ayarlanmadı"
+
+msgid "OUT"
+msgstr "ÇIKIŞ"
+
+msgid "Open / edit"
+msgstr "Aç / düzenle"
+
+msgid "Open linked product"
+msgstr "Bağlı ürünü aç"
+
+msgid "Optional notes about this warehouse"
+msgstr "Bu depo hakkında isteğe bağlı notlar"
+
+msgid "Partial"
+msgstr "Kısmi"
+
+msgid "Point the barcode at the frame"
+msgstr "Barkodu çerçeveye getirin"
+
+msgid "Preparing..."
+msgstr "Hazırlanıyor..."
+
+msgid "Press space to capture"
+msgstr "Yakalamak için boşluğa basın"
+
+msgid "Prev"
+msgstr "Geri"
+
+msgid "Print label"
+msgstr "Etiket yazdır"
+
+msgid "Print label (PDF)"
+msgstr "Etiket yazdır (PDF)"
+
+msgid "Product barcode"
+msgstr "Ürün barkodu"
+
+msgid "Product info"
+msgstr "Ürün bilgisi"
+
+msgid "Product name"
+msgstr "Ürün adı"
+
+msgid "Quantity (m)"
+msgstr "Miktar (m)"
+
+msgid "Quick stats"
+msgstr "Hızlı istatistikler"
+
+msgid "Raw OCR text"
+msgstr "Ham OCR metni"
+
+msgid "Reading file..."
+msgstr "Dosya okunuyor..."
+
+msgid "Reading label…"
+msgstr "Etiket okunuyor…"
+
+msgid "Reason / reference"
+msgstr "Sebep / referans"
+
+msgid "Record stock out"
+msgstr "Stok çıkışı kaydet"
+
+msgid "Roll"
+msgstr "Top"
+
+msgid "Roll scanner"
+msgstr "Top tarayıcı"
+
+msgid "Rolls (tops)"
+msgstr "Toplar"
+
+msgid "Same variant — details auto-filled from the first scan"
+msgstr "Aynı varyant — detaylar ilk taramadan otomatik dolduruldu"
+
+msgid "Save & next"
+msgstr "Kaydet ve ileri"
+
+msgid "Saved to warehouse, but catalog sync warning"
+msgstr "Depoya kaydedildi, ancak katalog senkronizasyon uyarısı"
+
+msgid "Scan a roll to add one."
+msgstr "Eklemek için bir top okutun."
+
+msgid "Scan again"
+msgstr "Tekrar okut"
+
+msgid "Scan roll"
+msgstr "Top okut"
+
+msgid "Scan to open this product"
+msgstr "Bu ürünü açmak için okut"
+
+msgid "Scanned"
+msgstr "Okutuldu"
+
+msgid "Scanned or typed barcode"
+msgstr "Okutulan veya yazılan barkod"
+
+msgid "Search by name, SKU, barcode…"
+msgstr "Ad, SKU, barkod ile ara…"
+
+msgid "Search or type a main product (e.g. MT-3016)"
+msgstr "Bir ana ürün arayın veya yazın (örn. MT-3016)"
+
+msgid "Search reason / reference / SKU / barcode"
+msgstr "Sebep / referans / SKU / barkod ara"
+
+msgid "Search warehouses…"
+msgstr "Depoları ara…"
+
+msgid "Select roll"
+msgstr "Top seç"
+
+msgid "Skipped:"
+msgstr "Atlanan:"
+
+msgid "Sold, used in production, damaged…"
+msgstr "Satıldı, üretimde kullanıldı, hasarlı…"
+
+msgid "Stock in"
+msgstr "Stok girişi"
+
+msgid "Stock in (total)"
+msgstr "Stok girişi (toplam)"
+
+msgid "Stock items"
+msgstr "Stok kalemleri"
+
+msgid "Stock movements"
+msgstr "Stok hareketleri"
+
+msgid "Stock out"
+msgstr "Stok çıkışı"
+
+msgid "Stock out (total)"
+msgstr "Stok çıkışı (toplam)"
+
+msgid "Supports .xlsx · USD/TRY auto-converted"
+msgstr ".xlsx destekler · USD/TRY otomatik dönüştürülür"
+
+msgid "Sync Products"
+msgstr "Ürünleri Senkronize Et"
+
+msgid ""
+"This action cannot be undone. All products in this warehouse will also be "
+"removed."
+msgstr "Bu işlem geri alınamaz. Bu depodaki tüm ürünler de kaldırılacak."
+
+msgid "This barcode has not been added yet."
+msgstr "Bu barkod henüz eklenmemiş."
+
+msgid ""
+"This roll will be permanently removed. A stock-out movement will be recorded"
+" so the timeline reflects the deletion."
+msgstr ""
+"Bu top kalıcı olarak kaldırılacak. Silmenin zaman çizelgesine yansıması için"
+" bir stok çıkışı hareketi kaydedilecek."
+
+msgid "This session"
+msgstr "Bu oturum"
+
+msgid "This top"
+msgstr "Bu top"
+
+msgid "Top (roll) barcode"
+msgstr "Top barkodu"
+
+msgid "Top quantity"
+msgstr "Top miktarı"
+
+msgid "Tops"
+msgstr "Toplar"
+
+msgid "Total (TRY)"
+msgstr "Toplam (TRY)"
+
+msgid "Total (USD)"
+msgstr "Toplam (USD)"
+
+msgid "Total processed:"
+msgstr "Toplam işlenen:"
+
+msgid "Total stock"
+msgstr "Toplam stok"
+
+msgid "Total value (USD)"
+msgstr "Toplam değer (USD)"
+
+msgid "Type to search a main product, or leave blank (auto from SKU)"
+msgstr "Ana ürün aramak için yazın veya boş bırakın (SKU'dan otomatik)"
+
+msgid "Type to search · clear = auto from SKU"
+msgstr "Aramak için yazın · temizle = SKU'dan otomatik"
+
+msgid "USD/TRY rate:"
+msgstr "USD/TRY kuru:"
+
+msgid "Unchanged:"
+msgstr "Değişmeyen:"
+
+msgid "Unit cost"
+msgstr "Birim maliyet"
+
+msgid "Unit cost (USD)"
+msgstr "Birim maliyet (USD)"
+
+msgid "Updated:"
+msgstr "Güncellendi:"
+
+msgid "Upload & Import"
+msgstr "Yükle ve İçe Aktar"
+
+msgid ""
+"Upload an .xlsx file with columns: Name (Adı), Code (Kodu), Quantity "
+"(Miktar), Purchase Price (Alış Fiyatı), Currency."
+msgstr ""
+"Şu sütunları içeren bir .xlsx dosyası yükleyin: Ad, Kod, Miktar, Alış "
+"Fiyatı, Para Birimi."
+
+msgid "Upload error:"
+msgstr "Yükleme hatası:"
+
+msgid "Variant attribute"
+msgstr "Varyant özelliği"
+
+msgid "View & filter all"
+msgstr "Tümünü görüntüle ve filtrele"
+
+msgid "Warehouse info"
+msgstr "Depo bilgisi"
+
+msgid "When"
+msgstr "Tarih"
+
+msgid "created:"
+msgstr "oluşturuldu:"
+
+msgid "e.g. SILVER"
+msgstr "örn. GÜMÜŞ"
+
+msgid "existing"
+msgstr "mevcut"
+
+msgid "filtered from"
+msgstr "şundan filtrelendi"
+
+msgid "main products"
+msgstr "ana ürün"
+
+msgid "new"
+msgstr "yeni"
+
+msgid "of"
+msgstr "/"
+
+msgid "remaining"
+msgstr "kalan"
+
+msgid "rolls"
+msgstr "top"
+
+msgid "rows..."
+msgstr "satır..."
+
+msgid "total"
+msgstr "toplam"
+
+msgid "translated from"
+msgstr "şundan çevrildi"
+
+msgid "unchanged:"
+msgstr "değişmeyen:"
+
+msgid "unlinked"
+msgstr "bağlantısız"
+
+msgid "updated:"
+msgstr "güncellendi:"
+
+msgid "warehouses"
+msgstr "depo"
+
+msgid "— None —"
+msgstr "— Yok —"
+
+msgid ""
+"\"%(name)s\" and all its stock items will be permanently removed. This "
+"action cannot be undone."
+msgstr ""
+"\"%(name)s\" ve tüm stok kalemleri kalıcı olarak kaldırılacak. Bu işlem geri"
+" alınamaz."
+
+msgid ""
+"<b>\"%(name)s\"</b> will be permanently removed from this warehouse, along "
+"with all its rolls (%(rolls_count)s) and stock movements. This cannot be "
+"undone."
+msgstr ""
+"<b>\"%(name)s\"</b> tüm toplarıyla (%(rolls_count)s) ve stok hareketleriyle "
+"birlikte bu depodan kalıcı olarak kaldırılacak. Bu işlem geri alınamaz."
+
+msgid "Showing %(start)s-%(end)s of %(total)s"
+msgstr "%(total)s kayıttan %(start)s-%(end)s gösteriliyor"
+
+msgid ""
+"Showing first %(shown)s of %(total)s variants — use search to narrow down."
+msgstr ""
+"%(total)s varyanttan ilk %(shown)s gösteriliyor — daraltmak için aramayı "
+"kullanın."
+
+msgid "roll"
+msgid_plural "rolls"
+msgstr[0] "top"
+msgstr[1] "top"
+
+msgid "%(counter)s entry"
+msgid_plural "%(counter)s entries"
+msgstr[0] "%(counter)s kayıt"
+msgstr[1] "%(counter)s kayıt"
+
+msgid "variant"
+msgid_plural "variants"
+msgstr[0] "varyant"
+msgstr[1] "varyant"
+
+msgid "Merge failed"
+msgstr "Birleştirme başarısız"
+
+msgid "Camera not supported in this browser."
+msgstr "Kamera bu tarayıcıda desteklenmiyor."
+
+msgid "Camera access denied or unavailable:"
+msgstr "Kamera erişimi reddedildi veya kullanılamıyor:"
+
+msgid "OCR failed"
+msgstr "OCR başarısız"
+
+msgid "Please enter a positive meters value"
+msgstr "Lütfen pozitif bir metre değeri girin"
+
+msgid "Same SKU + barcode was just added — proceed anyway?"
+msgstr "Aynı SKU + barkod az önce eklendi — yine de devam edilsin mi?"
+
+msgid "Save failed"
+msgstr "Kaydetme başarısız"
+
+msgid "Product update failed"
+msgstr "Ürün güncellemesi başarısız"
+
+msgid "Roll update failed"
+msgstr "Top güncellemesi başarısız"
+
+msgid "Camera not supported"
+msgstr "Kamera desteklenmiyor"
+
+msgid "Camera:"
+msgstr "Kamera:"
+
+msgid "Delete failed"
+msgstr "Silme başarısız"
+
+msgid "Failed"
+msgstr "Başarısız"
+
+msgid "Edit Warehouse"
+msgstr "Depoyu Düzenle"
+
+msgid "Add Warehouse"
+msgstr "Depo Ekle"
+
+msgid "Update warehouse details and accounting link."
+msgstr "Depo bilgilerini ve muhasebe bağlantısını güncelleyin."
+
+msgid "Define a new storage location for your inventory."
+msgstr "Envanteriniz için yeni bir depolama konumu tanımlayın."
+
+msgid "Main Warehouse, Branch A..."
+msgstr "Ana Depo, Şube A..."
+
+msgid "optional"
+msgstr "isteğe bağlı"
+
+msgid "— No accounting link —"
+msgstr "— Muhasebe bağlantısı yok —"
+
+msgid "Link this warehouse's net worth to a specific accounting book."
+msgstr "Bu deponun net değerini belirli bir muhasebe defterine bağlayın."
+
+msgid "Create Warehouse"
+msgstr "Depo Oluştur"
+
+msgid "Adjustment"
+msgstr "Düzeltme"
+
+msgid "Order #, roll #, reason text..."
+msgstr "Sipariş no, top no, sebep metni..."
+
+msgid "system"
+msgstr "sistem"

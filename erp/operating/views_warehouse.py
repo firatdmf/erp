@@ -447,10 +447,12 @@ from django.utils.translation import gettext_lazy as _lz
 # The sort options offered on the warehouse product list. Kept simple:
 # alphabetical by name, by top (roll) quantity, and most-recently-updated.
 SORT_OPTIONS = {
-    'name_asc':  ('name', _lz('A → Z')),
-    'name_desc': ('-name', _lz('Z → A')),
-    'qty_desc':  ('-quantity', _lz('Top quantity')),
-    'recent':    ('-updated_at', _lz('Recently updated')),
+    'name_asc':   ('name', _lz('A → Z')),
+    'name_desc':  ('-name', _lz('Z → A')),
+    'qty_desc':   ('-quantity', _lz('Top quantity')),
+    'price_desc': ('-cost_usd', _lz('Most expensive')),
+    'price_asc':  ('cost_usd', _lz('Cheapest')),
+    'recent':     ('-updated_at', _lz('Recently updated')),
 }
 
 
@@ -571,13 +573,20 @@ class WarehouseDetail(View):
                               line_usd=F('quantity') * F('cost_usd'),
                               line_try=F('quantity') * F('cost_try'),
                               reserved=reserved_meters_subquery()))
-            # A → Z by product NAME, top quantity, or recently updated.
+            # A → Z by product NAME, top quantity, unit price, or recent.
             _flat_sort = {
                 "name_asc": "name", "name_desc": "-name",
                 "qty_desc": "-quantity", "qty_asc": "quantity",
                 "recent": "-updated_at",
             }
-            flat = flat.order_by(_flat_sort.get(sort, "name"), "sku", "id")
+            # Price sorts use the normalized USD unit cost with NULLs last
+            # so uncosted products never top the "most expensive" list.
+            if sort == "price_desc":
+                flat = flat.order_by(F("cost_usd").desc(nulls_last=True), "name", "id")
+            elif sort == "price_asc":
+                flat = flat.order_by(F("cost_usd").asc(nulls_last=True), "name", "id")
+            else:
+                flat = flat.order_by(_flat_sort.get(sort, "name"), "sku", "id")
             paginator = Paginator(flat, PAGE_SIZE)
             try:
                 page = paginator.page(int(page_num))
@@ -590,7 +599,7 @@ class WarehouseDetail(View):
             # ── Group in SQL by main product (base name). One row per group →
             #    cheap to paginate even with thousands of variants. Each group
             #    expands to its variants (stock / SKU / rolls=tops/coupons). ──
-            from django.db.models import Max
+            from django.db.models import Max, Avg
             grouped = (base_qs.annotate(base=base_expr).values("base").annotate(
                 variant_count=Count("id"),
                 linked=Count("catalog_variant"),
@@ -601,13 +610,20 @@ class WarehouseDetail(View):
                 total_try=Coalesce(Sum(F("quantity") * F("cost_try")), Decimal("0"),
                                    output_field=DecimalField(max_digits=20, decimal_places=4)),
                 updated=Max("updated_at"),
+                avg_cost=Avg("cost_usd"),
             ))
             _sort_map = {
                 "name_asc": "base", "name_desc": "-base",
                 "qty_desc": "-total_qty", "qty_asc": "total_qty",
                 "recent": "-updated",
             }
-            grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
+            # Price sorts by the group's average USD unit cost, NULLs last.
+            if sort == "price_desc":
+                grouped = grouped.order_by(F("avg_cost").desc(nulls_last=True), "base")
+            elif sort == "price_asc":
+                grouped = grouped.order_by(F("avg_cost").asc(nulls_last=True), "base")
+            else:
+                grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
 
             # Paginate the GROUPS (main products), not the variant rows.
             paginator = Paginator(grouped, PAGE_SIZE)

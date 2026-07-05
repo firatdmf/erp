@@ -1191,13 +1191,9 @@
             </button>
           </div>
 
-          <div class="od-sort">
-            <select id="whSortInput" name="sort" onchange="onWhSortChange()">
-              {% for key, label in sort_options %}
-                <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
+          {# Sort is driven by the quick-filter chips below; this hidden
+             field holds the active key for the HTMX request. #}
+          <input type="hidden" id="whSortInput" name="sort" value="{{ sort|default:'name_asc' }}">
         </div>
 
         <!-- Quick filter chips (HTMX live) -->
@@ -1210,6 +1206,12 @@
           </button>
           <button type="button" class="od-fchip {% if sort == 'qty_desc' %}active{% endif %}" data-sort="qty_desc" onclick="setWhSort('qty_desc')">
             <i class="fa fa-cubes"></i>{% trans "Top quantity" %}
+          </button>
+          <button type="button" class="od-fchip {% if sort == 'price_desc' %}active{% endif %}" data-sort="price_desc" onclick="setWhSort('price_desc')">
+            <i class="fa fa-arrow-up-wide-short"></i>{% trans "Most expensive" %}
+          </button>
+          <button type="button" class="od-fchip {% if sort == 'price_asc' %}active{% endif %}" data-sort="price_asc" onclick="setWhSort('price_asc')">
+            <i class="fa fa-arrow-down-wide-short"></i>{% trans "Cheapest" %}
           </button>
           <button type="button" class="od-fchip {% if sort == 'recent' %}active{% endif %}" data-sort="recent" onclick="setWhSort('recent')">
             <i class="fa fa-clock"></i>{% trans "Recently updated" %}

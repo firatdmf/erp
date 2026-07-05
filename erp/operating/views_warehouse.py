@@ -282,8 +282,16 @@ class WarehouseList(View):
         warehouses = Warehouse.objects.annotate(
             n_products=Count('products'),
         ).order_by('name')
+        # "Son Hareketler" preview — the latest activity across every
+        # warehouse, linking to the full filterable feed.
+        recent = _decorate_movements(list(
+            StockMovement.objects
+            .select_related("product", "product__warehouse", "created_by")
+            .order_by("-created_at")[:6]
+        ))
         return render(request, self.template_name, {
             'warehouses': warehouses,
+            'recent_movements': recent,
         })
 
 
@@ -2716,6 +2724,194 @@ class WarehouseProductDetail(View):
         })
 
 
+# ────────────────────────────────────────────────────────────────────
+#  Activity categorization — StockMovement rows carry their origin only
+#  in free-text reason/reference, so the feed derives a "kind" from the
+#  known prefixes each writer uses:
+#    order      → ship/un-ship/edit-reversal cuts (reason "Order …" /
+#                 "Web order …", or an order reference "DK…"/"Order #…")
+#    in         → product intake (roll scan, manual add, import)
+#    out        → manual stock-out
+#    adjustment → roll delete / meters edit / manual override / edits
+# ────────────────────────────────────────────────────────────────────
+# Exact reason prefixes the order-lifecycle writers use. Deliberately
+# NOT a bare "Order"/"DK" prefix match: manual stock-out reasons and
+# roll barcodes are free-text (a "Deka" supplier mints DK-prefixed
+# barcodes, a user may type "Ordered by X"), which would misclassify
+# intake/adjustment rows as orders.
+_ORDER_REASON_PREFIXES = ("Order ship", "Order un-ship", "Order edit")
+# Order numbers are DK + zfill(7) digits (models.generate_order_number).
+_ORDER_REF_RE = r"^DK\d{7,}$"
+
+
+def _order_movement_q():
+    from django.db.models import Q as _Q
+    q = _Q(reference__regex=_ORDER_REF_RE) | _Q(reference__startswith="Order #")
+    for p in _ORDER_REASON_PREFIXES:
+        q |= _Q(reason__startswith=p)
+    return q
+
+
+def _movement_is_order(m):
+    import re as _re
+    r = (m.reason or "")
+    ref = (m.reference or "")
+    return (r.startswith(_ORDER_REASON_PREFIXES)
+            or bool(_re.match(_ORDER_REF_RE, ref))
+            or ref.startswith("Order #"))
+
+
+# English reason prefixes (as stored in the DB) → Turkish display text.
+# Order matters — longest/most-specific prefix first.
+_REASON_TR = [
+    ("Order edit · reversed", "Sipariş düzenleme iadesi"),
+    ("Order un-ship", "Sipariş sevk iptali"),
+    ("Order ship", "Sipariş sevkiyatı"),
+    ("Web order", "Web siparişi"),
+    ("Order", "Sipariş"),
+    ("Roll scanned", "Top okutuldu"),
+    ("Manual add", "Manuel ekleme"),
+    ("Manual stock-out", "Manuel stok çıkışı"),
+    ("Bulk roll delete", "Toplu top silme"),
+    ("Roll deleted", "Top silindi"),
+    ("Roll meters edited", "Top metresi düzenlendi"),
+    ("Manual adjustment", "Manuel düzeltme"),
+    ("Product edited", "Ürün düzenlendi"),
+    ("⚠️ Shortage", "⚠️ Eksik"),
+]
+
+
+def _reason_display(reason):
+    """Best-effort Turkish rendering of a stored English reason string.
+    Unknown reasons pass through unchanged."""
+    if not reason:
+        return reason
+    for en, tr in _REASON_TR:
+        if reason.startswith(en):
+            return tr + reason[len(en):]
+    return reason
+
+
+def _decorate_movements(movements):
+    """Attach .kind / .reason_display / .order_pk to each page row so
+    the templates can render category badges, Turkish reasons and a
+    link to the source order."""
+    from django.utils import translation
+    import re as _re
+    from .models import Order
+    is_tr = (translation.get_language() or "").startswith("tr")
+    refs = {m.reference for m in movements
+            if m.reference and _re.match(_ORDER_REF_RE, m.reference)}
+    order_map = dict(Order.objects.filter(order_number__in=refs)
+                     .values_list("order_number", "pk")) if refs else {}
+    for m in movements:
+        m.kind = "order" if _movement_is_order(m) else m.movement_type
+        m.reason_display = _reason_display(m.reason) if is_tr else m.reason
+        ref = m.reference or ""
+        m.order_pk = order_map.get(ref)
+        if m.order_pk is None and ref.startswith("Order #") and ref[7:].strip().isdigit():
+            m.order_pk = int(ref[7:].strip())
+    return movements
+
+
+@method_decorator(login_required, name='dispatch')
+class WarehouseMovementsAll(View):
+    """GLOBAL activity feed ("Son Hareketler") — every StockMovement
+    across ALL warehouses, filterable by date range, category (order /
+    intake / stock-out / adjustment), warehouse and free text.
+    Query params:
+      kind     : order | in | out | adjustment ('' = all)
+      warehouse: Warehouse.pk ('' = all)
+      from/to  : YYYY-MM-DD inclusive (timezone-aware via __date)
+      q        : free text across reason/reference/product name/sku/roll
+                 barcode (Turkish İ/ı-folded)
+      page     : pagination
+    """
+    template_name = "operating/warehouse_movements_all.html"
+
+    def get(self, request):
+        from django.db.models import Q as _Q, Sum
+        from datetime import datetime as _dt
+        from functools import reduce
+        import operator
+
+        qs = (StockMovement.objects
+              .select_related("product", "product__warehouse", "roll", "created_by"))
+
+        wh_param = (request.GET.get("warehouse") or "").strip()
+        if wh_param.isdigit():
+            qs = qs.filter(product__warehouse_id=int(wh_param))
+
+        date_from = (request.GET.get("from") or "").strip()
+        date_to = (request.GET.get("to") or "").strip()
+        try:
+            if date_from:
+                qs = qs.filter(created_at__date__gte=_dt.strptime(date_from, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+        try:
+            if date_to:
+                qs = qs.filter(created_at__date__lte=_dt.strptime(date_to, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+
+        q = (request.GET.get("q") or "").strip()
+        if q:
+            variants = _tr_ci_variants(q)
+
+            def _fq(field):
+                return reduce(operator.or_,
+                              (_Q(**{f"{field}__icontains": v}) for v in variants))
+            qs = qs.filter(_fq("reason") | _fq("reference") | _fq("product__name")
+                           | _fq("product__sku") | _fq("roll__barcode"))
+
+        # Stats reflect every filter EXCEPT the category, so picking
+        # "Sipariş" doesn't zero the intake/out totals.
+        stats_qs = qs
+        in_total = stats_qs.filter(movement_type="in").aggregate(s=Sum("quantity"))["s"] or 0
+        out_total = stats_qs.filter(movement_type="out").aggregate(s=Sum("quantity"))["s"] or 0
+        order_count = stats_qs.filter(_order_movement_q()).count()
+
+        kind = (request.GET.get("kind") or "").strip()
+        if kind == "order":
+            qs = qs.filter(_order_movement_q())
+        elif kind in ("in", "out", "adjustment"):
+            qs = qs.filter(movement_type=kind).exclude(_order_movement_q())
+
+        qs = qs.order_by("-created_at")
+
+        paginator = Paginator(qs, 50)
+        try:
+            page = paginator.page(request.GET.get("page", 1))
+        except (EmptyPage, PageNotAnInteger, ValueError):
+            page = paginator.page(1)
+
+        movements = _decorate_movements(list(page.object_list))
+
+        qd = request.GET.copy()
+        qd.pop("page", None)
+        filter_qs = qd.urlencode()
+
+        return render(request, self.template_name, {
+            "page_obj": page,
+            "paginator": paginator,
+            "movements": movements,
+            "in_total": in_total,
+            "out_total": out_total,
+            "net": (in_total or 0) - (out_total or 0),
+            "order_count": order_count,
+            "warehouses": list(Warehouse.objects.order_by("name").values("id", "name")),
+            "filter_qs": filter_qs,
+            "filters": {
+                "kind": kind,
+                "warehouse": wh_param,
+                "from": date_from,
+                "to": date_to,
+                "q": q,
+            },
+        })
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseMovements(View):
     """Filterable, paginated stock-movement ledger for a warehouse.
@@ -2743,9 +2939,6 @@ class WarehouseMovements(View):
         )
 
         types_param = (request.GET.get("type") or "").strip()
-        if types_param:
-            wanted = [t.strip() for t in types_param.split(",") if t.strip()]
-            qs = qs.filter(movement_type__in=wanted)
 
         date_from = (request.GET.get("from") or "").strip()
         date_to = (request.GET.get("to") or "").strip()
@@ -2768,13 +2961,16 @@ class WarehouseMovements(View):
 
         q = (request.GET.get("q") or "").strip()
         if q:
-            qs = qs.filter(
-                _Q(reason__icontains=q)
-                | _Q(reference__icontains=q)
-                | _Q(product__name__icontains=q)
-                | _Q(product__sku__icontains=q)
-                | _Q(roll__barcode__icontains=q)
-            )
+            # Turkish İ/ı-aware case folding, same as the product list search.
+            from functools import reduce
+            import operator
+            variants = _tr_ci_variants(q)
+
+            def _fq(field):
+                return reduce(operator.or_,
+                              (_Q(**{f"{field}__icontains": v}) for v in variants))
+            qs = qs.filter(_fq("reason") | _fq("reference") | _fq("product__name")
+                           | _fq("product__sku") | _fq("roll__barcode"))
 
         from decimal import Decimal as _D
         min_qty = (request.GET.get("min_qty") or "").strip().replace(",", ".")
@@ -2790,18 +2986,23 @@ class WarehouseMovements(View):
         except Exception:
             pass
 
-        qs = qs.order_by("-created_at")
-
-        # Quick stats
+        # Quick stats — computed BEFORE the type filter so picking
+        # type=out doesn't zero the "Stock in" card (and vice versa).
         from django.db.models import Sum
         in_total = qs.filter(movement_type="in").aggregate(s=Sum("quantity"))["s"] or 0
         out_total = qs.filter(movement_type="out").aggregate(s=Sum("quantity"))["s"] or 0
         net = (in_total or 0) - (out_total or 0)
 
+        if types_param:
+            wanted = [t.strip() for t in types_param.split(",") if t.strip()]
+            qs = qs.filter(movement_type__in=wanted)
+
+        qs = qs.order_by("-created_at")
+
         paginator = Paginator(qs, 50)
         try:
             page = paginator.page(request.GET.get("page", 1))
-        except (EmptyPage, PageNotAnInteger):
+        except (EmptyPage, PageNotAnInteger, ValueError):
             page = paginator.page(1)
 
         # Product dropdown options
@@ -2876,6 +3077,14 @@ class WarehouseProductEdit(View):
         if purchase_price_raw:
             try:
                 pp = Decimal(purchase_price_raw)
+                # The edit modal always re-posts the prefilled price, so
+                # only record a change when the value/currency actually
+                # differ — else every no-op save spams the activity feed.
+                price_changed = (
+                    product.purchase_price is None
+                    or pp != product.purchase_price
+                    or purchase_currency != (product.purchase_currency or "").upper()
+                )
                 product.purchase_price = pp
                 product.purchase_currency = purchase_currency
                 update_fields.extend(["purchase_price", "purchase_currency"])
@@ -2890,7 +3099,8 @@ class WarehouseProductEdit(View):
                 elif purchase_currency == "EUR":
                     product.cost_usd = pp
                 update_fields.extend(["cost_usd", "cost_try"])
-                changes.append(f"price → {pp} {purchase_currency}")
+                if price_changed:
+                    changes.append(f"price → {pp} {purchase_currency}")
             except (InvalidOperation, TypeError):
                 pass
 
@@ -2918,6 +3128,24 @@ class WarehouseProductEdit(View):
                 pass
 
         product.save(update_fields=list(set(update_fields)))
+
+        # Log non-quantity edits (name/SKU/barcode/model/price) as a
+        # zero-metre adjustment so the activity feed shows every product
+        # change. Quantity overrides already logged their own movement.
+        non_qty_changes = [c for c in changes if not c.startswith("qty ")]
+        if non_qty_changes:
+            try:
+                StockMovement.objects.create(
+                    product=product,
+                    roll=None,
+                    movement_type="adjustment",
+                    quantity=Decimal("0"),
+                    reason=("Product edited: " + "; ".join(non_qty_changes))[:255],
+                    reference="Product edit",
+                    created_by=request.user if request.user.is_authenticated else None,
+                )
+            except Exception:
+                pass  # audit logging must never block the edit itself
 
         # Keep the hidden catalog in sync: if the SKU/name changed (or the
         # user re-pointed the main product), re-link the catalog variant to

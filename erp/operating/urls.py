@@ -11,6 +11,9 @@ urlpatterns = [
     path("", views.index.as_view(), name="index"),
     # Warehouse
     path("warehouses/", views_warehouse.WarehouseList.as_view(), name="warehouse_list"),
+    # Global activity feed ("Son Hareketler") — all warehouses. Must sit
+    # above warehouses/<int:pk>/ patterns (won't collide: int ≠ "movements").
+    path("warehouses/movements/", views_warehouse.WarehouseMovementsAll.as_view(), name="warehouse_movements_all"),
     path("warehouses/create/", views_warehouse.WarehouseCreate.as_view(), name="create_warehouse"),
     path("warehouses/create/partial/", views_warehouse.WarehouseCreatePartial.as_view(), name="create_warehouse_partial"),
     path("warehouses/<int:pk>/", views_warehouse.WarehouseDetail.as_view(), name="warehouse_detail"),

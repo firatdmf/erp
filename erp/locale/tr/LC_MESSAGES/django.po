@@ -7457,3 +7457,12 @@ msgstr "sistem"
 
 msgid "Cheapest"
 msgstr "En ucuz"
+
+msgid "Recent activity"
+msgstr "Son Hareketler"
+
+msgid "Product intake"
+msgstr "Ürün girişi"
+
+msgid "Open order"
+msgstr "Siparişi aç"

@@ -443,18 +443,14 @@ class WarehouseEdit(View):
         return redirect(reverse('operating:warehouse_detail', args=[warehouse.pk]))
 
 
+from django.utils.translation import gettext_lazy as _lz
+# The sort options offered on the warehouse product list. Kept simple:
+# alphabetical by name, by top (roll) quantity, and most-recently-updated.
 SORT_OPTIONS = {
-    'name_asc': ('name', 'Name (A → Z)'),
-    'name_desc': ('-name', 'Name (Z → A)'),
-    'qty_desc': ('-quantity', 'Quantity (high → low)'),
-    'qty_asc': ('quantity', 'Quantity (low → high)'),
-    'price_desc': ('-purchase_price', 'Unit price (high → low)'),
-    'price_asc': ('purchase_price', 'Unit price (low → high)'),
-    'total_usd_desc': ('-_total_usd', 'Total USD (high → low)'),
-    'total_usd_asc': ('_total_usd', 'Total USD (low → high)'),
-    'total_try_desc': ('-_total_try', 'Total TRY (high → low)'),
-    'total_try_asc': ('_total_try', 'Total TRY (low → high)'),
-    'recent': ('-updated_at', 'Recently updated'),
+    'name_asc':  ('name', _lz('A → Z')),
+    'name_desc': ('-name', _lz('Z → A')),
+    'qty_desc':  ('-quantity', _lz('Top quantity')),
+    'recent':    ('-updated_at', _lz('Recently updated')),
 }
 
 
@@ -575,16 +571,13 @@ class WarehouseDetail(View):
                               line_usd=F('quantity') * F('cost_usd'),
                               line_try=F('quantity') * F('cost_try'),
                               reserved=reserved_meters_subquery()))
-            # Variant list sorts by SKU first, then name (per request).
+            # A → Z by product NAME, top quantity, or recently updated.
             _flat_sort = {
-                "name_asc": "sku", "name_desc": "-sku",
-                "qty_asc": "quantity", "qty_desc": "-quantity",
-                "price_asc": "cost_usd", "price_desc": "-cost_usd",
-                "total_usd_asc": "line_usd", "total_usd_desc": "-line_usd",
-                "total_try_asc": "line_try", "total_try_desc": "-line_try",
+                "name_asc": "name", "name_desc": "-name",
+                "qty_desc": "-quantity", "qty_asc": "quantity",
                 "recent": "-updated_at",
             }
-            flat = flat.order_by(_flat_sort.get(sort, "sku"), "name", "id")
+            flat = flat.order_by(_flat_sort.get(sort, "name"), "sku", "id")
             paginator = Paginator(flat, PAGE_SIZE)
             try:
                 page = paginator.page(int(page_num))
@@ -597,6 +590,7 @@ class WarehouseDetail(View):
             # ── Group in SQL by main product (base name). One row per group →
             #    cheap to paginate even with thousands of variants. Each group
             #    expands to its variants (stock / SKU / rolls=tops/coupons). ──
+            from django.db.models import Max
             grouped = (base_qs.annotate(base=base_expr).values("base").annotate(
                 variant_count=Count("id"),
                 linked=Count("catalog_variant"),
@@ -606,13 +600,12 @@ class WarehouseDetail(View):
                                    output_field=DecimalField(max_digits=20, decimal_places=4)),
                 total_try=Coalesce(Sum(F("quantity") * F("cost_try")), Decimal("0"),
                                    output_field=DecimalField(max_digits=20, decimal_places=4)),
+                updated=Max("updated_at"),
             ))
             _sort_map = {
                 "name_asc": "base", "name_desc": "-base",
-                "qty_asc": "total_qty", "qty_desc": "-total_qty",
-                "price_asc": "total_usd", "price_desc": "-total_usd",
-                "total_usd_asc": "total_usd", "total_usd_desc": "-total_usd",
-                "total_try_asc": "total_try", "total_try_desc": "-total_try",
+                "qty_desc": "-total_qty", "qty_asc": "total_qty",
+                "recent": "-updated",
             }
             grouped = grouped.order_by(_sort_map.get(sort, "base"), "base")
 

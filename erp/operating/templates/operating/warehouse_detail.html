@@ -1202,17 +1202,14 @@
 
         <!-- Quick filter chips (HTMX live) -->
         <div class="od-chip-row" id="whChips">
+          <button type="button" class="od-fchip {% if sort == 'name_asc' %}active{% endif %}" data-sort="name_asc" onclick="setWhSort('name_asc')">
+            <i class="fa fa-arrow-down-a-z"></i>A → Z
+          </button>
+          <button type="button" class="od-fchip {% if sort == 'name_desc' %}active{% endif %}" data-sort="name_desc" onclick="setWhSort('name_desc')">
+            <i class="fa fa-arrow-down-z-a"></i>Z → A
+          </button>
           <button type="button" class="od-fchip {% if sort == 'qty_desc' %}active{% endif %}" data-sort="qty_desc" onclick="setWhSort('qty_desc')">
             <i class="fa fa-cubes"></i>{% trans "Top quantity" %}
-          </button>
-          <button type="button" class="od-fchip {% if sort == 'total_usd_desc' %}active{% endif %}" data-sort="total_usd_desc" onclick="setWhSort('total_usd_desc')">
-            <i class="fa fa-dollar-sign"></i>{% trans "Most valuable (USD)" %}
-          </button>
-          <button type="button" class="od-fchip {% if sort == 'total_try_desc' %}active{% endif %}" data-sort="total_try_desc" onclick="setWhSort('total_try_desc')">
-            <span style="font-weight:800; font-size:12px;">₺</span>{% trans "Most valuable (TRY)" %}
-          </button>
-          <button type="button" class="od-fchip {% if sort == 'price_desc' %}active{% endif %}" data-sort="price_desc" onclick="setWhSort('price_desc')">
-            <i class="fa fa-tag"></i>{% trans "Most expensive" %}
           </button>
           <button type="button" class="od-fchip {% if sort == 'recent' %}active{% endif %}" data-sort="recent" onclick="setWhSort('recent')">
             <i class="fa fa-clock"></i>{% trans "Recently updated" %}

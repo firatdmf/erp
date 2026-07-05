@@ -515,6 +515,10 @@
     </div>
 
     <div class="top-bar-right">
+      <a href="{% url 'operating:warehouse_list' %}" class="top-bar-btn" id="topBarWarehousesBtn" title="{% trans 'My Warehouses' %}">
+        <i class="fas fa-warehouse"></i>
+        <span class="top-bar-btn-label">{% trans "My Warehouses" %}</span>
+      </a>
       <div class="favorites-container">
         <button class="top-bar-btn" onclick="toggleFavorites()" id="topBarFavoritesBtn" title="{% trans 'Favorites' %}">
           <i class="far fa-star"></i>

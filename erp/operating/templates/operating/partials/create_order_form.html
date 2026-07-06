@@ -418,7 +418,7 @@
 
   window.coToggle = function(s) { document.getElementById('co-step-'+s).classList.toggle('active'); };
 
-  window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell) {
+  window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
     // Stock is informational only — out-of-stock / low-stock products
     // can still be added (back-order). Catalog stock is deducted only
@@ -426,13 +426,18 @@
     // order can always be created regardless of current stock.
     const _stock = (stock === null || stock === undefined || stock === 'null') ? null : Number(stock);
     const _allowOversell = (allowOversell === true || allowOversell === 'true');
+    // Scan-synced catalog entries usually only ever get a purchase cost,
+    // never a sale price — the search falls back to showing that cost
+    // so the field isn't a bare $0, but it must stay clearly labelled
+    // as a purchase price until staff confirm/adjust it.
+    const _isCost = (isCost === true || isCost === 'true');
     itemIndex++;
     // Newest item on top so the user immediately sees what they
     // just added — important once the list grows past a few rows.
     orderItems.unshift({
       index: itemIndex, sku, variant, title: title||sku, price: parseFloat(price)||0,
       quantity: 1, description: '', categoryName: categoryName||'',
-      stock: _stock, allow_oversell: _allowOversell,
+      stock: _stock, allow_oversell: _allowOversell, is_cost_price: _isCost,
       is_custom_curtain: false, custom_width:'', custom_height:'',
       custom_pleat_type:'', custom_pleat_density:'', custom_mounting_type:'',
       custom_wing_type:'', custom_fabric_used_meters:''
@@ -480,7 +485,7 @@
                    oninput="coUpd(${i},'quantity',this.value)"
                    onchange="coUpd(${i},'quantity',this.value)">
           </div>
-          <div class="form-group"><label>{% trans "Unit Price" %}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
+          <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Alış fiyatı" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
         </div>
         <div id="co-curtain-${i}" style="display:${cc?'block':'none'}">
@@ -601,6 +606,13 @@
     if (!orderItems[i]) return;
     if (['quantity','price','custom_width','custom_height','custom_fabric_used_meters'].includes(f)) orderItems[i][f] = parseFloat(v)||0;
     else orderItems[i][f] = v;
+    if (f === 'price' && orderItems[i].is_cost_price) {
+      // Staff has looked at / edited the pre-filled cost — it's now a
+      // deliberate value, so drop the "purchase price" warning badge.
+      orderItems[i].is_cost_price = false;
+      const note = document.getElementById('co-costnote-'+i);
+      if (note) note.remove();
+    }
     if (f==='quantity'||f==='price') {
       const t = document.getElementById('co-itotal-'+i);
       if (t) t.textContent = '$'+(orderItems[i].quantity*orderItems[i].price).toFixed(2);

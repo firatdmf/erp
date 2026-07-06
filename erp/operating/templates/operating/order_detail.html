@@ -1979,7 +1979,7 @@
     // clicking a result fills our hidden SKU + label instead of the global
     // edit-order behaviour. base.html loads create_edit_order.js AFTER our
     // inline script, so we wait for DOMContentLoaded to win the global slot.
-    function odSelectProduct(sku, isVariant, title, price, category, stock, allowOversell) {
+    function odSelectProduct(sku, isVariant, title, price, category, stock, allowOversell, isCost) {
       if (!addSku) return;
       addSku.value = sku || '';
       addIsV.value = isVariant ? 'true' : 'false';
@@ -1987,13 +1987,20 @@
       const addOversell = document.getElementById('od-add-oversell');
       const addStockInfo = document.getElementById('od-add-stock-info');
       const oversellBool = (allowOversell === true || allowOversell === 'true');
+      const costBool = (isCost === true || isCost === 'true');
       if (addStock)    addStock.value    = (stock === null || stock === undefined) ? '' : String(stock);
       if (addOversell) addOversell.value = oversellBool ? 'true' : 'false';
       if (addPrice)    addPrice.value    = price || 0;
       if (addPick) {
         addPick.style.display = 'block';
+        // No sale price on file for this item — price was filled from
+        // purchase cost instead; flag it so staff confirm/adjust before
+        // adding, same warning shown in the create/edit-order sidebar.
+        const costNote = costBool
+          ? ' <span style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;" title="{% trans "No sale price on file — showing purchase cost instead. Confirm or adjust before adding." %}">{% trans "Alış fiyatı" %}</span>'
+          : '';
         addPick.innerHTML = '<i class="fa fa-check-circle"></i> ' +
-          (title || '') + ' <code style="color:#6b7280;">' + (sku || '') + '</code>';
+          (title || '') + ' <code style="color:#6b7280;">' + (sku || '') + '</code>' + costNote;
       }
       // Show stock info + cap the qty input.
       if (addStockInfo) {

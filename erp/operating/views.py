@@ -2307,6 +2307,33 @@ def product_autocomplete(request):
             f"Stok: {q:g}</span>"
         )
 
+    def resolve_price(product, variant=None):
+        """Selling price if one was ever set, else fall back to purchase
+        cost (flagged) — scan-synced catalog entries only ever get a
+        cost, never a sale price, so without this fallback the create/
+        edit-order search shows a bare $0 for almost every warehouse
+        product. Callers must label a cost-fallback as such; it is NOT
+        a computed sale price."""
+        if variant:
+            sale = variant.variant_price or product.price
+            if sale:
+                return sale, False
+            cost = variant.variant_cost or product.cost
+            return (cost, True) if cost else (0, False)
+        sale = product.price
+        if sale:
+            return sale, False
+        cost = product.cost
+        return (cost, True) if cost else (0, False)
+
+    def price_span(price, is_cost):
+        if is_cost:
+            return (
+                f"<span style='color:#92400E;font-weight:600;' title='Satış fiyatı girilmemiş — alış fiyatı gösteriliyor'>"
+                f"Alış: ${price}</span>"
+            )
+        return f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+
     def render_item(product, variant=None):
         title = escape(product.title or "")
         cat_name = escape(product.category.name if product.category else "")
@@ -2316,36 +2343,38 @@ def product_autocomplete(request):
 
         if variant:
             sku = escape(variant.variant_sku or "")
-            price = variant.variant_price or product.price or 0
+            price, is_cost = resolve_price(product, variant)
+            cost_arg = "true" if is_cost else "false"
             stock = variant.variant_quantity
             stock_arg = "null" if stock is None else f"{float(stock):g}"
             oversell_arg = "true" if allow_oversell else "false"
             attr_info = variant.attribute_summary() if hasattr(variant, 'attribute_summary') else ''
             attr_display = f' <span style="color:#6b7280;font-size:11px;">({escape(attr_info)})</span>' if attr_info else ''
             return (
-                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+                f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
                 f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
                 f"<strong>{title}</strong> - <code>{sku}</code>{attr_display}"
                 f"</span>"
                 f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
                 f"{stock_badge(stock, allow_oversell)}"
-                f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+                f"{price_span(price, is_cost)}"
                 f"</span></li>"
             )
         else:
             sku = escape(product.sku or "")
-            price = product.price or 0
+            price, is_cost = resolve_price(product)
+            cost_arg = "true" if is_cost else "false"
             stock = product.quantity
             stock_arg = "null" if stock is None else f"{float(stock):g}"
             oversell_arg = "true" if allow_oversell else "false"
             return (
-                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+                f"<li onclick=\"selectProduct('{sku}',false,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
                 f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
                 f"<strong>{title}</strong> - <code>{sku}</code>"
                 f"</span>"
                 f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
                 f"{stock_badge(stock, allow_oversell)}"
-                f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+                f"{price_span(price, is_cost)}"
                 f"</span></li>"
             )
 
@@ -2361,7 +2390,8 @@ def product_autocomplete(request):
         title_js = js_str(parent.title or display_name)
         cat_js = js_str(parent.category.name if parent.category else "")
         allow_oversell = bool(getattr(parent, "selling_while_out_of_stock", False))
-        price = variant.variant_price or parent.price or 0
+        price, is_cost = resolve_price(parent, variant)
+        cost_arg = "true" if is_cost else "false"
         total = sum((q or 0) for _, q in group["stocks"])
         stock_arg = f"{float(total):g}"
         oversell_arg = "true" if allow_oversell else "false"
@@ -2375,14 +2405,14 @@ def product_autocomplete(request):
         if parent.title and (parent.title or "").strip().lower() != display_name.strip().lower():
             hint = f" <span style='color:#6b7280;font-size:11px;'>→ {escape(parent.title)}</span>"
         return (
-            f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+            f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
             f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
             f"<span style='font-size:9.5px;font-weight:800;letter-spacing:.05em;color:#0F766E;background:#CCFBF1;border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:middle;'>DEPO</span>"
             f"<strong>{title}</strong> - <code>{sku}</code>{hint}"
             f"</span>"
             f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
             f"{wh_badges}"
-            f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+            f"{price_span(price, is_cost)}"
             f"</span></li>"
         )
 

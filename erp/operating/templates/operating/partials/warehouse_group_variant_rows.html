@@ -22,13 +22,13 @@
     {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each top has its own barcode' %}">{{ p.roll_count }} top</div>{% endif %}
     {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} m</div>{% endif %}
   </td>
-  <td class="num od-m-hide">
+  <td class="num" data-label="{% trans 'Unit cost' %}">
     {% if p.purchase_price %}
       <span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>
     {% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
   </td>
-  <td class="num" data-label="USD">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
-  <td class="num" data-label="TRY">{% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="{% trans 'Total (USD)' %}">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="{% trans 'Total (TRY)' %}">{% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
 </tr>
 {% empty %}
 <tr><td colspan="6" style="padding:12px 34px; color:#94A3B8;">{% trans "No variants." %}</td></tr>

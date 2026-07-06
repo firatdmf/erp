@@ -293,7 +293,11 @@
   }
 
   /* PRODUCTS TABLE */
-  .od-prods { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  /* Scroll container so the table can NEVER bleed outside the card —
+     if columns don't fit (e.g. edit mode on a narrow window) the table
+     scrolls horizontally inside the card instead of overflowing it. */
+  .od-prods-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .od-prods { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 620px; }
   .od-prods th, .od-prods td {
     padding: 10px 8px; text-align: left;
     border-bottom: 1px solid #EEF1F5; font-size: 12.5px;
@@ -312,13 +316,13 @@
      stretches them based on content, which made the inline inputs look
      mis-aligned. */
   .od-prods th:nth-child(1), .od-prods td:nth-child(1) { width: auto; }        /* Product */
-  .od-prods th:nth-child(2), .od-prods td:nth-child(2) { width: 100px; }       /* SKU */
-  .od-prods th:nth-child(3), .od-prods td:nth-child(3) { width: 120px; }       /* Variant */
-  .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 120px; }       /* Qty */
-  .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 120px; }       /* Price */
-  .od-prods th:nth-child(6), .od-prods td:nth-child(6) { width: 90px;  }       /* Cost */
-  .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 100px; }       /* Amount */
-  .od-prods th.od-edit-only, .od-prods td.od-edit-only { width: 40px; text-align: center; }        /* Delete btn */
+  .od-prods th:nth-child(2), .od-prods td:nth-child(2) { width: 90px; }        /* SKU */
+  .od-prods th:nth-child(3), .od-prods td:nth-child(3) { width: 105px; }       /* Variant */
+  .od-prods th:nth-child(4), .od-prods td:nth-child(4) { width: 96px; }        /* Qty */
+  .od-prods th:nth-child(5), .od-prods td:nth-child(5) { width: 96px; }        /* Price */
+  .od-prods th:nth-child(6), .od-prods td:nth-child(6) { width: 76px; }        /* Cost */
+  .od-prods th:nth-child(7), .od-prods td:nth-child(7) { width: 92px; }        /* Amount */
+  .od-prods th.od-edit-only, .od-prods td.od-edit-only { width: 38px; text-align: center; }        /* Delete btn */
 
   /* Inline editable cells — look like static text until focused. They
      fill their fixed-width cell so Qty + Price line up exactly. */
@@ -655,6 +659,9 @@
     .od-tl { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
+    /* On phones the secondary columns are hidden instead of scrolled —
+       drop the desktop min-width so the table fits the screen. */
+    .od-prods { min-width: 0; }
     /* Products table: hide the secondary columns and tighten the rest
        so it never overflows on a phone. Keeps Product/Qty/Price/Amount. */
     .od-prods th:nth-child(2), .od-prods td:nth-child(2),   /* SKU */
@@ -952,6 +959,7 @@
             <i class="fa fa-pen" data-edit-icon></i> <span data-edit-label>{% trans "Edit" %}</span>
           </button>
         </div>
+        <div class="od-prods-scroll">
         <table class="od-prods">
           <thead>
             <tr>
@@ -962,7 +970,7 @@
               <th class="num">{% trans "Price" %}</th>
               <th class="num" title="{% trans 'Per-unit cost (internal)' %}">{% trans "Cost" %}</th>
               <th class="num">{% trans "Amount" %}</th>
-              <th class="od-edit-only" style="width:36px;"></th>
+              <th class="od-edit-only"></th>
             </tr>
           </thead>
           <tbody id="od-items-tbody">
@@ -1033,6 +1041,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
         {% if not order.items.all %}
         <div id="od-no-items" class="od-empty-mute" style="padding: 20px 0; text-align: center;">{% trans "This order has no items yet" %}</div>
         {% endif %}
@@ -1536,6 +1545,10 @@
       }
     }
     window.__odBindInputs = function () { getInputs().forEach(bindInput); };
+    // Bind the EXISTING rows' qty/price inputs on load — without this
+    // only newly-added rows got listeners, so editing an existing item's
+    // quantity was never detected and the save bar never appeared.
+    window.__odBindInputs();
 
     function postUpdate(payload) {
       const body = new URLSearchParams(payload);
@@ -1958,6 +1971,8 @@
         ico.classList.toggle('fa-times',  editing);
       }
       applyReadonly();
+      // Re-bind in case rows were re-rendered (idempotent via data-bound).
+      if (editing && window.__odBindInputs) window.__odBindInputs();
     });
 
     // Override the existing inline product-autocomplete selectProduct() so

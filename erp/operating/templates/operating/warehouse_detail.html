@@ -161,14 +161,14 @@
     margin-bottom: 14px;
   }
   .od-search {
-    position: relative; flex: 1 1 320px; max-width: 420px; min-width: 220px;
+    position: relative; flex: 1 1 480px; max-width: 640px; min-width: 260px;
   }
   .od-search input {
     width: 100%; box-sizing: border-box;
-    padding: 10px 14px 10px 36px;
-    background: white; border: 1px solid #E0E6EE;
-    border-radius: 10px; outline: none;
-    font: 500 13px var(--font-sans); color: var(--ink);
+    padding: 13px 16px 13px 42px;
+    background: white; border: 1.5px solid #E0E6EE;
+    border-radius: 12px; outline: none;
+    font: 500 14.5px var(--font-sans); color: var(--ink);
     transition: all 140ms;
   }
   .od-search input::placeholder { color: var(--gray-500); }
@@ -177,8 +177,8 @@
     box-shadow: 0 0 0 3px rgba(20,127,116,0.12);
   }
   .od-search .ico {
-    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-    color: var(--gray-500); font-size: 12px;
+    position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+    color: var(--gray-500); font-size: 14px;
   }
   .od-sort {
     position: relative; display: inline-flex; align-items: center;
@@ -254,12 +254,12 @@
   .od-prods tbody tr:hover { background: #F8FAFC; }
   .od-prods .pname { font: 600 13px var(--font-sans); color: #0F1419; }
   .od-prods .psub { font: 500 11px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
-  .od-prods .mono { font: 500 11.5px var(--font-mono); color: var(--gray-700); }
+  .od-prods .mono { font: 800 14px var(--font-mono); color: #0F1419; letter-spacing: 0.01em; }
   .od-prods .sku-pill {
-    display: inline-block; padding: 3px 9px; border-radius: 6px;
-    background: #F1F5F9; color: var(--gray-700);
-    font: 500 11.5px var(--font-mono); letter-spacing: 0.02em;
-    border: 1px solid #E2E8EE;
+    display: inline-block; padding: 5px 11px; border-radius: 8px;
+    background: var(--nejum-teal-50, #E5F1F0); color: var(--nejum-teal-700, #005354);
+    font: 700 13px var(--font-mono); letter-spacing: 0.03em;
+    border: 1px solid rgba(20,127,116,0.30);
   }
   .od-prods .qty { font: 700 13px var(--font-sans); color: #0F1419; font-variant-numeric: tabular-nums; }
   .od-prods .rolls-pill {
@@ -280,8 +280,8 @@
     border: 1px solid rgba(20,127,116,0.25);
     margin-left: 4px;
   }
-  .od-prods .cost-usd { font: 700 12.5px var(--font-sans); color: var(--nejum-teal-700); }
-  .od-prods .cost-try { font: 700 12.5px var(--font-sans); color: #B27500; }
+  .od-prods .cost-usd { font: 500 11px var(--font-sans); color: var(--gray-500); }
+  .od-prods .cost-try { font: 500 11px var(--font-sans); color: var(--gray-500); }
 
   /* EMPTY STATE */
   .od-empty {

@@ -1441,43 +1441,71 @@
 
 <!-- ─── BARCODE LOOKUP (find existing product — no add) ───────── -->
 <style>
-  .bl-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(8,12,20,0.74); padding: 16px; }
+  .bl-overlay { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(6,10,18,0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); padding: 16px; }
   .bl-overlay.show { display: flex; }
-  .bl-shell { width: 100%; max-width: 460px; background: #0F1419; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 94vh; }
-  .bl-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.10); }
-  .bl-title { color: #fff; font: 700 14px var(--font-sans); display: inline-flex; align-items: center; gap: 9px; }
-  .bl-close { background: rgba(255,255,255,0.08); border: none; color: #fff; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 15px; }
-  .bl-cam { position: relative; background: #000; aspect-ratio: 3 / 4; max-height: 58vh; overflow: hidden; }
+  .bl-shell { width: 100%; max-width: 460px; background: linear-gradient(180deg, #101826 0%, #0B1220 100%); border: 1px solid rgba(94,234,212,0.10); border-radius: 20px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,0.6); display: flex; flex-direction: column; max-height: 94vh; }
+  .bl-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .bl-title { color: #fff; font: 700 14.5px var(--font-sans); display: inline-flex; align-items: center; gap: 10px; }
+  .bl-title i { color: #2DD4BF; }
+  .bl-close { background: rgba(255,255,255,0.08); border: none; color: #fff; width: 34px; height: 34px; border-radius: 10px; cursor: pointer; font-size: 15px; transition: background 140ms; }
+  .bl-close:hover { background: rgba(255,255,255,0.16); }
+  .bl-cam { position: relative; background: #000; aspect-ratio: 3 / 4; max-height: 56vh; overflow: hidden; }
   .bl-cam video { width: 100%; height: 100%; object-fit: cover; }
   .bl-guide { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-  .bl-guide-frame { width: 80%; height: 26%; border: 2px solid rgba(255,255,255,0.9); border-radius: 12px; box-shadow: 0 0 0 2000px rgba(0,0,0,0.30); }
-  .bl-hint { margin-top: 14px; color: #fff; font: 600 12.5px var(--font-sans); background: rgba(0,0,0,0.5); padding: 5px 12px; border-radius: 999px; }
-  .bl-result { padding: 20px 18px 22px; color: #fff; overflow-y: auto; }
-  .bl-rc-ico { width: 56px; height: 56px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 10px; }
-  .bl-rc.found .bl-rc-ico { background: rgba(16,185,129,0.16); color: #34D399; }
-  .bl-rc.notfound .bl-rc-ico { background: rgba(244,63,94,0.16); color: #FB7185; }
+  .bl-guide-frame { position: relative; width: 82%; height: 30%; border-radius: 16px; box-shadow: 0 0 0 2000px rgba(4,10,18,0.42); }
+  /* Corner brackets — the classic scanner look */
+  .bl-guide-frame .c { position: absolute; width: 28px; height: 28px; border: 3px solid #2DD4BF; filter: drop-shadow(0 0 6px rgba(45,212,191,0.55)); }
+  .bl-guide-frame .c1 { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 14px; }
+  .bl-guide-frame .c2 { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 14px; }
+  .bl-guide-frame .c3 { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 14px; }
+  .bl-guide-frame .c4 { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 14px; }
+  /* Animated scan line */
+  .bl-laser { position: absolute; left: 7%; right: 7%; top: 14%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #2DD4BF 30%, #5EEAD4 50%, #2DD4BF 70%, transparent); box-shadow: 0 0 14px 2px rgba(45,212,191,0.65); animation: blLaser 2.2s ease-in-out infinite; }
+  @keyframes blLaser { 0%, 100% { top: 12%; } 50% { top: 84%; } }
+  .bl-hint { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; color: #fff; font: 600 12.5px var(--font-sans); background: rgba(4,10,18,0.62); border: 1px solid rgba(255,255,255,0.12); padding: 6px 14px; border-radius: 999px; }
+  .bl-hint-dot { width: 7px; height: 7px; border-radius: 50%; background: #2DD4BF; animation: blPulse 1.4s ease-in-out infinite; }
+  @keyframes blPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+  .bl-result { padding: 18px 18px 20px; color: #fff; overflow-y: auto; }
   .bl-rc { text-align: center; }
   .bl-rc h4 { margin: 0 0 4px; font: 700 16px var(--font-sans); }
-  .bl-rc .bl-bc { font: 600 12px monospace; color: #94A3B8; margin-bottom: 14px; word-break: break-all; }
-  .bl-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 4px 14px; text-align: left; }
-  .bl-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font: 500 13px var(--font-sans); }
-  .bl-row:last-child { border-bottom: none; }
-  .bl-row .k { color: #94A3B8; white-space: nowrap; }
-  .bl-row .v { color: #fff; font-weight: 700; text-align: right; word-break: break-word; }
-  .bl-actions { display: flex; gap: 10px; margin-top: 16px; }
-  .bl-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 14px; border-radius: 10px; font: 700 13px var(--font-sans); cursor: pointer; border: none; text-decoration: none; }
-  .bl-btn.primary { background: #0F766E; color: #fff; }
+  /* Status pill (found / not found) */
+  .bl-status { display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 999px; font: 700 13px var(--font-sans); }
+  .bl-status.found { background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(52,211,153,0.35); }
+  .bl-status.notfound { background: rgba(244,63,94,0.14); color: #FB7185; border: 1px solid rgba(251,113,133,0.35); }
+  /* The scanned code — big, bright, unmissable */
+  .bl-bc-chip { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 0; padding: 13px 16px; background: linear-gradient(135deg, rgba(20,127,116,0.28), rgba(13,148,136,0.10)); border: 1px solid rgba(45,212,191,0.35); border-radius: 14px; font: 800 17px ui-monospace, monospace; color: #5EEAD4; letter-spacing: 0.05em; word-break: break-all; }
+  .bl-bc-chip i { font-size: 15px; opacity: 0.8; flex-shrink: 0; }
+  .bl-prod-name { font: 800 17px var(--font-sans); color: #fff; line-height: 1.3; }
+  .bl-sku-pill { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #CBD5E1; font: 700 11.5px ui-monospace, monospace; }
+  .bl-main-line { margin-top: 6px; color: #94A3B8; font: 600 12px var(--font-sans); }
+  /* Stat tiles — the numbers pop */
+  .bl-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 16px; text-align: left; }
+  .bl-tile { background: rgba(255,255,255,0.055); border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; padding: 12px 14px; }
+  .bl-tile .t-label { display: flex; align-items: center; gap: 6px; font: 700 10px var(--font-sans); text-transform: uppercase; letter-spacing: 0.08em; color: #7C8DA6; }
+  .bl-tile .t-value { margin-top: 5px; font: 800 21px var(--font-sans); color: #fff; font-variant-numeric: tabular-nums; }
+  .bl-tile .t-value .t-unit { font: 600 12px var(--font-sans); color: #94A3B8; margin-left: 3px; }
+  .bl-tile.hero { grid-column: 1 / -1; background: linear-gradient(135deg, #0D9488 0%, #0F766E 100%); border-color: rgba(94,234,212,0.45); box-shadow: 0 10px 28px rgba(13,148,136,0.35); }
+  .bl-tile.hero .t-label { color: rgba(255,255,255,0.78); }
+  .bl-tile.hero .t-value { font-size: 30px; }
+  .bl-tile.hero .t-value .t-unit { color: rgba(255,255,255,0.75); font-size: 14px; }
+  .bl-tile.hero .t-sub { margin-top: 3px; color: rgba(255,255,255,0.88); font: 600 12px var(--font-sans); }
+  .bl-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .bl-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 14px; border-radius: 12px; font: 700 13px var(--font-sans); cursor: pointer; border: none; text-decoration: none; transition: filter 140ms, background 140ms; }
+  .bl-btn.primary { background: linear-gradient(135deg, #0D9488, #0F766E); color: #fff; box-shadow: 0 6px 18px rgba(13,148,136,0.35); }
+  .bl-btn.primary:hover { filter: brightness(1.08); }
   .bl-btn.ghost { background: rgba(255,255,255,0.10); color: #fff; }
+  .bl-btn.ghost:hover { background: rgba(255,255,255,0.16); }
   .bl-spin { text-align: center; color: #cbd5e1; font: 600 13px var(--font-sans); padding: 8px; }
   .bl-manual { padding: 14px 16px 16px; }
   .bl-or { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
   .bl-or::before, .bl-or::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.12); }
   .bl-or span { color: #94A3B8; font: 700 11px var(--font-sans); text-transform: uppercase; letter-spacing: .06em; }
   .bl-manual-row { display: flex; gap: 8px; }
-  .bl-manual-input { flex: 1; min-width: 0; box-sizing: border-box; padding: 11px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #fff; font: 600 14px var(--font-sans); outline: none; }
+  .bl-manual-input { flex: 1; min-width: 0; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #fff; font: 600 14px var(--font-sans); outline: none; transition: border-color 140ms, box-shadow 140ms; }
   .bl-manual-input::placeholder { color: #94A3B8; font-weight: 500; }
-  .bl-manual-input:focus { border-color: #0F766E; box-shadow: 0 0 0 3px rgba(20,127,116,0.25); }
-  .bl-manual-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 11px 16px; border-radius: 10px; border: none; background: #0F766E; color: #fff; font: 700 13px var(--font-sans); cursor: pointer; white-space: nowrap; }
+  .bl-manual-input:focus { border-color: #2DD4BF; box-shadow: 0 0 0 3px rgba(45,212,191,0.22); }
+  .bl-manual-btn { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 12px 16px; border-radius: 12px; border: none; background: linear-gradient(135deg, #0D9488, #0F766E); color: #fff; font: 700 13px var(--font-sans); cursor: pointer; white-space: nowrap; box-shadow: 0 6px 18px rgba(13,148,136,0.30); }
+  .bl-manual-btn:hover { filter: brightness(1.08); }
 </style>
 <div class="bl-overlay" id="blOverlay">
   <div class="bl-shell">
@@ -1489,8 +1517,11 @@
       <div class="bl-cam">
         <video id="blVideo" autoplay playsinline muted></video>
         <div class="bl-guide">
-          <div class="bl-guide-frame"></div>
-          <div class="bl-hint">{% trans "Point the barcode at the frame" %}</div>
+          <div class="bl-guide-frame">
+            <span class="c c1"></span><span class="c c2"></span><span class="c c3"></span><span class="c c4"></span>
+            <div class="bl-laser"></div>
+          </div>
+          <div class="bl-hint"><span class="bl-hint-dot"></span>{% trans "Point the barcode at the frame" %}</div>
         </div>
       </div>
       {% get_current_language as LANGUAGE_CODE %}
@@ -3378,25 +3409,46 @@
       .then(function (resp) { return resp.json(); })
       .then(function (d) { renderLookup(d, code); })
       .catch(function () {
-        r.innerHTML = '<div class="bl-rc notfound"><div class="bl-rc-ico"><i class="fa fa-triangle-exclamation"></i></div><h4>{% trans "Network error" %}</h4>' + blAgainBtn() + '</div>';
+        r.innerHTML = '<div class="bl-rc notfound"><span class="bl-status notfound"><i class="fa fa-triangle-exclamation"></i> {% trans "Network error" %}</span>' + blAgainBtn() + '</div>';
       });
   }
   function renderLookup(d, code) {
     var r = document.getElementById('blResult');
     if (d && d.found && d.product) {
-      var p = d.product, rows = '';
-      rows += blRow('{% trans "SKU" %}', blEsc(p.sku || '—'));
-      rows += blRow('{% trans "Name" %}', blEsc(p.name || '—'));
-      rows += blRow('{% trans "Stock" %}', (p.quantity || 0).toFixed(2) + ' m');
-      rows += blRow('{% trans "Tops" %}', (p.rolls_count || 0) + ' top');
-      if (p.main_product) rows += blRow('{% trans "Main product" %}', blEsc(p.main_product));
-      if (d.roll) rows += blRow('{% trans "This top" %}', (d.roll.meters || 0).toFixed(2) + ' m' + (d.roll.lot_number ? ' · Lot ' + blEsc(d.roll.lot_number) : ''));
+      var p = d.product;
+      var tiles = '';
+      // HERO — the scanned top's meters, front and centre.
+      if (d.roll) {
+        var rm = (d.roll.meters || 0).toFixed(2);
+        var rem = (d.roll.meters_remaining !== null && d.roll.meters_remaining !== undefined)
+                  ? Number(d.roll.meters_remaining).toFixed(2) : null;
+        var sub = '';
+        if (rem !== null && rem !== rm) sub += '{% trans "remaining" %}: <b>' + rem + ' m</b>';
+        if (d.roll.lot_number) sub += (sub ? ' · ' : '') + 'Lot: ' + blEsc(d.roll.lot_number);
+        tiles +=
+          '<div class="bl-tile hero">' +
+            '<div class="t-label"><i class="fa fa-barcode"></i> {% trans "Scanned top" %}</div>' +
+            '<div class="t-value">' + ((rem !== null) ? rem : rm) + '<span class="t-unit">m</span></div>' +
+            (sub ? '<div class="t-sub">' + sub + '</div>' : '') +
+          '</div>';
+      }
+      tiles +=
+        '<div class="bl-tile">' +
+          '<div class="t-label"><i class="fa fa-warehouse"></i> {% trans "Current stock" %}</div>' +
+          '<div class="t-value">' + (p.quantity || 0).toFixed(2) + '<span class="t-unit">m</span></div>' +
+        '</div>' +
+        '<div class="bl-tile">' +
+          '<div class="t-label"><i class="fa fa-layer-group"></i> {% trans "Tops" %}</div>' +
+          '<div class="t-value">' + (p.rolls_count || 0) + '<span class="t-unit">top</span></div>' +
+        '</div>';
       r.innerHTML =
         '<div class="bl-rc found">' +
-          '<div class="bl-rc-ico"><i class="fa fa-circle-check"></i></div>' +
-          '<h4>{% trans "Already in this warehouse" %}</h4>' +
-          '<div class="bl-bc">' + blEsc(code) + '</div>' +
-          '<div class="bl-card">' + rows + '</div>' +
+          '<span class="bl-status found"><i class="fa fa-circle-check"></i> {% trans "Already in this warehouse" %}</span>' +
+          '<div class="bl-bc-chip"><i class="fa fa-barcode"></i>' + blEsc(code) + '</div>' +
+          '<div class="bl-prod-name">' + blEsc(p.name || '—') + '</div>' +
+          (p.sku ? '<span class="bl-sku-pill">' + blEsc(p.sku) + '</span>' : '') +
+          (p.main_product ? '<div class="bl-main-line">{% trans "Main product" %}: ' + blEsc(p.main_product) + '</div>' : '') +
+          '<div class="bl-tiles">' + tiles + '</div>' +
           '<div class="bl-actions">' +
             '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
             '<a class="bl-btn primary" href="' + p.detail_url + '"><i class="fa fa-pen-to-square"></i> {% trans "Open / edit" %}</a>' +
@@ -3405,9 +3457,8 @@
     } else {
       r.innerHTML =
         '<div class="bl-rc notfound">' +
-          '<div class="bl-rc-ico"><i class="fa fa-circle-xmark"></i></div>' +
-          '<h4>{% trans "Not in this warehouse" %}</h4>' +
-          '<div class="bl-bc">' + blEsc(code) + '</div>' +
+          '<span class="bl-status notfound"><i class="fa fa-circle-xmark"></i> {% trans "Not in this warehouse" %}</span>' +
+          '<div class="bl-bc-chip"><i class="fa fa-barcode"></i>' + blEsc(code) + '</div>' +
           '<p style="color:#94A3B8; font:500 13px var(--font-sans); margin:0 0 4px;">{% trans "This barcode has not been added yet." %}</p>' +
           '<div class="bl-actions">' +
             '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +

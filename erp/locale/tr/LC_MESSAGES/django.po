@@ -7466,3 +7466,6 @@ msgstr "Ürün girişi"
 
 msgid "Open order"
 msgstr "Siparişi aç"
+
+msgid "Scanned top"
+msgstr "Okutulan top"

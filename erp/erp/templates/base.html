@@ -40,7 +40,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'erp/css/nejum/tokens.css' %}?v=20" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/shell.css' %}?v=42" />
-    <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=7" />
+    <link rel="stylesheet" href="{% static 'erp/css/nejum/mobile-shell.css' %}?v=8" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard.css' %}?v=29" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/dashboard-mobile.css' %}?v=7" />
     <link rel="stylesheet" href="{% static 'erp/css/nejum/responsive-content.css' %}?v=4" />
@@ -4364,26 +4364,39 @@
         }
       });
 
-      // Favorites dropdown
+      // Favorites dropdown (desktop) + favorites bottom sheet (mobile) —
+      // one shared toggle drives whichever surface the current viewport
+      // shows; the other is inert (hidden by CSS), so touching both
+      // classList states on every call is harmless.
       let favoritesDropdownOpen = false;
       function toggleFavorites() {
         const dropdown = document.getElementById('favoritesDropdown');
-        if (!dropdown) return;
+        const mSheet = document.getElementById('mobileFavSheet');
+        const mOverlay = document.getElementById('mobileFavOverlay');
+        if (!dropdown && !mSheet) return;
         favoritesDropdownOpen = !favoritesDropdownOpen;
-        dropdown.classList.toggle('show', favoritesDropdownOpen);
+        if (dropdown) dropdown.classList.toggle('show', favoritesDropdownOpen);
+        if (mSheet) mSheet.classList.toggle('is-open', favoritesDropdownOpen);
+        if (mOverlay) mOverlay.classList.toggle('is-open', favoritesDropdownOpen);
         if (favoritesDropdownOpen) {
           const notif = document.getElementById('notificationDropdown');
           if (notif) { notif.classList.remove('active'); notificationDropdownOpen = false; }
         }
       }
       document.addEventListener('click', function (e) {
+        if (!favoritesDropdownOpen) return;
         const container = document.querySelector('.favorites-container');
-        if (container && !container.contains(e.target)) {
+        const mSheet = document.getElementById('mobileFavSheet');
+        const mTrigger = document.getElementById('mobileFavTrigger');
+        const insideDesktop = container && container.contains(e.target);
+        const insideMobile = (mSheet && mSheet.contains(e.target)) || (mTrigger && mTrigger.contains(e.target));
+        if (!insideDesktop && !insideMobile) {
           const dropdown = document.getElementById('favoritesDropdown');
-          if (dropdown && favoritesDropdownOpen) {
-            dropdown.classList.remove('show');
-            favoritesDropdownOpen = false;
-          }
+          if (dropdown) dropdown.classList.remove('show');
+          if (mSheet) mSheet.classList.remove('is-open');
+          const mOverlay = document.getElementById('mobileFavOverlay');
+          if (mOverlay) mOverlay.classList.remove('is-open');
+          favoritesDropdownOpen = false;
         }
       });
 

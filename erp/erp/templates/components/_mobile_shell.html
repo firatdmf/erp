@@ -25,7 +25,7 @@
 
 <!-- Bottom nav — quick actions only (Favorites, Notifications, Settings, Sign Out) -->
 <nav class="m-bottomnav" aria-label="Quick actions">
-  <button type="button" class="m-qbtn" onclick="toggleFavorites()" aria-label="Favorites">
+  <button type="button" class="m-qbtn" id="mobileFavTrigger" onclick="toggleFavorites()" aria-label="Favorites">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     <span>{% trans "Favorites" %}</span>
   </button>
@@ -371,6 +371,42 @@
 </aside>
 
 <div class="m-drawer-overlay" id="mobileDrawerOverlay" onclick="mobileToggleDrawer()"></div>
+
+{% comment %}
+  Mobile favorites — bottom sheet mirroring the desktop top-bar's Favorites
+  dropdown 1:1 (same 3 items/labels/links). The desktop dropdown itself is
+  unreachable on mobile because its ancestor `.global-top-bar` is
+  `display:none` under the mobile-shell media query, so this is a
+  mobile-native surface driven by the SAME shared toggleFavorites() in
+  base.html. Keep the 3 items in sync with base.html's .favorites-list.
+{% endcomment %}
+<div class="m-fav-overlay" id="mobileFavOverlay" onclick="toggleFavorites()"></div>
+<aside class="m-fav-sheet" id="mobileFavSheet" aria-label="{% trans 'Favorites' %}">
+  <div class="m-fav-sheet-handle"></div>
+  <div class="m-fav-sheet-header">
+    <h2 class="m-fav-sheet-title">{% trans "Favorites" %}</h2>
+    <button class="m-fav-close" type="button" onclick="toggleFavorites()" aria-label="Close">
+      <span class="m-fav-close-x" aria-hidden="true"></span>
+    </button>
+  </div>
+  <div class="m-fav-sheet-body">
+    <a class="m-drawer-item" href="{% url 'operating:order_list' %}">
+      <span class="m-drawer-ico"><i data-lucide="list"></i></span>
+      <span class="m-drawer-label">{% trans "Order list" %}</span>
+      <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </a>
+    <a class="m-drawer-item" href="#" onclick="toggleFavorites(); openOrderSidebar(); return false;">
+      <span class="m-drawer-ico"><i data-lucide="shopping-cart"></i></span>
+      <span class="m-drawer-label">{% trans "Create order" %}</span>
+      <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </a>
+    <a class="m-drawer-item" href="{% url 'current_account:cari_list' %}">
+      <span class="m-drawer-ico"><i data-lucide="id-card"></i></span>
+      <span class="m-drawer-label">{% trans "All Accounts" %}</span>
+      <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </a>
+  </div>
+</aside>
 
 <script>
   (function () {

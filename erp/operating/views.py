@@ -2225,19 +2225,54 @@ def webclient_autocomplete(request):
 # escape(product.title) will turn < into &lt;, > into &gt;, & into &amp;, etc.
 # This ensures that if a product title or variant SKU contains special characters (like <, >, &, or quotes), they won't break your HTML or allow malicious code to run.
 def product_autocomplete(request):
+    """Order-create/edit product search.
+
+    Sources, in priority order:
+      1. WAREHOUSE products — anything held in any warehouse (searched by
+         warehouse name/SKU and by the linked catalog title/variant-sku,
+         Turkish İ/ı-folded). Stock comes from the WAREHOUSE, shown per
+         warehouse. Products existing in both places surface HERE.
+      2. Catalog-only products — products/variants with no warehouse
+         link, so the whole assortment stays searchable.
+    Every row shows name + SKU."""
+    from functools import reduce
+    import operator as _op
+    from .views_warehouse import _tr_ci_variants
+    from .models import WarehouseProduct
+
     query = request.GET.get("product", "").strip().lower()
     if not query:
         return HttpResponse("")
 
+    q_variants = _tr_ci_variants(query)
+
+    def _fq(field):
+        return reduce(_op.or_, (Q(**{f"{field}__icontains": v}) for v in q_variants))
+
+    # ── 1) Warehouse hits, grouped by their catalog variant ──────────
+    wh_rows = (
+        WarehouseProduct.objects
+        .filter(catalog_variant__isnull=False)
+        .filter(_fq("name") | _fq("sku")
+                | _fq("catalog_variant__variant_sku")
+                | _fq("catalog_variant__product__title"))
+        .select_related("warehouse", "catalog_variant__product__category")
+        .order_by("name")[:60]
+    )
+    wh_groups = {}          # variant_id -> {"wp": first wp, "stocks": [(wh, qty)]}
+    for wp in wh_rows:
+        g = wh_groups.setdefault(wp.catalog_variant_id, {"wp": wp, "stocks": []})
+        g["stocks"].append((wp.warehouse.name, wp.quantity or 0))
+    wh_variant_ids = set(wh_groups.keys())
+
+    # ── 2) Catalog-only fallback (nothing already shown as warehouse) ─
     products = (
         Product.objects.filter(
-            Q(title__icontains=query)
-            | Q(sku__icontains=query)
-            | Q(variants__variant_sku__icontains=query)
+            _fq("title") | _fq("sku") | _fq("variants__variant_sku")
         )
         .select_related("category")
         .distinct()
-        .prefetch_related("variants")[:10]
+        .prefetch_related("variants")[:12]
     )
 
     def js_str(s):
@@ -2309,27 +2344,78 @@ def product_autocomplete(request):
                 f"</span></li>"
             )
 
+    def render_wh_item(group):
+        """One row per catalog variant held in warehouses. Stock badges
+        are PER WAREHOUSE (name + metres); the JS stock arg is the total."""
+        wp = group["wp"]
+        variant = wp.catalog_variant
+        parent = variant.product
+        display_name = wp.name or parent.title or ""
+        title = escape(display_name)
+        sku = escape(variant.variant_sku or "")
+        title_js = js_str(parent.title or display_name)
+        cat_js = js_str(parent.category.name if parent.category else "")
+        allow_oversell = bool(getattr(parent, "selling_while_out_of_stock", False))
+        price = variant.variant_price or parent.price or 0
+        total = sum((q or 0) for _, q in group["stocks"])
+        stock_arg = f"{float(total):g}"
+        oversell_arg = "true" if allow_oversell else "false"
+        wh_badges = "".join(
+            f"<span style='font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;"
+            f"color:#005354;background:#E5F1F0;margin-right:5px;white-space:nowrap;'>"
+            f"{escape((wh or '')[:14])}: {float(q or 0):g} m</span>"
+            for wh, q in group["stocks"][:3]
+        )
+        hint = ""
+        if parent.title and (parent.title or "").strip().lower() != display_name.strip().lower():
+            hint = f" <span style='color:#6b7280;font-size:11px;'>→ {escape(parent.title)}</span>"
+        return (
+            f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+            f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
+            f"<span style='font-size:9.5px;font-weight:800;letter-spacing:.05em;color:#0F766E;background:#CCFBF1;border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:middle;'>DEPO</span>"
+            f"<strong>{title}</strong> - <code>{sku}</code>{hint}"
+            f"</span>"
+            f"<span style='display:inline-flex;align-items:center;white-space:nowrap;flex-shrink:0;'>"
+            f"{wh_badges}"
+            f"<span style='color:#059669;font-weight:600;'>${price}</span>"
+            f"</span></li>"
+        )
+
     items = []
 
+    # Warehouse rows first — shared products get picked FROM the warehouse.
+    for group in list(wh_groups.values())[:8]:
+        items.append(render_wh_item(group))
+
+    # Catalog-only: skip every variant that lives in a warehouse (those
+    # are the rows above); keep variant-less products and unlinked variants.
+    cand_variant_ids = [v.id for p in products for v in p.variants.all()]
+    linked_ids = set(
+        WarehouseProduct.objects
+        .filter(catalog_variant_id__in=cand_variant_ids)
+        .values_list("catalog_variant_id", flat=True)
+    ) | wh_variant_ids
+
+    shown_catalog = 0
     for product in products:
-        variants = list(product.variants.all())
+        if shown_catalog >= 6:
+            break
+        variants = [v for v in product.variants.all() if v.id not in linked_ids]
 
         matches_parent = (
             query in (product.title or "").lower()
             or query in (product.sku or "").lower()
         )
 
-        if not variants:
+        if not product.variants.all():
             if matches_parent:
                 items.append(render_item(product))
+                shown_catalog += 1
         else:
-            if matches_parent:
-                for variant in variants:
+            for variant in variants:
+                if matches_parent or query in (variant.variant_sku or "").lower():
                     items.append(render_item(product, variant))
-            else:
-                for variant in variants:
-                    if query in (variant.variant_sku or "").lower():
-                        items.append(render_item(product, variant))
+                    shown_catalog += 1
 
     if not items:
         items.append("<li style='color:#9ca3af;padding:12px;'>Sonuç bulunamadı</li>")

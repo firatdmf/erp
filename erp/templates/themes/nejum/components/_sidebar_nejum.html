@@ -416,6 +416,8 @@
     </div>
   </div>
 
+  {% comment %}"My Store" (Mağazam) nav item hidden for now — storefront CMS pages, JS and endpoints stay in place; re-enable by uncommenting.{% endcomment %}
+  {% if False %}
   {# ============ MY STORE ============ #}
   <div class="nj-nav-item" data-flyout="storefront">
     <i data-lucide="store"></i>
@@ -446,6 +448,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
   {# ============ NOTES ============ #}
   <a class="nj-nav-item" href="{% url 'notes:index' %}">

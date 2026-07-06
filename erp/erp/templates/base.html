@@ -529,17 +529,17 @@
             <h3>{% trans "Favorites" %}</h3>
           </div>
           <div class="favorites-list">
-            <a href="{% url 'marketing:product_list' %}" class="favorites-item">
+            <a href="{% url 'operating:order_list' %}" class="favorites-item">
               <span class="favorites-item-icon"><i class="fas fa-list"></i></span>
-              <span class="favorites-item-label">{% trans "Product list" %}</span>
+              <span class="favorites-item-label">{% trans "Order list" %}</span>
             </a>
-            <a href="{% url 'marketing:product_create' %}" class="favorites-item">
-              <span class="favorites-item-icon"><i class="fas fa-plus"></i></span>
-              <span class="favorites-item-label">{% trans "Add product" %}</span>
+            <a href="#" class="favorites-item" onclick="openOrderSidebar(); return false;">
+              <span class="favorites-item-icon"><i class="fas fa-cart-plus"></i></span>
+              <span class="favorites-item-label">{% trans "Create order" %}</span>
             </a>
-            <a href="{% url 'team:team_list' %}" class="favorites-item">
-              <span class="favorites-item-icon"><i class="fas fa-users"></i></span>
-              <span class="favorites-item-label">{% trans "Team Members" %}</span>
+            <a href="{% url 'current_account:cari_list' %}" class="favorites-item">
+              <span class="favorites-item-icon"><i class="fas fa-id-card"></i></span>
+              <span class="favorites-item-label">{% trans "All Accounts" %}</span>
             </a>
           </div>
         </div>

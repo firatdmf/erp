@@ -11,7 +11,9 @@
 .m-shell-bar,
 .m-bottomnav,
 .m-drawer,
-.m-drawer-overlay { display: none; }
+.m-drawer-overlay,
+.m-fav-overlay,
+.m-fav-sheet { display: none; }
 
 @media (max-width: 1024px) {
 

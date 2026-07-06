@@ -1377,6 +1377,11 @@ class OrderCreate(View):
                         order.guest_email = request.POST.get("guest_email", "")
                         order.guest_phone = request.POST.get("guest_phone", "")
 
+                    # Retail (Perakende) flag — Step 1's order_type radio.
+                    # Persisted so the order list can label it, unlike
+                    # customer_source it isn't re-derivable after save.
+                    order.is_retail_order = request.POST.get("order_type") == "perakende"
+
                     # Notification opt-in — staff ticked "Send customer
                     # emails for this order" in the create sidebar.
                     order.notify_customer = bool(request.POST.get("notify_customer"))

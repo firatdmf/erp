@@ -391,6 +391,7 @@ class Order(models.Model):
     
     # Guest Order Information
     is_guest_order = models.BooleanField(default=False, help_text="True if order was placed by guest (non-registered user)")
+    is_retail_order = models.BooleanField(default=False, help_text="True if order was created via the Perakende (retail/walk-in) toggle on the create-order form")
     guest_email = models.EmailField(blank=True, null=True, help_text="Email address for guest orders")
     guest_phone = models.CharField(max_length=20, blank=True, null=True, help_text="Phone number for guest orders")
     guest_first_name = models.CharField(max_length=100, blank=True, null=True, help_text="First name for guest orders")

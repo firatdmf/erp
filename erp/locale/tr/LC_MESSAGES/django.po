@@ -6580,6 +6580,10 @@ msgctxt "sidebar"
 msgid "Accounts"
 msgstr "Cari Hesap"
 
+msgctxt "sidebar"
+msgid "Account"
+msgstr "Hesap"
+
 msgid "Size"
 msgstr "Beden"
 

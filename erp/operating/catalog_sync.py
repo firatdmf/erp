@@ -253,9 +253,19 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
             return None
         return b
 
-    # 1) Resolve / create the hidden base product. Never touch a featured
-    #    (website-visible) product — keep the hidden catalog separate.
+    # 1) Resolve / create the base product. A SKU match wins over
+    #    everything: if ANY catalog product — featured web products
+    #    included — carries the base code as its SKU, the variant
+    #    belongs under it (warehouse "K12767.G28" → web product
+    #    "Florenza" whose sku is "K12767"). Creating a parallel hidden
+    #    product in that case is exactly the duplication we must avoid.
+    #    Only then fall back to the hidden-by-title lookup, and lastly
+    #    create a fresh hidden product.
     product = existing_base_product
+    if product is None:
+        b = (base_name or "").strip()
+        if b:
+            product = Product.objects.filter(sku__iexact=b).order_by("id").first()
     if product is None:
         product = (Product.objects
                    .filter(title__iexact=base_name, featured=False)
@@ -288,7 +298,11 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
     if existing:
         variant = existing
         variant_created = False
-        variant.variant_featured = False
+        # Never un-feature a REAL web product's variant — hiding it from
+        # the storefront is not this sync's call. Hidden parents keep the
+        # old behaviour.
+        if not product.featured:
+            variant.variant_featured = False
         if qty is not None:
             variant.variant_quantity = qty          # mirror warehouse meters
         if variant_barcode and not variant.variant_barcode:
@@ -315,27 +329,31 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
     #        "color" and "model" on one product spawns a colour×model matrix
     #        of phantom variants, so every OTHER variant of the product is
     #        migrated onto this scan's dimension (each value's text is kept).
-    if attribute_name and attribute_value:
+    # A FEATURED parent's attribute setup belongs to the web team — only
+    # attach attributes to a variant we just created there, never rewire
+    # its existing variants or replace a web variant's values.
+    if attribute_name and attribute_value and (variant_created or not product.featured):
         Through = ProductVariant.product_variant_attribute_values.through
         target_attr, _ = ProductVariantAttribute.objects.get_or_create(
             name=_norm_attr(attribute_name))
 
-        # Migrate OTHER variants of this product off any different dimension.
-        other_links = (Through.objects
-                       .filter(productvariant__product=product)
-                       .exclude(productvariant_id=variant.id)
-                       .select_related("productvariantattributevalue"))
-        for link in other_links:
-            val = link.productvariantattributevalue
-            if val.product_variant_attribute_id == target_attr.id:
-                continue
-            moved, _ = ProductVariantAttributeValue.objects.get_or_create(
-                product_variant_attribute=target_attr,
-                product_variant_attribute_value=val.product_variant_attribute_value)
-            Through.objects.get_or_create(
-                productvariant_id=link.productvariant_id,
-                productvariantattributevalue_id=moved.id)
-            link.delete()
+        if not product.featured:
+            # Migrate OTHER variants of this product off any different dimension.
+            other_links = (Through.objects
+                           .filter(productvariant__product=product)
+                           .exclude(productvariant_id=variant.id)
+                           .select_related("productvariantattributevalue"))
+            for link in other_links:
+                val = link.productvariantattributevalue
+                if val.product_variant_attribute_id == target_attr.id:
+                    continue
+                moved, _ = ProductVariantAttributeValue.objects.get_or_create(
+                    product_variant_attribute=target_attr,
+                    product_variant_attribute_value=val.product_variant_attribute_value)
+                Through.objects.get_or_create(
+                    productvariant_id=link.productvariant_id,
+                    productvariantattributevalue_id=moved.id)
+                link.delete()
 
         # THIS variant: drop every old value, keep only the latest one.
         value_obj, _ = ProductVariantAttributeValue.objects.get_or_create(

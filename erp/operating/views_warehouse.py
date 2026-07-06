@@ -1406,11 +1406,33 @@ class WarehouseProductImport(View):
             if to_update:
                 WarehouseProduct.objects.bulk_update(to_update, update_fields, batch_size=1000)
 
+            # Link every imported row to the marketing catalog (match by
+            # SKU, create hidden products/variants for the rest) so the
+            # invariant "every warehouse product has a catalog link"
+            # survives imports. Never let linking break the import itself.
+            linked_info = {}
+            touched_skus = [p.sku for p in to_create if p.sku] + \
+                           [p.sku for p in to_update if p.sku]
+            if touched_skus:
+                yield (json.dumps({'phase': 'linking',
+                                   'message': 'Linking to catalog...'}) + '\n').encode('utf-8')
+                try:
+                    from .catalog_reconcile import reconcile_all_warehouse_links
+                    rs = reconcile_all_warehouse_links(apply=True, skus=touched_skus)
+                    linked_info = {
+                        'catalog_linked': rs['linked_wps'],
+                        'catalog_created': rs['products_created'],
+                        'catalog_conflicts': len(rs['conflicts']),
+                    }
+                except Exception as _exc:
+                    linked_info = {'catalog_link_error': str(_exc)}
+
             yield (json.dumps({
                 'phase': 'done',
                 'success': True,
                 'total': total_rows,
                 **counters,
+                **linked_info,
                 'usd_to_try_rate': str(usd_to_try),
                 'errors': errors[:10],
             }) + '\n').encode('utf-8')

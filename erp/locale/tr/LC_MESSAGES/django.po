@@ -7469,3 +7469,33 @@ msgstr "Siparişi aç"
 
 msgid "Scanned top"
 msgstr "Okutulan top"
+
+msgid "Order changes"
+msgstr "Sipariş Değişiklikleri"
+
+msgid "Order created"
+msgstr "Sipariş oluşturuldu"
+
+msgid "Status changed"
+msgstr "Durum değişti"
+
+msgid "Item added"
+msgstr "Ürün eklendi"
+
+msgid "Item removed"
+msgstr "Ürün çıkarıldı"
+
+msgid "Item updated"
+msgstr "Ürün güncellendi"
+
+msgid "Field updated"
+msgstr "Bilgi güncellendi"
+
+msgid "Product, field, value…"
+msgstr "Ürün, alan, değer…"
+
+msgid "No changes recorded for this order yet."
+msgstr "Bu sipariş için henüz değişiklik kaydedilmedi."
+
+msgid "records"
+msgstr "kayıt"

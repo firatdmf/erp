@@ -335,3 +335,8 @@ def create_or_update_liability_for_receipt(sender, instance, created, **kwargs):
                 },
             )
         )
+
+
+# Order audit trail — signal receivers live in audit.py; importing
+# here guarantees they are registered alongside the other signals.
+from . import audit  # noqa: E402,F401

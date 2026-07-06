@@ -1119,6 +1119,51 @@
                   placeholder="{% trans 'Internal notes about this order…' %}">{{ order.notes|default:'' }}</textarea>
       </section>
 
+      <!-- ORDER CHANGES — audit trail preview (full page at order_changes) -->
+      <section class="od-card" id="od-changes-card">
+        <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="display:flex; align-items:baseline; gap:10px;">
+            <h3>{% trans "Order changes" %}</h3>
+            <span class="od-card-sub">{{ order_changes_count|default:0 }} {% trans "records" %}</span>
+          </div>
+          <a href="{% url 'operating:order_changes' order.pk %}"
+             style="display:inline-flex; align-items:center; gap:6px; font:600 12.5px var(--font-sans); color:#00696A; text-decoration:none; white-space:nowrap;">
+            {% trans "View & filter all" %} <i class="fa fa-arrow-right" style="font-size:11px;"></i>
+          </a>
+        </div>
+        {% if order_changes_preview %}
+        <div>
+          {% for c in order_changes_preview %}
+          <div style="display:flex; align-items:flex-start; gap:10px; padding:9px 2px; {% if not forloop.last %}border-bottom:1px solid #F4F7FA;{% endif %}">
+            <span style="flex-shrink:0; display:inline-flex; align-items:center; gap:4px; padding:2px 9px 2px 7px; border-radius:999px; font:700 10px var(--font-sans); margin-top:1px;
+              {% if c.action == 'created' %}background:#E5F1F0; color:#005354;{% elif c.action == 'status' %}background:#DBEAFE; color:#1D4ED8;{% elif c.action == 'item_added' %}background:#D1FAE5; color:#065F46;{% elif c.action == 'item_removed' %}background:#FEE2E2; color:#B91C1C;{% elif c.action == 'item_updated' %}background:#FEF3C7; color:#8B5A00;{% else %}background:#F1F5F9; color:#475569;{% endif %}">
+              {{ c.action_display }}
+            </span>
+            <span style="flex:1; min-width:0; font:500 12.5px var(--font-sans); color:#374151; line-height:1.45;">
+              {% if c.item_label %}<b style="color:#0F1419;">{{ c.item_label|truncatechars:44 }}</b>{% if c.field_display %} · {{ c.field_display }}{% endif %}{% elif c.field_display %}<b style="color:#0F1419;">{{ c.field_display }}</b>{% endif %}
+              {% if c.old_display and c.new_display %}
+                <span style="color:#B91C1C; text-decoration:line-through;">{{ c.old_display|truncatechars:26 }}</span>
+                <span style="color:#A0A8B0;">→</span>
+                <span style="color:#0E6E4A; font-weight:700;">{{ c.new_display|truncatechars:26 }}</span>
+              {% elif c.new_display %}
+                <span style="color:#0E6E4A; font-weight:700;">{{ c.new_display|truncatechars:40 }}</span>
+              {% elif c.old_display %}
+                <span style="color:#B91C1C; text-decoration:line-through;">{{ c.old_display|truncatechars:40 }}</span>
+              {% endif %}
+            </span>
+            <span style="flex-shrink:0; font:500 10.5px var(--font-sans); color:#A0A8B0; white-space:nowrap; margin-top:2px;">
+              {{ c.created_at|date:"d M · H:i" }}{% if c.created_by %} · {{ c.created_by.username }}{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div style="padding:14px 2px; color:#94A3B8; font:500 12.5px var(--font-sans);">
+          <i class="fa fa-clock-rotate-left" style="margin-right:6px;"></i>{% trans "No changes recorded for this order yet." %}
+        </div>
+        {% endif %}
+      </section>
+
       <!-- CUSTOMER NOTIFICATIONS — toggle email opt-in on/off live. -->
       <section class="od-card" id="od-notify-card">
         <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">

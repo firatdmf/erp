@@ -1117,6 +1117,52 @@ class OrderRollReservation(models.Model):
         return f"Reserve {self.meters}m · roll #{self.roll_id} · order #{self.order_id}"
 
 
+class OrderChange(models.Model):
+    """Audit row for an order — one entry per meaningful change so the
+    order's original state and every later edit stay visible.
+
+    Written automatically by signal receivers in operating/audit.py on
+    every write path (create, edit screen, inline detail edits, status
+    transitions, packing, API) — views don't log by hand. The acting
+    user comes from a request-scoped thread-local set by
+    operating.audit.CurrentUserMiddleware."""
+
+    ACTION_CHOICES = [
+        ("created", "Order created"),
+        ("status", "Status changed"),
+        ("item_added", "Item added"),
+        ("item_removed", "Item removed"),
+        ("item_updated", "Item updated"),
+        ("field", "Field updated"),
+    ]
+
+    order = models.ForeignKey(
+        Order, related_name="change_logs", on_delete=models.CASCADE,
+    )
+    action = models.CharField(max_length=16, choices=ACTION_CHOICES, db_index=True)
+    # Which field changed (for action='field'/'item_updated'), e.g.
+    # 'carrier', 'quantity'. NULL for created/item_added/item_removed.
+    field = models.CharField(max_length=64, blank=True, null=True)
+    # Human label of the order item involved (product title + SKU).
+    item_label = models.CharField(max_length=255, blank=True, null=True)
+    old_value = models.TextField(blank=True, null=True)
+    new_value = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="order_changes",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["order", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.action} · order #{self.order_id} · {self.created_at:%Y-%m-%d %H:%M}"
+
+
 # A machine is a physical or virtual device that performs tasks in a workstation.
 # not used yet
 class Machine(models.Model):

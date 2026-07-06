@@ -295,6 +295,11 @@ class OrderDetail(DetailView):
         # gate + a summary on the detail page). Unconsumed = still held.
         ctx["reservation_count"] = self.object.roll_reservations.filter(consumed=False).count()
         ctx["has_cargo_info"] = bool((self.object.carrier or "").strip() and (self.object.tracking_number or "").strip())
+        # Change history preview (full page at order_changes).
+        ctx["order_changes_preview"] = _decorate_order_changes(list(
+            self.object.change_logs.select_related("created_by")[:8]
+        ))
+        ctx["order_changes_count"] = self.object.change_logs.count()
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -960,6 +965,115 @@ def order_pack_complete(request, pk):
         order.save(update_fields=["order_status", "updated_at"])
     return JsonResponse({"ok": True, "status": "packaging",
                          "redirect": reverse("operating:order_detail", args=[order.pk])})
+
+
+# ---------------------------------------------------------------------------
+# Order change history — the audit trail written by operating/audit.py.
+# Preview card on the detail page + a dedicated filterable page.
+# ---------------------------------------------------------------------------
+_CHANGE_FIELD_TR = {
+    "order_status": "Sipariş durumu", "carrier": "Kargo şirketi",
+    "tracking_number": "Takip numarası", "notes": "Notlar",
+    "print_header": "Yazdırma başlığı", "ettn": "ETTN",
+    "guest_first_name": "Misafir adı", "guest_last_name": "Misafir soyadı",
+    "guest_email": "Misafir e-posta", "guest_phone": "Misafir telefon",
+    "customer": "Müşteri", "quantity": "Miktar", "price": "Fiyat",
+    "product": "Ürün",
+}
+_CHANGE_ACTION_TR = {
+    "created": "Oluşturuldu", "status": "Durum",
+    "item_added": "Ürün eklendi", "item_removed": "Ürün çıkarıldı",
+    "item_updated": "Ürün güncellendi", "field": "Bilgi güncellendi",
+}
+
+
+def _decorate_order_changes(changes):
+    """Attach display attrs (Turkish labels, resolved status/carrier
+    names) to OrderChange rows for the templates."""
+    from django.utils import translation
+    from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
+    is_tr = (translation.get_language() or "").startswith("tr")
+    status_map = {k: str(v) for k, v in ORDER_STATUS_CHOICES}
+    carrier_map = dict(CARRIER_CHOICES)
+
+    def val_display(c, v):
+        if v is None:
+            return None
+        if c.field == "order_status":
+            return status_map.get(v, v)
+        if c.field == "carrier":
+            return carrier_map.get(v, v)
+        return v
+
+    for c in changes:
+        c.action_display = (_CHANGE_ACTION_TR.get(c.action, c.action) if is_tr
+                            else c.get_action_display())
+        if c.field:
+            c.field_display = (_CHANGE_FIELD_TR.get(c.field, c.field) if is_tr
+                               else c.field.replace("_", " "))
+        else:
+            c.field_display = None
+        c.old_display = val_display(c, c.old_value)
+        c.new_display = val_display(c, c.new_value)
+    return changes
+
+
+@login_required
+def order_changes(request, pk):
+    """Dedicated filterable page for an order's full change history.
+    Query params: action ('' | created | status | item_added |
+    item_removed | item_updated | field), from/to (YYYY-MM-DD), q, page."""
+    from datetime import datetime as _dt
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    from django.db.models import Q as _Q
+    from .models import OrderChange
+
+    order = get_object_or_404(Order, pk=pk)
+    qs = (OrderChange.objects.filter(order=order)
+          .select_related("created_by"))
+
+    action = (request.GET.get("action") or "").strip()
+    if action in {k for k, _ in OrderChange.ACTION_CHOICES}:
+        qs = qs.filter(action=action)
+
+    date_from = (request.GET.get("from") or "").strip()
+    date_to = (request.GET.get("to") or "").strip()
+    try:
+        if date_from:
+            qs = qs.filter(created_at__date__gte=_dt.strptime(date_from, "%Y-%m-%d").date())
+    except ValueError:
+        pass
+    try:
+        if date_to:
+            qs = qs.filter(created_at__date__lte=_dt.strptime(date_to, "%Y-%m-%d").date())
+    except ValueError:
+        pass
+
+    q = (request.GET.get("q") or "").strip()
+    if q:
+        qs = qs.filter(_Q(item_label__icontains=q) | _Q(field__icontains=q)
+                       | _Q(old_value__icontains=q) | _Q(new_value__icontains=q)
+                       | _Q(created_by__username__icontains=q))
+
+    qs = qs.order_by("-created_at", "-id")
+
+    paginator = Paginator(qs, 50)
+    try:
+        page = paginator.page(request.GET.get("page", 1))
+    except (EmptyPage, PageNotAnInteger, ValueError):
+        page = paginator.page(1)
+
+    qd = request.GET.copy()
+    qd.pop("page", None)
+
+    return render(request, "operating/order_changes.html", {
+        "order": order,
+        "page_obj": page,
+        "paginator": paginator,
+        "changes": _decorate_order_changes(list(page.object_list)),
+        "filter_qs": qd.urlencode(),
+        "filters": {"action": action, "from": date_from, "to": date_to, "q": q},
+    })
 
 
 # ---------------------------------------------------------------------------

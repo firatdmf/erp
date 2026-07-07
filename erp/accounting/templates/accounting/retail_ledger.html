@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load humanize %}
+
+{% block css %}
+<style>
+  :root {
+    --nejum-teal-50:  #E5F1F0;
+    --nejum-teal-500: #147F74;
+    --nejum-teal-600: #00696A;
+    --nejum-teal-700: #005354;
+    --gray-400: #A0A8B0;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --ink: #0F1419;
+  }
+  .rl { padding: 22px 28px 80px; font: 400 13.5px var(--font-sans); color: var(--ink); max-width: 1180px; margin: 0 auto; }
+  .rl, .rl * { box-sizing: border-box; }
+
+  .rl-back { display:inline-flex; align-items:center; gap:6px; padding: 6px 12px; background: white; border: 1px solid #E0E6EE; border-radius: 8px; font: 600 12.5px var(--font-sans); color: var(--gray-700); text-decoration: none; box-shadow: 0 1px 2px rgba(15,23,31,0.04); margin-bottom: 14px; }
+  .rl-back:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+
+  .rl-head { display:flex; align-items:flex-end; justify-content:space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .rl-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
+  .rl-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; margin: 0; }
+
+  .rl-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .rl-stat { background: white; border: 1px solid #E2E8EE; border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
+  .rl-stat .l { font: 700 10px var(--font-sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 4px; }
+  .rl-stat .v { font: 800 20px var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .rl-stat .v.teal { color: var(--nejum-teal-700); }
+
+  .rl-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: white; border: 1px solid #E2E8EE; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
+  .rl-filters input[type=text], .rl-filters input[type=date] {
+    padding: 8px 12px; border: 1px solid #E0E6EE; border-radius: 8px; font: 500 13px var(--font-sans); color: var(--ink); outline: none; background: #FAFBFD;
+  }
+  .rl-filters input:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); background: white; }
+  .rl-filters input[type=text] { min-width: 240px; }
+  .rl-btn { display:inline-flex; align-items:center; gap:6px; padding: 8px 14px; border-radius: 8px; font: 600 12.5px var(--font-sans); cursor: pointer; text-decoration: none; border: none; }
+  .rl-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); color: white; border: 1px solid var(--nejum-teal-700); }
+  .rl-btn.ghost { background: white; border: 1px solid #E0E6EE; color: var(--gray-700); }
+
+  .rl-tablewrap { background: white; border: 1px solid #E2E8EE; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  table.rl-t { width: 100%; border-collapse: collapse; font: 400 13px var(--font-sans); }
+  .rl-t thead th { background: #FAFBFD; border-bottom: 1px solid #E2E8EE; font: 600 10.5px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-500); padding: 10px 14px; text-align: left; white-space: nowrap; }
+  .rl-t th.num, .rl-t td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rl-t tbody td { padding: 11px 14px; border-bottom: 1px solid #EEF1F5; vertical-align: middle; }
+  .rl-t tbody tr:last-child td { border-bottom: none; }
+  .rl-t tbody tr:hover { background: #FAFBFD; }
+  .rl-ord { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); background: #F4F7FB; padding: 3px 8px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
+  .rl-ord:hover { background: var(--nejum-teal-50); }
+  .rl-amt { font-weight: 700; color: #0E6E4A; }
+  .rl-empty { padding: 60px 24px; text-align: center; color: var(--gray-500); }
+  .rl-empty .ico { font-size: 26px; color: var(--nejum-teal-500); margin-bottom: 10px; }
+
+  .rl-pager { display:flex; gap:6px; justify-content:center; padding: 14px; }
+  .rl-pg { padding: 6px 12px; border: 1px solid #E0E6EE; background: white; border-radius: 8px; font: 600 12px var(--font-sans); color: var(--gray-700); text-decoration: none; }
+  .rl-pg.active { background: var(--nejum-teal-600); border-color: var(--nejum-teal-700); color: white; }
+
+  @media (max-width: 720px) {
+    .rl { padding: 14px 12px 70px; }
+    .rl-title { font-size: 22px; }
+    .rl-filters input[type=text] { min-width: 0; width: 100%; }
+    .rl-tablewrap { overflow-x: auto; }
+    table.rl-t { min-width: 640px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rl">
+  {% if book %}
+  <a class="rl-back" href="{% url 'accounting:book_detail' book.id %}"><i class="fas fa-arrow-left"></i> {{ book.name }} {% trans "defteri" %}</a>
+  {% else %}
+  <a class="rl-back" href="{% url 'accounting:index' %}"><i class="fas fa-arrow-left"></i> {% trans "Defterler" %}</a>
+  {% endif %}
+
+  <div class="rl-head">
+    <div>
+      <div class="rl-eyebrow">{% trans "Muhasebe" %} · {% trans "Perakende" %}</div>
+      <h1 class="rl-title">{% trans "Perakende Satış Defteri" %}</h1>
+    </div>
+  </div>
+
+  <div class="rl-stats">
+    <div class="rl-stat">
+      <div class="l">{% trans "Kayıt" %}</div>
+      <div class="v">{{ row_count|intcomma }}</div>
+    </div>
+    <div class="rl-stat">
+      <div class="l">{% trans "Toplam Satış" %}{% if q or date_from or date_to %} ({% trans "filtreli" %}){% endif %}</div>
+      <div class="v teal">${{ total_amount|floatformat:2|intcomma }}</div>
+    </div>
+    {% for ca in cash_accounts %}
+    <div class="rl-stat">
+      <div class="l">{{ ca.name }} ({{ ca.currency.code }})</div>
+      <div class="v">{{ ca.currency.symbol }}{{ ca.balance|floatformat:2|intcomma }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <form class="rl-filters" method="get">
+    <input type="text" name="q" value="{{ q }}" placeholder="{% trans 'Sipariş no veya açıklama ara…' %}">
+    <input type="date" name="from" value="{{ date_from }}" title="{% trans 'Başlangıç tarihi' %}">
+    <input type="date" name="to" value="{{ date_to }}" title="{% trans 'Bitiş tarihi' %}">
+    <button type="submit" class="rl-btn primary"><i class="fas fa-filter"></i> {% trans "Filtrele" %}</button>
+    {% if q or date_from or date_to %}
+    <a href="{% url 'accounting:retail_ledger' %}" class="rl-btn ghost">{% trans "Temizle" %}</a>
+    {% endif %}
+  </form>
+
+  <div class="rl-tablewrap">
+    {% if rows %}
+    <table class="rl-t">
+      <thead>
+        <tr>
+          <th>{% trans "Tarih" %}</th>
+          <th>{% trans "Sipariş" %}</th>
+          <th>{% trans "Açıklama" %}</th>
+          <th>{% trans "Kasa" %}</th>
+          <th class="num">{% trans "Tutar" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td style="white-space:nowrap;">{{ r.date|date:"d M Y" }}</td>
+          <td>
+            {% if r.order_id %}
+              <a class="rl-ord" href="{% url 'operating:order_detail' r.order_id %}">
+                {% if r.order.order_number %}{{ r.order.order_number }}{% else %}#{{ r.order_id }}{% endif %}
+              </a>
+            {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
+          </td>
+          <td>{{ r.description|default:"—" }}</td>
+          <td style="color:var(--gray-600);">{{ r.cash_account.name }}</td>
+          <td class="num rl-amt">{% if r.currency %}{{ r.currency.symbol }}{% else %}${% endif %}{{ r.amount|floatformat:2|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="rl-empty">
+      <div class="ico"><i class="fas fa-cash-register"></i></div>
+      {% if q or date_from or date_to %}
+        {% trans "Bu filtrelere uyan kayıt yok." %}
+      {% else %}
+        {% trans "Henüz perakende satış kaydı yok — bir perakende sipariş tamamlandığında burada görünecek." %}
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if paginator.num_pages > 1 %}
+  <div class="rl-pager">
+    {% if page.has_previous %}<a class="rl-pg" href="?page={{ page.previous_page_number }}&q={{ q|urlencode }}&from={{ date_from }}&to={{ date_to }}">‹</a>{% endif %}
+    {% for n in paginator.page_range %}
+      {% if n == page.number %}<span class="rl-pg active">{{ n }}</span>
+      {% elif n == 1 or n == paginator.num_pages or n|add:'-2' <= page.number and n|add:'2' >= page.number %}
+        <a class="rl-pg" href="?page={{ n }}&q={{ q|urlencode }}&from={{ date_from }}&to={{ date_to }}">{{ n }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page.has_next %}<a class="rl-pg" href="?page={{ page.next_page_number }}&q={{ q|urlencode }}&from={{ date_from }}&to={{ date_to }}">›</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

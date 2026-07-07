@@ -1618,15 +1618,29 @@ class OrderCreate(View):
                 # movement so the customer's ledger reflects this
                 # order immediately. Web orders are not routed through
                 # this view, so we don't gate on order kind here.
+                # Retail (Perakende) orders are the exception: their
+                # sale + auto collection post to the shared retail cari
+                # when the order COMPLETES (apply_order_status_change),
+                # not at create. Here we only attach the retail cari
+                # when a deposit was taken, so that deposit has
+                # somewhere to post instead of being silently skipped.
                 try:
                     from current_account.services import (
                         get_or_create_cari_for_order, post_order_movement,
+                        get_or_create_retail_cari,
                     )
-                    cari = get_or_create_cari_for_order(order, member=member)
-                    if cari and order.cari_id != cari.pk:
-                        order.cari = cari
-                        order.save(update_fields=["cari"])
-                    post_order_movement(order, member=member)
+                    if order.is_retail_order:
+                        if (request.POST.get("deposit_received") or "").strip():
+                            cari = get_or_create_retail_cari(member=member)
+                            if order.cari_id != cari.pk:
+                                order.cari = cari
+                                order.save(update_fields=["cari"])
+                    else:
+                        cari = get_or_create_cari_for_order(order, member=member)
+                        if cari and order.cari_id != cari.pk:
+                            order.cari = cari
+                            order.save(update_fields=["cari"])
+                        post_order_movement(order, member=member)
                 except Exception as _e:
                     messages.warning(request, f"Order saved but cari sync had an issue: {_e}")
 

@@ -206,3 +206,156 @@ def reverse_order_movement(order):
     mv.delete()
     if cari:
         cari.recompute_balance(save=True)
+
+
+# ---------------------------------------------------------------------------
+# Perakende (retail) — anonymous walk-in sales.
+#
+# Retail orders have no contact/company, so get_or_create_cari_for_order
+# returns None and their revenue would vanish from the books entirely.
+# Instead they all post to ONE shared system cari ("Perakende
+# Satışları") when the order COMPLETES (moves to shipped): the sale
+# movement plus an automatic cash collection for whatever a deposit
+# hasn't already covered — retail is paid at the counter, so the cari
+# balance nets to ~0 and the account reads as a retail revenue journal.
+# The same completion also writes an EquityRevenue row into the
+# "Perakende" accounting Book so the defter mirrors the sale.
+# ---------------------------------------------------------------------------
+RETAIL_CARI_CODE = "PERAKENDE"
+RETAIL_BOOK_NAME = "Perakende"
+RETAIL_CASH_NAME = "Perakende Kasa"
+_RETAIL_AUTO_DESC = "Perakende otomatik tahsilat"
+
+
+def get_or_create_retail_cari(member=None) -> CariAccount:
+    """The single shared cari all retail orders post to."""
+    book = get_default_book()
+    cari = CariAccount.objects.filter(book=book, code=RETAIL_CARI_CODE).first()
+    if cari:
+        return cari
+    return CariAccount.objects.create(
+        book=book, code=RETAIL_CARI_CODE, name="Perakende Satışları",
+        type="customer", default_currency=_resolve_currency(),
+        notes="Sistem carisi — anonim perakende satışlar otomatik buraya işlenir.",
+        created_by=member,
+    )
+
+
+def _get_retail_book():
+    book = Book.objects.filter(name__iexact=RETAIL_BOOK_NAME).first()
+    if book:
+        return book
+    return Book.objects.create(name=RETAIL_BOOK_NAME)
+
+
+def _get_retail_cash_account(currency):
+    from accounting.models import CashAccount
+    book = _get_retail_book()
+    acc = CashAccount.objects.filter(book=book, name=RETAIL_CASH_NAME,
+                                     currency=currency).first()
+    if acc:
+        return acc
+    return CashAccount.objects.create(book=book, name=RETAIL_CASH_NAME,
+                                      currency=currency, balance=0)
+
+
+def _order_confirmed_collections(order, cari):
+    """Sum of confirmed collections already tagged to this order on the
+    retail cari (deposits + a possibly-existing auto collection)."""
+    from .models import Payment
+    from django.db.models import Sum
+    return (Payment.objects.filter(
+        cari=cari, type="collection", status="confirmed",
+        notes=f"ORD-{order.pk}",
+    ).aggregate(s=Sum("amount"))["s"] or Decimal("0"))
+
+
+def post_retail_order_financials(order, user=None):
+    """Idempotent completion posting for a retail order:
+      1. attach the shared retail cari + post the order_sale movement;
+      2. auto-collect the not-yet-collected remainder (cash, no
+         cash_account — physical cash is tracked by the defter side);
+      3. mirror the sale into the Perakende Book as EquityRevenue
+         (+ CashTransactionEntry + till balance via the standard
+         handle_equity_transaction machinery).
+    Safe to re-run (re-ship after un-ship): each leg checks its own
+    marker before writing."""
+    from .models import Payment
+    from .views_payment import _next_payment_number
+    from accounting.models import EquityRevenue
+
+    member = getattr(user, "member", None) if user else None
+    total = Decimal(str(order.total_value() or 0))
+    if total <= 0:
+        return
+
+    cari = get_or_create_retail_cari(member=member)
+    if order.cari_id != cari.pk:
+        order.cari = cari
+        order.save(update_fields=["cari", "updated_at"])
+    post_order_movement(order, member=member)
+
+    # ── auto collection for the remainder ────────────────────────
+    currency = _resolve_currency(order)
+    collected = _order_confirmed_collections(order, cari)
+    remainder = total - collected
+    if remainder > 0:
+        book = get_default_book()
+        pay = Payment.objects.create(
+            cari=cari, book=book,
+            number=_next_payment_number(book, "collection"),
+            type="collection", method="cash", status="draft",
+            date=date.today(), amount=remainder, currency=currency,
+            description=f"{_RETAIL_AUTO_DESC} — Sipariş #{order.pk}",
+            notes=f"ORD-{order.pk}",
+            created_by=member,
+        )
+        pay.confirm(user=user)
+
+    # ── defter (Perakende Book) mirror ───────────────────────────
+    retail_book = _get_retail_book()
+    if not EquityRevenue.objects.filter(order=order, book=retail_book).exists():
+        cash_acc = _get_retail_cash_account(currency)
+        rev = EquityRevenue.objects.create(
+            book=retail_book, cash_account=cash_acc, currency=currency,
+            amount=total, date=date.today(),
+            description=f"Perakende satış — Sipariş #{order.pk}",
+            order=order, revenue_type="sales",
+        )
+        from accounting.views import handle_equity_transaction
+        handle_equity_transaction(retail_book, total, currency, rev, rev.pk, cash_acc)
+
+
+def reverse_retail_order_financials(order, user=None):
+    """Undo post_retail_order_financials when a retail order leaves the
+    shipped state (un-ship / cancel): remove the sale movement, cancel
+    the AUTO collection (manual deposits are left alone), and reverse
+    the defter revenue + till cash."""
+    from .models import Payment
+    from accounting.models import EquityRevenue, CashAccount, CashTransactionEntry
+    from django.db.models import F as _F
+
+    reverse_order_movement(order)
+
+    cari = CariAccount.objects.filter(book=get_default_book(),
+                                      code=RETAIL_CARI_CODE).first()
+    if cari:
+        for pay in Payment.objects.filter(
+                cari=cari, type="collection", status="confirmed",
+                notes=f"ORD-{order.pk}",
+                description__startswith=_RETAIL_AUTO_DESC):
+            pay.cancel(user=user, reason="Sipariş sevk iptali")
+
+    retail_book = Book.objects.filter(name__iexact=RETAIL_BOOK_NAME).first()
+    if retail_book:
+        for rev in EquityRevenue.objects.filter(order=order, book=retail_book):
+            # Pull the cash back out of the till + drop the ledger rows.
+            # queryset.update bypasses CashAccount.clean's >=0 guard on
+            # purpose: the reversal must post even if the till was
+            # drained by other entries in the meantime.
+            CashAccount.objects.filter(pk=rev.cash_account_id).update(
+                balance=_F("balance") - rev.amount)
+            ct = ContentType.objects.get_for_model(EquityRevenue)
+            CashTransactionEntry.objects.filter(
+                book=retail_book, content_type=ct, content_pk=rev.pk).delete()
+            rev.delete()

@@ -20,7 +20,7 @@ from django.contrib.auth.decorators import login_required
 
 from django.http import JsonResponse
 from django.db.models import Q
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.utils import timezone
 from datetime import timedelta
 import decimal
@@ -1721,3 +1721,62 @@ class SalesDashboardView(View):
             return render(request, 'accounting/partials/sales_content.html', context)
         
         return render(request, self.template_name, context)
+
+
+@method_decorator(login_required, name="dispatch")
+class RetailLedger(View):
+    """Perakende satış defteri — every completed retail order's revenue
+    entry in the 'Perakende' Book, filterable by date range and search
+    (order no / description). The rows are the EquityRevenue records
+    written by current_account.services.post_retail_order_financials."""
+
+    template_name = "accounting/retail_ledger.html"
+    PAGE_SIZE = 50
+
+    def get(self, request):
+        from django.core.paginator import Paginator
+        from current_account.services import RETAIL_BOOK_NAME, RETAIL_CASH_NAME
+
+        book = Book.objects.filter(name__iexact=RETAIL_BOOK_NAME).first()
+
+        q = (request.GET.get("q") or "").strip()
+        date_from = (request.GET.get("from") or "").strip()
+        date_to = (request.GET.get("to") or "").strip()
+
+        rows = EquityRevenue.objects.none()
+        if book:
+            rows = (EquityRevenue.objects.filter(book=book)
+                    .select_related("order", "cash_account", "currency")
+                    .order_by("-date", "-id"))
+            if q:
+                q_filter = Q(description__icontains=q)
+                if q.lstrip("#").isdigit():
+                    q_filter |= Q(order_id=int(q.lstrip("#")))
+                q_filter |= Q(order__order_number__icontains=q)
+                rows = rows.filter(q_filter)
+            if date_from:
+                rows = rows.filter(date__gte=date_from)
+            if date_to:
+                rows = rows.filter(date__lte=date_to)
+
+        totals = rows.aggregate(total=Sum("amount"), n=Count("id"))
+        cash_accounts = (CashAccount.objects
+                         .filter(book=book, name=RETAIL_CASH_NAME)
+                         .select_related("currency")) if book else []
+
+        paginator = Paginator(rows, self.PAGE_SIZE)
+        try:
+            page = paginator.page(int(request.GET.get("page", "1")))
+        except Exception:
+            page = paginator.page(1)
+
+        return render(request, self.template_name, {
+            "book": book,
+            "page": page,
+            "paginator": paginator,
+            "rows": page.object_list,
+            "total_amount": totals["total"] or 0,
+            "row_count": totals["n"] or 0,
+            "cash_accounts": cash_accounts,
+            "q": q, "date_from": date_from, "date_to": date_to,
+        })

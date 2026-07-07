@@ -2837,6 +2837,20 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 consume_reservations_for_order(order, user=user)
             elif leaving_ship:
                 restore_reservations_for_order(order, user=user)
+            # Retail money leg — completion posts the sale + auto
+            # collection to the shared "Perakende Satışları" cari and
+            # mirrors it into the Perakende defter; un-ship reverses
+            # all of it. Inside the SAME transaction so status, stock
+            # and money can never diverge.
+            if getattr(order, "is_retail_order", False):
+                from current_account.services import (
+                    post_retail_order_financials,
+                    reverse_retail_order_financials,
+                )
+                if entering_ship:
+                    post_retail_order_financials(order, user=user)
+                elif leaving_ship:
+                    reverse_retail_order_financials(order, user=user)
     except Exception as _e:
         return False, f"error:{_e}"
     return True, None

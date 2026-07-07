@@ -665,6 +665,7 @@ class OrderDetail(DetailView):
         # checkbox on the detail page. Gated on is_retail_order so this
         # flag can never bypass the cargo gate for a normal order.
         skip_cargo = order.is_retail_order and request.POST.get("skip_cargo") == "1"
+        was_shipped = order.order_status in _SHIPPED_CLASS
 
         # All status changes funnel through the single atomic helper so
         # the ship gate (cargo required) + the reservation → stock-out
@@ -683,7 +684,36 @@ class OrderDetail(DetailView):
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             return redirect("operating:order_detail", pk=order.pk)
-        messages.success(request, "Order updated.")
+
+        now_shipped = order.order_status in _SHIPPED_CLASS
+        if now_shipped and not was_shipped:
+            messages.success(
+                request,
+                "Sipariş tamamlandı — stok düşüldü ve kayıtlar işlendi. "
+                "Bir yanlışlık olduysa 'Geri Aç & Düzelt' ile geri alabilirsiniz.",
+            )
+        elif was_shipped and not now_shipped:
+            # The optional reason from the "Geri Aç & Düzelt" prompt goes
+            # straight into the order's change history so the audit trail
+            # says WHY, not just that the status moved.
+            reason = (request.POST.get("revert_reason") or "").strip()
+            if reason:
+                from .models import OrderChange
+                try:
+                    OrderChange.objects.create(
+                        order=order, action="field", field="revert_reason",
+                        new_value=reason,
+                        created_by=request.user if request.user.is_authenticated else None,
+                    )
+                except Exception:
+                    pass
+            messages.success(
+                request,
+                "Sipariş geri açıldı — stok iade edildi, mali kayıtlar geri alındı. "
+                "Düzeltmeleri yaptıktan sonra 'Siparişi Tamamla' ile tekrar kapatın.",
+            )
+        else:
+            messages.success(request, "Order updated.")
         return redirect("operating:order_detail", pk=order.pk)
 
 
@@ -1082,7 +1112,7 @@ _CHANGE_FIELD_TR = {
     "guest_first_name": "Misafir adı", "guest_last_name": "Misafir soyadı",
     "guest_email": "Misafir e-posta", "guest_phone": "Misafir telefon",
     "customer": "Müşteri", "quantity": "Miktar", "price": "Fiyat",
-    "product": "Ürün",
+    "product": "Ürün", "revert_reason": "Geri açma sebebi",
 }
 _CHANGE_ACTION_TR = {
     "created": "Oluşturuldu", "status": "Durum",
@@ -2357,10 +2387,23 @@ def export_packing_list_excel(request, pk):
 def delete_order(request, pk):
     try:
         order = Order.objects.get(pk=pk)
-        order.delete()
-        messages.success(request, "Order deleted successfully.")
     except Order.DoesNotExist:
         messages.error(request, "Order not found.")
+        return redirect("operating:order_list")
+    # A shipped/completed order's rolls are already cut and its money
+    # posted — deleting it would cascade the consumed reservations away
+    # WITHOUT restoring stock, orphan the cari sale movement, and (for
+    # retail) crash on the defter entry's RESTRICT FK. Force the proper
+    # path: re-open first (which reverses everything), then delete.
+    if order.order_status in _SHIPPED_CLASS:
+        messages.error(
+            request,
+            "Tamamlanmış/gönderilmiş sipariş silinemez — stok ve cari kayıtları bozulur. "
+            "Önce sipariş detayındaki 'Geri Aç & Düzelt' ile geri açın, sonra silin.",
+        )
+        return redirect("operating:order_detail", pk=order.pk)
+    order.delete()
+    messages.success(request, "Order deleted successfully.")
     return redirect("operating:order_list")
 
 
@@ -2388,14 +2431,25 @@ def bulk_delete_orders(request):
     if not ids:
         return JsonResponse({"ok": False, "error": "No order_ids supplied"}, status=400)
     qs = Order.objects.filter(pk__in=ids)
-    count = qs.count()
+    # Same guard as delete_order: shipped orders must be re-opened first
+    # (stock + money already posted). Skip them and tell the UI which.
+    deletable = [o for o in qs if o.order_status not in _SHIPPED_CLASS]
+    skipped_ids = [o.pk for o in qs if o.order_status in _SHIPPED_CLASS]
     # Iterate so each Order.delete() triggers its cascade signals
     # (OrderItem post_delete restores catalog stock; cari movement is
     # reversed). bulk delete via qs.delete() would still cascade but
     # we keep it per-row for predictable signal ordering on Postgres.
-    for o in qs:
+    for o in deletable:
         o.delete()
-    return JsonResponse({"ok": True, "deleted": count})
+    resp = {"ok": True, "deleted": len(deletable),
+            "deleted_ids": [o.pk for o in deletable],
+            "skipped_ids": skipped_ids}
+    if skipped_ids:
+        resp["warning"] = (
+            f"{len(skipped_ids)} tamamlanmış sipariş silinmedi — önce sipariş "
+            "detayından 'Geri Aç & Düzelt' ile geri açın."
+        )
+    return JsonResponse(resp)
 
 
 

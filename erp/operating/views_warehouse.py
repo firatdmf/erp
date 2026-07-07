@@ -2817,7 +2817,13 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
 
     # Gate: packing-complete AND ship both require the reservations to
     # fully cover every line's metres — not merely "a roll was scanned".
-    if entering_ship or (changing and new_status == "packaging" and old_status != "packaging"):
+    # Coming BACK from a shipped status is exempt: the reservations are
+    # still consumed at this point (restore runs inside the transaction
+    # below), so the coverage check would always fail — and coverage was
+    # already enforced on the way in.
+    if entering_ship or (changing and new_status == "packaging"
+                         and old_status != "packaging"
+                         and old_status not in SHIPPED_CLASS):
         if order_reservation_shortfalls(order):
             # Persist any cargo edits but don't advance the status.
             order.save(update_fields=["carrier", "tracking_number", "updated_at"])

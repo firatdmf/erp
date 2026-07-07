@@ -931,6 +931,12 @@
                 <button type="button" id="od-complete-btn" class="ord-btn primary" data-status="shipped">
                   <i class="fa fa-truck-fast"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişi Tamamla{% else %}Complete order{% endif %}
                 </button>
+                {% else %}
+                <button type="button" id="od-revert-btn" class="ord-btn ghost"
+                        style="border-color:#F5D78B; background:#FFFBEB; color:#8B5A00;"
+                        title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Stok iadesiyle birlikte siparişi düzeltilebilir hale geri açar{% else %}Re-opens the order for corrections, restoring stock{% endif %}">
+                  <i class="fa fa-rotate-left"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Geri Aç &amp; Düzelt{% else %}Re-open &amp; Fix{% endif %}
+                </button>
                 {% endif %}
               </div>
             </div>
@@ -1430,7 +1436,13 @@
         shipGridEl.style.display = this.checked ? '' : 'none';
       });
     }
-    const CONFIRM_SHIP_NO_CARGO = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Kargo bilgisi girilmeden sipariş tamamlanacak ve rezerve edilen toplar stoktan düşülecek. Onaylıyor musunuz?'{% else %}'The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock. Continue?'{% endif %};
+    const CONFIRM_SHIP_NO_CARGO = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Kargo bilgisi girilmeden sipariş tamamlanacak ve rezerve edilen toplar stoktan düşülecek.'{% else %}'The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock.'{% endif %};
+    // Line-by-line recap appended to the complete-confirm so a mistyped
+    // quantity/price gets one last human look before stock + money post.
+    const ORDER_SUMMARY =
+      {% for item in order_items_sorted %}'• {{ item.product.title|default:item.description|escapejs }}{% if item.product_variant %} ({{ item.product_variant.variant_sku|escapejs }}){% endif %} — {{ item.quantity|floatformat:2 }} × ${{ item.price|floatformat:2 }}\n' +
+      {% endfor %}'{% if LANGUAGE_CODE|slice:":2" == "tr" %}Toplam{% else %}Total{% endif %}: ${{ order.total_value|floatformat:2 }}';
+    const CONFIRM_TAIL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'\n\nOnaylıyor musunuz?'{% else %}'\n\nContinue?'{% endif %};
     function setSkipCargo(v) {
       let inp = document.getElementById('od-skip-cargo-input');
       if (!inp) {
@@ -1443,7 +1455,7 @@
     function submitStatus(s) {
       if (SHIPPED.indexOf(s) !== -1) {
         if (hasCargoChk && !hasCargoChk.checked) {
-          if (!confirm(CONFIRM_SHIP_NO_CARGO)) return;
+          if (!confirm(CONFIRM_SHIP_NO_CARGO + '\n\n' + ORDER_SUMMARY + CONFIRM_TAIL)) return;
           setSkipCargo('1');
         } else {
           const c = ((carrierSel && carrierSel.value) || '').trim();
@@ -1453,7 +1465,7 @@
             if (!c && carrierSel) { carrierSel.focus(); } else if (trackingInp) { trackingInp.focus(); }
             return;
           }
-          if (!confirm(CONFIRM_SHIP)) return;
+          if (!confirm(CONFIRM_SHIP + '\n\n' + ORDER_SUMMARY + CONFIRM_TAIL)) return;
           setSkipCargo('0');
         }
       }
@@ -1468,6 +1480,31 @@
         submitStatus(s);
       });
     });
+
+    // "Geri Aç & Düzelt" — take a completed order back to Paketleniyor:
+    // stock returns to the exact rolls, the retail auto-collection is
+    // cancelled and the defter entry is removed (server side), and the
+    // order becomes editable again. Reason is optional and lands in the
+    // order's change history.
+    const revertBtn = document.getElementById('od-revert-btn');
+    if (revertBtn) {
+      revertBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        const msg = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Sipariş geri açılacak:\n\n• Kesilen metreler aynı toplara iade edilir\n• Otomatik tahsilat iptal edilir (elle girilen kapora kalır)\n• Perakende defterindeki kayıt kaldırılır\n• Sipariş yeniden düzenlenebilir olur\n\nDüzeltmeleri yaptıktan sonra "Siparişi Tamamla" ile tekrar kapatın. Devam edilsin mi?'{% else %}'The order will be re-opened:\n\n• Cut metres return to their rolls\n• The auto collection is cancelled (manual deposits stay)\n• The retail ledger entry is removed\n• The order becomes editable again\n\nComplete it again after fixing. Continue?'{% endif %};
+        if (!confirm(msg)) return;
+        const reason = prompt({% if LANGUAGE_CODE|slice:":2" == "tr" %}'Geri açma sebebi (opsiyonel — değişiklik geçmişine yazılır):'{% else %}'Reason for re-opening (optional — logged to change history):'{% endif %}, '');
+        if (reason === null) return;  // cancel on the prompt aborts too
+        let inp = document.getElementById('od-revert-reason-input');
+        if (!inp) {
+          inp = document.createElement('input');
+          inp.type = 'hidden'; inp.name = 'revert_reason'; inp.id = 'od-revert-reason-input';
+          statusForm.appendChild(inp);
+        }
+        inp.value = reason.trim();
+        statusInput.value = 'packaging';
+        statusForm.submit();
+      });
+    }
   }
 
   // ── Inline edit: dirty tracking + manual Save.

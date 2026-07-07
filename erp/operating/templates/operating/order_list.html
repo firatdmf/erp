@@ -890,12 +890,15 @@
         });
         const data = await r.json().catch(() => ({}));
         if (!(data && data.ok)) throw new Error(data && data.error || 'Delete failed');
-        // Remove deleted rows from all panes without a reload.
-        ids.forEach(id => {
+        // Remove ONLY the rows the server actually deleted — shipped
+        // orders are skipped server-side (must be re-opened first) and
+        // stay visible, with a warning explaining why.
+        (data.deleted_ids || ids).forEach(id => {
           document.querySelectorAll(`.ord-row[data-order-id="${id}"]`).forEach(row => row.remove());
         });
         selected.clear();
         refresh();
+        if (data.warning) alert(data.warning);
         // Update tab counts.
         document.querySelectorAll('.ord-tab').forEach(t => {
           const pane = document.querySelector(`.ord-list-wrap[data-pane="${t.dataset.tab}"]`);

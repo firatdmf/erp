@@ -779,6 +779,30 @@ def _roll_available_meters(roll, exclude_reservation_id=None):
     return avail if avail > 0 else _PDecimal("0")
 
 
+def _roll_unavailable_response(roll):
+    """JSON error for a roll with no reservable metres — says WHY: a
+    physically-empty roll and a roll fully held by other orders' active
+    reservations are different problems for the staff scanning it, so
+    the reserved case names the holding order(s)."""
+    from .models import OrderRollReservation
+    phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+    phys = phys or _PDecimal("0")
+    if phys > 0:
+        refs = []
+        for h in (OrderRollReservation.objects
+                  .filter(roll=roll, consumed=False).select_related("order")):
+            ref = (getattr(h.order, "order_number", None) or f"#{h.order_id}")
+            if ref not in refs:
+                refs.append(ref)
+        ref_txt = ", ".join(refs[:3]) + ("…" if len(refs) > 3 else "")
+        return JsonResponse({
+            "ok": False, "kind": "reserved",
+            "error": f"Bu top rezerve durumunda — {float(phys):g} m başka sipariş için ayrılmış ({ref_txt}).",
+        }, status=409)
+    return JsonResponse({"ok": False, "kind": "no_stock",
+                         "error": "Bu topta uygun metre kalmadı."}, status=409)
+
+
 def _lookup_roll_by_barcode_for_sku(code, target_sku):
     """Find a WarehouseProductRoll by barcode whose product matches
     target_sku (variant SKU or plain warehouse SKU) directly. Used when
@@ -924,8 +948,7 @@ def order_pack_reserve_add(request, pk):
     # Prefer the first matching roll that still has reservable metres.
     pick = next(((roll, mi) for (roll, mi) in matched if _roll_available_meters(roll) > 0), None)
     if pick is None:
-        return JsonResponse({"ok": False, "kind": "no_stock",
-                             "error": "Bu topta uygun/rezerv edilebilir metre kalmadı."}, status=409)
+        return _roll_unavailable_response(matched[0][0])
     roll_pick, matched_item = pick
 
     # Parse the requested metres (validation errors before we lock).
@@ -941,8 +964,9 @@ def order_pack_reserve_add(request, pk):
 
     r, capped, err = _create_roll_reservation(order, matched_item, roll_pick, req_meters, request.user)
     if err == "no_stock":
-        return JsonResponse({"ok": False, "kind": "no_stock",
-                             "error": "Bu topta uygun/rezerv edilebilir metre kalmadı."}, status=409)
+        # Raced: another request took the last metres between the check
+        # above and the lock — report the (possibly reserved) state.
+        return _roll_unavailable_response(roll_pick)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
 
 
@@ -1013,7 +1037,7 @@ def order_create_barcode_check(request):
         return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu top bu ürüne ait değil."}, status=409)
     avail = _roll_available_meters(roll)
     if avail <= 0:
-        return JsonResponse({"ok": False, "kind": "no_stock", "error": "Bu topta uygun metre kalmadı."}, status=409)
+        return _roll_unavailable_response(roll)
     return JsonResponse({
         "ok": True,
         "roll_id": roll.pk,

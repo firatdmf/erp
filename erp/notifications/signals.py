@@ -42,19 +42,25 @@ def create_order_notification_handler(sender, instance, created, **kwargs):
     """
     Create notifications when a new web/guest order is placed.
 
-    Manual orders (entered by staff via the create-order sidebar) do
+    Staff-entered orders (created via the create-order sidebar) do
     NOT generate notifications — per explicit user request, notifications
-    should only fire for incoming customer orders (web client or guest
-    checkout), not for internal data entry.
+    should only fire for incoming customer orders placed on the website,
+    not for internal data entry. Retail (Perakende) orders are always
+    is_guest_order=True too (same as a real guest checkout on the
+    website), so that flag alone can't tell them apart — is_retail_order
+    is the reliable marker, since it's only ever set by the staff
+    create-order sidebar's Perakende toggle, never by the website's own
+    checkout endpoint.
     """
     if not created:
         return
 
-    # Skip manual entry — only notify for web / guest orders.
+    # Skip staff/manual/retail entry — only notify for genuine web /
+    # guest-checkout orders.
     is_customer_order = bool(
         getattr(instance, "web_client_id", None) or
         getattr(instance, "is_guest_order", False)
-    )
+    ) and not getattr(instance, "is_retail_order", False)
     if not is_customer_order:
         return
 

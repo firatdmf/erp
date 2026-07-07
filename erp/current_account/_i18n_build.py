@@ -108,8 +108,16 @@ TR = {
     "Check / Promissory Note": "Çek / Senet",
     "CHECK / PROMISSORY NOTE": "ÇEK / SENET",
     "Checks / Promissory Notes": "Çekler / Senetler",
+    "Check / Note": "Çek / Senet",
     "Check / Promissory Note Portfolio": "Çek / Senet Portföyü",
+    "Back to Check / Note Portfolio": "Çek / Senet Portföyüne Dön",
     "New Check / Note": "Yeni Çek / Senet",
+    "Who is this instrument associated with": "Bu evrak kime ait",
+    "Bank / drawer details": "Banka / keşideci bilgileri",
+    "From customers": "Müşterilerden",
+    "To suppliers": "Tedarikçilere",
+    "Past due date": "Vadesi geçmiş",
+    "instruments": "evrak",
     "Portfolio": "Portföy",
     "Document Info": "Belge Bilgisi",
     "Document Details": "Belge Detayı",
@@ -130,7 +138,12 @@ TR = {
     "Deposit to Bank": "Bankaya Ver",
     "Endorse": "Ciro Et",
     "Endorse →": "Ciro Et →",
-    "Clear": "Tahsil",
+    # NOTE: bare "Clear" is shared with generic "clear filters" buttons
+    # elsewhere (cari_list, invoice_list, payment_list, dashboard...) —
+    # do NOT map it here or this script will clobber those to "Tahsil".
+    # The check-detail "mark as cleared" button uses a msgctxt="check"
+    # entry maintained directly in django.po instead (this script's
+    # extraction regex doesn't understand `context "..."` tags).
     "Cleared Cash Account": "Tahsil Edildiği Kasa",
     "Serial No": "Seri No",
     "Drawer": "Keşideci",
@@ -164,8 +177,11 @@ TR = {
     "REPORTS": "RAPORLAR",
     "Report Center": "Rapor Merkezi",
     "Account Reports": "Cari Raporları",
-    "Aging": "Yaşlandırma",
-    "Aging Report": "Yaşlandırma Raporu",
+    # NOTE: left out of this map on purpose — "Gecikme Analizi" is the
+    # translation already live in django.po and used across the sidebar/
+    # report pages; don't let this script silently rename it.
+    # "Aging": "Yaşlandırma",
+    # "Aging Report": "Yaşlandırma Raporu",
     "Aging analysis of open receivables and payables: 0-30, 30-60, 60-90, 90+ days": "Açık alacakların ve borçların yaşlanma analizi: 0-30, 30-60, 60-90, 90+ gün",
     "Trial Balance": "Cari Mizan",
     "Opening, debit, credit and closing balances of all accounts by book": "Defter bazlı tüm carilerin devir, borç, alacak, kapanış bakiyeleri",
@@ -416,7 +432,10 @@ TR = {
     # ---- Movement / Payment ----
     "New Movement": "Yeni Hareket",
     "Movement added.": "Hareket eklendi.",
-    "Open invoices will load after selecting an account.": "Cari'yi seçince açık faturalar yüklenir.",
+    # NOTE: left out on purpose — "Cari seçilince..." (no apostrophe) is
+    # the translation already live in django.po; don't let this script
+    # silently swap in the apostrophised variant.
+    # "Open invoices will load after selecting an account.": "Cari'yi seçince açık faturalar yüklenir.",
     "No open invoices — payment will be recorded as advance.": "Açık fatura yok — tahsilat avans olarak girecek.",
     "Select which invoices to apply this payment to. Any unallocated amount is recorded as an advance on the account.": "Tahsilatın hangi faturalara uygulanacağını seç. Eşleştirilmeyen kısım avans olarak cari hesaba yazılır.",
 

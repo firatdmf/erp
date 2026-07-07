@@ -313,7 +313,7 @@
                 <option value="">{% trans "— Select cash account —" %}</option>
                 {% for ca in cash_accounts %}<option value="{{ ca.id }}">{{ ca.name }} ({{ ca.currency.code }})</option>{% endfor %}
               </select>
-              <button type="submit" class="chk-d-btn success"><i data-lucide="check-circle"></i>{% trans "Clear" %}</button>
+              <button type="submit" class="chk-d-btn success"><i data-lucide="check-circle"></i>{% trans "Clear" context "check" %}</button>
             </div>
           </form>
 

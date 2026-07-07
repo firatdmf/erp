@@ -1081,6 +1081,10 @@ msgstr "Claim an Asset"
 msgid "Clear"
 msgstr "Temizle"
 
+msgctxt "check"
+msgid "Clear"
+msgstr "Tahsil"
+
 msgid "Client"
 msgstr "Client"
 
@@ -4736,7 +4740,7 @@ msgid ""
 "Aging analysis of open receivables and payables: 0-30, 30-60, 60-90, 90+ "
 "days"
 msgstr ""
-"Açık alacakların ve borçların gecikme analizi: 0-30, 30-60, 60-90, 90+ gün"
+"Açık alacakların ve borçların yaşlanma analizi: 0-30, 30-60, 60-90, 90+ gün"
 
 msgid "Aging, trial balance, credit limit and due date calendar reports"
 msgstr "Gecikme Analizi, mizan, risk limiti ve vade takvimi raporları"
@@ -6394,10 +6398,10 @@ msgid "Allocated"
 msgstr "Eşleştirilen"
 
 msgid "Back to Check / Note Portfolio"
-msgstr ""
+msgstr "Çek / Senet Portföyüne Dön"
 
 msgid "Bank / drawer details"
-msgstr ""
+msgstr "Banka / keşideci bilgileri"
 
 msgid "Basic details"
 msgstr ""
@@ -6406,7 +6410,7 @@ msgid "Cash Flow Calendar"
 msgstr ""
 
 msgid "Check / Note"
-msgstr ""
+msgstr "Çek / Senet"
 
 msgid "Code (asc)"
 msgstr "Kod (artan)"
@@ -6427,7 +6431,7 @@ msgid "FIFO auto-match available"
 msgstr ""
 
 msgid "From customers"
-msgstr ""
+msgstr "Müşterilerden"
 
 msgid "Internal notes about this account…"
 msgstr ""
@@ -6451,7 +6455,7 @@ msgid "Opened from the <a href=\"{{ cari_create_url2 }}\">New Account</a> page."
 msgstr ""
 
 msgid "Past due date"
-msgstr ""
+msgstr "Vadesi geçmiş"
 
 msgid "Period Summary"
 msgstr ""
@@ -6472,7 +6476,7 @@ msgid "Sum of invoice totals"
 msgstr ""
 
 msgid "To suppliers"
-msgstr ""
+msgstr "Tedarikçilere"
 
 msgid "Total ({{ count }} accounts)"
 msgstr ""
@@ -6487,10 +6491,10 @@ msgid "Welcome, {{ first }} {{ last }}!"
 msgstr ""
 
 msgid "Who is this instrument associated with"
-msgstr ""
+msgstr "Bu evrak kime ait"
 
 msgid "instruments"
-msgstr ""
+msgstr "evrak"
 
 msgid "invoices"
 msgstr ""
@@ -7503,3 +7507,75 @@ msgstr "Bu sipariş için henüz değişiklik kaydedilmedi."
 
 msgid "records"
 msgstr "kayıt"
+
+msgid "Add another note"
+msgstr ""
+
+msgid "Add another task"
+msgstr ""
+
+msgid "Amount to be Paid"
+msgstr ""
+
+msgid "Attach notes"
+msgstr ""
+
+msgid "Attach tasks"
+msgstr ""
+
+msgid "Consignee"
+msgstr ""
+
+msgid "Currency is required."
+msgstr ""
+
+msgid "Design ID"
+msgstr ""
+
+msgid "Domestic"
+msgstr ""
+
+msgid "Excel"
+msgstr ""
+
+msgid "Invoice Date"
+msgstr ""
+
+msgid "Invoice Number"
+msgstr ""
+
+msgid "Invoice Type"
+msgstr ""
+
+msgid "Line"
+msgstr ""
+
+msgid "Open current account"
+msgstr ""
+
+msgid "Payment Due Date"
+msgstr ""
+
+msgid "Product name or description"
+msgstr ""
+
+msgid "Remove all notes"
+msgstr ""
+
+msgid "Remove all tasks"
+msgstr ""
+
+msgid "Scenario"
+msgstr ""
+
+msgid ""
+"This invoice is already issued. Editing will sync the cari ledger. Continue?"
+msgstr ""
+
+msgid ""
+"This order already has an invoice (%(num)s). Cancel or delete it before "
+"creating a new one."
+msgstr ""
+
+msgid "Total Value"
+msgstr ""

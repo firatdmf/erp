@@ -517,6 +517,11 @@ GMAIL_SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify'
 ]
 
+# Order deletion guard — admins delete freely; anyone else must supply
+# this password (checked server-side in delete_order/bulk_delete_orders).
+# Override via env without a code change if it ever leaks.
+ORDER_DELETE_PASSWORD = config("ORDER_DELETE_PASSWORD", default="demfiratkarven")
+
 # File Upload Settings
 # Increase limits to allow multiple image uploads for products and variants
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (default is 2.5 MB)

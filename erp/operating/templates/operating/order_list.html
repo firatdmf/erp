@@ -876,12 +876,22 @@
         : ('{% trans "Delete" %} ' + ids.length + ' {% trans "orders? This cannot be undone." %}');
       if (!confirm(msg)) return;
 
+      // Non-admins must supply the deletion password (verified
+      // server-side — this prompt only collects it).
+      const IS_ADMIN = {% if is_admin %}true{% else %}false{% endif %};
+      let deletePw = '';
+      if (!IS_ADMIN) {
+        deletePw = prompt('{% trans "Sipariş silmek için şifre girin:" %}') || '';
+        if (!deletePw) return;
+      }
+
       deleteBtn.disabled = true;
       const origLabel = deleteBtn.innerHTML;
       deleteBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Deleting…" %}';
       try {
         const fd = new FormData();
         ids.forEach(id => fd.append('order_ids[]', id));
+        if (deletePw) fd.append('delete_password', deletePw);
         const csrf = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
         const r = await fetch('{% url "operating:bulk_delete_orders" %}', {
           method: 'POST',

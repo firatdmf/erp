@@ -2051,6 +2051,10 @@ class OrderList(ListView):
         context['b2c_count'] = len(b2c_orders)
         context['retail_count'] = len(retail_orders)
 
+        # Bulk-delete: admins skip the password prompt (server re-checks).
+        from .views_warehouse import _is_admin
+        context['is_admin'] = _is_admin(self.request.user)
+
         return context
 
 
@@ -2384,12 +2388,36 @@ def export_packing_list_excel(request, pk):
     # return HttpResponse("Packing list export is not implemented yet.")
 
 
+def _order_delete_allowed(request):
+    """Admins delete orders freely; everyone else must supply the
+    deletion password (settings.ORDER_DELETE_PASSWORD). The password
+    only ever travels via POST. Returns (ok, error_message)."""
+    from django.conf import settings as _s
+    from .views_warehouse import _is_admin
+    if _is_admin(request.user):
+        return True, None
+    supplied = (request.POST.get("delete_password") or "").strip()
+    if not supplied and request.content_type == "application/json":
+        try:
+            supplied = (json.loads(request.body.decode() or "{}").get("delete_password") or "").strip()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            supplied = ""
+    if supplied and supplied == _s.ORDER_DELETE_PASSWORD:
+        return True, None
+    return False, ("Sipariş silme yetkisi yalnızca adminde — devam etmek için "
+                   "silme şifresini girin." if not supplied else "Silme şifresi hatalı.")
+
+
 def delete_order(request, pk):
     try:
         order = Order.objects.get(pk=pk)
     except Order.DoesNotExist:
         messages.error(request, "Order not found.")
         return redirect("operating:order_list")
+    allowed, err = _order_delete_allowed(request)
+    if not allowed:
+        messages.error(request, err)
+        return redirect("operating:order_detail", pk=order.pk)
     # A shipped/completed order's rolls are already cut and its money
     # posted — deleting it would cascade the consumed reservations away
     # WITHOUT restoring stock, orphan the cari sale movement, and (for
@@ -2430,6 +2458,9 @@ def bulk_delete_orders(request):
             pass
     if not ids:
         return JsonResponse({"ok": False, "error": "No order_ids supplied"}, status=400)
+    allowed, err = _order_delete_allowed(request)
+    if not allowed:
+        return JsonResponse({"ok": False, "error": err}, status=403)
     qs = Order.objects.filter(pk__in=ids)
     # Same guard as delete_order: shipped orders must be re-opened first
     # (stock + money already posted). Skip them and tell the UI which.

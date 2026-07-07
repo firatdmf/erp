@@ -249,6 +249,65 @@
     </div>
   </div>
 
+  {% if is_retail_book %}
+  <!-- Son Hareketler — Perakende Satışları (only on the Perakende book).
+       Same filters as the standalone ledger page; the form GETs back to
+       this page so the embedded list filters in place. -->
+  <div class="arap-card" id="retail-recent" style="margin-top: 1.25rem;">
+    <div class="arap-head">
+      <span class="ico"><i class="fas fa-cash-register"></i></span>
+      <h3>Son Hareketler — Perakende Satışları</h3>
+      <span class="count">{{ retail_count }}</span>
+      <span style="margin-left:auto; font-weight:700; color:#0E6E4A; white-space:nowrap;">${{ retail_total|floatformat:2 }}</span>
+    </div>
+    <form method="get" action="#retail-recent"
+          style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding: 10px 14px; border-bottom: 1px solid #EEF1F5;">
+      <input type="text" name="q" value="{{ retail_q }}" placeholder="Sipariş no veya açıklama ara…"
+             style="flex:1 1 200px; min-width:160px; padding:7px 11px; border:1px solid #E0E6EE; border-radius:8px; font-size:13px; outline:none;">
+      <input type="date" name="from" value="{{ retail_from }}" title="Başlangıç"
+             style="padding:7px 10px; border:1px solid #E0E6EE; border-radius:8px; font-size:13px; outline:none;">
+      <input type="date" name="to" value="{{ retail_to }}" title="Bitiş"
+             style="padding:7px 10px; border:1px solid #E0E6EE; border-radius:8px; font-size:13px; outline:none;">
+      <button type="submit"
+              style="padding:7px 14px; border:none; border-radius:8px; background:#147F74; color:white; font-weight:600; font-size:12.5px; cursor:pointer;">
+        <i class="fas fa-filter"></i> Filtrele
+      </button>
+      {% if retail_q or retail_from or retail_to %}
+      <a href="{% url 'accounting:book_detail' book.id %}#retail-recent"
+         style="padding:7px 12px; border:1px solid #E0E6EE; border-radius:8px; color:#4B5563; font-weight:600; font-size:12.5px; text-decoration:none;">Temizle</a>
+      {% endif %}
+    </form>
+    <div class="arap-list">
+      {% for r in retail_rows %}
+        <div class="arap-row">
+          <div>
+            <div class="who">
+              {% if r.order_id %}
+                <a href="{% url 'operating:order_detail' r.order_id %}" style="color:#005354; text-decoration:none; font-weight:700;">
+                  {% if r.order.order_number %}{{ r.order.order_number }}{% else %}#{{ r.order_id }}{% endif %}
+                </a>
+              {% else %}—{% endif %}
+              <span style="color:#6B7280; font-weight:400;"> · {{ r.description|default:"" }}</span>
+            </div>
+            <div class="when">{{ r.date|date:"d.m.Y" }} · {{ r.created_at|date:"H:i" }}</div>
+          </div>
+          <div class="amt pos">+{{ r.amount|floatformat:2 }} {{ r.currency.code|default:"USD" }}</div>
+        </div>
+      {% empty %}
+        <div class="arap-empty">
+          {% if retail_q or retail_from or retail_to %}Bu filtrelere uyan perakende satış yok.{% else %}Henüz perakende satış kaydı yok — bir perakende sipariş tamamlandığında burada görünecek.{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div style="padding: 10px 14px; border-top: 1px solid #EEF1F5; text-align:right;">
+      <a href="{% url 'accounting:retail_ledger' %}{% if retail_q or retail_from or retail_to %}?q={{ retail_q|urlencode }}&from={{ retail_from }}&to={{ retail_to }}{% endif %}"
+         style="color:#005354; font-weight:700; font-size:13px; text-decoration:none;">
+        Tüm kayıtlar &amp; detaylı filtre <i class="fas fa-arrow-right" style="font-size:11px;"></i>
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Current Stakeholders Footer -->
   <div class="stakeholders-footer-card">
     <div class="card-header-title" style="margin-bottom: 1rem;">

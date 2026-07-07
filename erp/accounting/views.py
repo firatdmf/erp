@@ -145,6 +145,25 @@ class BookDetail(generic.DetailView):
             .select_related("currency", "supplier", "paid_with_cash_account")
             .order_by("-created_at")
         )
+
+        # Perakende book only: embedded "Son Hareketler" — the latest
+        # retail sales with the SAME filters as the standalone ledger
+        # page (q / from / to arrive as GET params on this page too).
+        from current_account.services import RETAIL_BOOK_NAME
+        is_retail_book = (book.name or "").strip().lower() == RETAIL_BOOK_NAME.lower()
+        context["is_retail_book"] = is_retail_book
+        if is_retail_book:
+            q = (self.request.GET.get("q") or "").strip()
+            date_from = (self.request.GET.get("from") or "").strip()
+            date_to = (self.request.GET.get("to") or "").strip()
+            rows = _retail_revenue_qs(book, q, date_from, date_to)
+            totals = rows.aggregate(total=Sum("amount"), n=Count("id"))
+            context.update({
+                "retail_rows": rows[:12],
+                "retail_total": totals["total"] or 0,
+                "retail_count": totals["n"] or 0,
+                "retail_q": q, "retail_from": date_from, "retail_to": date_to,
+            })
         return context
 
     def get_object(self):
@@ -1723,6 +1742,28 @@ class SalesDashboardView(View):
         return render(request, self.template_name, context)
 
 
+def _retail_revenue_qs(book, q, date_from, date_to):
+    """Filtered retail EquityRevenue rows — one filtering brain shared
+    by the standalone ledger page AND the embedded 'Son Hareketler'
+    section on the Perakende book's detail page."""
+    if not book:
+        return EquityRevenue.objects.none()
+    rows = (EquityRevenue.objects.filter(book=book)
+            .select_related("order", "cash_account", "currency")
+            .order_by("-date", "-id"))
+    if q:
+        q_filter = Q(description__icontains=q)
+        if q.lstrip("#").isdigit():
+            q_filter |= Q(order_id=int(q.lstrip("#")))
+        q_filter |= Q(order__order_number__icontains=q)
+        rows = rows.filter(q_filter)
+    if date_from:
+        rows = rows.filter(date__gte=date_from)
+    if date_to:
+        rows = rows.filter(date__lte=date_to)
+    return rows
+
+
 @method_decorator(login_required, name="dispatch")
 class RetailLedger(View):
     """Perakende satış defteri — every completed retail order's revenue
@@ -1743,21 +1784,7 @@ class RetailLedger(View):
         date_from = (request.GET.get("from") or "").strip()
         date_to = (request.GET.get("to") or "").strip()
 
-        rows = EquityRevenue.objects.none()
-        if book:
-            rows = (EquityRevenue.objects.filter(book=book)
-                    .select_related("order", "cash_account", "currency")
-                    .order_by("-date", "-id"))
-            if q:
-                q_filter = Q(description__icontains=q)
-                if q.lstrip("#").isdigit():
-                    q_filter |= Q(order_id=int(q.lstrip("#")))
-                q_filter |= Q(order__order_number__icontains=q)
-                rows = rows.filter(q_filter)
-            if date_from:
-                rows = rows.filter(date__gte=date_from)
-            if date_to:
-                rows = rows.filter(date__lte=date_to)
+        rows = _retail_revenue_qs(book, q, date_from, date_to)
 
         totals = rows.aggregate(total=Sum("amount"), n=Count("id"))
         cash_accounts = (CashAccount.objects

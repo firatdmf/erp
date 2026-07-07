@@ -185,7 +185,7 @@
             <div class="pf-row wide" style="margin-bottom: 14px;">
               <div class="pf-f">
                 <label>{% trans "Select Account" %}</label>
-                <select name="cari" required onchange="this.form.submit()">
+                <select name="cari" required onchange="if(this.value){ window.location.href = '{% url 'current_account:payment_create' %}?cari=' + this.value; }">
                   <option value="">{% trans "— Select account —" %}</option>
                   {% for c in cari_options %}<option value="{{ c.id }}">{{ c.code }} — {{ c.name }}</option>{% endfor %}
                 </select>

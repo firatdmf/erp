@@ -1,26 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./vir_env/Scripts/python.exe erp/manage.py showmigrations --plan)",
-      "Bash(./vir_env/Scripts/python.exe erp/manage.py showmigrations)",
-      "Bash(./vir_env/Scripts/python.exe erp/manage.py makemigrations --dry-run)",
-      "Bash(./vir_env/Scripts/python.exe erp/manage.py makemigrations storefront)",
-      "Bash(./vir_env/Scripts/python.exe erp/manage.py migrate storefront)",
-      "Bash(../vir_env/Scripts/python.exe manage.py startapp current_account)",
-      "Bash(../vir_env/Scripts/python.exe manage.py makemigrations current_account)",
-      "Bash(../vir_env/Scripts/python.exe manage.py makemigrations current_account --empty --name backfill_from_legacy_ar_ap)",
-      "Bash(../vir_env/Scripts/python.exe manage.py check)",
-      "Bash(../vir_env/Scripts/python.exe manage.py migrate current_account)",
-      "Bash(../vir_env/Scripts/python.exe manage.py showmigrations current_account)",
-      "Bash(../vir_env/Scripts/python.exe manage.py shell -c \"from current_account.models import CariAccount, CariMovement; print\\('Cariler:', CariAccount.objects.count\\(\\)\\); print\\('Hareketler:', CariMovement.objects.count\\(\\)\\)\")",
-      "Bash(../vir_env/Scripts/python.exe manage.py migrate current_account zero)",
-      "Bash(../vir_env/Scripts/python.exe manage.py shell -c ' *)",
-      "Bash(../vir_env/Scripts/python.exe manage.py makemigrations current_account --dry-run)",
-      "Bash(python -c ' *)",
-      "Bash(python -m py_compile erp/current_account/views.py erp/current_account/views_invoice.py erp/current_account/views_payment.py erp/current_account/views_check.py erp/current_account/views_report.py)",
-      "Bash(../vir_env/Scripts/python.exe manage.py makemessages -l tr --no-location)",
-      "Bash(../vir_env/Scripts/python.exe -c \"import polib; print\\(polib.__version__\\)\")",
-      "Bash(../vir_env/Scripts/python.exe -c \"import babel; print\\(babel.__version__\\)\")"
+     "Bash",
+      "Edit",
+      "Write"
     ]
   }
 }

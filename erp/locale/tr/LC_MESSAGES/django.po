@@ -3911,7 +3911,13 @@ msgstr "Kargoda"
 msgid "In transit"
 msgstr "Yolda"
 
+msgid "In Transit"
+msgstr "Yolda"
+
 msgid "Out for delivery"
+msgstr "Dağıtımda"
+
+msgid "Out for Delivery"
 msgstr "Dağıtımda"
 
 msgid "Delivered"

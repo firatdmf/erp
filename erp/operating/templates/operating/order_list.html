@@ -280,25 +280,29 @@
     width: fit-content;
   }
   .ord-status-dot { width: 6px; height: 6px; border-radius: 50%; }
-  /* Production-status colour map */
-  .ord-status.pending       { color: #B27500; background: #FEF3C7; }
-  .ord-status.pending       .ord-status-dot { background: #F59E0B; }
-  .ord-status.scheduled     { color: #1565C0; background: #DBEAFE; }
-  .ord-status.scheduled     .ord-status-dot { background: #3B82F6; }
-  .ord-status.in_production { color: #7E22CE; background: #F3E8FF; }
-  .ord-status.in_production .ord-status-dot { background: #A855F7; }
-  .ord-status.quality_check { color: #1565C0; background: #DBEAFE; }
-  .ord-status.quality_check .ord-status-dot { background: #3B82F6; }
-  .ord-status.in_repair     { color: #B27500; background: #FEF3C7; }
-  .ord-status.in_repair     .ord-status-dot { background: #F59E0B; }
-  .ord-status.ready         { color: #1565C0; background: #DBEAFE; }
-  .ord-status.ready         .ord-status-dot { background: #3B82F6; }
-  .ord-status.shipped       { color: #0E6E4A; background: #D1FAE5; }
-  .ord-status.shipped       .ord-status-dot { background: #10B981; }
-  .ord-status.completed     { color: #0F1419; background: #E5E7EB; }
-  .ord-status.completed     .ord-status-dot { background: #374151; }
-  .ord-status.cancelled     { color: #6B7280; background: #F3F4F6; }
-  .ord-status.cancelled     .ord-status-dot { background: #9CA3AF; }
+  /* Customer-facing order_status colour map (matches ORDER_STATUS_CHOICES —
+     this is the field the order actually progresses through; the legacy
+     production `status` field is no longer surfaced here). */
+  .ord-status.pending          { color: #B27500; background: #FEF3C7; }
+  .ord-status.pending          .ord-status-dot { background: #F59E0B; }
+  .ord-status.confirmed        { color: #1565C0; background: #DBEAFE; }
+  .ord-status.confirmed        .ord-status-dot { background: #3B82F6; }
+  .ord-status.preparing        { color: #7E22CE; background: #F3E8FF; }
+  .ord-status.preparing        .ord-status-dot { background: #A855F7; }
+  .ord-status.packaging        { color: #0F766E; background: #CCFBF1; }
+  .ord-status.packaging        .ord-status-dot { background: #14B8A6; }
+  .ord-status.shipped          { color: #0E6E4A; background: #D1FAE5; }
+  .ord-status.shipped          .ord-status-dot { background: #10B981; }
+  .ord-status.in_transit       { color: #0E7490; background: #CFFAFE; }
+  .ord-status.in_transit       .ord-status-dot { background: #06B6D4; }
+  .ord-status.out_for_delivery { color: #0E7490; background: #CFFAFE; }
+  .ord-status.out_for_delivery .ord-status-dot { background: #06B6D4; }
+  .ord-status.delivered        { color: #0F1419; background: #E5E7EB; }
+  .ord-status.delivered        .ord-status-dot { background: #374151; }
+  .ord-status.cancelled        { color: #6B7280; background: #F3F4F6; }
+  .ord-status.cancelled        .ord-status-dot { background: #9CA3AF; }
+  .ord-status.returned         { color: #B91C1C; background: #FEE2E2; }
+  .ord-status.returned         .ord-status-dot { background: #EF4444; }
   .ord-chev { width: 16px; height: 16px; color: var(--gray-400); justify-self: end; }
   .ord-row:hover .ord-chev { color: var(--nejum-teal-700); }
 
@@ -511,9 +515,9 @@
             </div>
           {% endwith %}
         </div>
-        <span class="ord-status {{ order.status }}">
+        <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>
-          {{ order.get_status_display }}
+          {{ order.get_order_status_display }}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>
@@ -582,9 +586,9 @@
             </div>
           {% endwith %}
         </div>
-        <span class="ord-status {{ order.status }}">
+        <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>
-          {{ order.get_status_display }}
+          {{ order.get_order_status_display }}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>
@@ -649,9 +653,9 @@
             </div>
           {% endwith %}
         </div>
-        <span class="ord-status {{ order.status }}">
+        <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>
-          {{ order.get_status_display }}
+          {{ order.get_order_status_display }}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>
@@ -713,9 +717,9 @@
             </div>
           {% endwith %}
         </div>
-        <span class="ord-status {{ order.status }}">
+        <span class="ord-status {{ order.order_status }}">
           <span class="ord-status-dot"></span>
-          {{ order.get_status_display }}
+          {{ order.get_order_status_display }}
         </span>
         <i class="fa fa-chevron-right ord-chev"></i>
       </a>

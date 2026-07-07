@@ -13,12 +13,19 @@ Every receiver is exception-safe: auditing must never break a save.
 """
 import threading
 
-from django.db.models.signals import pre_save, post_save, post_delete
+from django.db.models.signals import pre_save, post_save, pre_delete, post_delete
 from django.dispatch import receiver
 
 from .models import Order, OrderItem, OrderChange
 
 _state = threading.local()
+
+
+def _orders_being_deleted():
+    s = getattr(_state, "deleting_orders", None)
+    if s is None:
+        s = _state.deleting_orders = set()
+    return s
 
 
 class CurrentUserMiddleware:
@@ -184,10 +191,37 @@ def _audit_item_saved(sender, instance, created, **kwargs):
         pass
 
 
+@receiver(pre_delete, sender=Order)
+def _audit_order_deleting(sender, instance, **kwargs):
+    # Django's delete collector fires EVERY pre_delete before deleting
+    # any row, so this flag is set before the cascaded OrderItem
+    # post_delete receivers run.
+    try:
+        if instance.pk:
+            _orders_being_deleted().add(instance.pk)
+    except Exception:
+        pass
+
+
+@receiver(post_delete, sender=Order)
+def _audit_order_deleted(sender, instance, **kwargs):
+    try:
+        _orders_being_deleted().discard(instance.pk)
+    except Exception:
+        pass
+
+
 @receiver(post_delete, sender=OrderItem)
 def _audit_item_deleted(sender, instance, **kwargs):
     try:
-        # Order may be cascading away too — only log if it still exists.
+        # Skip when the whole ORDER is being deleted: its items cascade
+        # first, and an "item removed" row written then would reference
+        # a row that's gone by commit time — the FK is deferred, so the
+        # insert "succeeds" and the whole delete blows up at COMMIT.
+        # (An exists() check can't catch this: the Order row is still
+        # present while its items cascade.)
+        if instance.order_id in _orders_being_deleted():
+            return
         if not Order.objects.filter(pk=instance.order_id).exists():
             return
         _log(instance.order_id, "item_removed",

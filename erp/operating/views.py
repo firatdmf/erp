@@ -2439,10 +2439,11 @@ def bulk_delete_orders(request):
     # (OrderItem post_delete restores catalog stock; cari movement is
     # reversed). bulk delete via qs.delete() would still cascade but
     # we keep it per-row for predictable signal ordering on Postgres.
+    deleted_ids = [o.pk for o in deletable]  # capture BEFORE delete() nulls pk
     for o in deletable:
         o.delete()
-    resp = {"ok": True, "deleted": len(deletable),
-            "deleted_ids": [o.pk for o in deletable],
+    resp = {"ok": True, "deleted": len(deleted_ids),
+            "deleted_ids": deleted_ids,
             "skipped_ids": skipped_ids}
     if skipped_ids:
         resp["warning"] = (

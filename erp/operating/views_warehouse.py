@@ -2539,13 +2539,25 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
         return results
     order_ref = getattr(order, "order_number", None) or f"Order #{order.pk}"
     with _tx.atomic():
-        resv = (OrderRollReservation.objects
-                .select_for_update()
-                .filter(order=order, consumed=False)
-                .select_related("roll", "warehouse_product"))
+        resv = list(OrderRollReservation.objects
+                    .select_for_update()
+                    .filter(order=order, consumed=False))
+        # Fetch each distinct roll / product ONCE (locked) and share the
+        # instances across the loop. With select_related, every
+        # reservation row carried its OWN pre-loop copy of the roll and
+        # product, so two reservations on the same roll each subtracted
+        # from the ORIGINAL remaining and the last save won — under-
+        # cutting stock exactly when one order line is covered by
+        # several rolls (which the coverage gate now requires).
+        _roll_ids = {r.roll_id for r in resv if r.roll_id}
+        _wp_ids = {r.warehouse_product_id for r in resv if r.warehouse_product_id}
+        _rolls = {x.pk: x for x in WarehouseProductRoll.objects
+                  .select_for_update().filter(pk__in=_roll_ids)}
+        _wps = {x.pk: x for x in WarehouseProduct.objects
+                .select_for_update().filter(pk__in=_wp_ids)}
         for r in resv:
-            roll = r.roll
-            wp = r.warehouse_product
+            roll = _rolls.get(r.roll_id)
+            wp = _wps.get(r.warehouse_product_id)
             take = Decimal(str(r.meters or 0))
             if take <= 0 or roll is None or wp is None:
                 r.consumed = True
@@ -2603,13 +2615,20 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
         return restored
     order_ref = getattr(order, "order_number", None) or f"Order #{order.pk}"
     with _tx.atomic():
-        resv = (OrderRollReservation.objects
-                .select_for_update()
-                .filter(order=order, consumed=True)
-                .select_related("roll", "warehouse_product"))
+        resv = list(OrderRollReservation.objects
+                    .select_for_update()
+                    .filter(order=order, consumed=True))
+        # Shared locked instances per roll/product — same stale-copy fix
+        # as consume_reservations_for_order (see comment there).
+        _roll_ids = {r.roll_id for r in resv if r.roll_id}
+        _wp_ids = {r.warehouse_product_id for r in resv if r.warehouse_product_id}
+        _rolls = {x.pk: x for x in WarehouseProductRoll.objects
+                  .select_for_update().filter(pk__in=_roll_ids)}
+        _wps = {x.pk: x for x in WarehouseProduct.objects
+                .select_for_update().filter(pk__in=_wp_ids)}
         for r in resv:
-            roll = r.roll
-            wp = r.warehouse_product
+            roll = _rolls.get(r.roll_id)
+            wp = _wps.get(r.warehouse_product_id)
             qty = Decimal(str(r.meters or 0))
             if qty > 0 and roll is not None and wp is not None:
                 curr = roll.meters_remaining if roll.meters_remaining is not None else Decimal("0")
@@ -2642,6 +2661,111 @@ def restore_reservations_for_order(order, user=None, reason_prefix="Order un-shi
 SHIPPED_CLASS = frozenset({"shipped", "in_transit", "out_for_delivery", "delivered"})
 
 
+def order_reservation_shortfalls(order):
+    """Items whose ACTIVE (unconsumed) roll reservations do NOT cover
+    the ordered quantity. Returns [{item_id, name, required, reserved}]
+    — an empty list means the order is fully covered and may complete
+    packing / ship.
+
+    Rules:
+      * required metres = item.quantity, except custom-curtain lines,
+        which use their fabric-used metres when set (their quantity
+        counts curtains, not metres);
+      * items whose product has NO warehouse presence at all (nothing
+        that could ever be scanned) are skipped, so catalog-only lines
+        can't dead-end an order. Presence is checked at the level the
+        pack scan matches at: a line naming a specific variant needs
+        THAT variant (or its SKU) in a warehouse — a sibling variant
+        of the same parent doesn't count;
+      * reservations count per order line (order_item FK)."""
+    from functools import reduce
+    import operator as _op
+    from django.db.models import Sum, Q as _Q
+    from .models import OrderRollReservation, WarehouseProduct
+
+    items = list(order.items.all().select_related("product", "product_variant"))
+    if not items:
+        return []
+
+    reserved = {
+        r["order_item_id"]: (r["s"] or Decimal("0"))
+        for r in (OrderRollReservation.objects
+                  .filter(order=order, consumed=False, order_item__isnull=False)
+                  .values("order_item_id").annotate(s=Sum("meters")))
+    }
+
+    variant_ids = {it.product_variant_id for it in items if it.product_variant_id}
+    product_ids = {it.product_id for it in items if it.product_id}
+    skus = set()
+    for it in items:
+        for s in ((getattr(it.product_variant, "variant_sku", None) if it.product_variant_id else None),
+                  (getattr(it.product, "sku", None) if it.product_id else None)):
+            if s and s.strip():
+                skus.add(s.strip().lower())
+
+    wq = _Q(pk__in=[])
+    if variant_ids:
+        wq |= _Q(catalog_variant_id__in=variant_ids)
+    if product_ids:
+        wq |= _Q(catalog_variant__product_id__in=product_ids)
+    if skus:
+        wq |= reduce(_op.or_, (_Q(sku__iexact=s) for s in skus))
+    tracked_variants, tracked_products, tracked_skus = set(), set(), set()
+    for cv, cvp, wsku in (WarehouseProduct.objects.filter(wq)
+                          .values_list("catalog_variant_id",
+                                       "catalog_variant__product_id", "sku")):
+        if cv:
+            tracked_variants.add(cv)
+        if cvp:
+            tracked_products.add(cvp)
+        if wsku and wsku.strip():
+            tracked_skus.add(wsku.strip().lower())
+
+    shortfalls = []
+    for it in items:
+        vsku = ((getattr(it.product_variant, "variant_sku", "") or "").strip().lower()
+                if it.product_variant_id else "")
+        psku = ((getattr(it.product, "sku", "") or "").strip().lower()
+                if it.product_id else "")
+        if it.product_variant_id:
+            tracked = (it.product_variant_id in tracked_variants
+                       or (vsku and vsku in tracked_skus))
+        else:
+            tracked = ((it.product_id and it.product_id in tracked_products)
+                       or (psku and psku in tracked_skus))
+        if not tracked:
+            continue
+        required = it.quantity or Decimal("0")
+        if getattr(it, "is_custom_curtain", False) and it.custom_fabric_used_meters:
+            required = it.custom_fabric_used_meters
+        if required <= 0:
+            continue
+        got = reserved.get(it.pk, Decimal("0"))
+        if got < required:
+            name = ((it.product.title if it.product_id else None)
+                    or it.description or f"Kalem #{it.pk}")
+            if it.product_variant_id and vsku:
+                name = f"{name} ({vsku.upper()})"
+            shortfalls.append({"item_id": it.pk, "name": name,
+                               "required": required, "reserved": got})
+    return shortfalls
+
+
+def reservation_shortfall_message(order):
+    """Turkish, user-facing summary of what's still missing — shared by
+    every path that blocks on incomplete coverage."""
+    rows = order_reservation_shortfalls(order)
+    if not rows:
+        return ""
+    det = " · ".join(
+        f"{r['name']}: {float(r['reserved']):g}/{float(r['required']):g} m"
+        for r in rows[:4]
+    )
+    more = f" (+{len(rows) - 4} kalem)" if len(rows) > 4 else ""
+    return (f"Okutulan toplar siparişi karşılamıyor — {det}{more}. "
+            "Kalan metreleri paketleme sayfasından okutun.")
+
+
 def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                              user=None, require_cargo_for_ship=True):
     """THE single funnel for changing an order's order_status. Every
@@ -2650,15 +2774,17 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
 
       * entering a shipped-class status requires carrier + tracking
         (unless require_cargo_for_ship=False) — else nothing changes;
-      * entering 'packaging' requires at least one active reservation
-        (rolls scanned during packing);
+      * entering 'packaging' AND entering a shipped-class status both
+        require the scanned-roll reservations to fully COVER every
+        order line's metres (see order_reservation_shortfalls) — a
+        110 m line backed by a single 38 m roll cannot complete;
       * the status change, its catalog-stock signal, AND the warehouse
         reservation → stock-out conversion all happen inside ONE
         transaction, so a roll-cut failure rolls the whole thing back
         (no half-shipped, catalog-cut-but-warehouse-not state).
 
     Returns (ok: bool, code: str|None). code is a machine-readable
-    reason on failure: 'cargo_required' | 'packing_requires_scan' |
+    reason on failure: 'cargo_required' | 'insufficient_reservation' |
     'error:<detail>'."""
     from django.db import transaction as _tx
     from django.utils import timezone as _tz
@@ -2689,12 +2815,13 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
             order.save(update_fields=["carrier", "tracking_number", "updated_at"])
             return False, "cargo_required"
 
-    # Gate: packaging must be backed by at least one scanned roll.
-    if changing and new_status == "packaging" and old_status != "packaging":
-        if not order.roll_reservations.filter(consumed=False).exists():
+    # Gate: packing-complete AND ship both require the reservations to
+    # fully cover every line's metres — not merely "a roll was scanned".
+    if entering_ship or (changing and new_status == "packaging" and old_status != "packaging"):
+        if order_reservation_shortfalls(order):
             # Persist any cargo edits but don't advance the status.
             order.save(update_fields=["carrier", "tracking_number", "updated_at"])
-            return False, "packing_requires_scan"
+            return False, "insufficient_reservation"
 
     try:
         with _tx.atomic():

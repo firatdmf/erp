@@ -677,8 +677,9 @@ class OrderDetail(DetailView):
         if not ok:
             if code == "cargo_required":
                 messages.error(request, "Siparişi tamamlamak (Gönderildi) için kargo şirketi ve takip numarası gerekli.")
-            elif code == "packing_requires_scan":
-                messages.error(request, "Paketleniyor'a geçmek için önce en az bir top okutun.")
+            elif code == "insufficient_reservation":
+                from .views_warehouse import reservation_shortfall_message
+                messages.error(request, reservation_shortfall_message(order))
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             return redirect("operating:order_detail", pk=order.pk)
@@ -1024,8 +1025,11 @@ def order_create_barcode_check(request):
 @login_required
 @require_POST
 def order_pack_complete(request, pk):
-    """Confirm packing — needs at least one reserved roll. Moves the
-    order to 'packaging' (Paketleniyor). Re-runnable; no stock cut."""
+    """Confirm packing — the scanned rolls must fully COVER every order
+    line's metres (a 110 m line backed by one 38 m roll can't complete).
+    Moves the order to 'packaging' (Paketleniyor). Re-runnable; no
+    stock cut."""
+    from .views_warehouse import order_reservation_shortfalls, reservation_shortfall_message
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş zaten gönderildi."}, status=400)
@@ -1033,6 +1037,9 @@ def order_pack_complete(request, pk):
     if n < 1:
         return JsonResponse({"ok": False,
                              "error": "Paketlemeyi tamamlamak için en az bir top okutmalısınız."}, status=400)
+    if order_reservation_shortfalls(order):
+        return JsonResponse({"ok": False,
+                             "error": reservation_shortfall_message(order)}, status=400)
     if order.order_status != "packaging":
         order.order_status = "packaging"
         order.save(update_fields=["order_status", "updated_at"])
@@ -1541,13 +1548,16 @@ class OrderCreate(View):
                     generate_machine_qr_for_order(order)
 
                     # Retail orders skip the manual "Paketleniyor" scan
-                    # step entirely — the rolls were just reserved above,
-                    # right on the create form, so auto-advance through
-                    # the funnel (its packaging gate only needs an active
-                    # reservation to exist, which is now true).
+                    # step — the rolls were just reserved above, right on
+                    # the create form. The funnel's packaging gate now
+                    # requires FULL metre coverage; when the scanned rolls
+                    # don't cover the ordered quantities the order simply
+                    # stays "Açık" and we tell the user below.
+                    retail_stayed_open = False
                     if order.is_retail_order and order.roll_reservations.filter(consumed=False).exists():
                         from .views_warehouse import apply_order_status_change
-                        apply_order_status_change(order, "packaging", user=member)
+                        _adv_ok, _adv_code = apply_order_status_change(order, "packaging", user=member)
+                        retail_stayed_open = (not _adv_ok and _adv_code == "insufficient_reservation")
 
                 # ── NO warehouse stock-out at create ──────────────────
                 # New orders start "Açık" (Open) and reserve/deduct
@@ -1562,6 +1572,13 @@ class OrderCreate(View):
                         request,
                         "Sipariş oluşturuldu ama şu barkodlar için rezervasyon yapılamadı, "
                         "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                    )
+                if retail_stayed_open:
+                    from .views_warehouse import reservation_shortfall_message
+                    messages.warning(
+                        request,
+                        "Sipariş oluşturuldu ama Açık durumda kaldı: "
+                        + reservation_shortfall_message(order),
                     )
 
                 # ── Auto-link to a CariAccount + log the sales-order
@@ -3490,8 +3507,9 @@ def update_order_status(request, order_id):
         if not ok:
             if code == "cargo_required":
                 return JsonResponse({'error': 'Kargo şirketi ve takip numarası gerekli'}, status=400)
-            if code == "packing_requires_scan":
-                return JsonResponse({'error': 'Paketlemeye geçmek için en az bir top okutulmalı'}, status=400)
+            if code == "insufficient_reservation":
+                from .views_warehouse import reservation_shortfall_message
+                return JsonResponse({'error': reservation_shortfall_message(order)}, status=400)
             return JsonResponse({'error': 'Durum güncelleme hatası', 'details': (code or '').replace('error:', '')}, status=500)
 
         return JsonResponse({
@@ -3875,8 +3893,9 @@ class WebOrderStatusEdit(View):
         if not ok:
             if code == "cargo_required":
                 messages.error(request, "Siparişi tamamlamak için kargo şirketi ve takip numarası gerekli.")
-            elif code == "packing_requires_scan":
-                messages.error(request, "Paketlemeye geçmek için önce en az bir top okutun.")
+            elif code == "insufficient_reservation":
+                from .views_warehouse import reservation_shortfall_message
+                messages.error(request, reservation_shortfall_message(order))
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             next_url = request.POST.get('next') or request.GET.get('next')

@@ -608,6 +608,20 @@
     '</div>';
   }
 
+  // Coverage badge: total roll metres vs the line's ordered quantity.
+  // The server refuses to complete packing/shipping until every line is
+  // fully covered, so surface the same rule live while creating.
+  function rollCoverageHtml(item, i) {
+    var covered = (item.rolls || []).reduce(function (s, r) { return s + (parseFloat(r.meters) || 0); }, 0);
+    var need = parseFloat(item.quantity) || 0;
+    var full = covered >= need && need > 0;
+    var color = full ? '#065F46' : '#92400E';
+    var bg = full ? '#D1FAE5' : '#FEF3C7';
+    var note = full ? '{% trans "tamam" %}' : '{% trans "eksik — sipariş bu kalem tamamlanmadan kapatılamaz" %}';
+    return '<span id="co-rollcov-' + i + '" style="font-weight:700;font-size:10.5px;color:' + color + ';background:' + bg + ';padding:2px 8px;border-radius:6px;margin-left:auto;white-space:nowrap;">' +
+      (+covered.toFixed(2)) + ' / ' + (+need.toFixed(2)) + ' m · ' + note + '</span>';
+  }
+
   function rollSectionHtml(item, i) {
     if (!isRetailOrder) return '';
     var rolls = item.rolls || [];
@@ -615,6 +629,7 @@
     return '<div class="co-roll-section" style="margin-top:10px;padding:10px;background:#F0FDFA;border:1px solid #CCFBF1;border-radius:8px;">' +
       '<label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;color:#0F766E;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;">' +
         '<i class="fas fa-barcode"></i> {% trans "Top barkodu (kesilecek metre)" %}' +
+        rollCoverageHtml(item, i) +
       '</label>' +
       '<div style="display:flex;gap:6px;">' +
         '<input type="text" class="form-input co-roll-barcode-input" placeholder="{% trans "Barkod okutun veya yazın" %}" ' +
@@ -752,6 +767,11 @@
       const t = document.getElementById('co-itotal-'+i);
       if (t) t.textContent = '$'+(orderItems[i].quantity*orderItems[i].price).toFixed(2);
       updateTotal();
+    }
+    if (f === 'quantity' && isRetailOrder) {
+      // Coverage badge compares roll metres against qty — keep it live.
+      const cov = document.getElementById('co-rollcov-'+i);
+      if (cov) cov.outerHTML = rollCoverageHtml(orderItems[i], i);
     }
     // Mark / unmark the row for stock violation, and refresh the submit
     // button's enabled state. We DO NOT clamp the qty automatically —

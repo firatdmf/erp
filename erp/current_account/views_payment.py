@@ -352,6 +352,11 @@ class PaymentCancel(View):
         reason = request.POST.get("reason", "")
         payment.cancel(user=request.user, reason=reason)
         messages.success(request, _g("Payment cancelled."))
+        # Cancelled from the list? Go back there (filters intact) instead
+        # of bouncing to the detail page. Internal paths only.
+        nxt = (request.POST.get("next") or "").strip()
+        if nxt.startswith("/") and not nxt.startswith("//"):
+            return redirect(nxt)
         return redirect("current_account:payment_detail", pk=payment.pk)
 
 

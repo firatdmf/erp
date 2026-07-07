@@ -194,6 +194,21 @@
     color: var(--nejum-teal-700);
   }
   .pl-go:hover .arr { opacity: 1; transform: translateX(2px); }
+  .pl-cancel-form { display: inline-flex; margin-left: 6px; }
+  .pl-cancel {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px;
+    background: white;
+    border: 1px solid #F1C7C7;
+    border-radius: 7px;
+    font: 600 11.5px var(--font-sans);
+    color: #B91C1C;
+    cursor: pointer;
+    transition: all 140ms;
+    white-space: nowrap;
+  }
+  .pl-cancel i { width: 13px; height: 13px; }
+  .pl-cancel:hover { background: #FEF2F2; border-color: #FCA5A5; }
   @media (max-width: 720px) {
     .pl-go span { display: none; } /* shrink to icon-only on phones */
     .pl-go { padding: 6px 8px; }
@@ -368,6 +383,17 @@
               <span>{% trans "Account" %}</span>
               <i data-lucide="arrow-right" class="arr"></i>
             </a>
+            {% if p.status != 'cancelled' %}
+            <form method="post" action="{% url 'current_account:payment_cancel' p.pk %}" class="pl-cancel-form"
+                  onsubmit="return confirm('{% trans "Payment will be cancelled, a reverse movement will be created. Are you sure?" %}');">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="pl-cancel" title="{% trans 'Cancel' %}">
+                <i data-lucide="x-circle"></i>
+                <span>{% trans "Cancel" %}</span>
+              </button>
+            </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

@@ -100,7 +100,6 @@
         <div class="doc-type">{% trans "Order" %}</div>
       </td>
       <td align="right">
-        <div class="num">#{{ order.pk }}</div>
         <div class="date">{{ order.created_at|date:"d M Y · H:i" }}</div>
         <div style="margin-top: 4pt;">
           {% if order.contact %}<span class="kind b2b">B2B</span>
@@ -225,7 +224,7 @@
   <!-- FOOTER -->
   <table class="foot" cellspacing="0" cellpadding="0">
     <tr>
-      <td>{% if order.print_header %}{{ order.print_header }}{% else %}{{ BRAND_NAME|default:"Nejum ERP"|upper }}{% endif %} · {% trans "Order" %} #{{ order.pk }}</td>
+      <td>{% if order.print_header %}{{ order.print_header }}{% else %}{{ BRAND_NAME|default:"Nejum ERP"|upper }}{% endif %} · {% trans "Order" %}</td>
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>

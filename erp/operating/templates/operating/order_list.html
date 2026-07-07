@@ -400,6 +400,11 @@
       <span>{% trans "B2C / Web" %}</span>
       <span class="ord-tab-count">{{ b2c_count }}</span>
     </button>
+    <button type="button" class="ord-tab" data-tab="retail">
+      <i class="fa fa-cash-register"></i>
+      <span>{% trans "Perakende" %}</span>
+      <span class="ord-tab-count">{{ retail_count }}</span>
+    </button>
     <div class="ord-tabs-r">
       <input id="ord-search-input" class="ord-search-input" type="text"
              placeholder="{% trans 'Search order no, customer, product…' %}"/>
@@ -657,6 +662,70 @@
       <div class="ico"><i class="fa fa-globe"></i></div>
       <h3>{% trans "No web orders" %}</h3>
       <p>{% trans "Orders from your website will appear here" %}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ===================== PERAKENDE (RETAIL) ORDERS ===================== #}
+  <div class="ord-list-wrap" data-pane="retail">
+    {% if retail_orders %}
+    <div class="ord-list">
+      <div class="ord-list-head">
+        <label class="ord-select" title="{% trans 'Select all on this tab' %}">
+          <input type="checkbox" class="ord-select-all">
+        </label>
+        <span></span>
+        <span>{% trans "Order" %}</span>
+        <span>{% trans "Customer" %}</span>
+        <span>{% trans "Source" %}</span>
+        <span class="num">{% trans "Total" %}</span>
+        <span>{% trans "Status" %}</span>
+        <span></span>
+      </div>
+      {% for order in retail_orders %}
+      <a href="{% url 'operating:order_detail' order.pk %}" class="ord-row" data-order-id="{{ order.pk }}">
+        <label class="ord-select">
+          <input type="checkbox" class="ord-select-row" data-order-id="{{ order.pk }}">
+        </label>
+        <span class="ord-kind retail">{% trans "Perakende" %}</span>
+        <div class="ord-id">
+          <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
+          <span class="ord-date">{{ order.created_at|date:"d M Y · H:i" }}</span>
+        </div>
+        <div class="ord-cust">
+          <div class="ord-cust-avatar" style="background: #9F1239;">
+            {% if order.guest_first_name %}{{ order.guest_first_name|slice:":2"|upper }}{% else %}PK{% endif %}
+          </div>
+          <div>
+            <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name }} {{ order.guest_last_name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
+            <div class="ord-cust-c">{% trans "Perakende" %}</div>
+          </div>
+        </div>
+        <div>
+          <span style="font: 500 12px var(--font-sans); color: var(--gray-700);"><i class="fa fa-store" style="margin-right:6px;color:var(--gray-500);"></i>{% trans "ERP" %}</span>
+        </div>
+        <div class="num ord-total">
+          {{ order.total_value|floatformat:2 }} <span>USD</span>
+          {% with gp=order.gross_profit %}
+            <div class="ord-gross" title="{% trans 'Gross profit (internal)' %}">
+              <i class="fa fa-arrow-trend-up"></i>
+              ${{ gp|floatformat:2 }}
+            </div>
+          {% endwith %}
+        </div>
+        <span class="ord-status {{ order.status }}">
+          <span class="ord-status-dot"></span>
+          {{ order.get_status_display }}
+        </span>
+        <i class="fa fa-chevron-right ord-chev"></i>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="ord-empty">
+      <div class="ico"><i class="fa fa-cash-register"></i></div>
+      <h3>{% trans "No retail orders" %}</h3>
+      <p>{% trans "Orders created via the Perakende toggle will appear here" %}</p>
     </div>
     {% endif %}
   </div>

@@ -1936,17 +1936,27 @@ class OrderList(ListView):
         
         # B2C orders: Has web_client (regardless of contact/company)
         b2c_orders = [
-            order for order in all_orders 
+            order for order in all_orders
             if order.web_client
         ]
-        
+
+        # Retail (Perakende) orders — flagged at create time; always
+        # guest orders (no contact/company/web_client), so this never
+        # overlaps with B2B/B2C above.
+        retail_orders = [
+            order for order in all_orders
+            if order.is_retail_order
+        ]
+
         # Add to context
         context['b2b_orders'] = b2b_orders
         context['b2c_orders'] = b2c_orders
+        context['retail_orders'] = retail_orders
         context['total_count'] = len(all_orders)
         context['b2b_count'] = len(b2b_orders)
         context['b2c_count'] = len(b2c_orders)
-        
+        context['retail_count'] = len(retail_orders)
+
         return context
 
 

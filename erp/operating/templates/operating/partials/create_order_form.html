@@ -261,24 +261,28 @@
         </div>
       </div>
 
-      <!-- Delivery Address (shared) -->
-      <div class="form-group" style="margin-top:12px;">
-        <label>{% trans "Delivery Address" %}</label>
-        <input type="text" name="delivery_address_title" class="form-input" placeholder="Address title (Home, Work...)">
-      </div>
-      <div class="form-group">
-        <textarea name="delivery_address" class="form-textarea" placeholder="Full address" rows="2"></textarea>
-      </div>
-      <div class="co-row">
-        <div class="form-group">
-          <input type="text" name="delivery_city" class="form-input" placeholder="City">
+      <!-- Delivery Address (shared) — grouped with Guest fields under
+           the same Perakende "enter customer info" toggle, since a
+           delivery address is itself customer info. -->
+      <div id="co-delivery-fields">
+        <div class="form-group" style="margin-top:12px;">
+          <label>{% trans "Delivery Address" %}</label>
+          <input type="text" name="delivery_address_title" class="form-input" placeholder="Address title (Home, Work...)">
         </div>
         <div class="form-group">
-          <input type="text" name="delivery_country" class="form-input" placeholder="Country" value="Turkey">
+          <textarea name="delivery_address" class="form-textarea" placeholder="Full address" rows="2"></textarea>
         </div>
-      </div>
-      <div class="form-group">
-        <input type="text" name="delivery_phone" class="form-input" placeholder="Phone">
+        <div class="co-row">
+          <div class="form-group">
+            <input type="text" name="delivery_city" class="form-input" placeholder="City">
+          </div>
+          <div class="form-group">
+            <input type="text" name="delivery_country" class="form-input" placeholder="Country" value="Turkey">
+          </div>
+        </div>
+        <div class="form-group">
+          <input type="text" name="delivery_phone" class="form-input" placeholder="Phone">
+        </div>
       </div>
     </div>
   </div>
@@ -445,21 +449,25 @@
     var picker = document.getElementById('co-customer-picker');
     var retailToggle = document.getElementById('co-retail-customer-toggle');
     var guestFields = document.getElementById('co-guest-fields');
+    var deliveryFields = document.getElementById('co-delivery-fields');
     if (v === 'perakende') {
       // customer_source stays 'guest' under the hood (server still
       // treats a retail order's optional customer info the same way
-      // as a manually-picked Guest), but the picker UI itself and the
-      // Guest fields are hidden until the "enter customer info"
-      // checkbox below is ticked.
+      // as a manually-picked Guest), but the picker UI itself, the
+      // Guest fields, and the delivery address are all hidden until
+      // the "enter customer info" checkbox below is ticked.
       var g = document.querySelector('input[name=customer_source][value=guest]');
       if (g) { g.checked = true; }
       if (picker) picker.style.display = 'none';
       if (retailToggle) retailToggle.style.display = 'block';
       var chk = document.getElementById('co-retail-has-customer');
-      if (guestFields) guestFields.style.display = (chk && chk.checked) ? 'block' : 'none';
+      var show = (chk && chk.checked) ? 'block' : 'none';
+      if (guestFields) guestFields.style.display = show;
+      if (deliveryFields) deliveryFields.style.display = show;
     } else {
       if (picker) picker.style.display = '';
       if (retailToggle) retailToggle.style.display = 'none';
+      if (deliveryFields) deliveryFields.style.display = '';
       var checkedSrc = document.querySelector('input[name=customer_source]:checked');
       if (window.coCustomerSource) coCustomerSource(checkedSrc ? checkedSrc.value : 'crm');
     }
@@ -468,7 +476,10 @@
 
   window.coRetailCustomerToggle = function (checked) {
     var guestFields = document.getElementById('co-guest-fields');
-    if (guestFields) guestFields.style.display = checked ? 'block' : 'none';
+    var deliveryFields = document.getElementById('co-delivery-fields');
+    var show = checked ? 'block' : 'none';
+    if (guestFields) guestFields.style.display = show;
+    if (deliveryFields) deliveryFields.style.display = show;
   };
 
   window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
@@ -1027,11 +1038,14 @@
       var pickerEl = document.getElementById('co-customer-picker');
       var toggleEl = document.getElementById('co-retail-customer-toggle');
       var guestEl = document.getElementById('co-guest-fields');
+      var deliveryEl = document.getElementById('co-delivery-fields');
       var chkEl = document.getElementById('co-retail-has-customer');
       if (pickerEl) pickerEl.style.display = 'none';
       if (toggleEl) toggleEl.style.display = 'block';
       if (chkEl) chkEl.checked = hasExistingGuestInfo;
-      if (guestEl) guestEl.style.display = hasExistingGuestInfo ? 'block' : 'none';
+      var showRetail = hasExistingGuestInfo ? 'block' : 'none';
+      if (guestEl) guestEl.style.display = showRetail;
+      if (deliveryEl) deliveryEl.style.display = showRetail;
     }
 
     // In edit mode the form already posts to /operating/orders/edit/<id>/

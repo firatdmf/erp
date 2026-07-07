@@ -55,6 +55,7 @@ urlpatterns = [
     path("orders/<int:pk>/pack/update/", views.order_pack_reserve_update, name="order_pack_reserve_update"),
     path("orders/<int:pk>/pack/remove/", views.order_pack_reserve_remove, name="order_pack_reserve_remove"),
     path("orders/<int:pk>/pack/complete/", views.order_pack_complete, name="order_pack_complete"),
+    path("orders/create/barcode_check/", views.order_create_barcode_check, name="order_create_barcode_check"),
     path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),

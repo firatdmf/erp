@@ -123,16 +123,15 @@
         <label>{% trans "Type" %}</label>
         <div class="co-type-group">
           <label class="co-type-btn">
-            <input type="radio" name="order_type" value="web">
+            <input type="radio" name="order_type" value="web" onchange="coOrderType('web')">
             <i class="fas fa-globe"></i> Web Order
           </label>
           <label class="co-type-btn">
-            <input type="radio" name="order_type" value="manual" checked>
+            <input type="radio" name="order_type" value="manual" onchange="coOrderType('manual')" {% if not order or not order.is_retail_order %}checked{% endif %}>
             <i class="fas fa-store"></i> Manual
           </label>
           <label class="co-type-btn">
-            <input type="radio" name="order_type" value="perakende"
-              onchange="(function(){var g=document.querySelector('input[name=customer_source][value=guest]'); if(g){g.checked=true;} if(window.coCustomerSource){coCustomerSource('guest');}})()">
+            <input type="radio" name="order_type" value="perakende" onchange="coOrderType('perakende')" {% if order and order.is_retail_order %}checked{% endif %}>
             <i class="fas fa-cash-register"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Perakende{% else %}Retail{% endif %}
           </label>
         </div>
@@ -386,6 +385,13 @@
 <script>
 (function() {
   let orderItems = [], itemIndex = 0;
+  // Perakende (retail) orders capture roll barcode + cut metres right
+  // on the create/edit form instead of a later packing-scan visit —
+  // reflects whichever order_type radio the server rendered checked.
+  let isRetailOrder = (function () {
+    var r = document.querySelector('input[name="order_type"]:checked');
+    return !!r && r.value === 'perakende';
+  })();
 
   // ── Edit-mode hydration: prefill the orderItems array from the
   //    server payload so existing line items render and the user
@@ -410,13 +416,24 @@
           custom_pleat_type: '', custom_pleat_density: '',
           custom_mounting_type: '', custom_wing_type: '',
           custom_fabric_used_meters: '',
-          existing_item_id: it.item_id || null
+          existing_item_id: it.item_id || null,
+          rolls: []
         });
       });
     } catch (e) { /* ignore — render empty */ }
   }
 
   window.coToggle = function(s) { document.getElementById('co-step-'+s).classList.toggle('active'); };
+
+  window.coOrderType = function (v) {
+    isRetailOrder = (v === 'perakende');
+    if (v === 'perakende') {
+      var g = document.querySelector('input[name=customer_source][value=guest]');
+      if (g) { g.checked = true; }
+      if (window.coCustomerSource) coCustomerSource('guest');
+    }
+    renderProducts();
+  };
 
   window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
@@ -440,7 +457,8 @@
       stock: _stock, allow_oversell: _allowOversell, is_cost_price: _isCost,
       is_custom_curtain: false, custom_width:'', custom_height:'',
       custom_pleat_type:'', custom_pleat_density:'', custom_mounting_type:'',
-      custom_wing_type:'', custom_fabric_used_meters:''
+      custom_wing_type:'', custom_fabric_used_meters:'',
+      rolls: []
     });
     renderProducts({ highlightFirst: true });
     document.getElementById('co-product-search').value = '';
@@ -488,6 +506,7 @@
           <div class="form-group"><label>{% trans "Unit Price" %}${item.is_cost_price ? ` <span id="co-costnote-${i}" style="font-weight:700;font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:5px;margin-left:4px;vertical-align:middle;" title="{% trans 'No sale price on file — showing purchase cost instead. Confirm or adjust before saving.' %}">{% trans "Alış fiyatı" %}</span>` : ''}</label><input type="number" class="form-input" value="${item.price}" min="0" step="0.01" onchange="coUpd(${i},'price',this.value)"></div>
           <div class="form-group"><label>{% trans "Total" %}</label><div class="co-item-total" id="co-itotal-${i}">$${(item.quantity*item.price).toFixed(2)}</div></div>
         </div>
+        ${rollSectionHtml(item, i)}
         <div id="co-curtain-${i}" style="display:${cc?'block':'none'}">
           <div class="co-curtain-fields">
             <div class="form-group"><label>{% trans "Fabric Used (m)" %}</label><input type="number" class="form-input" value="${item.custom_fabric_used_meters}" min="0" step="0.01" onchange="coUpd(${i},'custom_fabric_used_meters',this.value)"></div>
@@ -527,6 +546,75 @@
     updateTotal();
     if (window.refreshStockState) refreshStockState();
   }
+
+  // ── Perakende roll capture — barcode + cut metres entered right on
+  //    the product card instead of a later packing-scan visit. No
+  //    camera here (per explicit request): a plain text input works
+  //    fine with a hardware barcode scanner acting as a keyboard. ──
+  function rollRowHtml(i, ri, r) {
+    return '<div class="co-roll-row" style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;">' +
+      '<code style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #E2E8EE;">' + esc(r.barcode) + '</code>' +
+      '<span style="color:#6b7280;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.warehouse || '') + ' · ' + r.available + ' m {% trans "mevcut" %}</span>' +
+      '<input type="number" class="form-input" style="width:78px;flex:0 0 auto;" value="' + r.meters + '" min="0.01" step="0.01" max="' + r.available + '" onchange="coRollMeters(' + i + ',' + ri + ',this.value)">' +
+      '<span>m</span>' +
+      '<button type="button" onclick="coRemoveRoll(' + i + ',' + ri + ')" style="color:#B91C1C;background:none;border:0;cursor:pointer;font-size:16px;line-height:1;padding:0 2px;">×</button>' +
+    '</div>';
+  }
+
+  function rollSectionHtml(item, i) {
+    if (!isRetailOrder) return '';
+    var rolls = item.rolls || [];
+    var rowsHtml = rolls.map(function (r, ri) { return rollRowHtml(i, ri, r); }).join('');
+    return '<div class="co-roll-section" style="margin-top:10px;padding:10px;background:#F0FDFA;border:1px solid #CCFBF1;border-radius:8px;">' +
+      '<label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;color:#0F766E;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;">' +
+        '<i class="fas fa-barcode"></i> {% trans "Top barkodu (kesilecek metre)" %}' +
+      '</label>' +
+      '<div style="display:flex;gap:6px;">' +
+        '<input type="text" class="form-input co-roll-barcode-input" placeholder="{% trans "Barkod okutun veya yazın" %}" ' +
+          'onkeydown="if(event.key===\'Enter\'){event.preventDefault(); coAddRoll(' + i + ', this);}">' +
+        '<button type="button" class="ord-btn" style="white-space:nowrap;" onclick="coAddRoll(' + i + ', this.previousElementSibling)">{% trans "Ekle" %}</button>' +
+      '</div>' +
+      (rowsHtml ? '<div class="co-rolls-list">' + rowsHtml + '</div>' : '') +
+    '</div>';
+  }
+
+  window.coAddRoll = function (i, inputEl) {
+    var item = orderItems[i];
+    if (!item) return;
+    var barcode = (inputEl.value || '').trim();
+    if (!barcode) return;
+    if ((item.rolls || []).some(function (r) { return r.barcode.toLowerCase() === barcode.toLowerCase(); })) {
+      showToast('Bu barkod zaten eklendi', 'warning');
+      return;
+    }
+    fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { showToast(d.error || 'Barkod doğrulanamadı', 'error'); return; }
+        if (!item.rolls) item.rolls = [];
+        var defaultMeters = Math.min(d.available, Number(item.quantity) || d.available);
+        item.rolls.push({ barcode: barcode, roll_id: d.roll_id, available: d.available, warehouse: d.warehouse, meters: defaultMeters });
+        renderProducts();
+      })
+      .catch(function () { showToast('Barkod kontrol edilemedi', 'error'); });
+  };
+
+  window.coRollMeters = function (i, ri, v) {
+    var item = orderItems[i];
+    if (!item || !item.rolls || !item.rolls[ri]) return;
+    var m = parseFloat(v) || 0;
+    var cap = item.rolls[ri].available;
+    if (m > cap) { m = cap; showToast('En fazla ' + cap + ' m girilebilir', 'warning'); }
+    item.rolls[ri].meters = m;
+    renderProducts();
+  };
+
+  window.coRemoveRoll = function (i, ri) {
+    var item = orderItems[i];
+    if (!item || !item.rolls) return;
+    item.rolls.splice(ri, 1);
+    renderProducts();
+  };
 
   window.coCustomerSource = function(src) {
     document.getElementById('co-crm-fields').style.display = src === 'crm' ? 'block' : 'none';
@@ -745,7 +833,8 @@
         custom_pleat_density: it.custom_pleat_density || null,
         custom_mounting_type: it.custom_mounting_type || null,
         custom_wing_type: it.custom_wing_type || null,
-        custom_fabric_used_meters: it.custom_fabric_used_meters || null
+        custom_fabric_used_meters: it.custom_fabric_used_meters || null,
+        rolls: (it.rolls || []).map(function (r) { return { barcode: r.barcode, meters: r.meters }; })
       };
       if (it.existing_item_id) payload.item_id = it.existing_item_id;
       return payload;

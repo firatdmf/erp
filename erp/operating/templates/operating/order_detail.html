@@ -896,7 +896,13 @@
                 No stock is deducted until the order is shipped via <b>Complete order</b>. Carrier + tracking number are required.
               {% endif %}
             </div>
-            <div class="od-ship-grid">
+            {% if order.is_retail_order %}
+            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#0F766E;margin-bottom:10px;cursor:pointer;">
+              <input type="checkbox" id="od-has-cargo" {% if order.carrier or order.tracking_number %}checked{% endif %}>
+              {% trans "Bu siparişte kargo var" %}
+            </label>
+            {% endif %}
+            <div class="od-ship-grid" id="od-ship-grid" {% if order.is_retail_order and not order.carrier and not order.tracking_number %}style="display:none;"{% endif %}>
               <label class="od-ship-f">
                 <span class="od-ship-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kargo şirketi{% else %}Carrier{% endif %}</span>
                 <select name="carrier">
@@ -1413,16 +1419,43 @@
     const SHIPPED = ['shipped', 'in_transit', 'out_for_delivery', 'delivered'];
     const NEED_CARGO_MSG = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Siparişi tamamlamak için kargo şirketi ve takip numarası girin.'{% else %}'Enter carrier and tracking number to complete the order.'{% endif %};
     const CONFIRM_SHIP = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Sipariş tamamlanacak ve paketlemede rezerve edilen toplar stoktan düşülecek. Onaylıyor musunuz?'{% else %}'The order will be completed and the rolls reserved during packing will be deducted from stock. Continue?'{% endif %};
+
+    // Retail-only: "Bu siparişte kargo var" toggles the carrier/tracking
+    // fields; unchecked lets the order complete cargo-free (in-person /
+    // walk-in sale) via the skip_cargo flag read server-side.
+    const hasCargoChk = document.getElementById('od-has-cargo');
+    const shipGridEl  = document.getElementById('od-ship-grid');
+    if (hasCargoChk && shipGridEl) {
+      hasCargoChk.addEventListener('change', function () {
+        shipGridEl.style.display = this.checked ? '' : 'none';
+      });
+    }
+    const CONFIRM_SHIP_NO_CARGO = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Kargo bilgisi girilmeden sipariş tamamlanacak ve rezerve edilen toplar stoktan düşülecek. Onaylıyor musunuz?'{% else %}'The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock. Continue?'{% endif %};
+    function setSkipCargo(v) {
+      let inp = document.getElementById('od-skip-cargo-input');
+      if (!inp) {
+        inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'skip_cargo'; inp.id = 'od-skip-cargo-input';
+        statusForm.appendChild(inp);
+      }
+      inp.value = v;
+    }
     function submitStatus(s) {
       if (SHIPPED.indexOf(s) !== -1) {
-        const c = ((carrierSel && carrierSel.value) || '').trim();
-        const t = ((trackingInp && trackingInp.value) || '').trim();
-        if (!c || !t) {
-          alert(NEED_CARGO_MSG);
-          if (!c && carrierSel) { carrierSel.focus(); } else if (trackingInp) { trackingInp.focus(); }
-          return;
+        if (hasCargoChk && !hasCargoChk.checked) {
+          if (!confirm(CONFIRM_SHIP_NO_CARGO)) return;
+          setSkipCargo('1');
+        } else {
+          const c = ((carrierSel && carrierSel.value) || '').trim();
+          const t = ((trackingInp && trackingInp.value) || '').trim();
+          if (!c || !t) {
+            alert(NEED_CARGO_MSG);
+            if (!c && carrierSel) { carrierSel.focus(); } else if (trackingInp) { trackingInp.focus(); }
+            return;
+          }
+          if (!confirm(CONFIRM_SHIP)) return;
+          setSkipCargo('0');
         }
-        if (!confirm(CONFIRM_SHIP)) return;
       }
       statusInput.value = s;
       statusForm.submit();

@@ -660,6 +660,11 @@ class OrderDetail(DetailView):
         new_status = (request.POST.get("order_status") or "").strip()
         carrier = request.POST.get("carrier")
         tracking = request.POST.get("tracking_number")
+        # Retail (Perakende) orders can complete without cargo info — a
+        # walk-in/in-person sale — via the "Bu siparişte kargo var"
+        # checkbox on the detail page. Gated on is_retail_order so this
+        # flag can never bypass the cargo gate for a normal order.
+        skip_cargo = order.is_retail_order and request.POST.get("skip_cargo") == "1"
 
         # All status changes funnel through the single atomic helper so
         # the ship gate (cargo required) + the reservation → stock-out
@@ -667,6 +672,7 @@ class OrderDetail(DetailView):
         from .views_warehouse import apply_order_status_change
         ok, code = apply_order_status_change(
             order, new_status, carrier=carrier, tracking=tracking, user=request.user,
+            require_cargo_for_ship=not skip_cargo,
         )
         if not ok:
             if code == "cargo_required":
@@ -772,6 +778,64 @@ def _roll_available_meters(roll, exclude_reservation_id=None):
     return avail if avail > 0 else _PDecimal("0")
 
 
+def _lookup_roll_by_barcode_for_sku(code, target_sku):
+    """Find a WarehouseProductRoll by barcode whose product matches
+    target_sku (variant SKU or plain warehouse SKU) directly. Used when
+    the caller already knows exactly which product/variant a barcode
+    should belong to (e.g. a not-yet-saved order-create line) — unlike
+    _match_roll_to_order, which guesses across a whole order's items.
+    Returns (roll_or_None, error_code_or_None); error_code is one of
+    'not_found' / 'wrong_product' / 'no_target'."""
+    from .models import WarehouseProductRoll
+    target = (target_sku or "").strip().lower()
+    if not target:
+        return None, "no_target"
+    rolls = list(WarehouseProductRoll.objects
+                 .select_related("product", "product__catalog_variant", "product__warehouse")
+                 .filter(barcode__iexact=code))
+    if not rolls:
+        return None, "not_found"
+    for roll in rolls:
+        wp = roll.product
+        if wp is None:
+            continue
+        cv = wp.catalog_variant
+        vsku = (getattr(cv, "variant_sku", "") or "").strip().lower() if cv else ""
+        wsku = (wp.sku or "").strip().lower()
+        if target in (vsku, wsku):
+            return roll, None
+    return None, "wrong_product"
+
+
+def _create_roll_reservation(order, order_item, roll, req_meters, user):
+    """Lock the roll, cap the requested metres to what's actually
+    reservable, and create the OrderRollReservation row. Shared by the
+    packing-scan endpoint and the retail order-create flow so both
+    enforce the exact same no-over-commit rule. Returns
+    (reservation_or_None, capped: bool, error_code_or_None) where
+    error_code is 'no_stock' on failure."""
+    from .models import OrderRollReservation, WarehouseProductRoll
+    with transaction.atomic():
+        locked = WarehouseProductRoll.objects.select_for_update().get(pk=roll.pk)
+        avail = _roll_available_meters(locked)
+        if avail <= 0:
+            return None, False, "no_stock"
+        capped = False
+        if req_meters is not None:
+            meters = req_meters
+            if meters > avail:
+                meters = avail
+                capped = True
+        else:
+            meters = avail
+        r = OrderRollReservation.objects.create(
+            order=order, order_item=order_item, roll=locked,
+            warehouse_product=locked.product, meters=meters,
+            created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
+        )
+    return r, capped, None
+
+
 def _reservation_payload(r):
     wp = r.warehouse_product
     return {
@@ -862,7 +926,6 @@ def order_pack_reserve_add(request, pk):
         return JsonResponse({"ok": False, "kind": "no_stock",
                              "error": "Bu topta uygun/rezerv edilebilir metre kalmadı."}, status=409)
     roll_pick, matched_item = pick
-    wp = roll_pick.product
 
     # Parse the requested metres (validation errors before we lock).
     raw = (request.POST.get("meters") or "").strip()
@@ -875,27 +938,10 @@ def order_pack_reserve_add(request, pk):
         if req_meters <= 0:
             return JsonResponse({"ok": False, "error": "Metre sıfırdan büyük olmalı."}, status=400)
 
-    # Lock the roll row and re-check availability inside the lock so two
-    # concurrent scans of the same roll can't over-commit it.
-    from django.db import transaction as _tx
-    capped = False
-    with _tx.atomic():
-        locked = WarehouseProductRoll.objects.select_for_update().get(pk=roll_pick.pk)
-        avail = _roll_available_meters(locked)
-        if avail <= 0:
-            return JsonResponse({"ok": False, "kind": "no_stock",
-                                 "error": "Bu topta uygun/rezerv edilebilir metre kalmadı."}, status=409)
-        if req_meters is not None:
-            meters = req_meters
-            if meters > avail:
-                meters = avail
-                capped = True
-        else:
-            meters = avail
-        r = OrderRollReservation.objects.create(
-            order=order, order_item=matched_item, roll=locked, warehouse_product=wp,
-            meters=meters, created_by=request.user if request.user.is_authenticated else None,
-        )
+    r, capped, err = _create_roll_reservation(order, matched_item, roll_pick, req_meters, request.user)
+    if err == "no_stock":
+        return JsonResponse({"ok": False, "kind": "no_stock",
+                             "error": "Bu topta uygun/rezerv edilebilir metre kalmadı."}, status=409)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
 
 
@@ -946,6 +992,33 @@ def order_pack_reserve_remove(request, pk):
     removed = r.id
     r.delete()
     return JsonResponse({"ok": True, "removed": removed})
+
+
+@login_required
+def order_create_barcode_check(request):
+    """Live validation for the retail order-create barcode+metres
+    inputs (Step 3 product cards). No Order exists yet at this point,
+    so this checks a barcode against a specific product/variant SKU the
+    caller already knows (the line's selected product) instead of
+    guessing across an order's items. Read-only — reserves nothing."""
+    code = (request.GET.get("barcode") or "").strip()
+    sku = (request.GET.get("sku") or "").strip()
+    if not code or not sku:
+        return JsonResponse({"ok": False, "error": "Barkod veya ürün bilgisi eksik."}, status=400)
+    roll, err = _lookup_roll_by_barcode_for_sku(code, sku)
+    if err == "not_found":
+        return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir top bulunamadı."}, status=404)
+    if err == "wrong_product":
+        return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu top bu ürüne ait değil."}, status=409)
+    avail = _roll_available_meters(roll)
+    if avail <= 0:
+        return JsonResponse({"ok": False, "kind": "no_stock", "error": "Bu topta uygun metre kalmadı."}, status=409)
+    return JsonResponse({
+        "ok": True,
+        "roll_id": roll.pk,
+        "available": float(avail),
+        "warehouse": (roll.product.warehouse.name if (roll.product and roll.product.warehouse_id) else ""),
+    })
 
 
 @login_required
@@ -1344,6 +1417,9 @@ class OrderCreate(View):
         # (shipped / delivered), so insufficient stock at create time
         # is fine. UI shows an amber back-order chip as a heads-up.
 
+        member = getattr(request.user, "member", None)
+        failed_barcodes = []
+
         if form.is_valid():
             try:
                 with transaction.atomic():
@@ -1434,15 +1510,59 @@ class OrderCreate(View):
                             order_item.custom_fabric_used_meters = item_data.get("custom_fabric_used_meters") or None
                             order_item.save()
 
+                        # Retail (Perakende) roll reservations — entered
+                        # right on this product card instead of a later
+                        # packing-scan visit. Each already passed the
+                        # live order_create_barcode_check while typing;
+                        # re-validated here for real, against the just-
+                        # created order_item. A bad/raced barcode is
+                        # skipped (never fails the whole order) and
+                        # surfaced as a warning below.
+                        if order.is_retail_order:
+                            for roll_data in (item_data.get("rolls") or []):
+                                bc = (roll_data.get("barcode") or "").strip()
+                                if not bc:
+                                    continue
+                                target_sku = variant.variant_sku if variant else (product.sku or "")
+                                roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
+                                if rerr:
+                                    failed_barcodes.append(bc)
+                                    continue
+                                raw_m = roll_data.get("meters")
+                                try:
+                                    req_m = _PDecimal(str(raw_m)) if raw_m else None
+                                except Exception:
+                                    req_m = None
+                                _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, request.user)
+                                if rerr:
+                                    failed_barcodes.append(bc)
+
                     # Generate QR code
                     generate_machine_qr_for_order(order)
 
+                    # Retail orders skip the manual "Paketleniyor" scan
+                    # step entirely — the rolls were just reserved above,
+                    # right on the create form, so auto-advance through
+                    # the funnel (its packaging gate only needs an active
+                    # reservation to exist, which is now true).
+                    if order.is_retail_order and order.roll_reservations.filter(consumed=False).exists():
+                        from .views_warehouse import apply_order_status_change
+                        apply_order_status_change(order, "packaging", user=member)
+
                 # ── NO warehouse stock-out at create ──────────────────
                 # New orders start "Açık" (Open) and reserve/deduct
-                # nothing. Warehouse rolls are reserved during the
-                # packing-scan step and only physically cut when the
-                # order is shipped (cargo info entered). See
+                # nothing (retail orders may auto-advance to "Paketleniyor"
+                # above once rolls are reserved, but that's still just a
+                # reservation — no physical stock moves). Rolls are only
+                # physically cut when the order is shipped (cargo info
+                # entered, or the retail no-cargo confirm). See
                 # views_warehouse.consume_reservations_for_order.
+                if failed_barcodes:
+                    messages.warning(
+                        request,
+                        "Sipariş oluşturuldu ama şu barkodlar için rezervasyon yapılamadı, "
+                        "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                    )
 
                 # ── Auto-link to a CariAccount + log the sales-order
                 # movement so the customer's ledger reflects this
@@ -1452,7 +1572,6 @@ class OrderCreate(View):
                     from current_account.services import (
                         get_or_create_cari_for_order, post_order_movement,
                     )
-                    member = getattr(request.user, "member", None)
                     cari = get_or_create_cari_for_order(order, member=member)
                     if cari and order.cari_id != cari.pk:
                         order.cari = cari

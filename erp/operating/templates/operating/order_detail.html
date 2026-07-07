@@ -1439,9 +1439,34 @@
     const CONFIRM_SHIP_NO_CARGO = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Kargo bilgisi girilmeden sipariş tamamlanacak ve rezerve edilen toplar stoktan düşülecek.'{% else %}'The order will complete WITHOUT cargo info and the reserved rolls will be deducted from stock.'{% endif %};
     // Line-by-line recap appended to the complete-confirm so a mistyped
     // quantity/price gets one last human look before stock + money post.
-    const ORDER_SUMMARY =
+    // Server-rendered snapshot as FALLBACK only — the live recap is
+    // built from the table's inputs at confirm time, because inline
+    // edits save via AJAX without a reload and a baked constant would
+    // show the pre-edit numbers.
+    const ORDER_SUMMARY_FALLBACK =
       {% for item in order_items_sorted %}'• {{ item.product.title|default:item.description|escapejs }}{% if item.product_variant %} ({{ item.product_variant.variant_sku|escapejs }}){% endif %} — {{ item.quantity|floatformat:2 }} × ${{ item.price|floatformat:2 }}\n' +
       {% endfor %}'{% if LANGUAGE_CODE|slice:":2" == "tr" %}Toplam{% else %}Total{% endif %}: ${{ order.total_value|floatformat:2 }}';
+    const SUMMARY_TOTAL_LABEL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Toplam'{% else %}'Total'{% endif %};
+    function buildOrderSummary() {
+      try {
+        const rows = document.querySelectorAll('#od-items-tbody tr[data-item-row]');
+        if (!rows.length) return ORDER_SUMMARY_FALLBACK;
+        const lines = [];
+        let total = 0;
+        rows.forEach(r => {
+          const nameEl = r.querySelector('.od-prod span:last-child');
+          const name = (nameEl ? nameEl.textContent : '').trim() || '—';
+          const vsku = (r.children[2] ? r.children[2].textContent : '').trim();
+          const qty = parseFloat(r.querySelector('input[data-field="quantity"]')?.value) || 0;
+          const price = parseFloat(r.querySelector('input[data-field="price"]')?.value) || 0;
+          total += qty * price;
+          lines.push('• ' + name + (vsku && vsku !== '—' ? ' (' + vsku + ')' : '') +
+                     ' — ' + qty.toFixed(2) + ' × $' + price.toFixed(2));
+        });
+        lines.push(SUMMARY_TOTAL_LABEL + ': $' + total.toFixed(2));
+        return lines.join('\n');
+      } catch (e) { return ORDER_SUMMARY_FALLBACK; }
+    }
     const CONFIRM_TAIL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'\n\nOnaylıyor musunuz?'{% else %}'\n\nContinue?'{% endif %};
     function setSkipCargo(v) {
       let inp = document.getElementById('od-skip-cargo-input');
@@ -1455,7 +1480,7 @@
     function submitStatus(s) {
       if (SHIPPED.indexOf(s) !== -1) {
         if (hasCargoChk && !hasCargoChk.checked) {
-          if (!confirm(CONFIRM_SHIP_NO_CARGO + '\n\n' + ORDER_SUMMARY + CONFIRM_TAIL)) return;
+          if (!confirm(CONFIRM_SHIP_NO_CARGO + '\n\n' + buildOrderSummary() + CONFIRM_TAIL)) return;
           setSkipCargo('1');
         } else {
           const c = ((carrierSel && carrierSel.value) || '').trim();
@@ -1465,7 +1490,7 @@
             if (!c && carrierSel) { carrierSel.focus(); } else if (trackingInp) { trackingInp.focus(); }
             return;
           }
-          if (!confirm(CONFIRM_SHIP + '\n\n' + ORDER_SUMMARY + CONFIRM_TAIL)) return;
+          if (!confirm(CONFIRM_SHIP + '\n\n' + buildOrderSummary() + CONFIRM_TAIL)) return;
           setSkipCargo('0');
         }
       }

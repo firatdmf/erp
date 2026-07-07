@@ -127,7 +127,10 @@
       <tbody>
         {% for r in rows %}
         <tr>
-          <td style="white-space:nowrap;">{{ r.date|date:"d M Y" }}</td>
+          <td style="white-space:nowrap;">
+            {{ r.date|date:"d M Y" }}
+            <div style="font-size:11px; color:var(--gray-500);">{{ r.created_at|date:"H:i" }}</div>
+          </td>
           <td>
             {% if r.order_id %}
               <a class="rl-ord" href="{% url 'operating:order_detail' r.order_id %}">

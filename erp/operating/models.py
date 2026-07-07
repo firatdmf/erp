@@ -791,27 +791,55 @@ class Warehouse(models.Model):
     def __str__(self):
         return self.name
 
-    def total_value_usd(self):
-        """Sum the per-product USD value across the warehouse. Uses the
-        WarehouseProduct.total_cost_usd() method (with purchase_price
-        fallback) so products that have a price but no explicit
-        cost_usd still contribute to the rollup."""
+    def _total_value_annotations(self):
+        """SQL expressions mirroring WarehouseProduct.unit_cost_usd/try's
+        purchase_price fallback (see those methods for the rules), so the
+        warehouse rollups run as ONE aggregate query instead of pulling
+        every product row into Python — with thousands of products over a
+        remote DB the loop version took seconds per call."""
         from decimal import Decimal
-        total = Decimal('0')
-        for p in self.products.all():
-            v = p.total_cost_usd()
-            if v:
-                total += v
-        return total
+        from django.db.models import Case, When, Q, F, Value, DecimalField
+        from django.db.models.functions import Coalesce
+        rate = WarehouseProduct._usd_try_rate()  # fetched ONCE, inlined
+        _dec = DecimalField(max_digits=20, decimal_places=4)
+
+        usd_cases = [When(Q(purchase_currency__isnull=True) | Q(purchase_currency=""),
+                          then=F("purchase_price"))]
+        try_cases = []
+        # Upper() comparisons mirror the .upper() in the Python methods.
+        usd_cases.append(When(Q(purchase_currency__iexact="USD") | Q(purchase_currency__iexact="EUR"),
+                              then=F("purchase_price")))
+        try_cases.append(When(purchase_currency__iexact="TRY", then=F("purchase_price")))
+        if rate and rate > 0:
+            usd_cases.append(When(purchase_currency__iexact="TRY",
+                                  then=F("purchase_price") / Value(rate, output_field=_dec)))
+            try_cases.append(When(Q(purchase_currency__isnull=True) | Q(purchase_currency="")
+                                  | Q(purchase_currency__iexact="USD"),
+                                  then=F("purchase_price") * Value(rate, output_field=_dec)))
+        unit_usd = Coalesce(F("cost_usd"), Case(*usd_cases, default=None, output_field=_dec),
+                            output_field=_dec)
+        unit_try = Coalesce(F("cost_try"), Case(*try_cases, default=None, output_field=_dec),
+                            output_field=_dec)
+        return unit_usd, unit_try
+
+    def total_values(self):
+        """(usd, try) rollups in a single aggregate query."""
+        from decimal import Decimal
+        from django.db.models import Sum, F, DecimalField
+        from django.db.models.functions import Coalesce
+        unit_usd, unit_try = self._total_value_annotations()
+        _dec = DecimalField(max_digits=20, decimal_places=4)
+        agg = self.products.aggregate(
+            usd=Coalesce(Sum(F("quantity") * unit_usd, output_field=_dec), Decimal("0"), output_field=_dec),
+            trl=Coalesce(Sum(F("quantity") * unit_try, output_field=_dec), Decimal("0"), output_field=_dec),
+        )
+        return agg["usd"], agg["trl"]
+
+    def total_value_usd(self):
+        return self.total_values()[0]
 
     def total_value_try(self):
-        from decimal import Decimal
-        total = Decimal('0')
-        for p in self.products.all():
-            v = p.total_cost_try()
-            if v:
-                total += v
-        return total
+        return self.total_values()[1]
 
     def product_count(self):
         return self.products.count()

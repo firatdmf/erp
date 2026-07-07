@@ -522,8 +522,12 @@ GMAIL_SCOPES = [
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (default is 2.5 MB)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB (default is 2.5 MB)
 
-# Django Debug Toolbar - Only enable in DEBUG mode
-if DEBUG:
+# Django Debug Toolbar — opt-in via DEBUG_TOOLBAR=True in .env (and only
+# in DEBUG mode). Its template-context inspection alone added ~3s per
+# request on heavy pages (it reprs the whole context, triggering dozens
+# of lazy FK queries against the remote DB), so it must never be on by
+# default for daily work.
+if DEBUG and config("DEBUG_TOOLBAR", default=False, cast=bool):
     INSTALLED_APPS.append('debug_toolbar')
     MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
     INTERNAL_IPS = [

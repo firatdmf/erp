@@ -682,9 +682,35 @@ class WarehouseDetail(View):
                 "is_catalog": (g.get("linked") or 0) > 0,
             } for g in page.object_list]
 
+        is_htmx = bool(request.headers.get('HX-Request'))
+
+        ctx = {
+            'warehouse': warehouse,
+            'groups': groups_render,      # main-product groups on this page
+            'variants': variants_render,  # flat variant rows on this page (view=variants)
+            'view_mode': view_mode,
+            'page': page,
+            'paginator': paginator,
+            'search': search,
+            'sort': sort,
+            'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
+            'filtered_count': paginator.count,
+        }
+
+        # HTMX partial refresh for search/sort/page — re-renders ONLY the
+        # rows + pagination, so skip every header stat (net-worth rollups,
+        # group/roll counts, suppliers, dup scan, recent movements): each
+        # is its own round-trip to the DB and none of it appears in the
+        # partial. This is what makes search-as-you-type feel instant.
+        if is_htmx:
+            if search:
+                # The pagination footer shows "filtered from N total".
+                ctx['product_count'] = WarehouseProduct.objects.filter(warehouse=warehouse).count()
+            return render(request, "operating/partials/warehouse_product_table_body.html", ctx)
+
         # Aggregate totals across the whole warehouse (independent of
-        # filter). Net-worth uses the model methods so products that
-        # have purchase_price but no explicit cost_usd still count.
+        # filter) — full page load only. Net-worth mirrors the per-product
+        # purchase_price fallback, computed as ONE SQL aggregate.
         all_products = WarehouseProduct.objects.filter(warehouse=warehouse)
         counts = all_products.aggregate(
             n=Count('id'),
@@ -694,29 +720,19 @@ class WarehouseDetail(View):
         group_count = (all_products.annotate(base=base_expr)
                        .values('base').distinct().count())
         roll_count = WarehouseProductRoll.objects.filter(product__warehouse=warehouse).count()
-        total_value_usd = warehouse.total_value_usd()
-        total_value_try = warehouse.total_value_try()
+        total_value_usd, total_value_try = warehouse.total_values()
 
         # "Son Hareketler" preview — the latest activity in THIS warehouse
-        # (all products), linking to the full filterable ledger. Skipped on
-        # HTMX partial refreshes (search/sort) which only re-render rows.
-        recent_movements = []
-        if not request.headers.get('HX-Request'):
-            recent_movements = _decorate_movements(list(
-                StockMovement.objects
-                .filter(product__warehouse=warehouse)
-                .select_related("product", "created_by")
-                .order_by("-created_at")[:6]
-            ))
+        # (all products), linking to the full filterable ledger.
+        recent_movements = _decorate_movements(list(
+            StockMovement.objects
+            .filter(product__warehouse=warehouse)
+            .select_related("product", "created_by")
+            .order_by("-created_at")[:6]
+        ))
 
-        ctx = {
-            'warehouse': warehouse,
+        ctx.update({
             'recent_movements': recent_movements,
-            'groups': groups_render,      # main-product groups on this page
-            'variants': variants_render,  # flat variant rows on this page (view=variants)
-            'view_mode': view_mode,
-            'page': page,
-            'paginator': paginator,
             'total_value_usd': total_value_usd,
             'total_value_try': total_value_try,
             'product_count': counts['n'],     # variants
@@ -727,16 +743,7 @@ class WarehouseDetail(View):
             'suppliers': _supplier_choices(),   # manual-add dropdown
             'dup_count': _warehouse_dup_sku_count(warehouse),  # duplicate-SKU variant groups
             'total_quantity': counts['qty'],
-            'search': search,
-            'sort': sort,
-            'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
-            'filtered_count': paginator.count,
-        }
-
-        # HTMX partial refresh for search/sort/page — re-render rows + pagination together
-        if request.headers.get('HX-Request'):
-            return render(request, "operating/partials/warehouse_product_table_body.html", ctx)
-
+        })
         return render(request, self.template_name, ctx)
 
 
@@ -2717,25 +2724,28 @@ class WarehouseProductDetail(View):
     template_name = "operating/warehouse_product_detail.html"
 
     def get(self, request, warehouse_pk, product_pk):
-        warehouse = get_object_or_404(Warehouse, pk=warehouse_pk)
+        # One fetch resolves product + warehouse + the linked catalog
+        # product (the template reads it) — each avoided query is a full
+        # round-trip to the remote DB.
         product = get_object_or_404(
-            WarehouseProduct, pk=product_pk, warehouse=warehouse,
+            WarehouseProduct.objects.select_related(
+                "warehouse", "catalog_variant__product"),
+            pk=product_pk, warehouse_id=warehouse_pk,
         )
+        warehouse = product.warehouse
         rolls = list(product.rolls.all().order_by("-scanned_at"))
         movements = product.movements.all().select_related("roll", "created_by")[:200]
 
-        # Aggregate quick stats
-        from django.db.models import Sum
+        # Aggregate quick stats — in/out totals in a single query.
+        from django.db.models import Sum, Q as _Q
         from decimal import Decimal as _Dec
         from .models import OrderRollReservation
-        in_total = (
-            product.movements.filter(movement_type="in").aggregate(s=Sum("quantity"))["s"]
-            or _Dec("0")
+        _io = product.movements.aggregate(
+            i=Sum("quantity", filter=_Q(movement_type="in")),
+            o=Sum("quantity", filter=_Q(movement_type="out")),
         )
-        out_total = (
-            product.movements.filter(movement_type="out").aggregate(s=Sum("quantity"))["s"]
-            or _Dec("0")
-        )
+        in_total = _io["i"] or _Dec("0")
+        out_total = _io["o"] or _Dec("0")
 
         # Active (unconsumed) reservations = packed-but-not-shipped metres
         # held against this product's rolls. Shown as a "Rezerv stok" card

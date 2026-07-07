@@ -177,51 +177,66 @@
                 data-guest-phone="{{ order.guest_phone|default:'' }}"></span>
         {% endif %}
       {% endif %}
-      <!-- Customer Source -->
-      <div class="form-group">
-        <label>{% trans "Customer Source" %}</label>
-        <div class="co-type-group">
-          <label class="co-type-btn">
-            <input type="radio" name="customer_source" value="crm" checked onchange="coCustomerSource('crm')">
-            <i class="fas fa-address-book"></i> CRM
-          </label>
-          <label class="co-type-btn">
-            <input type="radio" name="customer_source" value="web" onchange="coCustomerSource('web')">
-            <i class="fas fa-globe"></i> Web Client
-          </label>
-          <label class="co-type-btn">
-            <input type="radio" name="customer_source" value="guest" onchange="coCustomerSource('guest')">
-            <i class="fas fa-user"></i> Guest
-          </label>
+      <!-- Customer Source picker — hidden entirely for Perakende orders
+           (see co-retail-customer-toggle below), which default to no
+           recorded customer and skip straight to Delivery Address. -->
+      <div id="co-customer-picker">
+        <div class="form-group">
+          <label>{% trans "Customer Source" %}</label>
+          <div class="co-type-group">
+            <label class="co-type-btn">
+              <input type="radio" name="customer_source" value="crm" checked onchange="coCustomerSource('crm')">
+              <i class="fas fa-address-book"></i> CRM
+            </label>
+            <label class="co-type-btn">
+              <input type="radio" name="customer_source" value="web" onchange="coCustomerSource('web')">
+              <i class="fas fa-globe"></i> Web Client
+            </label>
+            <label class="co-type-btn">
+              <input type="radio" name="customer_source" value="guest" onchange="coCustomerSource('guest')">
+              <i class="fas fa-user"></i> Guest
+            </label>
+          </div>
+        </div>
+
+        <input type="hidden" id="customer-type" name="customer_type">
+        <input type="hidden" id="customer-pk" name="customer_pk">
+
+        <!-- CRM Customer Search -->
+        <div id="co-crm-fields">
+          <div class="form-group">
+            <label>{% trans "Search Contact / Company" %}</label>
+            <input type="text" id="co-customer-search" class="form-input" placeholder="Contact or company name..."
+              hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
+              hx-target="#co-customer-results" hx-swap="innerHTML" name="customer" autocomplete="off">
+          </div>
+          <div id="co-customer-results" class="co-autocomplete-results"></div>
+          <div id="co-customer-selected" class="co-selected-badge" style="display:none;"></div>
+        </div>
+
+        <!-- Web Client Search -->
+        <div id="co-web-fields" style="display:none;">
+          <div class="form-group">
+            <label>{% trans "Search Web Client" %}</label>
+            <input type="text" id="co-webclient-search" class="form-input" placeholder="Email or username..."
+              hx-get="{% url 'operating:webclient_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
+              hx-target="#co-webclient-results" hx-swap="innerHTML" name="webclient_q" autocomplete="off">
+          </div>
+          <div id="co-webclient-results" class="co-autocomplete-results"></div>
+          <div id="co-webclient-selected" class="co-selected-badge" style="display:none;"></div>
+          <input type="hidden" id="webclient-pk" name="webclient_pk">
         </div>
       </div>
 
-      <input type="hidden" id="customer-type" name="customer_type">
-      <input type="hidden" id="customer-pk" name="customer_pk">
-
-      <!-- CRM Customer Search -->
-      <div id="co-crm-fields">
-        <div class="form-group">
-          <label>{% trans "Search Contact / Company" %}</label>
-          <input type="text" id="co-customer-search" class="form-input" placeholder="Contact or company name..."
-            hx-get="{% url 'crm:customer_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
-            hx-target="#co-customer-results" hx-swap="innerHTML" name="customer" autocomplete="off">
-        </div>
-        <div id="co-customer-results" class="co-autocomplete-results"></div>
-        <div id="co-customer-selected" class="co-selected-badge" style="display:none;"></div>
-      </div>
-
-      <!-- Web Client Search -->
-      <div id="co-web-fields" style="display:none;">
-        <div class="form-group">
-          <label>{% trans "Search Web Client" %}</label>
-          <input type="text" id="co-webclient-search" class="form-input" placeholder="Email or username..."
-            hx-get="{% url 'operating:webclient_autocomplete' %}" hx-trigger="keyup changed delay:300ms"
-            hx-target="#co-webclient-results" hx-swap="innerHTML" name="webclient_q" autocomplete="off">
-        </div>
-        <div id="co-webclient-results" class="co-autocomplete-results"></div>
-        <div id="co-webclient-selected" class="co-selected-badge" style="display:none;"></div>
-        <input type="hidden" id="webclient-pk" name="webclient_pk">
+      <!-- Perakende-only: customer info is opt-in (most retail sales
+           don't record a customer). Checking this reveals the same
+           Guest fields below. -->
+      <div id="co-retail-customer-toggle" style="display:none;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; margin-bottom:12px;">
+          <input type="checkbox" id="co-retail-has-customer" onchange="coRetailCustomerToggle(this.checked)">
+          {% trans "Müşteri bilgilerini gir" %}
+          <span style="font-weight:500; color:var(--text-secondary); font-size:12px;">({% trans "opsiyonel" %})</span>
+        </label>
       </div>
 
       <!-- Guest Fields -->
@@ -427,12 +442,33 @@
 
   window.coOrderType = function (v) {
     isRetailOrder = (v === 'perakende');
+    var picker = document.getElementById('co-customer-picker');
+    var retailToggle = document.getElementById('co-retail-customer-toggle');
+    var guestFields = document.getElementById('co-guest-fields');
     if (v === 'perakende') {
+      // customer_source stays 'guest' under the hood (server still
+      // treats a retail order's optional customer info the same way
+      // as a manually-picked Guest), but the picker UI itself and the
+      // Guest fields are hidden until the "enter customer info"
+      // checkbox below is ticked.
       var g = document.querySelector('input[name=customer_source][value=guest]');
       if (g) { g.checked = true; }
-      if (window.coCustomerSource) coCustomerSource('guest');
+      if (picker) picker.style.display = 'none';
+      if (retailToggle) retailToggle.style.display = 'block';
+      var chk = document.getElementById('co-retail-has-customer');
+      if (guestFields) guestFields.style.display = (chk && chk.checked) ? 'block' : 'none';
+    } else {
+      if (picker) picker.style.display = '';
+      if (retailToggle) retailToggle.style.display = 'none';
+      var checkedSrc = document.querySelector('input[name=customer_source]:checked');
+      if (window.coCustomerSource) coCustomerSource(checkedSrc ? checkedSrc.value : 'crm');
     }
     renderProducts();
+  };
+
+  window.coRetailCustomerToggle = function (checked) {
+    var guestFields = document.getElementById('co-guest-fields');
+    if (guestFields) guestFields.style.display = checked ? 'block' : 'none';
   };
 
   window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
@@ -978,6 +1014,24 @@
         setVal('input[name="guest_phone"]',      g.guestPhone);
         if (sum3) sum3.textContent = ((g.guestFirst || '') + ' ' + (g.guestLast || '')).trim() || 'Guest';
       }
+    }
+
+    // Retail orders: hide the customer picker and show the "enter
+    // customer info" toggle instead (coOrderType only runs on the
+    // radio's onchange, which never fires just because the server
+    // rendered "perakende" as checked) — pre-check it if the order
+    // already has guest info so existing data isn't hidden away.
+    if (isRetailOrder) {
+      var hasExistingGuestInfo = !!(preset && preset.dataset.source === 'guest' &&
+        (preset.dataset.guestFirst || preset.dataset.guestLast || preset.dataset.guestEmail || preset.dataset.guestPhone));
+      var pickerEl = document.getElementById('co-customer-picker');
+      var toggleEl = document.getElementById('co-retail-customer-toggle');
+      var guestEl = document.getElementById('co-guest-fields');
+      var chkEl = document.getElementById('co-retail-has-customer');
+      if (pickerEl) pickerEl.style.display = 'none';
+      if (toggleEl) toggleEl.style.display = 'block';
+      if (chkEl) chkEl.checked = hasExistingGuestInfo;
+      if (guestEl) guestEl.style.display = hasExistingGuestInfo ? 'block' : 'none';
     }
 
     // In edit mode the form already posts to /operating/orders/edit/<id>/

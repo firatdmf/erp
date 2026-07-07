@@ -33,7 +33,6 @@
     .hdr .doc-type { font-size: 9pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
     .hdr .num { font-size: 20pt; font-weight: bold; text-align: right; }
     .hdr .date { font-size: 9pt; color: #4B5563; text-align: right; }
-    .hdr .status { background: #F4F7FB; color: #374151; padding: 2pt 8pt; border-radius: 12pt; font-size: 9pt; font-weight: bold; }
     .hdr .kind { padding: 2pt 6pt; font-size: 8pt; font-weight: bold; letter-spacing: 1pt; margin-left: 4pt; }
     .hdr .kind.b2b { background: #FEF3C7; color: #8B5A00; }
     .hdr .kind.b2c { background: #E0F2F1; color: #0B5F60; }
@@ -41,16 +40,11 @@
 
     h3 { font-size: 9pt; color: #6B7280; letter-spacing: 1.2pt; text-transform: uppercase; margin: 12pt 0 6pt; font-weight: bold; }
 
-    /* Meta row */
-    .meta-row { width: 100%; margin-bottom: 8pt; }
-    .meta-row td { padding-right: 24pt; vertical-align: top; }
-    .meta-row .lbl { font-size: 8pt; color: #6B7280; font-weight: bold; letter-spacing: 0.6pt; text-transform: uppercase; margin-bottom: 1pt; }
-    .meta-row .val { font-size: 11pt; color: #0F1419; font-weight: bold; }
-
     /* Customer / Delivery cards */
     .twocol { width: 100%; }
     .twocol td { width: 50%; vertical-align: top; padding-right: 8pt; }
     .twocol td:last-child { padding-right: 0; padding-left: 8pt; }
+    .twocol td.full { width: 100%; padding-right: 0; padding-left: 0; }
     .card { background: #FAFBFD; border: 1px solid #E2E8EE; padding: 10pt 12pt; }
     .card .name { font-size: 12pt; font-weight: bold; color: #0F1419; }
     .card .role { font-size: 8pt; color: #147F74; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-top: 2pt; }
@@ -109,7 +103,6 @@
         <div class="num">#{{ order.pk }}</div>
         <div class="date">{{ order.created_at|date:"d M Y · H:i" }}</div>
         <div style="margin-top: 4pt;">
-          <span class="status">{{ order.get_status_display|default:order.status }}</span>
           {% if order.contact %}<span class="kind b2b">B2B</span>
           {% elif order.company %}<span class="kind b2b">B2B</span>
           {% elif order.web_client %}<span class="kind web">WEB</span>{% endif %}
@@ -118,29 +111,18 @@
     </tr>
   </table>
 
-  <!-- META -->
-  <table class="meta-row" cellspacing="0" cellpadding="0">
-    <tr>
-      <td>
-        <div class="lbl">{% trans "Order Date" %}</div>
-        <div class="val">{{ order.created_at|date:"d M Y · H:i" }}</div>
-      </td>
-      <td>
-        <div class="lbl">{% trans "Updated" %}</div>
-        <div class="val">{{ order.updated_at|date:"d M Y · H:i" }}</div>
-      </td>
-      <td>
-        <div class="lbl">{% trans "Status" %}</div>
-        <div class="val">{{ order.get_status_display|default:order.status }}</div>
-      </td>
-    </tr>
-  </table>
-
-  <!-- CUSTOMER + DELIVERY -->
-  <h3>{% trans "Customer" %} &amp; {% trans "Delivery" %}</h3>
+  {% if has_customer_info or has_delivery_info %}
+  <!-- CUSTOMER + DELIVERY — only the side(s) that have real data print;
+       a lone side gets the full row instead of leaving a placeholder. -->
+  <h3>
+    {% if has_customer_info and has_delivery_info %}{% trans "Customer" %} &amp; {% trans "Delivery" %}
+    {% elif has_customer_info %}{% trans "Customer" %}
+    {% else %}{% trans "Delivery" %}{% endif %}
+  </h3>
   <table class="twocol" cellspacing="0" cellpadding="0">
     <tr>
-      <td>
+      {% if has_customer_info %}
+      <td{% if not has_delivery_info %} class="full"{% endif %}>
         <div class="card">
           {% if order.contact %}
             <div class="name">{{ order.contact.name|default:"—"|capfirst }}</div>
@@ -162,13 +144,12 @@
             <div class="role">{% trans "Web Customer" %}</div>
             {% if order.web_client.email %}<div class="line"><b>{% trans "Email" %}:</b> {{ order.web_client.email }}</div>{% endif %}
             {% if order.web_client.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ order.web_client.phone }}</div>{% endif %}
-          {% else %}
-            <div class="name">—</div>
-            <div class="line" style="color: #6B7280;">{% trans "No customer attached" %}</div>
           {% endif %}
         </div>
       </td>
-      <td>
+      {% endif %}
+      {% if has_delivery_info %}
+      <td{% if not has_customer_info %} class="full"{% endif %}>
         <div class="card">
           {% if order.delivery_address or order.delivery_city %}
             {% if order.delivery_address_title %}<div class="name">{{ order.delivery_address_title }}</div>{% endif %}
@@ -180,14 +161,13 @@
             {% if order.billing_address_title %}<div class="name">{{ order.billing_address_title }}</div>{% endif %}
             <div class="role">{% trans "Billing" %}</div>
             <div class="line">{{ order.billing_address }}</div>
-          {% else %}
-            <div class="name">—</div>
-            <div class="line" style="color: #6B7280;">{% trans "No delivery address" %}</div>
           {% endif %}
         </div>
       </td>
+      {% endif %}
     </tr>
   </table>
+  {% endif %}
 
   <!-- ITEMS -->
   <h3>{% trans "Products" %} ({{ order_items|length }})</h3>

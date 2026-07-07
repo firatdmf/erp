@@ -1390,6 +1390,15 @@ class OrderPrint(DetailView):
         ctx["order_items"] = items
         ctx["order_total"] = total
         ctx["is_pdf"] = True   # template can strip JS auto-print when rendering for PDF
+        # Drives the Customer/Delivery card layout: show only the side(s)
+        # that have real data instead of a "No customer attached" /
+        # "No delivery address" placeholder on a printed document.
+        ctx["has_customer_info"] = bool(order.contact_id or order.company_id or order.web_client_id)
+        ctx["has_delivery_info"] = bool(
+            (order.delivery_address or "").strip()
+            or (order.delivery_city or "").strip()
+            or (order.billing_address or "").strip()
+        )
         return ctx
 
     def render_to_response(self, context, **response_kwargs):

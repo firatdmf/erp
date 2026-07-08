@@ -891,6 +891,36 @@ def _create_roll_reservation(order, order_item, roll, req_meters, user):
     return r, capped, None
 
 
+def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcodes):
+    """Same roll-reservation handling OrderCreate.post() does for a
+    freshly-created order_item, reused by OrderEdit so picking rolls on
+    the product card works identically whether you're creating or
+    editing an order. Appends any barcode that couldn't be reserved to
+    `failed_barcodes` (never raises — a bad/raced barcode shouldn't
+    fail the whole save)."""
+    if not rolls_data:
+        return
+    variant = order_item.product_variant
+    product = order_item.product
+    target_sku = variant.variant_sku if variant else (product.sku if product else "")
+    for roll_data in rolls_data:
+        bc = (roll_data.get("barcode") or "").strip()
+        if not bc:
+            continue
+        roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
+        if rerr:
+            failed_barcodes.append(bc)
+            continue
+        raw_m = roll_data.get("meters")
+        try:
+            req_m = _PDecimal(str(raw_m)) if raw_m else None
+        except Exception:
+            req_m = None
+        _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, user)
+        if rerr:
+            failed_barcodes.append(bc)
+
+
 def _reservation_payload(r):
     wp = r.warehouse_product
     return {
@@ -905,26 +935,41 @@ def _reservation_payload(r):
         "roll_meters": (float(r.roll.meters or 0) if r.roll else None),
         "roll_remaining": (float(r.roll.meters_remaining) if (r.roll and r.roll.meters_remaining is not None) else None),
         "consumed": r.consumed,
+        "order_item_id": r.order_item_id,
+        "pack_id": r.pack_id,
     }
 
 
 @login_required
 def order_pack_scan(request, pk):
     """The packing page for an order — item checklist + roll scanner +
-    live list of reserved rolls."""
+    live list of reserved rolls. Non-retail (B2B) orders additionally
+    get the package (Pack) drag-and-drop grouping — scanned tops sorted
+    into named packages so it's visible which sack/box holds what;
+    retail orders keep the plain flat list."""
     order = get_object_or_404(Order, pk=pk)
     reservations = list(
         order.roll_reservations
-        .select_related("roll", "warehouse_product", "warehouse_product__warehouse")
+        .select_related("roll", "warehouse_product", "warehouse_product__warehouse", "pack")
         .order_by("-created_at")
     )
     items = list(order.items.all().select_related("product", "product_variant"))
+
+    packs = []
+    if not order.is_retail_order:
+        # Auto-create Pack #1 the first time this order's packing screen
+        # is opened — same convention as OrderPackingList.
+        if not order.packs.exists():
+            Pack.objects.create(order=order, pack_number=1)
+        packs = list(order.packs.order_by("pack_number"))
+
     return render(request, "operating/order_pack_scan.html", {
         "order": order,
         "items": items,
         "reservations": reservations,
         "reservation_count": sum(1 for r in reservations if not r.consumed),
         "shipped": order.order_status in _SHIPPED_CLASS,
+        "packs": packs,
     })
 
 
@@ -1050,6 +1095,34 @@ def order_pack_reserve_remove(request, pk):
 
 
 @login_required
+@require_POST
+def order_pack_reserve_assign_pack(request, pk):
+    """Drag-and-drop target for the packing screen — put a scanned top
+    into a package (or back to unassigned if pack_id is blank). Non-
+    retail orders only; retail keeps the flat, packless list."""
+    from .models import OrderRollReservation
+    order = get_object_or_404(Order, pk=pk)
+    if order.order_status in _SHIPPED_CLASS:
+        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    rid = (request.POST.get("reservation_id") or "").strip()
+    if not rid.isdigit():
+        return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
+    r = OrderRollReservation.objects.filter(pk=rid, order=order, consumed=False).first()
+    if r is None:
+        return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
+    pack_id = (request.POST.get("pack_id") or "").strip()
+    if pack_id:
+        pack = Pack.objects.filter(pk=pack_id, order=order).first()
+        if pack is None:
+            return JsonResponse({"ok": False, "error": "Paket bulunamadı."}, status=404)
+        r.pack = pack
+    else:
+        r.pack = None
+    r.save(update_fields=["pack"])
+    return JsonResponse({"ok": True, "reservation_id": r.pk, "pack_id": r.pack_id})
+
+
+@login_required
 def order_create_barcode_check(request):
     """Live validation for the retail order-create barcode+metres
     inputs (Step 3 product cards). No Order exists yet at this point,
@@ -1074,6 +1147,40 @@ def order_create_barcode_check(request):
         "available": float(avail),
         "warehouse": (roll.product.warehouse.name if (roll.product and roll.product.warehouse_id) else ""),
     })
+
+
+@login_required
+def order_create_roll_list(request):
+    """Browsable list of available rolls (tops) for a SKU — lets the
+    order-create/edit product card offer a click-to-pick list instead
+    of requiring every top to be typed/scanned by barcode. Same SKU
+    match rule as _lookup_roll_by_barcode_for_sku (variant SKU or plain
+    warehouse SKU), and the same reservation-aware availability as
+    order_create_barcode_check. Read-only — reserves nothing."""
+    from django.db.models import Q
+    from .models import WarehouseProductRoll
+    sku = (request.GET.get("sku") or "").strip()
+    if not sku:
+        return JsonResponse({"ok": False, "error": "Ürün bilgisi eksik."}, status=400)
+    rolls = (
+        WarehouseProductRoll.objects
+        .select_related("product", "product__warehouse")
+        .filter(status__in=["in_stock", "partial"])
+        .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
+        .order_by("-scanned_at")[:60]
+    )
+    out = []
+    for roll in rolls:
+        avail = _roll_available_meters(roll)
+        if avail <= 0:
+            continue
+        out.append({
+            "id": roll.pk,
+            "barcode": roll.barcode or "",
+            "warehouse": (roll.product.warehouse.name if (roll.product and roll.product.warehouse_id) else ""),
+            "available": float(avail),
+        })
+    return JsonResponse({"ok": True, "rolls": out})
 
 
 @login_required
@@ -1495,38 +1602,30 @@ class OrderCreate(View):
                 with transaction.atomic():
                     order = form.save(commit=False)
 
-                    # Customer
-                    customer_source = request.POST.get("customer_source", "crm")
-                    if customer_source == "crm":
-                        if customer_type == "contact" and customer_pk:
-                            try:
-                                order.contact = Contact.objects.get(pk=customer_pk)
-                            except Contact.DoesNotExist:
-                                pass
-                        elif customer_type == "company" and customer_pk:
-                            try:
-                                order.company = Company.objects.get(pk=customer_pk)
-                            except Company.DoesNotExist:
-                                pass
-                    elif customer_source == "web":
-                        webclient_pk = request.POST.get("webclient_pk")
-                        if webclient_pk:
-                            from authentication.models import WebClient
-                            try:
-                                order.web_client = WebClient.objects.get(pk=webclient_pk)
-                            except WebClient.DoesNotExist:
-                                pass
-                    elif customer_source == "guest":
-                        order.is_guest_order = True
-                        order.guest_first_name = request.POST.get("guest_first_name", "")
-                        order.guest_last_name = request.POST.get("guest_last_name", "")
-                        order.guest_email = request.POST.get("guest_email", "")
-                        order.guest_phone = request.POST.get("guest_phone", "")
-
-                    # Retail (Perakende) flag — Step 1's order_type radio.
-                    # Persisted so the order list can label it, unlike
-                    # customer_source it isn't re-derivable after save.
-                    order.is_retail_order = request.POST.get("order_type") == "perakende"
+                    # Customer — order kind is derived from WHICH customer
+                    # was picked, not a separate radio: a CRM contact/
+                    # company means a normal (B2B) order, the "retail"
+                    # pseudo-customer means a Perakende walk-in sale.
+                    order.is_retail_order = (customer_type == "retail")
+                    if customer_type == "contact" and customer_pk:
+                        try:
+                            order.contact = Contact.objects.get(pk=customer_pk)
+                        except Contact.DoesNotExist:
+                            pass
+                    elif customer_type == "company" and customer_pk:
+                        try:
+                            order.company = Company.objects.get(pk=customer_pk)
+                        except Company.DoesNotExist:
+                            pass
+                    elif customer_type == "retail":
+                        rname = request.POST.get("retail_customer_name", "").strip()
+                        rphone = request.POST.get("retail_customer_phone", "").strip()
+                        raddress = request.POST.get("retail_customer_address", "").strip()
+                        if rname or rphone or raddress:
+                            order.is_guest_order = True
+                            order.guest_first_name = rname
+                            order.guest_phone = rphone
+                            order.delivery_address = raddress
 
                     # Notification opt-in — staff ticked "Send customer
                     # emails for this order" in the create sidebar.
@@ -1537,12 +1636,14 @@ class OrderCreate(View):
                     # a proper cari collection. We leave the fields on
                     # the model alone (they stay NULL for new orders).
 
-                    # Delivery Address
-                    order.delivery_address_title = request.POST.get("delivery_address_title", "")
-                    order.delivery_address = request.POST.get("delivery_address", "")
-                    order.delivery_city = request.POST.get("delivery_city", "")
-                    order.delivery_country = request.POST.get("delivery_country", "")
-                    order.delivery_phone = request.POST.get("delivery_phone", "")
+                    # Delivery Address — CRM/B2B orders only (retail's
+                    # simplified name/phone/address is handled above).
+                    if customer_type != "retail":
+                        order.delivery_address_title = request.POST.get("delivery_address_title", "")
+                        order.delivery_address = request.POST.get("delivery_address", "")
+                        order.delivery_city = request.POST.get("delivery_city", "")
+                        order.delivery_country = request.POST.get("delivery_country", "")
+                        order.delivery_phone = request.POST.get("delivery_phone", "")
 
                     order.save()
 
@@ -1580,47 +1681,46 @@ class OrderCreate(View):
                             order_item.custom_fabric_used_meters = item_data.get("custom_fabric_used_meters") or None
                             order_item.save()
 
-                        # Retail (Perakende) roll reservations — entered
-                        # right on this product card instead of a later
-                        # packing-scan visit. Each already passed the
-                        # live order_create_barcode_check while typing;
-                        # re-validated here for real, against the just-
-                        # created order_item. A bad/raced barcode is
-                        # skipped (never fails the whole order) and
-                        # surfaced as a warning below.
-                        if order.is_retail_order:
-                            for roll_data in (item_data.get("rolls") or []):
-                                bc = (roll_data.get("barcode") or "").strip()
-                                if not bc:
-                                    continue
-                                target_sku = variant.variant_sku if variant else (product.sku or "")
-                                roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
-                                if rerr:
-                                    failed_barcodes.append(bc)
-                                    continue
-                                raw_m = roll_data.get("meters")
-                                try:
-                                    req_m = _PDecimal(str(raw_m)) if raw_m else None
-                                except Exception:
-                                    req_m = None
-                                _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, request.user)
-                                if rerr:
-                                    failed_barcodes.append(bc)
+                        # Roll (top) reservations — entered right on this
+                        # product card instead of a later packing-scan
+                        # visit, for ANY order (not just Perakende). Each
+                        # already passed the live order_create_barcode_check
+                        # or was picked from the browsable roll list while
+                        # building the line; re-validated here for real,
+                        # against the just-created order_item. A bad/raced
+                        # barcode is skipped (never fails the whole order)
+                        # and surfaced as a warning below.
+                        for roll_data in (item_data.get("rolls") or []):
+                            bc = (roll_data.get("barcode") or "").strip()
+                            if not bc:
+                                continue
+                            target_sku = variant.variant_sku if variant else (product.sku or "")
+                            roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
+                            if rerr:
+                                failed_barcodes.append(bc)
+                                continue
+                            raw_m = roll_data.get("meters")
+                            try:
+                                req_m = _PDecimal(str(raw_m)) if raw_m else None
+                            except Exception:
+                                req_m = None
+                            _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, request.user)
+                            if rerr:
+                                failed_barcodes.append(bc)
 
                     # Generate QR code
                     generate_machine_qr_for_order(order)
 
-                    # Retail orders skip the manual "Paketleniyor" scan
-                    # step — the rolls were just reserved above, right on
-                    # the create form. The funnel's packaging gate now
-                    # requires FULL metre coverage; when the scanned rolls
-                    # don't cover the ordered quantities the order simply
-                    # stays "Açık" and we tell the user below.
-                    retail_stayed_open = False
-                    if order.is_retail_order and order.roll_reservations.filter(consumed=False).exists():
+                    # Orders with rolls reserved right on the create form
+                    # skip the manual "Paketleniyor" scan step. The funnel's
+                    # packaging gate requires FULL metre coverage; when the
+                    # picked rolls don't cover the ordered quantities the
+                    # order simply stays "Açık" and we tell the user below.
+                    order_stayed_open = False
+                    if order.roll_reservations.filter(consumed=False).exists():
                         from .views_warehouse import apply_order_status_change
                         _adv_ok, _adv_code = apply_order_status_change(order, "packaging", user=member)
-                        retail_stayed_open = (not _adv_ok and _adv_code == "insufficient_reservation")
+                        order_stayed_open = (not _adv_ok and _adv_code == "insufficient_reservation")
 
                 # ── NO warehouse stock-out at create ──────────────────
                 # New orders start "Açık" (Open) and reserve/deduct
@@ -1636,7 +1736,7 @@ class OrderCreate(View):
                         "Sipariş oluşturuldu ama şu barkodlar için rezervasyon yapılamadı, "
                         "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
                     )
-                if retail_stayed_open:
+                if order_stayed_open:
                     from .views_warehouse import reservation_shortfall_message
                     messages.warning(
                         request,
@@ -1759,7 +1859,8 @@ class OrderEdit(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        items = self.object.items.all()
+        items = (self.object.items.all()
+                 .prefetch_related("roll_reservations__roll__product__warehouse"))
         context["order_items"] = items
         # JSON-safe payload for the JS to hydrate order_data with.
         # Using a dedicated list keeps it parser-tolerant of any title
@@ -1776,6 +1877,27 @@ class OrderEdit(UpdateView):
                 "description": it.description or "",
                 "quantity": float(it.quantity) if it.quantity is not None else 0,
                 "price": float(it.price) if it.price is not None else 0,
+                # Tops already reserved for this line — shown read-only in
+                # the product card. "available" excludes this reservation's
+                # OWN hold from the other-reservations subtraction (same
+                # rule order_pack_reserve_update uses), so it's already the
+                # correct ceiling — not "+ this reservation's meters", which
+                # would double-count the same physical length.
+                "rolls": [
+                    {
+                        "barcode": r.roll.barcode or "" if r.roll else "",
+                        "warehouse": (r.roll.product.warehouse.name
+                                     if (r.roll and r.roll.product and r.roll.product.warehouse_id)
+                                     else ""),
+                        "meters": float(r.meters or 0),
+                        "available": float(
+                            _roll_available_meters(r.roll, exclude_reservation_id=r.pk)
+                            if r.roll else (r.meters or 0)
+                        ),
+                    }
+                    for r in it.roll_reservations.all()
+                    if not r.consumed
+                ],
             }
             for it in items
         ]
@@ -1807,11 +1929,19 @@ class OrderEdit(UpdateView):
                     self.object.save(update_fields=["notify_customer", "updated_at"])
 
                 # Handle customer update
-                customer = self.request.POST.get("customer")
                 customer_pk = self.request.POST.get("customer_pk")
                 customer_type = self.request.POST.get("customer_type")
 
-                if customer_pk and customer_type:
+                if customer_type == "retail":
+                    rname = self.request.POST.get("retail_customer_name", "").strip()
+                    rphone = self.request.POST.get("retail_customer_phone", "").strip()
+                    raddress = self.request.POST.get("retail_customer_address", "").strip()
+                    self.object.guest_first_name = rname
+                    self.object.guest_phone = rphone
+                    self.object.delivery_address = raddress
+                    if rname or rphone or raddress:
+                        self.object.is_guest_order = True
+                elif customer_pk and customer_type:
                     if customer_type == "contact":
                         self.object.contact = get_object_or_404(Contact, pk=customer_pk)
                         self.object.company = None
@@ -1869,6 +1999,7 @@ class OrderEdit(UpdateView):
                         messages.error(self.request, "Invalid deleted items format.")
 
                 # Update existing items and add new ones
+                failed_barcodes = []
                 if product_json_input:
                     try:
                         product_json_input = json.loads(product_json_input)
@@ -1909,6 +2040,10 @@ class OrderEdit(UpdateView):
                                     order_item.quantity = item_data.get("quantity", 1)
                                     order_item.price = item_data.get("price", 0)
                                     order_item.save()
+                                    _order_edit_reserve_rolls(
+                                        self.object, order_item, item_data.get("rolls") or [],
+                                        self.request.user, failed_barcodes,
+                                    )
                                 except OrderItem.DoesNotExist:
                                     continue
                             else:
@@ -1952,9 +2087,19 @@ class OrderEdit(UpdateView):
                                 # )
                                 # order_item.qr_code_url = qr_code_url
                                 # order_item.save()
+                                _order_edit_reserve_rolls(
+                                    self.object, order_item, item_data.get("rolls") or [],
+                                    self.request.user, failed_barcodes,
+                                )
                     except json.JSONDecodeError:
                         messages.error(self.request, "Invalid product data format.")
                         return self.form_invalid(form)
+                if failed_barcodes:
+                    messages.warning(
+                        self.request,
+                        "Sipariş güncellendi ama şu barkodlar için rezervasyon yapılamadı, "
+                        "paketleme sayfasından tekrar deneyin: " + ", ".join(failed_barcodes),
+                    )
                 self.object.save()
 
                 # ── NO warehouse stock movement on edit ───────────────

@@ -3952,7 +3952,8 @@
   </div>
 
   <!-- Order Sidebar Modal — Create is a full-screen order-entry
-       workspace (not a side panel); Edit stays half-screen on desktop,
+       workspace, laid out as a single wide column (not a sidebar,
+       not a left/right split); Edit stays half-screen on desktop,
        full-screen on mobile. -->
   <style>
     #orderSidebarOverlay .sidebar-modal {
@@ -3972,53 +3973,45 @@
       box-sizing: border-box;
     }
 
-    /* ≥1024px: two-panel workspace. Left = the controls (Order Type /
-       Customer / Deposit / total / submit) in a comfortable fixed
-       column; right = Products as a full-height "cart" panel that fills
-       the rest of the width. Named grid areas (not auto-flow) so the
-       Products panel reliably spans the left column's whole height no
-       matter how tall each left section grows. Below 1024px the whole
-       thing falls back to the untouched single-column accordion. */
+    /* ≥1024px: single wide column, full-bleed on the white background —
+       no side-by-side split, no wrapping "card" (no border/shadow/bg)
+       around the form, so it reads as a page, not a floating panel.
+       Order Type / Customer / Products / Deposit & Notes, the total
+       row and the footer all flow top-to-bottom in one track, same
+       order as the plain accordion. Products stays a normal
+       collapsible accordion section like the other three — same
+       width, same behavior, nothing special-cased. Below 1024px this
+       whole block doesn't apply and the untouched single-column
+       accordion (identical to mobile) is what renders. */
     @media (min-width: 1024px) {
+      /* Leave the fixed 88px left nav (.nj-sidebar, z-index 70) visible
+         and usable — the backdrop + panel both start after it instead of
+         covering the whole viewport (.sidebar-overlay/.sidebar-modal
+         default to left:0/width:100vw, which otherwise darkens then
+         hides the nav under the panel). ".sidebar-modal" is anchored via
+         right:0, so shrinking its width alone leaves the gap on the left. */
+      #orderSidebarOverlay {
+        left: 88px;
+        width: calc(100vw - 88px);
+      }
+      #orderSidebarOverlay .sidebar-modal {
+        width: calc(100vw - 88px) !important;
+        max-width: calc(100vw - 88px) !important;
+      }
       #orderSidebarOverlay #createOrderForm {
-        display: grid;
-        grid-template-columns: minmax(460px, 600px) 1fr;
-        grid-template-areas:
-          "step1  products"
-          "step3  products"
-          "step4  products"
-          "total  products"
-          "footer products";
-        column-gap: 44px;
-        align-items: start;
+        display: block; /* explicitly undo the old grid */
+        max-width: 1120px;
+        margin: 0 auto;
       }
-      #orderSidebarOverlay #createOrderForm > #co-step-1          { grid-area: step1; }
-      #orderSidebarOverlay #createOrderForm > #co-step-3          { grid-area: step3; }
-      #orderSidebarOverlay #createOrderForm > #co-step-4          { grid-area: step4; }
-      #orderSidebarOverlay #createOrderForm > #co-order-total-row { grid-area: total; }
-      #orderSidebarOverlay #createOrderForm > .sidebar-footer     { grid-area: footer; margin-top: 18px !important; }
-
-      /* Right column: Products as a proper cart panel. */
-      #orderSidebarOverlay #createOrderForm > #co-step-2 {
-        grid-area: products;
-        align-self: stretch;
-        background: #F8FAFC;
-        border: 1px solid #E9EEF3;
-        border-radius: 16px;
-        padding: 4px 24px 22px;
-        min-height: calc(100dvh - 172px);
+      #orderSidebarOverlay #createOrderForm > .co-section {
+        margin-bottom: 22px; /* generous vertical rhythm between sections */
       }
-      /* It's a permanent column now, not a collapsible accordion row:
-         keep the body open and let its title read as a panel heading. */
-      #orderSidebarOverlay #createOrderForm > #co-step-2 .co-section-body {
-        max-height: none !important;
-        overflow: visible !important;
+      #orderSidebarOverlay #createOrderForm > #co-order-total-row {
+        margin-top: 8px;
       }
-      #orderSidebarOverlay #createOrderForm > #co-step-2 .co-section-header {
-        border-bottom: none;
-        cursor: default;
+      #orderSidebarOverlay #createOrderForm > .sidebar-footer {
+        margin-top: 18px !important;
       }
-      #orderSidebarOverlay #createOrderForm > #co-step-2 .co-chev { display: none; }
     }
     @media (min-width: 769px) {
       #editOrderSidebarOverlay .sidebar-modal {

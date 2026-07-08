@@ -637,6 +637,15 @@
                 {% endif %}
                 {% if r.reserved_m %}
                   <div style="font-size:10.5px;color:#B45309;font-weight:700;margin-top:3px;"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ r.reserved_m|floatformat:2 }} m</div>
+                  {% for resv in r.reservation_list %}
+                    <div style="font-size:10px;margin-top:1px;">
+                      <a href="{% url 'operating:order_detail' resv.order_id %}" target="_blank" rel="noopener" style="color:#92400E;text-decoration:underline;">
+                        <i class="fa fa-arrow-up-right-from-square" style="font-size:8px;"></i>
+                        {{ resv.order.order_number|default:resv.order_id }}
+                      </a>
+                      <span style="color:var(--gray-500);">({{ resv.meters|floatformat:2 }} m)</span>
+                    </div>
+                  {% endfor %}
                 {% endif %}
               </td>
               <td>

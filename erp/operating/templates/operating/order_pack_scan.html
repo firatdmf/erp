@@ -12,6 +12,7 @@
     --pk-font:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;
   }
   .pk-wrap{max-width:1100px;margin:0 auto;padding:18px 16px 120px;font-family:var(--pk-font);color:var(--pk-ink);}
+  .pk-wrap.pk-wide{max-width:1320px;}
   .pk-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
   .pk-back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--pk-gray);
     border:1.5px solid var(--pk-line);border-radius:10px;padding:8px 12px;font-weight:600;font-size:13px;}
@@ -31,7 +32,7 @@
   .pk-card-h .pk-sub{font-size:12px;color:var(--pk-gray);font-weight:600;}
   .pk-card-b{padding:14px 16px;}
 
-  /* Order items reference list */
+  /* Order items reference list (retail-only flat layout) */
   .pk-item{display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:9px 0;border-bottom:1px dashed var(--pk-line);}
   .pk-item:last-child{border-bottom:0;}
@@ -53,12 +54,14 @@
   .pk-btn.cam{width:100%;background:var(--pk-teal-50);color:var(--pk-teal-700);border-color:#BFE0DD;}
   .pk-btn:disabled{opacity:.5;cursor:not-allowed;}
 
-  /* Reserved rolls list */
+  /* Reserved rolls list (flat, retail) / grouped-by-product (non-retail) */
   .pk-empty{text-align:center;color:var(--pk-gray);font-size:13px;padding:26px 10px;}
   .pk-empty i{font-size:26px;display:block;margin-bottom:8px;opacity:.4;}
   .pk-row{border:1.5px solid var(--pk-line);border-radius:12px;padding:11px 12px;margin-bottom:9px;
-    animation:pkIn .18s ease;}
+    animation:pkIn .18s ease;background:#fff;}
   .pk-row.flash{border-color:var(--pk-amber);box-shadow:0 0 0 3px rgba(245,158,11,.18);}
+  .pk-row[draggable="true"]{cursor:grab;}
+  .pk-row[draggable="true"]:active{cursor:grabbing;}
   @keyframes pkIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
   .pk-row-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
   .pk-row-name{font-weight:700;font-size:13.5px;line-height:1.3;}
@@ -74,6 +77,41 @@
   .pk-m-inp:focus{outline:none;border-color:var(--pk-teal);box-shadow:0 0 0 3px rgba(20,127,116,.15);}
   .pk-note{font-size:12px;font-weight:600;color:var(--pk-amber);}
   .pk-avail{font-size:11px;color:var(--pk-gray);}
+
+  /* Product groups (non-retail: scanned tops sorted under their line) */
+  .pk-pgroup{border:1.5px solid var(--pk-line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+  .pk-pgroup-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:9px 12px;background:#FAFCFB;
+    border-bottom:1px solid var(--pk-line);}
+  .pk-pgroup-name{font-weight:700;font-size:13px;}
+  .pk-pgroup-sku{font-size:11px;color:var(--pk-gray);font-family:ui-monospace,monospace;}
+  .pk-pgroup-qty{margin-left:auto;font-weight:700;font-size:12.5px;color:var(--pk-teal-700);white-space:nowrap;}
+  .pk-pgroup-rolls{padding:10px 12px;min-height:40px;}
+  .pk-pgroup-rolls .pk-row:last-child{margin-bottom:0;}
+  .pk-pgroup-empty{font-size:12px;color:var(--pk-gray);padding:4px 0;}
+
+  /* Packages (non-retail: drag scanned tops here) */
+  .pk-packs-h{display:flex;align-items:center;gap:10px;}
+  .pk-packs-h .pk-badge{padding:2px 8px;border-radius:999px;background:#F4F7FB;color:var(--pk-gray);
+    font:700 11px var(--pk-font);}
+  .pk-add-pack{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;
+    background:linear-gradient(180deg,var(--pk-teal),var(--pk-teal-600));border:1px solid var(--pk-teal-700);
+    color:#fff;border-radius:8px;font:700 12px var(--pk-font);cursor:pointer;}
+  .pk-add-pack:hover{filter:brightness(1.08);}
+  .pk-packs{padding:12px;display:flex;flex-direction:column;gap:12px;}
+  .pk-pack{border:1.5px solid var(--pk-line);border-radius:12px;background:#FAFCFB;overflow:hidden;
+    transition:border-color 140ms,box-shadow 140ms;}
+  .pk-pack.is-target{border-color:var(--pk-teal);box-shadow:0 0 0 4px rgba(20,127,116,.14);background:#fff;}
+  .pk-pack-h{display:flex;align-items:center;gap:9px;padding:9px 12px;background:#fff;border-bottom:1px solid var(--pk-line);}
+  .pk-pack-num{width:26px;height:26px;border-radius:7px;background:var(--pk-teal-600);color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font:800 12px var(--pk-font);flex-shrink:0;}
+  .pk-pack-title{font-weight:700;font-size:13px;}
+  .pk-pack-meta{margin-left:auto;font-size:11px;color:var(--pk-gray);font-weight:600;}
+  .pk-pack-del{background:none;border:0;color:var(--pk-gray);cursor:pointer;padding:4px 6px;border-radius:6px;}
+  .pk-pack-del:hover{color:var(--pk-red);background:#FEF2F2;}
+  .pk-pack-body{padding:8px 10px 10px;min-height:56px;}
+  .pk-drop-hint{padding:12px;text-align:center;color:var(--pk-gray);font:500 12px var(--pk-font);
+    border:1.5px dashed #D1D5DB;border-radius:9px;background:#fff;}
+  .pk-pack.is-target .pk-drop-hint{color:var(--pk-teal-700);border-color:var(--pk-teal);border-style:solid;background:var(--pk-teal-50);}
 
   /* Sticky footer */
   .pk-foot{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;
@@ -119,13 +157,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="pk-wrap"
+<div class="pk-wrap{% if not order.is_retail_order %} pk-wide{% endif %}"
      data-add-url="{% url 'operating:order_pack_reserve_add' order.pk %}"
      data-upd-url="{% url 'operating:order_pack_reserve_update' order.pk %}"
      data-rem-url="{% url 'operating:order_pack_reserve_remove' order.pk %}"
+     data-assign-pack-url="{% url 'operating:order_pack_reserve_assign_pack' order.pk %}"
+     data-pack-crud-url="{% url 'operating:order_packing_list' order.pk %}"
      data-done-url="{% url 'operating:order_pack_complete' order.pk %}"
      data-detail-url="{% url 'operating:order_detail' order.pk %}"
-     data-shipped="{{ shipped|yesno:'1,0' }}">
+     data-shipped="{{ shipped|yesno:'1,0' }}"
+     data-pack-mode="{% if not order.is_retail_order %}1{% else %}0{% endif %}">
 
   <div class="pk-top">
     <a class="pk-back" href="{% url 'operating:order_detail' order.pk %}">
@@ -135,6 +176,11 @@
       {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleme — Top Okut{% else %}Packing — Scan rolls{% endif %}
       <small>{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</small>
     </h1>
+    {% if not order.is_retail_order and not shipped %}
+    <a href="{% url 'operating:order_packing_list' order.pk %}" class="pk-back" style="margin-left:auto;">
+      <i class="fa fa-box"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paket listesi{% else %}Package list{% endif %}
+    </a>
+    {% endif %}
   </div>
 
   {% if shipped %}
@@ -145,7 +191,13 @@
   {% else %}
   <div class="pk-banner">
     <i class="fa fa-circle-info"></i>
-    <div>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişin ürünlerine ait <b>topları okutun</b>. Her top için girilen metre o kupondan <b>rezerve</b> edilir — <b>stok ancak sipariş gönderildiğinde düşer</b>. Başka ürüne ait barkod eklenmez. Toplar sonradan düzenlenebilir/kaldırılabilir.{% else %}Scan the <b>rolls</b> of this order's products. The metres you enter are <b>reserved</b> from that roll — <b>stock is deducted only when the order ships</b>. Barcodes of other products are rejected. Rolls can be edited/removed later.{% endif %}</div>
+    <div>
+      {% if order.is_retail_order %}
+        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişin ürünlerine ait <b>topları okutun</b>. Her top için girilen metre o kupondan <b>rezerve</b> edilir — <b>stok ancak sipariş gönderildiğinde düşer</b>. Başka ürüne ait barkod eklenmez. Toplar sonradan düzenlenebilir/kaldırılabilir.{% else %}Scan the <b>rolls</b> of this order's products. The metres you enter are <b>reserved</b> from that roll — <b>stock is deducted only when the order ships</b>. Barcodes of other products are rejected. Rolls can be edited/removed later.{% endif %}
+      {% else %}
+        {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişin ürünlerine ait <b>topları okutun</b>, sonra sağdaki <b>paketlere sürükleyip bırakın</b> — hangi çuvalda hangi ürünler var böylece görülebilir. Stok ancak sipariş gönderildiğinde düşer.{% else %}Scan the <b>rolls</b> of this order's products, then <b>drag them into packages</b> on the right — so it's visible which sack holds which products. Stock is deducted only when the order ships.{% endif %}
+      {% endif %}
+    </div>
   </div>
   {% endif %}
 
@@ -178,7 +230,8 @@
 
   <div class="pk-grid">
 
-    <!-- LEFT: reserved rolls -->
+    {% if order.is_retail_order %}
+    <!-- LEFT: reserved rolls (flat — retail) -->
     <div class="pk-card">
       <div class="pk-card-h">
         <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Okutulan toplar{% else %}Scanned rolls{% endif %}</h3>
@@ -234,6 +287,109 @@
         {% endfor %}
       </div>
     </div>
+
+    {% else %}
+    <!-- LEFT: scanned tops grouped by product (non-retail) -->
+    <div class="pk-card">
+      <div class="pk-card-h">
+        <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Okutulan toplar{% else %}Scanned rolls{% endif %}</h3>
+        <span class="pk-sub"><span id="pkCount">0</span> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top · <span id="pkTotal">0</span> m rezerv{% else %}rolls · <span id="pkTotal">0</span> m reserved{% endif %}</span>
+      </div>
+      <div class="pk-card-b">
+        <div id="pkGroups">
+          {% for it in items %}
+          <div class="pk-pgroup">
+            <div class="pk-pgroup-h">
+              <span class="pk-pgroup-name">{{ it.display_name }}</span>
+              <span class="pk-pgroup-sku">{{ it.display_sku|default:'—' }}</span>
+              <span class="pk-pgroup-qty">{{ it.quantity|floatformat:2 }} m</span>
+            </div>
+            <div class="pk-pgroup-rolls" data-order-item-id="{{ it.pk }}" ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDropUnassign(event)">
+              {% for r in reservations %}{% if r.order_item_id == it.pk and not r.pack_id %}
+              <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
+                   data-order-item-id="{{ it.pk }}" data-assigned-pack=""
+                   data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+                <div class="pk-row-top">
+                  <div>
+                    <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
+                    <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
+                    <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+                  </div>
+                  {% if not shipped %}<button type="button" class="pk-x" data-remove="{{ r.id }}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Kaldır{% else %}Remove{% endif %}"><i class="fa fa-xmark"></i></button>{% endif %}
+                </div>
+                <div class="pk-row-cut">
+                  <label>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kesilecek{% else %}Cut{% endif %}:</label>
+                  <input type="number" step="0.01" min="0" class="pk-m-inp" value="{{ r.meters|floatformat:2 }}"
+                         data-mid="{{ r.id }}" {% if shipped %}disabled{% endif %}>
+                  <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+                  <span class="pk-note" data-note="{{ r.id }}">→ {% if LANGUAGE_CODE|slice:":2" == "tr" %}bu kupondan {{ r.meters|floatformat:2 }} m düşülecektir{% else %}{{ r.meters|floatformat:2 }} m will be deducted from this roll{% endif %}</span>
+                </div>
+              </div>
+              {% endif %}{% endfor %}
+              <div class="pk-pgroup-empty" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Henüz top okutulmadı.{% else %}No rolls scanned yet.{% endif %}</div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="pk-empty" style="padding:14px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişte ürün yok.{% else %}No products.{% endif %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: packages — drag scanned tops here -->
+    <div class="pk-card">
+      <div class="pk-card-h pk-packs-h">
+        <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketler{% else %}Packages{% endif %}</h3>
+        <span class="pk-badge" id="packsCount">{{ packs|length }}</span>
+        {% if not shipped %}
+        <button type="button" class="pk-add-pack" id="pkAddPackBtn">
+          <i class="fa fa-plus"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Yeni Paket{% else %}New package{% endif %}
+        </button>
+        {% endif %}
+      </div>
+      <div class="pk-packs" id="packsList">
+        {% for p in packs %}
+        <div class="pk-pack" data-pack-id="{{ p.pk }}" data-pack-number="{{ p.pack_number }}"
+             ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDrop(event)">
+          <div class="pk-pack-h">
+            <span class="pk-pack-num">{{ p.pack_number }}</span>
+            <span class="pk-pack-title">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paket{% else %}Package{% endif %} #{{ p.pack_number }}</span>
+            <span class="pk-pack-meta"><span data-count>0</span> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}rolls{% endif %}</span>
+            {% if not shipped %}
+            <button type="button" class="pk-pack-del" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketi sil{% else %}Delete package{% endif %}" onclick="pkDeletePack({{ p.pk }})">
+              <i class="fa fa-trash"></i>
+            </button>
+            {% endif %}
+          </div>
+          <div class="pk-pack-body" data-pack-body>
+            {% for r in reservations %}{% if r.pack_id == p.pk %}
+            <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
+                 data-order-item-id="{{ r.order_item_id }}" data-assigned-pack="{{ p.pk }}"
+                 data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+              <div class="pk-row-top">
+                <div>
+                  <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
+                  <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
+                  <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+                </div>
+                {% if not shipped %}<button type="button" class="pk-x" data-remove="{{ r.id }}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Kaldır{% else %}Remove{% endif %}"><i class="fa fa-xmark"></i></button>{% endif %}
+              </div>
+              <div class="pk-row-cut">
+                <label>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Kesilecek{% else %}Cut{% endif %}:</label>
+                <input type="number" step="0.01" min="0" class="pk-m-inp" value="{{ r.meters|floatformat:2 }}"
+                       data-mid="{{ r.id }}" {% if shipped %}disabled{% endif %}>
+                <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+                <span class="pk-note" data-note="{{ r.id }}">→ {% if LANGUAGE_CODE|slice:":2" == "tr" %}bu kupondan {{ r.meters|floatformat:2 }} m düşülecektir{% else %}{{ r.meters|floatformat:2 }} m will be deducted from this roll{% endif %}</span>
+              </div>
+            </div>
+            {% endif %}{% endfor %}
+            <div class="pk-drop-hint" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Topları buraya sürükleyin{% else %}Drag rolls here{% endif %}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   {% if not shipped %}
@@ -257,10 +413,17 @@
   var wrap = document.querySelector('.pk-wrap');
   var CSRF = '{{ csrf_token }}';
   var ADD = wrap.dataset.addUrl, UPD = wrap.dataset.updUrl, REM = wrap.dataset.remUrl,
+      ASSIGN_PACK = wrap.dataset.assignPackUrl, PACK_CRUD = wrap.dataset.packCrudUrl,
       DONE = wrap.dataset.doneUrl, DETAIL = wrap.dataset.detailUrl;
   var SHIPPED = wrap.dataset.shipped === '1';
+  var PACK_MODE = wrap.dataset.packMode === '1';
 
-  var listEl = document.getElementById('pkList');
+  // Flat list (retail) or the union of every group/pack body (non-retail)
+  // — used for count/total refresh and for locating rows by id.
+  function allRows(){ return document.querySelectorAll('.pk-row'); }
+
+  var listEl = document.getElementById('pkList');           // retail only
+  var groupsEl = document.getElementById('pkGroups');        // non-retail only
   var emptyEl = document.getElementById('pkEmpty');
   var toastEl = document.getElementById('pkToast');
   var toastT = null;
@@ -283,8 +446,10 @@
   function rowHtml(res){
     var rem = (res.roll_remaining != null ? res.roll_remaining : (res.roll_meters || 0));
     var m = Number(res.meters || 0);
+    var draggable = (PACK_MODE && !SHIPPED) ? ' draggable="true"' : '';
     return ''+
-      '<div class="pk-row" data-id="'+res.id+'" data-remaining="'+rem+'">'+
+      '<div class="pk-row"'+draggable+' data-id="'+res.id+'" data-remaining="'+rem+'"'+
+        ' data-order-item-id="'+(res.order_item_id||'')+'" data-assigned-pack="'+(res.pack_id||'')+'">'+
         '<div class="pk-row-top"><div>'+
           '<div class="pk-row-name">'+esc(res.product_name)+'</div>'+
           '<div class="pk-row-meta">'+esc(res.sku||'—')+(res.warehouse?(' · '+esc(res.warehouse)):'')+'</div>'+
@@ -301,8 +466,34 @@
       '</div>';
   }
 
+  // ── non-retail: keep every row physically inside its correct group/
+  //    pack container, and refresh empty-state hints + per-pack counts.
+  function pkRegroup(){
+    if (!PACK_MODE) return;
+    allRows().forEach(function(row){
+      var packId = row.dataset.assignedPack;
+      var target;
+      if (packId){
+        target = document.querySelector('.pk-pack[data-pack-id="'+packId+'"] [data-pack-body]');
+      } else {
+        target = document.querySelector('.pk-pgroup-rolls[data-order-item-id="'+row.dataset.orderItemId+'"]');
+      }
+      if (target && row.parentNode !== target) target.appendChild(row);
+    });
+    document.querySelectorAll('.pk-pgroup-rolls, [data-pack-body]').forEach(function(container){
+      var hint = container.querySelector('[data-empty-hint]');
+      var hasRows = container.querySelectorAll('.pk-row').length > 0;
+      if (hint) hint.style.display = hasRows ? 'none' : '';
+    });
+    document.querySelectorAll('.pk-pack').forEach(function(pack){
+      var count = pack.querySelectorAll('.pk-row').length;
+      var meta = pack.querySelector('.pk-pack-meta [data-count]');
+      if (meta) meta.textContent = count;
+    });
+  }
+
   function refreshCount(){
-    var rows = listEl.querySelectorAll('.pk-row');
+    var rows = allRows();
     var n = rows.length, tot = 0;
     rows.forEach(function(row){
       var inp = row.querySelector('.pk-m-inp'); tot += Number(inp && inp.value || 0);
@@ -313,14 +504,21 @@
     if (tt) tt.textContent = tot.toFixed(2);
     if (done) done.disabled = (n < 1);
     if (emptyEl) emptyEl.style.display = n ? 'none' : '';
+    pkRegroup();
   }
 
   function addRow(res, flash){
     var tmp = document.createElement('div'); tmp.innerHTML = rowHtml(res).trim();
     var el = tmp.firstChild;
-    listEl.insertBefore(el, listEl.firstChild);
+    if (PACK_MODE){
+      var target = document.querySelector('.pk-pgroup-rolls[data-order-item-id="'+(res.order_item_id||'')+'"]') || groupsEl;
+      target.insertBefore(el, target.firstChild);
+    } else {
+      listEl.insertBefore(el, listEl.firstChild);
+    }
     if (flash){ el.classList.add('flash'); setTimeout(function(){ el.classList.remove('flash'); }, 900); }
     refreshCount();
+    return el;
   }
 
   // ── add a barcode (manual or camera) ──────────────────────────────
@@ -340,11 +538,12 @@
       }
       if (d.duplicate){
         toast(t('Bu top zaten ekli.','This roll is already added.'), 'warn');
-        var ex = listEl.querySelector('.pk-row[data-id="'+d.reservation.id+'"]');
+        var ex = document.querySelector('.pk-row[data-id="'+d.reservation.id+'"]');
         if (ex){ ex.classList.add('flash'); setTimeout(function(){ ex.classList.remove('flash'); }, 900); ex.scrollIntoView({block:'center',behavior:'smooth'}); }
         return;
       }
-      addRow(d.reservation, true);
+      var el = addRow(d.reservation, true);
+      if (el) el.scrollIntoView({block:'center', behavior:'smooth'});
       if (d.capped) toast(t('Girilen metre topta kalanla sınırlandı.','Metres capped to what remains on the roll.'), 'warn');
       else toast(t('Top eklendi.','Roll added.'));
     }).catch(function(){ toast(t('Ağ hatası.','Network error.'), 'err'); })
@@ -357,12 +556,13 @@
   if (addBtn) addBtn.addEventListener('click', doManual);
   if (manual) manual.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); doManual(); } });
 
-  // ── edit meters + remove (event delegation) ───────────────────────
+  // ── edit meters + remove (event delegation on the whole page — rows
+  //    can live inside #pkList, a product group, or a pack body) ─────
   var updTimers = {};
-  listEl.addEventListener('input', function(e){
+  document.addEventListener('input', function(e){
     var inp = e.target.closest('.pk-m-inp'); if(!inp) return;
     var id = inp.dataset.mid;
-    var note = listEl.querySelector('.pk-note[data-note="'+id+'"]');
+    var note = document.querySelector('.pk-note[data-note="'+id+'"]');
     var m = Number(inp.value || 0);
     if (note) note.textContent = noteText(m > 0 ? m : 0);
     refreshCount();
@@ -377,13 +577,13 @@
       }).catch(function(){});
     }, 550);
   });
-  listEl.addEventListener('click', function(e){
+  document.addEventListener('click', function(e){
     var x = e.target.closest('.pk-x'); if(!x) return;
     var id = x.dataset.remove;
     if (!confirm(t('Bu topu kaldırmak istiyor musunuz?','Remove this roll?'))) return;
     post(REM, {reservation_id:id}).then(function(rr){
       var d = rr.j || {}; if(!d.ok){ toast(d.error||t('Kaldırılamadı.','Remove failed.'),'err'); return; }
-      var row = listEl.querySelector('.pk-row[data-id="'+id+'"]'); if(row) row.remove();
+      var row = document.querySelector('.pk-row[data-id="'+id+'"]'); if(row) row.remove();
       refreshCount(); toast(t('Top kaldırıldı.','Roll removed.'));
     }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); });
   });
@@ -400,6 +600,87 @@
   });
 
   refreshCount();
+
+  // ══════════════════════ packages (non-retail only) ════════════════
+  if (PACK_MODE){
+    function pkFetchCrud(payload){
+      var body = new URLSearchParams(payload); body.append('csrfmiddlewaretoken', CSRF);
+      return fetch(PACK_CRUD, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}, body:body})
+        .then(function(r){ return r.json(); });
+    }
+
+    function assignToPack(reservationId, packId){
+      post(ASSIGN_PACK, {reservation_id: reservationId, pack_id: packId || ''}).then(function(rr){
+        var d = rr.j || {};
+        if (!d.ok){ toast(d.error || t('Taşınamadı.','Could not move.'), 'err'); return; }
+        var row = document.querySelector('.pk-row[data-id="'+reservationId+'"]');
+        if (row) row.dataset.assignedPack = d.pack_id || '';
+        pkRegroup();
+      }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); });
+    }
+
+    var addPackBtn = document.getElementById('pkAddPackBtn');
+    if (addPackBtn) addPackBtn.addEventListener('click', function(){
+      pkFetchCrud({action:'add_pack'}).then(function(data){
+        if (!data.ok){ toast(data.error || t('Oluşturulamadı.','Could not create.'), 'err'); return; }
+        var wrapEl = document.createElement('div');
+        wrapEl.className = 'pk-pack';
+        wrapEl.dataset.packId = data.pack.id;
+        wrapEl.dataset.packNumber = data.pack.number;
+        wrapEl.setAttribute('ondragover', 'pkDragOver(event)');
+        wrapEl.setAttribute('ondragleave', 'pkDragLeave(event)');
+        wrapEl.setAttribute('ondrop', 'pkDrop(event)');
+        wrapEl.innerHTML =
+          '<div class="pk-pack-h">' +
+            '<span class="pk-pack-num">' + data.pack.number + '</span>' +
+            '<span class="pk-pack-title">' + t('Paket','Package') + ' #' + data.pack.number + '</span>' +
+            '<span class="pk-pack-meta"><span data-count>0</span> ' + t('top','rolls') + '</span>' +
+            '<button type="button" class="pk-pack-del" onclick="pkDeletePack(' + data.pack.id + ')"><i class="fa fa-trash"></i></button>' +
+          '</div>' +
+          '<div class="pk-pack-body" data-pack-body><div class="pk-drop-hint" data-empty-hint>' + t('Topları buraya sürükleyin','Drag rolls here') + '</div></div>';
+        document.getElementById('packsList').appendChild(wrapEl);
+        document.getElementById('packsCount').textContent = document.querySelectorAll('.pk-pack').length;
+      });
+    });
+
+    window.pkDeletePack = function(packId){
+      if (!confirm(t('Bu paketi silmek istiyor musunuz? İçindeki toplar atanmamış duruma döner.','Delete this package? Its rolls will become unassigned.'))) return;
+      pkFetchCrud({action:'delete_pack', pack_id: packId}).then(function(data){
+        if (!data.ok){ toast(data.error || t('Silinemedi.','Could not delete.'), 'err'); return; }
+        document.querySelectorAll('.pk-row[data-assigned-pack="'+packId+'"]').forEach(function(row){ row.dataset.assignedPack = ''; });
+        var el = document.querySelector('.pk-pack[data-pack-id="'+packId+'"]');
+        if (el) el.remove();
+        document.getElementById('packsCount').textContent = document.querySelectorAll('.pk-pack').length;
+        pkRegroup();
+      });
+    };
+
+    // Drag & drop
+    var dragResId = null;
+    document.addEventListener('dragstart', function(e){
+      var row = e.target.closest('.pk-row[draggable="true"]');
+      if (!row) return;
+      dragResId = row.dataset.id;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    window.pkDragOver = function(e){ e.preventDefault(); e.currentTarget.classList.add('is-target'); e.dataTransfer.dropEffect = 'move'; };
+    window.pkDragLeave = function(e){ e.currentTarget.classList.remove('is-target'); };
+    window.pkDrop = function(e){
+      e.preventDefault();
+      e.currentTarget.classList.remove('is-target');
+      if (!dragResId) return;
+      assignToPack(dragResId, e.currentTarget.dataset.packId);
+      dragResId = null;
+    };
+    // Dropping back onto a product group unassigns (removes from pack).
+    window.pkDropUnassign = function(e){
+      e.preventDefault();
+      e.currentTarget.classList.remove('is-target');
+      if (!dragResId) return;
+      assignToPack(dragResId, '');
+      dragResId = null;
+    };
+  }
 
   // ══════════════════════ camera (zxing-wasm) ══════════════════════
   var zx = null, zxLoading = null, camStream = null, camRaf = null, camRunning = false, lastDecode = 0;

@@ -3,6 +3,7 @@ from . import views
 from . import views_warehouse
 from . import order_excel
 from . import warehouse_label
+from . import warehouse_excel
 from django.views.generic import TemplateView, RedirectView
 
 
@@ -17,6 +18,7 @@ urlpatterns = [
     path("warehouses/create/", views_warehouse.WarehouseCreate.as_view(), name="create_warehouse"),
     path("warehouses/create/partial/", views_warehouse.WarehouseCreatePartial.as_view(), name="create_warehouse_partial"),
     path("warehouses/<int:pk>/", views_warehouse.WarehouseDetail.as_view(), name="warehouse_detail"),
+    path("warehouses/<int:pk>/excel/", warehouse_excel.warehouse_excel, name="warehouse_excel"),
     path("warehouses/<int:pk>/group-variants/", views_warehouse.warehouse_group_variants, name="warehouse_group_variants"),
     path("warehouses/<int:pk>/catalog-search/", views_warehouse.catalog_base_search, name="catalog_base_search"),
     path("warehouses/<int:pk>/barcode-lookup/", views_warehouse.warehouse_barcode_lookup, name="warehouse_barcode_lookup"),
@@ -54,8 +56,10 @@ urlpatterns = [
     path("orders/<int:pk>/pack/add/", views.order_pack_reserve_add, name="order_pack_reserve_add"),
     path("orders/<int:pk>/pack/update/", views.order_pack_reserve_update, name="order_pack_reserve_update"),
     path("orders/<int:pk>/pack/remove/", views.order_pack_reserve_remove, name="order_pack_reserve_remove"),
+    path("orders/<int:pk>/pack/assign_pack/", views.order_pack_reserve_assign_pack, name="order_pack_reserve_assign_pack"),
     path("orders/<int:pk>/pack/complete/", views.order_pack_complete, name="order_pack_complete"),
     path("orders/create/barcode_check/", views.order_create_barcode_check, name="order_create_barcode_check"),
+    path("orders/create/roll_list/", views.order_create_roll_list, name="order_create_roll_list"),
     path("orders/<int:pk>/excel/", order_excel.order_excel, name="order_excel"),
     path("orders/", views.OrderList.as_view(), name="order_list"),
     path("orders/analytics/", views.OrderAnalytics.as_view(), name="order_analytics"),

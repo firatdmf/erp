@@ -40,6 +40,7 @@ path('search_contacts_only/',views.search_contacts_only,name="search_contacts_on
 path('add_contact_to_company/<int:company_pk>/<int:contact_pk>/',views.add_contact_to_company.as_view(),name="add_contact_to_company"),
 path('company/company_search/', views.company_search, name='company_search'),
 path('customer_autocomplete/', views.customer_autocomplete, name='customer_autocomplete'),
+path('quick_create_customer/', views.quick_create_customer, name='quick_create_customer'),
 path('company/<int:pk>/toggle_email_campaign/', views.toggle_email_campaign, name='toggle_email_campaign'),
 path('company/<int:pk>/notes_partial/', views.get_notes_partial, name='get_notes_partial'),
 path('company/<int:pk>/tasks_partial/', views.get_tasks_partial, name='get_tasks_partial'),

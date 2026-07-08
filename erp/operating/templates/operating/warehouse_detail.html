@@ -1197,6 +1197,10 @@
 
           {% comment %}Sort is driven by the quick-filter chips below; this hidden field holds the active key for the HTMX request.{% endcomment %}
           <input type="hidden" id="whSortInput" name="sort" value="{{ sort|default:'name_asc' }}">
+
+          <button type="button" class="ord-btn ghost" onclick="downloadWarehouseExcel()" title="{% trans 'Download the current list as an Excel file' %}">
+            <i class="fa fa-file-excel"></i> {% trans "Export to Excel" %}
+          </button>
         </div>
 
         <!-- Quick filter chips (HTMX live) -->
@@ -2339,6 +2343,14 @@
       b.classList.toggle('active', b.dataset.view === v);
     });
     htmx.trigger(document.body, 'whFilterChanged');
+  }
+
+  const whExcelUrl = "{% url 'operating:warehouse_excel' warehouse.pk %}";
+  function downloadWarehouseExcel() {
+    const search = (document.getElementById('whSearchInput') || {}).value || '';
+    const sort = (document.getElementById('whSortInput') || {}).value || 'name_asc';
+    const params = new URLSearchParams({ search: search, sort: sort });
+    window.location.href = whExcelUrl + '?' + params.toString();
   }
 
   function syncWhChipsActive() {

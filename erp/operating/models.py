@@ -1133,6 +1133,14 @@ class OrderRollReservation(models.Model):
         "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="roll_reservations",
     )
+    # Which physical package (Pack) this scanned top was dragged into on
+    # the packing screen — non-retail orders only (retail keeps the flat
+    # list). Null = not yet assigned to a package. SET_NULL on pack
+    # delete so its tops fall back to "unassigned" instead of vanishing.
+    pack = models.ForeignKey(
+        "Pack", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="roll_reservations",
+    )
 
     class Meta:
         ordering = ["-created_at"]

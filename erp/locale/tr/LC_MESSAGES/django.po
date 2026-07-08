@@ -7609,3 +7609,11 @@ msgstr "Misafir"
 
 msgid "Retail"
 msgstr "Perakende"
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "Export to Excel"
+msgstr "Excel'e Aktar"
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "Download the current list as an Excel file"
+msgstr "Mevcut listeyi Excel dosyası olarak indir"

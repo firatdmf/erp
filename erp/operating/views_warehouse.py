@@ -2778,6 +2778,11 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         require the scanned-roll reservations to fully COVER every
         order line's metres (see order_reservation_shortfalls) — a
         110 m line backed by a single 38 m roll cannot complete;
+      * entering 'cancelled' releases every active roll reservation —
+        cancelling a shipped order first restores its cut stock (the
+        leaving_ship branch below), then this drops the (now-inactive)
+        reservation rows entirely, so a cancelled order never keeps
+        warehouse capacity falsely held for stock that'll never ship;
       * the status change, its catalog-stock signal, AND the warehouse
         reservation → stock-out conversion all happen inside ONE
         transaction, so a roll-cut failure rolls the whole thing back
@@ -2808,6 +2813,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     entering_ship = changing and new_status in SHIPPED_CLASS and old_status not in SHIPPED_CLASS
     leaving_ship = (old_status in SHIPPED_CLASS and new_status in valid_statuses
                     and new_status not in SHIPPED_CLASS and new_status != old_status)
+    entering_cancelled = changing and new_status == "cancelled" and old_status != "cancelled"
 
     # Gate: shipping needs cargo info.
     if entering_ship and require_cargo_for_ship:
@@ -2843,6 +2849,13 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 consume_reservations_for_order(order, user=user)
             elif leaving_ship:
                 restore_reservations_for_order(order, user=user)
+            if entering_cancelled:
+                # Never any physical stock to restore here: leaving_ship
+                # (if it also fired) already converted consumed rows back
+                # to active ones above, and a non-shipped order's
+                # reservations were never consumed in the first place —
+                # either way they're plain soft holds now, safe to drop.
+                order.roll_reservations.filter(consumed=False).delete()
             # Retail money leg — completion posts the sale + auto
             # collection to the shared "Perakende Satışları" cari and
             # mirrors it into the Perakende defter; un-ship reverses
@@ -2896,14 +2909,21 @@ class WarehouseProductDetail(View):
 
         # Active (unconsumed) reservations = packed-but-not-shipped metres
         # held against this product's rolls. Shown as a "Rezerv stok" card
-        # and per-roll on the rolls list.
-        _resv = (OrderRollReservation.objects
-                 .filter(warehouse_product=product, consumed=False)
-                 .values("roll_id").annotate(s=Sum("meters")))
-        reserved_by_roll = {r["roll_id"]: (r["s"] or _Dec("0")) for r in _resv}
+        # and per-roll on the rolls list — each with the order it's held
+        # for, so "Rezerv: 40 m" is traceable instead of a dead-end number.
+        _resv_rows = (OrderRollReservation.objects
+                      .filter(warehouse_product=product, consumed=False)
+                      .select_related("order")
+                      .order_by("-created_at"))
+        reserved_by_roll = {}
+        reservations_by_roll = {}
+        for _resv in _resv_rows:
+            reserved_by_roll[_resv.roll_id] = reserved_by_roll.get(_resv.roll_id, _Dec("0")) + (_resv.meters or _Dec("0"))
+            reservations_by_roll.setdefault(_resv.roll_id, []).append(_resv)
         reserved_total = sum(reserved_by_roll.values(), _Dec("0"))
         for r in rolls:
             r.reserved_m = reserved_by_roll.get(r.id, _Dec("0"))
+            r.reservation_list = reservations_by_roll.get(r.id, [])
 
         return render(request, self.template_name, {
             "warehouse": warehouse,

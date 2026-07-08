@@ -1116,8 +1116,38 @@ def customer_autocomplete(request):
         )
     if not contacts and not companies:
         parts.append("<li class='customer-ac-empty'>No results found.</li>")
+        parts.append(
+            "<li class='customer-ac-create' "
+            f"data-name=\"{escape(query)}\" style='cursor:pointer;'>"
+            f"<i class='fa fa-plus-circle'></i> &quot;{escape(query)}&quot; için yeni müşteri oluştur"
+            "</li>"
+        )
     parts.append("</ul>")
     return HttpResponse("".join(parts))
+
+
+@login_required
+def quick_create_customer(request):
+    """Minimal inline customer creation from the order-creation screen —
+    name/phone/email/address only. Tax info and currency live on the
+    CariAccount, which is auto-created behind the scenes once the order
+    is saved (get_or_create_cari_for_order), so there's no need to ask
+    for them here."""
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"ok": False, "error": "Name is required"}, status=400)
+    phone = (request.POST.get("phone") or "").strip()
+    email = (request.POST.get("email") or "").strip()
+    address = (request.POST.get("address") or "").strip()
+    contact = Contact.objects.create(
+        name=name,
+        phone=[phone] if phone else [],
+        email=[email] if email else [],
+        address=address,
+    )
+    return JsonResponse({"ok": True, "id": contact.pk, "name": contact.name, "type": "contact"})
 
 
 @login_required

@@ -3951,10 +3951,29 @@
   </div>
   </div>
 
-  <!-- Order Sidebar Modal — half-screen on desktop, full-screen on mobile -->
+  <!-- Order Sidebar Modal — Create is full-screen at every size (this is
+       a real order-entry workspace, not a quick side-panel form); Edit
+       stays half-screen on desktop, full-screen on mobile. -->
   <style>
+    #orderSidebarOverlay .sidebar-modal {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important; /* dynamic viewport height — avoids the mobile address-bar jump */
+      border-radius: 0 !important;
+    }
+    /* The modal/header/content stay full-bleed (same bg colour, so no
+       visible seam) but the actual form is capped + centred so it
+       doesn't stretch into unreadably wide rows on a desktop monitor. */
+    #orderSidebarOverlay .sidebar-header,
+    #orderSidebarOverlay .sidebar-content {
+      max-width: 900px;
+      width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+      box-sizing: border-box;
+    }
     @media (min-width: 769px) {
-      #orderSidebarOverlay .sidebar-modal,
       #editOrderSidebarOverlay .sidebar-modal {
         width: 50vw !important;
         max-width: 50vw !important;

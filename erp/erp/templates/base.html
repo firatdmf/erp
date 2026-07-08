@@ -3951,9 +3951,9 @@
   </div>
   </div>
 
-  <!-- Order Sidebar Modal — Create is full-screen at every size (this is
-       a real order-entry workspace, not a quick side-panel form); Edit
-       stays half-screen on desktop, full-screen on mobile. -->
+  <!-- Order Sidebar Modal — Create is a full-screen order-entry
+       workspace (not a side panel); Edit stays half-screen on desktop,
+       full-screen on mobile. -->
   <style>
     #orderSidebarOverlay .sidebar-modal {
       width: 100vw !important;
@@ -3961,41 +3961,64 @@
       height: 100vh !important;
       height: 100dvh !important; /* dynamic viewport height — avoids the mobile address-bar jump */
       border-radius: 0 !important;
+      background: #FFFFFF;
+    }
+    #orderSidebarOverlay .sidebar-header {
+      padding-left: 40px !important;
+      padding-right: 40px !important;
     }
     #orderSidebarOverlay .sidebar-content {
+      padding: 22px 40px 40px !important;
       box-sizing: border-box;
     }
-    /* Wide screens: a real 2-column workspace instead of one long
-       centred column — Products (the tall, content-heavy step) gets
-       its own wide column so the page actually USES the width instead
-       of just centring a narrow card on empty space. Order Type /
-       Customer / Deposit / totals / submit stack in a fixed-width
-       left column alongside it. Named areas (not implicit auto-flow)
-       so the Products column reliably spans the left column's full
-       natural height regardless of how tall each left section is. */
-    @media (min-width: 1080px) {
+
+    /* ≥1024px: two-panel workspace. Left = the controls (Order Type /
+       Customer / Deposit / total / submit) in a comfortable fixed
+       column; right = Products as a full-height "cart" panel that fills
+       the rest of the width. Named grid areas (not auto-flow) so the
+       Products panel reliably spans the left column's whole height no
+       matter how tall each left section grows. Below 1024px the whole
+       thing falls back to the untouched single-column accordion. */
+    @media (min-width: 1024px) {
       #orderSidebarOverlay #createOrderForm {
         display: grid;
-        grid-template-columns: minmax(380px, 440px) 1fr;
-        grid-template-rows: auto auto auto auto auto;
+        grid-template-columns: minmax(460px, 600px) 1fr;
         grid-template-areas:
           "step1  products"
           "step3  products"
           "step4  products"
           "total  products"
           "footer products";
-        column-gap: 32px;
+        column-gap: 44px;
         align-items: start;
-        max-width: 1600px;
-        margin: 0 auto;
       }
-      #orderSidebarOverlay #createOrderForm #co-step-1        { grid-area: step1; }
-      #orderSidebarOverlay #createOrderForm #co-step-3        { grid-area: step3; }
-      #orderSidebarOverlay #createOrderForm #co-step-4        { grid-area: step4; }
-      #orderSidebarOverlay #createOrderForm #co-order-total-row { grid-area: total; }
-      #orderSidebarOverlay #createOrderForm .sidebar-footer   { grid-area: footer; position: sticky; bottom: 0; }
-      #orderSidebarOverlay #createOrderForm #co-step-2        { grid-area: products; height: 100%; }
-      #orderSidebarOverlay #createOrderForm #co-step-2 .co-section-body { max-height: none !important; }
+      #orderSidebarOverlay #createOrderForm > #co-step-1          { grid-area: step1; }
+      #orderSidebarOverlay #createOrderForm > #co-step-3          { grid-area: step3; }
+      #orderSidebarOverlay #createOrderForm > #co-step-4          { grid-area: step4; }
+      #orderSidebarOverlay #createOrderForm > #co-order-total-row { grid-area: total; }
+      #orderSidebarOverlay #createOrderForm > .sidebar-footer     { grid-area: footer; margin-top: 18px !important; }
+
+      /* Right column: Products as a proper cart panel. */
+      #orderSidebarOverlay #createOrderForm > #co-step-2 {
+        grid-area: products;
+        align-self: stretch;
+        background: #F8FAFC;
+        border: 1px solid #E9EEF3;
+        border-radius: 16px;
+        padding: 4px 24px 22px;
+        min-height: calc(100dvh - 172px);
+      }
+      /* It's a permanent column now, not a collapsible accordion row:
+         keep the body open and let its title read as a panel heading. */
+      #orderSidebarOverlay #createOrderForm > #co-step-2 .co-section-body {
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      #orderSidebarOverlay #createOrderForm > #co-step-2 .co-section-header {
+        border-bottom: none;
+        cursor: default;
+      }
+      #orderSidebarOverlay #createOrderForm > #co-step-2 .co-chev { display: none; }
     }
     @media (min-width: 769px) {
       #editOrderSidebarOverlay .sidebar-modal {

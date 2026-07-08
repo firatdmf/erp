@@ -1173,7 +1173,7 @@ msgid "Create New Team"
 msgstr "Yeni Takım Oluştur"
 
 msgid "Create Order"
-msgstr "Order Oluştur"
+msgstr "Sipariş Oluştur"
 
 msgid "Create Product Formm"
 msgstr "Product Formm Oluştur"
@@ -1221,7 +1221,7 @@ msgid "Customer Information"
 msgstr "Müşteri Bilgileri"
 
 msgid "Customer Source"
-msgstr "Customer Source"
+msgstr "Müşteri Kaynağı"
 
 msgid "Customers"
 msgstr "Müşteriler"
@@ -1833,10 +1833,10 @@ msgid "Schedule Meeting"
 msgstr "Toplantı Planla"
 
 msgid "Search Contact / Company"
-msgstr "Contact / Company ara"
+msgstr "Kişi / Firma ara"
 
 msgid "Search Product"
-msgstr "Product ara"
+msgstr "Ürün ara"
 
 msgid "Search User"
 msgstr "Kullanıcı Ara"
@@ -7585,3 +7585,27 @@ msgstr ""
 
 msgid "Total Value"
 msgstr ""
+
+msgid "Order Type"
+msgstr "Sipariş Türü"
+
+msgid "Web Order"
+msgstr "Web Siparişi"
+
+msgid "Manual"
+msgstr "Manuel"
+
+msgid "No products added yet"
+msgstr "Henüz ürün eklenmedi"
+
+msgid "Order total"
+msgstr "Sipariş toplamı"
+
+msgid "Web Client"
+msgstr "Web Müşterisi"
+
+msgid "Guest"
+msgstr "Misafir"
+
+msgid "Retail"
+msgstr "Perakende"

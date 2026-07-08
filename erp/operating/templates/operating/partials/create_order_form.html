@@ -114,7 +114,7 @@
   <div class="co-section active" id="co-step-1">
     <div class="co-section-header" onclick="coToggle(1)">
       <div class="co-section-num">1</div>
-      <span>Order Type</span>
+      <span>{% trans "Order Type" %}</span>
       <span class="co-section-summary" id="co-sum-1"></span>
       <i class="fas fa-chevron-down co-chev"></i>
     </div>
@@ -124,11 +124,11 @@
         <div class="co-type-group">
           <label class="co-type-btn">
             <input type="radio" name="order_type" value="web" onchange="coOrderType('web')">
-            <i class="fas fa-globe"></i> Web Order
+            <i class="fas fa-globe"></i> {% trans "Web Order" %}
           </label>
           <label class="co-type-btn">
             <input type="radio" name="order_type" value="manual" onchange="coOrderType('manual')" {% if not order or not order.is_retail_order %}checked{% endif %}>
-            <i class="fas fa-store"></i> Manual
+            <i class="fas fa-store"></i> {% trans "Manual" %}
           </label>
           <label class="co-type-btn">
             <input type="radio" name="order_type" value="perakende" onchange="coOrderType('perakende')" {% if order and order.is_retail_order %}checked{% endif %}>
@@ -144,7 +144,7 @@
   <div class="co-section active" id="co-step-3">
     <div class="co-section-header" onclick="coToggle(3)">
       <div class="co-section-num">2</div>
-      <span>Customer</span>
+      <span>{% trans "Customer" %}</span>
       <span class="co-section-summary" id="co-sum-3"></span>
       <i class="fas fa-chevron-down co-chev"></i>
     </div>
@@ -291,7 +291,7 @@
   <div class="co-section active" id="co-step-2">
     <div class="co-section-header" onclick="coToggle(2)">
       <div class="co-section-num">3</div>
-      <span>Products</span>
+      <span>{% trans "Products" %}</span>
       <span class="co-section-summary" id="co-sum-2"></span>
       <i class="fas fa-chevron-down co-chev"></i>
     </div>
@@ -524,7 +524,7 @@
   function renderProducts(opts) {
     opts = opts || {};
     const el = document.getElementById('co-products-list');
-    if (!orderItems.length) { el.innerHTML = '<div class="co-empty">No products added yet</div>'; return; }
+    if (!orderItems.length) { el.innerHTML = '<div class="co-empty">{% trans "No products added yet" %}</div>'; return; }
     el.innerHTML = orderItems.map((item, i) => {
       const cc = item.is_custom_curtain;
       // First (i===0) is the newest item — flash it briefly when

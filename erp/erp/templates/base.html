@@ -3962,16 +3962,40 @@
       height: 100dvh !important; /* dynamic viewport height — avoids the mobile address-bar jump */
       border-radius: 0 !important;
     }
-    /* The modal/header/content stay full-bleed (same bg colour, so no
-       visible seam) but the actual form is capped + centred so it
-       doesn't stretch into unreadably wide rows on a desktop monitor. */
-    #orderSidebarOverlay .sidebar-header,
     #orderSidebarOverlay .sidebar-content {
-      max-width: 900px;
-      width: 100%;
-      margin-left: auto;
-      margin-right: auto;
       box-sizing: border-box;
+    }
+    /* Wide screens: a real 2-column workspace instead of one long
+       centred column — Products (the tall, content-heavy step) gets
+       its own wide column so the page actually USES the width instead
+       of just centring a narrow card on empty space. Order Type /
+       Customer / Deposit / totals / submit stack in a fixed-width
+       left column alongside it. Named areas (not implicit auto-flow)
+       so the Products column reliably spans the left column's full
+       natural height regardless of how tall each left section is. */
+    @media (min-width: 1080px) {
+      #orderSidebarOverlay #createOrderForm {
+        display: grid;
+        grid-template-columns: minmax(380px, 440px) 1fr;
+        grid-template-rows: auto auto auto auto auto;
+        grid-template-areas:
+          "step1  products"
+          "step3  products"
+          "step4  products"
+          "total  products"
+          "footer products";
+        column-gap: 32px;
+        align-items: start;
+        max-width: 1600px;
+        margin: 0 auto;
+      }
+      #orderSidebarOverlay #createOrderForm #co-step-1        { grid-area: step1; }
+      #orderSidebarOverlay #createOrderForm #co-step-3        { grid-area: step3; }
+      #orderSidebarOverlay #createOrderForm #co-step-4        { grid-area: step4; }
+      #orderSidebarOverlay #createOrderForm #co-order-total-row { grid-area: total; }
+      #orderSidebarOverlay #createOrderForm .sidebar-footer   { grid-area: footer; position: sticky; bottom: 0; }
+      #orderSidebarOverlay #createOrderForm #co-step-2        { grid-area: products; height: 100%; }
+      #orderSidebarOverlay #createOrderForm #co-step-2 .co-section-body { max-height: none !important; }
     }
     @media (min-width: 769px) {
       #editOrderSidebarOverlay .sidebar-modal {

@@ -857,6 +857,78 @@ def catalog_base_search(request, pk):
 
 
 @login_required
+def catalog_product_variants(request, pk, product_id):
+    """List the EXISTING variants of one catalog product, for the "Yeni ürün"
+    panel's existing-main-product picker — lets staff see what's already on
+    the product BEFORE typing a variant name, instead of guessing."""
+    from marketing.models import Product
+    # Scoped to hidden/warehouse products only — same as catalog_base_search —
+    # so this intake endpoint can't be used to read out a real storefront
+    # product's SKU/barcode/quantity by guessing its id.
+    product = Product.objects.filter(pk=product_id, featured=False).first()
+    if product is None:
+        return JsonResponse({"results": []})
+    variants = (product.variants
+                .prefetch_related("product_variant_attribute_values__product_variant_attribute")
+                .order_by("variant_sku"))
+    results = []
+    for v in variants:
+        av = (v.product_variant_attribute_values.all()[:1] or [None])[0]
+        results.append({
+            "id": v.id,
+            "label": (av.product_variant_attribute_value.replace("_", " ").title() if av else v.variant_sku),
+            "attribute_name": (av.product_variant_attribute.name if av else None),
+            "variant_sku": v.variant_sku,
+            "variant_barcode": v.variant_barcode,
+            "variant_quantity": float(v.variant_quantity or 0),
+        })
+    return JsonResponse({"results": results})
+
+
+@login_required
+def catalog_variant_match(request, pk, product_id):
+    """Classify a variant NAME being typed into the "Yeni ürün" panel as
+    EXISTING (adds stock to an already-catalogued variant) or NEW (will
+    create one), using the SAME parse/translate logic sync_roll_to_catalog
+    uses at save time — so the preview badge and the actual save never
+    disagree on what counts as "the same variant"."""
+    from .catalog_sync import translate_color, _norm_attr, _norm_value
+    from marketing.models import Product, ProductVariant
+
+    name = (request.GET.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"exists": False, "attribute_name": None, "attribute_value": None})
+
+    eng = translate_color(name)
+    attribute_name = "color" if eng else "model"
+    attribute_value = eng or name
+
+    # Scoped to hidden/warehouse products only — see catalog_product_variants.
+    product = Product.objects.filter(pk=product_id, featured=False).first()
+    match = None
+    if product is not None:
+        match = (ProductVariant.objects
+                 .filter(product=product,
+                         product_variant_attribute_values__product_variant_attribute__name=_norm_attr(attribute_name),
+                         product_variant_attribute_values__product_variant_attribute_value=_norm_value(attribute_value))
+                 .first())
+
+    if match:
+        return JsonResponse({
+            "exists": True,
+            "attribute_name": attribute_name,
+            "attribute_value": attribute_value,
+            "variant_sku": match.variant_sku,
+            "variant_quantity": float(match.variant_quantity or 0),
+        })
+    return JsonResponse({
+        "exists": False,
+        "attribute_name": attribute_name,
+        "attribute_value": attribute_value,
+    })
+
+
+@login_required
 def warehouse_next_sku(request, pk):
     """Preview the next auto product SKU for a supplier prefix so the New-product
     panel can show it (and root the variant SKUs on it) BEFORE saving. Indicative
@@ -980,15 +1052,16 @@ class WarehouseManualAdd(View):
         if not isinstance(variants_in, list) or not variants_in:
             return JsonResponse({"success": False, "error": "En az bir varyant ekleyin."}, status=400)
 
-        # ── Supplier → barcode prefix ──
+        # ── Supplier → barcode prefix + purchase (alım) posting below ──
         supplier_name = ""
+        supplier_obj = None
         supplier_id = data.get("supplier_id")
         if supplier_id:
             try:
                 from crm.models import Supplier
-                s = Supplier.objects.filter(pk=int(supplier_id)).first()
-                if s:
-                    supplier_name = str(s)
+                supplier_obj = Supplier.objects.filter(pk=int(supplier_id)).first()
+                if supplier_obj:
+                    supplier_name = str(supplier_obj)
             except Exception:
                 pass
         prefix = (data.get("barcode_prefix") or "").strip().upper()
@@ -1022,6 +1095,7 @@ class WarehouseManualAdd(View):
         created = {"main_product": None, "variants": 0, "tops": 0,
                    "barcodes": [], "variant_skus": []}
         warnings = []
+        purchase_lines = []   # what THIS request added, for the alış faturası
         mint = _barcode_minter(prefix)
         prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
         usd_try = _get_usd_try_rate() or Decimal("1")
@@ -1147,7 +1221,8 @@ class WarehouseManualAdd(View):
                                                "cost_usd", "cost_try", "updated_at"])
 
                     first_barcode = None
-                    total = Decimal("0")
+                    added_qty = Decimal("0")
+                    new_roll_ids = []
                     for t in tops:
                         qty = _safe_decimal(t.get("qty"))
                         if qty is None or qty <= 0:
@@ -1166,6 +1241,8 @@ class WarehouseManualAdd(View):
                             quantity=qty, reason="Manual add",
                             reference=code, created_by=user,
                         )
+                        added_qty += qty
+                        new_roll_ids.append(roll.pk)
                         created["tops"] += 1
                         created["barcodes"].append(code)
 
@@ -1180,6 +1257,7 @@ class WarehouseManualAdd(View):
                         wp.barcode = first_barcode[:64]
                     wp.save(update_fields=["quantity", "barcode", "updated_at"])
 
+                    cat_variant_obj = None
                     try:
                         _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
                             base_name=base_name,
@@ -1191,18 +1269,74 @@ class WarehouseManualAdd(View):
                         )
                         wp.catalog_variant = cat_variant
                         wp.save(update_fields=["catalog_variant"])
+                        cat_variant_obj = cat_variant
                     except CatalogSyncConflict as exc:
                         warnings.append(f"{v_sku}: {exc}")
                     created["variants"] += 1
                     created["variant_skus"].append(v_sku)
+
+                    # Purchase-invoice line — only for stock actually added
+                    # in THIS request (added_qty), never the product's full
+                    # roll total, so re-adding to an existing SKU doesn't
+                    # re-bill previous intakes.
+                    if supplier_obj and added_qty > 0:
+                        purchase_lines.append({
+                            "description": wp_name,
+                            "quantity": added_qty,
+                            "unit": unit,
+                            "unit_price": price if (price and price > 0) else Decimal("0"),
+                            "currency": currency,
+                            "product": main_product,
+                            "variant": cat_variant_obj,
+                            "roll_ids": new_roll_ids,
+                        })
         except Exception as exc:
             import traceback
             traceback.print_exc()
             return JsonResponse({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
 
+        # ── Alış faturası (purchase invoice) — the intake above IS a
+        # purchase: we now owe the supplier for these goods. Posted to the
+        # supplier's cari as an issued purchase invoice so the alım shows
+        # up in the invoice list (type=purchase) and the cari statement
+        # links straight back to it. Best-effort: a bookkeeping hiccup
+        # must never roll back the physical stock that was just added.
+        purchase_info = None
+        if supplier_obj and purchase_lines:
+            try:
+                from current_account.services import create_purchase_invoice_for_intake
+                member = getattr(request.user, "member", None)
+                inv = create_purchase_invoice_for_intake(
+                    supplier_obj, purchase_lines, member=member, user=user,
+                )
+                purchase_info = {
+                    "invoice_id": inv.pk,
+                    "number": f"{inv.series}-{inv.number}",
+                    "total": float(inv.total or 0),
+                    "currency": inv.currency.code,
+                }
+                # Link each physical top back to the invoice line it was
+                # received against — items are created in the same order
+                # as purchase_lines, so zipping by line_no is exact.
+                inv_items = list(inv.items.order_by("line_no"))
+                for line, item in zip(purchase_lines, inv_items):
+                    roll_ids = line.get("roll_ids") or []
+                    if roll_ids:
+                        WarehouseProductRoll.objects.filter(pk__in=roll_ids).update(
+                            purchase_invoice_item=item
+                        )
+                if not any(l["unit_price"] > 0 for l in purchase_lines):
+                    warnings.append(
+                        "Alış faturası 0 tutarla oluşturuldu — fiyat girilmedi. "
+                        "Faturayı cari sayfasından düzenleyebilirsiniz."
+                    )
+            except Exception as exc:
+                warnings.append(f"Stok eklendi ama alış faturası oluşturulamadı: {exc}")
+
         return JsonResponse({
             "success": True, "created": created,
             "warnings": warnings, "prefix": prefix,
+            "purchase": purchase_info,
         })
 
 

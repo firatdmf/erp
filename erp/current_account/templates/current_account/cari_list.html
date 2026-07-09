@@ -195,7 +195,6 @@
     </div>
     <div class="ca-head-r">
       <a href="{% url 'current_account:help' %}" class="ca-btn ghost"><i data-lucide="help-circle"></i>{% trans "Help" %}</a>
-      <a href="{% url 'current_account:cari_create' %}" class="ca-btn primary"><i data-lucide="plus"></i>{% trans "New Account" %}</a>
     </div>
   </div>
 
@@ -330,8 +329,7 @@
   <div class="ca-empty">
     <div class="ico"><i data-lucide="users"></i></div>
     <h3>{% trans "No accounts found" %}</h3>
-    <p>{% trans "Adjust filters or open a new account." %}</p>
-    <a href="{% url 'current_account:cari_create' %}" class="ca-btn primary"><i data-lucide="plus"></i>{% trans "New Account" %}</a>
+    <p>{% trans "Adjust filters to see other accounts." %}</p>
   </div>
   {% endif %}
 </div>

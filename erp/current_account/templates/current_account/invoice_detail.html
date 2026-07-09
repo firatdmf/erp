@@ -508,7 +508,14 @@
           {% csrf_token %}
           <button type="submit" class="iv-btn danger"><i data-lucide="trash-2"></i>{% trans "Delete" %}</button>
         </form>
-      {% elif invoice.status != 'cancelled' %}
+      {% elif invoice.status == 'cancelled' %}
+        <form method="post" action="{% url 'current_account:invoice_restore' invoice.pk %}" style="display:inline;"
+              onsubmit="return submitInvoiceRestore(this);">
+          {% csrf_token %}
+          <input type="hidden" name="password" value="">
+          <button type="submit" class="iv-btn primary"><i data-lucide="rotate-ccw"></i>{% trans "Restore" %}</button>
+        </form>
+      {% else %}
         <form method="post" action="{% url 'current_account:invoice_cancel' invoice.pk %}" style="display:inline;"
               onsubmit="return confirm('{% trans 'Are you sure you want to cancel this invoice? A reverse movement will be created.' %}');">
           {% csrf_token %}
@@ -702,5 +709,14 @@
   </div>
 </div>
 
-<script>if (window.lucide) lucide.createIcons();</script>
+<script>
+  if (window.lucide) lucide.createIcons();
+
+  function submitInvoiceRestore(form) {
+    var pw = window.prompt('{% trans "Enter the restore password to un-cancel this invoice:" %}');
+    if (pw === null || pw.trim() === '') return false;
+    form.password.value = pw;
+    return true;
+  }
+</script>
 {% endblock %}

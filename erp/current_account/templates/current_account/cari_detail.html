@@ -353,7 +353,10 @@
                   <span class="mv-type">{{ m.mv.get_movement_type_display }}</span>
                 {% endif %}
               </td>
-              <td>{{ m.mv.description|default:"—" }}</td>
+              <td>
+                {{ m.mv.description|default:"—" }}
+                {% if m.mv.created_by %}<div style="font-size: 11px; color: var(--gray-500); margin-top: 2px;">{% blocktrans with name=m.mv.created_by %}by {{ name }}{% endblocktrans %}</div>{% endif %}
+              </td>
               <td style="font-size: 12.5px;">
                 {% if pay %}
                   <a href="{% url 'current_account:payment_detail' pay.pk %}"

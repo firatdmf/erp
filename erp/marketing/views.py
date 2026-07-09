@@ -3350,7 +3350,99 @@ def upload_blog_image(request):
             'url': url,
             'type': image_type
         })
-        
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+def _extract_and_rewrite_html(raw_html, path_map, folder):
+    """Parse an uploaded HTML file (a full document OR a bare content
+    fragment — Word/Google Docs exports are usually the former, a
+    hand-written snippet the latter), upload every LOCAL <img src=...>
+    found via `path_map` (relative-path/basename -> UploadedFile) to the
+    CDN, rewrite the src to the resulting URL, and return the inner
+    HTML as a plain string ready to drop straight into a content field.
+    Already-remote sources (http(s)/data:) are left untouched."""
+    from lxml import html as lxml_html
+
+    lowered = raw_html.lower()
+    if '<body' in lowered or '<html' in lowered:
+        doc = lxml_html.fromstring(raw_html)
+        body = doc.find('.//body')
+        root = body if body is not None else doc
+    else:
+        # A bare fragment can have several top-level siblings, which a
+        # plain fromstring() can't parse (it wants one root) — wrap it.
+        root = lxml_html.fragment_fromstring(raw_html, create_parent='div')
+
+    uploaded = 0
+    warnings = []
+    for img in root.iter('img'):
+        src = (img.get('src') or '').strip()
+        if not src or src.startswith(('http://', 'https://', '//', 'data:')):
+            continue
+        norm = src.replace('\\', '/').lstrip('./')
+        key = norm if norm in path_map else norm.split('/')[-1]
+        file_obj = path_map.get(key)
+        if not file_obj:
+            warnings.append(f'Görsel bulunamadı, bağlantı değiştirilmedi: {src}')
+            continue
+        try:
+            file_obj.seek(0)
+            url = smart_upload(file_obj, folder)
+            img.set('src', url)
+            uploaded += 1
+        except Exception as exc:
+            warnings.append(f'{src}: yüklenemedi ({exc})')
+
+    parts = [root.text] if root.text else []
+    for child in root:
+        parts.append(lxml_html.tostring(child, encoding='unicode'))
+    return ''.join(parts), uploaded, warnings
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def upload_blog_html(request):
+    """Upload an .html file (optionally alongside its images, selected
+    as a whole folder so relative paths like "word/media/image1.png"
+    resolve correctly) as blog content. Every local <img> reference gets
+    its matching file uploaded to the CDN and the src rewritten, then
+    the resulting HTML is handed back so the caller can drop it straight
+    into a content_<lang> textarea — no more copy/pasting Markdown for
+    each inline image by hand."""
+    try:
+        html_file = request.FILES.get('html_file')
+        if not html_file:
+            return JsonResponse({'success': False, 'error': 'HTML dosyası gerekli.'}, status=400)
+
+        try:
+            raw = html_file.read().decode('utf-8')
+        except UnicodeDecodeError:
+            html_file.seek(0)
+            raw = html_file.read().decode('utf-8', errors='replace')
+
+        images = request.FILES.getlist('images')
+        image_paths = request.POST.getlist('image_paths')
+        path_map = {}
+        for i, f in enumerate(images):
+            rel = (image_paths[i] if i < len(image_paths) else f.name) or f.name
+            key = rel.replace('\\', '/').lstrip('./')
+            path_map[key] = f
+            path_map.setdefault(key.split('/')[-1], f)   # basename fallback
+
+        blog_slug = request.POST.get('slug', 'temp')
+        folder = f"media/blog/{blog_slug}/content"
+
+        html, uploaded, warnings = _extract_and_rewrite_html(raw, path_map, folder)
+
+        return JsonResponse({
+            'success': True,
+            'html': html,
+            'images_uploaded': uploaded,
+            'images_total': len(images),
+            'warnings': warnings,
+        })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 

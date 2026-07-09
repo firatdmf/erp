@@ -968,6 +968,24 @@
   .np-ac-item:hover { background: #F1F7F6; }
   .np-ac-item small { color: var(--gray-500); margin-left: 6px; }
 
+  /* Existing-variants chip row (shown under the search box once a main
+     product is selected, so the user sees what's already on it). */
+  .np-existing-variants {
+    margin-top: 8px; padding: 9px 10px;
+    background: var(--nejum-teal-50, #E5F1F0); border: 1px solid rgba(20,127,116,0.20);
+    border-radius: 9px; font: 500 11.5px var(--font-sans); color: var(--nejum-teal-700, #005354);
+  }
+  .np-existing-variants .np-ev-label { font-weight: 700; margin-right: 4px; }
+  .np-existing-variants .np-ev-chip {
+    display: inline-block; margin: 2px 4px 0 0; padding: 2px 7px;
+    background: white; border: 1px solid rgba(20,127,116,0.25); border-radius: 999px;
+    font: 600 11px var(--font-sans); color: #0F1419;
+    appearance: none; cursor: pointer; transition: all 120ms;
+  }
+  .np-existing-variants .np-ev-chip:hover { background: var(--nejum-teal-500, #147F74); color: #fff; border-color: var(--nejum-teal-500, #147F74); }
+  .np-existing-variants .np-ev-chip.picked { background: var(--nejum-teal-700, #005354); color: #fff; border-color: var(--nejum-teal-700, #005354); }
+  .np-existing-variants.empty { color: var(--gray-500); }
+
   /* Variant cards */
   .np-variants { display: flex; flex-direction: column; gap: 12px; }
   .np-variant {
@@ -980,6 +998,15 @@
   .np-variant-row .np-input { height: 38px; }
   .np-v-name { flex: 1.4; }
   .np-v-sku  { flex: 1; }
+  /* Existing/new classification badge (mirrors the scan screen's .rs-match) */
+  .np-v-match {
+    margin: -2px 0 8px; padding: 5px 9px;
+    background: var(--nejum-teal-50, #E5F1F0); color: var(--nejum-teal-700, #005354);
+    border: 1px solid rgba(20,127,116,0.20); border-radius: 7px;
+    font: 600 11px var(--font-sans); display: none; align-items: center; gap: 6px;
+  }
+  .np-v-match.show { display: flex; }
+  .np-v-match.new { background: #FEF3C7; color: #8B5A00; border-color: #F5D78B; }
   .np-tops { display: flex; flex-direction: column; gap: 7px; }
   .np-top { display: flex; align-items: center; gap: 8px; }
   .np-top-no { font: 600 11px var(--font-sans); color: var(--gray-500); min-width: 42px; }
@@ -1665,6 +1692,7 @@
           <input type="hidden" id="npMainId">
           <input type="hidden" id="npMainExistingSku">
           <div id="npMainDrop" class="np-ac-drop"></div>
+          <div id="npExistingVariants" class="np-existing-variants" style="display:none;"></div>
         </div>
       </div>
 
@@ -1723,6 +1751,10 @@
   const NP_URL = "{% url 'operating:warehouse_manual_add' warehouse.pk %}";
   const NP_SEARCH = "{% url 'operating:catalog_base_search' warehouse.pk %}";
   const NP_NEXTSKU = "{% url 'operating:warehouse_next_sku' warehouse.pk %}";
+  // Product id isn't known until an existing main product is picked, so we
+  // template the URL with a "0" placeholder and swap it in per-call.
+  const NP_VARIANTS_TPL = "{% url 'operating:catalog_product_variants' warehouse.pk 0 %}";
+  const NP_MATCH_TPL = "{% url 'operating:catalog_variant_match' warehouse.pk 0 %}";
   const NP_CSRF = "{{ csrf_token }}";
   const NP_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
   const NP_CUR = '<select class="np-select np-v-cur"><option>USD</option><option>TRY</option><option>EUR</option></select>';
@@ -1731,6 +1763,10 @@
   let npHasVariants = true;
   let npPreviewSku = '';
   let npNextSkuTimer = null;
+  // Existing variants of the currently-selected main product (mode=existing),
+  // fetched via NP_VARIANTS_TPL — lets the panel show "already on this
+  // product" state before the user even types a variant name.
+  window.npExistingVariants = [];
 
   function npCurPrefix() {
     const sel = document.getElementById('npSupplier');
@@ -1803,8 +1839,19 @@
     });
     document.getElementById('npNewMain').style.display = (mode === 'new') ? '' : 'none';
     document.getElementById('npExistingMain').style.display = (mode === 'existing') ? '' : 'none';
+    if (mode === 'new') {
+      // Leaving "existing" — drop its search + selection state so a fresh
+      // "New" entry never inherits the previous product's variant badges.
+      document.getElementById('npMainSearch').value = '';
+      document.getElementById('npMainId').value = '';
+      const exReset = document.getElementById('npMainExistingSku'); if (exReset) exReset.value = '';
+      const dropReset = document.getElementById('npMainDrop'); if (dropReset) { dropReset.classList.remove('show'); dropReset.innerHTML = ''; }
+      window.npResetExistingVariants();
+      document.querySelectorAll('#npVariants .np-v-sku').forEach(function (s) { delete s.dataset.matchLocked; });
+    }
     npFetchNextSku();
     npRefreshVariantSkus();
+    npRefreshVariantMatches();
   };
 
   window.npSetHasVariants = function (has) {
@@ -1836,10 +1883,82 @@
   window.npSuggestVariantSku = function (vEl) {
     const nameI = vEl.querySelector('.np-v-name');
     const skuI = vEl.querySelector('.np-v-sku');
-    if (!skuI || skuI.dataset.touched) return;
+    // matchLocked = the SKU is the REAL sku of an existing variant (set by
+    // npCheckVariantMatch below) — the auto-suggestion must never overwrite
+    // it with a freshly generated code.
+    if (!skuI || skuI.dataset.touched || skuI.dataset.matchLocked) return;
     const root = npBaseSku();
     const sfx = slug(nameI.value) || vEl.dataset.vid;
     skuI.value = root ? (root + '-' + sfx).slice(0, 20) : '';
+  };
+
+  // Debounced existing/new classification of a variant card's name, ONLY
+  // meaningful when an existing main product is selected (mode=existing).
+  // Reuses the same parse/translate rules sync_roll_to_catalog applies at
+  // save time (via the catalog_variant_match endpoint) so this preview and
+  // the actual save never disagree.
+  window.npRefreshVariantMatches = function () {
+    document.querySelectorAll('#npVariants .np-variant').forEach(function (v) { npQueueVariantMatch(v); });
+  };
+  window.npQueueVariantMatch = function (vEl) {
+    clearTimeout(vEl._npMatchTimer);
+    vEl._npMatchTimer = setTimeout(function () { npCheckVariantMatch(vEl); }, 250);
+  };
+  window.npCheckVariantMatch = function (vEl) {
+    const badge = vEl.querySelector('.np-v-match');
+    const skuI = vEl.querySelector('.np-v-sku');
+    const nameI = vEl.querySelector('.np-v-name');
+    if (!badge || !skuI || !nameI) return;
+    const productId = document.getElementById('npMainId').value;
+    const name = (nameI.value || '').trim();
+    // Release a previous lock as soon as the classification is stale — it
+    // gets re-set below if the (possibly new) name still matches.
+    delete skuI.dataset.matchLocked;
+    if (npMode !== 'existing' || !productId || !name) {
+      badge.classList.remove('show', 'new'); badge.innerHTML = '';
+      return;
+    }
+    // Token guard: only the LAST-SENT request for this card may apply its
+    // result — otherwise a slower earlier response arriving after a faster
+    // later one could overwrite the badge/lock with a stale classification.
+    const reqToken = (vEl._npMatchToken = (vEl._npMatchToken || 0) + 1);
+    fetch(NP_MATCH_TPL.replace(/\/0\/$/, '/' + productId + '/') + '?name=' + encodeURIComponent(name),
+      { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (vEl._npMatchToken !== reqToken) return;
+        if (d.exists) {
+          badge.classList.add('show'); badge.classList.remove('new');
+          badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "MEVCUT" %} — ' +
+            '{% trans "will add stock to this variant" %} (' +
+            (Math.round((d.variant_quantity || 0) * 100) / 100) + ')';
+          skuI.value = d.variant_sku || skuI.value;
+          skuI.dataset.matchLocked = '1';
+        } else {
+          badge.classList.add('show', 'new');
+          badge.innerHTML = '<i class="fa fa-plus-circle"></i> {% trans "YENİ" %} — {% trans "will create a new variant" %}';
+          delete skuI.dataset.matchLocked;
+          npSuggestVariantSku(vEl);
+        }
+      }).catch(function () {
+        if (vEl._npMatchToken !== reqToken) return;
+        badge.classList.remove('show', 'new'); badge.innerHTML = '';
+      });
+  };
+
+  // Hand-editing a SKU that was locked to an existing variant's real sku
+  // breaks that match — the badge must stop claiming "MEVCUT" for a sku the
+  // save will actually ignore (the backend still dedups by attribute, not
+  // by the typed sku, so keeping the old badge up would be misleading).
+  window.npUnlockVariantSku = function (skuI) {
+    skuI.dataset.touched = '1';
+    const wasLocked = !!skuI.dataset.matchLocked;
+    delete skuI.dataset.matchLocked;
+    if (wasLocked) {
+      const vEl = skuI.closest('.np-variant');
+      const badge = vEl && vEl.querySelector('.np-v-match');
+      if (badge) { badge.classList.remove('show', 'new'); badge.innerHTML = ''; }
+    }
   };
 
   window.npAddVariant = function () {
@@ -1853,9 +1972,10 @@
         '<button type="button" class="np-mini-x np-variant-rm" title="{% trans "Remove" %}" onclick="npRemoveVariant(this)">' + NP_TRASH + '</button>' +
       '</div>' +
       '<div class="np-variant-row">' +
-        '<input class="np-input np-v-name" placeholder="{% trans "Color / model (e.g. Beyaz)" %}" oninput="npSuggestVariantSku(this.closest(\'.np-variant\'))">' +
-        '<input class="np-input np-v-sku" placeholder="{% trans "SKU (auto)" %}" oninput="this.dataset.touched=\'1\'">' +
+        '<input class="np-input np-v-name" placeholder="{% trans "Color / model (e.g. Beyaz)" %}" oninput="npSuggestVariantSku(this.closest(\'.np-variant\')); npQueueVariantMatch(this.closest(\'.np-variant\'))">' +
+        '<input class="np-input np-v-sku" placeholder="{% trans "SKU (auto)" %}" oninput="npUnlockVariantSku(this)">' +
       '</div>' +
+      '<div class="np-v-match"></div>' +
       '<div class="np-price-row">' +
         '<span class="np-price-label">{% trans "Purchase price" %}</span>' +
         '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">' +
@@ -1936,10 +2056,86 @@
     }
   };
 
+  // Clear the existing-variants chip row and every per-card match badge —
+  // called whenever the selected main product changes or is cleared, so a
+  // stale "MEVCUT/YENİ" verdict from the previous product never lingers.
+  window.npResetExistingVariants = function () {
+    window.npExistingVariants = [];
+    const box = document.getElementById('npExistingVariants');
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    document.querySelectorAll('#npVariants .np-v-match').forEach(function (m) {
+      m.classList.remove('show', 'new'); m.innerHTML = '';
+    });
+  };
+
+  window.npLoadExistingVariants = function (productId) {
+    const box = document.getElementById('npExistingVariants');
+    if (!box) return;
+    if (!productId) { window.npResetExistingVariants(); return; }
+    fetch(NP_VARIANTS_TPL.replace(/\/0\/$/, '/' + productId + '/'), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        window.npExistingVariants = d.results || [];
+        box.style.display = '';
+        if (!window.npExistingVariants.length) {
+          box.classList.add('empty');
+          box.innerHTML = '{% trans "This product has no variants yet." %}';
+          return;
+        }
+        box.classList.remove('empty');
+        box.innerHTML = '<span class="np-ev-label">{% trans "Existing variants on this product:" %}</span>' +
+          window.npExistingVariants.map(function (v) {
+            return '<button type="button" class="np-ev-chip" data-sku="' + npEsc(v.variant_sku) + '" onclick="npPickExistingVariant(\'' + npEsc(v.variant_sku).replace(/'/g, "\\'") + '\', this)" title="{% trans "Click to fill a variant row with this" %}">' +
+              npEsc(v.label || v.variant_sku) + ' (' +
+              (Math.round((v.variant_quantity || 0) * 100) / 100) + ')</button>';
+          }).join('');
+      }).catch(function () { window.npResetExistingVariants(); });
+  };
+
+  function npEsc(s) {
+    return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
+    });
+  }
+
+  // Clicking an "existing variants" chip fills a variant row directly —
+  // the row's own name/SKU inputs are still editable afterwards, this is
+  // just a shortcut so the user doesn't have to retype a name and hope it
+  // matches what npCheckVariantMatch would classify.
+  window.npPickExistingVariant = function (sku, chipEl) {
+    const v = (window.npExistingVariants || []).find(function (x) { return x.variant_sku === sku; });
+    if (!v) return;
+    let target = Array.prototype.find.call(
+      document.querySelectorAll('#npVariants .np-variant'),
+      function (vEl) { return !(vEl.querySelector('.np-v-name') || {}).value; }
+    );
+    if (!target) {
+      npAddVariant();
+      const all = document.querySelectorAll('#npVariants .np-variant');
+      target = all[all.length - 1];
+    }
+    const nameI = target.querySelector('.np-v-name');
+    const skuI = target.querySelector('.np-v-sku');
+    const badge = target.querySelector('.np-v-match');
+    nameI.value = v.label || v.variant_sku;
+    skuI.value = v.variant_sku;
+    skuI.dataset.matchLocked = '1';
+    if (badge) {
+      badge.classList.add('show');
+      badge.classList.remove('new');
+      badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "MEVCUT" %} — ' +
+        '{% trans "will add stock to this variant" %} (' +
+        (Math.round((v.variant_quantity || 0) * 100) / 100) + ')';
+    }
+    if (chipEl) chipEl.classList.add('picked');
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
   let npSearchTimer = null;
   window.npSearchMain = function (q) {
     document.getElementById('npMainId').value = '';
     const exReset = document.getElementById('npMainExistingSku'); if (exReset) exReset.value = '';
+    window.npResetExistingVariants();
     const drop = document.getElementById('npMainDrop');
     clearTimeout(npSearchTimer);
     q = (q || '').trim();
@@ -1963,7 +2159,9 @@
               document.getElementById('npMainSearch').value = row.getAttribute('data-title');
               document.getElementById('npMainExistingSku').value = row.getAttribute('data-sku') || '';
               drop.classList.remove('show');
+              npLoadExistingVariants(row.getAttribute('data-id'));
               npRefreshVariantSkus();
+              npRefreshVariantMatches();
             });
           });
         }).catch(function () { drop.classList.remove('show'); });

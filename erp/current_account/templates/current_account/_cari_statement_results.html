@@ -57,7 +57,10 @@
             <span class="mv-type">{{ r.mv.get_movement_type_display }}</span>
           {% endif %}
         </td>
-        <td><span class="st-desc {% if not r.mv.description %}muted{% endif %}">{{ r.mv.description|default:"—" }}</span></td>
+        <td>
+          <span class="st-desc {% if not r.mv.description %}muted{% endif %}">{{ r.mv.description|default:"—" }}</span>
+          {% if r.mv.created_by %}<div style="font-size: 11px; color: var(--gray-500); margin-top: 2px;">{% blocktrans with name=r.mv.created_by %}by {{ name }}{% endblocktrans %}</div>{% endif %}
+        </td>
         <td>
           {% if pay %}
             <a href="{% url 'current_account:payment_detail' pay.pk %}"

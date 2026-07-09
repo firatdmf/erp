@@ -227,6 +227,10 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
     - quantity MIRRORS the warehouse stock onto the variant; the parent
       Product.quantity is recomputed as the sum of its variants' quantities.
     - Re-scanning the same variant_sku updates it in place (no duplicate).
+    - A different variant_sku that matches an EXISTING (product, attribute_name,
+      attribute_value) is treated as the SAME logical variant: quantity is
+      ADDED to it instead of forking a second ProductVariant, and its own
+      variant_sku is left untouched.
     - Raises CatalogSyncConflict if variant_sku already belongs to another product.
     """
     from marketing.models import (
@@ -285,6 +289,13 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
             if new_sku:
                 product.sku = new_sku
                 product.save(update_fields=["sku"])
+        # Lock the product row for the rest of this transaction. There's no
+        # DB constraint on (product, attribute_value) — only variant_sku is
+        # globally unique — so without this, two concurrent syncs for the
+        # SAME new (product, attribute) pair would both see no attr_matched
+        # row below and both create(), forking a duplicate variant. Locking
+        # the parent product serializes concurrent syncs onto it.
+        Product.objects.select_for_update().filter(pk=product.id).first()
 
     # 2) Lock the variant row (concurrent scans of the same roll are safe).
     existing = (ProductVariant.objects.select_for_update()
@@ -295,6 +306,24 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
             f"#{existing.product_id}, not '{base_name}' (#{product.id})."
         )
 
+    # 1b) Same logical variant under a DIFFERENT sku? A caller (e.g. the
+    #     manual warehouse-intake form) may hand us a freshly minted
+    #     variant_sku for what is actually a colour/model this product
+    #     already carries — get_or_create-by-sku alone would then fork a
+    #     second ProductVariant for it. Reuse the attribute-matched row
+    #     instead, adding the incoming stock to it (unlike the mirror
+    #     behaviour below, this quantity is genuinely NEW stock, not a
+    #     restatement of the same roll/scan).
+    attr_matched = False
+    if existing is None and attribute_name and attribute_value:
+        attr_matched = (ProductVariant.objects.select_for_update()
+                        .filter(product=product,
+                                product_variant_attribute_values__product_variant_attribute__name=_norm_attr(attribute_name),
+                                product_variant_attribute_values__product_variant_attribute_value=_norm_value(attribute_value))
+                        .first())
+        if attr_matched:
+            existing = attr_matched
+
     if existing:
         variant = existing
         variant_created = False
@@ -304,7 +333,13 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         if not product.featured:
             variant.variant_featured = False
         if qty is not None:
-            variant.variant_quantity = qty          # mirror warehouse meters
+            if attr_matched:
+                # Matched by attribute, not by sku — this is additional
+                # stock coming in under its own roll(s), not a restatement
+                # of the matched variant's existing total.
+                variant.variant_quantity = (variant.variant_quantity or Decimal("0")) + qty
+            else:
+                variant.variant_quantity = qty          # mirror warehouse meters
         if variant_barcode and not variant.variant_barcode:
             variant.variant_barcode = variant_barcode[:14]
         if cost_dec is not None:

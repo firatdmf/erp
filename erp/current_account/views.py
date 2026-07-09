@@ -325,7 +325,7 @@ class CariDetail(View):
         )
         recent_movements = (
             cari.movements
-            .select_related("currency")
+            .select_related("currency", "created_by__user")
             .order_by("-date", "-id")[:20]
         )
         movements_with_balance = []
@@ -409,7 +409,7 @@ class CariStatement(View):
 
         # Base queryset — date range first so the prior-balance
         # calculation stays correct.
-        base = cari.movements.select_related("currency").all()
+        base = cari.movements.select_related("currency", "created_by__user").all()
         qs = base.order_by("date", "id")
         if date_from:
             qs = qs.filter(date__gte=date_from)

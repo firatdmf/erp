@@ -61,6 +61,9 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
 GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="") # Fixed case sensitivity
 
+# Confirmation password gate for restoring (un-cancelling) a cancelled invoice.
+INVOICE_RESTORE_PASSWORD = config("INVOICE_RESTORE_PASSWORD", default="demfiratkarven")
+
 ALLOWED_HOSTS = [
     ".vercel.app",
     "erp.demfirat.com",

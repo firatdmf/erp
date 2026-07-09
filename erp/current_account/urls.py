@@ -2,7 +2,7 @@ from django.urls import path
 
 from django.views.generic import TemplateView
 
-from . import views, views_invoice, views_payment, views_report, views_check, invoice_excel
+from . import views, views_invoice, views_payment, views_report, views_check, views_purchase, invoice_excel
 
 app_name = "current_account"
 
@@ -23,8 +23,13 @@ urlpatterns = [
     path("fatura/<int:pk>/excel/",   invoice_excel.invoice_excel,           name="invoice_excel"),
     path("fatura/<int:pk>/duzenle/", views_invoice.InvoiceEdit.as_view(),   name="invoice_edit"),
     path("fatura/<int:pk>/kes/",     views_invoice.InvoiceIssue.as_view(),  name="invoice_issue"),
-    path("fatura/<int:pk>/iptal/",   views_invoice.InvoiceCancel.as_view(), name="invoice_cancel"),
-    path("fatura/<int:pk>/sil/",     views_invoice.InvoiceDelete.as_view(), name="invoice_delete"),
+    path("fatura/<int:pk>/iptal/",   views_invoice.InvoiceCancel.as_view(),  name="invoice_cancel"),
+    path("fatura/<int:pk>/geri-al/", views_invoice.InvoiceRestore.as_view(), name="invoice_restore"),
+    path("fatura/<int:pk>/sil/",     views_invoice.InvoiceDelete.as_view(),  name="invoice_delete"),
+
+    # --- Purchase orders (warehouse intake, not a generic invoice view) ---
+    path("satin-alma/",              views_purchase.PurchaseOrderList.as_view(),   name="purchase_order_list"),
+    path("satin-alma/<int:pk>/",     views_purchase.PurchaseOrderDetail.as_view(), name="purchase_order_detail"),
 
     # --- Payment (Phase 3) ---
     path("tahsilat/",                  views_payment.PaymentList.as_view(),    name="payment_list"),

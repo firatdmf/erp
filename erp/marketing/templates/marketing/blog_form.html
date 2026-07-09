@@ -466,6 +466,7 @@
                 </div>
                 <div class="form-group">
                     <label>{% trans "Content (TR) * - Markdown supported" %}</label>
+                    {% include "marketing/_blog_html_upload.html" with lang="tr" %}
                     {{ form.content_tr }}
                 </div>
             </div>
@@ -482,6 +483,7 @@
                 </div>
                 <div class="form-group">
                     <label>{% trans "Content (EN) - Markdown supported" %}</label>
+                    {% include "marketing/_blog_html_upload.html" with lang="en" %}
                     {{ form.content_en }}
                 </div>
                 <div class="form-group">
@@ -502,6 +504,7 @@
                 </div>
                 <div class="form-group">
                     <label>{% trans "Content (RU) - Markdown supported" %}</label>
+                    {% include "marketing/_blog_html_upload.html" with lang="ru" %}
                     {{ form.content_ru }}
                 </div>
                 <div class="form-group">
@@ -522,6 +525,7 @@
                 </div>
                 <div class="form-group">
                     <label>{% trans "Content (PL) - Markdown supported" %}</label>
+                    {% include "marketing/_blog_html_upload.html" with lang="pl" %}
                     {{ form.content_pl }}
                 </div>
                 <div class="form-group">
@@ -530,6 +534,13 @@
                 </div>
             </div>
         </div>
+
+        <!-- Shared hidden inputs for the HTML-file / HTML-folder upload
+             control included above in every language tab (see
+             marketing/_blog_html_upload.html) — one pair total, reused
+             across tabs via currentHtmlUploadLang. -->
+        <input type="file" id="htmlFileInput" accept=".html,.htm" style="display:none" onchange="handleHtmlFilesSelect(this)">
+        <input type="file" id="htmlFolderInput" webkitdirectory multiple style="display:none" onchange="handleHtmlFilesSelect(this)">
 
         <!-- Advanced Options (Code Injection) -->
         <div class="form-section">
@@ -791,6 +802,80 @@
             toast.style.animation = 'fadeOut 0.3s ease';
             setTimeout(() => toast.remove(), 300);
         }, 3000);
+    }
+
+    // ── HTML file / folder upload → content textarea ───────────────────
+    // Lets staff pick an exported .html file (optionally its whole
+    // folder, so relative image paths like "word/media/image1.png"
+    // resolve) instead of hand-typing Markdown + copy-pasting one image
+    // URL at a time. The server uploads every local <img> it finds and
+    // rewrites the src, then hands back the ready-to-use HTML.
+    let currentHtmlUploadLang = null;
+
+    function triggerHtmlUpload(lang, mode) {
+        currentHtmlUploadLang = lang;
+        const input = document.getElementById(mode === 'folder' ? 'htmlFolderInput' : 'htmlFileInput');
+        input.value = '';   // reset so re-picking the same file/folder still fires 'change'
+        input.click();
+    }
+
+    async function handleHtmlFilesSelect(input) {
+        const lang = currentHtmlUploadLang;
+        currentHtmlUploadLang = null;
+        if (!lang || !input.files || !input.files.length) return;
+
+        const files = Array.from(input.files);
+        const htmlFile = files.find(f => /\.html?$/i.test(f.name));
+        if (!htmlFile) {
+            alert('{% trans "Seçilen dosya(lar) arasında bir .html dosyası bulunamadı." %}');
+            return;
+        }
+        const imgExtRe = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
+        const imageFiles = files.filter(f => f !== htmlFile &&
+            (imgExtRe.test(f.name) || /^image\//.test(f.type || '')));
+
+        const statusEl = document.getElementById('htmlUploadStatus_' + lang);
+        if (statusEl) statusEl.textContent = '{% trans "Yükleniyor…" %} (' + imageFiles.length + ' {% trans "görsel" %})';
+
+        const formData = new FormData();
+        formData.append('html_file', htmlFile, htmlFile.webkitRelativePath || htmlFile.name);
+        imageFiles.forEach(f => {
+            formData.append('images', f, f.webkitRelativePath || f.name);
+            formData.append('image_paths', f.webkitRelativePath || f.name);
+        });
+        formData.append('slug', document.getElementById('id_slug').value || 'temp');
+
+        try {
+            const response = await fetch('{% url "marketing:upload_blog_html" %}', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            });
+            const data = await response.json();
+            if (!data.success) {
+                alert('{% trans "Yüklenemedi" %}: ' + (data.error || ''));
+                if (statusEl) statusEl.textContent = '';
+                return;
+            }
+            const textarea = document.getElementById('id_content_' + lang);
+            if (textarea) {
+                if (textarea.value.trim() && !confirm('{% trans "Mevcut içeriğin üzerine yazılsın mı?" %}')) {
+                    if (statusEl) statusEl.textContent = '';
+                    return;
+                }
+                textarea.value = data.html;
+            }
+            let msg = '✅ ' + data.images_uploaded + '/' + data.images_total + ' {% trans "görsel yüklendi" %}';
+            if (data.warnings && data.warnings.length) {
+                msg += ' — ' + data.warnings.length + ' {% trans "uyarı" %}';
+                console.warn('HTML upload warnings:', data.warnings);
+            }
+            if (statusEl) statusEl.textContent = msg;
+            showToast(msg);
+        } catch (error) {
+            alert('{% trans "Hata" %}: ' + error.message);
+            if (statusEl) statusEl.textContent = '';
+        }
     }
 
     // Form submit with loading state

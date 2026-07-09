@@ -34,6 +34,24 @@ def assign_cari_code(sender, instance, **kwargs):
 
 
 # ---------------------------------------------------------------------------
+# 1b. Every supplier gets a cari — created the moment the supplier is,
+#     no matter which UI path created it (full form, sidebar partial,
+#     admin). Purchases (warehouse stock intake) post debt against it.
+# ---------------------------------------------------------------------------
+@receiver(post_save, sender="crm.Supplier")
+def create_cari_for_supplier(sender, instance, created, **kwargs):
+    if not created:
+        return
+    try:
+        from .services import get_or_create_cari_for_supplier
+        get_or_create_cari_for_supplier(instance)
+    except Exception:
+        # Never block supplier creation on cari bookkeeping — the helper
+        # is idempotent, so the first purchase will create it instead.
+        pass
+
+
+# ---------------------------------------------------------------------------
 # 2. Mirror to legacy accounting AR/AP
 # ---------------------------------------------------------------------------
 def _mirror_to_legacy(movement):

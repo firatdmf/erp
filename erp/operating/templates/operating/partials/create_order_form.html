@@ -625,6 +625,16 @@
     opts = opts || {};
     const el = document.getElementById('co-products-list');
     if (!orderItems.length) { el.innerHTML = '<div class="co-empty">{% trans "No products added yet" %}</div>'; return; }
+
+    // Every roll click re-renders the whole list, which destroys and
+    // recreates each product's scrollable tops list — without saving
+    // scrollTop here, picking a roll mid-scroll snaps that list back
+    // to the top every single time. Keyed by product index.
+    const rollScroll = {};
+    el.querySelectorAll('.co-rolls-list[data-roll-list-i]').forEach(function (n) {
+      rollScroll[n.dataset.rollListI] = n.scrollTop;
+    });
+
     el.innerHTML = orderItems.map((item, i) => {
       // First (i===0) is the newest item — flash it briefly when
       // selectProduct passed highlightFirst.
@@ -645,6 +655,11 @@
     }).join('');
     updateTotal();
     if (window.refreshStockState) refreshStockState();
+
+    el.querySelectorAll('.co-rolls-list[data-roll-list-i]').forEach(function (n) {
+      var saved = rollScroll[n.dataset.rollListI];
+      if (saved) n.scrollTop = saved;
+    });
   }
 
   // ── Top (roll) picking — replaces typing a quantity. A line's
@@ -747,7 +762,7 @@
         '<span style="font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;">({% trans "seçmek için tıklayın" %})</span>' +
       '</label>' +
       searchBlock +
-      '<div class="co-rolls-list" style="max-height:220px;overflow-y:auto;">' + rowsHtml + '</div>' +
+      '<div class="co-rolls-list" data-roll-list-i="' + i + '" style="max-height:220px;overflow-y:auto;">' + rowsHtml + '</div>' +
     '</div>';
   }
 

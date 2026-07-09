@@ -8,14 +8,17 @@ Invoice views (Phase 2).
     /cari/fatura/<id>/duzenle/          → InvoiceEdit (draft only)
     /cari/fatura/<id>/kes/              → InvoiceIssue
     /cari/fatura/<id>/iptal/            → InvoiceCancel
+    /cari/fatura/<id>/geri-al/          → InvoiceRestore
     /cari/fatura/<id>/sil/              → InvoiceDelete (draft only)
 
 The create/edit forms receive line items as JSON in the `items_json` field,
 so the dynamic add/remove UX stays simple and reliable.
 """
+import hmac
 import json
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -531,6 +534,38 @@ class InvoiceCancel(View):
         reason = request.POST.get("reason", "")
         invoice.cancel(user=request.user, reason=reason)
         messages.success(request, _g("Invoice cancelled."))
+        return redirect("current_account:invoice_detail", pk=invoice.pk)
+
+
+# ---------------------------------------------------------------------------
+# Restore (undo cancel)
+# ---------------------------------------------------------------------------
+@method_decorator(login_required, name="dispatch")
+class InvoiceRestore(View):
+    def post(self, request, pk):
+        invoice = get_object_or_404(Invoice, pk=pk)
+        if invoice.status != "cancelled":
+            messages.error(request, _g("Only cancelled invoices can be restored."))
+            return redirect("current_account:invoice_detail", pk=invoice.pk)
+
+        password = request.POST.get("password", "")
+        if not hmac.compare_digest(password, settings.INVOICE_RESTORE_PASSWORD):
+            messages.error(request, _g("Incorrect password. Invoice was not restored."))
+            return redirect("current_account:invoice_detail", pk=invoice.pk)
+
+        if invoice.order_id:
+            dup = invoice.order.invoices.exclude(status="cancelled").exclude(pk=invoice.pk).first()
+            if dup:
+                messages.warning(
+                    request,
+                    _g("This order already has an active invoice (%(num)s). Cancel or delete it before restoring this one.")
+                    % {"num": f"{dup.series}-{dup.number}"},
+                )
+                return redirect("current_account:invoice_detail", pk=invoice.pk)
+
+        reason = request.POST.get("reason", "")
+        invoice.restore(user=request.user, reason=reason)
+        messages.success(request, _g("Invoice restored."))
         return redirect("current_account:invoice_detail", pk=invoice.pk)
 
 

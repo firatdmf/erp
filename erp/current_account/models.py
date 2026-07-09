@@ -668,6 +668,39 @@ class Invoice(models.Model):
         self.status = "cancelled"
         self.save(update_fields=["status", "updated_at"])
 
+    def restore(self, user=None, reason=""):
+        """
+        Restore a cancelled invoice. Inverse of cancel(): posts a
+        counter-movement to the cancel-counter (re-establishing the
+        original posting) and puts status back into an active state.
+        Audit-safe — never deletes the cancel-counter movement.
+        """
+        if self.status != "cancelled":
+            raise ValidationError(f"Only cancelled invoices can be restored (current status: {self.status}).")
+
+        if not self.posted_movement_id:
+            self.status = "draft"
+            self.save(update_fields=["status", "updated_at"])
+            return
+
+        CariMovement.objects.create(
+            cari=self.cari,
+            book=self.book,
+            date=self.date,
+            amount=self.posted_movement.amount,
+            currency=self.currency,
+            movement_type="adjustment",
+            description=f"RESTORE — {self.get_type_display()} {self.series}-{self.number}"
+                        + (f" ({reason})" if reason else ""),
+            reference=f"RESTORE {self.series}-{self.number}",
+            source_type=ContentType.objects.get_for_model(Invoice),
+            source_id=self.pk,
+            created_by=user.member if user and hasattr(user, "member") else None,
+        )
+        self.status = "issued"
+        self.save(update_fields=["status", "updated_at"])
+        self.recompute_payment()
+
 
 # ---------------------------------------------------------------------------
 # 5. InvoiceItem — Fatura Kalemi

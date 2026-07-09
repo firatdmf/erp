@@ -1104,7 +1104,7 @@ msgid "Company / Contact"
 msgstr "Company / Contact"
 
 msgid "Company Name"
-msgstr "Company Name"
+msgstr "Şirket Adı"
 
 msgid "Complete"
 msgstr "Tamamla"
@@ -1287,7 +1287,7 @@ msgid "Due Date *"
 msgstr "Due Date *"
 
 msgid "Due date"
-msgstr "Due date"
+msgstr "Bitiş tarihi"
 
 msgid "Duration (min)"
 msgstr "Süre (dk)"
@@ -1317,7 +1317,7 @@ msgid "Email"
 msgstr "E-posta"
 
 msgid "Email addresses"
-msgstr "Email addresses"
+msgstr "E-posta adresleri"
 
 msgid "Est. Price"
 msgstr "Est. Price"
@@ -1440,7 +1440,7 @@ msgid "Items in Pack"
 msgstr "Items in Pack"
 
 msgid "Job Title"
-msgstr "Job Title"
+msgstr "Ünvan"
 
 msgid "KPI Dashboard"
 msgstr "KPI Dashboard"
@@ -1710,7 +1710,7 @@ msgid "Phone"
 msgstr "Telefon"
 
 msgid "Phone numbers"
-msgstr "Phone numbers"
+msgstr "Telefon numaraları"
 
 msgid "Photo"
 msgstr "Photo"
@@ -1749,7 +1749,7 @@ msgid "Profit"
 msgstr "Profit"
 
 msgid "Prospect"
-msgstr "Prospect"
+msgstr "Aday"
 
 msgid "Publish"
 msgstr "Publish"
@@ -1773,7 +1773,7 @@ msgid "Qty"
 msgstr "Adet"
 
 msgid "Qualified"
-msgstr "Qualified"
+msgstr "Nitelikli"
 
 msgid "Quick Search"
 msgstr "Quick Search"
@@ -1923,7 +1923,7 @@ msgid "Task Title"
 msgstr "Task Title"
 
 msgid "Task name"
-msgstr "Task name"
+msgstr "Görev adı"
 
 msgid "Tasks that are due"
 msgstr "Tasks that are due"
@@ -2283,7 +2283,7 @@ msgid "Sales"
 msgstr "Satışlar"
 
 msgid "Purchases"
-msgstr "Satın Almalar"
+msgstr "Alımlar"
 
 msgid "Add Product"
 msgstr "Ürün Ekle"
@@ -4828,6 +4828,13 @@ msgid ""
 msgstr ""
 "Faturayı iptal etmek istediğine emin misin? Ters hareket oluşturulacak."
 
+msgid ""
+"Are you sure you want to restore this invoice? A new ledger movement will be"
+" created."
+msgstr ""
+"Faturayı geri yüklemek istediğine emin misin? Yeni bir cari hareketi "
+"oluşturulacak."
+
 msgid "Are you sure you want to delete/deactivate this account?"
 msgstr "Bu cari kartını silmek/pasifleştirmek istediğine emin misin?"
 
@@ -5378,6 +5385,9 @@ msgstr "Fatura kesildi: %(series)s-%(number)s"
 msgid "Invoice no, check no, etc."
 msgstr "Fatura no, çek no, vs."
 
+msgid "Invoice restored."
+msgstr "Fatura geri yüklendi."
+
 msgid "Invoice updated."
 msgstr "Fatura güncellendi."
 
@@ -5588,6 +5598,9 @@ msgstr ""
 
 msgid "Only Exceeded"
 msgstr "Sadece Limit Aşanlar"
+
+msgid "Only cancelled invoices can be restored."
+msgstr "Yalnızca iptal edilmiş faturalar geri yüklenebilir."
 
 msgid "Only draft invoices can be deleted. Cancel issued invoices instead."
 msgstr "Yalnızca taslak faturalar silinebilir. Kesilmiş faturayı iptal et."
@@ -7515,19 +7528,19 @@ msgid "records"
 msgstr "kayıt"
 
 msgid "Add another note"
-msgstr ""
+msgstr "Başka bir not ekle"
 
 msgid "Add another task"
-msgstr ""
+msgstr "Başka bir görev ekle"
 
 msgid "Amount to be Paid"
 msgstr ""
 
 msgid "Attach notes"
-msgstr ""
+msgstr "Not ekle"
 
 msgid "Attach tasks"
-msgstr ""
+msgstr "Görev ekle"
 
 msgid "Consignee"
 msgstr ""
@@ -7566,10 +7579,10 @@ msgid "Product name or description"
 msgstr ""
 
 msgid "Remove all notes"
-msgstr ""
+msgstr "Tüm notları kaldır"
 
 msgid "Remove all tasks"
-msgstr ""
+msgstr "Tüm görevleri kaldır"
 
 msgid "Scenario"
 msgstr ""
@@ -7582,6 +7595,15 @@ msgid ""
 "This order already has an invoice (%(num)s). Cancel or delete it before "
 "creating a new one."
 msgstr ""
+"Bu siparişin zaten bir faturası var (%(num)s). Yenisini oluşturmadan önce "
+"iptal et veya sil."
+
+msgid ""
+"This order already has an active invoice (%(num)s). Cancel or delete it "
+"before restoring this one."
+msgstr ""
+"Bu siparişin zaten aktif bir faturası var (%(num)s). Bunu geri yüklemeden "
+"önce diğerini iptal et veya sil."
 
 msgid "Total Value"
 msgstr ""
@@ -7617,3 +7639,228 @@ msgstr "Excel'e Aktar"
 #: operating/templates/operating/warehouse_detail.html:0
 msgid "Download the current list as an Excel file"
 msgstr "Mevcut listeyi Excel dosyası olarak indir"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Purchase order"
+msgstr "Satın alma siparişi"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Purchased products"
+msgstr "Satın alınan ürünler"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Physical tops received"
+msgstr "Gelen fiziksel toplar"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "No tops linked to this line yet."
+msgstr "Bu kaleme henüz top bağlanmadı."
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Back to purchases"
+msgstr "Alımlara dön"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Accounting record"
+msgstr "Muhasebe kaydı"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "View invoice"
+msgstr "Faturayı görüntüle"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Total (listed)"
+msgstr "Toplam (listelenen)"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "No purchases yet"
+msgstr "Henüz alım yok"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid ""
+"Purchases are created automatically when new stock is added to a warehouse "
+"with a supplier selected."
+msgstr ""
+"Bir depoya tedarikçi seçilerek yeni stok eklendiğinde alımlar otomatik "
+"oluşturulur."
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Purchase No"
+msgstr "Alım No"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid ""
+"What was bought, from which supplier, and which physical tops arrived — not "
+"a generic invoice view."
+msgstr ""
+"Ne alındığı, hangi tedarikçiden ve hangi fiziksel topların geldiği — genel "
+"fatura görünümü değil."
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "product"
+msgstr "ürün"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "All suppliers"
+msgstr "Tüm tedarikçiler"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "All statuses"
+msgstr "Tüm durumlar"
+
+#: current_account/templates/current_account/purchase_order_list.html
+#: current_account/templates/current_account/purchase_order_detail.html
+msgid "Search supplier…"
+msgstr "Tedarikçi ara…"
+
+#: current_account/templates/current_account/invoice_detail.html
+#: current_account/templates/current_account/cari_detail.html
+#: current_account/templates/current_account/_cari_statement_results.html
+#: current_account/views_invoice.py
+msgid "by %(name)s"
+msgstr "%(name)s tarafından"
+
+#: current_account/templates/current_account/invoice_detail.html
+#: current_account/templates/current_account/cari_detail.html
+#: current_account/templates/current_account/_cari_statement_results.html
+#: current_account/views_invoice.py
+msgid "Enter the restore password to un-cancel this invoice:"
+msgstr "Bu faturayı geri almak için şifreyi girin:"
+
+#: current_account/templates/current_account/invoice_detail.html
+#: current_account/templates/current_account/cari_detail.html
+#: current_account/templates/current_account/_cari_statement_results.html
+#: current_account/views_invoice.py
+msgid "Incorrect password. Invoice was not restored."
+msgstr "Şifre yanlış. Fatura geri alınmadı."
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "Existing variants on this product:"
+msgstr "Bu üründe kayıtlı varyantlar:"
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "This product has no variants yet."
+msgstr "Bu üründe henüz varyant yok."
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "MEVCUT"
+msgstr "MEVCUT"
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "YENİ"
+msgstr "YENİ"
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "will add stock to this variant"
+msgstr "bu varyanta stok eklenecek"
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "will create a new variant"
+msgstr "yeni bir varyant oluşturulacak"
+
+#: operating/templates/operating/warehouse_detail.html:0
+msgid "Click to fill a variant row with this"
+msgstr "Bir varyant satırını bununla doldurmak için tıklayın"
+
+#: erp/templates/base.html:0
+msgid "Open a cari account"
+msgstr "Cari hesabı aç"
+
+#: erp/templates/base.html:0
+msgid "A cari account is automatically created for this record."
+msgstr "Bu kayıt için otomatik olarak bir cari hesap oluşturulur."
+
+#: erp/templates/base.html:0
+msgid "Send Follow-up Emails"
+msgstr "Takip E-postaları Gönder"
+
+#: erp/templates/base.html:0
+msgid "Automatically send 5 follow-up emails over 54 days"
+msgstr "54 gün boyunca otomatik olarak 5 takip e-postası gönderilir"
+
+#: erp/templates/base.html:0
+msgid "Attach an item"
+msgstr "Bir öğe ekle"
+
+#: erp/templates/base.html:0
+msgid "Attach a contact"
+msgstr "Bir kişi ekle"
+
+#: erp/templates/base.html:0
+msgid "Remove this contact"
+msgstr "Bu kişiyi kaldır"
+
+#: erp/templates/base.html:0
+msgid "Search contacts..."
+msgstr "Kişi ara..."
+
+#: erp/templates/base.html:0
+msgid "Add new contact"
+msgstr "Yeni kişi ekle"
+
+#: erp/templates/base.html:0
+msgid "Attach a note"
+msgstr "Bir not ekle"
+
+#: erp/templates/base.html:0
+msgid "Remove this note"
+msgstr "Bu notu kaldır"
+
+#: erp/templates/base.html:0
+msgid "Attach a task"
+msgstr "Bir görev ekle"
+
+#: erp/templates/base.html:0
+msgid "Remove this task"
+msgstr "Bu görevi kaldır"
+
+#: erp/templates/base.html:0
+msgid "Create company"
+msgstr "Şirket oluştur"
+
+#: erp/templates/base.html:0
+msgid "Creating..."
+msgstr "Oluşturuluyor..."
+
+#: erp/templates/base.html:0
+msgid "Contact created successfully!"
+msgstr "Kişi başarıyla oluşturuldu!"
+
+#: erp/templates/base.html:0
+msgid "Failed to create contact"
+msgstr "Kişi oluşturulamadı"
+
+#: erp/templates/base.html:0
+msgid "An error occurred while creating the contact."
+msgstr "Kişi oluşturulurken bir hata oluştu."
+
+#: erp/templates/base.html:0
+msgid "created successfully!"
+msgstr "başarıyla oluşturuldu!"
+
+#: erp/templates/base.html:0
+msgid "Failed to create company"
+msgstr "Şirket oluşturulamadı"
+
+#: erp/templates/base.html:0
+msgid "An error occurred while creating the company."
+msgstr "Şirket oluşturulurken bir hata oluştu."
+
+#: current_account/templates/current_account/cari_list.html
+msgid "Adjust filters to see other accounts."
+msgstr "Diğer hesapları görmek için filtreleri değiştirin."

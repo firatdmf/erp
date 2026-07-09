@@ -144,11 +144,6 @@
         <span class="m-drawer-label">{% trans "All Accounts" %}</span>
         <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
       </a>
-      <a class="m-drawer-item" href="{% url 'current_account:cari_create' %}">
-        <span class="m-drawer-ico"><i data-lucide="user-plus"></i></span>
-        <span class="m-drawer-label">{% trans "New Account" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
       <a class="m-drawer-item" href="{% url 'current_account:invoice_list' %}">
         <span class="m-drawer-ico"><i data-lucide="file-text"></i></span>
         <span class="m-drawer-label">{% trans "All Invoices" %}</span>
@@ -314,12 +309,17 @@
 
     <div class="m-drawer-section">
       <div class="m-drawer-section-title">{% trans "Procurement" %}</div>
+      <a class="m-drawer-item" href="{% url 'current_account:invoice_list' %}?type=purchase">
+        <span class="m-drawer-ico"><i data-lucide="package-plus"></i></span>
+        <span class="m-drawer-label">{% trans "Purchases" %}</span>
+        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
       <a class="m-drawer-item" href="{% url 'procurement:request_list' %}">
         <span class="m-drawer-ico"><i data-lucide="file-text"></i></span>
         <span class="m-drawer-label">{% trans "Purchase requests" %}</span>
         <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
       </a>
-      <a class="m-drawer-item" href="{% url 'procurement:order_list' %}">
+      <a class="m-drawer-item" href="{% url 'current_account:purchase_order_list' %}">
         <span class="m-drawer-ico"><i data-lucide="receipt"></i></span>
         <span class="m-drawer-label">{% trans "Purchase orders" %}</span>
         <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>

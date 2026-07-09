@@ -1,0 +1,15 @@
+{% load i18n %}
+<div class="html-upload-row" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+  <button type="button" class="btn-html-upload" onclick="triggerHtmlUpload('{{ lang }}', 'file')"
+          style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; background:#fff; border:1px solid #d1d5db; border-radius:8px; font-size:0.82rem; font-weight:600; color:#374151; cursor:pointer;">
+    <i class="fas fa-file-code"></i> {% trans "HTML dosyası seç" %}
+  </button>
+  <button type="button" class="btn-html-upload" onclick="triggerHtmlUpload('{{ lang }}', 'folder')"
+          style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; background:#fff; border:1px solid #d1d5db; border-radius:8px; font-size:0.82rem; font-weight:600; color:#374151; cursor:pointer;">
+    <i class="fas fa-folder-open"></i> {% trans "Klasör seç (HTML + Görseller)" %}
+  </button>
+  <span id="htmlUploadStatus_{{ lang }}" style="font-size:0.8rem; color:#6b7280;"></span>
+</div>
+<p style="color:#6b7280; font-size:0.8rem; margin:-4px 0 8px;">
+  {% trans "İçindeki görsellere göreli yol (src) ile bağlı bir HTML dosyası seçin — görseller otomatik yüklenip bağlantılar güncellenir. Görseller ayrı bir alt klasördeyse (örn. Word'den dışa aktarımda olduğu gibi) \"Klasör seç\" ile ikisini birlikte yükleyin." %}
+</p>

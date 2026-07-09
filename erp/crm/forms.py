@@ -59,6 +59,10 @@ class ContactCreateForm(ModelForm):
         widget=forms.HiddenInput(attrs={"id": "task_member_id"})
     )
 
+    create_cari = forms.BooleanField(
+        required=False, initial=True, label="Cari hesabı aç"
+    )
+
     # Multi-item payloads from the Add-Contact sidebar (JSON arrays).
     # notes_data: list of strings.
     # tasks_data: list of {name, due_date, description, member}.
@@ -329,6 +333,10 @@ class CompanyForm(ModelForm):
     )
     task_description = forms.CharField(
         widget=forms.Textarea, label="Task Description", required=False
+    )
+
+    create_cari = forms.BooleanField(
+        required=False, initial=True, label="Cari hesabı aç"
     )
 
     def __init__(self, *args, **kwargs):

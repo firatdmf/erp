@@ -48,6 +48,7 @@ urlpatterns = [
     path("blog_edit/<int:pk>/",views.BlogEdit.as_view(),name="blog_edit"),
     path("blog_delete/<int:pk>/",views.BlogDelete.as_view(),name="blog_delete"),
     path("api/upload_blog_image/",views.upload_blog_image,name="upload_blog_image"),
+    path("api/upload_blog_html/",views.upload_blog_html,name="upload_blog_html"),
     path("api/delete_blog_image/",views.delete_blog_image,name="delete_blog_image"),
     path("api/get_blog_posts/",views.get_blog_posts,name="get_blog_posts"),
     path("api/get_blog_post/<slug:slug>/",views.get_blog_post,name="get_blog_post"),

@@ -783,12 +783,6 @@
                   <span>{% trans "All Accounts" %}</span>
                 </a>
               </li>
-              <li>
-                <a href="{% url 'current_account:cari_create' %}">
-                  <i class="fas fa-user-plus" aria-hidden="true"></i>
-                  <span>{% trans "New Account" %}</span>
-                </a>
-              </li>
             </ul>
           </div>
           <div class="add-menu-section">
@@ -1415,7 +1409,7 @@
     <div class="sidebar-modal" onclick="event.stopPropagation();">
       <div class="sidebar-header">
         <button class="sidebar-close" onclick="closeCompanySidebar()">
-          <i class="fas fa-times"></i> Close
+          <i class="fas fa-times"></i> {% trans "Close" %}
         </button>
         <div class="sidebar-title">
           <i class="fas fa-building"></i>
@@ -1426,7 +1420,7 @@
         <form id="companyForm" method="post" onsubmit="submitCompanyForm(event); return false;">
           {% csrf_token %}
           <div class="form-group">
-            <label for="id_company_name">Company Name <span style="color: #ef4444;">*</span></label>
+            <label for="id_company_name">{% trans "Company Name" %} <span style="color: #ef4444;">*</span></label>
             <input type="text" name="name" id="id_company_name" class="form-input" required autofocus
               hx-get="{% url 'crm:check_company_duplicate' %}" hx-trigger="keyup changed delay:500ms"
               hx-target="#company_name_error">
@@ -1483,13 +1477,24 @@
             </select>
           </div>
 
+          <!-- Cari Account Option -->
+          <div class="email-followup-option">
+            <div class="email-checkbox-wrapper">
+              <input type="checkbox" name="create_cari" id="company_create_cari" class="email-checkbox" checked>
+              <label for="company_create_cari" class="email-checkbox-label">
+                <span class="email-checkbox-title">💳 {% trans "Open a cari account" %}</span>
+                <span class="email-checkbox-description">{% trans "A cari account is automatically created for this record." %}</span>
+              </label>
+            </div>
+          </div>
+
           <!-- Email Follow-up Option -->
           <div class="email-followup-option">
             <div class="email-checkbox-wrapper">
               <input type="checkbox" name="send_followup_emails" id="send_followup_emails" class="email-checkbox">
               <label for="send_followup_emails" class="email-checkbox-label">
-                <span class="email-checkbox-title">📧 Send Follow-up Emails</span>
-                <span class="email-checkbox-description">Automatically send 5 follow-up emails over 54 days</span>
+                <span class="email-checkbox-title">📧 {% trans "Send Follow-up Emails" %}</span>
+                <span class="email-checkbox-description">{% trans "Automatically send 5 follow-up emails over 54 days" %}</span>
               </label>
             </div>
           </div>
@@ -1498,17 +1503,17 @@
           <div class="attach-section">
             <div class="attach-header">
               <i class="fas fa-paperclip"></i>
-              <span>Attach an item</span>
+              <span>{% trans "Attach an item" %}</span>
             </div>
             <div class="attach-buttons">
               <button type="button" class="attach-btn" onclick="toggleAttachment('companyContact')">
-                <i class="fas fa-user"></i> Contact
+                <i class="fas fa-user"></i> {% trans "Contact" %}
               </button>
               <button type="button" class="attach-btn" onclick="toggleAttachment('companyNote')">
-                <i class="fas fa-file-text"></i> Note
+                <i class="fas fa-file-text"></i> {% trans "Note" %}
               </button>
               <button type="button" class="attach-btn" onclick="toggleAttachment('companyTask')">
-                <i class="fas fa-check-circle"></i> Task
+                <i class="fas fa-check-circle"></i> {% trans "Task" %}
               </button>
             </div>
           </div>
@@ -1516,17 +1521,17 @@
           <!-- Contact attachment -->
           <div id="companyContactSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fas fa-user"></i> Attach a contact</span>
+              <span><i class="fas fa-user"></i> {% trans "Attach a contact" %}</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('companyContact', {clear: true})">
-                Remove this contact
+                {% trans "Remove this contact" %}
               </button>
             </div>
             <div class="contact-selector-wrapper">
               <div class="contact-search-box">
-                <input type="text" id="company_contact_search" class="form-input" placeholder="Search contacts..."
+                <input type="text" id="company_contact_search" class="form-input" placeholder="{% trans 'Search contacts...' %}"
                   autocomplete="off" />
                 <button type="button" class="add-contact-icon-btn" onclick="openContactSidebarFromCompany()"
-                  title="Add new contact">
+                  title="{% trans 'Add new contact' %}">
                   <i class="fas fa-plus"></i>
                 </button>
               </div>
@@ -1539,9 +1544,9 @@
           <!-- Note attachment -->
           <div id="companyNoteSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fas fa-file-text"></i> Attach a note</span>
+              <span><i class="fas fa-file-text"></i> {% trans "Attach a note" %}</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('companyNote', {clear: true})">
-                Remove this note
+                {% trans "Remove this note" %}
               </button>
             </div>
             <div class="form-group">
@@ -1553,9 +1558,9 @@
           <!-- Task attachment -->
           <div id="companyTaskSection" class="attachment-section" style="display: none;">
             <div class="attachment-header">
-              <span><i class="fas fa-check-circle"></i> Attach a task</span>
+              <span><i class="fas fa-check-circle"></i> {% trans "Attach a task" %}</span>
               <button type="button" class="remove-attachment" onclick="toggleAttachment('companyTask', {clear: true})">
-                Remove this task
+                {% trans "Remove this task" %}
               </button>
             </div>
             <div class="form-row">
@@ -1585,12 +1590,12 @@
 
           <div class="sidebar-footer">
             <button type="submit" id="companySubmitBtn" class="btn btn-primary">
-              <span class="btn-text">Create company</span>
+              <span class="btn-text">{% trans "Create company" %}</span>
               <span class="btn-spinner" style="display: none;">
                 <svg class="spinner-icon" viewBox="0 0 50 50">
                   <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
                 </svg>
-                Creating...
+                {% trans "Creating..." %}
               </span>
             </button>
             <button type="button" class="btn btn-secondary" onclick="closeCompanySidebar()">{% trans "Cancel" %}</button>
@@ -1605,7 +1610,7 @@
     <div class="sidebar-modal" onclick="event.stopPropagation();">
       <div class="sidebar-header">
         <button class="sidebar-close" onclick="closeMainContactSidebar()">
-          <i class="fas fa-times"></i> Close
+          <i class="fas fa-times"></i> {% trans "Close" %}
         </button>
         <div class="sidebar-title">
           <i class="fas fa-user"></i>
@@ -1616,7 +1621,7 @@
         <form id="mainContactForm" method="post" onsubmit="submitMainContactForm(event); return false;">
           {% csrf_token %}
           <div class="form-group">
-            <label for="id_main_contact_name">Name <span style="color: #ef4444;">*</span></label>
+            <label for="id_main_contact_name">{% trans "Name" %} <span style="color: #ef4444;">*</span></label>
             <input type="text" name="name" id="id_main_contact_name" class="form-input" required autofocus
               hx-get="{% url 'crm:check_contact_duplicate' %}" hx-trigger="keyup changed delay:500ms"
               hx-target="#contact_name_error">
@@ -1645,18 +1650,29 @@
             <textarea name="address" id="id_main_contact_address" class="form-textarea" rows="2"></textarea>
           </div>
 
+          <!-- Cari Account Option -->
+          <div class="email-followup-option">
+            <div class="email-checkbox-wrapper">
+              <input type="checkbox" name="create_cari" id="main_contact_create_cari" class="email-checkbox" checked>
+              <label for="main_contact_create_cari" class="email-checkbox-label">
+                <span class="email-checkbox-title">💳 {% trans "Open a cari account" %}</span>
+                <span class="email-checkbox-description">{% trans "A cari account is automatically created for this record." %}</span>
+              </label>
+            </div>
+          </div>
+
           <!-- Attach an item section -->
           <div class="attach-section">
             <div class="attach-header">
               <i class="fas fa-paperclip"></i>
-              <span>Attach an item</span>
+              <span>{% trans "Attach an item" %}</span>
             </div>
             <div class="attach-buttons">
               <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactNote')">
-                <i class="fas fa-file-text"></i> Note
+                <i class="fas fa-file-text"></i> {% trans "Note" %}
               </button>
               <button type="button" class="attach-btn" onclick="toggleAttachment('mainContactTask')">
-                <i class="fas fa-check-circle"></i> Task
+                <i class="fas fa-check-circle"></i> {% trans "Task" %}
               </button>
             </div>
           </div>
@@ -1698,12 +1714,12 @@
 
           <div class="sidebar-footer">
             <button type="submit" id="mainContactSubmitBtn" class="btn btn-primary">
-              <span class="btn-text">Add Contact</span>
+              <span class="btn-text">{% trans "Add Contact" %}</span>
               <span class="btn-spinner" style="display: none;">
                 <svg class="spinner-icon" viewBox="0 0 50 50">
                   <circle class="spinner-path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
                 </svg>
-                Creating...
+                {% trans "Creating..." %}
               </span>
             </button>
             <button type="button" class="btn btn-secondary" onclick="closeMainContactSidebar()">{% trans "Cancel" %}</button>
@@ -1754,7 +1770,7 @@
     <div class="sidebar-modal" onclick="event.stopPropagation()">
       <div class="sidebar-header">
         <button class="sidebar-close" onclick="closeContactSidebar()">
-          <i class="fas fa-arrow-left"></i> Back
+          <i class="fas fa-arrow-left"></i> {% trans "Back" %}
         </button>
         <div class="sidebar-title">
           <i class="fas fa-user"></i>
@@ -1765,7 +1781,7 @@
         <form id="contactForm" method="post" onsubmit="submitContactForm(event); return false;">
           {% csrf_token %}
           <div class="form-group">
-            <label for="id_contact_name">Name <span style="color: #ef4444;">*</span></label>
+            <label for="id_contact_name">{% trans "Name" %} <span style="color: #ef4444;">*</span></label>
             <input type="text" name="name" id="id_contact_name" class="form-input" required autofocus
               hx-get="{% url 'crm:check_contact_duplicate' %}?input_id=id_contact_name"
               hx-trigger="keyup changed delay:500ms" hx-target="#nested_contact_name_error">
@@ -1792,6 +1808,17 @@
           <div class="form-group">
             <label for="id_contact_address">{% trans "Address" %}</label>
             <textarea name="address" id="id_contact_address" class="form-textarea" rows="2"></textarea>
+          </div>
+
+          <!-- Cari Account Option -->
+          <div class="email-followup-option">
+            <div class="email-checkbox-wrapper">
+              <input type="checkbox" name="create_cari" id="nested_contact_create_cari" class="email-checkbox" checked>
+              <label for="nested_contact_create_cari" class="email-checkbox-label">
+                <span class="email-checkbox-title">💳 {% trans "Open a cari account" %}</span>
+                <span class="email-checkbox-description">{% trans "A cari account is automatically created for this record." %}</span>
+              </label>
+            </div>
           </div>
 
           <div class="sidebar-footer">
@@ -2737,7 +2764,7 @@
         .then(data => {
           if (data.success) {
             // Show success toast
-            toastMessage.textContent = `Company "${data.company_name || ''}" created successfully!`;
+            toastMessage.textContent = `{% trans "Company" %} "${data.company_name || ''}" {% trans "created successfully!" %}`;
             toast.classList.add('show');
 
             // Hide toast after 3 seconds
@@ -2760,7 +2787,7 @@
             btnSpinner.style.display = 'none';
             submitBtn.disabled = false;
             // Show errors
-            alert('Error: ' + (data.error || 'Failed to create company'));
+            alert('{% trans "Error" %}: ' + (data.error || '{% trans "Failed to create company" %}'));
           }
         })
         .catch(error => {
@@ -2769,7 +2796,7 @@
           btnSpinner.style.display = 'none';
           submitBtn.disabled = false;
           console.error('Error:', error);
-          alert('An error occurred while creating the company.');
+          alert('{% trans "An error occurred while creating the company." %}');
         });
     }
 
@@ -2930,7 +2957,7 @@
         .then(data => {
           if (data.success) {
             // Show success toast
-            toastMessage.textContent = `Contact "${data.contact.name || ''}" created successfully!`;
+            toastMessage.textContent = `{% trans "Contact" %} "${data.contact.name || ''}" {% trans "created successfully!" %}`;
             toast.classList.add('show');
 
             // Hide toast after 3 seconds
@@ -2953,7 +2980,7 @@
             btnSpinner.style.display = 'none';
             submitBtn.disabled = false;
             // Show errors
-            alert('Error: ' + (data.errors || 'Failed to create contact'));
+            alert('{% trans "Error" %}: ' + (data.errors || '{% trans "Failed to create contact" %}'));
           }
         })
         .catch(error => {
@@ -2962,7 +2989,7 @@
           btnSpinner.style.display = 'none';
           submitBtn.disabled = false;
           console.error('Error:', error);
-          alert('An error occurred while creating the contact.');
+          alert('{% trans "An error occurred while creating the contact." %}');
         });
     }
 
@@ -3313,7 +3340,7 @@
             gap: 6px;
           " onclick="removeCompanyContact()" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
             <i class="fas fa-times"></i>
-            Remove
+            {% trans "Remove" %}
           </button>
         `;
       companySelectedContact.classList.add('active');
@@ -3371,15 +3398,15 @@
             );
 
             // Show success message
-            alert('Contact created successfully!');
+            alert('{% trans "Contact created successfully!" %}');
           } else {
             // Show errors
-            alert('Error: ' + (data.errors || 'Failed to create contact'));
+            alert('{% trans "Error" %}: ' + (data.errors || '{% trans "Failed to create contact" %}'));
           }
         })
         .catch(error => {
           console.error('Error:', error);
-          alert('An error occurred while creating the contact.');
+          alert('{% trans "An error occurred while creating the contact." %}');
         });
     }
 

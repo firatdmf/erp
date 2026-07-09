@@ -1022,6 +1022,16 @@ class WarehouseProductRoll(models.Model):
         blank=True, null=True,
         help_text="Raw OCR text — useful for debugging misreads",
     )
+    # The purchase-invoice LINE this physical top was received against —
+    # lets the purchase-order detail page drill all the way down from
+    # "we bought 115m of seta grey from deneme" to the exact tops that
+    # arrived. Set at intake time (WarehouseManualAdd); SET_NULL so
+    # deleting/cancelling an invoice never deletes real warehouse stock.
+    purchase_invoice_item = models.ForeignKey(
+        "current_account.InvoiceItem",
+        on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="warehouse_rolls",
+    )
 
     class Meta:
         ordering = ["-scanned_at"]

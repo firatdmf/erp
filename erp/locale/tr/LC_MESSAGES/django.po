@@ -7864,3 +7864,53 @@ msgstr "Şirket oluşturulurken bir hata oluştu."
 #: current_account/templates/current_account/cari_list.html
 msgid "Adjust filters to see other accounts."
 msgstr "Diğer hesapları görmek için filtreleri değiştirin."
+
+#: current_account/views_invoice.py
+#: current_account/templates/current_account/cari_detail.html
+#: operating/templates/operating/order_detail.html
+msgid "An invoice can only be created after the order is completed (shipped)."
+msgstr ""
+"Fatura, ancak sipariş tamamlandıktan (gönderildikten) sonra kesilebilir."
+
+#: current_account/views_invoice.py
+#: current_account/templates/current_account/cari_detail.html
+#: operating/templates/operating/order_detail.html
+msgid ""
+"Linked order #%(num)s was cancelled as well — its cari posting was reversed "
+"and any shipped stock restored."
+msgstr ""
+"Bağlı sipariş #%(num)s de iptal edildi — cari kaydı geri alındı ve "
+"gönderilmiş stok varsa geri yüklendi."
+
+#: current_account/views_invoice.py
+#: current_account/templates/current_account/cari_detail.html
+#: operating/templates/operating/order_detail.html
+msgid ""
+"Invoice cancelled, but the linked order #%(num)s could not be cancelled "
+"automatically (%(code)s)."
+msgstr ""
+"Fatura iptal edildi ancak bağlı sipariş #%(num)s otomatik olarak iptal "
+"edilemedi (%(code)s)."
+
+#: current_account/views_invoice.py
+#: current_account/templates/current_account/cari_detail.html
+#: operating/templates/operating/order_detail.html
+msgid "Invoice after completion"
+msgstr "Fatura tamamlanınca"
+
+#: current_account/views_invoice.py
+#: current_account/templates/current_account/cari_detail.html
+#: operating/templates/operating/order_detail.html
+msgid "Pending order — already reflected on the balance"
+msgstr "Bekleyen sipariş — bakiyeye zaten yansıdı"
+
+#: operating/templates/operating/order_detail.html
+msgid ""
+"The invoice is issued automatically the moment the order is completed "
+"(shipped)."
+msgstr ""
+"Fatura, sipariş tamamlandığı (gönderildiği) anda otomatik olarak kesilir."
+
+#: operating/templates/operating/order_detail.html
+msgid "Invoice auto-issues on completion"
+msgstr "Fatura tamamlanınca otomatik kesilir"

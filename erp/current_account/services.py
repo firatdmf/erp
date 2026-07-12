@@ -204,6 +204,75 @@ def create_purchase_invoice_for_intake(supplier, lines, *, member=None, user=Non
     return inv
 
 
+def create_invoice_for_order(order, *, user=None):
+    """Auto-issue the sales invoice for a completed (shipped) order.
+
+    Called from apply_order_status_change the moment an order enters a
+    shipped status — the invoice is the paper trail of the completed
+    sale. Lines mirror the order items 1:1 with 0% tax so the invoice
+    total equals the order total, i.e. exactly the receivable the
+    order_sale movement already posted (issue() posts a 0-amount marker
+    for order-linked invoices — no double counting).
+
+    Idempotent: an order that already has a non-cancelled invoice is
+    left alone (re-ship after un-ship creates a fresh one only because
+    un-shipping cancels the old). Returns the Invoice or None.
+    """
+    from .models import Invoice, InvoiceItem
+
+    if not order or not order.cari_id:
+        return None
+    if order.invoices.exclude(status="cancelled").exists():
+        return None
+    try:
+        total = Decimal(str(order.total_value() or 0))
+    except Exception:
+        total = Decimal("0")
+    if total <= 0:
+        return None
+
+    cari = order.cari
+    book = cari.book or get_default_book()
+    settings_obj = CariSettings.for_book(book)
+    member = getattr(user, "member", None) if user else None
+    today = date.today()
+    from datetime import timedelta
+    term_days = cari.payment_term_days or 30
+
+    with transaction.atomic():
+        inv = Invoice.objects.create(
+            cari=cari, book=book,
+            series="FAT",
+            number=settings_obj.next_invoice_number(series="FAT"),
+            type="sales", status="draft",
+            date=today, due_date=today + timedelta(days=term_days),
+            currency=cari.default_currency or _resolve_currency(order),
+            order=order,
+            created_by=member,
+        )
+        for i, it in enumerate(order.items.all(), start=1):
+            desc = ""
+            if getattr(it, "product_variant_id", None) and it.product_variant:
+                desc = f"{it.product.title} [{it.product_variant.variant_sku}]"
+            elif getattr(it, "product_id", None) and it.product:
+                desc = it.product.title
+            InvoiceItem.objects.create(
+                invoice=inv, line_no=i,
+                product=it.product,
+                variant=getattr(it, "product_variant", None),
+                description=(desc or "Item")[:300],
+                quantity=it.quantity or Decimal("0"),
+                unit="mt",
+                unit_price=it.price or Decimal("0"),
+                discount_rate=Decimal("0"),
+                tax_rate=Decimal("0"),
+            )
+        inv.recompute_totals(save=True)
+        inv.refresh_from_db()
+        inv.issue(user=user)
+    return inv
+
+
 # ---------------------------------------------------------------------------
 # Movements — keep the order ↔ movement mapping atomic + idempotent.
 # ---------------------------------------------------------------------------
@@ -249,8 +318,10 @@ def post_order_movement(order, *, member=None):
 
     existing = _order_movement(order)
 
-    if total <= 0:
-        # An empty order shouldn't sit on the ledger — clean it up.
+    # A cancelled order must never carry a receivable — item edits fire
+    # the OrderItem sync signal regardless of status, and without this
+    # guard such an edit would silently resurrect the reversed movement.
+    if total <= 0 or getattr(order, "order_status", "") == "cancelled":
         if existing:
             existing.delete()
             cari.recompute_balance(save=True)

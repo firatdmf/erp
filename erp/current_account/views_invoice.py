@@ -196,6 +196,17 @@ class InvoiceCreate(View):
                 .filter(pk=int(order_id)).first()
             )
             if prefilled_order:
+                # An order is only invoiceable once it's actually gone
+                # out the door — before that the receivable can still
+                # change (or the whole order be cancelled), so the
+                # invoice would be fiction.
+                from operating.views_warehouse import SHIPPED_CLASS
+                if prefilled_order.order_status not in SHIPPED_CLASS:
+                    messages.warning(
+                        request,
+                        _g("An invoice can only be created after the order is completed (shipped)."),
+                    )
+                    return redirect("operating:order_detail", pk=prefilled_order.pk)
                 # Block duplicate invoices — if this order already has a
                 # non-cancelled invoice, bounce back to the order detail
                 # with an explanatory message. The user must cancel or
@@ -293,10 +304,16 @@ class InvoiceCreate(View):
         if order_id and str(order_id).isdigit():
             from operating.models import Order
             order_obj = Order.objects.filter(pk=int(order_id)).first()
-            # Server-side duplicate guard — same check the GET path
-            # runs, so a stale form submit can't slip a second invoice
-            # past us.
+            # Server-side guards — same checks the GET path runs, so a
+            # stale form submit can't slip past us.
             if order_obj:
+                from operating.views_warehouse import SHIPPED_CLASS
+                if order_obj.order_status not in SHIPPED_CLASS:
+                    messages.warning(
+                        request,
+                        _g("An invoice can only be created after the order is completed (shipped)."),
+                    )
+                    return redirect("operating:order_detail", pk=order_obj.pk)
                 dup = order_obj.invoices.exclude(status="cancelled").first()
                 if dup:
                     messages.warning(
@@ -534,6 +551,28 @@ class InvoiceCancel(View):
         reason = request.POST.get("reason", "")
         invoice.cancel(user=request.user, reason=reason)
         messages.success(request, _g("Invoice cancelled."))
+
+        # Invoice and order live or die together: cancelling the invoice
+        # cancels its source order too, which reverses the order_sale
+        # movement off the cari and (if it was shipped) restores the cut
+        # stock — all via the single status funnel so nothing diverges.
+        if invoice.order_id:
+            order = invoice.order
+            if order.order_status != "cancelled":
+                from operating.views_warehouse import apply_order_status_change
+                ok, code = apply_order_status_change(order, "cancelled", user=request.user)
+                if ok:
+                    messages.success(
+                        request,
+                        _g("Linked order #%(num)s was cancelled as well — its cari posting was reversed and any shipped stock restored.")
+                        % {"num": order.pk},
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        _g("Invoice cancelled, but the linked order #%(num)s could not be cancelled automatically (%(code)s).")
+                        % {"num": order.pk, "code": code or ""},
+                    )
         return redirect("current_account:invoice_detail", pk=invoice.pk)
 
 

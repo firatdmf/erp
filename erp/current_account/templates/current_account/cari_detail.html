@@ -157,6 +157,19 @@
   .cd-tbl .invno { font: 600 12px var(--font-mono); color: var(--nejum-teal-700); text-decoration: none; }
   .cd-tbl .invno:hover { text-decoration: underline; }
 
+  /* Order status pill — pending orders sit on the balance already, the
+     amber pill flags them as not-yet-shipped money. */
+  .cd-tbl .ord-st {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px;
+    font: 700 10px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .cd-tbl .ord-st i { width: 11px; height: 11px; }
+  .cd-tbl .ord-st-pending   { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+  .cd-tbl .ord-st-done      { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
+  .cd-tbl .ord-st-cancelled { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+
   /* Empty state inside card */
   .cd-empty { padding: 40px 20px; text-align: center; color: var(--gray-500); font: 500 13px var(--font-sans); }
   .cd-empty a { color: var(--nejum-teal-700); text-decoration: none; font-weight: 600; }
@@ -280,7 +293,15 @@
                 </a>
               </td>
               <td style="color: var(--gray-600); font-size: 12.5px;">{{ o.created_at|date:"d.m.Y" }}</td>
-              <td style="color: var(--gray-600); font-size: 12px;">{{ o.get_status_display }}</td>
+              <td>
+                {% if o.order_status == "cancelled" or o.order_status == "returned" %}
+                  <span class="ord-st ord-st-cancelled"><i data-lucide="x-circle"></i>{{ o.get_order_status_display }}</span>
+                {% elif o.order_status == "shipped" or o.order_status == "in_transit" or o.order_status == "out_for_delivery" or o.order_status == "delivered" %}
+                  <span class="ord-st ord-st-done"><i data-lucide="check-circle"></i>{{ o.get_order_status_display }}</span>
+                {% else %}
+                  <span class="ord-st ord-st-pending" title="{% trans 'Pending order — already reflected on the balance' %}"><i data-lucide="clock"></i>{% trans "Pending" %} · {{ o.get_order_status_display }}</span>
+                {% endif %}
+              </td>
               <td class="num">{{ o.items.count }}</td>
               <td class="num">${{ o.total_value|floatformat:2|intcomma }}</td>
             </tr>

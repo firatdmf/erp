@@ -1224,12 +1224,19 @@
           <h3>{% trans "Current account" %}</h3>
           <div style="display:flex; align-items:center; gap:8px;">
             {% if not has_active_invoice %}
+              {% if order.order_status == "shipped" or order.order_status == "in_transit" or order.order_status == "out_for_delivery" or order.order_status == "delivered" %}
               <a href="{% url 'current_account:invoice_create' %}?order={{ order.pk }}"
                  class="od-link"
                  style="font-size: 11.5px; padding:5px 10px; background:#147F74; color:#fff; border-radius:6px;"
                  title="{% trans 'Create invoice from this order' %}">
                 <i class="fa fa-file-invoice"></i> {% trans "Create invoice" %}
               </a>
+              {% else %}
+              <span style="font-size: 11px; color:#92400E; background:#FEF3C7; border:1px solid #FDE68A; padding:4px 9px; border-radius:6px; white-space:nowrap;"
+                    title="{% trans 'The invoice is issued automatically the moment the order is completed (shipped).' %}">
+                <i class="fa fa-hourglass-half"></i> {% trans "Invoice auto-issues on completion" %}
+              </span>
+              {% endif %}
             {% endif %}
             <a href="{% url 'current_account:cari_detail' order.cari.pk %}"
                class="od-link" style="font-size: 11.5px;">

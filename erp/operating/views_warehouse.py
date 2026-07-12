@@ -2948,6 +2948,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     leaving_ship = (old_status in SHIPPED_CLASS and new_status in valid_statuses
                     and new_status not in SHIPPED_CLASS and new_status != old_status)
     entering_cancelled = changing and new_status == "cancelled" and old_status != "cancelled"
+    leaving_cancelled = changing and old_status == "cancelled"
 
     # Gate: shipping needs cargo info.
     if entering_ship and require_cargo_for_ship:
@@ -2983,6 +2984,11 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 consume_reservations_for_order(order, user=user)
             elif leaving_ship:
                 restore_reservations_for_order(order, user=user)
+                # Un-shipped order is no longer a completed sale — its
+                # invoice may not stay live (invoices only exist for
+                # completed orders). Re-shipping issues a fresh one.
+                for _inv in order.invoices.exclude(status="cancelled"):
+                    _inv.cancel(user=user, reason=f"Order #{order.pk} un-shipped")
             if entering_cancelled:
                 # Never any physical stock to restore here: leaving_ship
                 # (if it also fired) already converted consumed rows back
@@ -2990,6 +2996,21 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # reservations were never consumed in the first place —
                 # either way they're plain soft holds now, safe to drop.
                 order.roll_reservations.filter(consumed=False).delete()
+                # A cancelled order must vanish from the books: the
+                # order_sale movement comes off the cari (retail posts
+                # at create too now), and any invoice cut from this
+                # order is cancelled with it (its counter-movement is
+                # 0-amount, the order movement carries the receivable —
+                # see Invoice.issue()).
+                from current_account.services import reverse_order_movement
+                reverse_order_movement(order)
+                for _inv in order.invoices.exclude(status="cancelled"):
+                    _inv.cancel(user=user, reason=f"Order #{order.pk} cancelled")
+            elif leaving_cancelled:
+                # Re-opened order goes back on the books.
+                if order.cari_id:
+                    from current_account.services import post_order_movement
+                    post_order_movement(order)
             # Retail money leg — completion posts the sale + auto
             # collection to the shared "Perakende Satışları" cari and
             # mirrors it into the Perakende defter; un-ship reverses
@@ -3004,6 +3025,19 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                     post_retail_order_financials(order, user=user)
                 elif leaving_ship:
                     reverse_retail_order_financials(order, user=user)
+            # Completed sale → its invoice cuts itself, retail included
+            # — no manual step. Runs AFTER the retail leg so a legacy
+            # retail order that only gets its cari linked there is still
+            # invoiceable. Swallow-and-log: a numbering hiccup must
+            # never un-ship the order (the order-detail button stays as
+            # the manual fallback).
+            if entering_ship:
+                try:
+                    from current_account.services import create_invoice_for_order
+                    create_invoice_for_order(order, user=user)
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
     except Exception as _e:
         return False, f"error:{_e}"
     return True, None

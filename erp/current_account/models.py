@@ -724,6 +724,16 @@ class InvoiceItem(models.Model):
         related_name="invoice_items",
     )
 
+    # For auto-issued sales invoices (create_invoice_for_order): the
+    # order line this item mirrors, so the invoice can show exactly
+    # which physical tops (OrderRollReservation) fulfilled it — same
+    # traceability WarehouseProductRoll.purchase_invoice_item gives
+    # purchase invoices, mirrored for the sales side.
+    order_item = models.ForeignKey(
+        "operating.OrderItem", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="invoice_items",
+    )
+
     description = models.CharField(max_length=300)
     quantity    = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
     unit        = models.CharField(max_length=20, default="pcs")

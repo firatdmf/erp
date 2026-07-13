@@ -212,6 +212,10 @@
   table.doc-items tbody td.center { text-align: center; }
   table.doc-items .row-no { font: 700 10.5px var(--font-sans); color: var(--ink); text-align: center; }
   table.doc-items .design-id { font: 700 10.5px var(--font-mono); color: var(--ink); text-align: center; }
+  .roll-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .roll-chips .rc-lbl { font: 700 8.5px var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-600, #4B5563); width: 100%; margin-bottom: 1px; }
+  .roll-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border: 1px solid var(--ink); border-radius: 4px; font: 500 9px var(--font-sans); }
+  .roll-chip code { font: 700 9px var(--font-mono); }
   table.doc-items .desc-multi { white-space: pre-line; }
 
   /* Amount-to-be-Paid lives as a tfoot row spanning the leading
@@ -647,7 +651,17 @@
             {% elif it.product.type %}{{ it.product.type }}
             {% else %}—{% endif %}
           </td>
-          <td class="desc-multi">{{ it.description }}</td>
+          <td class="desc-multi">
+            {{ it.description }}
+            {% if it.display_rolls %}
+            <div class="roll-chips">
+              <span class="rc-lbl">{% trans "Tops" %}</span>
+              {% for r in it.display_rolls %}
+              <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.meters|floatformat:2 }} m</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </td>
           <td class="num">{{ it.quantity|floatformat:2|intcomma }} {{ it.unit|unit_loc }}</td>
           <td class="num">{{ invoice.currency.symbol }}{{ it.unit_price|floatformat:2|intcomma }}</td>
           <td class="num"><b>{{ invoice.currency.symbol }}{{ it.total|floatformat:2|intcomma }}</b></td>

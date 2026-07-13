@@ -260,6 +260,7 @@ def create_invoice_for_order(order, *, user=None):
                 invoice=inv, line_no=i,
                 product=it.product,
                 variant=getattr(it, "product_variant", None),
+                order_item=it,
                 description=(desc or "Item")[:300],
                 quantity=it.quantity or Decimal("0"),
                 unit="mt",

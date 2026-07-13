@@ -12,6 +12,7 @@ urlpatterns = [
     path("yeni/",                  views.CariCreate.as_view(),         name="cari_create"),
     path("<int:pk>/",              views.CariDetail.as_view(),         name="cari_detail"),
     path("<int:pk>/ekstre/",       views.CariStatement.as_view(),      name="cari_statement"),
+    path("ekstre/tumu/",           views.CariStatementAll.as_view(),   name="cari_statement_all"),
     path("<int:pk>/duzenle/",      views.CariEdit.as_view(),           name="cari_edit"),
     path("<int:pk>/sil/",          views.CariDelete.as_view(),         name="cari_delete"),
     path("<int:pk>/hareket/yeni/", views.CariMovementCreate.as_view(), name="movement_create"),

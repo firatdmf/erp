@@ -502,14 +502,44 @@ class InvoiceDetail(View):
     template_name = "current_account/invoice_detail.html"
 
     def get(self, request, pk):
+        from django.db.models import Prefetch
+        from operating.models import WarehouseProductRoll
+
         invoice = get_object_or_404(
             Invoice.objects.select_related("cari", "book", "currency", "order",
                                            "posted_movement"),
             pk=pk,
         )
-        items = invoice.items.select_related(
+        # Roll-level traceability — "which physical tops" per line, for
+        # both directions: purchase invoices link rolls directly
+        # (purchase_invoice_item), sales invoices via the order line's
+        # consumed reservations (order_item -> roll_reservations).
+        items = list(invoice.items.select_related(
             "product", "product__category", "variant",
-        ).order_by("line_no")
+        ).prefetch_related(
+            Prefetch("warehouse_rolls",
+                     queryset=WarehouseProductRoll.objects.select_related("product")),
+            "order_item__roll_reservations__roll",
+        ).order_by("line_no"))
+        for it in items:
+            purchase_rolls = list(it.warehouse_rolls.all())
+            if purchase_rolls:
+                # Each roll here IS the physical top this PO line put
+                # into stock — its own .meters is exactly that line's
+                # contribution, safe to show as-is.
+                it.display_rolls = [
+                    {"barcode": r.barcode, "meters": r.meters} for r in purchase_rolls
+                ]
+            elif it.order_item_id:
+                # A roll can be shared across order lines (partial
+                # cuts) — the reservation's own .meters is what THIS
+                # line actually used, not the roll's full size.
+                it.display_rolls = [
+                    {"barcode": r.roll.barcode, "meters": r.meters}
+                    for r in it.order_item.roll_reservations.all() if r.consumed
+                ]
+            else:
+                it.display_rolls = []
 
         # Tax breakdown by rate (for the totals summary)
         tax_breakdown = {}

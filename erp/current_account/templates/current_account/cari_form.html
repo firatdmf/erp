@@ -84,6 +84,18 @@
   .cf-toggle .lbl-w b { font: 600 13px var(--font-sans); color: var(--ink); }
   .cf-toggle .lbl-w span { font: 500 11.5px var(--font-sans); color: var(--gray-500); }
 
+  /* Entity-type segmented control — what this cari IS: a company, a
+     person, or a supplier. Picking one decides which CRM record gets
+     created alongside the cari, so it comes before everything else. */
+  .cf-etype { display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .cf-etype-btn { display:flex; flex-direction: column; align-items:center; gap: 6px; padding: 14px 10px; border: 1.5px solid #E0E6EE; border-radius: 10px; background: white; cursor: pointer; transition: all 140ms; }
+  .cf-etype-btn i { width: 20px; height: 20px; color: var(--gray-500); }
+  .cf-etype-btn b { font: 700 12.5px var(--font-sans); color: var(--ink); }
+  .cf-etype-btn:hover { border-color: #C5CCD3; }
+  .cf-etype-btn.active { border-color: var(--nejum-teal-500); background: var(--nejum-teal-50); box-shadow: 0 0 0 3px rgba(20,127,116,0.10); }
+  .cf-etype-btn.active i, .cf-etype-btn.active b { color: var(--nejum-teal-700); }
+  .cf-etype-hint { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin: -8px 0 16px; }
+
   .cf-foot { display:flex; align-items: center; gap: 10px; padding: 14px 22px; background: #FAFBFD; border-top: 1px solid #EEF1F5; }
   .cf-foot-l { font: 500 12px var(--font-sans); color: var(--gray-500); display:flex; align-items:center; gap:6px; }
   .cf-foot-l i { width: 14px; height: 14px; }
@@ -118,20 +130,38 @@
           <span class="sub">{% trans "Basic info & classification" %}</span>
         </div>
 
+        {% if not cari %}
+        <input type="hidden" name="entity_type" id="cf-entity-type" value="company">
+        <div class="cf-etype">
+          <div class="cf-etype-btn active" data-etype="company" onclick="cfPickEtype('company')">
+            <i data-lucide="building-2"></i><b>{% trans "Company" %}</b>
+          </div>
+          <div class="cf-etype-btn" data-etype="contact" onclick="cfPickEtype('contact')">
+            <i data-lucide="user"></i><b>{% trans "Person" %}</b>
+          </div>
+          <div class="cf-etype-btn" data-etype="supplier" onclick="cfPickEtype('supplier')">
+            <i data-lucide="truck"></i><b>{% trans "Supplier" %}</b>
+          </div>
+        </div>
+        <div class="cf-etype-hint">{% trans "A matching CRM record is created together with the account — this decides which kind." %}</div>
+        {% endif %}
+
         <div class="cf-row">
           <div class="cf-f span-2">
-            <label>{% trans "Name" %}<span class="req">*</span></label>
-            <input type="text" name="name" required maxlength="200" value="{{ cari.name|default:'' }}" placeholder="{% trans 'e.g., Acme Inc.' %}">
+            <label id="cf-name-label">{% trans "Name" %}<span class="req">*</span></label>
+            <input type="text" name="name" id="cf-name-input" required maxlength="200" value="{{ cari.name|default:'' }}" placeholder="{% trans 'e.g., Acme Inc.' %}">
           </div>
 
+          {% if cari %}
           <div class="cf-f">
             <label>{% trans "Type" %}<span class="req">*</span></label>
             <select name="type" required>
               {% for val,label in type_choices %}
-                <option value="{{ val }}" {% if cari and cari.type == val %}selected{% endif %}>{{ label }}</option>
+                <option value="{{ val }}" {% if cari.type == val %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>
+          {% endif %}
 
           {# Book selection removed — there is exactly one book and it
              is auto-assigned by the view (get_default_book). #}
@@ -151,25 +181,12 @@
         <div class="cf-section-h">
           <span class="ico"><i data-lucide="briefcase"></i></span>
           <h3>{% trans "Commercial Terms" %}</h3>
-          <span class="sub">{% trans "Credit, discount and payment terms" %}</span>
+          <span class="sub">{% trans "Discount and opening balance" %}</span>
         </div>
 
+        <input type="hidden" name="payment_term_days" value="{{ cari.payment_term_days|default:30 }}">
+        <input type="hidden" name="credit_limit" value="{{ cari.credit_limit|default:'0.00' }}">
         <div class="cf-row three">
-          <div class="cf-f">
-            <label>{% trans "Payment Term (days)" %}</label>
-            <div class="ins with-suffix">
-              <input type="number" name="payment_term_days" min="0" value="{{ cari.payment_term_days|default:30 }}">
-              <span class="suffix">{% trans "days" %}</span>
-            </div>
-          </div>
-          <div class="cf-f">
-            <label>{% trans "Credit Limit" %}</label>
-            <div class="ins with-prefix">
-              <span class="prefix">$</span>
-              <input type="number" step="0.01" name="credit_limit" value="{{ cari.credit_limit|default:'0.00' }}" placeholder="0.00">
-            </div>
-            <span class="hint">{% trans "0 = no limit" %}</span>
-          </div>
           <div class="cf-f">
             <label>{% trans "Discount Rate" %}</label>
             <div class="ins with-suffix">
@@ -305,5 +322,27 @@
   </form>
 </div>
 
-<script>if (window.lucide) lucide.createIcons();</script>
+<script>
+  if (window.lucide) lucide.createIcons();
+
+  var CF_LABELS = {
+    company:  { label: "{% trans 'Company Name' %}",  placeholder: "{% trans 'e.g., Acme Inc.' %}" },
+    contact:  { label: "{% trans 'Full Name' %}",      placeholder: "{% trans 'e.g., Jane Doe' %}" },
+    supplier: { label: "{% trans 'Supplier Name' %}",  placeholder: "{% trans 'e.g., Acme Fabrics' %}" }
+  };
+  window.cfPickEtype = function (etype) {
+    var input = document.getElementById('cf-entity-type');
+    if (input) input.value = etype;
+    document.querySelectorAll('.cf-etype-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.etype === etype);
+    });
+    var lbl = CF_LABELS[etype];
+    if (lbl) {
+      var labelEl = document.getElementById('cf-name-label');
+      var inputEl = document.getElementById('cf-name-input');
+      if (labelEl) labelEl.firstChild.textContent = lbl.label;
+      if (inputEl) inputEl.placeholder = lbl.placeholder;
+    }
+  };
+</script>
 {% endblock %}

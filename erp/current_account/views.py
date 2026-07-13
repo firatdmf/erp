@@ -147,67 +147,121 @@ class CariList(View):
 class CariCreate(View):
     template_name = "current_account/cari_form.html"
 
+    ENTITY_TYPES = ("company", "contact", "supplier")
+
     def get(self, request):
         return render(request, self.template_name, {
             "cari": None,
             "books": _books(),
             "currencies": _currencies(),
             "type_choices": CariAccount.TYPE_CHOICES,
+            "entity_types": self.ENTITY_TYPES,
         })
 
     def post(self, request):
-        # Book is no longer a user-facing choice — there is one book
-        # company-wide. Auto-resolve via the shared service so the
-        # UI stays simple and we don't risk picking the wrong one.
-        from .services import get_default_book
-        book = get_default_book()
+        # A cari is never a floating record any more — creating one here
+        # always creates the matching CRM entity (company/contact) or
+        # Supplier alongside it (the same "supplier gets a cari" rule
+        # applied uniformly), so there's one job instead of two.
+        from crm.models import Company, Contact, Supplier
+        from .services import (
+            get_or_create_cari_for_company,
+            get_or_create_cari_for_contact, get_or_create_cari_for_supplier,
+        )
+
+        entity_type = request.POST.get("entity_type", "company")
+        if entity_type not in self.ENTITY_TYPES:
+            entity_type = "company"
+
+        name = request.POST.get("name", "").strip()
+        if not name:
+            messages.error(request, _g("Name is required."))
+            return redirect("current_account:cari_create")
 
         currency_id = request.POST.get("default_currency")
         if not currency_id:
             messages.error(request, _g("Currency is required."))
             return redirect("current_account:cari_create")
 
-        cari = CariAccount(
-            book=book,
-            name=request.POST.get("name", "").strip(),
-            type=request.POST.get("type", "customer"),
-            default_currency_id=int(currency_id),
-            payment_term_days=int(request.POST.get("payment_term_days") or 30),
-            credit_limit=Decimal(request.POST.get("credit_limit") or "0"),
-            discount_rate=Decimal(request.POST.get("discount_rate") or "0"),
-            opening_balance=Decimal(request.POST.get("opening_balance") or "0"),
-            opening_balance_date=request.POST.get("opening_balance_date") or None,
-            tax_office=request.POST.get("tax_office", ""),
-            tax_number=request.POST.get("tax_number", ""),
-            identity_number=request.POST.get("identity_number", ""),
-            billing_address=request.POST.get("billing_address", ""),
-            billing_city=request.POST.get("billing_city", ""),
-            billing_country=request.POST.get("billing_country", "TR"),
-            email=request.POST.get("email", ""),
-            phone=request.POST.get("phone", ""),
-            notes=request.POST.get("notes", ""),
-            is_active=True,
-            created_by=getattr(request.user, "member", None),
-        )
+        email = request.POST.get("email", "").strip()
+        phone = request.POST.get("phone", "").strip()
+        address = request.POST.get("billing_address", "").strip()
+        country = request.POST.get("billing_country", "TR").strip()
+        member = getattr(request.user, "member", None)
+
         try:
-            cari.full_clean()
+            if entity_type == "company":
+                if Company.objects.filter(name__iexact=name).exists():
+                    messages.error(request, _g("A company with this name already exists."))
+                    return redirect("current_account:cari_create")
+                entity = Company.objects.create(
+                    name=name,
+                    email=[email] if email else [],
+                    phone=[phone] if phone else [],
+                    address=address,
+                    country=country,
+                )
+                cari = get_or_create_cari_for_company(entity, member=member)
+            elif entity_type == "contact":
+                entity = Contact.objects.create(
+                    name=name,
+                    email=[email] if email else [],
+                    phone=[phone] if phone else [],
+                    address=address,
+                    country=country,
+                )
+                cari = get_or_create_cari_for_contact(entity, member=member)
+            else:
+                entity = Supplier.objects.create(
+                    company_name=name,
+                    email=email, phone=phone,
+                    address=address, country=country,
+                )
+                # The post_save signal on Supplier already creates the
+                # cari unconditionally — this call is idempotent and
+                # just fetches that same row.
+                cari = get_or_create_cari_for_supplier(entity, member=member)
+        except Exception as exc:
+            messages.error(request, _g("Could not create record: %(error)s") % {"error": exc})
+            return redirect("current_account:cari_create")
+
+        # Layer the cari-specific commercial/tax fields on top of the
+        # row the service function just created.
+        cari.default_currency_id = int(currency_id)
+        cari.payment_term_days = int(request.POST.get("payment_term_days") or 30)
+        cari.credit_limit = Decimal(request.POST.get("credit_limit") or "0")
+        cari.discount_rate = Decimal(request.POST.get("discount_rate") or "0")
+        cari.tax_office = request.POST.get("tax_office", "")
+        cari.tax_number = request.POST.get("tax_number", "")
+        cari.identity_number = request.POST.get("identity_number", "")
+        cari.billing_address = address
+        cari.billing_city = request.POST.get("billing_city", "")
+        cari.billing_country = country
+        cari.email = email
+        cari.phone = phone
+        cari.notes = request.POST.get("notes", "")
+        opening_balance = Decimal(request.POST.get("opening_balance") or "0")
+        cari.opening_balance = opening_balance
+        cari.opening_balance_date = request.POST.get("opening_balance_date") or None
+
+        try:
+            cari.full_clean(exclude=["code"])
         except Exception as exc:
             messages.error(request, _g("Invalid data: %(error)s") % {"error": exc})
             return redirect("current_account:cari_create")
-
         cari.save()
 
         # If opening balance non-zero, drop a single opening movement
-        if cari.opening_balance and cari.opening_balance != Decimal("0"):
+        if opening_balance and opening_balance != Decimal("0"):
             CariMovement.objects.create(
                 cari=cari,
                 book=cari.book,
                 date=cari.opening_balance_date or timezone.now().date(),
-                amount=cari.opening_balance,
+                amount=opening_balance,
                 currency=cari.default_currency,
                 movement_type="opening",
                 description="Opening balance",
-                created_by=getattr(request.user, "member", None),
+                created_by=member,
             )
 
         messages.success(request, _g("Account created: %(code)s") % {"code": cari.code})
@@ -480,6 +534,35 @@ class CariStatement(View):
         if request.headers.get("HX-Request") == "true":
             return render(request, "current_account/_cari_statement_results.html", ctx)
         return render(request, self.template_name, ctx)
+
+
+# ---------------------------------------------------------------------------
+# All-accounts printable statement — every cari's CURRENT balance, split
+# into who owes us (borçlular) vs who we owe (alacaklılar) so each side
+# can be printed on its own.
+# ---------------------------------------------------------------------------
+@method_decorator(login_required, name="dispatch")
+class CariStatementAll(View):
+    template_name = "current_account/cari_statement_all.html"
+
+    def get(self, request):
+        caris = (
+            CariAccount.objects.filter(is_active=True)
+            .select_related("book", "default_currency")
+            .exclude(cached_balance=0)
+            .order_by("-cached_balance")
+        )
+        debtors = [c for c in caris if c.cached_balance > 0]     # owe US
+        creditors = [c for c in caris if c.cached_balance < 0]   # WE owe them
+
+        creditors_total = sum((c.cached_balance for c in creditors), Decimal("0.00"))
+        return render(request, self.template_name, {
+            "debtors": debtors,
+            "creditors": creditors,
+            "debtors_total": sum((c.cached_balance for c in debtors), Decimal("0.00")),
+            "creditors_total": abs(creditors_total),
+            "generated_at": timezone.now(),
+        })
 
 
 # ---------------------------------------------------------------------------

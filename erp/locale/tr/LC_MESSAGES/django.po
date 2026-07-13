@@ -5972,7 +5972,7 @@ msgid "To Invoices"
 msgstr "Faturalara"
 
 msgid "Total (%(count)s accounts)"
-msgstr ""
+msgstr "Toplam (%(count)s hesap)"
 
 msgid "Total Accounts"
 msgstr "Toplam Cari"
@@ -7914,3 +7914,141 @@ msgstr ""
 #: operating/templates/operating/order_detail.html
 msgid "Invoice auto-issues on completion"
 msgstr "Fatura tamamlanınca otomatik kesilir"
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "Person"
+msgstr "Kişi"
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid ""
+"A matching CRM record is created together with the account — this decides "
+"which kind."
+msgstr ""
+"Hesapla birlikte eşleşen bir CRM kaydı da oluşturulur — bu seçim hangi türde"
+" olacağını belirler."
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "Full Name"
+msgstr "Ad Soyad"
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "e.g., Jane Doe"
+msgstr "ör. Ayşe Yılmaz"
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "Supplier Name"
+msgstr "Tedarikçi Adı"
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "e.g., Acme Fabrics"
+msgstr "ör. Acme Tekstil"
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "Name is required."
+msgstr "Ad alanı zorunludur."
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "A company with this name already exists."
+msgstr "Bu isimde bir şirket zaten var."
+
+#: current_account/templates/current_account/cari_form.html
+#: current_account/views.py
+msgid "Could not create record: %(error)s"
+msgstr "Kayıt oluşturulamadı: %(error)s"
+
+#: current_account/templates/current_account/cari_form.html
+msgid "Discount and opening balance"
+msgstr "İndirim ve açılış bakiyesi"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Print statement"
+msgstr "Ekstre yazdır"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "All Accounts Statement"
+msgstr "Tüm Cariler Ekstresi"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Current balance of every account, as of"
+msgstr "Her hesabın güncel bakiyesi, şu tarih itibarıyla:"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Generated"
+msgstr "Oluşturulma"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Print all"
+msgstr "Tümünü yazdır"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Print debtors only"
+msgstr "Yalnızca borçluları yazdır"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Print creditors only"
+msgstr "Yalnızca alacaklıları yazdır"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Debtors (owe us)"
+msgstr "Borçlular (bize borçlu)"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Total receivable"
+msgstr "Toplam alacak"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Creditors (we owe)"
+msgstr "Alacaklılar (biz borçluyuz)"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Total payable"
+msgstr "Toplam borç"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Debtors"
+msgstr "Borçlular"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Owe us"
+msgstr "Bize borçlu"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "Creditors"
+msgstr "Alacaklılar"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "We owe"
+msgstr "Biz borçluyuz"
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "No debtor accounts."
+msgstr "Borçlu hesap yok."
+
+#: current_account/templates/current_account/cari_statement_all.html
+#: current_account/templates/current_account/cari_list.html
+msgid "No creditor accounts."
+msgstr "Alacaklı hesap yok."

@@ -2290,49 +2290,76 @@ class OrderItemUnitScanPack(View):
         return render(request, self.template_name, context)
 
 
-class OrderPackingList(View):
-    """Modern packing UI — pack at the OrderItem level.
+def _pack_roll_rows(pack):
+    """The physical tops actually assigned to a Pack, sourced from
+    OrderRollReservation.pack — the SAME data order_pack_scan.html's
+    drag-into-package UI writes. This is the one place item assignment
+    happens; packing_list/PDF only ever READ this, they never let
+    staff re-assign, so there's no second place to "pack" an order."""
+    rows = []
+    for r in (pack.roll_reservations
+              .select_related("roll", "order_item__product", "order_item__product_variant",
+                              "warehouse_product")
+              .order_by("id")):
+        if r.order_item_id and r.order_item.product_id:
+            title = r.order_item.product.title
+            sku = (r.order_item.product_variant.variant_sku
+                   if r.order_item.product_variant_id else (r.order_item.product.sku or "-"))
+        else:
+            title = r.warehouse_product.name if r.warehouse_product_id else "-"
+            sku = r.warehouse_product.sku if (r.warehouse_product_id and r.warehouse_product.sku) else "-"
+        rows.append({
+            "title": title, "sku": sku,
+            "barcode": r.roll.barcode if r.roll_id else "-",
+            "meters": r.meters,
+        })
+    return rows
 
-    GET  → render order items + their pack assignments. Auto-creates
-           Pack #1 the first time the page is opened.
-    POST → JSON API for the inline UI:
-           - action=add_pack            → create the next-numbered Pack
-           - action=assign  + item_id + pack_id → move item to that pack
-           - action=remove  + item_id   → unassign from any pack
-           - action=delete_pack + pack_id → remove pack (items go back to unassigned)
+
+class OrderPackingList(View):
+    """Read-only packing list + print/export — NOT an assignment UI.
+
+    Item-to-package assignment happens in exactly ONE place,
+    order_pack_scan.html's drag-and-drop (OrderRollReservation.pack).
+    This screen used to have its OWN competing assign/unassign
+    interface backed by a separate model (PackedOrderItem), which
+    never saw what was actually scanned+packed on the other screen —
+    packages assigned in order_pack_scan.html showed up empty here,
+    so staff ended up "packing" the same order twice with two
+    disagreeing results. Fixed by making this purely a report: list
+    packs and what's really in them (per _pack_roll_rows), plus PDF
+    export, and nothing that writes an assignment.
+
+    GET  → render each pack's real contents + any scanned-but-not-yet-
+           -packed tops. Auto-creates Pack #1 the first time it's opened
+           (order_pack_scan.html relies on that pre-existing pack too).
+    POST → JSON API, pack HOUSEKEEPING only (no item assignment):
+           - action=add_pack    → create the next-numbered Pack
+           - action=delete_pack → remove an empty-of-purpose pack
+             (its reservations fall back to unassigned via SET_NULL)
     """
     template_name = "operating/order_packing_list.html"
 
     def get(self, request, pk):
-        from .models import PackedOrderItem
-        order = get_object_or_404(
-            Order.objects.prefetch_related(
-                "items__product", "items__product_variant",
-            ),
-            pk=pk,
-        )
-        # Auto-create Pack #1 if none exist — the UI assumes at least one.
+        order = get_object_or_404(Order, pk=pk)
+        # Auto-create Pack #1 if none exist — order_pack_scan.html's
+        # "drag into a package" panel assumes at least one exists.
         if not order.packs.exists():
             Pack.objects.create(order=order, pack_number=1)
-        packs = list(order.packs.order_by("pack_number")
-                                .prefetch_related("packed_order_items__order_item__product"))
+        packs = list(order.packs.order_by("pack_number"))
+        for p in packs:
+            p.rows = _pack_roll_rows(p)
 
-        items = list(order.items.select_related("product", "product_variant"))
-        assigned = {
-            poi.order_item_id: poi.pack_id
-            for poi in PackedOrderItem.objects.filter(pack__order=order)
-        }
-        for it in items:
-            it.assigned_pack_id = assigned.get(it.pk)
+        unassigned_count = order.roll_reservations.filter(pack__isnull=True).count()
 
         return render(request, self.template_name, {
             "order": order,
             "packs": packs,
-            "items": items,
+            "unassigned_count": unassigned_count,
+            "shipped": order.order_status in _SHIPPED_CLASS,
         })
 
     def post(self, request, pk):
-        from .models import PackedOrderItem
         order = get_object_or_404(Order, pk=pk)
         action = (request.POST.get("action") or "").strip()
 
@@ -2358,37 +2385,8 @@ class OrderPackingList(View):
             # Refuse to delete the last remaining pack.
             if order.packs.count() <= 1:
                 return JsonResponse({"ok": False, "error": "Cannot delete the only pack"}, status=400)
-            pack.delete()  # CASCADE deletes the packed_order_items too
+            pack.delete()  # SET_NULL releases its roll_reservations back to unassigned
             return JsonResponse({"ok": True})
-
-        if action == "assign":
-            try:
-                item_id = int(request.POST.get("item_id") or 0)
-                pack_id = int(request.POST.get("pack_id") or 0)
-            except (TypeError, ValueError):
-                return JsonResponse({"ok": False, "error": "Bad params"}, status=400)
-            item = get_object_or_404(OrderItem, pk=item_id, order=order)
-            pack = get_object_or_404(Pack, pk=pack_id, order=order)
-            # OneToOneField guarantees one-pack-per-item: delete any
-            # existing assignment, then create the new one. This is
-            # the "auto-move" the user asked for.
-            PackedOrderItem.objects.filter(order_item=item).delete()
-            PackedOrderItem.objects.create(pack=pack, order_item=item)
-            return JsonResponse({
-                "ok": True,
-                "item_id": item.pk,
-                "pack_id": pack.pk,
-                "pack_number": pack.pack_number,
-            })
-
-        if action == "remove":
-            try:
-                item_id = int(request.POST.get("item_id") or 0)
-            except (TypeError, ValueError):
-                return JsonResponse({"ok": False, "error": "Bad item_id"}, status=400)
-            PackedOrderItem.objects.filter(order_item_id=item_id,
-                                           pack__order=order).delete()
-            return JsonResponse({"ok": True, "item_id": item_id})
 
         return JsonResponse({"ok": False, "error": "Unknown action"}, status=400)
 
@@ -2425,31 +2423,19 @@ from openpyxl.utils import get_column_letter
 
 
 def export_packing_list_excel(request, pk):
-    print("export packing list excel for order with pk: ", pk)
     order = Order.objects.get(pk=pk)
-    packs = order.packs.prefetch_related("items__order_item_unit__order_item")
+    packs = order.packs.order_by("pack_number")
 
-    # create excel workbook and worksheet
     wb = openpyxl.Workbook()
-    # select the active worksheet
     ws = wb.active
     ws.title = f"Packing List - Order {pk}"
 
-    # write the title row
-    ws.merge_cells("A1:F1")
+    ws.merge_cells("A1:E1")
     ws["A1"] = f"Packing List for Order #{pk} — {order.get_client()} "
     ws["A1"].font = Font(size=14, bold=True)
     ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
 
-    # Headers
-    headers = [
-        "Pack Number",
-        "SKU",
-        "Description",
-        "Quantity",
-        "Unit of Measure",
-        "Unit ID",
-    ]
+    headers = ["Pack Number", "Product", "SKU", "Barcode", "Metres"]
     header_font = Font(bold=True)
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=2, column=col_num, value=header)
@@ -2457,74 +2443,56 @@ def export_packing_list_excel(request, pk):
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
     thin_border = Border(
-        left=Side(style="thin"),
-        right=Side(style="thin"),
-        top=Side(style="thin"),
-        bottom=Side(style="thin"),
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
     )
     thick_border = Border(
-        left=Side(style="thick"),
-        right=Side(style="thick"),
-        top=Side(style="thick"),
-        bottom=Side(style="thick"),
+        left=Side(style="thick"), right=Side(style="thick"),
+        top=Side(style="thick"), bottom=Side(style="thick"),
     )
 
-    # End of first rows.
     row = 3
     for pack in packs:
         pack_start_row = row
+        rows = _pack_roll_rows(pack)
 
-        for packed_item in pack.items.all():
-            unit = packed_item.order_item_unit
-            order_item = unit.order_item
-
-            values = [
-                pack.pack_number,
-                order_item.display_sku(),
-                order_item.description or "N/A",
-                unit.quantity,
-                order_item.product.unit_of_measurement or "units",
-                unit.pk,
-            ]
-
+        for r in rows:
+            values = [pack.pack_number, r["title"], r["sku"], r["barcode"], float(r["meters"] or 0)]
             for col_index, value in enumerate(values, start=1):
                 cell = ws.cell(row=row, column=col_index, value=value)
                 cell.border = thin_border
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-
             row += 1
 
-        # Add thick border around entire pack row range
+        if not rows:
+            cell = ws.cell(row=row, column=1, value=pack.pack_number)
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            empty_cell = ws.cell(row=row, column=2, value="(empty)")
+            empty_cell.border = thin_border
+            for c in range(3, 6):
+                ws.cell(row=row, column=c).border = thin_border
+            row += 1
 
-        # Add thick border around entire pack row range
         for r in range(pack_start_row, row):
-            for c in range(1, 7):
+            for c in range(1, 6):
                 ws.cell(row=r, column=c).border = thick_border
 
-        # Merge cells in "Pack Number" column (A) for the same pack
         if row - pack_start_row > 1:
-            ws.merge_cells(
-                start_row=pack_start_row, start_column=1, end_row=row - 1, end_column=1
-            )
+            ws.merge_cells(start_row=pack_start_row, start_column=1, end_row=row - 1, end_column=1)
             merged_cell = ws.cell(row=pack_start_row, column=1)
             merged_cell.alignment = Alignment(horizontal="center", vertical="center")
-            # merged_cell.alignment = Alignment(vertical="center", horizontal="center")
 
-    # Adjust column widths
-    for col in range(1, 7):
+    for col in range(1, 6):
         ws.column_dimensions[get_column_letter(col)].width = 22
 
-    # Export
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     filename = f"packing_list_order_{pk}.xlsx"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    # ws.cell().alignment = Alignment(horizontal="center", vertical="center")
     wb.save(response)
     return response
-
-    # return HttpResponse("Packing list export is not implemented yet.")
 
 
 def _order_delete_allowed(request):
@@ -3086,7 +3054,8 @@ def order_packing_list_pdf(request, pk):
         'package': "Paket" if is_tr else "Package",
         'product': "Ürün" if is_tr else "Product",
         'sku': "SKU",
-        'qty': "Miktar" if is_tr else "Qty",
+        'barcode': "Barkod" if is_tr else "Barcode",
+        'meters': "Metre" if is_tr else "Metres",
     }
     
     font = _ensure_pdf_fonts() or "Helvetica"
@@ -3153,23 +3122,17 @@ def order_packing_list_pdf(request, pk):
         
         items_data = [[
             Paragraph(f"<b>{labels['product']}</b>", normal_style),
-            Paragraph(f"<b>{labels['sku']}</b>", normal_style),
-            Paragraph(f"<b>{labels['qty']}</b>", normal_style)
+            Paragraph(f"<b>{labels['barcode']}</b>", normal_style),
+            Paragraph(f"<b>{labels['meters']}</b>", normal_style)
         ]]
-        
-        pois = pack.packed_order_items.all()
-        for poi in pois:
-            it = poi.order_item
-            title = getattr(it.product, "title", None) or it.description or "Product"
-            sku = (it.product_variant.variant_sku if (it.product_variant_id and it.product_variant) 
-                   else (it.product.sku if it.product else "-"))
-            qty = str(it.quantity)
+
+        for row in _pack_roll_rows(pack):
             items_data.append([
-                Paragraph(title, normal_style),
-                Paragraph(sku, normal_style),
-                Paragraph(qty, normal_style)
+                Paragraph(f"{row['title']} ({row['sku']})", normal_style),
+                Paragraph(str(row['barcode']), normal_style),
+                Paragraph(f"{row['meters']:.2f} m" if row['meters'] is not None else "-", normal_style),
             ])
-            
+
         col_widths = [85 * mm, 38 * mm, 20 * mm]
         tbl = Table(items_data, colWidths=col_widths)
         tbl.setStyle(TableStyle([
@@ -3232,7 +3195,7 @@ def pack_pdf(request, pack_pk):
         'order': "Sipariş" if is_tr else "Order",
         'contents': "İÇERİK" if is_tr else "CONTENTS",
         'product': "Ürün" if is_tr else "Product",
-        'qty': "Miktar" if is_tr else "Qty",
+        'meters': "Metre" if is_tr else "Metres",
     }
     
     font = _ensure_pdf_fonts() or "Helvetica"
@@ -3304,19 +3267,15 @@ def pack_pdf(request, pack_pk):
     
     items_data = [[
         Paragraph(f"<b>{labels['product']}</b>", normal_style),
-        Paragraph(f"<b>{labels['qty']}</b>", normal_style)
+        Paragraph(f"<b>{labels['meters']}</b>", normal_style)
     ]]
-    
-    pois = pack.packed_order_items.all()
-    for poi in pois:
-        it = poi.order_item
-        title = getattr(it.product, "title", None) or it.description or "Product"
-        qty = str(it.quantity)
+
+    for row in _pack_roll_rows(pack):
         items_data.append([
-            Paragraph(title, normal_style),
-            Paragraph(qty, normal_style)
+            Paragraph(row['title'], normal_style),
+            Paragraph(f"{row['meters']:.2f} m" if row['meters'] is not None else "-", normal_style),
         ])
-        
+
     tbl = Table(items_data, colWidths=[65 * mm, 24 * mm])
     tbl.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),

@@ -23,7 +23,7 @@
     --ink: #0F1419;
   }
 
-  .pk { max-width: 1400px; margin: 0 auto; padding: 22px 28px 80px; font: 400 13.5px var(--font-sans); color: var(--ink); }
+  .pk { max-width: 1100px; margin: 0 auto; padding: 22px 28px 80px; font: 400 13.5px var(--font-sans); color: var(--ink); }
   .pk, .pk * { box-sizing: border-box; }
 
   .pk-crumbs { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -35,80 +35,42 @@
   .pk-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
   .pk-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
   .pk-title { font: 800 28px var(--font-sans); letter-spacing: -0.02em; color: var(--ink); margin: 0; }
-  .pk-sub { font: 500 13px var(--font-sans); color: var(--gray-600); margin-top: 4px; }
+  .pk-sub { font: 500 13px var(--font-sans); color: var(--gray-600); margin-top: 4px; max-width: 480px; }
 
-  .pk-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-    gap: 18px;
-    align-items: start;
-  }
-  @media (max-width: 980px) { .pk-grid { grid-template-columns: 1fr; } }
+  .pk-warn { display:flex; align-items:center; gap: 10px; padding: 12px 16px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; margin-bottom: 18px; color: #92400E; font: 600 12.5px var(--font-sans); }
+  .pk-warn i { font-size: 16px; }
+  .pk-warn a { margin-left: auto; color: var(--nejum-teal-700); text-decoration: none; font-weight: 700; white-space: nowrap; }
+  .pk-warn a:hover { text-decoration: underline; }
 
-  .pk-card { background: white; border: 1px solid #E2E8EE; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,31,0.03); overflow: hidden; }
-  .pk-card-h { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #EEF1F5; }
-  .pk-card-h h3 { font: 700 14px var(--font-sans); color: var(--ink); margin: 0; }
-  .pk-card-h .badge { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: #F4F7FB; color: var(--gray-600); font: 700 11px var(--font-sans); font-variant-numeric: tabular-nums; }
+  .pk-toolbar { display:flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .pk-toolbar .spacer { flex: 1; }
+  .pk-btn { display:inline-flex; align-items:center; gap:7px; padding: 9px 15px; border-radius: 9px; font: 700 12.5px var(--font-sans); cursor: pointer; transition: all 140ms; white-space: nowrap; text-decoration: none; border: 1px solid transparent; }
+  .pk-btn.ghost { background: white; border-color: #E0E6EE; color: var(--gray-700); box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
+  .pk-btn.ghost:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .pk-btn.primary { background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border-color: var(--nejum-teal-700); color: white; }
+  .pk-btn.primary:hover { filter: brightness(1.05); color: white; }
 
-  .pk-items { padding: 8px; max-height: 70vh; overflow-y: auto; }
-  .pk-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid #EEF1F5;
-    border-radius: 9px;
-    background: white;
-    margin-bottom: 6px;
-    transition: border-color 140ms, background 140ms;
-    cursor: grab;
-  }
-  .pk-item:active { cursor: grabbing; }
-  .pk-item:hover { border-color: var(--nejum-teal-300); background: #FAFCFB; }
-  .pk-item.is-assigned { background: var(--nejum-teal-50); border-color: var(--nejum-teal-300); }
-  .pk-item-thumb { width: 36px; height: 36px; border-radius: 8px; background: #F4F7FB; display: inline-flex; align-items: center; justify-content: center; color: var(--gray-500); font-size: 14px; flex-shrink: 0; }
-  .pk-item-info { flex: 1; min-width: 0; }
-  .pk-item-name { font: 700 13px var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pk-item-meta { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .pk-item-meta .sku { font-family: var(--font-mono); color: var(--gray-600); }
-  .pk-item-tag { padding: 2px 7px; border-radius: 6px; font: 700 10px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; }
-  .pk-item-tag.assigned { background: var(--nejum-teal-100); color: var(--nejum-teal-700); }
-  .pk-item-tag.unassigned { background: #FEF3C7; color: #92400E; }
-  .pk-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
-  .pk-pill-btn { padding: 5px 10px; background: white; border: 1px solid #DDE3E7; border-radius: 6px; font: 600 11.5px var(--font-sans); color: var(--gray-700); cursor: pointer; transition: all 140ms; }
-  .pk-pill-btn:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
-  .pk-pill-btn.danger:hover { border-color: #FCA5A5; color: #B91C1C; background: #FEF2F2; }
-
-  .pk-packs-h { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #EEF1F5; }
-  .pk-packs-h h3 { font: 700 14px var(--font-sans); color: var(--ink); margin: 0; }
-  .pk-packs-h .badge { padding: 2px 8px; border-radius: 999px; background: #F4F7FB; color: var(--gray-600); font: 700 11px var(--font-sans); margin-left: 6px; }
-  .pk-add-pack { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: linear-gradient(180deg, var(--nejum-teal-500), var(--nejum-teal-600)); border: 1px solid var(--nejum-teal-700); color: white; border-radius: 8px; font: 700 12.5px var(--font-sans); cursor: pointer; transition: filter 140ms; }
-  .pk-add-pack:hover { filter: brightness(1.08); }
-
-  .pk-packs { padding: 12px; display: flex; flex-direction: column; gap: 12px; max-height: 70vh; overflow-y: auto; }
-
-  .pk-pack { border: 1.5px solid #E0E6EE; border-radius: 10px; background: #FAFCFB; overflow: hidden; transition: border-color 140ms, box-shadow 140ms; }
-  .pk-pack.is-target { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 4px rgba(20,127,116,0.12); background: white; }
-  .pk-pack-h { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: white; border-bottom: 1px solid #EEF1F5; }
+  .pk-packs { display: flex; flex-direction: column; gap: 14px; }
+  .pk-pack { background: white; border: 1.5px solid #E0E6EE; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
+  .pk-pack-h { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #FAFCFB; border-bottom: 1px solid #EEF1F5; }
   .pk-pack-num { width: 30px; height: 30px; border-radius: 8px; background: var(--nejum-teal-600); color: white; display: inline-flex; align-items: center; justify-content: center; font: 800 13px var(--font-sans); flex-shrink: 0; }
-  .pk-pack-title { font: 700 13.5px var(--font-sans); color: var(--ink); }
-  .pk-pack-meta { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-left: auto; font-variant-numeric: tabular-nums; }
-  .pk-pack-del { background: transparent; border: 1px solid transparent; color: var(--gray-400); cursor: pointer; padding: 4px 7px; border-radius: 6px; transition: all 140ms; }
-  .pk-pack-del:hover { color: #B91C1C; background: #FEF2F2; border-color: #FCA5A5; }
-  .pk-pack-view { background: transparent; border: 1px solid transparent; color: var(--nejum-teal-600); cursor: pointer; padding: 4px 7px; border-radius: 6px; transition: all 140ms; margin-left: 6px; }
-  .pk-pack-view:hover { color: var(--nejum-teal-700); background: var(--nejum-teal-50); border-color: var(--nejum-teal-300); }
+  .pk-pack-title { font: 700 14px var(--font-sans); color: var(--ink); }
+  .pk-pack-code { font: 600 11px var(--font-mono); color: var(--gray-500); }
+  .pk-pack-meta { font: 700 11.5px var(--font-sans); color: var(--nejum-teal-700); margin-left: auto; font-variant-numeric: tabular-nums; background: var(--nejum-teal-50); padding: 3px 9px; border-radius: 999px; }
+  .pk-pack-actions { display: flex; gap: 4px; }
+  .pk-pack-btn { background: transparent; border: 1px solid transparent; color: var(--gray-500); cursor: pointer; padding: 5px 8px; border-radius: 6px; transition: all 140ms; text-decoration: none; display: inline-flex; align-items: center; }
+  .pk-pack-btn:hover { color: var(--nejum-teal-700); background: var(--nejum-teal-50); border-color: var(--nejum-teal-300); }
+  .pk-pack-btn.danger:hover { color: #B91C1C; background: #FEF2F2; border-color: #FCA5A5; }
 
-  .pk-pack-body { padding: 8px 12px 12px; min-height: 60px; }
-  .pk-drop-hint { padding: 12px; text-align: center; color: var(--gray-500); font: 500 12px var(--font-sans); border: 1.5px dashed #D1D5DB; border-radius: 8px; background: white; }
-  .pk-pack.is-target .pk-drop-hint { color: var(--nejum-teal-700); border-color: var(--nejum-teal-500); border-style: solid; background: var(--nejum-teal-50); }
+  .pk-rolls { padding: 4px 0; }
+  .pk-roll-row { display: flex; align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid #F4F7FB; }
+  .pk-roll-row:last-child { border-bottom: none; }
+  .pk-roll-name { font: 700 12.5px var(--font-sans); color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pk-roll-sku { font: 500 11px var(--font-mono); color: var(--gray-500); }
+  .pk-roll-bc { font: 600 11px var(--font-mono); color: var(--gray-700); background: #F4F7FB; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
+  .pk-roll-m { font: 800 12.5px var(--font-sans); color: var(--nejum-teal-700); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-  .pk-move { position: relative; }
-  .pk-move-btn { padding: 5px 10px; background: white; border: 1px solid #DDE3E7; border-radius: 6px; font: 600 11.5px var(--font-sans); color: var(--nejum-teal-700); cursor: pointer; }
-  .pk-move-btn:hover { border-color: var(--nejum-teal-500); background: var(--nejum-teal-50); }
-  .pk-move-menu { position: absolute; right: 0; top: calc(100% + 4px); background: white; border: 1px solid #E2E8EE; border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,31,0.10); padding: 4px; min-width: 160px; z-index: 10; display: none; }
-  .pk-move-menu.open { display: block; }
-  .pk-move-menu button { display: block; width: 100%; text-align: left; padding: 6px 10px; background: transparent; border: none; font: 600 12px var(--font-sans); color: var(--gray-700); cursor: pointer; border-radius: 4px; }
-  .pk-move-menu button:hover { background: #F4F7FB; color: var(--nejum-teal-700); }
-  .pk-move-menu button.current { color: var(--gray-400); font-weight: 500; cursor: default; }
-  .pk-move-menu button.current:hover { background: transparent; }
+  .pk-empty { padding: 20px 16px; text-align: center; color: var(--gray-500); font: 500 12.5px var(--font-sans); }
 </style>
 {% endblock %}
 
@@ -125,88 +87,68 @@
   <div class="pk-head">
     <div>
       <div class="pk-eyebrow">{% trans "Packing" %}</div>
-      <h1 class="pk-title">{% trans "Packages" %}</h1>
-      <div class="pk-sub">{% trans "Drag or move items into packages. Each item can be in only one package." %}</div>
-    </div>
-    <div style="display: flex; gap: 8px; align-self: flex-end;">
-      <a href="{% url 'operating:order_packing_list_pdf' order.pk %}" class="pk-back" style="background: white; color: var(--nejum-teal-600); border-color: var(--nejum-teal-300); font-weight: 700;" target="_blank">
-        <i class="fa fa-file-pdf-o"></i> {% trans "PDF List" %}
-      </a>
+      <h1 class="pk-title">{% trans "Package list" %}</h1>
+      <div class="pk-sub">{% trans "View only — to change which top goes in which package, use the Packing (Scan tops) screen." %}</div>
     </div>
   </div>
 
-  <div class="pk-grid">
+  {% if unassigned_count %}
+  <div class="pk-warn">
+    <i class="fa fa-triangle-exclamation"></i>
+    {% blocktrans count c=unassigned_count %}{{ c }} scanned top is not yet in a package.{% plural %}{{ c }} scanned tops are not yet in a package.{% endblocktrans %}
+    <a href="{% url 'operating:order_pack_scan' order.pk %}">{% trans "Finish packing" %} →</a>
+  </div>
+  {% endif %}
 
-    <!-- LEFT: items in the order -->
-    <div class="pk-card">
-      <div class="pk-card-h">
-        <h3>{% trans "Products in this order" %}</h3>
-        <span class="badge" id="itemsCount">{{ items|length }}</span>
+  <div class="pk-toolbar">
+    <a href="{% url 'operating:order_packing_list_pdf' order.pk %}" class="pk-btn primary" target="_blank">
+      <i class="fa fa-file-pdf-o"></i> {% trans "Download full list (PDF)" %}
+    </a>
+    {% if not shipped %}
+    <button type="button" class="pk-btn ghost" onclick="pkAddPack()">
+      <i class="fa fa-plus"></i> {% trans "New package" %}
+    </button>
+    {% endif %}
+    <span class="spacer"></span>
+    <a href="{% url 'operating:export_packing_list_excel' order.pk %}" class="pk-btn ghost">
+      <i class="fa fa-file-excel-o"></i> Excel
+    </a>
+  </div>
+
+  <div class="pk-packs" id="packsList">
+    {% for p in packs %}
+    <div class="pk-pack" data-pack-id="{{ p.pk }}">
+      <div class="pk-pack-h">
+        <span class="pk-pack-num">{{ p.pack_number }}</span>
+        <div>
+          <div class="pk-pack-title">{% trans "Package" %} #{{ p.pack_number }}</div>
+          <div class="pk-pack-code">{{ p.code }}</div>
+        </div>
+        <span class="pk-pack-meta">{{ p.rows|length }} {% trans "top" %}</span>
+        <div class="pk-pack-actions">
+          <a class="pk-pack-btn" href="{% url 'operating:pack_pdf' p.pk %}" target="_blank" title="{% trans 'Print this package (PDF)' %}">
+            <i class="fa fa-file-pdf-o"></i>
+          </a>
+          {% if not shipped %}
+          <button type="button" class="pk-pack-btn danger" title="{% trans 'Delete package' %}" onclick="pkDeletePack({{ p.pk }})">
+            <i class="fa fa-trash"></i>
+          </button>
+          {% endif %}
+        </div>
       </div>
-      <div class="pk-items" id="itemsList">
-        {% for it in items %}
-        <div class="pk-item {% if it.assigned_pack_id %}is-assigned{% endif %}"
-             draggable="true"
-             data-item-id="{{ it.pk }}"
-             data-assigned-pack="{{ it.assigned_pack_id|default:'' }}">
-          <span class="pk-item-thumb"><i class="fa fa-box"></i></span>
-          <div class="pk-item-info">
-            <div class="pk-item-name">
-              {{ it.product.title|default:it.description|default:"Item" }}
-            </div>
-            <div class="pk-item-meta">
-              {% if it.product_variant %}<span class="sku">{{ it.product_variant.variant_sku|default:'' }}</span>
-              {% elif it.product %}<span class="sku">{{ it.product.sku|default:'' }}</span>{% endif %}
-              <span>{{ it.quantity|floatformat:2 }} × ${{ it.price|floatformat:2 }}</span>
-            </div>
-          </div>
-          <div class="pk-item-actions">
-            <div class="pk-move">
-              <button type="button" class="pk-move-btn" onclick="pkToggleMove(this); event.stopPropagation();">
-                {% trans "Move to…" %}
-              </button>
-              <div class="pk-move-menu"></div>
-            </div>
-          </div>
+      <div class="pk-rolls">
+        {% for r in p.rows %}
+        <div class="pk-roll-row">
+          <span class="pk-roll-name">{{ r.title }} <span class="pk-roll-sku">{{ r.sku }}</span></span>
+          <code class="pk-roll-bc">{{ r.barcode }}</code>
+          <span class="pk-roll-m">{{ r.meters|floatformat:2 }} m</span>
         </div>
         {% empty %}
-        <div style="padding:24px; text-align:center; color:var(--gray-500); font-size:13px;">
-          {% trans "This order has no items." %}
-        </div>
+        <div class="pk-empty">{% trans "No tops in this package yet." %}</div>
         {% endfor %}
       </div>
     </div>
-
-    <!-- RIGHT: packages -->
-    <div class="pk-card">
-      <div class="pk-packs-h">
-        <h3>{% trans "Packages" %}</h3>
-        <span class="badge" id="packsCount">{{ packs|length }}</span>
-        <button type="button" class="pk-add-pack" onclick="pkAddPack()">
-          <i class="fa fa-plus"></i> {% trans "New package" %}
-        </button>
-      </div>
-      <div class="pk-packs" id="packsList">
-        {% for p in packs %}
-        <div class="pk-pack" data-pack-id="{{ p.pk }}" data-pack-number="{{ p.pack_number }}"
-             data-pack-code="{{ p.code|default:'' }}" data-pack-qr-url="{{ p.qr_code_url|default:'' }}"
-             ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDrop(event)">
-          <div class="pk-pack-h">
-            <span class="pk-pack-num">{{ p.pack_number }}</span>
-            <span class="pk-pack-title">{% trans "Package" %} #{{ p.pack_number }}</span>
-            <span class="pk-pack-meta"><span data-count>0</span> {% trans "items" %}</span>
-            <button type="button" class="pk-pack-view" title="{% trans 'View package details' %}" onclick="showPackModal(this)">
-              <i class="fa fa-eye"></i>
-            </button>
-            <button type="button" class="pk-pack-del" title="{% trans 'Delete package' %}" onclick="pkDeletePack({{ p.pk }})">
-              <i class="fa fa-trash"></i>
-            </button>
-          </div>
-          <div class="pk-pack-body" data-pack-body></div>
-         </div>
-        {% endfor %}
-      </div>
-    </div>
+    {% endfor %}
   </div>
 </div>
 
@@ -223,293 +165,19 @@
     }).then(r => r.json());
   }
 
-  function pkRender() {
-    const packs = [...document.querySelectorAll('.pk-pack')];
-    const items = [...document.querySelectorAll('.pk-item')];
-
-    // Clear pack bodies
-    packs.forEach(p => {
-      const body = p.querySelector('[data-pack-body]');
-      body.querySelectorAll('.pk-item').forEach(i => body.removeChild(i));
-      const hint = body.querySelector('.pk-drop-hint');
-      if (hint) hint.remove();
-    });
-
-    let unassignedCount = 0;
-    items.forEach(it => {
-      const assignedPack = it.dataset.assignedPack;
-      if (assignedPack) {
-        const target = document.querySelector(`.pk-pack[data-pack-id="${assignedPack}"] [data-pack-body]`);
-        if (target) target.appendChild(it);
-      } else {
-        document.getElementById('itemsList').appendChild(it);
-        unassignedCount++;
-      }
-      pkRefreshTag(it);
-    });
-
-    // Empty hints + counts per pack
-    packs.forEach(p => {
-      const body = p.querySelector('[data-pack-body]');
-      const count = body.querySelectorAll('.pk-item').length;
-      if (count === 0) {
-        const hint = document.createElement('div');
-        hint.className = 'pk-drop-hint';
-        hint.textContent = '{% trans "Drop or assign items here" %}';
-        body.appendChild(hint);
-      }
-      const meta = p.querySelector('.pk-pack-meta [data-count]');
-      if (meta) meta.textContent = count;
-    });
-
-    document.getElementById('itemsCount').textContent = items.length;
-    document.getElementById('packsCount').textContent = packs.length;
-  }
-
-  function pkRefreshTag(itemEl) {
-    const assigned = itemEl.dataset.assignedPack;
-    const meta = itemEl.querySelector('.pk-item-meta');
-    if (!meta) return;
-    let tag = meta.querySelector('.pk-item-tag');
-    if (tag) tag.remove();
-    if (assigned) {
-      const pack = document.querySelector(`.pk-pack[data-pack-id="${assigned}"]`);
-      const n = pack ? pack.dataset.packNumber : '?';
-      const t = document.createElement('span');
-      t.className = 'pk-item-tag assigned';
-      t.innerHTML = '<i class="fa fa-box"></i> {% trans "Pack" %} #' + n;
-      meta.appendChild(t);
-      itemEl.classList.add('is-assigned');
-    } else {
-      const t = document.createElement('span');
-      t.className = 'pk-item-tag unassigned';
-      t.textContent = '{% trans "Unassigned" %}';
-      meta.appendChild(t);
-      itemEl.classList.remove('is-assigned');
-    }
-    // Add/remove "X" button
-    const actions = itemEl.querySelector('.pk-item-actions');
-    let removeBtn = actions.querySelector('.pk-pill-btn.danger');
-    if (assigned && !removeBtn) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'pk-pill-btn danger';
-      b.title = '{% trans "Unassign" %}';
-      b.onclick = () => pkRemove(itemEl.dataset.itemId);
-      b.innerHTML = '<i class="fa fa-times"></i>';
-      actions.appendChild(b);
-    } else if (!assigned && removeBtn) {
-      removeBtn.remove();
-    }
-  }
-
-  function pkToggleMove(btn) {
-    const menu = btn.nextElementSibling;
-    document.querySelectorAll('.pk-move-menu.open').forEach(m => {
-      if (m !== menu) m.classList.remove('open');
-    });
-    if (!menu.classList.contains('open')) {
-      pkBuildMoveMenu(btn, menu);
-    }
-    menu.classList.toggle('open');
-  }
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.pk-move')) {
-      document.querySelectorAll('.pk-move-menu.open').forEach(m => m.classList.remove('open'));
-    }
-  });
-
-  function pkBuildMoveMenu(btn, menu) {
-    const itemEl = btn.closest('.pk-item');
-    const current = itemEl.dataset.assignedPack;
-    menu.innerHTML = '';
-    document.querySelectorAll('.pk-pack').forEach(p => {
-      const id = p.dataset.packId;
-      const n = p.dataset.packNumber;
-      const b = document.createElement('button');
-      b.type = 'button';
-      if (String(id) === String(current)) {
-        b.className = 'current';
-        b.textContent = '{% trans "Pack" %} #' + n + '  ✓';
-      } else {
-        b.textContent = '{% trans "Pack" %} #' + n;
-        b.onclick = () => { pkAssign(itemEl.dataset.itemId, id); menu.classList.remove('open'); };
-      }
-      menu.appendChild(b);
-    });
-    if (current) {
-      const sep = document.createElement('div');
-      sep.style.cssText = 'height:1px; background:#EEF1F5; margin:4px 0;';
-      menu.appendChild(sep);
-      const u = document.createElement('button');
-      u.type = 'button';
-      u.textContent = '{% trans "Unassign" %}';
-      u.style.color = '#B91C1C';
-      u.onclick = () => { pkRemove(itemEl.dataset.itemId); menu.classList.remove('open'); };
-      menu.appendChild(u);
-    }
-  }
-
-  function pkAssign(itemId, packId) {
-    pkFetch({ action: 'assign', item_id: itemId, pack_id: packId }).then(data => {
-      if (!data.ok) { alert(data.error || 'Failed'); return; }
-      const it = document.querySelector('.pk-item[data-item-id="' + data.item_id + '"]');
-      if (it) it.dataset.assignedPack = data.pack_id;
-      pkRender();
-    });
-  }
-
-  function pkRemove(itemId) {
-    pkFetch({ action: 'remove', item_id: itemId }).then(data => {
-      if (!data.ok) return;
-      const it = document.querySelector('.pk-item[data-item-id="' + data.item_id + '"]');
-      if (it) it.dataset.assignedPack = '';
-      pkRender();
-    });
-  }
-
   function pkAddPack() {
     pkFetch({ action: 'add_pack' }).then(data => {
       if (!data.ok) { alert(data.error || 'Failed'); return; }
-      const wrap = document.createElement('div');
-      wrap.className = 'pk-pack';
-      wrap.dataset.packId = data.pack.id;
-      wrap.dataset.packNumber = data.pack.number;
-      wrap.dataset.packCode = data.pack.code || '';
-      wrap.dataset.packQrUrl = data.pack.qr_code_url || '';
-      wrap.setAttribute('ondragover', 'pkDragOver(event)');
-      wrap.setAttribute('ondragleave', 'pkDragLeave(event)');
-      wrap.setAttribute('ondrop', 'pkDrop(event)');
-      wrap.innerHTML =
-        '<div class="pk-pack-h">' +
-          '<span class="pk-pack-num">' + data.pack.number + '</span>' +
-          '<span class="pk-pack-title">{% trans "Package" %} #' + data.pack.number + '</span>' +
-          '<span class="pk-pack-meta"><span data-count>0</span> {% trans "items" %}</span>' +
-          '<button type="button" class="pk-pack-view" title="{% trans "View package details" %}" onclick="showPackModal(this)"><i class="fa fa-eye"></i></button>' +
-          '<button type="button" class="pk-pack-del" onclick="pkDeletePack(' + data.pack.id + ')"><i class="fa fa-trash"></i></button>' +
-        '</div>' +
-        '<div class="pk-pack-body" data-pack-body></div>';
-      document.getElementById('packsList').appendChild(wrap);
-      pkRender();
+      window.location.reload();
     });
   }
 
   function pkDeletePack(packId) {
-    if (!confirm('{% trans "Delete this package? Its items will go back to unassigned." %}')) return;
+    if (!confirm('{% trans "Delete this package? Its tops go back to unassigned." %}')) return;
     pkFetch({ action: 'delete_pack', pack_id: packId }).then(data => {
       if (!data.ok) { alert(data.error || 'Failed'); return; }
-      document.querySelectorAll('.pk-item[data-assigned-pack="' + packId + '"]').forEach(it => {
-        it.dataset.assignedPack = '';
-      });
-      const el = document.querySelector('.pk-pack[data-pack-id="' + packId + '"]');
-      if (el) el.remove();
-      pkRender();
+      window.location.reload();
     });
-  }
-
-  // Drag & drop
-  let dragItemId = null;
-  document.addEventListener('dragstart', (e) => {
-    const it = e.target.closest('.pk-item');
-    if (!it) return;
-    dragItemId = it.dataset.itemId;
-    e.dataTransfer.effectAllowed = 'move';
-  });
-  function pkDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('is-target'); e.dataTransfer.dropEffect = 'move'; }
-  function pkDragLeave(e) { e.currentTarget.classList.remove('is-target'); }
-  function pkDrop(e) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('is-target');
-    if (!dragItemId) return;
-    pkAssign(dragItemId, e.currentTarget.dataset.packId);
-    dragItemId = null;
-  }
-
-  // Initial paint
-  pkRender();
-</script>
-
-<!-- Pack Details Modal -->
-<div id="packDetailsModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 20, 25, 0.45); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-  <div style="background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 500px; width: 100%; overflow: hidden; border: 1px solid #E2E8EE;">
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F3F4F6;">
-      <h3 style="margin: 0; font-family: var(--font-sans); font-size: 16px; font-weight: 700; color: var(--ink);" id="modalPackTitle">{% trans "Package Details" %}</h3>
-      <button onclick="closePackModal()" style="background: none; border: none; cursor: pointer; color: var(--gray-500); font-size: 20px;"><i class="fa fa-times"></i></button>
-    </div>
-    <div style="padding: 20px; text-align: center;">
-      <div style="background: #F9FAFB; border-radius: 12px; padding: 20px; display: inline-block; margin-bottom: 18px; border: 1px solid #E5E7EB;">
-        <img id="modalPackQR" src="" alt="QR Code" style="width: 150px; height: 150px; display: block; margin: 0 auto;" />
-        <div id="modalPackCode" style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--gray-700); margin-top: 10px;"></div>
-      </div>
-      <div style="text-align: left;">
-        <h4 style="margin: 0 0 8px; font-family: var(--font-sans); font-size: 13px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.05em;">{% trans "Package Contents" %}</h4>
-        <div id="modalPackItems" style="max-height: 180px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px; background: white; padding: 6px 12px;"></div>
-      </div>
-    </div>
-    <div style="display: flex; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid #F3F4F6; background: #F9FAFB; gap: 8px;">
-      <a id="modalPackPrintBtn" href="" class="pk-pill-btn" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;" target="_blank">
-        <i class="fa fa-print"></i> {% trans "Print Label" %}
-      </a>
-      <button onclick="closePackModal()" class="pk-pill-btn" style="background: var(--nejum-teal-600); color: white; border-color: var(--nejum-teal-700);">{% trans "Close" %}</button>
-    </div>
-  </div>
-</div>
-
-<script>
-  function showPackModal(btn) {
-    const packEl = btn.closest('.pk-pack');
-    const packId = packEl.dataset.packId;
-    const packNum = packEl.dataset.packNumber;
-    const packCode = packEl.dataset.packCode || `PK-{{ order.order_number|default:order.pk }}-${packNum}`;
-    const qrUrl = packEl.dataset.packQrUrl;
-
-    document.getElementById('modalPackTitle').textContent = `{% trans "Package Details" %} #${packNum}`;
-    document.getElementById('modalPackCode').textContent = packCode;
-    
-    const qrImg = document.getElementById('modalPackQR');
-    if (qrUrl) {
-      qrImg.src = qrUrl;
-      qrImg.style.display = 'block';
-    } else {
-      qrImg.style.display = 'none';
-    }
-
-    const itemsContainer = document.getElementById('modalPackItems');
-    itemsContainer.innerHTML = '';
-    const itemEls = packEl.querySelectorAll('.pk-item');
-    if (itemEls.length === 0) {
-      itemsContainer.innerHTML = '<div style="color: var(--gray-500); padding: 8px 0; text-align: center;">{% trans "Empty package" %}</div>';
-    } else {
-      itemEls.forEach(el => {
-        const name = el.querySelector('.pk-item-name').textContent.trim();
-        const meta = el.querySelector('.pk-item-meta').cloneNode(true);
-        const div = document.createElement('div');
-        div.style.padding = '8px 0';
-        div.style.borderBottom = '1px solid #F3F4F6';
-        
-        const titleDiv = document.createElement('div');
-        titleDiv.style.fontWeight = '600';
-        titleDiv.style.color = 'var(--ink)';
-        titleDiv.textContent = name;
-        
-        div.appendChild(titleDiv);
-        div.appendChild(meta);
-        itemsContainer.appendChild(div);
-      });
-      if (itemsContainer.lastElementChild) {
-        itemsContainer.lastElementChild.style.borderBottom = 'none';
-      }
-    }
-
-    const printBtn = document.getElementById('modalPackPrintBtn');
-    printBtn.href = `/operating/packs/${packId}/pdf/`;
-
-    document.getElementById('packDetailsModal').style.display = 'flex';
-  }
-
-  function closePackModal() {
-    document.getElementById('packDetailsModal').style.display = 'none';
   }
 </script>
 {% endblock %}

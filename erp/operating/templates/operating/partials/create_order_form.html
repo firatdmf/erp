@@ -350,6 +350,8 @@
       </div>
       <div style="font:500 11.5px 'Inter',sans-serif; color:#64748B; margin-top:2px;">
         <span id="co-total-count">0</span> {% trans "items" %}
+        <span style="margin:0 4px;color:#CBD5E1;">·</span>
+        <span id="co-total-tops">0</span> {% trans "top" %}
       </div>
     </div>
     <div id="co-total-amount"
@@ -756,10 +758,15 @@
       }
     }
 
+    var selectedCount = existing.length + picked.length;
+
     return '<div class="co-roll-section" style="margin-top:10px;padding:10px;background:#F8FAFC;border:1px solid #E2E8EE;border-radius:8px;">' +
       '<label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;color:#0F766E;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;">' +
         '<i class="fas fa-layer-group"></i> {% trans "Toplar" %}' +
         '<span style="font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;">({% trans "seçmek için tıklayın" %})</span>' +
+        '<span class="co-roll-count-badge" style="margin-left:auto;font-weight:800;font-size:10.5px;letter-spacing:0;text-transform:none;color:' + (selectedCount ? '#0F766E' : '#94A3B8') + ';background:' + (selectedCount ? '#D1FAE5' : '#F1F5F9') + ';padding:2px 8px;border-radius:999px;">' +
+          selectedCount + ' {% trans "top" %}' +
+        '</span>' +
       '</label>' +
       searchBlock +
       '<div class="co-rolls-list" data-roll-list-i="' + i + '" style="max-height:220px;overflow-y:auto;">' + rowsHtml + '</div>' +
@@ -1106,15 +1113,18 @@
   function updateTotal() {
     const amtEl = document.getElementById('co-total-amount');
     const cntEl = document.getElementById('co-total-count');
+    const topsEl = document.getElementById('co-total-tops');
     if (!amtEl) return;
-    let sum = 0;
+    let sum = 0, topCount = 0;
     orderItems.forEach(it => {
       const q = parseFloat(it.quantity) || 0;
       const p = parseFloat(it.price) || 0;
       sum += q * p;
+      topCount += (it.existingRolls || []).length + (it.rolls || []).length;
     });
     amtEl.textContent = '$' + sum.toFixed(2);
     if (cntEl) cntEl.textContent = orderItems.length;
+    if (topsEl) topsEl.textContent = topCount;
   }
 
   // Deposit / Total / Remaining row was removed in favor of the

@@ -8052,3 +8052,49 @@ msgstr "Borçlu hesap yok."
 #: current_account/templates/current_account/cari_list.html
 msgid "No creditor accounts."
 msgstr "Alacaklı hesap yok."
+
+#: operating/templates/operating/partials/create_order_form.html
+msgid "top"
+msgstr "top"
+
+#: operating/templates/operating/order_packing_list.html
+msgid "%(c)s scanned top is not yet in a package."
+msgid_plural "%(c)s scanned tops are not yet in a package."
+msgstr[0] "%(c)s taranan top henüz bir pakete atanmadı."
+msgstr[1] "%(c)s taranan top henüz bir pakete atanmadı."
+
+#: operating/templates/operating/order_packing_list.html
+msgid "Finish packing"
+msgstr "Paketlemeyi bitir"
+
+#: operating/templates/operating/order_packing_list.html
+msgid "Package list"
+msgstr "Paket listesi"
+
+#: operating/templates/operating/order_packing_list.html
+msgid ""
+"View only — to change which top goes in which package, use the Packing (Scan"
+" tops) screen."
+msgstr ""
+"Yalnızca görüntüleme — hangi topun hangi pakette olacağını değiştirmek için "
+"Paketleme (Top Okut) ekranını kullanın."
+
+#: operating/templates/operating/order_packing_list.html
+msgid "Download full list (PDF)"
+msgstr "Tüm listeyi indir (PDF)"
+
+#: operating/templates/operating/order_packing_list.html
+msgid "Print this package (PDF)"
+msgstr "Bu paketi yazdır (PDF)"
+
+#: operating/templates/operating/order_packing_list.html
+msgid "No tops in this package yet."
+msgstr "Bu pakette henüz top yok."
+
+#: operating/templates/operating/order_packing_list.html
+msgid "Delete package? Its tops go back to unassigned."
+msgstr "Paket silinsin mi? İçindeki toplar atanmamış duruma döner."
+
+#: operating/templates/operating/order_packing_list.html
+msgid "Delete this package? Its tops go back to unassigned."
+msgstr "Bu paket silinsin mi? İçindeki toplar atanmamış duruma döner."

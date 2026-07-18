@@ -408,6 +408,13 @@ class InvoiceEdit(View):
             "prefilled_cari": invoice.cari,
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices": Invoice.INVOICE_TYPES,
+            # Order-linked invoices mirror the order's items — the order
+            # itself is what the cari balance is actually computed from
+            # (see issue()/post_order_movement), so letting someone edit
+            # quantities/prices HERE would silently detach the invoice
+            # from what's really owed. Items are read-only in that case;
+            # see the matching enforcement in post() below.
+            "items_locked": bool(invoice.order_id),
             "items_json": json.dumps([{
                 "description":   it.description,
                 "product_id":    it.product_id,
@@ -427,14 +434,23 @@ class InvoiceEdit(View):
         if blocked:
             return blocked
 
-        try:
-            items_data = _parse_items(request.POST.get("items_json", ""))
-        except ValueError as e:
-            messages.error(request, str(e))
-            return redirect("current_account:invoice_edit", pk=pk)
-        if not items_data:
-            messages.error(request, _g("You must add at least one invoice item."))
-            return redirect("current_account:invoice_edit", pk=pk)
+        # Order-linked invoices mirror the order — the cari balance is
+        # computed from the ORDER (see issue()/post_order_movement), not
+        # from these items, so item edits here would just make the
+        # printed invoice lie about what's actually owed. Ignore
+        # whatever the client sent for items entirely rather than
+        # trusting a hidden/disabled field to have stayed untouched.
+        items_locked = bool(invoice.order_id)
+        items_data = None
+        if not items_locked:
+            try:
+                items_data = _parse_items(request.POST.get("items_json", ""))
+            except ValueError as e:
+                messages.error(request, str(e))
+                return redirect("current_account:invoice_edit", pk=pk)
+            if not items_data:
+                messages.error(request, _g("You must add at least one invoice item."))
+                return redirect("current_account:invoice_edit", pk=pk)
 
         with transaction.atomic():
             invoice.type = request.POST.get("type") or invoice.type
@@ -454,13 +470,14 @@ class InvoiceEdit(View):
                 setattr(invoice, f, (request.POST.get(f) or "").strip())
             invoice.save()
 
-            # Wipe + recreate items. For issued invoices this is also
-            # safe because each InvoiceItem doesn't carry external
-            # references — only the parent Invoice + its posted_movement
-            # do, which we update next.
-            invoice.items.all().delete()
-            for item in items_data:
-                InvoiceItem.objects.create(invoice=invoice, **item)
+            if not items_locked:
+                # Wipe + recreate items. For issued invoices this is also
+                # safe because each InvoiceItem doesn't carry external
+                # references — only the parent Invoice + its posted_movement
+                # do, which we update next.
+                invoice.items.all().delete()
+                for item in items_data:
+                    InvoiceItem.objects.create(invoice=invoice, **item)
             invoice.recompute_totals(save=True)
 
             # ── Sync the cari movement if this invoice was already

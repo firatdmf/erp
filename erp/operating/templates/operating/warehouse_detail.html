@@ -901,7 +901,7 @@
   }
   .np-panel {
     position: absolute; top: 0; right: 0; bottom: 0;
-    width: 460px; max-width: 94vw;
+    width: 860px; max-width: 96vw;
     background: #F7F9FB;
     box-shadow: -18px 0 48px rgba(15, 23, 31, 0.22);
     display: flex; flex-direction: column;
@@ -1028,14 +1028,25 @@
   .np-price-label { font: 600 11px var(--font-sans); color: var(--gray-500); min-width: 92px; }
   .np-price-row .np-input { height: 36px; flex: 1; min-width: 0; }
   .np-price-row .np-select { height: 36px; width: 74px; flex: 0 0 74px; padding: 0 6px; }
-  .np-add-top, .np-add-variant {
+  .np-add-top, .np-add-variant, .np-add-product {
     margin-top: 9px; width: 100%; border: 1px dashed #BFD6D2; background: #F2F8F7;
     color: var(--nejum-teal-700); border-radius: 9px; padding: 9px; cursor: pointer;
     font: 600 12.5px var(--font-sans); display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   }
   .np-add-top { padding: 7px; font-size: 12px; background: #F6FAFA; }
   .np-add-variant { margin-top: 12px; }
-  .np-add-top:hover, .np-add-variant:hover { background: #E9F5F3; border-color: var(--nejum-teal-500); }
+  .np-add-product { margin-top: 2px; padding: 11px; font-size: 13px; }
+  .np-add-top:hover, .np-add-variant:hover, .np-add-product:hover { background: #E9F5F3; border-color: var(--nejum-teal-500); }
+
+  /* Product cards — one per main product, all visible in the one panel so
+     a multi-product delivery never needs the panel closed/reopened. */
+  .np-products { display: flex; flex-direction: column; gap: 14px; margin-bottom: 4px; }
+  .np-product-card {
+    background: #F5F9F9; border: 1.5px solid #D3E2DF; border-radius: 14px;
+    padding: 14px; box-shadow: 0 1px 3px rgba(15,23,31,0.05);
+  }
+  .np-product-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .np-product-no { font: 800 12px var(--font-sans); color: var(--nejum-teal-700); letter-spacing: 0.04em; text-transform: uppercase; }
 
   .np-foot {
     flex-shrink: 0; border-top: 1px solid #E2E8EE; background: white;
@@ -1044,7 +1055,7 @@
   .np-summary { font: 500 12px var(--font-sans); color: var(--gray-600); min-height: 16px; }
   .np-summary b { color: #0F1419; }
   .np-actions { display: flex; gap: 8px; }
-  .np-actions .ord-btn { flex: 1; justify-content: center; }
+  .np-actions .ord-btn { flex: 1; justify-content: center; white-space: normal; text-align: center; line-height: 1.25; }
   .np-actions .ord-btn[disabled] { opacity: 0.55; pointer-events: none; }
 
   @media (max-width: 560px) {
@@ -1664,7 +1675,7 @@
     </div>
 
     <div class="np-body">
-      <!-- Supplier → barcode prefix -->
+      <!-- Supplier → barcode prefix (whole batch — one delivery) -->
       <div class="np-field">
         <label>{% trans "Supplier" %}</label>
         <select id="npSupplier" class="np-select" onchange="npUpdatePrefix()">
@@ -1676,27 +1687,7 @@
         <div class="np-hint">{% trans "Barcode prefix" %}: <b id="npPrefix">GEN</b> · {% trans "each top gets its own unique barcode" %}</div>
       </div>
 
-      <!-- Main product: new or existing -->
-      <div class="np-field">
-        <label>{% trans "Main product" %}</label>
-        <div class="np-seg">
-          <button type="button" class="np-seg-btn active" data-mode="new" onclick="npSetMode('new')">{% trans "New" %}</button>
-          <button type="button" class="np-seg-btn" data-mode="existing" onclick="npSetMode('existing')">{% trans "Existing" %}</button>
-        </div>
-        <div id="npNewMain">
-          <input id="npMainName" class="np-input" placeholder="{% trans 'Name (e.g. GREK)' %}" oninput="npOnNameInput()">
-          <div class="np-hint" style="margin-top:6px;">{% trans "Product SKU" %}: <b id="npMainSkuHint">GEN###</b> · {% trans "auto, unique. Groups the variants below." %}</div>
-        </div>
-        <div id="npExistingMain" class="np-ac-wrap" style="display:none;">
-          <input id="npMainSearch" class="np-input" placeholder="{% trans 'Search existing main product (name or SKU)…' %}" autocomplete="off" oninput="npSearchMain(this.value)">
-          <input type="hidden" id="npMainId">
-          <input type="hidden" id="npMainExistingSku">
-          <div id="npMainDrop" class="np-ac-drop"></div>
-          <div id="npExistingVariants" class="np-existing-variants" style="display:none;"></div>
-        </div>
-      </div>
-
-      <!-- Unit (generic: fabric=m, bedding=pcs, …) -->
+      <!-- Unit (generic: fabric=m, bedding=pcs, …) — whole batch -->
       <div class="np-field">
         <label>{% trans "Unit" %}</label>
         <select id="npUnit" class="np-select" onchange="npRelabelUnits(); npSummaryUpdate();">
@@ -1707,40 +1698,19 @@
         </select>
       </div>
 
-      <!-- Variants & their tops -->
-      <div class="np-field" style="margin-bottom:8px;">
-        <label>{% trans "Variants & tops" %}</label>
-        <div class="np-seg" id="npVarMode">
-          <button type="button" class="np-seg-btn" data-hv="0" onclick="npSetHasVariants(false)">{% trans "No variant" %}</button>
-          <button type="button" class="np-seg-btn active" data-hv="1" onclick="npSetHasVariants(true)">{% trans "Has variants" %}</button>
-        </div>
-      </div>
-
-      <!-- No-variant ("simple product"): just price + quantity (tops) -->
-      <div id="npNoVariant" style="display:none;">
-        <div class="np-variant">
-          <div class="np-price-row">
-            <span class="np-price-label">{% trans "Purchase price" %}</span>
-            <input class="np-input np-nv-price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">
-            <select class="np-select np-nv-cur"><option>USD</option><option>TRY</option><option>EUR</option></select>
-          </div>
-          <div class="np-tops" id="npNvTops"></div>
-          <button type="button" class="np-add-top" onclick="npAddTop(document.getElementById('npNoVariant').querySelector('.np-variant'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>
-        </div>
-      </div>
-
-      <!-- Variant cards -->
-      <div id="npVariantsWrap">
-        <div class="np-variants" id="npVariants"></div>
-        <button type="button" class="np-add-variant" onclick="npAddVariant()"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>
-      </div>
+      <!-- Products — one card per main product (+ its variants & tops). A
+           delivery often has several unrelated products, so this is a
+           repeatable list: everything stays visible and editable in this
+           one window, and it's all saved together in one submit. -->
+      <div class="np-products" id="npProducts"></div>
+      <button type="button" class="np-add-product" onclick="npAddProduct()"><i class="fa fa-plus"></i> {% trans "Add product" %}</button>
     </div>
 
     <div class="np-foot">
       <div class="np-summary" id="npSummary"></div>
       <div class="np-actions">
-        <button type="button" class="ord-btn ghost" onclick="closeNewProduct()">{% trans "Cancel" %}</button>
-        <button type="button" class="ord-btn primary" id="npSaveBtn" onclick="npSave()"><i class="fa fa-check"></i> {% trans "Save" %}</button>
+        <button type="button" class="ord-btn ghost" onclick="closeNewProduct()">{% trans "Close" %}</button>
+        <button type="button" class="ord-btn primary" id="npSaveBtn" onclick="npSave()"><i class="fa fa-check"></i> {% trans "Save all" %}</button>
       </div>
     </div>
   </aside>
@@ -1759,39 +1729,34 @@
   const NP_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
   const NP_CUR = '<select class="np-select np-v-cur"><option>USD</option><option>TRY</option><option>EUR</option></select>';
   let npVid = 0;
-  let npMode = 'new';
-  let npHasVariants = true;
-  let npPreviewSku = '';
-  let npNextSkuTimer = null;
-  // Existing variants of the currently-selected main product (mode=existing),
-  // fetched via NP_VARIANTS_TPL — lets the panel show "already on this
-  // product" state before the user even types a variant name.
-  window.npExistingVariants = [];
 
   function npCurPrefix() {
     const sel = document.getElementById('npSupplier');
     const opt = sel && sel.options[sel.selectedIndex];
     return ((opt && opt.getAttribute('data-prefix')) || 'GEN') || 'GEN';
   }
-  // Fetch the next auto product SKU so the panel shows it (and roots variant
-  // SKUs on it) up-front, not only after saving.
-  function npFetchNextSku() {
-    const hint = document.getElementById('npMainSkuHint');
-    if (npMode !== 'new') { npPreviewSku = ''; return; }
+  // Fetch the next auto product SKU for ONE product card so the panel shows
+  // it (and roots that card's variant SKUs on it) up-front, not only after
+  // saving. Indicative only — if several cards are in "new" mode at once
+  // they may briefly preview the same number; the backend mints the real,
+  // unique SKUs sequentially at save time regardless.
+  function npFetchNextSku(cardEl) {
+    const hint = cardEl.querySelector('.np-main-sku-hint');
+    if (cardEl._npMode !== 'new') { cardEl._npPreviewSku = ''; return; }
     const prefix = npCurPrefix();
     if (hint) hint.textContent = prefix + '…';
-    clearTimeout(npNextSkuTimer);
-    npNextSkuTimer = setTimeout(function () {
+    clearTimeout(cardEl._npNextSkuTimer);
+    cardEl._npNextSkuTimer = setTimeout(function () {
       fetch(NP_NEXTSKU + '?prefix=' + encodeURIComponent(prefix), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          npPreviewSku = (d && d.sku) || (prefix + '001');
-          if (hint) hint.textContent = npPreviewSku;
-          npRefreshVariantSkus();
+          cardEl._npPreviewSku = (d && d.sku) || (prefix + '001');
+          if (hint) hint.textContent = cardEl._npPreviewSku;
+          npRefreshVariantSkus(cardEl);
         }).catch(function () {
-          npPreviewSku = prefix + '001';
-          if (hint) hint.textContent = npPreviewSku;
-          npRefreshVariantSkus();
+          cardEl._npPreviewSku = prefix + '001';
+          if (hint) hint.textContent = cardEl._npPreviewSku;
+          npRefreshVariantSkus(cardEl);
         });
     }, 120);
   }
@@ -1803,21 +1768,22 @@
   function slug(s) {
     return (s || '').toUpperCase().replace(/[^A-Z0-9ĞÜŞİÖÇ]/gi, '').slice(0, 10);
   }
-  function npBaseSku() {
-    if (npMode === 'existing') {
-      const ex = (document.getElementById('npMainExistingSku') || {}).value || '';
+  function npBaseSku(cardEl) {
+    if (cardEl._npMode === 'existing') {
+      const ex = (cardEl.querySelector('.np-main-existing-sku') || {}).value || '';
       if (ex) return ex.toUpperCase();
-      return slug((document.getElementById('npMainSearch') || {}).value || '');
+      return slug((cardEl.querySelector('.np-main-search') || {}).value || '');
     }
     // NEW mode: root variant SKUs on the previewed main SKU (e.g. KZL004).
-    return (npPreviewSku || '').toUpperCase();
+    return (cardEl._npPreviewSku || '').toUpperCase();
   }
 
   window.openNewProduct = function () {
     const ov = document.getElementById('newProductOverlay');
     if (!ov) return;
-    if (!document.querySelectorAll('#npVariants .np-variant').length) npAddVariant();
-    if (!document.querySelector('#npNvTops .np-top')) npAddTop(document.getElementById('npNoVariant').querySelector('.np-variant'));
+    const wrap = document.getElementById('npProducts');
+    if (wrap) wrap.innerHTML = '';
+    npAddProduct();
     ov.classList.add('show');
     ov.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -1832,53 +1798,142 @@
     document.body.style.overflow = '';
   };
 
-  window.npSetMode = function (mode) {
-    npMode = mode;
-    document.querySelectorAll('#newProductOverlay .np-seg-btn[data-mode]').forEach(function (b) {
+  // One card = one main product (new or existing) + its variants & tops.
+  // Per-card state (mode, has-variants, sku preview, existing-variant list)
+  // lives directly on the card element so any number of products can be
+  // built up side by side in this one window.
+  window.npAddProduct = function () {
+    const wrap = document.getElementById('npProducts');
+    if (!wrap) return;
+    const el = document.createElement('div');
+    el.className = 'np-product-card';
+    el._npMode = 'new';
+    el._npHasVariants = true;
+    el._npPreviewSku = '';
+    el._npNextSkuTimer = null;
+    el._npSearchTimer = null;
+    el._npExistingVariants = [];
+    el.innerHTML =
+      '<div class="np-product-head">' +
+        '<span class="np-product-no">{% trans "Product" %}</span>' +
+        '<button type="button" class="np-mini-x np-product-rm" title="{% trans "Remove" %}" onclick="npRemoveProduct(this)">' + NP_TRASH + '</button>' +
+      '</div>' +
+      '<div class="np-field">' +
+        '<label>{% trans "Main product" %}</label>' +
+        '<div class="np-seg">' +
+          '<button type="button" class="np-seg-btn active" data-mode="new" onclick="npSetMode(this, \'new\')">{% trans "New" %}</button>' +
+          '<button type="button" class="np-seg-btn" data-mode="existing" onclick="npSetMode(this, \'existing\')">{% trans "Existing" %}</button>' +
+        '</div>' +
+        '<div class="np-new-main">' +
+          '<input class="np-input np-main-name" placeholder="{% trans "Name (e.g. GREK)" %}" oninput="npOnNameInput(this)">' +
+          '<div class="np-hint" style="margin-top:6px;">{% trans "Product SKU" %}: <b class="np-main-sku-hint">' + npCurPrefix() + '###</b> · {% trans "auto, unique. Groups the variants below." %}</div>' +
+        '</div>' +
+        '<div class="np-existing-main np-ac-wrap" style="display:none;">' +
+          '<input class="np-input np-main-search" placeholder="{% trans "Search existing main product (name or SKU)…" %}" autocomplete="off" oninput="npSearchMain(this)">' +
+          '<input type="hidden" class="np-main-id">' +
+          '<input type="hidden" class="np-main-existing-sku">' +
+          '<div class="np-main-drop np-ac-drop"></div>' +
+          '<div class="np-existing-variants" style="display:none;"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="np-field" style="margin-bottom:8px;">' +
+        '<label>{% trans "Variants & tops" %}</label>' +
+        '<div class="np-seg">' +
+          '<button type="button" class="np-seg-btn" data-hv="0" onclick="npSetHasVariants(this, false)">{% trans "No variant" %}</button>' +
+          '<button type="button" class="np-seg-btn active" data-hv="1" onclick="npSetHasVariants(this, true)">{% trans "Has variants" %}</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="np-no-variant" style="display:none;">' +
+        '<div class="np-variant">' +
+          '<div class="np-price-row">' +
+            '<span class="np-price-label">{% trans "Purchase price" %}</span>' +
+            '<input class="np-input np-nv-price" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
+            NP_CUR +
+          '</div>' +
+          '<div class="np-tops np-nv-tops"></div>' +
+          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="np-variants-wrap">' +
+        '<div class="np-variants"></div>' +
+        '<button type="button" class="np-add-variant" onclick="npAddVariant(this.closest(\'.np-product-card\'))"><i class="fa fa-plus"></i> {% trans "Add variant" %}</button>' +
+      '</div>';
+    wrap.appendChild(el);
+    npAddVariant(el);
+    npFetchNextSku(el);
+    npRenumberProducts();
+    npSummaryUpdate();
+    const nameInput = el.querySelector('.np-main-name');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (nameInput) nameInput.focus();
+  };
+  // Renumber product cards AND hide the remove icon when only one is left
+  // (there must always be at least one product in the batch).
+  window.npRenumberProducts = function () {
+    const cards = document.querySelectorAll('#npProducts .np-product-card');
+    cards.forEach(function (card, i) {
+      const no = card.querySelector('.np-product-no');
+      if (no) no.textContent = '{% trans "Product" %} ' + (i + 1);
+      const rm = card.querySelector('.np-product-rm');
+      if (rm) rm.style.display = (cards.length <= 1) ? 'none' : '';
+    });
+  };
+  window.npRemoveProduct = function (btn) {
+    const card = btn.closest('.np-product-card');
+    if (card) card.remove();
+    npRenumberProducts();
+    npSummaryUpdate();
+  };
+
+  window.npSetMode = function (btnEl, mode) {
+    const card = btnEl.closest('.np-product-card');
+    card._npMode = mode;
+    card.querySelectorAll('.np-seg-btn[data-mode]').forEach(function (b) {
       b.classList.toggle('active', b.getAttribute('data-mode') === mode);
     });
-    document.getElementById('npNewMain').style.display = (mode === 'new') ? '' : 'none';
-    document.getElementById('npExistingMain').style.display = (mode === 'existing') ? '' : 'none';
+    card.querySelector('.np-new-main').style.display = (mode === 'new') ? '' : 'none';
+    card.querySelector('.np-existing-main').style.display = (mode === 'existing') ? '' : 'none';
     if (mode === 'new') {
       // Leaving "existing" — drop its search + selection state so a fresh
       // "New" entry never inherits the previous product's variant badges.
-      document.getElementById('npMainSearch').value = '';
-      document.getElementById('npMainId').value = '';
-      const exReset = document.getElementById('npMainExistingSku'); if (exReset) exReset.value = '';
-      const dropReset = document.getElementById('npMainDrop'); if (dropReset) { dropReset.classList.remove('show'); dropReset.innerHTML = ''; }
-      window.npResetExistingVariants();
-      document.querySelectorAll('#npVariants .np-v-sku').forEach(function (s) { delete s.dataset.matchLocked; });
+      card.querySelector('.np-main-search').value = '';
+      card.querySelector('.np-main-id').value = '';
+      const exReset = card.querySelector('.np-main-existing-sku'); if (exReset) exReset.value = '';
+      const dropReset = card.querySelector('.np-main-drop'); if (dropReset) { dropReset.classList.remove('show'); dropReset.innerHTML = ''; }
+      npResetExistingVariants(card);
+      card.querySelectorAll('.np-variants .np-v-sku').forEach(function (s) { delete s.dataset.matchLocked; });
     }
-    npFetchNextSku();
-    npRefreshVariantSkus();
-    npRefreshVariantMatches();
+    npFetchNextSku(card);
+    npRefreshVariantSkus(card);
+    npRefreshVariantMatches(card);
   };
 
-  window.npSetHasVariants = function (has) {
-    npHasVariants = !!has;
-    document.querySelectorAll('#npVarMode .np-seg-btn').forEach(function (b) {
-      b.classList.toggle('active', (b.getAttribute('data-hv') === '1') === npHasVariants);
+  window.npSetHasVariants = function (btnEl, has) {
+    const card = btnEl.closest('.np-product-card');
+    card._npHasVariants = !!has;
+    card.querySelectorAll('.np-seg-btn[data-hv]').forEach(function (b) {
+      b.classList.toggle('active', (b.getAttribute('data-hv') === '1') === card._npHasVariants);
     });
-    document.getElementById('npVariantsWrap').style.display = npHasVariants ? '' : 'none';
-    document.getElementById('npNoVariant').style.display = npHasVariants ? 'none' : '';
-    if (!npHasVariants && !document.querySelector('#npNvTops .np-top')) {
-      npAddTop(document.getElementById('npNoVariant').querySelector('.np-variant'));
+    card.querySelector('.np-variants-wrap').style.display = card._npHasVariants ? '' : 'none';
+    card.querySelector('.np-no-variant').style.display = card._npHasVariants ? 'none' : '';
+    if (!card._npHasVariants && !card.querySelector('.np-nv-tops .np-top')) {
+      npAddTop(card.querySelector('.np-no-variant .np-variant'));
     }
-    if (npHasVariants && !document.querySelectorAll('#npVariants .np-variant').length) npAddVariant();
+    if (card._npHasVariants && !card.querySelectorAll('.np-variants .np-variant').length) npAddVariant(card);
     npSummaryUpdate();
   };
 
   window.npUpdatePrefix = function () {
     const p = npCurPrefix();
     const a = document.getElementById('npPrefix'); if (a) a.textContent = p;
-    npFetchNextSku();
+    document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) { npFetchNextSku(card); });
   };
 
-  window.npOnNameInput = function () {
-    npRefreshVariantSkus();
+  window.npOnNameInput = function (inputEl) {
+    npRefreshVariantSkus(inputEl.closest('.np-product-card'));
   };
-  window.npRefreshVariantSkus = function () {
-    document.querySelectorAll('#npVariants .np-variant').forEach(function (v) { npSuggestVariantSku(v); });
+  window.npRefreshVariantSkus = function (cardEl) {
+    cardEl.querySelectorAll('.np-variants .np-variant').forEach(function (v) { npSuggestVariantSku(v); });
   };
   window.npSuggestVariantSku = function (vEl) {
     const nameI = vEl.querySelector('.np-v-name');
@@ -1887,7 +1942,8 @@
     // npCheckVariantMatch below) — the auto-suggestion must never overwrite
     // it with a freshly generated code.
     if (!skuI || skuI.dataset.touched || skuI.dataset.matchLocked) return;
-    const root = npBaseSku();
+    const card = vEl.closest('.np-product-card');
+    const root = npBaseSku(card);
     const sfx = slug(nameI.value) || vEl.dataset.vid;
     skuI.value = root ? (root + '-' + sfx).slice(0, 20) : '';
   };
@@ -1897,8 +1953,8 @@
   // Reuses the same parse/translate rules sync_roll_to_catalog applies at
   // save time (via the catalog_variant_match endpoint) so this preview and
   // the actual save never disagree.
-  window.npRefreshVariantMatches = function () {
-    document.querySelectorAll('#npVariants .np-variant').forEach(function (v) { npQueueVariantMatch(v); });
+  window.npRefreshVariantMatches = function (cardEl) {
+    cardEl.querySelectorAll('.np-variants .np-variant').forEach(function (v) { npQueueVariantMatch(v); });
   };
   window.npQueueVariantMatch = function (vEl) {
     clearTimeout(vEl._npMatchTimer);
@@ -1909,12 +1965,13 @@
     const skuI = vEl.querySelector('.np-v-sku');
     const nameI = vEl.querySelector('.np-v-name');
     if (!badge || !skuI || !nameI) return;
-    const productId = document.getElementById('npMainId').value;
+    const card = vEl.closest('.np-product-card');
+    const productId = card.querySelector('.np-main-id').value;
     const name = (nameI.value || '').trim();
     // Release a previous lock as soon as the classification is stale — it
     // gets re-set below if the (possibly new) name still matches.
     delete skuI.dataset.matchLocked;
-    if (npMode !== 'existing' || !productId || !name) {
+    if (card._npMode !== 'existing' || !productId || !name) {
       badge.classList.remove('show', 'new'); badge.innerHTML = '';
       return;
     }
@@ -1961,7 +2018,7 @@
     }
   };
 
-  window.npAddVariant = function () {
+  window.npAddVariant = function (cardEl) {
     npVid += 1;
     const el = document.createElement('div');
     el.className = 'np-variant';
@@ -1983,16 +2040,16 @@
       '</div>' +
       '<div class="np-tops"></div>' +
       '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>';
-    document.getElementById('npVariants').appendChild(el);
+    cardEl.querySelector('.np-variants').appendChild(el);
     npSuggestVariantSku(el);
     npAddTop(el);
-    npRenumberVariants();
+    npRenumberVariants(cardEl);
     npSummaryUpdate();
   };
   // Renumber the variant labels AND hide the remove icon on the FIRST variant
   // (there must always be at least one in "Has variants" mode).
-  window.npRenumberVariants = function () {
-    const vs = document.querySelectorAll('#npVariants .np-variant');
+  window.npRenumberVariants = function (cardEl) {
+    const vs = cardEl.querySelectorAll('.np-variants .np-variant');
     vs.forEach(function (v, i) {
       const no = v.querySelector('.np-variant-no');
       if (no) no.textContent = '{% trans "Variant" %} ' + (i + 1);
@@ -2002,8 +2059,9 @@
   };
   window.npRemoveVariant = function (btn) {
     const v = btn.closest('.np-variant');
+    const card = btn.closest('.np-product-card');
     if (v) v.remove();
-    npRenumberVariants();
+    npRenumberVariants(card);
     npSummaryUpdate();
   };
 
@@ -2034,62 +2092,68 @@
     document.querySelectorAll('#newProductOverlay .np-top-unit').forEach(function (s) { s.textContent = u; });
   };
 
+  // Aggregate across EVERY product card — the whole batch's totals, so the
+  // footer reflects everything in the window, not just one product.
   window.npSummaryUpdate = function () {
-    let vcount = 0, tcount = 0, total = 0;
+    let pcount = 0, vcount = 0, tcount = 0, total = 0;
     function addQ(q) {
       const val = parseFloat((q.value || '').replace(',', '.'));
       if (!isNaN(val) && val > 0) { tcount++; total += val; }
     }
-    if (npHasVariants) {
-      document.querySelectorAll('#npVariants .np-variant').forEach(function (v) {
-        vcount++;
-        v.querySelectorAll('.np-top-qty').forEach(addQ);
-      });
-    } else {
-      document.querySelectorAll('#npNvTops .np-top-qty').forEach(addQ);
-    }
+    document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) {
+      pcount++;
+      if (card._npHasVariants) {
+        card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
+          vcount++;
+          v.querySelectorAll('.np-top-qty').forEach(addQ);
+        });
+      } else {
+        card.querySelectorAll('.np-nv-tops .np-top-qty').forEach(addQ);
+      }
+    });
     const el = document.getElementById('npSummary');
     if (el) {
       el.style.color = '';
-      el.innerHTML = (npHasVariants ? ('<b>' + vcount + '</b> {% trans "variants" %} · ') : '') +
+      el.innerHTML = '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
         '<b>' + tcount + '</b> {% trans "tops" %} · <b>' + (Math.round(total * 100) / 100) + '</b> ' + unitShort();
     }
   };
 
-  // Clear the existing-variants chip row and every per-card match badge —
-  // called whenever the selected main product changes or is cleared, so a
-  // stale "MEVCUT/YENİ" verdict from the previous product never lingers.
-  window.npResetExistingVariants = function () {
-    window.npExistingVariants = [];
-    const box = document.getElementById('npExistingVariants');
+  // Clear the existing-variants chip row and every match badge for ONE
+  // card — called whenever that card's selected main product changes or is
+  // cleared, so a stale "MEVCUT/YENİ" verdict from the previous product
+  // never lingers.
+  window.npResetExistingVariants = function (cardEl) {
+    cardEl._npExistingVariants = [];
+    const box = cardEl.querySelector('.np-existing-variants');
     if (box) { box.style.display = 'none'; box.innerHTML = ''; }
-    document.querySelectorAll('#npVariants .np-v-match').forEach(function (m) {
+    cardEl.querySelectorAll('.np-variants .np-v-match').forEach(function (m) {
       m.classList.remove('show', 'new'); m.innerHTML = '';
     });
   };
 
-  window.npLoadExistingVariants = function (productId) {
-    const box = document.getElementById('npExistingVariants');
+  window.npLoadExistingVariants = function (cardEl, productId) {
+    const box = cardEl.querySelector('.np-existing-variants');
     if (!box) return;
-    if (!productId) { window.npResetExistingVariants(); return; }
+    if (!productId) { npResetExistingVariants(cardEl); return; }
     fetch(NP_VARIANTS_TPL.replace(/\/0\/$/, '/' + productId + '/'), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        window.npExistingVariants = d.results || [];
+        cardEl._npExistingVariants = d.results || [];
         box.style.display = '';
-        if (!window.npExistingVariants.length) {
+        if (!cardEl._npExistingVariants.length) {
           box.classList.add('empty');
           box.innerHTML = '{% trans "This product has no variants yet." %}';
           return;
         }
         box.classList.remove('empty');
         box.innerHTML = '<span class="np-ev-label">{% trans "Existing variants on this product:" %}</span>' +
-          window.npExistingVariants.map(function (v) {
-            return '<button type="button" class="np-ev-chip" data-sku="' + npEsc(v.variant_sku) + '" onclick="npPickExistingVariant(\'' + npEsc(v.variant_sku).replace(/'/g, "\\'") + '\', this)" title="{% trans "Click to fill a variant row with this" %}">' +
+          cardEl._npExistingVariants.map(function (v) {
+            return '<button type="button" class="np-ev-chip" data-sku="' + npEsc(v.variant_sku) + '" onclick="npPickExistingVariant(this.closest(\'.np-product-card\'), \'' + npEsc(v.variant_sku).replace(/'/g, "\\'") + '\', this)" title="{% trans "Click to fill a variant row with this" %}">' +
               npEsc(v.label || v.variant_sku) + ' (' +
               (Math.round((v.variant_quantity || 0) * 100) / 100) + ')</button>';
           }).join('');
-      }).catch(function () { window.npResetExistingVariants(); });
+      }).catch(function () { npResetExistingVariants(cardEl); });
   };
 
   function npEsc(s) {
@@ -2102,16 +2166,16 @@
   // the row's own name/SKU inputs are still editable afterwards, this is
   // just a shortcut so the user doesn't have to retype a name and hope it
   // matches what npCheckVariantMatch would classify.
-  window.npPickExistingVariant = function (sku, chipEl) {
-    const v = (window.npExistingVariants || []).find(function (x) { return x.variant_sku === sku; });
+  window.npPickExistingVariant = function (cardEl, sku, chipEl) {
+    const v = (cardEl._npExistingVariants || []).find(function (x) { return x.variant_sku === sku; });
     if (!v) return;
     let target = Array.prototype.find.call(
-      document.querySelectorAll('#npVariants .np-variant'),
+      cardEl.querySelectorAll('.np-variants .np-variant'),
       function (vEl) { return !(vEl.querySelector('.np-v-name') || {}).value; }
     );
     if (!target) {
-      npAddVariant();
-      const all = document.querySelectorAll('#npVariants .np-variant');
+      npAddVariant(cardEl);
+      const all = cardEl.querySelectorAll('.np-variants .np-variant');
       target = all[all.length - 1];
     }
     const nameI = target.querySelector('.np-v-name');
@@ -2131,16 +2195,16 @@
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
-  let npSearchTimer = null;
-  window.npSearchMain = function (q) {
-    document.getElementById('npMainId').value = '';
-    const exReset = document.getElementById('npMainExistingSku'); if (exReset) exReset.value = '';
-    window.npResetExistingVariants();
-    const drop = document.getElementById('npMainDrop');
-    clearTimeout(npSearchTimer);
-    q = (q || '').trim();
+  window.npSearchMain = function (inputEl) {
+    const card = inputEl.closest('.np-product-card');
+    card.querySelector('.np-main-id').value = '';
+    const exReset = card.querySelector('.np-main-existing-sku'); if (exReset) exReset.value = '';
+    npResetExistingVariants(card);
+    const drop = card.querySelector('.np-main-drop');
+    clearTimeout(card._npSearchTimer);
+    const q = (inputEl.value || '').trim();
     if (q.length < 2) { drop.classList.remove('show'); drop.innerHTML = ''; return; }
-    npSearchTimer = setTimeout(function () {
+    card._npSearchTimer = setTimeout(function () {
       fetch(NP_SEARCH + '?q=' + encodeURIComponent(q), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { return r.json(); })
         .then(function (d) {
@@ -2155,26 +2219,26 @@
           drop.classList.add('show');
           drop.querySelectorAll('.np-ac-item[data-id]').forEach(function (row) {
             row.addEventListener('click', function () {
-              document.getElementById('npMainId').value = row.getAttribute('data-id');
-              document.getElementById('npMainSearch').value = row.getAttribute('data-title');
-              document.getElementById('npMainExistingSku').value = row.getAttribute('data-sku') || '';
+              card.querySelector('.np-main-id').value = row.getAttribute('data-id');
+              card.querySelector('.np-main-search').value = row.getAttribute('data-title');
+              card.querySelector('.np-main-existing-sku').value = row.getAttribute('data-sku') || '';
               drop.classList.remove('show');
-              npLoadExistingVariants(row.getAttribute('data-id'));
-              npRefreshVariantSkus();
-              npRefreshVariantMatches();
+              npLoadExistingVariants(card, row.getAttribute('data-id'));
+              npRefreshVariantSkus(card);
+              npRefreshVariantMatches(card);
             });
           });
         }).catch(function () { drop.classList.remove('show'); });
     }, 250);
   };
 
+  // Single atomic submit for the WHOLE batch — every product card in
+  // #npProducts, all in one request. Nothing is saved (or reset) until this
+  // succeeds, so a mistake on one product never loses the others.
   window.npSave = function () {
     const btn = document.getElementById('npSaveBtn');
-    const main = (npMode === 'existing')
-      ? { mode: 'existing', id: document.getElementById('npMainId').value || '' }
-      : { mode: 'new', name: (document.getElementById('npMainName').value || '').trim(), sku: npPreviewSku || '' };
-    if (npMode === 'existing' && !main.id) { alert('{% trans "Select an existing main product." %}'); return; }
-    if (npMode === 'new' && !main.name) { alert('{% trans "Enter a main product name." %}'); return; }
+    const cards = document.querySelectorAll('#npProducts .np-product-card');
+    if (!cards.length) { alert('{% trans "Add at least one product." %}'); return; }
 
     function npCollectTops(scope) {
       const tops = [];
@@ -2185,27 +2249,40 @@
       return tops;
     }
 
-    const variants = [];
-    if (npHasVariants) {
-      document.querySelectorAll('#npVariants .np-variant').forEach(function (v) {
-        const name = (v.querySelector('.np-v-name').value || '').trim();
-        const sku = (v.querySelector('.np-v-sku').value || '').trim();
-        const priceEl = v.querySelector('.np-v-price');
-        const curEl = v.querySelector('.np-v-cur');
-        const tops = npCollectTops(v);
-        if (name || sku || tops.length) variants.push({
-          name: name, sku: sku, tops: tops,
-          price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD'
+    const products = [];
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const label = '{% trans "Product" %} ' + (i + 1);
+      const main = (card._npMode === 'existing')
+        ? { mode: 'existing', id: card.querySelector('.np-main-id').value || '' }
+        : { mode: 'new', name: (card.querySelector('.np-main-name').value || '').trim(), sku: card._npPreviewSku || '' };
+      if (card._npMode === 'existing' && !main.id) { alert(label + ': {% trans "Select an existing main product." %}'); return; }
+      if (card._npMode === 'new' && !main.name) { alert(label + ': {% trans "Enter a main product name." %}'); return; }
+
+      const variants = [];
+      if (card._npHasVariants) {
+        card.querySelectorAll('.np-variants .np-variant').forEach(function (v) {
+          const name = (v.querySelector('.np-v-name').value || '').trim();
+          const sku = (v.querySelector('.np-v-sku').value || '').trim();
+          const priceEl = v.querySelector('.np-v-price');
+          const curEl = v.querySelector('.np-v-cur');
+          const tops = npCollectTops(v);
+          if (name || sku || tops.length) variants.push({
+            name: name, sku: sku, tops: tops,
+            price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD'
+          });
         });
-      });
-      if (!variants.length) { alert('{% trans "Add at least one variant with a top." %}'); return; }
-    } else {
-      const block = document.getElementById('npNoVariant');
-      const tops = npCollectTops(block);
-      if (!tops.length) { alert('{% trans "Enter at least one quantity." %}'); return; }
-      const priceEl = block.querySelector('.np-nv-price');
-      const curEl = block.querySelector('.np-nv-cur');
-      variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD' });
+        if (!variants.length) { alert(label + ': {% trans "Add at least one variant with a top." %}'); return; }
+      } else {
+        const block = card.querySelector('.np-no-variant');
+        const tops = npCollectTops(block);
+        if (!tops.length) { alert(label + ': {% trans "Enter at least one quantity." %}'); return; }
+        const priceEl = block.querySelector('.np-nv-price');
+        const curEl = block.querySelector('.np-nv-cur');
+        variants.push({ name: '', sku: '', tops: tops, price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD' });
+      }
+
+      products.push({ main_product: main, has_variants: card._npHasVariants, variants: variants });
     }
 
     const sel = document.getElementById('npSupplier');
@@ -2214,9 +2291,7 @@
       supplier_id: (sel && sel.value) || null,
       barcode_prefix: (opt && opt.getAttribute('data-prefix')) || '',
       unit: document.getElementById('npUnit').value || 'mt',
-      has_variants: npHasVariants,
-      main_product: main,
-      variants: variants
+      products: products
     };
 
     btn.disabled = true;
@@ -2229,30 +2304,32 @@
     }).then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.success) {
-          const c = d.created || {};
-          const mp = c.main_product || {};
+          const list = d.created || [];
+          let vtotal = 0, ttotal = 0;
+          list.forEach(function (c) { vtotal += c.variants || 0; ttotal += c.tops || 0; });
           const summary = document.getElementById('npSummary');
           if (summary) {
             summary.style.color = '#0E6E4A';
-            summary.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "Saved" %} · ' +
-              '{% trans "Main SKU" %} <b>' + (mp.sku || '—') + '</b> · <b>' + (c.variants || 0) +
-              '</b> {% trans "variants" %} · <b>' + (c.tops || 0) + '</b> {% trans "tops" %}';
+            summary.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "Saved" %} · <b>' + list.length + '</b> {% trans "products" %} · ' +
+              '<b>' + vtotal + '</b> {% trans "variants" %} · <b>' + ttotal + '</b> {% trans "tops" %}';
           }
           (d.warnings || []).forEach(function (w) { console.warn('catalog:', w); });
           btn.innerHTML = '<i class="fa fa-check"></i> {% trans "Done" %}';
           setTimeout(function () { window.location.reload(); }, 1400);
+        } else {
+          alert((d && d.error) || '{% trans "Could not save." %}');
+          btn.disabled = false; btn.innerHTML = orig;
         }
-        else { alert((d && d.error) || '{% trans "Could not save." %}'); btn.disabled = false; btn.innerHTML = orig; }
       }).catch(function () {
-        alert('{% trans "Network error." %}'); btn.disabled = false; btn.innerHTML = orig;
+        alert('{% trans "Network error." %}');
+        btn.disabled = false; btn.innerHTML = orig;
       });
   };
 
   document.addEventListener('click', function (e) {
-    const drop = document.getElementById('npMainDrop');
-    if (drop && drop.classList.contains('show') && !e.target.closest('#npExistingMain')) {
-      drop.classList.remove('show');
-    }
+    document.querySelectorAll('#npProducts .np-main-drop.show').forEach(function (drop) {
+      if (!e.target.closest('.np-existing-main')) { drop.classList.remove('show'); }
+    });
   });
 
   // Merge duplicate same-SKU variants — PREVIEW which tops/products merge, then confirm.

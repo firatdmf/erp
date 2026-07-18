@@ -8098,3 +8098,30 @@ msgstr "Paket silinsin mi? İçindeki toplar atanmamış duruma döner."
 #: operating/templates/operating/order_packing_list.html
 msgid "Delete this package? Its tops go back to unassigned."
 msgstr "Bu paket silinsin mi? İçindeki toplar atanmamış duruma döner."
+
+#: current_account/templates/current_account/invoice_form.html
+msgid ""
+"This invoice was issued from an order — its lines mirror the order and the "
+"account balance is calculated from the order, not from this invoice. "
+"Quantity, price and product can't be changed here; edit the order instead "
+"(only possible before it ships)."
+msgstr ""
+"Bu fatura bir siparişten kesildi — kalemleri siparişi birebir yansıtır ve "
+"cari bakiyesi bu faturadan değil siparişten hesaplanır. Miktar, fiyat ve "
+"ürün burada değiştirilemez; bunun yerine siparişi düzenleyin (yalnızca "
+"kargoya verilmeden önce mümkündür)."
+
+msgid "Save & add another"
+msgstr "Kaydet ve devam et"
+
+msgid "Save & finish"
+msgstr "Kaydet ve bitir"
+
+msgid "total this session"
+msgstr "bu oturumda toplam"
+
+msgid "Save all"
+msgstr "Tümünü kaydet"
+
+msgid "Add at least one product."
+msgstr "En az bir ürün ekleyin."

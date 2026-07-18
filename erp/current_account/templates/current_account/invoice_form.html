@@ -435,6 +435,12 @@
           </div>
 
           <div class="if-items">
+            {% if items_locked %}
+            <div style="display:flex; align-items:flex-start; gap:10px; margin:10px 16px; padding:10px 12px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; color:#92400E; font:500 12px var(--font-sans);">
+              <i data-lucide="lock" style="width:15px; height:15px; flex-shrink:0; margin-top:1px;"></i>
+              <span>{% trans "This invoice was issued from an order — its lines mirror the order and the account balance is calculated from the order, not from this invoice. Quantity, price and product can't be changed here; edit the order instead (only possible before it ships)." %}</span>
+            </div>
+            {% endif %}
             <table>
               <thead>
                 <tr>
@@ -452,11 +458,13 @@
               <tbody id="itemsBody"></tbody>
             </table>
 
+            {% if not items_locked %}
             <div class="if-add-row-wrap">
               <button type="button" class="if-add-row" id="addRowBtn">
                 <i data-lucide="plus"></i> {% trans "Add Item" %}
               </button>
             </div>
+            {% endif %}
           </div>
         </div>
 
@@ -532,6 +540,7 @@
 
 <script>
 (function() {
+  const ITEMS_LOCKED = {{ items_locked|yesno:"true,false" }};
   const itemsBody = document.getElementById('itemsBody');
   const rowTpl = document.getElementById('rowTemplate');
   const addBtn = document.getElementById('addRowBtn');
@@ -615,19 +624,27 @@
         if (el && data[f] !== undefined && data[f] !== null) el.value = data[f];
       });
     }
-    row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', computeAll));
-    row.querySelector('.btn-del').addEventListener('click', () => {
-      row.remove();
-      renumber();
-      computeAll();
-    });
+    if (ITEMS_LOCKED) {
+      // Read-only mirror of the order's lines — disabled (not just
+      // readonly) so buildItemsJson can't pick up a stray edit, and no
+      // delete button since there's nothing here to remove.
+      row.querySelectorAll('input').forEach(inp => { inp.disabled = true; });
+      row.querySelector('.col-del').remove();
+    } else {
+      row.querySelectorAll('input').forEach(inp => inp.addEventListener('input', computeAll));
+      row.querySelector('.btn-del').addEventListener('click', () => {
+        row.remove();
+        renumber();
+        computeAll();
+      });
+    }
     itemsBody.appendChild(row);
     renumber();
     computeAll();
     if (window.lucide) lucide.createIcons();
   }
 
-  addBtn.addEventListener('click', () => addRow());
+  if (addBtn) addBtn.addEventListener('click', () => addRow());
   otherChargesInput.addEventListener('input', computeAll);
 
   // ── VAT toggle ─────────────────────────────────────────

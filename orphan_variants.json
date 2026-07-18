@@ -1,0 +1,1189 @@
+[
+  {
+    "product_id": 257,
+    "product_title": "0000103",
+    "variant_id": 694,
+    "variant_sku": "0000103-white",
+    "attr_name": "Color",
+    "attr_val": "White",
+    "qty": 1.0,
+    "created": "694",
+    "siblings": []
+  },
+  {
+    "product_id": 257,
+    "product_title": "0000103",
+    "variant_id": 695,
+    "variant_sku": "0000103-cream",
+    "attr_name": "Color",
+    "attr_val": "Cream",
+    "qty": 0.0,
+    "created": "695",
+    "siblings": []
+  },
+  {
+    "product_id": 267,
+    "product_title": "1072",
+    "variant_id": 725,
+    "variant_sku": "KZL000912",
+    "attr_name": "model",
+    "attr_val": "v-356",
+    "qty": 70.0,
+    "created": "725",
+    "siblings": []
+  },
+  {
+    "product_id": 218,
+    "product_title": "2052",
+    "variant_id": 596,
+    "variant_sku": "2025A.BEYAZ",
+    "attr_name": "color",
+    "attr_val": "silver-white",
+    "qty": 317.0,
+    "created": "596",
+    "siblings": []
+  },
+  {
+    "product_id": 218,
+    "product_title": "2052",
+    "variant_id": 597,
+    "variant_sku": "2052A.BEYAZ",
+    "attr_name": "color",
+    "attr_val": "gold-white",
+    "qty": 397.3,
+    "created": "597",
+    "siblings": []
+  },
+  {
+    "product_id": 209,
+    "product_title": "2058",
+    "variant_id": 563,
+    "variant_sku": "2058.G",
+    "attr_name": "model",
+    "attr_val": "gold",
+    "qty": 569.2,
+    "created": "563",
+    "siblings": [
+      {
+        "sku": "2058 ALTIN",
+        "qty": 568.2,
+        "wp_name": "2058 ALTIN"
+      }
+    ]
+  },
+  {
+    "product_id": 209,
+    "product_title": "2058",
+    "variant_id": 1950,
+    "variant_sku": "2058 Altın",
+    "attr_name": "model",
+    "attr_val": "gold",
+    "qty": 568.2,
+    "created": "1950",
+    "siblings": [
+      {
+        "sku": "2058 ALTIN",
+        "qty": 568.2,
+        "wp_name": "2058 ALTIN"
+      }
+    ]
+  },
+  {
+    "product_id": 209,
+    "product_title": "2058",
+    "variant_id": 1992,
+    "variant_sku": "2058 23-101",
+    "attr_name": "model",
+    "attr_val": "white",
+    "qty": 139.0,
+    "created": "1992",
+    "siblings": []
+  },
+  {
+    "product_id": 212,
+    "product_title": "2086",
+    "variant_id": 575,
+    "variant_sku": "KZL000323",
+    "attr_name": "color",
+    "attr_val": "gold-white",
+    "qty": 513.8,
+    "created": "575",
+    "siblings": [
+      {
+        "sku": "KZL000344",
+        "qty": 302.0,
+        "wp_name": "2086 ALTIN A.BEYAZ"
+      }
+    ]
+  },
+  {
+    "product_id": 280,
+    "product_title": "24620İ",
+    "variant_id": 743,
+    "variant_sku": "24620İ.G52",
+    "attr_name": "color",
+    "attr_val": "dark_cream",
+    "qty": 20.2,
+    "created": "743",
+    "siblings": []
+  },
+  {
+    "product_id": 732,
+    "product_title": "3012",
+    "variant_id": 1501,
+    "variant_sku": "KZL0000339",
+    "attr_name": "color",
+    "attr_val": "ecru",
+    "qty": 140.5,
+    "created": "1501",
+    "siblings": []
+  },
+  {
+    "product_id": 724,
+    "product_title": "7277 BEYAZ",
+    "variant_id": 1496,
+    "variant_sku": "EL0000078",
+    "attr_name": "color",
+    "attr_val": "white",
+    "qty": 25.0,
+    "created": "1496",
+    "siblings": []
+  },
+  {
+    "product_id": 260,
+    "product_title": "91930",
+    "variant_id": 701,
+    "variant_sku": "91930-03",
+    "attr_name": "Color",
+    "attr_val": "03",
+    "qty": 0.0,
+    "created": "701",
+    "siblings": []
+  },
+  {
+    "product_id": 260,
+    "product_title": "91930",
+    "variant_id": 702,
+    "variant_sku": "91930-101",
+    "attr_name": "Color",
+    "attr_val": "101",
+    "qty": 0.0,
+    "created": "702",
+    "siblings": []
+  },
+  {
+    "product_id": 260,
+    "product_title": "91930",
+    "variant_id": 703,
+    "variant_sku": "91930-102",
+    "attr_name": "Color",
+    "attr_val": "102",
+    "qty": 0.0,
+    "created": "703",
+    "siblings": []
+  },
+  {
+    "product_id": 260,
+    "product_title": "91930",
+    "variant_id": 704,
+    "variant_sku": "91930-353",
+    "attr_name": "Color",
+    "attr_val": "353",
+    "qty": 0.0,
+    "created": "704",
+    "siblings": []
+  },
+  {
+    "product_id": 260,
+    "product_title": "91930",
+    "variant_id": 705,
+    "variant_sku": "91930-354",
+    "attr_name": "Color",
+    "attr_val": "354",
+    "qty": 0.0,
+    "created": "705",
+    "siblings": []
+  },
+  {
+    "product_id": 919,
+    "product_title": "A-1",
+    "variant_id": 1752,
+    "variant_sku": "A-1",
+    "attr_name": "model",
+    "attr_val": "a-1",
+    "qty": 22.4,
+    "created": "1752",
+    "siblings": []
+  },
+  {
+    "product_id": 982,
+    "product_title": "AMBRE",
+    "variant_id": 1733,
+    "variant_sku": "LZK000D2002",
+    "attr_name": "color",
+    "attr_val": "grey",
+    "qty": 839.5,
+    "created": "1733",
+    "siblings": [
+      {
+        "sku": "LZK0002002",
+        "qty": 839.5,
+        "wp_name": "AMBRE T-7102 V6 GRİ"
+      }
+    ]
+  },
+  {
+    "product_id": 188,
+    "product_title": "asdsa3445",
+    "variant_id": 492,
+    "variant_sku": "asdase54545454",
+    "attr_name": "color",
+    "attr_val": "blue",
+    "qty": 33.0,
+    "created": "492",
+    "siblings": []
+  },
+  {
+    "product_id": 188,
+    "product_title": "asdsa3445",
+    "variant_id": 548,
+    "variant_sku": "pink",
+    "attr_name": "color",
+    "attr_val": "pink",
+    "qty": 18.0,
+    "created": "548",
+    "siblings": []
+  },
+  {
+    "product_id": 188,
+    "product_title": "asdsa3445",
+    "variant_id": 711,
+    "variant_sku": "t_45111_4",
+    "attr_name": "color",
+    "attr_val": "t",
+    "qty": 8.0,
+    "created": "711",
+    "siblings": []
+  },
+  {
+    "product_id": 188,
+    "product_title": "asdsa3445",
+    "variant_id": 718,
+    "variant_sku": "asds33378758",
+    "attr_name": "color",
+    "attr_val": "red",
+    "qty": 4.0,
+    "created": "718",
+    "siblings": []
+  },
+  {
+    "product_id": 2,
+    "product_title": "Butterfly",
+    "variant_id": 1,
+    "variant_sku": "RK24539RW8",
+    "attr_name": "size per panel",
+    "attr_val": "130 x 210cm",
+    "qty": 0.0,
+    "created": "1",
+    "siblings": []
+  },
+  {
+    "product_id": 2,
+    "product_title": "Butterfly",
+    "variant_id": 2,
+    "variant_sku": "RK24539RW9",
+    "attr_name": "size per panel",
+    "attr_val": "130 x 240cm",
+    "qty": 95.0,
+    "created": "2",
+    "siblings": []
+  },
+  {
+    "product_id": 198,
+    "product_title": "Crepe",
+    "variant_id": 517,
+    "variant_sku": "KZL000317",
+    "attr_name": "color",
+    "attr_val": "white",
+    "qty": 200.0,
+    "created": "517",
+    "siblings": []
+  },
+  {
+    "product_id": 198,
+    "product_title": "Crepe",
+    "variant_id": 619,
+    "variant_sku": "cappucino",
+    "attr_name": "color",
+    "attr_val": "cappucino",
+    "qty": 0.0,
+    "created": "619",
+    "siblings": []
+  },
+  {
+    "product_id": 896,
+    "product_title": "DEGRADE",
+    "variant_id": 1732,
+    "variant_sku": "KZL0000025",
+    "attr_name": "model",
+    "attr_val": "purple",
+    "qty": 246.9,
+    "created": "1732",
+    "siblings": []
+  },
+  {
+    "product_id": 1147,
+    "product_title": "DN-3478",
+    "variant_id": 2053,
+    "variant_sku": "DNM002-EKRU",
+    "attr_name": "color",
+    "attr_val": "ecru",
+    "qty": 50.0,
+    "created": "2053",
+    "siblings": []
+  },
+  {
+    "product_id": 1147,
+    "product_title": "DN-3478",
+    "variant_id": 2054,
+    "variant_sku": "DNM002-GRI",
+    "attr_name": "color",
+    "attr_val": "grey",
+    "qty": 35.0,
+    "created": "2054",
+    "siblings": []
+  },
+  {
+    "product_id": 806,
+    "product_title": "FİLETÜL",
+    "variant_id": 1530,
+    "variant_sku": "GÜR0000074",
+    "attr_name": "color",
+    "attr_val": "powder",
+    "qty": 98.0,
+    "created": "1530",
+    "siblings": [
+      {
+        "sku": "GÜR000074",
+        "qty": 98.0,
+        "wp_name": "FİLETÜL PUDRA"
+      }
+    ]
+  },
+  {
+    "product_id": 165,
+    "product_title": "GL8014",
+    "variant_id": 360,
+    "variant_sku": "GL8014.T08",
+    "attr_name": "color",
+    "attr_val": "ecru",
+    "qty": 833.6,
+    "created": "360",
+    "siblings": []
+  },
+  {
+    "product_id": 165,
+    "product_title": "GL8014",
+    "variant_id": 666,
+    "variant_sku": "GL8014.S19",
+    "attr_name": "color",
+    "attr_val": "s19",
+    "qty": 19.1,
+    "created": "666",
+    "siblings": []
+  },
+  {
+    "product_id": 165,
+    "product_title": "GL8014",
+    "variant_id": 667,
+    "variant_sku": "GL8014.S20",
+    "attr_name": "color",
+    "attr_val": "s20",
+    "qty": 20.0,
+    "created": "667",
+    "siblings": []
+  },
+  {
+    "product_id": 276,
+    "product_title": "GREK",
+    "variant_id": 741,
+    "variant_sku": "13213123424",
+    "attr_name": "color",
+    "attr_val": "tul",
+    "qty": 20.0,
+    "created": "741",
+    "siblings": []
+  },
+  {
+    "product_id": 276,
+    "product_title": "GREK",
+    "variant_id": 1029,
+    "variant_sku": "K3683.G07",
+    "attr_name": "color",
+    "attr_val": "cream",
+    "qty": 20.7,
+    "created": "1029",
+    "siblings": []
+  },
+  {
+    "product_id": 1162,
+    "product_title": "K10080T",
+    "variant_id": 2083,
+    "variant_sku": "K10080T.K17",
+    "attr_name": "model",
+    "attr_val": "kremkadi̇fe_+kare_sanal",
+    "qty": 41.3,
+    "created": "2083",
+    "siblings": []
+  },
+  {
+    "product_id": 584,
+    "product_title": "K12233",
+    "variant_id": 1348,
+    "variant_sku": "K12333.S18",
+    "attr_name": "color",
+    "attr_val": "cream",
+    "qty": 130.7,
+    "created": "1348",
+    "siblings": [
+      {
+        "sku": "K12233.S13",
+        "qty": 172.4,
+        "wp_name": "1512-753 KOYU KREM"
+      }
+    ]
+  },
+  {
+    "product_id": 391,
+    "product_title": "K24018İNCİ",
+    "variant_id": 997,
+    "variant_sku": "K2401İNCİ.G33",
+    "attr_name": "color",
+    "attr_val": "white",
+    "qty": 95.0,
+    "created": "997",
+    "siblings": []
+  },
+  {
+    "product_id": 443,
+    "product_title": "K24600",
+    "variant_id": 1046,
+    "variant_sku": "K24600.528",
+    "attr_name": "color",
+    "attr_val": "white",
+    "qty": 81.2,
+    "created": "1046",
+    "siblings": []
+  },
+  {
+    "product_id": 349,
+    "product_title": "K24828İT",
+    "variant_id": 940,
+    "variant_sku": "K24828İT. G141",
+    "attr_name": "color",
+    "attr_val": "altin_yarimat",
+    "qty": 20.0,
+    "created": "940",
+    "siblings": []
+  },
+  {
+    "product_id": 349,
+    "product_title": "K24828İT",
+    "variant_id": 946,
+    "variant_sku": "K24828İT. T35",
+    "attr_name": "color",
+    "attr_val": "750_mat_sedef",
+    "qty": 20.2,
+    "created": "946",
+    "siblings": [
+      {
+        "sku": "K24828İT.F13",
+        "qty": 40.8,
+        "wp_name": "FİXE 750 MAT SEDEF"
+      },
+      {
+        "sku": "K24828İT.T35",
+        "qty": 80.4,
+        "wp_name": "FİXE 750MAT SEDEF"
+      }
+    ]
+  },
+  {
+    "product_id": 1159,
+    "product_title": "K24860T",
+    "variant_id": 2074,
+    "variant_sku": "K24860T.G44",
+    "attr_name": "Color",
+    "attr_val": "White",
+    "qty": 0.0,
+    "created": "2074",
+    "siblings": []
+  },
+  {
+    "product_id": 273,
+    "product_title": "K24892I",
+    "variant_id": 738,
+    "variant_sku": "K24892I.G157",
+    "attr_name": "color",
+    "attr_val": "light_cream",
+    "qty": 20.8,
+    "created": "738",
+    "siblings": []
+  },
+  {
+    "product_id": 514,
+    "product_title": "K25282",
+    "variant_id": 1232,
+    "variant_sku": "K25232.G121",
+    "attr_name": "color",
+    "attr_val": "gold_cream",
+    "qty": 41.3,
+    "created": "1232",
+    "siblings": [
+      {
+        "sku": "K25282.G130",
+        "qty": 102.0,
+        "wp_name": "103 YARIMAT ALTIN+KELEBEK KORT"
+      }
+    ]
+  },
+  {
+    "product_id": 364,
+    "product_title": "K36008",
+    "variant_id": 982,
+    "variant_sku": "K36008.G11",
+    "attr_name": "color",
+    "attr_val": "altin_si̇m",
+    "qty": 20.9,
+    "created": "982",
+    "siblings": []
+  },
+  {
+    "product_id": 555,
+    "product_title": "K48064",
+    "variant_id": 1266,
+    "variant_sku": "K48060.G56",
+    "attr_name": "model",
+    "attr_val": "simli_gri-600_mat",
+    "qty": 105.6,
+    "created": "1266",
+    "siblings": []
+  },
+  {
+    "product_id": 269,
+    "product_title": "K48123",
+    "variant_id": 727,
+    "variant_sku": "K48123.A77",
+    "attr_name": "color",
+    "attr_val": "ecru",
+    "qty": 20.0,
+    "created": "727",
+    "siblings": []
+  },
+  {
+    "product_id": 259,
+    "product_title": "K8702",
+    "variant_id": 700,
+    "variant_sku": "K8702.G08",
+    "attr_name": "Color",
+    "attr_val": "Dark Cream",
+    "qty": 0.0,
+    "created": "700",
+    "siblings": []
+  },
+  {
+    "product_id": 755,
+    "product_title": "KREP",
+    "variant_id": 1527,
+    "variant_sku": "KZL00000145",
+    "attr_name": "color",
+    "attr_val": "cappucino",
+    "qty": 204.5,
+    "created": "1527",
+    "siblings": []
+  },
+  {
+    "product_id": 740,
+    "product_title": "Liva",
+    "variant_id": 1510,
+    "variant_sku": "KZLİVA002",
+    "attr_name": "color",
+    "attr_val": "ecru",
+    "qty": 380.0,
+    "created": "1510",
+    "siblings": []
+  },
+  {
+    "product_id": 255,
+    "product_title": "MT-1004",
+    "variant_id": 688,
+    "variant_sku": "MT-1004-beige",
+    "attr_name": "Color",
+    "attr_val": "Beige",
+    "qty": 0.0,
+    "created": "688",
+    "siblings": []
+  },
+  {
+    "product_id": 255,
+    "product_title": "MT-1004",
+    "variant_id": 689,
+    "variant_sku": "MT-1004-ecru",
+    "attr_name": "Color",
+    "attr_val": "Ecru",
+    "qty": 0.0,
+    "created": "689",
+    "siblings": []
+  },
+  {
+    "product_id": 255,
+    "product_title": "MT-1004",
+    "variant_id": 690,
+    "variant_sku": "MT-1004-cream",
+    "attr_name": "Color",
+    "attr_val": "Cream",
+    "qty": 0.0,
+    "created": "690",
+    "siblings": []
+  },
+  {
+    "product_id": 255,
+    "product_title": "MT-1004",
+    "variant_id": 699,
+    "variant_sku": "MT-1004-white",
+    "attr_name": "Color",
+    "attr_val": "White",
+    "qty": 0.0,
+    "created": "699",
+    "siblings": []
+  },
+  {
+    "product_id": 254,
+    "product_title": "MT-1006",
+    "variant_id": 686,
+    "variant_sku": "MT-1006-beige",
+    "attr_name": "Color",
+    "attr_val": "Beige",
+    "qty": 0.0,
+    "created": "686",
+    "siblings": []
+  },
+  {
+    "product_id": 254,
+    "product_title": "MT-1006",
+    "variant_id": 687,
+    "variant_sku": "MT-1006-ecru",
+    "attr_name": "Color",
+    "attr_val": "Ecru",
+    "qty": 0.0,
+    "created": "687",
+    "siblings": []
+  },
+  {
+    "product_id": 253,
+    "product_title": "MT-1010",
+    "variant_id": 683,
+    "variant_sku": "MT-1010-beige",
+    "attr_name": "Color",
+    "attr_val": "Beige",
+    "qty": 0.0,
+    "created": "683",
+    "siblings": []
+  },
+  {
+    "product_id": 253,
+    "product_title": "MT-1010",
+    "variant_id": 684,
+    "variant_sku": "MT-1010-gray",
+    "attr_name": "Color",
+    "attr_val": "Gray",
+    "qty": 0.0,
+    "created": "684",
+    "siblings": []
+  },
+  {
+    "product_id": 253,
+    "product_title": "MT-1010",
+    "variant_id": 685,
+    "variant_sku": "MT-1010-cream",
+    "attr_name": "Color",
+    "attr_val": "Cream",
+    "qty": 0.0,
+    "created": "685",
+    "siblings": []
+  },
+  {
+    "product_id": 262,
+    "product_title": "MT-1012",
+    "variant_id": 708,
+    "variant_sku": "MT-1012-white",
+    "attr_name": "Color",
+    "attr_val": "White",
+    "qty": 0.0,
+    "created": "708",
+    "siblings": []
+  },
+  {
+    "product_id": 262,
+    "product_title": "MT-1012",
+    "variant_id": 709,
+    "variant_sku": "MT-1012-ecru",
+    "attr_name": "Color",
+    "attr_val": "Ecru",
+    "qty": 0.0,
+    "created": "709",
+    "siblings": []
+  },
+  {
+    "product_id": 261,
+    "product_title": "MT-1015",
+    "variant_id": 706,
+    "variant_sku": "MT-1015-silver",
+    "attr_name": "Color",
+    "attr_val": "Silver",
+    "qty": 0.0,
+    "created": "706",
+    "siblings": []
+  },
+  {
+    "product_id": 261,
+    "product_title": "MT-1015",
+    "variant_id": 707,
+    "variant_sku": "MT-1015-beige-gold",
+    "attr_name": "Color",
+    "attr_val": "Beige Gold",
+    "qty": 0.0,
+    "created": "707",
+    "siblings": []
+  },
+  {
+    "product_id": 252,
+    "product_title": "MT-1020",
+    "variant_id": 680,
+    "variant_sku": "MT-1020-pink",
+    "attr_name": "Color",
+    "attr_val": "Pink",
+    "qty": 0.0,
+    "created": "680",
+    "siblings": []
+  },
+  {
+    "product_id": 252,
+    "product_title": "MT-1020",
+    "variant_id": 681,
+    "variant_sku": "MT-1020-beige",
+    "attr_name": "Color",
+    "attr_val": "Beige",
+    "qty": 0.0,
+    "created": "681",
+    "siblings": []
+  },
+  {
+    "product_id": 252,
+    "product_title": "MT-1020",
+    "variant_id": 682,
+    "variant_sku": "MT-1020-ecru",
+    "attr_name": "Color",
+    "attr_val": "Ecru",
+    "qty": 0.0,
+    "created": "682",
+    "siblings": []
+  },
+  {
+    "product_id": 251,
+    "product_title": "MT-1034",
+    "variant_id": 677,
+    "variant_sku": "MT-1034-beige",
+    "attr_name": "Color",
+    "attr_val": "Beige",
+    "qty": 0.0,
+    "created": "677",
+    "siblings": []
+  },
+  {
+    "product_id": 251,
+    "product_title": "MT-1034",
+    "variant_id": 678,
+    "variant_sku": "MT-1034-white",
+    "attr_name": "Color",
+    "attr_val": "White",
+    "qty": 0.0,
+    "created": "678",
+    "siblings": []
+  },
+  {
+    "product_id": 251,
+    "product_title": "MT-1034",
+    "variant_id": 679,
+    "variant_sku": "MT-1034-ecru",
+    "attr_name": "Color",
+    "attr_val": "Ecru",
+    "qty": 0.0,
+    "created": "679",
+    "siblings": []
+  },
+  {
+    "product_id": 258,
+    "product_title": "MT-1035",
+    "variant_id": 696,
+    "variant_sku": "mt-1035-pearl",
+    "attr_name": "Color",
+    "attr_val": "Pearl",
+    "qty": 0.0,
+    "created": "696",
+    "siblings": []
+  },
+  {
+    "product_id": 258,
+    "product_title": "MT-1035",
+    "variant_id": 697,
+    "variant_sku": "mt-1035-silver",
+    "attr_name": "Color",
+    "attr_val": "Silver",
+    "qty": 0.0,
+    "created": "697",
+    "siblings": []
+  },
+  {
+    "product_id": 258,
+    "product_title": "MT-1035",
+    "variant_id": 698,
+    "variant_sku": "mt-1035-gold",
+    "attr_name": "Color",
+    "attr_val": "Gold",
+    "qty": 0.0,
+    "created": "698",
+    "siblings": []
+  },
+  {
+    "product_id": 256,
+    "product_title": "MT-1038",
+    "variant_id": 692,
+    "variant_sku": "mt-1038-white-silver",
+    "attr_name": "Color",
+    "attr_val": "White Silver",
+    "qty": 80.0,
+    "created": "692",
+    "siblings": []
+  },
+  {
+    "product_id": 256,
+    "product_title": "MT-1038",
+    "variant_id": 693,
+    "variant_sku": "mt-1038-gold",
+    "attr_name": "Color",
+    "attr_val": "Gold",
+    "qty": 80.0,
+    "created": "693",
+    "siblings": []
+  },
+  {
+    "product_id": 256,
+    "product_title": "MT-1038",
+    "variant_id": 719,
+    "variant_sku": "mt-1038-pearl",
+    "attr_name": "Color",
+    "attr_val": "Pearl",
+    "qty": 0.0,
+    "created": "719",
+    "siblings": []
+  },
+  {
+    "product_id": 256,
+    "product_title": "MT-1038",
+    "variant_id": 720,
+    "variant_sku": "mt-1038_silver",
+    "attr_name": "Color",
+    "attr_val": "Silver",
+    "qty": 80.0,
+    "created": "720",
+    "siblings": []
+  },
+  {
+    "product_id": 250,
+    "product_title": "MT-1065",
+    "variant_id": 676,
+    "variant_sku": "MT-1065-ecru",
+    "attr_name": "Color",
+    "attr_val": "Ecru",
+    "qty": 0.0,
+    "created": "676",
+    "siblings": []
+  },
+  {
+    "product_id": 264,
+    "product_title": "MT-1068",
+    "variant_id": 715,
+    "variant_sku": "MT-1068_beige",
+    "attr_name": "Color",
+    "attr_val": "Beige",
+    "qty": 0.0,
+    "created": "715",
+    "siblings": []
+  },
+  {
+    "product_id": 264,
+    "product_title": "MT-1068",
+    "variant_id": 716,
+    "variant_sku": "MT-1068_black",
+    "attr_name": "Color",
+    "attr_val": "Black",
+    "qty": 0.0,
+    "created": "716",
+    "siblings": []
+  },
+  {
+    "product_id": 264,
+    "product_title": "MT-1068",
+    "variant_id": 717,
+    "variant_sku": "MT-1068_cream",
+    "attr_name": "Color",
+    "attr_val": "Cream",
+    "qty": 0.0,
+    "created": "717",
+    "siblings": []
+  },
+  {
+    "product_id": 264,
+    "product_title": "MT-1068",
+    "variant_id": 721,
+    "variant_sku": "MT-1068_mink",
+    "attr_name": "Color",
+    "attr_val": "Mink",
+    "qty": 0.0,
+    "created": "721",
+    "siblings": []
+  },
+  {
+    "product_id": 249,
+    "product_title": "MT-1074",
+    "variant_id": 671,
+    "variant_sku": "MT-1074-beige",
+    "attr_name": "Color",
+    "attr_val": "Beige",
+    "qty": 0.0,
+    "created": "671",
+    "siblings": []
+  },
+  {
+    "product_id": 249,
+    "product_title": "MT-1074",
+    "variant_id": 672,
+    "variant_sku": "MT-1074-gray",
+    "attr_name": "Color",
+    "attr_val": "Gray",
+    "qty": 0.0,
+    "created": "672",
+    "siblings": []
+  },
+  {
+    "product_id": 249,
+    "product_title": "MT-1074",
+    "variant_id": 674,
+    "variant_sku": "MT-1074-cream",
+    "attr_name": "Color",
+    "attr_val": "Cream",
+    "qty": 0.0,
+    "created": "674",
+    "siblings": []
+  },
+  {
+    "product_id": 249,
+    "product_title": "MT-1074",
+    "variant_id": 675,
+    "variant_sku": "MT-1074-white",
+    "attr_name": "Color",
+    "attr_val": "White",
+    "qty": 0.0,
+    "created": "675",
+    "siblings": []
+  },
+  {
+    "product_id": 263,
+    "product_title": "MT-3016",
+    "variant_id": 712,
+    "variant_sku": "MT-3016_silver",
+    "attr_name": "Color",
+    "attr_val": "Silver",
+    "qty": 0.0,
+    "created": "712",
+    "siblings": []
+  },
+  {
+    "product_id": 263,
+    "product_title": "MT-3016",
+    "variant_id": 713,
+    "variant_sku": "MT-3016_white-silver",
+    "attr_name": "Color",
+    "attr_val": "White Silver",
+    "qty": 0.0,
+    "created": "713",
+    "siblings": []
+  },
+  {
+    "product_id": 263,
+    "product_title": "MT-3016",
+    "variant_id": 714,
+    "variant_sku": "MT-3016_cream-gold",
+    "attr_name": "Color",
+    "attr_val": "Cream Gold",
+    "qty": 0.0,
+    "created": "714",
+    "siblings": []
+  },
+  {
+    "product_id": 263,
+    "product_title": "MT-3016",
+    "variant_id": 722,
+    "variant_sku": "MRKTEST01",
+    "attr_name": "color",
+    "attr_val": "silver",
+    "qty": 40.0,
+    "created": "722",
+    "siblings": [
+      {
+        "sku": "MRK00047",
+        "qty": 26.0,
+        "wp_name": "MT-3016 GÜMÜŞ"
+      }
+    ]
+  },
+  {
+    "product_id": 263,
+    "product_title": "MT-3016",
+    "variant_id": 723,
+    "variant_sku": "MRKTEST02",
+    "attr_name": "model",
+    "attr_val": "deluxe",
+    "qty": 10.0,
+    "created": "723",
+    "siblings": []
+  },
+  {
+    "product_id": 248,
+    "product_title": "MT-4003",
+    "variant_id": 691,
+    "variant_sku": "MT-4003-ecru",
+    "attr_name": "Color",
+    "attr_val": "Ecru",
+    "qty": 0.0,
+    "created": "691",
+    "siblings": []
+  },
+  {
+    "product_id": 587,
+    "product_title": "N1080",
+    "variant_id": 1980,
+    "variant_sku": "N1080",
+    "attr_name": "model",
+    "attr_val": "g02",
+    "qty": 71.4,
+    "created": "1980",
+    "siblings": [
+      {
+        "sku": "N1080.G02",
+        "qty": 71.4,
+        "wp_name": "51 KREM"
+      }
+    ]
+  },
+  {
+    "product_id": 385,
+    "product_title": "N1321T",
+    "variant_id": 1117,
+    "variant_sku": "N321T.G16",
+    "attr_name": "color",
+    "attr_val": "mirle_marletto",
+    "qty": 57.6,
+    "created": "1117",
+    "siblings": []
+  },
+  {
+    "product_id": 394,
+    "product_title": "N1380T",
+    "variant_id": 2075,
+    "variant_sku": "N1380T.G31",
+    "attr_name": "model",
+    "attr_val": "White",
+    "qty": 0.0,
+    "created": "2075",
+    "siblings": []
+  },
+  {
+    "product_id": 393,
+    "product_title": "N1830T",
+    "variant_id": 998,
+    "variant_sku": "N1830T.G129",
+    "attr_name": "model",
+    "attr_val": "epi̇_yeşi̇l_+_pudra_+_marletto",
+    "qty": 30.3,
+    "created": "998",
+    "siblings": []
+  },
+  {
+    "product_id": 1144,
+    "product_title": "satre",
+    "variant_id": 2050,
+    "variant_sku": "DNM001-GRI",
+    "attr_name": "color",
+    "attr_val": "grey",
+    "qty": 10.0,
+    "created": "2050",
+    "siblings": []
+  },
+  {
+    "product_id": 231,
+    "product_title": "TRIAL DENEME",
+    "variant_id": 629,
+    "variant_sku": "asd",
+    "attr_name": "asd",
+    "attr_val": "red",
+    "qty": 5.0,
+    "created": "629",
+    "siblings": []
+  },
+  {
+    "product_id": 231,
+    "product_title": "TRIAL DENEME",
+    "variant_id": 632,
+    "variant_sku": "asdsa",
+    "attr_name": "asd",
+    "attr_val": "brown",
+    "qty": 4.0,
+    "created": "632",
+    "siblings": []
+  },
+  {
+    "product_id": 231,
+    "product_title": "TRIAL DENEME",
+    "variant_id": 662,
+    "variant_sku": "asdsaaa",
+    "attr_name": "asd",
+    "attr_val": "blue",
+    "qty": 3.0,
+    "created": "662",
+    "siblings": []
+  },
+  {
+    "product_id": 1120,
+    "product_title": "Ttm",
+    "variant_id": 1995,
+    "variant_sku": "LZK000110",
+    "attr_name": "color",
+    "attr_val": "white",
+    "qty": 300.0,
+    "created": "1995",
+    "siblings": []
+  },
+  {
+    "product_id": 683,
+    "product_title": "TTM PİLİSE",
+    "variant_id": 1994,
+    "variant_sku": "ONRKZL00050",
+    "attr_name": "color",
+    "attr_val": "white",
+    "qty": 2196.4,
+    "created": "1994",
+    "siblings": []
+  }
+]

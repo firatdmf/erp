@@ -3000,10 +3000,12 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
 
       * entering a shipped-class status requires carrier + tracking
         (unless require_cargo_for_ship=False) — else nothing changes;
-      * entering 'packaging' AND entering a shipped-class status both
-        require the scanned-roll reservations to fully COVER every
-        order line's metres (see order_reservation_shortfalls) — a
-        110 m line backed by a single 38 m roll cannot complete;
+      * entering 'packaging'/a shipped status does NOT require the
+        scanned reservations to cover the ordered metres — a mismatch
+        between ordered and scanned quantity is allowed; the cari/
+        invoice bill only the actually-scanned amount regardless (see
+        Order.billable_value), so under/over-scanning can never
+        mis-charge the customer;
       * entering 'cancelled' releases every active roll reservation —
         cancelling a shipped order first restores its cut stock (the
         leaving_ship branch below), then this drops the (now-inactive)
@@ -3015,8 +3017,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         (no half-shipped, catalog-cut-but-warehouse-not state).
 
     Returns (ok: bool, code: str|None). code is a machine-readable
-    reason on failure: 'cargo_required' | 'insufficient_reservation' |
-    'error:<detail>'."""
+    reason on failure: 'cargo_required' | 'error:<detail>'."""
     from django.db import transaction as _tx
     from django.utils import timezone as _tz
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
@@ -3048,19 +3049,13 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
             order.save(update_fields=["carrier", "tracking_number", "updated_at"])
             return False, "cargo_required"
 
-    # Gate: packing-complete AND ship both require the reservations to
-    # fully cover every line's metres — not merely "a roll was scanned".
-    # Coming BACK from a shipped status is exempt: the reservations are
-    # still consumed at this point (restore runs inside the transaction
-    # below), so the coverage check would always fail — and coverage was
-    # already enforced on the way in.
-    if entering_ship or (changing and new_status == "packaging"
-                         and old_status != "packaging"
-                         and old_status not in SHIPPED_CLASS):
-        if order_reservation_shortfalls(order):
-            # Persist any cargo edits but don't advance the status.
-            order.save(update_fields=["carrier", "tracking_number", "updated_at"])
-            return False, "insufficient_reservation"
+    # NOTE: entering 'packaging'/a shipped status used to require the
+    # scanned reservations to fully COVER every line's ordered metres
+    # (order_reservation_shortfalls) — deliberately removed. Ordered vs.
+    # actually-scanned quantity are allowed to disagree; the cari/invoice
+    # already bill only what was really scanned (Order.billable_value),
+    # so under- or over-scanning can never mis-charge the customer, and
+    # staff no longer get blocked from shipping over a metre mismatch.
 
     try:
         with _tx.atomic():
@@ -3074,6 +3069,14 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                                       "shipped_at", "delivered_at", "updated_at"])
             if entering_ship:
                 consume_reservations_for_order(order, user=user)
+                # A roll can have had less on it than was reserved by the
+                # time it's actually cut (consume_reservations_for_order
+                # clamps r.meters down to what was really available) — the
+                # cari must reflect that final, physically-true amount,
+                # not whatever was scanned/reserved a moment earlier.
+                if order.cari_id:
+                    from current_account.services import post_order_movement
+                    post_order_movement(order, member=getattr(user, "member", None))
             elif leaving_ship:
                 restore_reservations_for_order(order, user=user)
                 # Un-shipped order is no longer a completed sale — its

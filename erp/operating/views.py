@@ -324,6 +324,17 @@ class OrderDetail(DetailView):
         action = (request.POST.get("action") or "").strip()
         member = getattr(request.user, "member", None)
 
+        # Once an order has shipped its rolls are already cut and the
+        # cari/invoice already reflect what was actually packed — editing
+        # items past that point would desync catalog/warehouse stock from
+        # a sale that's already booked. Blocked here server-side (not just
+        # by hiding the button) since these are separate POST endpoints
+        # reachable directly. "Geri Aç & Düzelt" (update_status back to an
+        # earlier stage) takes the order out of _SHIPPED_CLASS, which
+        # re-opens editing automatically — no separate unlock needed.
+        if action in {"update_item", "add_item", "remove_item"} and order.order_status in _SHIPPED_CLASS:
+            return JsonResponse({"ok": False, "error": "Gönderilen siparişlerde ürünler düzenlenemez."}, status=400)
+
         def _sync_cari_total():
             """Re-post the cari movement for this order after its total
             changed (qty/price/add/remove). Idempotent — updates in place
@@ -953,7 +964,7 @@ def order_pack_scan(request, pk):
         .select_related("roll", "warehouse_product", "warehouse_product__warehouse", "pack")
         .order_by("-created_at")
     )
-    items = list(order.items.all().select_related("product", "product_variant"))
+    items = list(order.items.all().select_related("product", "product_variant", "pack"))
 
     packs = []
     if not order.is_retail_order:
@@ -963,10 +974,32 @@ def order_pack_scan(request, pk):
             Pack.objects.create(order=order, pack_number=1)
         packs = list(order.packs.order_by("pack_number"))
 
+    # Split into lines that have a physical top to scan ("tracked" — a
+    # warehouse/roll match exists) vs. lines that never can (bought-and-
+    # resold trade goods that live only in the Products catalog, no
+    # warehouse entry at all). Tracked lines get the scan/pack UI below;
+    # untracked ones just need to be visible so staff know to physically
+    # pack them too — shown as a plain checklist, not nested under
+    # "Okutulan toplar" (there's nothing to scan for them).
+    tracked_map = order.classify_items_by_tracking(items)
+    tracked_items = [it for it in items if tracked_map.get(it.pk, False)]
+    untracked_items = [it for it in items if not tracked_map.get(it.pk, False)]
+
+    # Tops scanned for a line that was later edited/removed on the order
+    # form. Editing an order NEVER touches reservations (top scanning is
+    # only ever done here, on the packing screen) — so these don't
+    # disappear or free up, they just lose their item grouping. Surfaced
+    # in their own section so staff can still see/remove/re-pack them
+    # instead of them silently sitting invisible.
+    unassigned_reservations = [r for r in reservations if not r.order_item_id and not r.pack_id]
+
     return render(request, "operating/order_pack_scan.html", {
         "order": order,
         "items": items,
+        "tracked_items": tracked_items,
+        "untracked_items": untracked_items,
         "reservations": reservations,
+        "unassigned_reservations": unassigned_reservations,
         "reservation_count": sum(1 for r in reservations if not r.consumed),
         "shipped": order.order_status in _SHIPPED_CLASS,
         "packs": packs,
@@ -1042,6 +1075,12 @@ def order_pack_reserve_add(request, pk):
         # Raced: another request took the last metres between the check
         # above and the lock — report the (possibly reserved) state.
         return _roll_unavailable_response(roll_pick)
+    # The cari receivable is sourced from scanned metres (see
+    # Order.billable_value) — a fresh scan changes it, so re-post now
+    # rather than waiting for some unrelated OrderItem save.
+    if order.cari_id:
+        from current_account.services import post_order_movement
+        post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
 
 
@@ -1072,6 +1111,9 @@ def order_pack_reserve_update(request, pk):
         meters = avail
     r.meters = meters
     r.save(update_fields=["meters"])
+    if order.cari_id:
+        from current_account.services import post_order_movement
+        post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
 
 
@@ -1091,6 +1133,9 @@ def order_pack_reserve_remove(request, pk):
         return JsonResponse({"ok": False, "error": "Rezervasyon bulunamadı."}, status=404)
     removed = r.id
     r.delete()
+    if order.cari_id:
+        from current_account.services import post_order_movement
+        post_order_movement(order)
     return JsonResponse({"ok": True, "removed": removed})
 
 
@@ -1120,6 +1165,36 @@ def order_pack_reserve_assign_pack(request, pk):
         r.pack = None
     r.save(update_fields=["pack"])
     return JsonResponse({"ok": True, "reservation_id": r.pk, "pack_id": r.pack_id})
+
+
+@login_required
+@require_POST
+def order_pack_assign_item(request, pk):
+    """Drag-and-drop target for warehouse-UNTRACKED order lines (catalog/
+    trade goods with no roll to scan) — put the whole line into a
+    package (or back to the plain order list if pack_id is blank).
+    These lines have nothing to reserve, so this is a direct
+    OrderItem.pack assignment instead of the roll-reservation machinery
+    tracked lines use (order_pack_reserve_assign_pack)."""
+    order = get_object_or_404(Order, pk=pk)
+    if order.order_status in _SHIPPED_CLASS:
+        return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    item_id = (request.POST.get("item_id") or "").strip()
+    if not item_id.isdigit():
+        return JsonResponse({"ok": False, "error": "Geçersiz kalem."}, status=400)
+    item = OrderItem.objects.filter(pk=item_id, order=order).first()
+    if item is None:
+        return JsonResponse({"ok": False, "error": "Kalem bulunamadı."}, status=404)
+    pack_id = (request.POST.get("pack_id") or "").strip()
+    if pack_id:
+        pack = Pack.objects.filter(pk=pack_id, order=order).first()
+        if pack is None:
+            return JsonResponse({"ok": False, "error": "Paket bulunamadı."}, status=404)
+        item.pack = pack
+    else:
+        item.pack = None
+    item.save(update_fields=["pack"])
+    return JsonResponse({"ok": True, "item_id": item.pk, "pack_id": item.pack_id})
 
 
 @login_required
@@ -1186,11 +1261,11 @@ def order_create_roll_list(request):
 @login_required
 @require_POST
 def order_pack_complete(request, pk):
-    """Confirm packing — the scanned rolls must fully COVER every order
-    line's metres (a 110 m line backed by one 38 m roll can't complete).
-    Moves the order to 'packaging' (Paketleniyor). Re-runnable; no
-    stock cut."""
-    from .views_warehouse import order_reservation_shortfalls, reservation_shortfall_message
+    """Confirm packing. Moves the order to 'packaging' (Paketleniyor).
+    Re-runnable; no stock cut. Scanned metres don't have to fully cover
+    every order line's ordered metres — a mismatch is allowed (the cari/
+    invoice bill only what was actually scanned, see
+    Order.billable_value), only "nothing scanned at all" is rejected."""
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş zaten gönderildi."}, status=400)
@@ -1198,9 +1273,6 @@ def order_pack_complete(request, pk):
     if n < 1:
         return JsonResponse({"ok": False,
                              "error": "Paketlemeyi tamamlamak için en az bir top okutmalısınız."}, status=400)
-    if order_reservation_shortfalls(order):
-        return JsonResponse({"ok": False,
-                             "error": reservation_shortfall_message(order)}, status=400)
     if order.order_status != "packaging":
         order.order_status = "packaging"
         order.save(update_fields=["order_status", "updated_at"])
@@ -1743,6 +1815,17 @@ class OrderCreate(View):
                         "Sipariş oluşturuldu ama Açık durumda kaldı: "
                         + reservation_shortfall_message(order),
                     )
+
+                # ── Freeze a point-in-time copy of the order as first
+                # created — the "İlk Oluşturulan" tab on the detail page
+                # always shows this, even after later edits change the
+                # live items. Best-effort: a snapshot hiccup must never
+                # fail order creation.
+                try:
+                    order.original_snapshot = order.build_snapshot()
+                    order.save(update_fields=["original_snapshot"])
+                except Exception:
+                    pass
 
                 # ── Auto-link to a CariAccount + log the sales-order
                 # movement so the customer's ledger reflects this

@@ -209,10 +209,16 @@ def create_invoice_for_order(order, *, user=None):
 
     Called from apply_order_status_change the moment an order enters a
     shipped status — the invoice is the paper trail of the completed
-    sale. Lines mirror the order items 1:1 with 0% tax so the invoice
-    total equals the order total, i.e. exactly the receivable the
+    sale. Lines mirror the order items, but their QUANTITY is the
+    actually scanned/packed amount (order.get_billable_line_quantities()),
+    not the ordered quantity — packing and the order detail can genuinely
+    disagree (extra or short rolls scanned), and the invoice/cari must
+    bill reality, not the original request. 0% tax so the invoice total
+    equals order.billable_value(), i.e. exactly the receivable the
     order_sale movement already posted (issue() posts a 0-amount marker
-    for order-linked invoices — no double counting).
+    for order-linked invoices — no double counting). A line whose
+    billable quantity is 0 (nothing scanned, e.g. it was dropped/never
+    packed) is skipped entirely rather than invoiced as zero.
 
     Idempotent: an order that already has a non-cancelled invoice is
     left alone (re-ship after un-ship creates a fresh one only because
@@ -225,7 +231,7 @@ def create_invoice_for_order(order, *, user=None):
     if order.invoices.exclude(status="cancelled").exists():
         return None
     try:
-        total = Decimal(str(order.total_value() or 0))
+        total = Decimal(str(order.billable_value() or 0))
     except Exception:
         total = Decimal("0")
     if total <= 0:
@@ -239,6 +245,8 @@ def create_invoice_for_order(order, *, user=None):
     from datetime import timedelta
     term_days = cari.payment_term_days or 30
 
+    qty_map = order.get_billable_line_quantities()
+
     with transaction.atomic():
         inv = Invoice.objects.create(
             cari=cari, book=book,
@@ -250,19 +258,24 @@ def create_invoice_for_order(order, *, user=None):
             order=order,
             created_by=member,
         )
-        for i, it in enumerate(order.items.all(), start=1):
+        line_no = 0
+        for it in order.items.all():
+            qty = qty_map.get(it.pk, it.quantity or Decimal("0"))
+            if not qty or qty <= 0:
+                continue
+            line_no += 1
             desc = ""
             if getattr(it, "product_variant_id", None) and it.product_variant:
                 desc = f"{it.product.title} [{it.product_variant.variant_sku}]"
             elif getattr(it, "product_id", None) and it.product:
                 desc = it.product.title
             InvoiceItem.objects.create(
-                invoice=inv, line_no=i,
+                invoice=inv, line_no=line_no,
                 product=it.product,
                 variant=getattr(it, "product_variant", None),
                 order_item=it,
                 description=(desc or "Item")[:300],
-                quantity=it.quantity or Decimal("0"),
+                quantity=qty,
                 unit="mt",
                 unit_price=it.price or Decimal("0"),
                 discount_rate=Decimal("0"),
@@ -300,6 +313,17 @@ def post_order_movement(order, *, member=None):
     invoice_sale; the customer's cari balance reflects pending orders
     even before a formal invoice is issued.
 
+    The amount is order.billable_value() — price × ACTUALLY SCANNED/
+    PACKED quantity per line (see Order.get_billable_line_quantities) —
+    not the ordered total. An order sitting there with items but nothing
+    scanned yet posts 0 and carries no receivable; the receivable grows
+    live as staff scan barcodes into packing, and reflects real
+    shortages/overages if what got scanned differs from what was
+    ordered. Called both by the OrderItem save signal (order edits) and
+    by every packing/reservation endpoint (scan add/update/remove/
+    assign-pack, consume/restore at ship/un-ship) so the cari tracks
+    packing in real time, not just order edits.
+
     Idempotent: re-running after an edit updates the amount in place
     instead of creating a duplicate movement.
     """
@@ -310,10 +334,10 @@ def post_order_movement(order, *, member=None):
     if not cari:
         return None
 
-    # Compute total from the order. Use the model's total_value() so
-    # we stay consistent with what the UI displays.
+    # Compute total from what was actually scanned/packed, not what was
+    # ordered — see Order.billable_value().
     try:
-        total = Decimal(str(order.total_value() or 0))
+        total = Decimal(str(order.billable_value() or 0))
     except Exception:
         total = Decimal("0")
 

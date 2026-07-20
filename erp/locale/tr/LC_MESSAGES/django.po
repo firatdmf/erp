@@ -8125,3 +8125,241 @@ msgstr "Tümünü kaydet"
 
 msgid "Add at least one product."
 msgstr "En az bir ürün ekleyin."
+
+msgid "Profit margin %"
+msgstr "Kar oranı %"
+
+msgid "group default"
+msgstr "grup varsayılanı"
+
+msgid "Leave blank to use the product group's margin."
+msgstr "Boş bırakılırsa ürün grubunun kar oranı geçerli olur."
+
+msgid "Order rules"
+msgstr "Sipariş kuralları"
+
+msgid "Minimum order quantity"
+msgstr "Minimum sipariş miktarı"
+
+msgid "Leave blank to use the product group's minimum."
+msgstr "Boş bırakılırsa ürün grubunun minimumu geçerli olur."
+
+msgid "Care instructions"
+msgstr "Bakım talimatları"
+
+msgid "Leave blank to use the product group's care instructions."
+msgstr "Boş bırakılırsa ürün grubunun bakım talimatları geçerli olur."
+
+msgid "Product Groups"
+msgstr "Ürün Grupları"
+
+msgid "groups"
+msgstr "grup"
+
+msgid "products without a group"
+msgstr "grupsuz ürün"
+
+msgid "New group"
+msgstr "Yeni grup"
+
+msgid "Hidden"
+msgstr "Gizli"
+
+msgid "margin"
+msgstr "kar"
+
+msgid "min"
+msgstr "min"
+
+msgid "No product groups yet. Create the first one."
+msgstr "Henüz ürün grubu yok. İlkini oluşturun."
+
+msgid "New product group"
+msgstr "Yeni ürün grubu"
+
+msgid "Group name"
+msgstr "Grup adı"
+
+msgid "e.g. curtain, bed, fabric"
+msgstr "örn. curtain, bed, fabric"
+
+msgid "Saved in lowercase; spaces become underscores."
+msgstr "Küçük harfle kaydedilir; boşluklar alt çizgi olur."
+
+msgid "Enter a group name."
+msgstr "Grup adı girin."
+
+msgid "Visible on storefront"
+msgstr "Sitede görünür"
+
+msgid "Delete group"
+msgstr "Grubu sil"
+
+msgid "Products with cost"
+msgstr "Maliyeti girili ürün"
+
+msgid "Group image"
+msgstr "Grup görseli"
+
+msgid "Uploading a new image replaces the current one."
+msgstr "Yeni görsel yüklerseniz mevcut görselin yerini alır."
+
+msgid "Turn off to hide this whole group from the B2B website."
+msgstr "Kapatırsanız bu grubun tamamı B2B sitesinde gizlenir."
+
+msgid ""
+"Saved in lowercase; spaces become underscores. Storefront category URLs use "
+"this name."
+msgstr ""
+"Küçük harfle kaydedilir; boşluklar alt çizgi olur. Sitedeki kategori "
+"adresleri bu ismi kullanır."
+
+msgid "e.g. 40"
+msgstr "örn. 40"
+
+msgid ""
+"Selling price = cost × (1 + margin/100). A product can override this with "
+"its own margin on the product edit page."
+msgstr ""
+"Satış fiyatı = maliyet × (1 + oran/100). Bir ürün, ürün düzenleme "
+"sayfasından kendi kar oranıyla bunu ezebilir."
+
+msgid ""
+"Recalculates the price of every costed product and variant in this group "
+"from its cost. Products without a cost are skipped."
+msgstr ""
+"Bu gruptaki maliyeti girili tüm ürün ve varyantların fiyatını maliyetinden "
+"yeniden hesaplar. Maliyeti olmayanlar atlanır."
+
+msgid "Apply margin to all prices"
+msgstr "Kar oranını tüm fiyatlara uygula"
+
+msgid "Lead time (days)"
+msgstr "Teslim süresi (gün)"
+
+msgid "e.g. 25"
+msgstr "örn. 25"
+
+msgid ""
+"Defaults for every product in the group; a product can set its own minimum "
+"on the product edit page."
+msgstr ""
+"Gruptaki tüm ürünler için varsayılandır; bir ürün kendi minimumunu ürün "
+"düzenleme sayfasından belirleyebilir."
+
+msgid "Care & washing"
+msgstr "Bakım & yıkama"
+
+msgid "Washing instructions"
+msgstr "Yıkama talimatları"
+
+msgid "e.g. Machine wash 30°C, do not bleach…"
+msgstr "örn. 30°C makinede yıkanır, çamaşır suyu kullanmayın…"
+
+msgid "Products show these on the storefront unless they define their own."
+msgstr "Ürünler kendi talimatlarını tanımlamadıkça sitede bunlar gösterilir."
+
+msgid "Foreign trade"
+msgstr "Dış ticaret"
+
+msgid "HS (GTIP) code"
+msgstr "GTİP kodu"
+
+msgid "e.g. 6303.92"
+msgstr "örn. 6303.92"
+
+msgid "Customs tariff code used on export paperwork for this group."
+msgstr "Bu grubun ihracat evraklarında kullanılan gümrük tarife kodu."
+
+msgid "Save settings"
+msgstr "Ayarları kaydet"
+
+msgid "Products in this group"
+msgstr "Bu gruptaki ürünler"
+
+msgid "Margin"
+msgstr "Kar oranı"
+
+msgid "own"
+msgstr "özel"
+
+msgid "no cost"
+msgstr "maliyet yok"
+
+msgid "group"
+msgstr "grup"
+
+msgid "No products in this group yet."
+msgstr "Bu grupta henüz ürün yok."
+
+msgid "Example"
+msgstr "Örnek"
+
+msgid "cost"
+msgstr "maliyet"
+
+msgid "price"
+msgstr "fiyat"
+
+msgid "Settings saved."
+msgstr "Ayarlar kaydedildi."
+
+msgid "Enter and save a margin first."
+msgstr "Önce bir kar oranı girip kaydedin."
+
+msgid ""
+"Recalculate ALL prices in this group from cost using the saved margin? This "
+"overwrites current prices."
+msgstr ""
+"Bu gruptaki TÜM fiyatlar kayıtlı kar oranıyla maliyetten yeniden hesaplansın"
+" mı? Mevcut fiyatların üzerine yazılır."
+
+msgid "Prices updated"
+msgstr "Fiyatlar güncellendi"
+
+msgid "skipped (no cost)"
+msgstr "atlandı (maliyet yok)"
+
+msgid ""
+"Delete this group? Its products are kept but lose their group (and its "
+"defaults)."
+msgstr ""
+"Bu grup silinsin mi? Ürünler korunur ama gruplarını (ve varsayılanlarını) "
+"kaybeder."
+
+msgid "Product groups"
+msgstr "Ürün Grupları"
+
+msgid "Add product group"
+msgstr "Ürün Grubu Ekle"
+
+msgid "Profit margin"
+msgstr "Kar oranı"
+
+msgid "Create group"
+msgstr "Grubu oluştur"
+
+msgid ""
+"Set the group's defaults now — every product you put in it inherits them."
+msgstr ""
+"Grubun varsayılanlarını şimdi belirleyin — içine koyduğunuz her ürün bunları"
+" devralır."
+
+msgid "Current"
+msgstr "Güncel"
+
+msgid "Originally created"
+msgstr "İlk oluşturulan"
+
+msgid ""
+"Frozen exactly as the order was first created, on %(dt)s. Later edits never "
+"change this view."
+msgstr ""
+"Siparişin ilk oluşturulduğu haliyle donduruldu — %(dt)s. Sonraki "
+"düzenlemeler bu görünümü hiç değiştirmez."
+
+msgid "No items recorded in the original snapshot."
+msgstr "İlk kayıtta ürün bulunamadı."
+
+msgid "Original grand total"
+msgstr "İlk toplam tutar"

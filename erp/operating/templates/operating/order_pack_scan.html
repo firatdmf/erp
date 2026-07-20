@@ -191,6 +191,7 @@
      data-upd-url="{% url 'operating:order_pack_reserve_update' order.pk %}"
      data-rem-url="{% url 'operating:order_pack_reserve_remove' order.pk %}"
      data-assign-pack-url="{% url 'operating:order_pack_reserve_assign_pack' order.pk %}"
+     data-assign-item-url="{% url 'operating:order_pack_assign_item' order.pk %}"
      data-pack-crud-url="{% url 'operating:order_packing_list' order.pk %}"
      data-done-url="{% url 'operating:order_pack_complete' order.pk %}"
      data-detail-url="{% url 'operating:order_detail' order.pk %}"
@@ -333,7 +334,7 @@
       </div>
       <div class="pk-card-b">
         <div id="pkGroups">
-          {% for it in items %}
+          {% for it in tracked_items %}
           <div class="pk-pgroup">
             <div class="pk-pgroup-h">
               <span class="pk-pgroup-name">{{ it.display_name }}</span>
@@ -373,8 +374,47 @@
             </div>
           </div>
           {% empty %}
-          <div class="pk-empty" style="padding:14px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Siparişte ürün yok.{% else %}No products.{% endif %}</div>
+          <div class="pk-empty" style="padding:14px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu siparişte okutulacak (depo takipli) ürün yok.{% else %}No warehouse-tracked products to scan in this order.{% endif %}</div>
           {% endfor %}
+
+          {% if unassigned_reservations %}
+          <div class="pk-pgroup">
+            <div class="pk-pgroup-h">
+              <span class="pk-pgroup-name">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Atanmamış toplar{% else %}Unassigned tops{% endif %}</span>
+              <span class="pk-pgroup-sku">{% if LANGUAGE_CODE|slice:":2" == "tr" %}artık siparişteki bir kalemle eşleşmiyor{% else %}no longer matches an order line{% endif %}</span>
+            </div>
+            <div class="pk-pgroup-rolls" data-order-item-id="">
+              {% for r in unassigned_reservations %}
+              <div class="pk-row" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ r.id }}"
+                   data-order-item-id="" data-assigned-pack=""
+                   data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters }}">
+                <div class="pk-row-top">
+                  <div>
+                    <div class="pk-row-name">{{ r.warehouse_product.name }}</div>
+                    <div class="pk-row-meta">{{ r.warehouse_product.sku|default:'—' }}{% if r.warehouse_product.warehouse_id %} · {{ r.warehouse_product.warehouse.name }}{% endif %}</div>
+                    <span class="pk-row-bc">{{ r.roll.barcode|default:'—' }}</span>
+                  </div>
+                  {% if not shipped %}<button type="button" class="pk-x" data-remove="{{ r.id }}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Kaldır{% else %}Remove{% endif %}"><i class="fa fa-xmark"></i></button>{% endif %}
+                </div>
+                <div class="pk-row-cut" data-cut="{{ r.id }}" data-meters="{{ r.meters|floatformat:2 }}" data-remaining="{{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }}">
+                  <span class="pk-cut-view">
+                    <span class="pk-cut-val">{{ r.meters|floatformat:2 }} m{% if r.meters < r.roll.meters_remaining|default:r.roll.meters %} <small>({% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %})</small>{% endif %}</span>
+                    <span class="pk-avail">/ {{ r.roll.meters_remaining|default:r.roll.meters|floatformat:2 }} m</span>
+                    {% if not shipped %}<button type="button" class="pk-scissors" data-mid="{{ r.id }}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Kısmi kes{% else %}Partial cut{% endif %}"><i class="fa fa-scissors"></i></button>{% endif %}
+                  </span>
+                  {% if not shipped %}
+                  <span class="pk-cut-edit" style="display:none;">
+                    <input type="number" step="0.01" min="0" class="pk-m-inp" data-mid="{{ r.id }}">
+                    <button type="button" class="pk-cut-ok" data-mid="{{ r.id }}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Onayla{% else %}Confirm{% endif %}"><i class="fa fa-check"></i></button>
+                    <button type="button" class="pk-cut-cancel" data-mid="{{ r.id }}" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Vazgeç{% else %}Cancel{% endif %}"><i class="fa fa-xmark"></i></button>
+                  </span>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -433,6 +473,17 @@
               </div>
             </div>
             {% endif %}{% endfor %}
+            {% for it in untracked_items %}{% if it.pack_id == p.pk %}
+            <div class="pk-row pk-citem" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ it.pk }}" data-assigned-pack="{{ p.pk }}">
+              <div class="pk-row-top">
+                <div>
+                  <div class="pk-row-name">{{ it.display_name }}</div>
+                  <div class="pk-row-meta">{{ it.display_sku|default:'—' }}</div>
+                </div>
+                <span class="pk-item-qty" style="flex-shrink:0;">{{ it.quantity|floatformat:2 }}</span>
+              </div>
+            </div>
+            {% endif %}{% endfor %}
             <div class="pk-drop-hint" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Topları buraya sürükleyin{% else %}Drag rolls here{% endif %}</div>
           </div>
         </div>
@@ -441,6 +492,38 @@
     </div>
     {% endif %}
   </div>
+
+  {% if not order.is_retail_order and untracked_items %}
+  <!-- Products in this order with no warehouse/barcode presence at all
+       (bought-and-resold trade goods entered straight into Products) —
+       nothing to scan for these, but staff still need to physically pack
+       them, so they're listed here as a plain, draggable checklist —
+       drag into a package the same way scanned tops are, just via a
+       direct OrderItem→Pack assignment (order_pack_assign_item) instead
+       of the roll-reservation machinery tracked lines use. -->
+  <div class="pk-card" id="pkUntrackedCard" style="margin-top:16px;">
+    <div class="pk-card-h">
+      <h3>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Sipariş listesi{% else %}Order list{% endif %}</h3>
+      <span class="pk-sub">{{ untracked_items|length }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}ürün · okutma gerekmiyor{% else %}products · no scan needed{% endif %}</span>
+    </div>
+    <div class="pk-card-b">
+      <div id="pkUntrackedList" ondragover="pkDragOver(event)" ondragleave="pkDragLeave(event)" ondrop="pkDropUnassign(event)">
+        {% for it in untracked_items %}{% if not it.pack_id %}
+        <div class="pk-row pk-citem" draggable="{% if not shipped %}true{% else %}false{% endif %}" data-id="{{ it.pk }}" data-assigned-pack="">
+          <div class="pk-row-top">
+            <div>
+              <div class="pk-row-name">{{ it.display_name }}</div>
+              <div class="pk-row-meta">{{ it.display_sku|default:'—' }}</div>
+            </div>
+            <span class="pk-item-qty" style="flex-shrink:0;">{{ it.quantity|floatformat:2 }}</span>
+          </div>
+        </div>
+        {% endif %}{% endfor %}
+        <div class="pk-pgroup-empty" data-empty-hint>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tüm ürünler paketlere atandı.{% else %}All products assigned to packages.{% endif %}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   {% if not shipped %}
   <div class="pk-foot">
@@ -463,14 +546,19 @@
   var wrap = document.querySelector('.pk-wrap');
   var CSRF = '{{ csrf_token }}';
   var ADD = wrap.dataset.addUrl, UPD = wrap.dataset.updUrl, REM = wrap.dataset.remUrl,
-      ASSIGN_PACK = wrap.dataset.assignPackUrl, PACK_CRUD = wrap.dataset.packCrudUrl,
+      ASSIGN_PACK = wrap.dataset.assignPackUrl, ASSIGN_ITEM = wrap.dataset.assignItemUrl,
+      PACK_CRUD = wrap.dataset.packCrudUrl,
       DONE = wrap.dataset.doneUrl, DETAIL = wrap.dataset.detailUrl;
   var SHIPPED = wrap.dataset.shipped === '1';
   var PACK_MODE = wrap.dataset.packMode === '1';
 
   // Flat list (retail) or the union of every group/pack body (non-retail)
   // — used for count/total refresh and for locating rows by id.
-  function allRows(){ return document.querySelectorAll('.pk-row'); }
+  // Excludes .pk-citem (untracked/catalog-item rows) — those aren't
+  // physical tops, so they don't belong in the roll count/metre total
+  // or the "at least one scan" gate. They're regrouped separately below.
+  function allRows(){ return document.querySelectorAll('.pk-row:not(.pk-citem)'); }
+  function allCatalogRows(){ return document.querySelectorAll('.pk-citem'); }
 
   var listEl = document.getElementById('pkList');           // retail only
   var groupsEl = document.getElementById('pkGroups');        // non-retail only
@@ -541,13 +629,22 @@
       }
       if (target && row.parentNode !== target) target.appendChild(row);
     });
-    document.querySelectorAll('.pk-pgroup-rolls, [data-pack-body]').forEach(function(container){
+    // Untracked (catalog) rows regroup the same way, just against
+    // #pkUntrackedList instead of a per-product pgroup when unassigned.
+    allCatalogRows().forEach(function(row){
+      var packId = row.dataset.assignedPack;
+      var target = packId
+        ? document.querySelector('.pk-pack[data-pack-id="'+packId+'"] [data-pack-body]')
+        : document.getElementById('pkUntrackedList');
+      if (target && row.parentNode !== target) target.appendChild(row);
+    });
+    document.querySelectorAll('.pk-pgroup-rolls, [data-pack-body], #pkUntrackedList').forEach(function(container){
       var hint = container.querySelector('[data-empty-hint]');
       var hasRows = container.querySelectorAll('.pk-row').length > 0;
       if (hint) hint.style.display = hasRows ? 'none' : '';
     });
     document.querySelectorAll('.pk-pack').forEach(function(pack){
-      var count = pack.querySelectorAll('.pk-row').length;
+      var count = pack.querySelectorAll('.pk-row:not(.pk-citem)').length;
       var meta = pack.querySelector('.pk-pack-meta [data-count]');
       if (meta) meta.textContent = count;
     });
@@ -726,6 +823,19 @@
       }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); });
     }
 
+    // Same as assignToPack, but for a warehouse-untracked order line —
+    // a direct OrderItem.pack assignment (order_pack_assign_item), no
+    // roll/reservation involved.
+    function assignItemToPack(itemId, packId){
+      post(ASSIGN_ITEM, {item_id: itemId, pack_id: packId || ''}).then(function(rr){
+        var d = rr.j || {};
+        if (!d.ok){ toast(d.error || t('Taşınamadı.','Could not move.'), 'err'); return; }
+        var row = document.querySelector('.pk-citem[data-id="'+itemId+'"]');
+        if (row) row.dataset.assignedPack = d.pack_id || '';
+        pkRegroup();
+      }).catch(function(){ toast(t('Ağ hatası.','Network error.'),'err'); });
+    }
+
     var addPackBtn = document.getElementById('pkAddPackBtn');
     if (addPackBtn) addPackBtn.addEventListener('click', function(){
       pkFetchCrud({action:'add_pack'}).then(function(data){
@@ -764,10 +874,17 @@
 
     // Drag & drop
     var dragResId = null;
+    var dragKind = 'reservation';
     document.addEventListener('dragstart', function(e){
+      var citem = e.target.closest('.pk-citem[draggable="true"]');
+      if (citem){
+        dragResId = citem.dataset.id; dragKind = 'item';
+        e.dataTransfer.effectAllowed = 'move';
+        return;
+      }
       var row = e.target.closest('.pk-row[draggable="true"]');
       if (!row) return;
-      dragResId = row.dataset.id;
+      dragResId = row.dataset.id; dragKind = 'reservation';
       e.dataTransfer.effectAllowed = 'move';
     });
     window.pkDragOver = function(e){ e.preventDefault(); e.currentTarget.classList.add('is-target'); e.dataTransfer.dropEffect = 'move'; };
@@ -776,15 +893,18 @@
       e.preventDefault();
       e.currentTarget.classList.remove('is-target');
       if (!dragResId) return;
-      assignToPack(dragResId, e.currentTarget.dataset.packId);
+      if (dragKind === 'item') assignItemToPack(dragResId, e.currentTarget.dataset.packId);
+      else assignToPack(dragResId, e.currentTarget.dataset.packId);
       dragResId = null;
     };
-    // Dropping back onto a product group unassigns (removes from pack).
+    // Dropping back onto a product group (or #pkUntrackedList) unassigns
+    // (removes from pack).
     window.pkDropUnassign = function(e){
       e.preventDefault();
       e.currentTarget.classList.remove('is-target');
       if (!dragResId) return;
-      assignToPack(dragResId, '');
+      if (dragKind === 'item') assignItemToPack(dragResId, '');
+      else assignToPack(dragResId, '');
       dragResId = null;
     };
   }

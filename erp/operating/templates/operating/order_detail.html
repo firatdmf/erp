@@ -70,6 +70,30 @@
   }
   .ord-btn.primary:hover { filter: brightness(1.04); color: white; }
 
+  /* Products card: Current vs. İlk Oluşturulan (original snapshot) tabs */
+  .od-item-tabs {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #F4F7FB; border: 1px solid #E2E8EE; border-radius: 10px;
+    padding: 4px; margin-bottom: 12px;
+  }
+  .od-item-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px; background: transparent; border: none; border-radius: 7px;
+    font: 600 12px var(--font-sans); color: var(--gray-600); cursor: pointer; transition: all 140ms;
+  }
+  .od-item-tab i { width: 12px; height: 12px; }
+  .od-item-tab:hover { color: #0F1419; background: white; }
+  .od-item-tab.active {
+    background: white; color: var(--nejum-teal-700);
+    box-shadow: 0 1px 2px rgba(15,23,31,0.08), inset 0 0 0 1px rgba(20,127,116,0.18);
+  }
+  .od-orig-note {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    padding: 8px 12px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 9px;
+    font: 500 11.5px var(--font-sans); color: var(--gray-600);
+  }
+  .od-orig-note i { color: var(--nejum-teal-600); }
+
   /* KIND + STATUS PILLS */
   .ord-kind {
     display: inline-flex; align-items: center; justify-content: center;
@@ -967,10 +991,30 @@
             <h3>{% trans "Products" %}</h3>
             <span class="od-card-sub"><span id="od-items-count">{{ order.items.count }}</span> {% trans "items" %}</span>
           </div>
+          {% if order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
           <button type="button" id="od-prods-edit-toggle" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
             <i class="fa fa-pen" data-edit-icon></i> <span data-edit-label>{% trans "Edit" %}</span>
           </button>
+          {% else %}
+          <span class="ord-btn ghost" style="font-size:12px; padding:6px 10px; opacity:0.6; cursor:default;"
+                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Gönderilen siparişlerde ürünler düzenlenemez — önce 'Geri Aç & Düzelt' ile siparişi geri açın{% else %}Shipped orders can't be edited — use 'Re-open & Fix' first{% endif %}">
+            <i class="fa fa-lock"></i> <span>{% trans "Locked" %}</span>
+          </span>
+          {% endif %}
         </div>
+
+        {% if order.original_snapshot %}
+        <div class="od-item-tabs" id="od-item-tabs">
+          <button type="button" class="od-item-tab active" data-item-tab="current">
+            <i class="fa fa-pen-to-square"></i> <span>{% trans "Current" %}</span>
+          </button>
+          <button type="button" class="od-item-tab" data-item-tab="original">
+            <i class="fa fa-flag"></i> <span>{% trans "Originally created" %}</span>
+          </button>
+        </div>
+        {% endif %}
+
+        <div data-item-pane="current">
         <div class="od-prods-scroll">
         <table class="od-prods">
           <thead>
@@ -1128,6 +1172,61 @@
           </div>
           {% endif %}
         </div>
+        </div><!-- /data-item-pane="current" -->
+
+        {% if order.original_snapshot %}
+        <div data-item-pane="original" style="display:none;">
+          <div class="od-orig-note">
+            <i class="fa fa-circle-info"></i>
+            {% blocktrans with dt=order.created_at|date:"d M Y · H:i" %}Frozen exactly as the order was first created, on {{ dt }}. Later edits never change this view.{% endblocktrans %}
+          </div>
+          <div class="od-prods-scroll">
+          <table class="od-prods">
+            <thead>
+              <tr>
+                <th>{% trans "Product" %}</th>
+                <th>SKU</th>
+                <th>{% trans "Variant" %}</th>
+                <th class="num">{% trans "Qty" %}</th>
+                <th class="num">{% trans "Price" %}</th>
+                <th class="num">{% trans "Amount" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for oi in order.original_snapshot.items %}
+              <tr>
+                <td>{{ oi.product_title|default:oi.description|default:"—" }}</td>
+                <td><span class="mono">{{ oi.sku|default:"—" }}</span></td>
+                <td>
+                  {{ oi.variant_label|default:"—" }}
+                  {% if oi.rolls %}
+                    <div style="margin-top:3px;">
+                      {% for rl in oi.rolls %}
+                        {% if rl.barcode %}
+                        <span class="mono" style="display:inline-block; font-size:10.5px; color:var(--gray-600); background:#F4F7FB; border-radius:5px; padding:1px 6px; margin:1px 3px 1px 0;">{{ rl.barcode }} · {{ rl.meters|floatformat:"-2" }}</span>
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </td>
+                <td class="num">{{ oi.quantity|floatformat:"-2" }}</td>
+                <td class="num">${{ oi.price|floatformat:2 }}</td>
+                <td class="num"><b>${{ oi.subtotal|floatformat:2 }}</b></td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="6" class="od-empty-mute" style="text-align:center; padding:16px;">{% trans "No items recorded in the original snapshot." %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          <div class="od-totals">
+            <div class="od-tot-row total">
+              <span>{% trans "Original grand total" %}</span>
+              <span>${{ order.original_snapshot.total_value|floatformat:2 }}</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
       </section>
 
       <!-- NOTES (inline editable) -->
@@ -1984,6 +2083,23 @@
         e.preventDefault();
         e.returnValue = '';
       }
+    });
+  })();
+
+  // ──────────────────────────────────────────────────────────
+  //  Products card: Current / İlk Oluşturulan (original) tabs.
+  // ──────────────────────────────────────────────────────────
+  (function () {
+    const tabs = document.getElementById('od-item-tabs');
+    if (!tabs) return;
+    tabs.querySelectorAll('.od-item-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const which = btn.getAttribute('data-item-tab');
+        tabs.querySelectorAll('.od-item-tab').forEach(function (b) { b.classList.toggle('active', b === btn); });
+        document.querySelectorAll('[data-item-pane]').forEach(function (pane) {
+          pane.style.display = (pane.getAttribute('data-item-pane') === which) ? '' : 'none';
+        });
+      });
     });
   })();
 

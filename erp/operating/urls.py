@@ -59,6 +59,7 @@ urlpatterns = [
     path("orders/<int:pk>/pack/update/", views.order_pack_reserve_update, name="order_pack_reserve_update"),
     path("orders/<int:pk>/pack/remove/", views.order_pack_reserve_remove, name="order_pack_reserve_remove"),
     path("orders/<int:pk>/pack/assign_pack/", views.order_pack_reserve_assign_pack, name="order_pack_reserve_assign_pack"),
+    path("orders/<int:pk>/pack/assign_item/", views.order_pack_assign_item, name="order_pack_assign_item"),
     path("orders/<int:pk>/pack/complete/", views.order_pack_complete, name="order_pack_complete"),
     path("orders/create/barcode_check/", views.order_create_barcode_check, name="order_create_barcode_check"),
     path("orders/create/roll_list/", views.order_create_roll_list, name="order_create_roll_list"),

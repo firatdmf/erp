@@ -452,6 +452,14 @@ class Order(models.Model):
         help_text="Kargo şirketi"
     )
 
+    # A frozen, point-in-time copy of the order (customer/address/notes +
+    # every line item, including any rolls already scanned) captured ONCE
+    # right after creation — see build_snapshot(). Backs the "İlk
+    # Oluşturulan" (originally created) tab on the order detail page so
+    # staff can always see what the customer actually ordered, even after
+    # later edits change the live OrderItem rows. Never written to again.
+    original_snapshot = models.JSONField(null=True, blank=True)
+
     # Current-account link — auto-populated on save() for manual orders
     # so cari pages can list this order's movements and so we don't
     # double-create a cari for the same customer. Web orders skip this.
@@ -469,6 +477,181 @@ class Order(models.Model):
         return round(sum(item.subtotal() for item in self.items.all()), 2)
 
         # Now whenever an OrderItem is added, updated, or deleted, the overall Order.status will update automatically.
+
+    def classify_items_by_tracking(self, items=None):
+        """Which order lines have ANY warehouse/roll presence ("tracked" —
+        can be barcode-scanned) vs. which are catalog/trade-only
+        ("untracked" — physically nothing to scan, e.g. goods bought and
+        resold straight from the Products catalog with no warehouse
+        entry). Matches at the same level the packing scanner matches
+        at: a line naming a specific variant needs THAT variant (or its
+        SKU) in a warehouse — a sibling variant of the same parent
+        product doesn't count.
+
+        This is the single source of truth for "tracked" — used by
+        get_billable_line_quantities() (what bills the cari/invoice) and
+        by the packing screen (which lines get a scan/pack UI vs. a
+        plain checklist entry). Returns {order_item_id: bool}.
+        """
+        from functools import reduce
+        import operator as _op
+        from django.db.models import Q as _Q
+
+        items = items if items is not None else list(
+            self.items.all().select_related("product", "product_variant")
+        )
+        if not items:
+            return {}
+
+        variant_ids = {it.product_variant_id for it in items if it.product_variant_id}
+        product_ids = {it.product_id for it in items if it.product_id}
+        skus = set()
+        for it in items:
+            for s in ((getattr(it.product_variant, "variant_sku", None) if it.product_variant_id else None),
+                      (getattr(it.product, "sku", None) if it.product_id else None)):
+                if s and s.strip():
+                    skus.add(s.strip().lower())
+
+        tracked_variants, tracked_products, tracked_skus = set(), set(), set()
+        if variant_ids or product_ids or skus:
+            wq = _Q(pk__in=[])
+            if variant_ids:
+                wq |= _Q(catalog_variant_id__in=variant_ids)
+            if product_ids:
+                wq |= _Q(catalog_variant__product_id__in=product_ids)
+            if skus:
+                wq |= reduce(_op.or_, (_Q(sku__iexact=s) for s in skus))
+            for cv, cvp, wsku in (WarehouseProduct.objects.filter(wq)
+                                  .values_list("catalog_variant_id",
+                                               "catalog_variant__product_id", "sku")):
+                if cv:
+                    tracked_variants.add(cv)
+                if cvp:
+                    tracked_products.add(cvp)
+                if wsku and wsku.strip():
+                    tracked_skus.add(wsku.strip().lower())
+
+        result = {}
+        for it in items:
+            vsku = ((getattr(it.product_variant, "variant_sku", "") or "").strip().lower()
+                    if it.product_variant_id else "")
+            psku = ((getattr(it.product, "sku", "") or "").strip().lower()
+                    if it.product_id else "")
+            if it.product_variant_id:
+                tracked = (it.product_variant_id in tracked_variants
+                           or (vsku and vsku in tracked_skus))
+            else:
+                tracked = ((it.product_id and it.product_id in tracked_products)
+                           or (psku and psku in tracked_skus))
+            result[it.pk] = tracked
+        return result
+
+    def get_billable_line_quantities(self):
+        """Per-order-item quantity that should actually be BILLED (cari +
+        invoice) — the metres physically scanned into this order's
+        packing (OrderRollReservation, whether still a pending hold or
+        already consumed at ship time), NOT the ordered quantity. A line
+        with nothing scanned yet contributes 0 here even though it has
+        an ordered quantity — the unscanned portion of an order must
+        never show up on the customer's account. The one exception: a
+        product with NO warehouse/roll presence at all (nothing that
+        could ever be scanned — e.g. a catalog-only line) falls back to
+        its ordered quantity, since no scan data could ever exist for it.
+
+        Returns {order_item_id: Decimal}.
+        """
+        from decimal import Decimal
+        from django.db.models import Sum
+
+        items = list(self.items.all().select_related("product", "product_variant"))
+        if not items:
+            return {}
+
+        # Every reservation ever made for this line — pending
+        # (consumed=False, a soft hold from packing) AND consumed=True
+        # (physically cut at ship time) — both represent metres that
+        # were actually scanned.
+        scanned = {
+            r["order_item_id"]: (r["s"] or Decimal("0"))
+            for r in (self.roll_reservations
+                      .filter(order_item__isnull=False)
+                      .values("order_item_id").annotate(s=Sum("meters")))
+        }
+        tracked_map = self.classify_items_by_tracking(items)
+
+        result = {}
+        for it in items:
+            tracked = tracked_map.get(it.pk, False)
+            result[it.pk] = scanned.get(it.pk, Decimal("0")) if tracked else (it.quantity or Decimal("0"))
+        return result
+
+    def billable_value(self):
+        """The amount that should reflect on the cari/invoice — price ×
+        billable (scanned) quantity per line, summed. See
+        get_billable_line_quantities() for exactly what counts."""
+        from decimal import Decimal
+        qmap = self.get_billable_line_quantities()
+        total = Decimal("0")
+        for it in self.items.all():
+            qty = qmap.get(it.pk, it.quantity or Decimal("0"))
+            total += (it.price or Decimal("0")) * qty
+        return round(total, 2)
+
+    def build_snapshot(self):
+        """A frozen JSON copy of this order's state, called ONCE right
+        after creation (see OrderCreate.post) to populate
+        original_snapshot — the "İlk Oluşturulan" tab. Never call this
+        again later; the whole point is that it does NOT track edits."""
+        def _f(v):
+            return float(v) if v is not None else None
+
+        client_name = ""
+        if self.contact_id:
+            client_name = str(self.contact)
+        elif self.company_id:
+            client_name = str(self.company)
+        elif self.is_guest_order:
+            client_name = (" ".join(x for x in [self.guest_first_name, self.guest_last_name] if x)
+                            or self.guest_email or self.guest_phone or "")
+        elif self.web_client_id:
+            client_name = str(self.web_client)
+
+        items = []
+        for it in (self.items.all()
+                   .select_related("product", "product_variant")
+                   .prefetch_related("roll_reservations__roll")):
+            items.append({
+                "product_title": it.product.title if it.product_id else None,
+                "sku": (it.product_variant.variant_sku if it.product_variant_id
+                        else (it.product.sku if it.product_id else None)),
+                "variant_label": (it.product_variant.full_name if it.product_variant_id else None),
+                "description": it.description or "",
+                "quantity": _f(it.quantity),
+                "price": _f(it.price),
+                "subtotal": _f(it.subtotal()),
+                "is_custom_curtain": bool(it.is_custom_curtain),
+                "custom_width": _f(it.custom_width),
+                "custom_height": _f(it.custom_height),
+                "custom_fabric_used_meters": _f(it.custom_fabric_used_meters),
+                "rolls": [
+                    {"barcode": (r.roll.barcode if r.roll_id else None), "meters": _f(r.meters)}
+                    for r in it.roll_reservations.all()
+                ],
+            })
+
+        return {
+            "captured_at": self.created_at.isoformat() if self.created_at else None,
+            "order_number": self.order_number,
+            "client_name": client_name,
+            "notes": self.notes or "",
+            "delivery_address_title": self.delivery_address_title or "",
+            "delivery_address": self.delivery_address or "",
+            "delivery_city": self.delivery_city or "",
+            "delivery_country": self.delivery_country or "",
+            "delivery_phone": self.delivery_phone or "",
+            "total_value": _f(self.total_value()),
+            "items": items,
+        }
 
     def gross_profit(self):
         """Sum of every item's (price - cost) × quantity. Internal-only
@@ -591,6 +774,15 @@ class OrderItem(models.Model):
     )
     target_quantity_per_pack = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    # Which physical package this line was packed into — ONLY used for
+    # warehouse-untracked (catalog-only) lines, which have no roll to
+    # scan/reserve so OrderRollReservation.pack doesn't apply to them.
+    # Tracked lines are packed via their roll reservations instead; this
+    # stays null for them.
+    pack = models.ForeignKey(
+        "Pack", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="catalog_items",
     )
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True, null=True)

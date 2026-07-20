@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block css %}
+{% include "marketing/partials/_product_group_styles.html" %}
+{% endblock css %}
+
+{% block content %}
+<div class="pgd">
+  <a class="pgd-back" href="{% url 'marketing:product_group_list' %}"><i data-lucide="arrow-left"></i>{% trans "Product Groups" %}</a>
+
+  <div class="pgd-head">
+    <div class="pgd-head-l">
+      <div class="pgd-avatar"><i data-lucide="layers"></i></div>
+      <div>
+        <h1 class="pgd-title">{% trans "New product group" %}</h1>
+        <div class="pgd-hint" style="margin-top:2px;">{% trans "Set the group's defaults now — every product you put in it inherits them." %}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pgd-flash" id="pgdFlash"></div>
+
+  <div class="pgd-cols-single">
+    <form id="pgcForm" onsubmit="return false;">
+      {% include "marketing/partials/_product_group_form_cards.html" with group=None %}
+      <div class="pgd-save-bar">
+        <a class="pgd-btn ghost" href="{% url 'marketing:product_group_list' %}">{% trans "Cancel" %}</a>
+        <button type="button" class="pgd-btn primary" id="pgcCreateBtn" onclick="pgcCreate()"><i data-lucide="check"></i>{% trans "Create group" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const PGC_CSRF = '{{ csrf_token }}';
+
+function pgdFlash(ok, msg) {
+  const f = document.getElementById('pgdFlash');
+  f.className = 'pgd-flash ' + (ok ? 'ok' : 'err');
+  f.textContent = msg;
+  f.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  clearTimeout(f._t);
+  f._t = setTimeout(function () { f.className = 'pgd-flash'; }, 6000);
+}
+
+function pgdMarginExample() {
+  const box = document.getElementById('pgdMarginExample');
+  const m = parseFloat((document.getElementById('pgdMargin').value || '').replace(',', '.'));
+  if (isNaN(m)) { box.style.display = 'none'; return; }
+  const price = (100 * (1 + m / 100)).toFixed(2);
+  box.style.display = '';
+  box.textContent = '{% trans "Example" %}: {% trans "cost" %} $100 → {% trans "price" %} $' + price;
+}
+
+function pgcCreate() {
+  const form = document.getElementById('pgcForm');
+  const name = (form.querySelector('input[name="name"]').value || '').trim();
+  if (!name) { pgdFlash(false, '{% trans "Enter a group name." %}'); return; }
+  const btn = document.getElementById('pgcCreateBtn');
+  btn.disabled = true;
+  const fd = new FormData(form);
+  fetch("{% url 'marketing:product_group_create' %}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': PGC_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+    body: fd
+  }).then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.success) {
+        window.location.href = "{% url 'marketing:product_group_list' %}" + d.id + "/";
+      } else {
+        pgdFlash(false, (d && d.error) || '{% trans "Could not save." %}');
+        btn.disabled = false;
+      }
+    }).catch(function () { pgdFlash(false, '{% trans "Network error." %}'); btn.disabled = false; });
+}
+
+if (window.lucide) { lucide.createIcons(); }
+</script>
+{% endblock content %}

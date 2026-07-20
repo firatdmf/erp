@@ -918,6 +918,18 @@
                   <span>Product List</span>
                 </a>
               </li>
+              <li>
+                <a href="{% url 'marketing:product_group_list' %}">
+                  <i class="fas fa-layer-group" aria-hidden="true"></i>
+                  <span>{% trans "Product groups" %}</span>
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'marketing:product_group_create' %}">
+                  <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                  <span>{% trans "Add product group" %}</span>
+                </a>
+              </li>
             </ul>
           </div>
           <div class="add-menu-section">

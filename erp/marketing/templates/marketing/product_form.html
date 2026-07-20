@@ -521,17 +521,39 @@
         </div>
         <div class="form-row">
           <div class="form-group" style="flex: 1;">
-            <label for="id_b2b_price">
-              {% trans "B2B Price" %}
-              <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "(wholesale storefront only)" %}</span>
+            <label for="id_profit_margin">
+              {% trans "Profit margin" %} (%)
+              {% if product.category and product.category.profit_margin is not None %}
+                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group default" %}: %{{ product.category.profit_margin|floatformat:"-2" }}</span>
+              {% endif %}
             </label>
-            {{ form.b2b_price }}
+            {{ form.profit_margin }}
             <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">
-              {% trans "Leave blank to fall back to the retail price." %}
+              {% trans "Leave blank to use the product group's margin." %}
             </p>
           </div>
         </div>
       </div>
+
+      <!-- Order rules (wholesale minimums) -->
+      <div class="form-card sidebar-card">
+        <div class="form-card-title"><span class="form-card-ico"><i data-lucide="scale"></i></span>{% trans "Order rules" %}</div>
+        <div class="form-row">
+          <div class="form-group" style="flex: 1;">
+            <label for="id_minimum_order_quantity">
+              {% trans "Minimum order quantity" %}
+              {% if product.category and product.category.minimum_order_quantity is not None %}
+                <span style="margin-left:6px;font-size:11px;color:#9ca3af;font-weight:400;">{% trans "group default" %}: {{ product.category.minimum_order_quantity|floatformat:"-2" }}</span>
+              {% endif %}
+            </label>
+            {{ form.minimum_order_quantity }}
+            <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">
+              {% trans "Leave blank to use the product group's minimum." %}
+            </p>
+          </div>
+        </div>
+      </div>
+
 
       {# ============ CAMPAIGN / DISCOUNT ============ #}
       <div class="form-card sidebar-card" id="campaign_card">
@@ -1937,43 +1959,16 @@
           <label for="modal_variant_cost">{% trans "Cost per item" %}</label>
           <div class="input-with-icon">
             <span class="currency-symbol">$</span>
-            <input type="number" id="modal_variant_cost" class="form-input" step="0.01" placeholder="0.00" oninput="calcSuggestedPrice()">
+            <input type="number" id="modal_variant_cost" class="form-input" step="0.01" placeholder="0.00">
           </div>
         </div>
-      </div>
 
-      <div class="form-row">
         <div class="form-group">
-          <label for="modal_variant_price">
-            Suggested Price
-            <span id="modal_price_calc_indicator" style="display:none;margin-left:6px;font-weight:400;color:#6b7280;font-size:11px;">
-              <i class="fas fa-spinner fa-spin"></i> calculating...
-            </span>
-            <span id="modal_price_formula" style="margin-left:6px;font-weight:400;color:#9ca3af;font-size:11px;">
-              (cost &times; 2 / 0.7)
-            </span>
-          </label>
+          <label for="modal_variant_price">{% trans "Price" %}</label>
           <div class="input-with-icon">
             <span class="currency-symbol">$</span>
             <input type="number" id="modal_variant_price" class="form-input" step="0.01" placeholder="0.00">
           </div>
-        </div>
-      </div>
-
-      <!-- B2B price (wholesale storefront only) -->
-      <div class="form-row">
-        <div class="form-group">
-          <label for="modal_variant_b2b_price">
-            {% trans "B2B Price" %}
-            <span style="margin-left:6px;font-weight:400;color:#9ca3af;font-size:11px;">{% trans "(wholesale storefront only)" %}</span>
-          </label>
-          <div class="input-with-icon">
-            <span class="currency-symbol">$</span>
-            <input type="number" id="modal_variant_b2b_price" class="form-input" step="0.01" placeholder="0.00">
-          </div>
-          <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">
-            {% trans "Leave blank to inherit from the product's B2B price (or retail)." %}
-          </p>
         </div>
       </div>
 

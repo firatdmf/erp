@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block css %}
+{% include "marketing/partials/_product_group_styles.html" %}
+{% endblock css %}
+
+{% block content %}
+<div class="pgd">
+  <a class="pgd-back" href="{% url 'marketing:product_group_list' %}"><i data-lucide="arrow-left"></i>{% trans "Product Groups" %}</a>
+
+  <div class="pgd-head">
+    <div class="pgd-head-l">
+      <div class="pgd-avatar">
+        {% if group.image_url %}<img src="{{ group.image_url }}" alt="{{ group.name }}">{% else %}<i data-lucide="layers"></i>{% endif %}
+      </div>
+      <div>
+        <h1 class="pgd-title">{{ group.name }}</h1>
+        {% if group.is_active %}
+          <span class="pgd-badge on"><i data-lucide="eye" style="width:12px;height:12px;"></i>{% trans "Visible on storefront" %}</span>
+        {% else %}
+          <span class="pgd-badge off"><i data-lucide="eye-off" style="width:12px;height:12px;"></i>{% trans "Hidden" %}</span>
+        {% endif %}
+      </div>
+    </div>
+    <button type="button" class="pgd-btn danger" onclick="pgdDelete()"><i data-lucide="trash-2"></i>{% trans "Delete group" %}</button>
+  </div>
+
+  <div class="pgd-stats">
+    <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.product_count }}</div><div class="pgd-stat-l">{% trans "Products" %}</div></div>
+    <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.variant_count }}</div><div class="pgd-stat-l">{% trans "Variants" %}</div></div>
+    <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.total_stock|floatformat:"-2" }}</div><div class="pgd-stat-l">{% trans "Total stock" %}</div></div>
+    <div class="pgd-stat"><div class="pgd-stat-v">{{ stats.costed_count }}</div><div class="pgd-stat-l">{% trans "Products with cost" %}</div></div>
+  </div>
+
+  <div class="pgd-flash" id="pgdFlash"></div>
+
+  <div class="pgd-cols">
+    <div>
+      <form id="pgdForm" onsubmit="return false;">
+        {% include "marketing/partials/_product_group_form_cards.html" %}
+        <div class="pgd-save-bar">
+          <button type="button" class="pgd-btn primary" id="pgdSaveBtn" onclick="pgdSave()"><i data-lucide="check"></i>{% trans "Save settings" %}</button>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <div class="pgd-card">
+        <div class="pgd-card-title"><i data-lucide="package"></i>{% trans "Products in this group" %}</div>
+        <div class="pgd-table-wrap">
+          <table class="pgd-table">
+            <thead>
+              <tr>
+                <th>{% trans "Product" %}</th>
+                <th class="num">{% trans "Variants" %}</th>
+                <th class="num">{% trans "Stock" %}</th>
+                <th class="num">{% trans "Price" %}</th>
+                <th>{% trans "Margin" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                <tr>
+                  <td>
+                    <div class="pgd-p-title"><a href="{% url 'marketing:product_edit' r.product.pk %}">{{ r.product.title }}</a></div>
+                    {% if r.product.sku %}<span class="pgd-sku">{{ r.product.sku }}</span>{% endif %}
+                  </td>
+                  <td class="num">{{ r.variant_count }}</td>
+                  <td class="num">{{ r.stock|floatformat:"-2" }}</td>
+                  <td class="num">{% if r.product.price %}${{ r.product.price|floatformat:2 }}{% else %}—{% endif %}</td>
+                  <td>
+                    {% if r.margin_override is not None %}
+                      <span class="pgd-mini-chip teal">%{{ r.margin_override|floatformat:"-2" }} {% trans "own" %}</span>
+                    {% elif not r.has_cost %}
+                      <span class="pgd-mini-chip warn">{% trans "no cost" %}</span>
+                    {% else %}
+                      <span class="pgd-mini-chip">{% trans "group" %}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="pgd-table-empty">{% trans "No products in this group yet." %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PGD_URL = "{% url 'marketing:product_group_detail' group.pk %}";
+const PGD_CSRF = '{{ csrf_token }}';
+
+function pgdFlash(ok, msg) {
+  const f = document.getElementById('pgdFlash');
+  f.className = 'pgd-flash ' + (ok ? 'ok' : 'err');
+  f.textContent = msg;
+  f.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  clearTimeout(f._t);
+  f._t = setTimeout(function () { f.className = 'pgd-flash'; }, 6000);
+}
+
+function pgdMarginExample() {
+  const box = document.getElementById('pgdMarginExample');
+  const m = parseFloat((document.getElementById('pgdMargin').value || '').replace(',', '.'));
+  if (isNaN(m)) { box.style.display = 'none'; return; }
+  const price = (100 * (1 + m / 100)).toFixed(2);
+  box.style.display = '';
+  box.textContent = '{% trans "Example" %}: {% trans "cost" %} $100 → {% trans "price" %} $' + price;
+}
+pgdMarginExample();
+
+function pgdSave() {
+  const btn = document.getElementById('pgdSaveBtn');
+  btn.disabled = true;
+  const fd = new FormData(document.getElementById('pgdForm'));
+  fd.append('action', 'save_settings');
+  fetch(PGD_URL, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': PGD_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+    body: fd
+  }).then(function (r) { return r.json(); })
+    .then(function (d) {
+      btn.disabled = false;
+      if (d && d.success) {
+        pgdFlash(true, '{% trans "Settings saved." %}');
+        setTimeout(function () { window.location.reload(); }, 700);
+      } else {
+        pgdFlash(false, (d && d.error) || '{% trans "Could not save." %}');
+      }
+    }).catch(function () { btn.disabled = false; pgdFlash(false, '{% trans "Network error." %}'); });
+}
+
+function pgdApplyMargin() {
+  const m = (document.getElementById('pgdMargin').value || '').trim();
+  if (!m) { pgdFlash(false, '{% trans "Enter and save a margin first." %}'); return; }
+  if (!confirm('{% trans "Recalculate ALL prices in this group from cost using the saved margin? This overwrites current prices." %}')) return;
+  const btn = document.getElementById('pgdApplyBtn');
+  btn.disabled = true;
+  const fd = new FormData();
+  fd.append('action', 'apply_margin');
+  fetch(PGD_URL, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': PGD_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+    body: fd
+  }).then(function (r) { return r.json(); })
+    .then(function (d) {
+      btn.disabled = false;
+      if (d && d.success) {
+        pgdFlash(true, '{% trans "Prices updated" %} — ' + d.products_updated + ' {% trans "products" %}, ' +
+          d.variants_updated + ' {% trans "variants" %}' +
+          (d.skipped_no_cost ? ' · ' + d.skipped_no_cost + ' {% trans "skipped (no cost)" %}' : ''));
+        setTimeout(function () { window.location.reload(); }, 1200);
+      } else {
+        pgdFlash(false, (d && d.error) || '{% trans "Could not save." %}');
+      }
+    }).catch(function () { btn.disabled = false; pgdFlash(false, '{% trans "Network error." %}'); });
+}
+
+function pgdDelete() {
+  if (!confirm('{% trans "Delete this group? Its products are kept but lose their group (and its defaults)." %}')) return;
+  const fd = new FormData();
+  fd.append('action', 'delete_group');
+  fetch(PGD_URL, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': PGD_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+    body: fd
+  }).then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.success) { window.location.href = "{% url 'marketing:product_group_list' %}"; }
+      else { pgdFlash(false, (d && d.error) || '{% trans "Could not save." %}'); }
+    }).catch(function () { pgdFlash(false, '{% trans "Network error." %}'); });
+}
+
+if (window.lucide) { lucide.createIcons(); }
+</script>
+{% endblock content %}

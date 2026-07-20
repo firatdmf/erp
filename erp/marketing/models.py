@@ -116,6 +116,11 @@ class ProductCollection(models.Model):
 
 
 class ProductCategory(models.Model):
+    """Ürün grubu (bed, fabric, curtain…). Beyond classification, the group
+    is the DEFAULTS layer for its products: pricing margin, order rules and
+    care texts are set once here and every product in the group inherits
+    them unless it sets its own override (see Product.effective_*)."""
+
     class Meta:
         verbose_name_plural = "Product Categories"
 
@@ -124,6 +129,38 @@ class ProductCategory(models.Model):
     description = models.TextField(null=True, blank=True)
 
     image_url = models.URLField(null=True, blank=True)
+
+    # Shown on the B2B storefront? Lets a whole group be pulled offline
+    # without touching each product's featured flag.
+    is_active = models.BooleanField(default=True)
+
+    # Pricing: % profit margin applied on top of cost when pricing the
+    # group's products (price = cost * (1 + margin/100)). The group page
+    # can bulk-apply this to every costed product/variant in the group.
+    profit_margin = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Kar oranı % — maliyet üzerine eklenir (fiyat = maliyet × (1 + oran/100))",
+    )
+
+    # Order rules — defaults for the B2B storefront.
+    minimum_order_quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Bu gruptaki ürünler için minimum sipariş miktarı (ürün bazında ezilebilir)",
+    )
+    lead_time_days = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Tahmini tedarik/teslim süresi (gün)",
+    )
+
+    # Care text — entered once per group, pulled by every product that
+    # doesn't define its own (products keep theirs inside the description
+    # translations JSON). Bilingual like the product-level texts.
+    care_instructions = models.TextField(null=True, blank=True)           # EN
+    care_instructions_tr = models.TextField(null=True, blank=True)
+
+    # Customs tariff (GTIP/HS) code — the group usually shares one; used on
+    # export paperwork for foreign B2B customers.
+    hs_code = models.CharField(max_length=20, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         self.name = self.name.lower().strip().replace(" ", "_")
@@ -217,16 +254,20 @@ class Product(models.Model):
     )
     # Set price of the product for online sale. (If the product has a variant this should be null maybe)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    # B2B wholesale price — shown on the B2B storefront (demfirat-b2b) only.
-    # If set on the parent product, applies to every variant unless the
-    # variant overrides it with its own b2b_price.
-    b2b_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        verbose_name="B2B Price",
-        help_text="Wholesale price shown on the B2B storefront. Leave blank to use the retail price."
-    )
     # Product cost for profit calculation
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # ── Per-product OVERRIDES of the product group's defaults ──
+    # Null = inherit from category; the effective_* properties below resolve
+    # the fallback chain (product → category → None).
+    profit_margin = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Kar oranı % — boş bırakılırsa ürün grubununki geçerli",
+    )
+    minimum_order_quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Minimum sipariş miktarı — boş bırakılırsa ürün grubununki geçerli",
+    )
 
     # If true, the product will be displayed on marketing channels (website etc)
     featured = models.BooleanField(default=True, blank=True, null=True, db_index=True)
@@ -286,6 +327,49 @@ class Product(models.Model):
         else:
             return self.title
 
+    # Fallback chain: product override → product group default → None.
+    @property
+    def effective_profit_margin(self):
+        if self.profit_margin is not None:
+            return self.profit_margin
+        return self.category.profit_margin if self.category_id else None
+
+    @property
+    def effective_minimum_order_quantity(self):
+        if self.minimum_order_quantity is not None:
+            return self.minimum_order_quantity
+        return self.category.minimum_order_quantity if self.category_id else None
+
+    def _own_translation_text(self, lang, key):
+        """A product's own per-language rich text, stored by the product form
+        inside description as {"translations": {"en": {...}, "tr": {...}}}."""
+        raw = (self.description or "").strip()
+        if not raw.startswith("{"):
+            return None
+        try:
+            import json as _json
+            data = _json.loads(raw)
+            value = (data.get("translations") or {}).get(lang, {}).get(key)
+            return value or None
+        except (ValueError, AttributeError):
+            return None
+
+    def get_care_instructions(self, lang="en"):
+        """The product's OWN care text (from its description translations)
+        wins; otherwise the product group's default for that language."""
+        own = self._own_translation_text(lang, "care_instructions")
+        if own:
+            return own
+        if not self.category_id:
+            return None
+        if lang == "tr":
+            return self.category.care_instructions_tr
+        return self.category.care_instructions
+
+    @property
+    def effective_care_instructions(self):
+        return self.get_care_instructions("en")
+
 
 class ProductVariant(models.Model):
     class Meta:
@@ -315,13 +399,6 @@ class ProductVariant(models.Model):
     # Set price of the product for online sale.
     variant_price = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
-    )
-    # B2B wholesale price — shown on the B2B storefront for this specific variant.
-    # Falls back to Product.b2b_price (or variant_price) if blank.
-    variant_b2b_price = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        verbose_name="Variant B2B Price",
-        help_text="Wholesale price for this variant. Leave blank to inherit from product."
     )
     variant_cost = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True

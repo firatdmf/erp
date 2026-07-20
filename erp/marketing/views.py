@@ -876,20 +876,24 @@ class BaseProductView(ModelFormMixin):
         
         # Fields that are not part of the model (form-only fields)
         non_model_fields = {"variant_id", "variant_sku", "variant_attribute_values", "variant_images", "primary_image_index", "product_attributes"}
-        
+        # Only real model columns may reach setattr/bulk_update — a stale
+        # browser tab running old JS can still POST removed keys (e.g. the
+        # dropped variant_b2b_price) and would otherwise crash bulk_update.
+        valid_model_fields = {f.name for f in ProductVariant._meta.concrete_fields}
+
         for variant_data in variants_data:
             variant_sku = variant_data.get("variant_sku")
             if not variant_sku:
                 continue
-            
+
             variant = existing_variants_dict.get(variant_sku)
             if not variant:
                 continue
-            
+
             has_changes = False
             # Update variant fields and track changes
             for key, value in variant_data.items():
-                if key not in non_model_fields:
+                if key not in non_model_fields and key in valid_model_fields:
                     old_value = getattr(variant, key, None)
                     # Boolean fields: never let a missing/None value
                     # silently flip the flag — coerce to a real bool
@@ -2692,7 +2696,7 @@ def get_products(request):
             WITH pids AS (SELECT unnest(%(pids)s::bigint[]) AS id),
             variants AS (
                 SELECT json_agg(sub) as data FROM (
-                    SELECT id, product_id, variant_sku, variant_price, variant_b2b_price,
+                    SELECT id, product_id, variant_sku, variant_price,
                            variant_quantity, variant_featured
                     FROM marketing_productvariant
                     WHERE product_id IN (SELECT id FROM pids)
@@ -2800,8 +2804,8 @@ def get_products(request):
             "description": p.description,
             "price": p.price,
             "prices": _convert_price(p.price, rates),
-            "b2b_price": float(p.b2b_price) if getattr(p, 'b2b_price', None) is not None else None,
-            "b2b_prices": _convert_price(p.b2b_price, rates) if getattr(p, 'b2b_price', None) is not None else None,
+            "minimum_order_quantity": float(p.effective_minimum_order_quantity) if p.effective_minimum_order_quantity is not None else None,
+            "care_instructions": {"en": p.get_care_instructions("en"), "tr": p.get_care_instructions("tr")},
             "primary_image": p.primary_image.file_url if p.primary_image else None,
             "is_packaged": bool(p.is_packaged),
             "pack_count": int(p.pack_count) if p.pack_count else None,
@@ -2836,8 +2840,6 @@ def get_products(request):
             "variant_sku": v["variant_sku"],
             "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
             "variant_prices": _convert_price(v["variant_price"], rates),
-            "variant_b2b_price": float(v["variant_b2b_price"]) if v.get("variant_b2b_price") is not None else None,
-            "variant_b2b_prices": _convert_price(v["variant_b2b_price"], rates) if v.get("variant_b2b_price") is not None else None,
             "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
             "variant_featured": v.get("variant_featured", True),
             "product_variant_attribute_values": variant_av_map.get(v["id"], []),
@@ -2926,7 +2928,10 @@ def get_product(request):
                 p.featured, p.selling_while_out_of_stock, p.weight, p.unit_of_weight,
                 p.category_id, p.supplier_id, p.datasheet_url, p.minimum_inventory_level,
                 pi.file_url as primary_image_url,
-                pc.name as category_name
+                pc.name as category_name,
+                COALESCE(p.minimum_order_quantity, pc.minimum_order_quantity) as min_order_qty,
+                pc.care_instructions as group_care_en,
+                pc.care_instructions_tr as group_care_tr
             FROM marketing_product p
             LEFT JOIN marketing_productfile pi ON pi.id = p.primary_image_id
             LEFT JOIN marketing_productcategory pc ON pc.id = p.category_id
@@ -2942,7 +2947,24 @@ def get_product(request):
      p_tags, p_type, p_uom, p_quantity, p_price,
      p_featured, p_selling_oos, p_weight, p_uow,
      p_category_id, p_supplier_id, p_datasheet_url, p_min_inv,
-     p_primary_image_url, p_category_name) = row
+     p_primary_image_url, p_category_name,
+     p_min_order_qty, p_group_care_en, p_group_care_tr) = row
+
+    # Care texts per language: the product's OWN text (from its description
+    # translations JSON) wins; otherwise the product group's default.
+    def _own_care(lang):
+        raw = (p_description or "").strip()
+        if not raw.startswith("{"):
+            return None
+        try:
+            return (json.loads(raw).get("translations") or {}).get(lang, {}).get("care_instructions") or None
+        except ValueError:
+            return None
+
+    p_care_texts = {
+        "en": _own_care("en") or p_group_care_en,
+        "tr": _own_care("tr") or p_group_care_tr,
+    }
 
     _t1 = _time.time()
 
@@ -2962,7 +2984,7 @@ def get_product(request):
             variants AS (
                 SELECT json_agg(sub) as data FROM (
                     SELECT id, variant_sku, variant_barcode, variant_quantity, variant_price,
-                           variant_cost, variant_featured, product_id
+                           variant_featured, product_id
                     FROM marketing_productvariant
                     WHERE product_id = %(pid)s
                 ) sub
@@ -3042,6 +3064,8 @@ def get_product(request):
         "supplier_id": p_supplier_id,
         "datasheet_url": p_datasheet_url,
         "minimum_inventory_level": float(p_min_inv) if p_min_inv is not None else None,
+        "minimum_order_quantity": float(p_min_order_qty) if p_min_order_qty is not None else None,
+        "care_instructions": p_care_texts,
         "primary_image": p_primary_image_url,
     }
 
@@ -3108,7 +3132,6 @@ def get_product(request):
             "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
             "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
             "variant_prices": _convert_price(v["variant_price"], rates),
-            "variant_cost": float(v["variant_cost"]) if v["variant_cost"] is not None else None,
             "variant_featured": v["variant_featured"],
             "product_id": v["product_id"],
             "primary_image": variant_primary_map.get(v["id"]),

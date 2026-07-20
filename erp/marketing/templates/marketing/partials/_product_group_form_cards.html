@@ -1,0 +1,96 @@
+{% load i18n %}
+{% comment %}
+The product-group settings cards, shared by the create page (group = None →
+blank fields, visibility defaults on) and the detail/settings page (group
+set → current values, plus the bulk apply-margin box).
+Expects: group (ProductCategory or None).
+{% endcomment %}
+
+<div class="pgd-card">
+  <div class="pgd-card-title"><i data-lucide="settings-2"></i>{% trans "General" %}</div>
+  <div class="pgd-field">
+    <label>{% trans "Group name" %}</label>
+    <input class="pgd-input" name="name" value="{{ group.name|default:'' }}" autocomplete="off">
+    <div class="pgd-hint">{% trans "Saved in lowercase; spaces become underscores. Storefront category URLs use this name." %}</div>
+  </div>
+  <div class="pgd-field">
+    <label>{% trans "Description" %}</label>
+    <textarea class="pgd-textarea" name="description" rows="3">{{ group.description|default:"" }}</textarea>
+  </div>
+  <div class="pgd-field">
+    <label>{% trans "Group image" %}</label>
+    <input class="pgd-input" type="file" name="image" accept="image/*">
+    {% if group.image_url %}<div class="pgd-hint">{% trans "Uploading a new image replaces the current one." %}</div>{% endif %}
+  </div>
+  <div class="pgd-field pgd-toggle">
+    <div>
+      <div class="pgd-toggle-info">{% trans "Visible on storefront" %}</div>
+      <div class="pgd-toggle-desc">{% trans "Turn off to hide this whole group from the B2B website." %}</div>
+    </div>
+    <label class="pgd-switch">
+      <input type="checkbox" name="is_active" value="1" {% if not group or group.is_active %}checked{% endif %}>
+      <span class="track"></span>
+    </label>
+  </div>
+</div>
+
+<div class="pgd-card">
+  <div class="pgd-card-title"><i data-lucide="percent"></i>{% trans "Pricing" %}</div>
+  <div class="pgd-field">
+    <label>{% trans "Profit margin" %} (%)</label>
+    <input class="pgd-input" name="profit_margin" id="pgdMargin" type="number" step="0.01" min="0"
+           value="{{ group.profit_margin|default_if_none:''|stringformat:'s' }}" placeholder="{% trans 'e.g. 40' %}"
+           oninput="pgdMarginExample()">
+    <div class="pgd-hint">{% trans "Selling price = cost × (1 + margin/100). A product can override this with its own margin on the product edit page." %}</div>
+    <div class="pgd-margin-example" id="pgdMarginExample" style="display:none;"></div>
+  </div>
+  {% if group %}
+    <div class="pgd-apply-box">
+      <div class="pgd-apply-note">
+        {% trans "Recalculates the price of every costed product and variant in this group from its cost. Products without a cost are skipped." %}
+      </div>
+      <button type="button" class="pgd-btn ghost" id="pgdApplyBtn" onclick="pgdApplyMargin()">
+        <i data-lucide="calculator"></i>{% trans "Apply margin to all prices" %}
+      </button>
+    </div>
+  {% endif %}
+</div>
+
+<div class="pgd-card">
+  <div class="pgd-card-title"><i data-lucide="scale"></i>{% trans "Order rules" %}</div>
+  <div class="pgd-row2">
+    <div class="pgd-field">
+      <label>{% trans "Minimum order quantity" %}</label>
+      <input class="pgd-input" name="minimum_order_quantity" type="number" step="0.01" min="0"
+             value="{{ group.minimum_order_quantity|default_if_none:''|stringformat:'s' }}" placeholder="{% trans 'e.g. 25' %}">
+    </div>
+    <div class="pgd-field">
+      <label>{% trans "Lead time (days)" %}</label>
+      <input class="pgd-input" name="lead_time_days" type="number" step="1" min="0"
+             value="{{ group.lead_time_days|default_if_none:'' }}" placeholder="{% trans 'e.g. 15' %}">
+    </div>
+  </div>
+  <div class="pgd-hint">{% trans "Defaults for every product in the group; a product can set its own minimum on the product edit page." %}</div>
+</div>
+
+<div class="pgd-card">
+  <div class="pgd-card-title"><i data-lucide="shirt"></i>{% trans "Care instructions" %}</div>
+  <div class="pgd-field">
+    <label>{% trans "Care instructions" %} (EN)</label>
+    <textarea class="pgd-textarea" name="care_instructions" rows="4" placeholder="{% trans 'e.g. Machine wash 30°C, do not bleach…' %}">{{ group.care_instructions|default:"" }}</textarea>
+  </div>
+  <div class="pgd-field">
+    <label>{% trans "Care instructions" %} (TR)</label>
+    <textarea class="pgd-textarea" name="care_instructions_tr" rows="4">{{ group.care_instructions_tr|default:"" }}</textarea>
+    <div class="pgd-hint">{% trans "Products show these on the storefront unless they define their own." %} {% trans "A product's own care text (entered in its language tabs) always wins." %}</div>
+  </div>
+</div>
+
+<div class="pgd-card">
+  <div class="pgd-card-title"><i data-lucide="globe"></i>{% trans "Foreign trade" %}</div>
+  <div class="pgd-field">
+    <label>{% trans "HS (GTIP) code" %}</label>
+    <input class="pgd-input" name="hs_code" value="{{ group.hs_code|default:'' }}" placeholder="{% trans 'e.g. 6303.92' %}" autocomplete="off">
+    <div class="pgd-hint">{% trans "Customs tariff code used on export paperwork for this group." %}</div>
+  </div>
+</div>

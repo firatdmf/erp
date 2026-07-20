@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import api_stock_update
 from . import views_csv_stock
+from . import views_product_groups
 app_name = "marketing"
 
 
@@ -14,6 +15,10 @@ urlpatterns = [
     path("product/<int:pk>/variants/", views.product_variants, name="product_variants"),
     path("product/<int:pk>/delete/",views.ProductDelete.as_view(),name="product_delete"),
     path("product/bulk-delete/", views.product_bulk_delete, name="product_bulk_delete"),
+    # Product groups (ürün grupları) — group settings, margin-based pricing
+    path("product-groups/", views_product_groups.ProductGroupList.as_view(), name="product_group_list"),
+    path("product-groups/new/", views_product_groups.ProductGroupCreate.as_view(), name="product_group_create"),
+    path("product-groups/<int:pk>/", views_product_groups.ProductGroupDetail.as_view(), name="product_group_detail"),
     # path("product_file_create/",views.ProductFileCreate.as_view(),name="product_file_create"),
     # below are for api routes
     path("api/get_product_categories",views.get_product_categories,name="get_product_categories"),

@@ -251,6 +251,14 @@
             <span class="nj-fi-icon"><i data-lucide="list"></i></span>
             <span class="nj-fi-label">{% trans "Product list" %}</span>
           </a>
+          <a class="nj-fly-item" href="{% url 'marketing:product_group_list' %}">
+            <span class="nj-fi-icon"><i data-lucide="layers"></i></span>
+            <span class="nj-fi-label">{% trans "Product groups" %}</span>
+          </a>
+          <a class="nj-fly-item" href="{% url 'marketing:product_group_create' %}">
+            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
+            <span class="nj-fi-label">{% trans "Add product group" %}</span>
+          </a>
         </div>
         <div class="nj-fly-group">
           <div class="nj-fly-group-title">{% trans "CUSTOMERS" %}</div>

@@ -20,42 +20,63 @@ def create_web_client(request):
     """Create a new web client account"""
     try:
         data = json.loads(request.body)
-        
+
         # Validation
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
         name = data.get('name')
-        
+        # B2B wholesale registration fields. company_name is the primary
+        # identifier for a business account; phone/country/tax_id are
+        # optional so the form still works for buyers without a formal
+        # registered company. Kept generic (no country-specific formats)
+        # since customers are mostly international.
+        company_name = data.get('company_name')
+        phone = data.get('phone')
+        country = data.get('country')
+        tax_id = data.get('tax_id')
+
         if not all([username, email, password, name]):
             return JsonResponse({
                 'error': 'All fields (username, email, password, name) are required'
             }, status=400)
-        
+
         # Check if username already exists
         if WebClient.objects.filter(username=username).exists():
             return JsonResponse({
                 'error': 'Username already taken'
             }, status=409)
-        
+
         # Check if email already exists
         if WebClient.objects.filter(email=email).exists():
             return JsonResponse({
                 'error': 'Email already registered'
             }, status=409)
-        
+
         # Hash password
         hashed_password = make_password(password)
-        
+
+        # Company details go in web_client_settings (JSONField) rather than
+        # new columns — additive, no migration needed.
+        business_settings = {}
+        if company_name:
+            business_settings['company_name'] = company_name
+        if country:
+            business_settings['country'] = country
+        if tax_id:
+            business_settings['tax_id'] = tax_id
+
         # Create web client
         web_client = WebClient.objects.create(
             username=username,
             email=email,
             password=hashed_password,
             name=name,
+            phone=phone or None,
+            web_client_settings=business_settings,
             is_active=False  # User must verify email
         )
-        
+
         return JsonResponse({
             'message': 'Account created successfully',
             'user': {
@@ -63,6 +84,7 @@ def create_web_client(request):
                 'username': web_client.username,
                 'email': web_client.email,
                 'name': web_client.name,
+                'company_name': company_name,
                 'created_at': web_client.created_at.isoformat()
             }
         }, status=201)

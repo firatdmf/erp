@@ -50,10 +50,29 @@
   .ca-tab.active { background: var(--nejum-teal-50); color: var(--nejum-teal-700); box-shadow: inset 0 0 0 1px rgba(20,127,116,0.20); }
   .ca-tab-count { display:inline-flex; align-items:center; justify-content:center; padding: 1px 8px; background: #EEF1F5; border-radius: 999px; font: 600 11px var(--font-mono); color: var(--gray-600); min-width: 22px; }
   .ca-tab.active .ca-tab-count { background: var(--nejum-teal-600); color: white; }
-  .ca-tabs-r { margin-left: auto; display:flex; gap:8px; align-items:center; }
-  .ca-search-input { width: 320px; padding: 9px 14px; background: #F4F7FB; border: 1px solid transparent; border-radius: 8px; font: 500 13px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms; }
+  .ca-tabs-r { margin-left: auto; display:flex; gap:8px; align-items:center; flex: 1 1 auto; min-width: 220px; max-width: 520px; }
+  .ca-search-wrap { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
+  .ca-search-icon {
+    position: absolute; left: 14px; top: 50%;
+    width: 15px !important; height: 15px !important;
+    transform: translateY(-50%);
+    color: var(--gray-500); pointer-events: none;
+  }
+  .ca-search-input { width: 100%; padding: 10px 34px 10px 40px; background: #F4F7FB; border: 1px solid transparent; border-radius: 8px; font: 500 13.5px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms; }
   .ca-search-input::placeholder { color: var(--gray-500); }
   .ca-search-input:focus { background: white; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+  .ca-search-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 20px !important; height: 20px !important;
+    display: none; align-items:center; justify-content:center;
+    background: #E2E8EE; border: none; border-radius: 50%; color: var(--gray-600); cursor: pointer; padding: 0;
+  }
+  .ca-search-clear:hover { background: #D5DBE2; color: var(--ink); }
+  .ca-search-clear i, .ca-search-clear svg { width: 11px !important; height: 11px !important; }
+  @media (max-width: 1050px) {
+    .ca-tabs { flex-wrap: wrap; }
+    .ca-tabs-r { margin-left: 0; flex-basis: 100%; max-width: none; order: 10; }
+  }
 
   /* Compact filter bar — single row of label-prefixed chips that
      collapse cleanly down to phones. Same pattern as payment_list. */
@@ -175,7 +194,6 @@
     .ca-list-head, .ca-row { grid-template-columns: 100px 1.4fr 120px 140px 90px 22px; gap: 10px; }
   }
   @media (max-width: 900px) {
-    .ca-search-input { width: 200px; }
     .ca-list-head { display: none; }
     .ca-row { grid-template-columns: auto 1fr auto; gap: 10px; padding: 14px; }
     .ca-row > .ca-name-w { grid-column: 1 / -1; }
@@ -237,9 +255,17 @@
         </a>
       {% endfor %}
       <div class="ca-tabs-r">
-        <input name="q" value="{{ q }}" class="ca-search-input" type="text"
-               placeholder="{% trans 'Search: code, name, tax no, email, phone…' %}"
-               onkeydown="if(event.key==='Enter'){this.form.submit();}">
+        <div class="ca-search-wrap">
+          <i data-lucide="search" class="ca-search-icon"></i>
+          <input name="q" value="{{ q }}" class="ca-search-input" type="text" id="ca-search-input"
+                 placeholder="{% trans 'Search: code, name, tax no, email, phone…' %}"
+                 autocomplete="off"
+                 onkeydown="if(event.key==='Enter'){this.form.submit();}">
+          <button type="button" class="ca-search-clear" id="ca-search-clear"
+                  style="{% if q %}display: flex;{% endif %}" onclick="caClearSearch()">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -339,5 +365,39 @@
 
 <script>
   if (window.lucide) lucide.createIcons();
+
+  // Belt-and-suspenders: lucide sets width/height as SVG attributes, which
+  // can outrank our class-based CSS in some browsers — pin the search/clear
+  // icon sizes directly so they never balloon to lucide's 24px default and
+  // collide with the input placeholder text.
+  document.querySelectorAll('.ca-search-icon').forEach(function (el) {
+    el.setAttribute('width', '15');
+    el.setAttribute('height', '15');
+  });
+  document.querySelectorAll('.ca-search-clear svg, .ca-search-clear i').forEach(function (el) {
+    el.setAttribute('width', '11');
+    el.setAttribute('height', '11');
+  });
+
+  (function () {
+    const input = document.getElementById('ca-search-input');
+    const clearBtn = document.getElementById('ca-search-clear');
+    if (!input) return;
+
+    let searchTimeout;
+    input.addEventListener('input', function () {
+      const query = input.value.trim();
+      clearBtn.style.display = query ? 'flex' : 'none';
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => input.form.submit(), 500);
+    });
+  })();
+
+  function caClearSearch() {
+    const input = document.getElementById('ca-search-input');
+    input.value = '';
+    document.getElementById('ca-search-clear').style.display = 'none';
+    input.form.submit();
+  }
 </script>
 {% endblock %}

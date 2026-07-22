@@ -616,12 +616,14 @@ body { padding-top: 64px !important; }
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 2px !important;
+  min-width: 0 !important;
 }
 .global-top-bar .notification-container,
 .global-top-bar .favorites-container {
-  width: 72px !important;
+  width: 64px !important;
   height: 48px !important;
-  flex: 0 0 72px !important;
+  flex: 0 1 64px !important;
+  min-width: 44px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -715,10 +717,11 @@ body { padding-top: 64px !important; }
   align-items: center !important;
   justify-content: center !important;
   gap: 4px !important;
-  width: 72px !important;
+  width: 64px !important;
   height: 48px !important;
   padding: 4px 4px !important;
-  flex: 0 0 72px !important;
+  flex: 0 1 64px !important;
+  min-width: 44px !important;
   border-radius: var(--radius-sm, 6px) !important;
   background: transparent !important;
   border: 1px solid transparent !important;
@@ -734,17 +737,20 @@ body { padding-top: 64px !important; }
   color: #1B2128 !important;
 }
 .global-top-bar .top-bar-btn i {
-  font-size: 16px !important;
+  font-size: 15px !important;
   color: inherit !important;
   line-height: 1 !important;
 }
 .global-top-bar .top-bar-btn-label {
-  font-size: 10px !important;
+  font-size: 9px !important;
   font-weight: 500 !important;
   letter-spacing: 0.01em !important;
   color: inherit !important;
   line-height: 1 !important;
   white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
   font-family: var(--font-sans, 'Plus Jakarta Sans'), sans-serif !important;
 }
 .global-top-bar .notification-dot {

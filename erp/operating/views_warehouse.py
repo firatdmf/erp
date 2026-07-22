@@ -906,6 +906,36 @@ def warehouse_barcode_lookup(request, pk):
                    else "product") if product else None
 
     if not product:
+        # Not in THIS warehouse — but the barcode might be a real top that
+        # was received into a DIFFERENT warehouse. Say so instead of a flat
+        # "not found", and offer a one-click move so staff don't end up
+        # re-adding it as brand-new stock (a silent duplicate).
+        other_roll = (WarehouseProductRoll.objects
+                      .select_related("product", "product__warehouse")
+                      .exclude(product__warehouse=warehouse)
+                      .filter(barcode__iexact=code)
+                      .first())
+        if other_roll:
+            op = other_roll.product
+            return JsonResponse({
+                "found": False,
+                "found_elsewhere": True,
+                "barcode": code,
+                "other_warehouse": {"id": op.warehouse_id, "name": op.warehouse.name},
+                "product": {
+                    "id": op.pk, "sku": op.sku, "name": op.name,
+                    "quantity": float(op.quantity or 0),
+                },
+                "roll": {
+                    "id": other_roll.pk, "barcode": other_roll.barcode,
+                    "meters": float(other_roll.meters or 0),
+                    "meters_remaining": (float(other_roll.meters_remaining)
+                                          if other_roll.meters_remaining is not None else None),
+                    "lot_number": other_roll.lot_number,
+                },
+                "move_url": reverse("operating:warehouse_roll_move_here",
+                                    args=[warehouse.pk, other_roll.pk]),
+            })
         return JsonResponse({"found": False, "barcode": code})
 
     main = product.catalog_variant.product if product.catalog_variant_id else None
@@ -931,6 +961,94 @@ def warehouse_barcode_lookup(request, pk):
             "meters_remaining": (float(roll.meters_remaining) if roll.meters_remaining is not None else None),
             "lot_number": roll.lot_number,
         } if roll else None),
+    })
+
+
+@login_required
+def warehouse_roll_move_here(request, pk, roll_pk):
+    """Move ONE physical top (roll) that currently belongs to a DIFFERENT
+    warehouse into THIS one — reached from the barcode-lookup "found
+    elsewhere" result. Only the scanned roll moves; any other rolls of the
+    same product stay put in the source warehouse.
+
+    Finds-or-creates a same-SKU WarehouseProduct in the target warehouse
+    (mirroring the source's price/cost/catalog link when creating), re-points
+    the roll at it, and logs a paired StockMovement(adjustment) on each side
+    so the transfer shows up in both warehouses' history. Recomputes
+    quantity + re-syncs the catalog for both the source and target product.
+    """
+    from django.db import transaction
+
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST required."}, status=405)
+
+    target_warehouse = get_object_or_404(Warehouse, pk=pk)
+    roll = get_object_or_404(
+        WarehouseProductRoll.objects.select_related("product", "product__warehouse"),
+        pk=roll_pk,
+    )
+    source_wp = roll.product
+
+    if source_wp.warehouse_id == target_warehouse.pk:
+        return JsonResponse({"success": False, "error": "Bu top zaten bu depoda."}, status=400)
+
+    user = request.user if request.user.is_authenticated else None
+
+    with transaction.atomic():
+        target_wp = (WarehouseProduct.objects
+                     .filter(warehouse=target_warehouse, sku__iexact=(source_wp.sku or ""))
+                     .first()) if source_wp.sku else None
+        if target_wp is None:
+            target_wp = WarehouseProduct.objects.create(
+                warehouse=target_warehouse, name=source_wp.name, sku=source_wp.sku,
+                barcode=source_wp.barcode, quantity=Decimal("0"),
+                purchase_price=source_wp.purchase_price,
+                purchase_currency=source_wp.purchase_currency,
+                cost_usd=source_wp.cost_usd, cost_try=source_wp.cost_try,
+                catalog_variant=source_wp.catalog_variant,
+            )
+
+        meters = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+        meters = meters or Decimal("0")
+
+        StockMovement.objects.create(
+            product=source_wp, roll=None, movement_type="adjustment",
+            quantity=-meters,
+            reason=f"Transferred to {target_warehouse.name}",
+            reference=roll.barcode, created_by=user,
+        )
+        source_warehouse_name = source_wp.warehouse.name
+        roll.product = target_wp
+        roll.save(update_fields=["product"])
+        StockMovement.objects.create(
+            product=target_wp, roll=roll, movement_type="adjustment",
+            quantity=meters,
+            reason=f"Transferred from {source_warehouse_name}",
+            reference=roll.barcode, created_by=user,
+        )
+
+        for wp in (source_wp, target_wp):
+            total = Decimal("0")
+            for r in wp.rolls.all():
+                rem = r.meters_remaining if r.meters_remaining is not None else (r.meters or Decimal("0"))
+                total += rem or Decimal("0")
+            wp.quantity = total
+            wp.save(update_fields=["quantity", "updated_at"])
+            _resync_wp_catalog(wp)
+
+    return JsonResponse({
+        "success": True,
+        "product": {
+            "id": target_wp.pk,
+            "name": target_wp.name,
+            "sku": target_wp.sku,
+            "quantity": float(target_wp.quantity or 0),
+            "detail_url": reverse("operating:warehouse_product_detail",
+                                  args=[target_warehouse.pk, target_wp.pk]),
+        },
+        "roll": {
+            "id": roll.pk, "barcode": roll.barcode, "meters": float(meters),
+        },
     })
 
 

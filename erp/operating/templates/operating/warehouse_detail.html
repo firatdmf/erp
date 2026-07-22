@@ -1539,6 +1539,7 @@
   .bl-status { display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 999px; font: 700 13px var(--font-sans); }
   .bl-status.found { background: rgba(16,185,129,0.14); color: #34D399; border: 1px solid rgba(52,211,153,0.35); }
   .bl-status.notfound { background: rgba(244,63,94,0.14); color: #FB7185; border: 1px solid rgba(251,113,133,0.35); }
+  .bl-status.elsewhere { background: rgba(245,158,11,0.14); color: #FBBF24; border: 1px solid rgba(251,191,36,0.35); }
   /* The scanned code — big, bright, unmissable */
   .bl-bc-chip { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 0; padding: 13px 16px; background: linear-gradient(135deg, rgba(20,127,116,0.28), rgba(13,148,136,0.10)); border: 1px solid rgba(45,212,191,0.35); border-radius: 14px; font: 800 17px ui-monospace, monospace; color: #5EEAD4; letter-spacing: 0.05em; word-break: break-all; }
   .bl-bc-chip i { font-size: 15px; opacity: 0.8; flex-shrink: 0; }
@@ -3976,6 +3977,32 @@
             '<a class="bl-btn primary" href="' + p.detail_url + '"><i class="fa fa-pen-to-square"></i> {% trans "Open / edit" %}</a>' +
           '</div>' +
         '</div>';
+    } else if (d && d.found_elsewhere) {
+      var ep = d.product, er = d.roll, ew = d.other_warehouse;
+      var erem = (er.meters_remaining !== null && er.meters_remaining !== undefined)
+                 ? Number(er.meters_remaining).toFixed(2) : Number(er.meters || 0).toFixed(2);
+      r.innerHTML =
+        '<div class="bl-rc elsewhere">' +
+          '<span class="bl-status elsewhere"><i class="fa fa-warehouse"></i> {% trans "In a different warehouse" %}</span>' +
+          '<div class="bl-bc-chip"><i class="fa fa-barcode"></i>' + blEsc(code) + '</div>' +
+          '<div class="bl-prod-name">' + blEsc(ep.name || '—') + '</div>' +
+          (ep.sku ? '<span class="bl-sku-pill">' + blEsc(ep.sku) + '</span>' : '') +
+          '<p style="color:#92400E; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
+            '<i class="fa fa-triangle-exclamation"></i> ' +
+            '{% trans "This top is registered in" %} <b>' + blEsc(ew.name) + '</b>' +
+          '</p>' +
+          '<div class="bl-tiles">' +
+            '<div class="bl-tile hero">' +
+              '<div class="t-label"><i class="fa fa-barcode"></i> {% trans "Scanned top" %}</div>' +
+              '<div class="t-value">' + erem + '<span class="t-unit">m</span></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="bl-actions">' +
+            '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
+            '<button type="button" class="bl-btn primary" id="blMoveBtn" onclick="moveRollToThisWarehouse(' + er.id + ', this)">' +
+              '<i class="fa fa-truck-fast"></i> {% trans "Move to this warehouse" %}</button>' +
+          '</div>' +
+        '</div>';
     } else {
       r.innerHTML =
         '<div class="bl-rc notfound">' +
@@ -3988,6 +4015,37 @@
           '</div>' +
         '</div>';
     }
+  }
+  function moveRollToThisWarehouse(rollId, btn) {
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Moving…" %}';
+    var url = "{% url 'operating:warehouse_roll_move_here' warehouse.pk 0 %}".replace('/0/move-here/', '/' + rollId + '/move-here/');
+    fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.success) {
+          var r = document.getElementById('blResult');
+          r.innerHTML =
+            '<div class="bl-rc found">' +
+              '<span class="bl-status found"><i class="fa fa-circle-check"></i> {% trans "Moved to this warehouse" %}</span>' +
+              '<div class="bl-prod-name">' + blEsc(d.product.name || '—') + '</div>' +
+              (d.product.sku ? '<span class="bl-sku-pill">' + blEsc(d.product.sku) + '</span>' : '') +
+              '<div class="bl-actions">' +
+                '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
+                '<a class="bl-btn primary" href="' + d.product.detail_url + '"><i class="fa fa-pen-to-square"></i> {% trans "Open / edit" %}</a>' +
+              '</div>' +
+            '</div>';
+        } else {
+          alert((d && d.error) || '{% trans "Could not move." %}');
+          btn.disabled = false; btn.innerHTML = orig;
+        }
+      }).catch(function () {
+        alert('{% trans "Network error" %}');
+        btn.disabled = false; btn.innerHTML = orig;
+      });
   }
   function lookupScanAgain() {
     blLastCode = '';

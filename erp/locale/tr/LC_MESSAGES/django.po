@@ -8410,3 +8410,21 @@ msgid ""
 msgstr ""
 "Alış faturaları iptalden sonra geri alınamaz — fiziksel stok kalıcı olarak "
 "silindi. Gerekirse yeni bir alım oluşturun."
+
+msgid "In a different warehouse"
+msgstr "Başka bir depoda"
+
+msgid "This top is registered in"
+msgstr "Bu top şurada kayıtlı:"
+
+msgid "Move to this warehouse"
+msgstr "Bu depoya taşı"
+
+msgid "Moving…"
+msgstr "Taşınıyor…"
+
+msgid "Moved to this warehouse"
+msgstr "Bu depoya taşındı"
+
+msgid "Could not move."
+msgstr "Taşınamadı."

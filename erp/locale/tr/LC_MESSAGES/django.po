@@ -8363,3 +8363,50 @@ msgstr "İlk kayıtta ürün bulunamadı."
 
 msgid "Original grand total"
 msgstr "İlk toplam tutar"
+
+msgid "Cancel purchase"
+msgstr "Alımı iptal et"
+
+msgid ""
+"This purchase's stock links are missing, so it can only be cancelled from "
+"here — not edited."
+msgstr ""
+"Bu alımın stok bağlantıları eksik, bu yüzden buradan sadece iptal edilebilir"
+" — düzenlenemez."
+
+msgid "Editing purchase"
+msgstr "Alım düzenleniyor"
+
+msgid "Save changes"
+msgstr "Değişiklikleri kaydet"
+
+msgid ""
+"This permanently removes the physical stock this purchase brought in and "
+"reverses the cari debt. This cannot be undone. Continue?"
+msgstr ""
+"Bu, alımın getirdiği fiziksel stoğu kalıcı olarak siler ve cari borcunu geri"
+" alır. Bu işlem geri alınamaz. Devam edilsin mi?"
+
+msgid ""
+"This purchase's stock links are missing, so it can't be edited from here — "
+"view or cancel it from the purchases page instead."
+msgstr ""
+"Bu alımın stok bağlantıları eksik, bu yüzden buradan düzenlenemez — alımlar "
+"sayfasından görüntüleyin veya iptal edin."
+
+msgid ""
+"Only an admin can cancel a purchase — it permanently removes the physical "
+"stock it brought in."
+msgstr ""
+"Bir alımı sadece yönetici iptal edebilir — bu işlem alımın getirdiği "
+"fiziksel stoğu kalıcı olarak siler."
+
+msgid "Purchase cancelled — its stock was removed and the cari debt reversed."
+msgstr "Alım iptal edildi — stoğu kaldırıldı ve cari borcu geri alındı."
+
+msgid ""
+"Purchase invoices can't be restored after cancellation — the physical stock "
+"was permanently removed. Create a new purchase if needed."
+msgstr ""
+"Alış faturaları iptalden sonra geri alınamaz — fiziksel stok kalıcı olarak "
+"silindi. Gerekirse yeni bir alım oluşturun."

@@ -204,6 +204,85 @@ def create_purchase_invoice_for_intake(supplier, lines, *, member=None, user=Non
     return inv
 
 
+def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
+    """Apply an edit-diff to a purchase invoice's items IN PLACE.
+
+    Never deletes and recreates `InvoiceItem` rows — that's exactly what the
+    generic invoice editor does, and because `WarehouseProductRoll.
+    purchase_invoice_item` is SET_NULL, that wipe+recreate silently orphans
+    the roll↔invoice-item traceability link every time. This updates
+    existing items in place and only ever CREATEs a row for a genuinely new
+    line, so existing roll links on unchanged/updated lines are never
+    touched.
+
+    `line_updates` — one dict per surviving/new purchase line:
+      {"invoice_item_id": <id> | None,      # None → brand-new line
+       "product": marketing.Product | None,
+       "variant": marketing.ProductVariant | None,
+       "description": str, "unit": str, "unit_price": Decimal,
+       "quantity": Decimal,                 # recomputed from roll.meters
+                                             # (NOT meters_remaining) across
+                                             # this line's surviving + new tops
+       "new_roll_ids": [int, ...]}          # rolls to backfill onto this item
+
+    A line whose resulting quantity is 0 (every top removed, nothing added
+    back) has its InvoiceItem deleted outright — no $0 ghost lines; its
+    `post_delete` signal recomputes the invoice total for free.
+
+    Returns the invoice, refreshed with final totals.
+    """
+    from operating.models import WarehouseProductRoll
+    from .models import InvoiceItem
+
+    existing_items = {it.pk: it for it in invoice.items.all()}
+    next_line_no = max((it.line_no for it in existing_items.values()), default=0) + 1
+
+    for line in line_updates:
+        item_id = line.get("invoice_item_id")
+        qty = line.get("quantity") or Decimal("0")
+        new_roll_ids = line.get("new_roll_ids") or []
+
+        if item_id:
+            item = existing_items.get(item_id)
+            if item is None:
+                continue  # defensive — shouldn't happen, caller owns validation
+            if qty <= 0 and not new_roll_ids:
+                item.delete()
+                continue
+            item.quantity = qty
+            if line.get("unit_price") is not None:
+                item.unit_price = line["unit_price"]
+            if line.get("unit"):
+                item.unit = line["unit"][:20]
+            if line.get("description"):
+                item.description = line["description"][:300]
+            item.save()
+            if new_roll_ids:
+                WarehouseProductRoll.objects.filter(pk__in=new_roll_ids).update(
+                    purchase_invoice_item=item
+                )
+        else:
+            if qty <= 0:
+                continue
+            item = InvoiceItem.objects.create(
+                invoice=invoice, line_no=next_line_no,
+                product=line.get("product"), variant=line.get("variant"),
+                description=(line.get("description") or "")[:300],
+                quantity=qty, unit=(line.get("unit") or "mt")[:20],
+                unit_price=line.get("unit_price") or Decimal("0"),
+                discount_rate=Decimal("0"), tax_rate=Decimal("0"),
+            )
+            next_line_no += 1
+            if new_roll_ids:
+                WarehouseProductRoll.objects.filter(pk__in=new_roll_ids).update(
+                    purchase_invoice_item=item
+                )
+
+    invoice.recompute_totals(save=True)
+    invoice.refresh_from_db()
+    return invoice
+
+
 def create_invoice_for_order(order, *, user=None):
     """Auto-issue the sales invoice for a completed (shipped) order.
 

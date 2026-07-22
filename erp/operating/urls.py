@@ -34,6 +34,7 @@ urlpatterns = [
     path("warehouses/<int:pk>/delete/", views_warehouse.WarehouseDelete.as_view(), name="warehouse_delete"),
     path("warehouses/<int:pk>/scan/", views_warehouse.WarehouseRollScan.as_view(), name="warehouse_roll_scan"),
     path("warehouses/<int:pk>/manual-add/", views_warehouse.WarehouseManualAdd.as_view(), name="warehouse_manual_add"),
+    path("warehouses/<int:pk>/purchase/<int:invoice_id>/edit/", views_warehouse.WarehousePurchaseEdit.as_view(), name="warehouse_purchase_edit"),
     path("warehouses/<int:pk>/next-sku/", views_warehouse.warehouse_next_sku, name="warehouse_next_sku"),
     path("warehouses/<int:pk>/merge-duplicates/", views_warehouse.WarehouseMergeDuplicates.as_view(), name="warehouse_merge_duplicates"),
     path("warehouses/<int:warehouse_pk>/products/<int:product_pk>/", views_warehouse.WarehouseProductDetail.as_view(), name="warehouse_product_detail"),

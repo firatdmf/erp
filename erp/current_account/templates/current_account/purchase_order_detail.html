@@ -77,7 +77,23 @@
       <div class="po-eyebrow">{% trans "Purchase order" %}</div>
       <h1 class="po-title">{{ invoice.number }}</h1>
     </div>
-    <span class="po-badge {{ invoice.status }}">{{ invoice.get_status_display }}</span>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="po-badge {{ invoice.status }}">{{ invoice.get_status_display }}</span>
+      {% if invoice.status != 'cancelled' %}
+        {% if warehouse_id %}
+          <a class="po-back" href="{% url 'operating:warehouse_detail' warehouse_id %}?edit_purchase={{ invoice.pk }}">
+            <i class="fa fa-pen"></i> {% trans "Edit" %}
+          </a>
+        {% endif %}
+        <form method="post" action="{% url 'current_account:purchase_cancel' invoice.pk %}" style="display:inline;"
+              onsubmit="return poConfirmCancel(this);">
+          {% csrf_token %}
+          <button type="submit" class="po-back" style="color:#B91C1C; border-color:#FCA5A5; cursor:pointer;">
+            <i class="fa fa-ban"></i> {% trans "Cancel purchase" %}
+          </button>
+        </form>
+      {% endif %}
+    </div>
   </div>
 
   <div class="po-info">
@@ -98,6 +114,13 @@
       <div class="po-card-v"><a href="{% url 'current_account:invoice_detail' invoice.pk %}">{% trans "View invoice" %} →</a></div>
     </div>
   </div>
+
+  {% if invoice.status != 'cancelled' and not warehouse_id %}
+  <div style="background:#FEF3C7; border:1px solid #FDE68A; color:#92400E; border-radius:10px; padding:10px 14px; font-size:12.5px; margin-bottom:16px;">
+    <i class="fa fa-triangle-exclamation"></i>
+    {% trans "This purchase's stock links are missing, so it can only be cancelled from here — not edited." %}
+  </div>
+  {% endif %}
 
   <h2 class="po-items-h">{% trans "Purchased products" %}</h2>
 
@@ -132,5 +155,16 @@
 
 <script>
   if (window.lucide) lucide.createIcons();
+
+  // Cancelling a purchase hard-deletes the physical stock it brought in —
+  // irreversible, unlike a normal invoice cancel. A plain confirm() is too
+  // easy to click through by habit, so require typing the purchase number.
+  function poConfirmCancel(form) {
+    const typed = window.prompt(
+      "{% trans 'This permanently deletes the physical stock this purchase brought in and cannot be undone. Type the purchase number to confirm:' %}\n" +
+      "{{ invoice.series }}-{{ invoice.number }}"
+    );
+    return typed === "{{ invoice.series }}-{{ invoice.number }}";
+  }
 </script>
 {% endblock %}

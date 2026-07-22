@@ -397,11 +397,43 @@ class InvoiceEdit(View):
             return redirect("current_account:invoice_detail", pk=invoice.pk)
         return None
 
+    def _purchase_redirect(self, request, invoice):
+        """Purchase invoices can't go through this generic item editor —
+        it deletes and recreates InvoiceItem rows, which silently orphans
+        WarehouseProductRoll.purchase_invoice_item (SET_NULL) and never
+        touches stock quantities at all. Redirect (server-side, so a
+        bookmarked/typed URL can't bypass this either) to the dedicated
+        warehouse-sidebar edit flow instead. Returns a redirect response,
+        or None if this isn't a purchase invoice."""
+        if invoice.type != "purchase":
+            return None
+        from operating.models import WarehouseProductRoll
+        warehouse_id = (
+            WarehouseProductRoll.objects
+            .filter(purchase_invoice_item__invoice_id=invoice.pk)
+            .values_list("product__warehouse_id", flat=True)
+            .first()
+        )
+        if warehouse_id:
+            return redirect(
+                reverse("operating:warehouse_detail", args=[warehouse_id])
+                + f"?edit_purchase={invoice.pk}"
+            )
+        messages.warning(
+            request,
+            _g("This purchase's stock links are missing, so it can't be edited from here — "
+               "view or cancel it from the purchases page instead."),
+        )
+        return redirect("current_account:purchase_order_detail", pk=invoice.pk)
+
     def get(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
         blocked = self._block_if_cancelled(request, invoice)
         if blocked:
             return blocked
+        redirected = self._purchase_redirect(request, invoice)
+        if redirected:
+            return redirected
 
         return render(request, self.template_name, {
             "invoice": invoice,
@@ -433,6 +465,9 @@ class InvoiceEdit(View):
         blocked = self._block_if_cancelled(request, invoice)
         if blocked:
             return blocked
+        redirected = self._purchase_redirect(request, invoice)
+        if redirected:
+            return redirected
 
         # Order-linked invoices mirror the order — the cari balance is
         # computed from the ORDER (see issue()/post_order_movement), not
@@ -479,27 +514,7 @@ class InvoiceEdit(View):
                 for item in items_data:
                     InvoiceItem.objects.create(invoice=invoice, **item)
             invoice.recompute_totals(save=True)
-
-            # ── Sync the cari movement if this invoice was already
-            # posted to the ledger. Order-attached invoices stay at
-            # amount=0 (no double counting); standalone invoices get
-            # their amount/desc/date refreshed in place.
-            mv = invoice.posted_movement
-            if mv:
-                if invoice.order_id:
-                    new_amount = Decimal("0.00")
-                else:
-                    new_amount = invoice.total * Decimal(invoice.ledger_sign)
-                mv.amount = new_amount
-                mv.amount_base = Decimal("0")    # force recompute on save
-                mv.date = invoice.date
-                mv.due_date = invoice.due_date
-                mv.currency = invoice.currency
-                mv.description = f"{invoice.get_type_display()} {invoice.series}-{invoice.number}"
-                mv.reference = f"{invoice.series}-{invoice.number}"
-                mv.save()
-                # CariMovement.save() already calls recompute_balance,
-                # so the cari snapshot is up-to-date now.
+            invoice.resync_posted_movement(user=request.user)
 
             if request.POST.get("auto_issue") == "1" and invoice.status == "draft":
                 try:
@@ -595,6 +610,34 @@ class InvoiceIssue(View):
 class InvoiceCancel(View):
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
+
+        if invoice.type == "purchase":
+            # Purchase invoices go through the dedicated, stock-aware
+            # cancel path — hard-deletes the physical tops it brought in
+            # (blocked if any is already reserved elsewhere), not just the
+            # money side. Same function the purchases page's own Cancel
+            # button calls, so there's exactly one implementation of this
+            # irreversible operation regardless of entry point.
+            from operating.views_warehouse import _is_admin
+            from .views_purchase import cancel_purchase_invoice, PurchaseCancelBlocked
+            if not _is_admin(request.user):
+                messages.error(
+                    request,
+                    _g("Only an admin can cancel a purchase — it permanently removes "
+                       "the physical stock it brought in."),
+                )
+                return redirect("current_account:invoice_detail", pk=invoice.pk)
+            try:
+                cancel_purchase_invoice(invoice.pk, request.user)
+            except (PurchaseCancelBlocked, ValueError) as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    _g("Purchase cancelled — its stock was removed and the cari debt reversed."),
+                )
+            return redirect("current_account:invoice_detail", pk=invoice.pk)
+
         reason = request.POST.get("reason", "")
         invoice.cancel(user=request.user, reason=reason)
         messages.success(request, _g("Invoice cancelled."))
@@ -632,6 +675,19 @@ class InvoiceRestore(View):
         invoice = get_object_or_404(Invoice, pk=pk)
         if invoice.status != "cancelled":
             messages.error(request, _g("Only cancelled invoices can be restored."))
+            return redirect("current_account:invoice_detail", pk=invoice.pk)
+
+        if invoice.type == "purchase":
+            # A purchase cancel HARD-DELETES the physical stock it brought
+            # in (see cancel_purchase_invoice) — restoring would resurrect
+            # a supplier debt for goods that no longer exist anywhere.
+            # Unlike a normal invoice cancel, this one is deliberately not
+            # reversible.
+            messages.error(
+                request,
+                _g("Purchase invoices can't be restored after cancellation — the physical "
+                   "stock was permanently removed. Create a new purchase if needed."),
+            )
             return redirect("current_account:invoice_detail", pk=invoice.pk)
 
         password = request.POST.get("password", "")

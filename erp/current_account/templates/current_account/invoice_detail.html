@@ -498,7 +498,9 @@
       <a href="{% url 'current_account:invoice_excel' invoice.pk %}" class="iv-btn ghost"><i data-lucide="sheet"></i>{% trans "Excel" %}</a>
       {% if invoice.status != 'cancelled' %}
         <a href="{% url 'current_account:invoice_edit' invoice.pk %}" class="iv-btn ghost"
-           {% if invoice.status != 'draft' %}onclick="return confirm('{% trans 'This invoice is already issued. Editing will sync the cari ledger. Continue?' %}');"{% endif %}>
+           {% if invoice.type == 'purchase' %}
+             {# Server-side redirects to the warehouse-sidebar edit flow either way — no confirm needed here. #}
+           {% elif invoice.status != 'draft' %}onclick="return confirm('{% trans 'This invoice is already issued. Editing will sync the cari ledger. Continue?' %}');"{% endif %}>
           <i data-lucide="edit-3"></i>{% trans "Edit" %}
         </a>
       {% endif %}
@@ -513,15 +515,19 @@
           <button type="submit" class="iv-btn danger"><i data-lucide="trash-2"></i>{% trans "Delete" %}</button>
         </form>
       {% elif invoice.status == 'cancelled' %}
+        {% if invoice.type != 'purchase' %}
         <form method="post" action="{% url 'current_account:invoice_restore' invoice.pk %}" style="display:inline;"
               onsubmit="return submitInvoiceRestore(this);">
           {% csrf_token %}
           <input type="hidden" name="password" value="">
           <button type="submit" class="iv-btn primary"><i data-lucide="rotate-ccw"></i>{% trans "Restore" %}</button>
         </form>
+        {% endif %}
+        {# Purchase invoices can't be restored after cancellation — their #}
+        {# stock was hard-deleted (see PurchaseCancel / InvoiceRestore guard). #}
       {% else %}
         <form method="post" action="{% url 'current_account:invoice_cancel' invoice.pk %}" style="display:inline;"
-              onsubmit="return confirm('{% trans 'Are you sure you want to cancel this invoice? A reverse movement will be created.' %}');">
+              onsubmit="return confirm('{% if invoice.type == 'purchase' %}{% trans 'This permanently removes the physical stock this purchase brought in and reverses the cari debt. This cannot be undone. Continue?' %}{% else %}{% trans 'Are you sure you want to cancel this invoice? A reverse movement will be created.' %}{% endif %}');">
           {% csrf_token %}
           <button type="submit" class="iv-btn danger"><i data-lucide="x-circle"></i>{% trans "Cancel" %}</button>
         </form>

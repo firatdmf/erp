@@ -1048,6 +1048,30 @@
   .np-product-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
   .np-product-no { font: 800 12px var(--font-sans); color: var(--nejum-teal-700); letter-spacing: 0.04em; text-transform: uppercase; }
 
+  /* Edit-mode: reopening the sidebar pre-filled for an existing purchase.
+     Product/variant identity is read-only text (no picker) — only tops
+     (and, on a fully-emptied line, price) are editable. */
+  .np-edit-banner {
+    display: flex; align-items: center; gap: 9px; margin-bottom: 14px;
+    padding: 10px 14px; background: #EFF6FF; border: 1px solid #BFDBFE;
+    color: #1D4ED8; border-radius: 10px; font: 600 12.5px var(--font-sans);
+  }
+  .np-edit-banner b { font-family: var(--font-mono); }
+  .np-edit-readonly { font: 700 13px var(--font-sans); color: #0F1419; }
+  .np-edit-readonly code {
+    font: 700 11px var(--font-mono); background: #F4F7FB; border-radius: 5px;
+    padding: 1px 6px; margin-right: 6px; color: var(--gray-700);
+  }
+  .np-existing-tops { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0; }
+  .np-etop {
+    display: flex; align-items: center; gap: 7px; padding: 6px 10px;
+    background: #F8FAFC; border: 1px solid #E2E8EE; border-radius: 8px; font-size: 12px;
+  }
+  .np-etop code { font-family: var(--font-mono); background: white; border: 1px solid #E2E8EE; border-radius: 5px; padding: 1px 6px; }
+  .np-etop.locked { background: #FEF3C7; border-color: #FDE68A; }
+  .np-etop .lock-ico { color: #B27500; font-size: 11px; }
+  .np-etop .np-mini-x { width: 18px; height: 18px; }
+
   .np-foot {
     flex-shrink: 0; border-top: 1px solid #E2E8EE; background: white;
     padding: 12px 18px; display: flex; flex-direction: column; gap: 8px;
@@ -1725,9 +1749,15 @@
   // template the URL with a "0" placeholder and swap it in per-call.
   const NP_VARIANTS_TPL = "{% url 'operating:catalog_product_variants' warehouse.pk 0 %}";
   const NP_MATCH_TPL = "{% url 'operating:catalog_variant_match' warehouse.pk 0 %}";
+  // Invoice id isn't known until a Düzenle link opens the sidebar with
+  // ?edit_purchase=<id> — templated with a "0" placeholder like the others.
+  const NP_EDIT_TPL = "{% url 'operating:warehouse_purchase_edit' warehouse.pk 0 %}";
+  const NP_PURCHASE_DETAIL_TPL = "{% url 'current_account:purchase_order_detail' 0 %}";
   const NP_CSRF = "{{ csrf_token }}";
   const NP_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+  const NP_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="lock-ico"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
   const NP_CUR = '<select class="np-select np-v-cur"><option>USD</option><option>TRY</option><option>EUR</option></select>';
+  let NP_EDIT_INVOICE_ID = null;
   let npVid = 0;
 
   function npCurPrefix() {
@@ -1781,6 +1811,7 @@
   window.openNewProduct = function () {
     const ov = document.getElementById('newProductOverlay');
     if (!ov) return;
+    npResetEditMode();
     const wrap = document.getElementById('npProducts');
     if (wrap) wrap.innerHTML = '';
     npAddProduct();
@@ -1796,7 +1827,32 @@
     ov.classList.remove('show');
     ov.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
+    if (NP_EDIT_INVOICE_ID) {
+      npResetEditMode();
+      const params = new URLSearchParams(window.location.search);
+      params.delete('edit_purchase');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+    }
   };
+
+  // Undo everything npLoadForEdit locked/hid/relabelled, so a plain "Add
+  // product" reachable right after closing an edit session starts fully
+  // fresh instead of inheriting disabled selects / a hidden Add-product
+  // button / the "Save changes" label from the edit session.
+  function npResetEditMode() {
+    NP_EDIT_INVOICE_ID = null;
+    const sel = document.getElementById('npSupplier');
+    if (sel) sel.disabled = false;
+    const unitSel = document.getElementById('npUnit');
+    if (unitSel) unitSel.disabled = false;
+    const addProductBtn = document.querySelector('.np-add-product');
+    if (addProductBtn) addProductBtn.style.display = '';
+    const banner = document.getElementById('npEditBanner');
+    if (banner) banner.remove();
+    const saveBtn = document.getElementById('npSaveBtn');
+    if (saveBtn) saveBtn.innerHTML = '<i class="fa fa-check"></i> {% trans "Save all" %}';
+  }
 
   // One card = one main product (new or existing) + its variants & tops.
   // Per-card state (mode, has-variants, sku preview, existing-variant list)
@@ -2232,10 +2288,183 @@
     }, 250);
   };
 
+  // ── Edit an existing purchase — reopens this SAME panel pre-filled with
+  // its current lines/tops. Deliberately ADDITIVE: npAddProduct/npAddVariant/
+  // npAddTop (above) are untouched and keep meaning "add something brand
+  // new" in both modes; existing/locked rows get their own renderer so the
+  // two concepts never share one code path with a runtime flag. ──────────
+
+  // One read-only chip per EXISTING top. Locked (already reserved into a
+  // customer order — even if not yet shipped/consumed) rows show a lock
+  // icon and can't be removed; unlocked ones keep a delete control that
+  // just drops the chip — nothing is sent to the server for a dropped
+  // roll_id, which is exactly what marks it "removed" in the diff.
+  window.npAddExistingTop = function (vEl, top) {
+    const box = vEl.querySelector('.np-existing-tops');
+    if (!box) return;
+    const row = document.createElement('div');
+    row.className = 'np-etop' + (top.locked ? ' locked' : '');
+    row.dataset.rollId = top.roll_id;
+    const meters = parseFloat(top.meters);
+    row.innerHTML =
+      '<code>' + (top.barcode || '—') + '</code>' +
+      '<span>' + (isNaN(meters) ? top.meters : meters.toFixed(2)) + ' ' + unitShort() + '</span>' +
+      (top.locked
+        ? NP_LOCK
+        : '<button type="button" class="np-mini-x" title="{% trans "Remove" %}" onclick="this.closest(\'.np-etop\').remove(); npSummaryUpdate();">' + NP_TRASH + '</button>');
+    box.appendChild(row);
+  };
+
+  function npBuildEditVariantEl(v) {
+    const el = document.createElement('div');
+    el.className = 'np-variant';
+    el.dataset.itemId = v.invoice_item_id;
+    el.dataset.wpId = v.warehouse_product_id || '';
+    const hasExisting = (v.tops || []).length > 0;
+    el.innerHTML =
+      '<div class="np-variant-head"><span class="np-edit-readonly">' +
+        (v.sku ? ('<code>' + v.sku + '</code>') : '') + (v.name || '') +
+      '</span></div>' +
+      '<div class="np-existing-tops"></div>' +
+      '<div class="np-tops"></div>' +
+      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>' +
+      '<div class="np-price-row" style="display:' + (hasExisting ? 'none' : 'flex') + '; margin-top:9px;">' +
+        '<span class="np-price-label">{% trans "Purchase price" %}</span>' +
+        '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" value="' +
+          (v.unit_price || '') + '">' +
+      '</div>';
+    (v.tops || []).forEach(function (t) { window.npAddExistingTop(el, t); });
+    return el;
+  }
+
+  // Fetches the purchase's current lines/tops and rebuilds #npProducts to
+  // show them read-only (identity) + editable (tops, and price only on a
+  // line with zero surviving original tops) instead of the normal blank
+  // "start a new intake" state.
+  window.npLoadForEdit = function (invoiceId) {
+    NP_EDIT_INVOICE_ID = invoiceId;
+    fetch(NP_EDIT_TPL.replace('/0/edit/', '/' + invoiceId + '/edit/'), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.success) {
+          alert((d && d.error) || '{% trans "Alım yüklenemedi." %}');
+          return;
+        }
+        const ov = document.getElementById('newProductOverlay');
+        const wrap = document.getElementById('npProducts');
+        wrap.innerHTML = '';
+
+        const sel = document.getElementById('npSupplier');
+        if (sel) {
+          if (d.supplier_id) sel.value = String(d.supplier_id);
+          sel.disabled = true;
+        }
+        const unitSel = document.getElementById('npUnit');
+        if (unitSel) unitSel.disabled = true;
+        const addProductBtn = document.querySelector('.np-add-product');
+        if (addProductBtn) addProductBtn.style.display = 'none';
+
+        let banner = document.getElementById('npEditBanner');
+        if (!banner) {
+          banner = document.createElement('div');
+          banner.id = 'npEditBanner';
+          banner.className = 'np-edit-banner';
+          wrap.parentNode.insertBefore(banner, wrap);
+        }
+        banner.innerHTML = '<i class="fa fa-pen"></i> {% trans "Editing purchase" %} <b>' + d.number + '</b>';
+
+        (d.products || []).forEach(function (group) {
+          const card = document.createElement('div');
+          card.className = 'np-product-card np-edit-card';
+          card.innerHTML =
+            '<div class="np-product-head"><span class="np-edit-readonly">' + (group.product_title || '') + '</span></div>' +
+            '<div class="np-variants-wrap"><div class="np-variants"></div></div>';
+          const variantsBox = card.querySelector('.np-variants');
+          (group.variants || []).forEach(function (v) { variantsBox.appendChild(npBuildEditVariantEl(v)); });
+          wrap.appendChild(card);
+        });
+
+        npRelabelUnits();
+        npSummaryUpdate();
+        const saveBtn = document.getElementById('npSaveBtn');
+        if (saveBtn) saveBtn.innerHTML = '<i class="fa fa-check"></i> {% trans "Save changes" %}';
+
+        ov.classList.add('show');
+        ov.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        if (window.lucide) lucide.createIcons();
+      }).catch(function () { alert('{% trans "Ağ hatası." %}'); });
+  };
+
+  function npCollectEditPayload() {
+    const products = [];
+    document.querySelectorAll('#npProducts .np-edit-card').forEach(function (card) {
+      const variants = [];
+      card.querySelectorAll('.np-variants .np-variant').forEach(function (vEl) {
+        const keptRollIds = [];
+        vEl.querySelectorAll('.np-existing-tops .np-etop').forEach(function (row) {
+          keptRollIds.push(parseInt(row.dataset.rollId, 10));
+        });
+        const newTops = [];
+        vEl.querySelectorAll('.np-tops .np-top-qty').forEach(function (q) {
+          const val = parseFloat((q.value || '').replace(',', '.'));
+          if (!isNaN(val) && val > 0) newTops.push({ qty: val });
+        });
+        const variant = {
+          invoice_item_id: parseInt(vEl.dataset.itemId, 10),
+          warehouse_product_id: vEl.dataset.wpId ? parseInt(vEl.dataset.wpId, 10) : null,
+          kept_roll_ids: keptRollIds,
+          new_tops: newTops,
+        };
+        const priceRow = vEl.querySelector('.np-price-row');
+        const priceEl = vEl.querySelector('.np-v-price');
+        if (priceEl && priceRow && priceRow.style.display !== 'none' && priceEl.value) {
+          variant.price = priceEl.value;
+        }
+        variants.push(variant);
+      });
+      products.push({ main_product: { mode: 'existing' }, variants: variants });
+    });
+    return products;
+  }
+
+  function npSaveEdit() {
+    const btn = document.getElementById('npSaveBtn');
+    const payload = {
+      unit: (document.getElementById('npUnit') || {}).value || 'mt',
+      products: npCollectEditPayload(),
+    };
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Kaydediliyor…" %}';
+    fetch(NP_EDIT_TPL.replace('/0/edit/', '/' + NP_EDIT_INVOICE_ID + '/edit/'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': NP_CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(payload),
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.success) {
+          window.location.href = NP_PURCHASE_DETAIL_TPL.replace('/0/', '/' + NP_EDIT_INVOICE_ID + '/');
+        } else {
+          let msg = (d && d.error) || '{% trans "Kaydedilemedi." %}';
+          if (d && d.blocked && d.blocked.length) {
+            msg += '\n' + d.blocked.map(function (b) { return b.barcode; }).join(', ');
+          }
+          alert(msg);
+          btn.disabled = false; btn.innerHTML = orig;
+        }
+      }).catch(function () {
+        alert('{% trans "Ağ hatası." %}');
+        btn.disabled = false; btn.innerHTML = orig;
+      });
+  }
+
   // Single atomic submit for the WHOLE batch — every product card in
   // #npProducts, all in one request. Nothing is saved (or reset) until this
   // succeeds, so a mistake on one product never loses the others.
   window.npSave = function () {
+    if (NP_EDIT_INVOICE_ID) { npSaveEdit(); return; }
     const btn = document.getElementById('npSaveBtn');
     const cards = document.querySelectorAll('#npProducts .np-product-card');
     if (!cards.length) { alert('{% trans "Add at least one product." %}'); return; }
@@ -2380,6 +2609,11 @@
         else { alert((d && d.error) || '{% trans "Merge failed" %}'); btn.disabled = false; btn.innerHTML = orig; }
       }).catch(function () { alert(_mgTR ? 'Ağ hatası' : 'Network error'); btn.disabled = false; btn.innerHTML = orig; });
   };
+
+  // Reached via "Düzenle" on a purchase (?edit_purchase=<invoice id>) —
+  // open the panel already loaded with that purchase instead of blank.
+  const _npEditParam = new URLSearchParams(window.location.search).get('edit_purchase');
+  if (_npEditParam) { window.npLoadForEdit(_npEditParam); }
 })();
 </script>
 

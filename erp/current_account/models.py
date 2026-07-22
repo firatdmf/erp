@@ -634,6 +634,48 @@ class Invoice(models.Model):
         self.save(update_fields=["status", "posted_movement", "updated_at"])
         return movement
 
+    def resync_posted_movement(self, user=None):
+        """Refresh the ledger row after totals/date/currency change on an
+        already-issued invoice. Order-attached invoices stay at amount=0
+        (no double counting); standalone invoices get amount/desc/date
+        refreshed in place on the SAME CariMovement (never delete+recreate —
+        that would break anything referencing it by id).
+
+        If `posted_movement` is somehow missing on a non-draft/non-cancelled
+        invoice (should not happen in normal flow, since issue() always sets
+        it in the same transaction as status→issued), post a fresh one
+        instead of silently doing nothing — a purchase/sales edit that
+        changes the total must never leave the cari balance stale.
+        """
+        if self.status in ("draft", "cancelled"):
+            return None
+        amount = Decimal("0.00") if self.order_id else self.total * Decimal(self.ledger_sign)
+
+        mv = self.posted_movement
+        if mv is None:
+            mv = CariMovement.objects.create(
+                cari=self.cari, book=self.book, date=self.date, due_date=self.due_date,
+                amount=amount, currency=self.currency, movement_type=self.movement_type,
+                description=f"{self.get_type_display()} {self.series}-{self.number}",
+                reference=f"{self.series}-{self.number}",
+                source_type=ContentType.objects.get_for_model(Invoice),
+                source_id=self.pk,
+                created_by=user.member if user and hasattr(user, "member") else None,
+            )
+            self.posted_movement = mv
+            self.save(update_fields=["posted_movement", "updated_at"])
+            return mv
+
+        mv.amount = amount
+        mv.amount_base = Decimal("0")    # force recompute on save
+        mv.date = self.date
+        mv.due_date = self.due_date
+        mv.currency = self.currency
+        mv.description = f"{self.get_type_display()} {self.series}-{self.number}"
+        mv.reference = f"{self.series}-{self.number}"
+        mv.save()   # CariMovement.save() already calls recompute_balance
+        return mv
+
     def cancel(self, user=None, reason=""):
         """
         Cancel an issued invoice. Posts a counter-movement so the

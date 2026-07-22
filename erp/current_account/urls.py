@@ -31,6 +31,7 @@ urlpatterns = [
     # --- Purchase orders (warehouse intake, not a generic invoice view) ---
     path("satin-alma/",              views_purchase.PurchaseOrderList.as_view(),   name="purchase_order_list"),
     path("satin-alma/<int:pk>/",     views_purchase.PurchaseOrderDetail.as_view(), name="purchase_order_detail"),
+    path("satin-alma/<int:pk>/iptal/", views_purchase.PurchaseCancel.as_view(),    name="purchase_cancel"),
 
     # --- Payment (Phase 3) ---
     path("tahsilat/",                  views_payment.PaymentList.as_view(),    name="payment_list"),

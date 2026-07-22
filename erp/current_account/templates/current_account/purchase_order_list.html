@@ -67,6 +67,15 @@
 
   .po-empty { text-align:center; padding: 60px 20px; color: var(--gray-500); }
   .po-empty .ico { font-size: 34px; color: var(--gray-400); margin-bottom: 10px; }
+
+  .po-row-actions { text-align: right; width: 1%; white-space: nowrap; }
+  .po-edit-ic {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 8px;
+    color: var(--gray-500); text-decoration: none; transition: all 140ms;
+  }
+  .po-edit-ic:hover { background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+  .po-edit-ic i { width: 14px; height: 14px; }
 </style>
 {% endblock %}
 
@@ -119,6 +128,7 @@
           <th>{% trans "Items" %}</th>
           <th>{% trans "Status" %}</th>
           <th class="num">{% trans "Total" %}</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -127,11 +137,17 @@
           <td><a class="po-num" href="{% url 'current_account:purchase_order_detail' inv.pk %}">{{ inv.number }}</a></td>
           <td><span class="po-date">{{ inv.date|date:"d.m.Y" }}</span></td>
           <td><a class="po-supplier" href="{% url 'current_account:cari_detail' inv.cari.pk %}">{{ inv.cari.name }}</a></td>
-          <td><span class="po-items-count">{{ inv.item_count }} {% trans "product" %}{{ inv.item_count|pluralize }}</span></td>
+          <td><span class="po-items-count">{{ inv.item_count }} {% trans "product" %}</span></td>
           <td>
             <span class="po-badge {{ inv.status }}">{{ inv.get_status_display }}</span>
           </td>
           <td class="num po-total">{{ inv.currency.symbol|default:"$" }}{{ inv.total|floatformat:2|intcomma }}</td>
+          <td class="po-row-actions">
+            {% if inv.status != 'cancelled' and inv.warehouse_id_for_edit %}
+              <a class="po-edit-ic" href="{% url 'operating:warehouse_detail' inv.warehouse_id_for_edit %}?edit_purchase={{ inv.pk }}"
+                 title="{% trans 'Edit' %}"><i data-lucide="pencil"></i></a>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

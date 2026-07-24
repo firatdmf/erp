@@ -1,0 +1,12 @@
+{% load i18n %}{% get_current_language as LANGUAGE_CODE %}{% comment %}
+One scanned top (OrderRollReservation) shown READ-ONLY on the order-detail
+page — a compact pill: barcode, reserved metres, partial/cut markers and
+the package it was sorted into. All editing happens on the separate
+"Düzenleme ve Paketleme" screen (order_pack_scan).
+{% endcomment %}<span class="od-top-pill{% if r.consumed %} consumed{% endif %}">
+  <span class="bc">{{ r.roll.barcode|default:'—' }}</span>
+  <span class="m">{{ r.meters|floatformat:"-2" }} m</span>
+  {% if not r.consumed and r.meters < r.roll.meters_remaining|default:r.roll.meters %}<span class="tag">{% if LANGUAGE_CODE|slice:":2" == "tr" %}kısmi{% else %}partial{% endif %}</span>{% endif %}
+  {% if r.consumed %}<span class="tag cut">{% if LANGUAGE_CODE|slice:":2" == "tr" %}kesildi{% else %}cut{% endif %}</span>{% endif %}
+  {% if r.pack_id %}<span class="tag pack"><i class="fa fa-box"></i> #{{ r.pack.pack_number }}</span>{% endif %}
+</span>

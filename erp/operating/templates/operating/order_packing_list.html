@@ -88,7 +88,8 @@
     <div>
       <div class="pk-eyebrow">{% trans "Packing" %}</div>
       <h1 class="pk-title">{% trans "Package list" %}</h1>
-      <div class="pk-sub">{% trans "View only — to change which top goes in which package, use the Packing (Scan tops) screen." %}</div>
+      {% get_current_language as LANGUAGE_CODE %}
+      <div class="pk-sub">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Salt görünüm — hangi topun hangi pakete gireceğini "Düzenleme ve Paketleme" ekranında değiştirin.{% else %}View only — to change which top goes in which package, use the "Edit &amp; Pack" screen.{% endif %}</div>
     </div>
   </div>
 

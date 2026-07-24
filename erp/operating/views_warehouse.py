@@ -150,6 +150,40 @@ def _supplier_choices():
         return []
 
 
+# DB category slugs → Turkish display labels for the manual-add "Ürün Türü"
+# select (unknown slugs fall back to the raw name).
+_CATEGORY_TR_LABELS = {
+    "fabric": "Kumaş",
+    "ready-made_curtain": "Hazır Perde",
+    "throw": "Örtü / Şal",
+    "bed": "Yatak Tekstili",
+}
+
+
+def _product_category_choices():
+    """ProductCategories for the manual-add "Ürün Türü" select, fabric first
+    (it's the default for warehouse-minted products — this is a fabric mill)."""
+    try:
+        from marketing.models import ProductCategory
+        rows = list(ProductCategory.objects.all().order_by("name"))
+        rows.sort(key=lambda c: (c.name != "fabric", c.name))
+        return [{"id": c.id, "name": c.name,
+                 "label": _CATEGORY_TR_LABELS.get(c.name, c.name),
+                 "is_default": c.name == "fabric"} for c in rows]
+    except Exception:
+        return []
+
+
+def _default_fabric_category():
+    """The 'fabric' ProductCategory (or None) — default type for every product
+    minted through the warehouse flows, so invoices never show a blank type."""
+    try:
+        from marketing.models import ProductCategory
+        return ProductCategory.objects.filter(name="fabric").first()
+    except Exception:
+        return None
+
+
 # Manual-add unit → a valid marketing.Product.unit_of_measurement choice
 # (the model only allows units/mt/kg; the real per-roll quantity is generic).
 _PRODUCT_UNIT_MAP = {"mt": "mt", "kg": "kg", "adet": "units", "paket": "units", "units": "units"}
@@ -837,6 +871,7 @@ class WarehouseDetail(View):
             'roll_count': roll_count,         # rolls (tops)
             'is_admin': _is_admin(request.user),
             'suppliers': _supplier_choices(),   # manual-add dropdown
+            'product_categories': _product_category_choices(),  # manual-add "Ürün Türü"
             'dup_count': _warehouse_dup_sku_count(warehouse),  # duplicate-SKU variant groups
             'total_quantity': counts['qty'],
         })
@@ -879,9 +914,19 @@ def warehouse_group_variants(request, pk):
 @login_required
 def warehouse_barcode_lookup(request, pk):
     """Barcode-only LOOKUP (separate from scanning to ADD). Given a scanned
-    barcode, says whether that product is already in this warehouse — match a
-    roll's (top's) barcode first, else the product barcode / SKU — and returns
-    its info so staff can confirm "did I already add this?" without searching."""
+    barcode, says whether that top/product is already in this warehouse.
+
+    Match precedence — a ROLL barcode identifies one specific physical
+    top, so roll matches (in ANY warehouse) always outrank the product-
+    level barcode/SKU fallback. Previously the current warehouse's
+    product fallback fired before the cross-warehouse roll check, so
+    scanning a top that physically lives in warehouse B while standing
+    in warehouse A wrongly reported "already in this warehouse" whenever
+    the same PRODUCT also existed in A — hiding the "move it here" flow.
+      1. roll with this barcode in THIS warehouse   → found (roll)
+      2. roll with this barcode in ANOTHER warehouse → found_elsewhere + move
+      3. product in THIS warehouse by product barcode / SKU → found
+      4. nothing → not found"""
     from django.db.models import Q
     warehouse = get_object_or_404(Warehouse, pk=pk)
     code = (request.GET.get("barcode") or "").strip()
@@ -889,6 +934,7 @@ def warehouse_barcode_lookup(request, pk):
         return JsonResponse({"found": False, "error": "No barcode"}, status=400)
 
     matched = None
+    product = None
     roll = (WarehouseProductRoll.objects
             .select_related("product", "product__catalog_variant__product")
             .filter(product__warehouse=warehouse, barcode__iexact=code)
@@ -897,19 +943,10 @@ def warehouse_barcode_lookup(request, pk):
         product = roll.product
         matched = "roll"
     else:
-        product = (WarehouseProduct.objects
-                   .select_related("catalog_variant__product")
-                   .filter(warehouse=warehouse)
-                   .filter(Q(barcode__iexact=code) | Q(sku__iexact=code))
-                   .first())
-        matched = ("sku" if (product and (product.sku or "").lower() == code.lower())
-                   else "product") if product else None
-
-    if not product:
-        # Not in THIS warehouse — but the barcode might be a real top that
-        # was received into a DIFFERENT warehouse. Say so instead of a flat
-        # "not found", and offer a one-click move so staff don't end up
-        # re-adding it as brand-new stock (a silent duplicate).
+        # The barcode may be a real top received into a DIFFERENT
+        # warehouse — that wins over any same-product fallback here, and
+        # offers a one-click move so staff don't re-add it as brand-new
+        # stock (a silent duplicate).
         other_roll = (WarehouseProductRoll.objects
                       .select_related("product", "product__warehouse")
                       .exclude(product__warehouse=warehouse)
@@ -936,6 +973,17 @@ def warehouse_barcode_lookup(request, pk):
                 "move_url": reverse("operating:warehouse_roll_move_here",
                                     args=[warehouse.pk, other_roll.pk]),
             })
+        # No roll anywhere — fall back to a product-level barcode/SKU
+        # match within THIS warehouse.
+        product = (WarehouseProduct.objects
+                   .select_related("catalog_variant__product")
+                   .filter(warehouse=warehouse)
+                   .filter(Q(barcode__iexact=code) | Q(sku__iexact=code))
+                   .first())
+        matched = ("sku" if (product and (product.sku or "").lower() == code.lower())
+                   else "product") if product else None
+
+    if not product:
         return JsonResponse({"found": False, "barcode": code})
 
     main = product.catalog_variant.product if product.catalog_variant_id else None
@@ -1354,8 +1402,18 @@ class WarehouseManualAdd(View):
 
         # ── Pass 1: resolve + validate EVERY product before writing anything,
         # so a mistake on product #3 never leaves #1/#2 half-saved. ──
+        from marketing.models import ProductCategory as _PCat
+        fabric_cat = _default_fabric_category()
         resolved = []
         for i, p_in in enumerate(products_in, start=1):
+            # Ürün türü (category) — panel sends the chosen id; anything
+            # missing/invalid falls back to fabric (kumaş), the house default.
+            category = None
+            cat_id = str(p_in.get("category_id") or "").strip()
+            if cat_id.isdigit():
+                category = _PCat.objects.filter(pk=int(cat_id)).first()
+            if category is None:
+                category = fabric_cat
             variants_in = p_in.get("variants") or []
             if not isinstance(variants_in, list) or not variants_in:
                 return JsonResponse({"success": False, "error": f"Ürün {i}: en az bir varyant ekleyin."}, status=400)
@@ -1383,7 +1441,7 @@ class WarehouseManualAdd(View):
             resolved.append({
                 "main_product": main_product, "base_name": base_name,
                 "desired_sku": desired_sku, "has_variants": has_variants,
-                "variants_in": variants_in,
+                "variants_in": variants_in, "category": category,
             })
 
         created_list = []
@@ -1402,6 +1460,7 @@ class WarehouseManualAdd(View):
                     desired_sku = item["desired_sku"]
                     has_variants = item["has_variants"]
                     variants_in = item["variants_in"]
+                    category = item["category"]
 
                     created = {"main_product": None, "variants": 0, "tops": 0,
                                "barcodes": [], "variant_skus": []}
@@ -1424,6 +1483,7 @@ class WarehouseManualAdd(View):
                                     main_product = _Prod.objects.create(
                                         title=base_name, sku=candidate, featured=False,
                                         unit_of_measurement=prod_unit, quantity=Decimal("0"),
+                                        category=category,
                                     )
                                 break
                             except IntegrityError:
@@ -1431,6 +1491,11 @@ class WarehouseManualAdd(View):
                                 continue
                         if main_product is None:
                             raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
+                    elif not main_product.category_id and category:
+                        # Existing main product with no type yet — backfill it so
+                        # its invoices stop showing a blank "Ürün Tipi" column.
+                        main_product.category = category
+                        main_product.save(update_fields=["category"])
                     created["main_product"] = {
                         "id": main_product.id, "title": main_product.title,
                         "sku": main_product.sku,
@@ -3577,8 +3642,11 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     write path (order detail page, JSON API, web-order edit) must go
     through here so the lifecycle rules can't diverge:
 
-      * entering a shipped-class status requires carrier + tracking
-        (unless require_cargo_for_ship=False) — else nothing changes;
+      * cargo info (carrier + tracking) is OPTIONAL — completing an
+        order without it is allowed for every order type; whatever the
+        caller supplies is stored. (require_cargo_for_ship is kept in
+        the signature for caller compatibility but no longer enforced —
+        the user explicitly wants cargo-less completion.);
       * entering 'packaging'/a shipped status does NOT require the
         scanned reservations to cover the ordered metres — a mismatch
         between ordered and scanned quantity is allowed; the cari/
@@ -3590,13 +3658,19 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         leaving_ship branch below), then this drops the (now-inactive)
         reservation rows entirely, so a cancelled order never keeps
         warehouse capacity falsely held for stock that'll never ship;
+      * 'cancelled' is TERMINAL — once an order is cancelled it can
+        never move to any other status again (mirrors purchase invoices
+        after PurchaseCancel). Its cari posting was reversed and its
+        invoice(s) cancelled with it; silently re-posting those on an
+        un-cancel was the bug this closes, not a feature to preserve.
+        A mis-cancelled order needs a brand-new order, not a reopen;
       * the status change, its catalog-stock signal, AND the warehouse
         reservation → stock-out conversion all happen inside ONE
         transaction, so a roll-cut failure rolls the whole thing back
         (no half-shipped, catalog-cut-but-warehouse-not state).
 
     Returns (ok: bool, code: str|None). code is a machine-readable
-    reason on failure: 'cargo_required' | 'error:<detail>'."""
+    reason on failure: 'order_cancelled_terminal' | 'error:<detail>'."""
     from django.db import transaction as _tx
     from django.utils import timezone as _tz
     from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES
@@ -3604,6 +3678,10 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
     valid_statuses = {k for k, _ in ORDER_STATUS_CHOICES}
     valid_carriers = {k for k, _ in CARRIER_CHOICES}
     old_status = order.order_status
+
+    changing = bool(new_status) and new_status in valid_statuses and new_status != old_status
+    if changing and old_status == "cancelled":
+        return False, "order_cancelled_terminal"
 
     # Stash any cargo info the caller carried.
     if carrier is not None:
@@ -3615,18 +3693,15 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
         if tstr:
             order.tracking_number = tstr
 
-    changing = bool(new_status) and new_status in valid_statuses and new_status != old_status
     entering_ship = changing and new_status in SHIPPED_CLASS and old_status not in SHIPPED_CLASS
     leaving_ship = (old_status in SHIPPED_CLASS and new_status in valid_statuses
                     and new_status not in SHIPPED_CLASS and new_status != old_status)
     entering_cancelled = changing and new_status == "cancelled" and old_status != "cancelled"
-    leaving_cancelled = changing and old_status == "cancelled"
 
-    # Gate: shipping needs cargo info.
-    if entering_ship and require_cargo_for_ship:
-        if not (order.carrier or "").strip() or not (order.tracking_number or "").strip():
-            order.save(update_fields=["carrier", "tracking_number", "updated_at"])
-            return False, "cargo_required"
+    # NOTE: the "shipping needs cargo info" gate used to live here —
+    # deliberately removed. Cargo is optional for every order; whatever
+    # carrier/tracking the caller supplied was stored above and the
+    # completion proceeds either way.
 
     # NOTE: entering 'packaging'/a shipped status used to require the
     # scanned reservations to fully COVER every line's ordered metres
@@ -3680,11 +3755,6 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 reverse_order_movement(order)
                 for _inv in order.invoices.exclude(status="cancelled"):
                     _inv.cancel(user=user, reason=f"Order #{order.pk} cancelled")
-            elif leaving_cancelled:
-                # Re-opened order goes back on the books.
-                if order.cari_id:
-                    from current_account.services import post_order_movement
-                    post_order_movement(order)
             # Retail money leg — completion posts the sale + auto
             # collection to the shared "Perakende Satışları" cari and
             # mirrors it into the Perakende defter; un-ship reverses

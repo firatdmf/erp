@@ -414,12 +414,17 @@
           custom_mounting_type: '', custom_wing_type: '',
           custom_fabric_used_meters: '',
           existing_item_id: it.item_id || null,
-          // Reservations already saved on this order line — shown
-          // read-only; newly picked tops go in `rolls` instead.
-          existingRolls: (it.rolls || []).map(function (r) {
-            return { barcode: r.barcode || '', warehouse: r.warehouse || '', meters: parseFloat(r.meters) || 0, available: parseFloat(r.available) || 0 };
+          // Saved reservations hydrate STRAIGHT into `rolls` so they
+          // behave exactly like fresh picks — tick off to deselect,
+          // scissors for a partial cut. Nothing hits the server until
+          // "save changes"; the backend then reconciles the submitted
+          // list against the saved reservations (kept / re-cut /
+          // released). A small KAYITLI tag marks the already-saved ones.
+          existingRolls: [],
+          rolls: (it.rolls || []).map(function (r) {
+            return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', meters: parseFloat(r.meters) || 0, available: parseFloat(r.available) || 0 };
           }),
-          rolls: [], availableRolls: [], rollsLoading: true,
+          availableRolls: [], rollsLoading: true,
           manualMeters: 0, manualNote: '', showManualEntry: false
         });
         if (it.sku) editHydratedItems.push({ stableIndex: stableIndex, sku: it.sku });
@@ -706,7 +711,10 @@
     var scissorsBtn = picked
       ? '<button type="button" onclick="event.stopPropagation(); coToggleRollCut(' + i + ',' + ri + ')" title="{% trans "Kısmi kes" %}" style="background:none;border:0;color:#B45309;cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;"><i class="fas fa-scissors"></i></button>'
       : '';
-    var tag = locked
+    // Already-saved (hydrated) rolls carry reservation_id — tag them so
+    // staff can tell saved apart from freshly picked. They untick and
+    // re-cut exactly like fresh picks; the backend reconciles on save.
+    var tag = (locked || (picked && r.reservation_id))
       ? '<span style="font-size:9.5px;font-weight:700;color:#64748B;background:#E2E8F0;padding:2px 6px;border-radius:5px;white-space:nowrap;flex-shrink:0;">{% trans "KAYITLI" %}</span>'
       : '';
     return '<div class="co-roll-row"' + toggleAttrs + ' style="display:flex;align-items:center;gap:8px;padding:8px 9px;margin-top:6px;font-size:12px;background:' + bg + ';border:1px solid ' + border + ';border-radius:7px;' + (locked ? '' : 'cursor:pointer;') + '">' +
@@ -848,7 +856,22 @@
   window.coRemoveRoll = function (i, ri) {
     var item = orderItems[i];
     if (!item || !item.rolls) return;
-    item.rolls.splice(ri, 1);
+    var removed = item.rolls.splice(ri, 1)[0];
+    // An unticked SAVED roll is still reserved server-side until the
+    // form is saved, so the availableRolls fetch won't list it. Put it
+    // back on the candidates list locally so it can be re-ticked if the
+    // user changes their mind before saving (re-ticking by the same
+    // barcode makes the save reconcile keep the reservation).
+    if (removed && removed.reservation_id) {
+      var bc = (removed.barcode || '').toLowerCase();
+      var already = (item.availableRolls || []).some(function (r) {
+        return (r.barcode || '').toLowerCase() === bc;
+      });
+      if (!already) {
+        item.availableRolls = item.availableRolls || [];
+        item.availableRolls.unshift({ barcode: removed.barcode, warehouse: removed.warehouse, available: removed.available });
+      }
+    }
     syncQtyFromRolls(i);
     renderProducts();
   };

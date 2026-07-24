@@ -290,6 +290,13 @@
     margin-top: 14px; padding-top: 14px;
     border-top: 1px dashed #EEF1F5;
   }
+  .od-cancelled-note {
+    margin-top: 14px; padding: 10px 14px;
+    border-top: 1px dashed #EEF1F5;
+    display: flex; align-items: center; gap: 8px;
+    font: 600 12.5px var(--font-sans);
+    color: #B23B3B;
+  }
   .od-more-status summary {
     cursor: pointer; user-select: none;
     font: 600 12px var(--font-sans);
@@ -481,8 +488,61 @@
   .od-card.editing button.od-edit-only { display: block !important; }
   .od-card.editing td.od-edit-only,
   .od-card.editing th.od-edit-only { display: table-cell !important; }
+  .od-card.editing span.od-edit-only { display: inline-flex !important; }
   .od-card.editing #od-prods-edit-toggle,
   .od-card.editing #od-cust-edit-toggle { background: #147F74; color: #fff; border-color: #147F74; }
+
+  /* ══════════ Tops (scanned rolls) — READ-ONLY display ══════════
+     Each product line shows its scanned tops as compact pills right
+     under it: barcode · metres · partial/cut/pack tags. All EDITING
+     (scan, cut, remove, pack) lives on the separate "Düzenleme ve
+     Paketleme" screen (order_pack_scan). */
+  tr.od-tops-row > td { padding: 2px 12px 10px !important; background: #FAFCFB; border-top: 0 !important; }
+  .od-tops-wrap { position: sticky; left: 0; max-width: calc(100vw - 72px); }
+  @media (min-width: 1200px) { .od-tops-wrap { max-width: 100%; } }
+  .od-tops-head {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    font: 600 11px var(--font-sans); color: #64748B; margin: 4px 0 6px;
+  }
+  .od-tops-head b { color: #005354; }
+  /* The PRODUCT ROW is the accordion trigger — chevron in its first
+     cell rotates when its tops row below is revealed. */
+  tr.od-row-toggle { cursor: pointer; }
+  tr.od-row-toggle:hover td { background: #FAFCFB; }
+  .od-tops-chev { font-size: 9px; transition: transform 140ms; color: #94A3B8; flex-shrink: 0; }
+  .od-tops-chev.open { transform: rotate(90deg); }
+  /* Compact per-line badge under the product name — scanned recap (or
+     "not tracked") visible without expanding anything. */
+  .od-scan-chip { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;
+    font: 700 10.5px var(--font-sans); color: #005354; background: #E5F1F0;
+    border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+  .od-scan-chip.muted { color: #64748B; background: #F4F7FB; font-weight: 600; }
+  .od-tops-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .od-top-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 9px; background: #fff; border: 1px solid #E2E8F0;
+    border-radius: 8px; font-size: 11.5px; line-height: 1.4; max-width: 100%;
+  }
+  .od-top-pill.consumed { background: #F8FAFC; border-style: dashed; }
+  .od-top-pill .bc { font-family: var(--font-mono, monospace); font-size: 11px; color: #0F1419;
+    background: #F1F5F9; border-radius: 5px; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .od-top-pill .m { font-weight: 800; color: #005354; white-space: nowrap; }
+  .od-top-pill .tag { font: 700 9.5px var(--font-sans); letter-spacing: .03em; text-transform: uppercase;
+    color: #92400E; background: #FEF3C7; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+  .od-top-pill .tag.cut { color: #475569; background: #F1F5F9; }
+  .od-top-pill .tag.pack { color: #005354; background: #E5F1F0; }
+  .od-tops-none { font: 500 11px var(--font-sans); color: #94A3B8; }
+  .od-variant-name { font: 600 12.5px var(--font-sans); color: #0F1419; line-height: 1.3; }
+  .od-variant-sku { display: inline-block; margin-top: 2px; font-size: 10.5px; color: #94A3B8; }
+  .od-num-val { font: 700 13px var(--font-sans); font-variant-numeric: tabular-nums; color: #0F1419; }
+  .od-untracked-note { display: inline-flex; align-items: center; gap: 6px;
+    font: 600 10.5px var(--font-sans); color: #64748B; background: #F4F7FB;
+    border-radius: 999px; padding: 2px 9px; }
+  /* Unassigned tops (line edited away) — read-only warning group */
+  .od-unassigned { margin-top: 10px; border: 1.5px solid #FDE68A; background: #FFFBEB; border-radius: 10px; padding: 10px 12px; }
+  .od-unassigned-h { font: 700 12px var(--font-sans); color: #92400E; margin-bottom: 6px; }
+  .od-unassigned-h small { font-weight: 600; color: #B45309; }
+  .od-unassigned .od-tops-list { margin-top: 2px; }
 
   .od-row-del {
     width: 28px; height: 28px; border-radius: 6px;
@@ -773,6 +833,7 @@
 {% endblock %}
 
 {% block content %}
+{% get_current_language as LANGUAGE_CODE %}
 <div class="ord">
 
   <!-- CRUMBS -->
@@ -804,7 +865,7 @@
             {% if order.order_status == 'pending' %}{% trans "Pending" %}
             {% elif order.order_status == 'confirmed' %}{% trans "Confirmed" %}
             {% elif order.order_status == 'preparing' %}{% trans "Preparing" %}
-            {% elif order.order_status == 'shipped' %}{% trans "Shipped" %}
+            {% elif order.order_status == 'shipped' %}{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamlandı{% else %}Completed{% endif %}
             {% elif order.order_status == 'in_transit' %}{% trans "In transit" %}
             {% elif order.order_status == 'out_for_delivery' %}{% trans "Out for delivery" %}
             {% elif order.order_status == 'delivered' %}{% trans "Delivered" %}
@@ -854,6 +915,11 @@
         <a href="{% url 'operating:order_production' order.pk %}" class="ord-btn ghost">
           <i class="fa fa-industry"></i>{% trans "Production" %}
         </a>
+      {% endif %}
+      {% if not shipped and not is_terminal %}
+        <button type="button" class="ord-btn ghost" onclick="openEditOrderSidebar({{ order.pk }})">
+          <i class="fa fa-pen"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Düzenle{% else %}Edit{% endif %}
+        </button>
         <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn primary">
           <i class="fa fa-barcode"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketle (Top Okut){% else %}Pack (Scan rolls){% endif %}
         </a>
@@ -879,10 +945,19 @@
           <input type="hidden" name="action" value="update_status">
           <input type="hidden" name="order_status" id="od-status-input" value="{{ order.order_status|default:'pending' }}">
 
-          {% comment %}3-stage flow — Açık → Paketleniyor (opens the packing-scan page) → Gönderildi (needs cargo info, cuts reserved rolls).{% endcomment %}
+          {% comment %}3-stage flow — Açık → Paketleniyor (opens the "Düzenleme ve Paketleme" screen) → Tamamlandı (cuts reserved rolls; cargo optional).{% endcomment %}
           <div class="od-stages od-stages-3">
             {% for s in status_stages %}
               {% if s.key == 'packaging' %}
+                {% if is_terminal %}
+                {% comment %}Cancelled/returned is terminal — the packing screen must not be reachable, so the stage renders as a dead chip, not a link.{% endcomment %}
+                <span class="od-stage {% if s.filled %}filled{% endif %}" style="cursor:default;">
+                  <span class="od-stage-n">{{ forloop.counter }}</span>
+                  <span class="od-stage-l">
+                    {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketleniyor{% else %}Packing{% endif %}
+                  </span>
+                </span>
+                {% else %}
                 <a href="{% url 'operating:order_pack_scan' order.pk %}"
                    class="od-stage od-stage-link {% if s.filled %}filled{% endif %} {% if order.order_status == 'packaging' %}now{% endif %}"
                    style="text-decoration:none;">
@@ -892,12 +967,13 @@
                     {% if reservation_count %}<span class="od-stage-badge">{{ reservation_count }}</span>{% endif %}
                   </span>
                 </a>
+                {% endif %}
               {% elif s.key == 'shipped' %}
                 <button type="button"
                         class="od-stage {% if s.filled %}filled{% endif %} {% if order.order_status == 'shipped' %}now{% endif %}"
                         data-status="shipped">
                   <span class="od-stage-n">{{ forloop.counter }}</span>
-                  <span class="od-stage-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Gönderildi{% else %}Shipped{% endif %}</span>
+                  <span class="od-stage-l">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamlandı{% else %}Completed{% endif %}</span>
                 </button>
               {% else %}
                 <button type="button"
@@ -915,9 +991,9 @@
             <div class="od-ship-hint" style="font-size:12px;color:#64748B;margin-bottom:8px;">
               <i class="fa fa-circle-info"></i>
               {% if LANGUAGE_CODE|slice:":2" == "tr" %}
-                Sipariş “Gönderildi” olana ve <b>Siparişi Tamamla</b> denene kadar stok düşmez. Tamamlamak için kargo şirketi ve takip numarası zorunludur.
+                <b>Siparişi Tamamla</b> denene kadar stok düşmez. Kargo bilgileri opsiyoneldir — girilirse kaydedilir, girilmese de sipariş tamamlanabilir.
               {% else %}
-                No stock is deducted until the order is shipped via <b>Complete order</b>. Carrier + tracking number are required.
+                No stock is deducted until <b>Complete order</b> is pressed. Cargo info is optional — saved if entered, but the order can complete without it.
               {% endif %}
             </div>
             {% if order.is_retail_order %}
@@ -944,7 +1020,7 @@
             </div>
             <div class="od-ship-actions">
               <span class="od-ship-meta">
-                {% if order.shipped_at %}<i class="fa fa-truck"></i> {% trans "Shipped" %}: {{ order.shipped_at|date:"d M Y · H:i" }}{% endif %}
+                {% if order.shipped_at %}<i class="fa fa-check-circle"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamlandı{% else %}Completed{% endif %}: {{ order.shipped_at|date:"d M Y · H:i" }}{% endif %}
                 {% if order.delivered_at %} · <i class="fa fa-check-circle"></i> {% trans "Delivered" %}: {{ order.delivered_at|date:"d M Y · H:i" }}{% endif %}
               </span>
               <div style="display:flex; gap:8px;">
@@ -967,6 +1043,12 @@
           </div>
         </form>
 
+        {% if order.order_status == 'cancelled' %}
+        <div class="od-cancelled-note">
+          <i class="fa fa-ban"></i>
+          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Bu sipariş iptal edildi ve tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun.{% else %}This order was cancelled and can't be reopened. Create a new order if needed.{% endif %}
+        </div>
+        {% else %}
         <details class="od-more-status">
           <summary>{% trans "More statuses (cancelled, returned, delivered…)" %}</summary>
           <div class="od-more-grid">
@@ -982,22 +1064,36 @@
             {% endfor %}
           </div>
         </details>
+        {% endif %}
       </section>
 
-      <!-- PRODUCTS -->
+      <!-- PRODUCTS — rich READ-ONLY view. All editing (qty/price/lines,
+           top scanning/cutting, packing) happens on the dedicated
+           "Düzenleme ve Paketleme" screen (order_pack_scan). -->
       <section class="od-card" id="od-products-card">
         <div class="od-card-h" style="display:flex; align-items:center; justify-content:space-between;">
           <div style="display:flex; align-items:baseline; gap:10px;">
             <h3>{% trans "Products" %}</h3>
             <span class="od-card-sub"><span id="od-items-count">{{ order.items.count }}</span> {% trans "items" %}</span>
           </div>
-          {% if order.order_status != 'shipped' and order.order_status != 'delivered' and order.order_status != 'in_transit' and order.order_status != 'out_for_delivery' %}
-          <button type="button" id="od-prods-edit-toggle" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
-            <i class="fa fa-pen" data-edit-icon></i> <span data-edit-label>{% trans "Edit" %}</span>
-          </button>
+          {% if not shipped and not is_terminal %}
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;"
+                    onclick="openEditOrderSidebar({{ order.pk }})">
+              <i class="fa fa-pen"></i> <span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Düzenle{% else %}Edit{% endif %}</span>
+            </button>
+            <a href="{% url 'operating:order_pack_scan' order.pk %}" class="ord-btn ghost" style="font-size:12px; padding:6px 10px;">
+              <i class="fa fa-barcode"></i> <span>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Paketle{% else %}Pack{% endif %}</span>
+            </a>
+          </div>
+          {% elif is_terminal %}
+          <span class="ord-btn ghost" style="font-size:12px; padding:6px 10px; opacity:0.6; cursor:default;"
+                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}İptal edilmiş sipariş düzenlenemez ve paketlenemez{% else %}A cancelled order can't be edited or packed{% endif %}">
+            <i class="fa fa-lock"></i> <span>{% trans "Locked" %}</span>
+          </span>
           {% else %}
           <span class="ord-btn ghost" style="font-size:12px; padding:6px 10px; opacity:0.6; cursor:default;"
-                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Gönderilen siparişlerde ürünler düzenlenemez — önce 'Geri Aç & Düzelt' ile siparişi geri açın{% else %}Shipped orders can't be edited — use 'Re-open & Fix' first{% endif %}">
+                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Tamamlanan siparişlerde ürünler düzenlenemez — önce 'Geri Aç & Düzelt' ile siparişi geri açın{% else %}Completed orders can't be edited — use 'Re-open & Fix' first{% endif %}">
             <i class="fa fa-lock"></i> <span>{% trans "Locked" %}</span>
           </span>
           {% endif %}
@@ -1015,6 +1111,7 @@
         {% endif %}
 
         <div data-item-pane="current">
+
         <div class="od-prods-scroll">
         <table class="od-prods">
           <thead>
@@ -1026,58 +1123,65 @@
               <th class="num">{% trans "Price" %}</th>
               <th class="num" title="{% trans 'Per-unit cost (internal)' %}">{% trans "Cost" %}</th>
               <th class="num">{% trans "Amount" %}</th>
-              <th class="od-edit-only"></th>
             </tr>
           </thead>
           <tbody id="od-items-tbody">
             {% for item in order_items_sorted %}
-            <tr data-item-row="{{ item.pk }}">
+            {% comment %}The PRODUCT ROW is the accordion trigger — click
+               it to reveal the tops below (chevron in the first cell).
+               The product-name link still navigates normally.{% endcomment %}
+            <tr data-item-row="{{ item.pk }}"{% if item.is_tracked and item.scanned_count %} class="od-row-toggle" data-toggle-tops="{{ item.pk }}"{% endif %}>
               <td>
-                {% if item.product %}
-                <a href="{% url 'marketing:product_detail' item.product.pk %}" class="od-prod-link">
-                  <div class="od-prod">
-                    {% with first_file=item.product.files.first %}
-                      {% if first_file and first_file.file_url %}
-                        <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
+                <div style="display:flex; align-items:flex-start; gap:6px;">
+                  {% if item.is_tracked and item.scanned_count %}
+                  <i class="fa fa-chevron-right od-tops-chev" data-chev="{{ item.pk }}" style="margin-top:12px;"></i>
+                  {% else %}
+                  <span style="width:9px; flex-shrink:0;"></span>
+                  {% endif %}
+                  <div style="min-width:0;">
+                    {% if item.product %}
+                    <a href="{% url 'marketing:product_detail' item.product.pk %}" class="od-prod-link">
+                      <div class="od-prod">
+                        {% with first_file=item.product.files.first %}
+                          {% if first_file and first_file.file_url %}
+                            <img class="od-prod-img" src="{{ first_file.file_url }}" alt="">
+                          {% else %}
+                            <span class="od-prod-img"></span>
+                          {% endif %}
+                        {% endwith %}
+                        <span>{{ item.product.title }}</span>
+                      </div>
+                    </a>
+                    {% else %}
+                    <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
+                    {% endif %}
+                    {% if item.is_tracked %}
+                      {% if item.scanned_count %}
+                      <span class="od-scan-chip"><i class="fa fa-layer-group"></i> {{ item.scanned_count }} top · {{ item.scanned_meters|floatformat:"-2" }} m</span>
                       {% else %}
-                        <span class="od-prod-img"></span>
+                      <span class="od-scan-chip muted"><i class="fa fa-layer-group"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}top okutulmadı{% else %}no tops{% endif %}</span>
                       {% endif %}
-                    {% endwith %}
-                    <span>{{ item.product.title }}</span>
+                    {% else %}
+                      <span class="od-scan-chip muted"><i class="fa fa-box"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}depo takipsiz{% else %}not tracked{% endif %}{% if item.pack_id %} · {% if LANGUAGE_CODE|slice:":2" == "tr" %}Paket{% else %}Pack{% endif %} #{{ item.pack.pack_number }}{% endif %}</span>
+                    {% endif %}
                   </div>
-                </a>
-                {% else %}
-                <div class="od-prod"><span class="od-prod-img"></span><span class="od-empty-mute">{% trans "(deleted product)" %}</span></div>
-                {% endif %}
+                </div>
               </td>
               <td><span class="mono">{{ item.product.sku|default:"—" }}</span></td>
-              <td><span class="mono">{{ item.product_variant.variant_sku|default:"—" }}</span></td>
-              <td class="num">
-                <input type="number" class="od-inline-input" step="0.01" min="0" readonly
-                       value="{{ item.quantity|default:0|stringformat:'g' }}"
-                       data-item-id="{{ item.pk }}" data-field="quantity"
-                       data-original="{{ item.quantity|default:0|stringformat:'g' }}"
-                       data-stock="{{ item.available_stock|default_if_none:'' }}"
-                       data-oversell="{% if item.allow_oversell %}true{% else %}false{% endif %}"
-                       {% if item.max_qty is not None and not item.allow_oversell %}max="{{ item.max_qty|stringformat:'g' }}"{% endif %}
-                       onwheel="this.blur()">
-                {% if item.available_stock is not None %}
-                <div class="od-row-stock od-edit-only" data-row-stock="{{ item.pk }}">
-                  {% with s=item.available_stock %}
-                  <span class="od-stock-pill {% if s <= 0 and not item.allow_oversell %}out{% elif s < 10 %}low{% else %}ok{% endif %}">
-                    {% trans "Stock" %}: <b>{{ s|stringformat:'g' }}</b>
-                  </span>
-                  {% endwith %}
-                </div>
+              <td>
+                {% if item.product_variant %}
+                  {% if item.variant_label %}
+                    <div class="od-variant-name">{{ item.variant_label }}</div>
+                    <span class="mono od-variant-sku">{{ item.product_variant.variant_sku }}</span>
+                  {% else %}
+                    <span class="mono">{{ item.product_variant.variant_sku }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="od-empty-mute">—</span>
                 {% endif %}
               </td>
-              <td class="num">
-                <input type="number" class="od-inline-input" step="0.01" min="0" readonly
-                       value="{{ item.price|default:0|stringformat:'g' }}"
-                       data-item-id="{{ item.pk }}" data-field="price"
-                       data-original="{{ item.price|default:0|stringformat:'g' }}"
-                       onwheel="this.blur()">
-              </td>
+              <td class="num"><span class="od-num-val">{{ item.quantity|default:0|floatformat:"-2" }}</span></td>
+              <td class="num"><span class="od-num-val">${{ item.price|default:0|floatformat:2 }}</span></td>
               <td class="num" data-item-cost="{{ item.pk }}" data-unit-cost="{{ item.unit_cost|default:0 }}">
                 {% with uc=item.unit_cost %}
                   {% if uc and uc > 0 %}
@@ -1088,18 +1192,41 @@
                 {% endwith %}
               </td>
               <td class="num" data-item-subtotal="{{ item.pk }}"><b>${{ item.subtotal|floatformat:2 }}</b></td>
-              <td class="od-edit-only">
-                <button type="button" class="od-row-del" data-remove-item="{{ item.pk }}" title="{% trans 'Remove' %}">
-                  <i class="fa fa-times"></i>
-                </button>
+            </tr>
+            {% if item.is_tracked and item.scanned_count %}
+            <tr class="od-tops-row" data-tops-for="{{ item.pk }}" style="display:none;">
+              <td colspan="7">
+                <div class="od-tops-wrap">
+                  <div class="od-tops-list">
+                    {% for r in item.item_reservations %}{% include "operating/partials/od_top_row.html" %}{% endfor %}
+                  </div>
+                </div>
               </td>
             </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
         </table>
         </div>
         {% if not order.items.all %}
         <div id="od-no-items" class="od-empty-mute" style="padding: 20px 0; text-align: center;">{% trans "This order has no items yet" %}</div>
+        {% endif %}
+
+        {% if unassigned_reservations %}
+        <!-- Tops whose order line was later edited/removed — they stay
+             reserved (scanning is permanent) but no longer group under a
+             product. Kept visible so they can be cut/removed/re-packed. -->
+        <div class="od-unassigned" id="od-unassigned">
+          <div class="od-unassigned-h">
+            <i class="fa fa-triangle-exclamation"></i>
+            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Atanmamış toplar <small>— artık siparişteki bir kalemle eşleşmiyor, faturalanmaz</small>{% else %}Unassigned tops <small>— no longer match an order line, not billed</small>{% endif %}
+          </div>
+          <div data-tops-list="">
+            {% for r in unassigned_reservations %}
+              {% include "operating/partials/od_top_row.html" %}
+            {% endfor %}
+          </div>
+        </div>
         {% endif %}
 
         <!-- Add-item row (edit mode) -->
@@ -1139,6 +1266,12 @@
             <span>{% trans "Grand total" %}</span>
             <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
           </div>
+          {% if total_scanned_count %}
+          <div class="od-tot-row" style="color:#005354;">
+            <span><i class="fa fa-layer-group" style="font-size:10px; opacity:.7;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Toplam okutulan{% else %}Total scanned{% endif %}</span>
+            <span style="font-weight:700;">{{ total_scanned_count }} {% if LANGUAGE_CODE|slice:":2" == "tr" %}top{% else %}tops{% endif %} · {{ total_scanned_meters|floatformat:"-2" }} m</span>
+          </div>
+          {% endif %}
           {% with tc=order.total_cost gp=order.gross_profit gm=order.gross_margin_pct %}
           <div class="od-tot-row" style="margin-top:6px; padding:8px 10px; background:#FFFBEB; border:1px dashed #FDE68A; border-radius:8px; color:#92400E;">
             <span style="display:inline-flex; align-items:center; gap:6px;">
@@ -1585,20 +1718,14 @@
     }
     function submitStatus(s) {
       if (SHIPPED.indexOf(s) !== -1) {
-        if (hasCargoChk && !hasCargoChk.checked) {
-          if (!confirm(CONFIRM_SHIP_NO_CARGO + '\n\n' + buildOrderSummary() + CONFIRM_TAIL)) return;
-          setSkipCargo('1');
-        } else {
-          const c = ((carrierSel && carrierSel.value) || '').trim();
-          const t = ((trackingInp && trackingInp.value) || '').trim();
-          if (!c || !t) {
-            alert(NEED_CARGO_MSG);
-            if (!c && carrierSel) { carrierSel.focus(); } else if (trackingInp) { trackingInp.focus(); }
-            return;
-          }
-          if (!confirm(CONFIRM_SHIP + '\n\n' + buildOrderSummary() + CONFIRM_TAIL)) return;
-          setSkipCargo('0');
-        }
+        // Cargo info is OPTIONAL for every order — completing without a
+        // carrier/tracking just gets a slightly different confirm text.
+        const c = ((carrierSel && carrierSel.value) || '').trim();
+        const t = ((trackingInp && trackingInp.value) || '').trim();
+        const noCargo = (!c && !t) || (hasCargoChk && !hasCargoChk.checked);
+        const msg = (noCargo ? CONFIRM_SHIP_NO_CARGO : CONFIRM_SHIP) + '\n\n' + buildOrderSummary() + CONFIRM_TAIL;
+        if (!confirm(msg)) return;
+        setSkipCargo(noCargo ? '1' : '0');
       }
       statusInput.value = s;
       statusForm.submit();
@@ -1930,10 +2057,12 @@
       const tbody = document.getElementById('od-items-tbody');
       if (tbody) {
         tbody.querySelectorAll('tr[data-item-row^="new-"]').forEach(row => row.remove());
-        // Restore deleted rows
+        // Restore deleted rows (and their paired tops sub-rows)
         tbody.querySelectorAll('tr[data-item-deleted="true"]').forEach(row => {
           row.removeAttribute('data-item-deleted');
           row.style.display = '';
+          const tops = tbody.querySelector('tr.od-tops-row[data-tops-for="' + row.getAttribute('data-item-row') + '"]');
+          if (tops) tops.style.display = '';
         });
         if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();
       }
@@ -1953,6 +2082,10 @@
       saveBtn.disabled = true;
       const origLabel = saveBtn.innerHTML;
       saveBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
+      // Structural changes (added/removed lines) get a reload after the
+      // flush — the tops sub-rows / scan match-maps / pack strip for the
+      // new shape only exist server-side.
+      const structural = newRows.length > 0 || deletedRows.length > 0;
 
       try {
         let latestTotal = null;
@@ -1967,6 +2100,8 @@
             if (r.cari) applyCariSnapshot(r.cari);
             if (r.profit) applyProfitSnapshot(r.profit);
           }
+          const delTops = document.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
+          if (delTops) delTops.remove();
           delRow.remove();
         }
 
@@ -2065,8 +2200,15 @@
             el.textContent = '$' + Number(latestTotal).toFixed(2);
           });
         }
-        if (window.__odExitEditMode) {
-          window.__odExitEditMode();
+        // Structural change → reload so the new line's tops section, scan
+        // matching and pack strip come back consistent from the server.
+        // Pure qty/price/notes saves stay in edit mode with no reload —
+        // this is a packing work session, don't slam it shut.
+        if (structural) {
+          // ?edit=1 is always stripped via replaceState on load, so this
+          // is guaranteed to be a different URL → full navigation.
+          window.location.href = window.location.pathname + '?edit=1#od-products-card';
+          return;
         }
       } catch (e) {
         alert(e.message || 'Save failed — please refresh.');
@@ -2100,6 +2242,28 @@
           pane.style.display = (pane.getAttribute('data-item-pane') === which) ? '' : 'none';
         });
       });
+    });
+  })();
+
+  // ──────────────────────────────────────────────────────────
+  //  Products card: clicking a product ROW expands/collapses its
+  //  scanned-tops row beneath (chevron rotates). The product-name
+  //  link keeps navigating normally.
+  // ──────────────────────────────────────────────────────────
+  (function () {
+    const tbody = document.getElementById('od-items-tbody');
+    if (!tbody) return;
+    tbody.addEventListener('click', function (e) {
+      if (e.target.closest('a')) return;               // links win
+      const row = e.target.closest('tr.od-row-toggle');
+      if (!row) return;
+      const id = row.getAttribute('data-toggle-tops');
+      const tops = tbody.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
+      if (!tops) return;
+      const open = tops.style.display === 'none';
+      tops.style.display = open ? '' : 'none';
+      const chev = row.querySelector('[data-chev]');
+      if (chev) chev.classList.toggle('open', open);
     });
   })();
 
@@ -2142,12 +2306,14 @@
     }
     window.__odUpdateActiveItemsCount = updateActiveItemsCount;
 
+    const EDIT_LABEL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Düzenle ve Paketle'{% else %}'Edit & Pack'{% endif %};
+    const CLOSE_LABEL = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Kapat'{% else %}'Close'{% endif %};
     function exitEditMode() {
       if (card && card.classList.contains('editing')) {
         card.classList.remove('editing');
         const lbl = toggle.querySelector('[data-edit-label]');
         const ico = toggle.querySelector('[data-edit-icon]');
-        if (lbl) lbl.textContent = '{% trans "Edit" %}';
+        if (lbl) lbl.textContent = EDIT_LABEL;
         if (ico) {
           ico.classList.add('fa-pen');
           ico.classList.remove('fa-times');
@@ -2161,13 +2327,16 @@
       // When CANCELLING (leaving edit mode), discard any dirty input
       // values so the row reflects the persisted state. Without this
       // the save-bar lingered showing "unsaved change" even though the
-      // user clearly wanted to back out.
+      // user clearly wanted to back out. (Top operations — scan/cut/
+      // remove/pack — were saved instantly and are NOT reverted here.)
       if (!willEdit) {
         tbody?.querySelectorAll('tr[data-item-row^="new-"]').forEach(row => row.remove());
-        // Restore deleted rows
+        // Restore deleted rows (and their paired tops sub-rows)
         tbody?.querySelectorAll('tr[data-item-deleted="true"]').forEach(row => {
           row.removeAttribute('data-item-deleted');
           row.style.display = '';
+          const tops = tbody.querySelector('tr.od-tops-row[data-tops-for="' + row.getAttribute('data-item-row') + '"]');
+          if (tops) tops.style.display = '';
         });
         if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();
 
@@ -2183,7 +2352,7 @@
       const editing = card.classList.contains('editing');
       const lbl = toggle.querySelector('[data-edit-label]');
       const ico = toggle.querySelector('[data-edit-icon]');
-      if (lbl) lbl.textContent = editing ? '{% trans "Cancel" %}' : '{% trans "Edit" %}';
+      if (lbl) lbl.textContent = editing ? CLOSE_LABEL : EDIT_LABEL;
       if (ico) {
         ico.classList.toggle('fa-pen',   !editing);
         ico.classList.toggle('fa-times',  editing);
@@ -2351,11 +2520,23 @@
       const row = tbody.querySelector('[data-item-row="' + id + '"]');
       if (!row) return;
 
+      // Removing a line with scanned tops orphans its reservations —
+      // they stay reserved (scanning is permanent) but drop out of the
+      // cari billing. Make that an informed choice, not an accident.
+      const topsRow = tbody.querySelector('tr.od-tops-row[data-tops-for="' + id + '"]');
+      const scannedCount = topsRow ? topsRow.querySelectorAll('.od-top-row[data-id]').length : 0;
+      if (!id.startsWith('new-') && scannedCount > 0) {
+        const msg = {% if LANGUAGE_CODE|slice:":2" == "tr" %}'Bu üründe ' + scannedCount + ' okutulmuş top var. Ürünü kaldırırsanız toplar "Atanmamış" durumuna düşer ve FATURALANMAZ. Devam edilsin mi?'{% else %}'This line has ' + scannedCount + ' scanned tops. Removing it leaves them "Unassigned" and NOT billed. Continue?'{% endif %};
+        if (!confirm(msg)) return;
+      }
+
       if (id.startsWith('new-')) {
         row.remove();
+        if (topsRow) topsRow.remove();
       } else {
         row.setAttribute('data-item-deleted', 'true');
         row.style.display = 'none';
+        if (topsRow) topsRow.style.display = 'none';
       }
 
       if (window.__odUpdateActiveItemsCount) window.__odUpdateActiveItemsCount();

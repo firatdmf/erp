@@ -195,6 +195,79 @@ class index(View):
         return render(request, "operating/index.html", context)
 
 
+def _order_item_variant_label(it):
+    """Human-readable label for an order line's variant. Auto-minted
+    variant SKUs (KZL000344, MRK0011, …) mean nothing to staff — the
+    warehouse product's own name ("2086 GÜMÜŞ ABEYA") is what they
+    recognize, so prefer it (minus the redundant base title), then the
+    variant's attribute values, then None (caller falls back to SKU)."""
+    v = it.product_variant
+    if v is None:
+        return None
+    wps = list(v.warehouse_products.all())
+    if wps and (wps[0].name or "").strip():
+        label = wps[0].name.strip()
+        title = (getattr(it.product, "title", "") or "").strip()
+        if title and label.lower().startswith(title.lower()):
+            label = label[len(title):].strip(" -·/") or label
+        return label
+    vals = [av.product_variant_attribute_value
+            for av in v.product_variant_attribute_values.all()
+            if (av.product_variant_attribute_value or "").strip()]
+    return " / ".join(vals) if vals else None
+
+
+def _order_profit_snapshot(order):
+    """Order-level cost + profit numbers for the totals widget. Shared by
+    OrderDetail.post and the pack-reserve endpoints so any change that
+    shifts billed value can refresh the UI without a reload."""
+    try:
+        tc = float(order.total_cost() or 0)
+        gp = float(order.gross_profit() or 0)
+        ov = float(order.total_value() or 0)
+        margin = round(gp / ov * 100, 1) if ov > 0 else None
+        return {"total_cost": tc, "gross_profit": gp, "margin": margin}
+    except Exception:
+        return None
+
+
+def _order_cari_snapshot(order):
+    """Small JSON-able dict with the current cari balance so the client can
+    refresh the sidebar without a page reload.
+
+    Deliberately fetches a fresh CariAccount + CariMovement from the DB —
+    the signal handler updates movement.amount and re-aggregates
+    cached_balance via .update(), which does NOT touch any in-memory
+    instance; a direct read is the only way to see the new value."""
+    if not order.cari_id:
+        return None
+    try:
+        from current_account.models import CariAccount, CariMovement
+        from django.contrib.contenttypes.models import ContentType
+        cari = CariAccount.objects.get(pk=order.cari_id)
+        ct = ContentType.objects.get_for_model(order.__class__)
+        mv = CariMovement.objects.filter(
+            source_type=ct, source_id=order.pk, movement_type="order_sale",
+        ).first()
+        mv_amount = float(mv.amount) if mv else None
+        mv_symbol = (mv.currency.symbol if (mv and mv.currency_id) else "") or ""
+        bal = float(cari.cached_balance or 0)
+        if bal > 0: color = "#B45309"
+        elif bal < 0: color = "#147F74"
+        else: color = "#374151"
+        return {
+            "balance": bal,
+            "absolute_balance": abs(bal),
+            "balance_label": cari.balance_label,
+            "currency_symbol": cari.display_currency_symbol or "",
+            "color": color,
+            "mv_amount": mv_amount,
+            "mv_symbol": mv_symbol,
+        }
+    except Exception:
+        return None
+
+
 class OrderDetail(DetailView):
     model = Order
     template_name = "operating/order_detail.html"
@@ -203,11 +276,14 @@ class OrderDetail(DetailView):
     def get_queryset(self):
         # Prefetch items + their product/variant so gross_profit() can
         # read costs without extra queries (the template also iterates
-        # items for the line breakdown).
+        # items for the line breakdown). The variant's warehouse products
+        # + attribute values feed the human-readable variant label.
         return Order.objects.select_related(
             "contact", "company", "web_client", "cari",
         ).prefetch_related(
             "items__product", "items__product_variant",
+            "items__product_variant__warehouse_products",
+            "items__product_variant__product_variant_attribute_values",
         )
 
     def get_context_data(self, **kwargs):
@@ -291,9 +367,38 @@ class OrderDetail(DetailView):
         ctx["status_choices"]  = ORDER_STATUS_CHOICES
         ctx["carrier_choices"] = CARRIER_CHOICES
         ctx["is_terminal"] = current in {"cancelled", "returned"}
-        # Reserved rolls scanned during packing (for the "Gönderildi"
-        # gate + a summary on the detail page). Unconsumed = still held.
-        ctx["reservation_count"] = self.object.roll_reservations.filter(consumed=False).count()
+        ctx["shipped"] = current in _SHIPPED_CLASS
+
+        # ── Packing data (the pack screen folded into this page) ──
+        # ONE reservations query; everything else is grouped in Python.
+        # Consumed reservations stay visible (read-only history on a
+        # shipped order), matching the old pack screen.
+        reservations = list(
+            self.object.roll_reservations
+            .select_related("roll", "warehouse_product",
+                            "warehouse_product__warehouse", "pack")
+            .order_by("-created_at")
+        )
+        by_item = {}
+        for r in reservations:
+            if r.order_item_id:
+                by_item.setdefault(r.order_item_id, []).append(r)
+        items_sorted = ctx["order_items_sorted"]
+        tracked_map = self.object.classify_items_by_tracking(items_sorted)
+        from decimal import Decimal as _D
+        for it in items_sorted:
+            it.is_tracked = bool(tracked_map.get(it.pk, False))
+            it.item_reservations = by_item.get(it.pk, [])
+            it.scanned_meters = sum((r.meters or _D("0") for r in it.item_reservations), _D("0"))
+            it.scanned_count = len(it.item_reservations)
+            it.variant_label = _order_item_variant_label(it)
+        # Every item-less reservation, pack or no pack — in this layout
+        # nothing else renders them, so filtering pack'd ones out (as the
+        # pack screen does) would make them invisible here.
+        ctx["unassigned_reservations"] = [r for r in reservations if not r.order_item_id]
+        ctx["total_scanned_meters"] = sum((r.meters or _D("0") for r in reservations), _D("0"))
+        ctx["total_scanned_count"] = len(reservations)
+        ctx["reservation_count"] = sum(1 for r in reservations if not r.consumed)
         ctx["has_cargo_info"] = bool((self.object.carrier or "").strip() and (self.object.tracking_number or "").strip())
         # Change history preview (full page at order_changes).
         ctx["order_changes_preview"] = _decorate_order_changes(list(
@@ -334,6 +439,14 @@ class OrderDetail(DetailView):
         # re-opens editing automatically — no separate unlock needed.
         if action in {"update_item", "add_item", "remove_item"} and order.order_status in _SHIPPED_CLASS:
             return JsonResponse({"ok": False, "error": "Gönderilen siparişlerde ürünler düzenlenemez."}, status=400)
+        # Terminal orders: item/customer mutations are dead too — same
+        # direct-POST reasoning as above. update_status stays allowed (the
+        # funnel itself refuses leaving 'cancelled'; 'returned' may be
+        # deliberately re-opened via the status panel).
+        if (action in {"update_item", "add_item", "remove_item",
+                       "update_customer", "update_guest"}
+                and order.order_status in {"cancelled", "returned"}):
+            return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş düzenlenemez."}, status=400)
 
         def _sync_cari_total():
             """Re-post the cari movement for this order after its total
@@ -346,56 +459,10 @@ class OrderDetail(DetailView):
                 pass
 
         def _profit_snapshot():
-            """Order-level cost + profit numbers for the totals widget.
-            Refreshes after qty/price/add/remove so the user sees real
-            margin without a page reload."""
-            try:
-                tc = float(order.total_cost() or 0)
-                gp = float(order.gross_profit() or 0)
-                ov = float(order.total_value() or 0)
-                margin = round(gp / ov * 100, 1) if ov > 0 else None
-                return {"total_cost": tc, "gross_profit": gp, "margin": margin}
-            except Exception:
-                return None
+            return _order_profit_snapshot(order)
 
         def _cari_snapshot():
-            """Return a small JSON-able dict with the current cari balance
-            so the client can refresh the sidebar without a page reload.
-
-            We deliberately fetch a fresh CariAccount + CariMovement from
-            the DB here — the signal handler has already updated the
-            movement.amount and re-aggregated cached_balance via
-            CariAccount.objects.filter(...).update(), which does NOT
-            invalidate any in-memory Cari instance. A direct DB read is
-            the only way to get the post-update value."""
-            if not order.cari_id:
-                return None
-            try:
-                from current_account.models import CariAccount, CariMovement
-                from django.contrib.contenttypes.models import ContentType
-                cari = CariAccount.objects.get(pk=order.cari_id)
-                ct = ContentType.objects.get_for_model(order.__class__)
-                mv = CariMovement.objects.filter(
-                    source_type=ct, source_id=order.pk, movement_type="order_sale",
-                ).first()
-                mv_amount = float(mv.amount) if mv else None
-                mv_symbol = (mv.currency.symbol if (mv and mv.currency_id) else "") or ""
-                bal = float(cari.cached_balance or 0)
-                abs_bal = abs(bal)
-                if bal > 0: color = "#B45309"
-                elif bal < 0: color = "#147F74"
-                else: color = "#374151"
-                return {
-                    "balance": bal,
-                    "absolute_balance": abs_bal,
-                    "balance_label": cari.balance_label,
-                    "currency_symbol": cari.display_currency_symbol or "",
-                    "color": color,
-                    "mv_amount": mv_amount,
-                    "mv_symbol": mv_symbol,
-                }
-            except Exception:
-                return None
+            return _order_cari_snapshot(order)
 
         # ── Inline item edit (qty / price) ──────────────────────
         if action == "update_item":
@@ -692,6 +759,8 @@ class OrderDetail(DetailView):
             elif code == "insufficient_reservation":
                 from .views_warehouse import reservation_shortfall_message
                 messages.error(request, reservation_shortfall_message(order))
+            elif code == "order_cancelled_terminal":
+                messages.error(request, "İptal edilmiş bir sipariş tekrar açılamaz. Gerekirse yeni bir sipariş oluşturun.")
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             return redirect("operating:order_detail", pk=order.pk)
@@ -903,33 +972,73 @@ def _create_roll_reservation(order, order_item, roll, req_meters, user):
 
 
 def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcodes):
-    """Same roll-reservation handling OrderCreate.post() does for a
-    freshly-created order_item, reused by OrderEdit so picking rolls on
-    the product card works identically whether you're creating or
-    editing an order. Appends any barcode that couldn't be reserved to
-    `failed_barcodes` (never raises — a bad/raced barcode shouldn't
-    fail the whole save)."""
-    if not rolls_data:
-        return
+    """RECONCILE an order line's roll reservations against the edit
+    form's submitted selection — `rolls_data` is the line's FINAL desired
+    set of tops, exactly as ticked in the sidebar (saved rolls hydrate
+    into the same list as fresh picks):
+
+      * submitted barcode matching an existing unconsumed reservation →
+        kept; its metres updated in place if the user changed them via
+        the scissors (capped to what's really available, same rule as
+        order_pack_reserve_update);
+      * submitted barcode with no reservation yet → reserved (the
+        original create-flow behaviour);
+      * existing unconsumed reservation whose barcode was UNTICKED
+        (absent from the submission) → released.
+
+    Nothing is touched until the user presses save — this runs inside
+    OrderEdit.form_valid's transaction. For a freshly-created line there
+    are no existing reservations, so this degrades to plain adding.
+    Appends any barcode that couldn't be reserved to `failed_barcodes`
+    (never raises — a bad/raced barcode shouldn't fail the whole save)."""
+    rolls_data = rolls_data or []
     variant = order_item.product_variant
     product = order_item.product
     target_sku = variant.variant_sku if variant else (product.sku if product else "")
+
+    existing = {}
+    for r in order_item.roll_reservations.filter(consumed=False).select_related("roll"):
+        key = ((r.roll.barcode or "").strip().lower() if r.roll else "")
+        if key:
+            existing[key] = r
+
+    submitted_keys = set()
     for roll_data in rolls_data:
         bc = (roll_data.get("barcode") or "").strip()
         if not bc:
             continue
-        roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
-        if rerr:
-            failed_barcodes.append(bc)
-            continue
+        key = bc.lower()
+        submitted_keys.add(key)
         raw_m = roll_data.get("meters")
         try:
             req_m = _PDecimal(str(raw_m)) if raw_m else None
         except Exception:
             req_m = None
+
+        held = existing.get(key)
+        if held is not None:
+            # Kept — apply a metres change (scissors) if any.
+            if req_m is not None and req_m > 0 and abs(held.meters - req_m) > _PDecimal("0.004"):
+                avail = _roll_available_meters(held.roll, exclude_reservation_id=held.pk)
+                new_m = req_m if req_m <= avail else avail
+                if new_m > 0:
+                    held.meters = new_m
+                    held.save(update_fields=["meters"])
+            continue
+
+        roll, rerr = _lookup_roll_by_barcode_for_sku(bc, target_sku)
+        if rerr:
+            failed_barcodes.append(bc)
+            continue
         _r, _capped, rerr = _create_roll_reservation(order, order_item, roll, req_m, user)
         if rerr:
             failed_barcodes.append(bc)
+
+    # Unticked → release. Only this line's own unconsumed holds are ever
+    # touched, and only because the user explicitly deselected them.
+    for key, held in existing.items():
+        if key not in submitted_keys:
+            held.delete()
 
 
 def _reservation_payload(r):
@@ -957,8 +1066,15 @@ def order_pack_scan(request, pk):
     live list of reserved rolls. Non-retail (B2B) orders additionally
     get the package (Pack) drag-and-drop grouping — scanned tops sorted
     into named packages so it's visible which sack/box holds what;
-    retail orders keep the plain flat list."""
+    retail orders keep the plain flat list. PACKING ONLY — editing the
+    order's lines/prices happens in the pre-filled create-order sidebar
+    (openEditOrderSidebar → OrderEdit)."""
     order = get_object_or_404(Order, pk=pk)
+    # Cancelled/returned is terminal — never render the packing UI (which
+    # would also auto-create Pack #1 as a GET side effect) for a dead order.
+    if order.order_status in {"cancelled", "returned"}:
+        messages.error(request, "İptal edilmiş sipariş paketlenemez.")
+        return redirect("operating:order_detail", pk=order.pk)
     reservations = list(
         order.roll_reservations
         .select_related("roll", "warehouse_product", "warehouse_product__warehouse", "pack")
@@ -1015,6 +1131,11 @@ def order_pack_reserve_add(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    if order.order_status in {"cancelled", "returned"}:
+        # Cancelling an order deletes its reservations and is terminal —
+        # a top scanned onto it afterwards would hold warehouse stock
+        # forever with nothing to ever release it.
+        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
 
     code = (request.POST.get("barcode") or "").strip()
     if not code:
@@ -1081,7 +1202,8 @@ def order_pack_reserve_add(request, pk):
     if order.cari_id:
         from current_account.services import post_order_movement
         post_order_movement(order)
-    return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
+    return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
+                         "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
 
 
 @login_required
@@ -1092,6 +1214,8 @@ def order_pack_reserve_update(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    if order.order_status in {"cancelled", "returned"}:
+        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
@@ -1114,7 +1238,8 @@ def order_pack_reserve_update(request, pk):
     if order.cari_id:
         from current_account.services import post_order_movement
         post_order_movement(order)
-    return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r)})
+    return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
+                         "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
 
 
 @login_required
@@ -1125,6 +1250,8 @@ def order_pack_reserve_remove(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    if order.order_status in {"cancelled", "returned"}:
+        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
@@ -1136,7 +1263,8 @@ def order_pack_reserve_remove(request, pk):
     if order.cari_id:
         from current_account.services import post_order_movement
         post_order_movement(order)
-    return JsonResponse({"ok": True, "removed": removed})
+    return JsonResponse({"ok": True, "removed": removed,
+                         "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
 
 
 @login_required
@@ -1149,6 +1277,8 @@ def order_pack_reserve_assign_pack(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    if order.order_status in {"cancelled", "returned"}:
+        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
     rid = (request.POST.get("reservation_id") or "").strip()
     if not rid.isdigit():
         return JsonResponse({"ok": False, "error": "Geçersiz rezervasyon."}, status=400)
@@ -1179,6 +1309,8 @@ def order_pack_assign_item(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+    if order.order_status in {"cancelled", "returned"}:
+        return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
     item_id = (request.POST.get("item_id") or "").strip()
     if not item_id.isdigit():
         return JsonResponse({"ok": False, "error": "Geçersiz kalem."}, status=400)
@@ -1269,6 +1401,10 @@ def order_pack_complete(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if order.order_status in _SHIPPED_CLASS:
         return JsonResponse({"ok": False, "error": "Sipariş zaten gönderildi."}, status=400)
+    if order.order_status in {"cancelled", "returned"}:
+        # Also blocks the raw order_status='packaging' save below from
+        # reviving a terminal order outside the status funnel.
+        return JsonResponse({"ok": False, "error": "İptal edilmiş bir sipariş tekrar açılamaz."}, status=400)
     n = order.roll_reservations.filter(consumed=False).count()
     if n < 1:
         return JsonResponse({"ok": False,
@@ -1925,6 +2061,14 @@ class OrderEdit(UpdateView):
         if self.object.status == "completed":
             messages.error(request, "Completed orders cannot be edited.")
             return HttpResponseForbidden("You cannot edit a completed order.")
+        # Cancelled is TERMINAL (apply_order_status_change refuses any
+        # transition away from it); returned is locked the same way while
+        # in that status (it can only be revived through the status panel).
+        # Editing either would silently mutate items and re-trigger
+        # cari/catalog signals on a dead order.
+        if self.object.order_status in {"cancelled", "returned"}:
+            messages.error(request, "İptal edilmiş sipariş düzenlenemez.")
+            return redirect("operating:order_detail", pk=self.object.pk)
         # Once an order is shipped its rolls are already cut and its
         # reservations consumed. Editing items then would desync catalog
         # vs warehouse stock (the item signals adjust catalog while the
@@ -1937,14 +2081,29 @@ class OrderEdit(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         items = (self.object.items.all()
-                 .prefetch_related("roll_reservations__roll__product__warehouse"))
+                 .select_related("product", "product_variant")
+                 .prefetch_related(
+                     "roll_reservations__roll__product__warehouse",
+                     "product_variant__warehouse_products",
+                     "product_variant__product_variant_attribute_values",
+                 ))
         context["order_items"] = items
         # JSON-safe payload for the JS to hydrate order_data with.
         # Using a dedicated list keeps it parser-tolerant of any title
         # containing apostrophes, quotes, or newlines.
+        def _card_title(it):
+            title = (getattr(it.product, "title", "") or "").strip()
+            label = _order_item_variant_label(it)
+            if title and label:
+                return f"{title} — {label}"
+            return title or label or ""
         context["order_items_payload"] = [
             {
                 "item_id": it.pk,
+                # Human title for the product card header — the sidebar
+                # otherwise falls back to the (often auto-minted,
+                # meaningless) SKU and staff can't tell products apart.
+                "title": _card_title(it),
                 "sku": (
                     it.product_variant.variant_sku
                     if it.product_variant
@@ -1962,6 +2121,12 @@ class OrderEdit(UpdateView):
                 # would double-count the same physical length.
                 "rolls": [
                     {
+                        # reservation_id lets the edit sidebar RELEASE a
+                        # saved top explicitly (posts to
+                        # order_pack_reserve_remove) — an intentional
+                        # user action, not the silent auto-release that
+                        # was reverted earlier.
+                        "reservation_id": r.pk,
                         "barcode": r.roll.barcode or "" if r.roll else "",
                         "warehouse": (r.roll.product.warehouse.name
                                      if (r.roll and r.roll.product and r.roll.product.warehouse_id)
@@ -2426,8 +2591,11 @@ class OrderPackingList(View):
     def get(self, request, pk):
         order = get_object_or_404(Order, pk=pk)
         # Auto-create Pack #1 if none exist — order_pack_scan.html's
-        # "drag into a package" panel assumes at least one exists.
-        if not order.packs.exists():
+        # "drag into a package" panel assumes at least one exists. Never
+        # on a terminal (cancelled/returned) order, though: that would
+        # write a Pack as a GET side effect on a dead order.
+        if (not order.packs.exists()
+                and order.order_status not in {"cancelled", "returned"}):
             Pack.objects.create(order=order, pack_number=1)
         packs = list(order.packs.order_by("pack_number"))
         for p in packs:
@@ -2444,6 +2612,13 @@ class OrderPackingList(View):
 
     def post(self, request, pk):
         order = get_object_or_404(Order, pk=pk)
+        # Same server-side lock as the reserve/assign endpoints — this
+        # was previously only enforced by hiding the buttons in the UI,
+        # leaving the endpoint itself open on a shipped order.
+        if order.order_status in _SHIPPED_CLASS:
+            return JsonResponse({"ok": False, "error": "Sipariş gönderildi — paketleme kilitli."}, status=400)
+        if order.order_status in {"cancelled", "returned"}:
+            return JsonResponse({"ok": False, "error": "İptal edilmiş sipariş paketlenemez."}, status=400)
         action = (request.POST.get("action") or "").strip()
 
         if action == "add_pack":
@@ -2731,6 +2906,7 @@ def product_autocomplete(request):
                 | _fq("catalog_variant__variant_sku")
                 | _fq("catalog_variant__product__title"))
         .select_related("warehouse", "catalog_variant__product__category")
+        .prefetch_related("catalog_variant__product_variant_attribute_values")
         .order_by("name")[:60]
     )
     wh_groups = {}          # variant_id -> {"wp": first wp, "stocks": [(wh, qty)]}
@@ -2746,7 +2922,7 @@ def product_autocomplete(request):
         )
         .select_related("category")
         .distinct()
-        .prefetch_related("variants")[:12]
+        .prefetch_related("variants__product_variant_attribute_values")[:12]
     )
 
     def js_str(s):
@@ -2819,6 +2995,15 @@ def product_autocomplete(request):
             oversell_arg = "true" if allow_oversell else "false"
             attr_info = variant.attribute_summary() if hasattr(variant, 'attribute_summary') else ''
             attr_display = f' <span style="color:#6b7280;font-size:11px;">({escape(attr_info)})</span>' if attr_info else ''
+            # The picked item's card title must NAME the variant, not just
+            # the base product — "2086 — Beyaz", never a bare "2086".
+            vals = ", ".join(
+                v.product_variant_attribute_value
+                for v in variant.product_variant_attribute_values.all()
+                if v.product_variant_attribute_value
+            )
+            if vals:
+                title_js = js_str(f"{product.title} — {vals}" if product.title else vals)
             return (
                 f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
                 f"<span style='min-width:0;flex-grow:1;word-break:break-word;'>"
@@ -2853,10 +3038,31 @@ def product_autocomplete(request):
         wp = group["wp"]
         variant = wp.catalog_variant
         parent = variant.product
-        display_name = wp.name or parent.title or ""
-        title = escape(display_name)
+        display_name = (wp.name or parent.title or "").strip()
+        base_title = (parent.title or "").strip()
+        # Variant qualifier: the part of the warehouse name beyond the base
+        # title ("2086 ALTIN" → "ALTIN"), the whole warehouse name if it's
+        # unrelated to the base, else the variant's attribute values. The
+        # picked card then reads "2086 — ALTIN", never a bare "2086".
+        label = ""
+        if display_name and base_title and display_name.lower() != base_title.lower():
+            if display_name.lower().startswith(base_title.lower()):
+                label = display_name[len(base_title):].strip(" -–—·/")
+            else:
+                label = display_name
+        if not label:
+            label = ", ".join(
+                v.product_variant_attribute_value
+                for v in variant.product_variant_attribute_values.all()
+                if v.product_variant_attribute_value
+            )
+        if base_title and label:
+            full_title = f"{base_title} — {label}"
+        else:
+            full_title = display_name or base_title or label
+        title = escape(full_title)
         sku = escape(variant.variant_sku or "")
-        title_js = js_str(parent.title or display_name)
+        title_js = js_str(full_title)
         cat_js = js_str(parent.category.name if parent.category else "")
         allow_oversell = bool(getattr(parent, "selling_while_out_of_stock", False))
         price, is_cost = resolve_price(parent, variant)
@@ -2871,7 +3077,7 @@ def product_autocomplete(request):
             for wh, q in group["stocks"][:3]
         )
         hint = ""
-        if parent.title and (parent.title or "").strip().lower() != display_name.strip().lower():
+        if base_title and base_title.lower() not in full_title.lower():
             hint = f" <span style='color:#6b7280;font-size:11px;'>→ {escape(parent.title)}</span>"
         return (
             f"<li onclick=\"selectProduct('{sku}',true,'{title_js}',{price},'{cat_js}',{stock_arg},{oversell_arg},{cost_arg})\" style='display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
@@ -3824,6 +4030,8 @@ def update_order_status(request, order_id):
             if code == "insufficient_reservation":
                 from .views_warehouse import reservation_shortfall_message
                 return JsonResponse({'error': reservation_shortfall_message(order)}, status=400)
+            if code == "order_cancelled_terminal":
+                return JsonResponse({'error': 'İptal edilmiş bir sipariş tekrar açılamaz.'}, status=400)
             return JsonResponse({'error': 'Durum güncelleme hatası', 'details': (code or '').replace('error:', '')}, status=500)
 
         return JsonResponse({
@@ -4210,6 +4418,8 @@ class WebOrderStatusEdit(View):
             elif code == "insufficient_reservation":
                 from .views_warehouse import reservation_shortfall_message
                 messages.error(request, reservation_shortfall_message(order))
+            elif code == "order_cancelled_terminal":
+                messages.error(request, "İptal edilmiş bir sipariş tekrar açılamaz.")
             else:
                 messages.error(request, f"Sipariş güncellenemedi: {(code or '').replace('error:', '')}")
             next_url = request.POST.get('next') or request.GET.get('next')

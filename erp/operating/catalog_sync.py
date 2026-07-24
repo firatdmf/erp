@@ -275,9 +275,14 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
                    .filter(title__iexact=base_name, featured=False)
                    .order_by("id").first())
     if product is None:
+        # Default every warehouse-minted product's type to "fabric" (kumaş) —
+        # without it the invoice's "Ürün Tipi" column renders blank.
+        from marketing.models import ProductCategory
+        fabric = ProductCategory.objects.filter(name="fabric").first()
         product = Product.objects.create(
             title=base_name, sku=_safe_sku(base_name), featured=False,
             unit_of_measurement="mt", quantity=Decimal("0"),
+            category=fabric,
         )
         product_created = True
     else:

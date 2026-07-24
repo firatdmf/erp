@@ -409,9 +409,17 @@ class WarehouseList(View):
     template_name = "operating/warehouse_list.html"
 
     def get(self, request):
-        warehouses = Warehouse.objects.annotate(
+        warehouses = list(Warehouse.objects.annotate(
             n_products=Count('products'),
-        ).order_by('name')
+        ).prefetch_related('combined_sources').order_by('name'))
+        # Combined (ortak) warehouses own no products — their card shows
+        # the MEMBERS' variant count and member names instead.
+        for w in warehouses:
+            if w.is_combined:
+                w.member_list = sorted(w.combined_sources.all(),
+                                       key=lambda m: (m.name or '').lower())
+                w.n_products = WarehouseProduct.objects.filter(
+                    warehouse_id__in=[m.pk for m in w.member_list]).count()
         # "Son Hareketler" preview — the latest activity across every
         # warehouse, linking to the full filterable feed.
         recent = _decorate_movements(list(
@@ -434,15 +442,46 @@ def _get_book_choices():
         return []
 
 
+def _combined_form_ctx(warehouse=None):
+    """Shared context for the warehouse form: books + the normal warehouses
+    offered as members of a combined (ortak) warehouse."""
+    ctx = {
+        'warehouse': warehouse,
+        'books': _get_book_choices(),
+        'member_choices': Warehouse.objects.filter(kind='normal').order_by('name'),
+        'combined_selected': set(),
+    }
+    if warehouse is not None and warehouse.is_combined:
+        ctx['combined_selected'] = set(
+            warehouse.combined_sources.values_list('id', flat=True))
+    return ctx
+
+
+def _parse_combined_fields(request, *, exclude_pk=None):
+    """Read kind + member selection from the warehouse form POST.
+    Returns (kind, sources, error). Members must be NORMAL warehouses
+    (no combined-of-combined) and a combined warehouse needs ≥ 2."""
+    kind = (request.POST.get('kind') or 'normal').strip()
+    if kind not in ('normal', 'combined'):
+        kind = 'normal'
+    if kind != 'combined':
+        return 'normal', [], None
+    ids = [int(x) for x in request.POST.getlist('combined_sources') if str(x).isdigit()]
+    qs = Warehouse.objects.filter(pk__in=ids, kind='normal')
+    if exclude_pk:
+        qs = qs.exclude(pk=exclude_pk)
+    sources = list(qs)
+    if len(sources) < 2:
+        return kind, sources, "Ortak depo için en az iki normal depo seçin."
+    return kind, sources, None
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseCreate(View):
     template_name = "operating/warehouse_form.html"
 
     def get(self, request):
-        return render(request, self.template_name, {
-            'warehouse': None,
-            'books': _get_book_choices(),
-        })
+        return render(request, self.template_name, _combined_form_ctx())
 
     def post(self, request):
         name = (request.POST.get('name') or '').strip()
@@ -452,14 +491,15 @@ class WarehouseCreate(View):
 
         if not name:
             messages.error(request, "Name is required")
-            return render(request, self.template_name, {
-                'warehouse': None, 'books': _get_book_choices()
-            })
+            return render(request, self.template_name, _combined_form_ctx())
         if Warehouse.objects.filter(name__iexact=name).exists():
             messages.error(request, "A warehouse with this name already exists")
-            return render(request, self.template_name, {
-                'warehouse': None, 'books': _get_book_choices()
-            })
+            return render(request, self.template_name, _combined_form_ctx())
+
+        kind, sources, kind_err = _parse_combined_fields(request)
+        if kind_err:
+            messages.error(request, kind_err)
+            return render(request, self.template_name, _combined_form_ctx())
 
         book = None
         if book_id:
@@ -474,7 +514,10 @@ class WarehouseCreate(View):
             location=location or None,
             description=description or None,
             accounting_book=book,
+            kind=kind,
         )
+        if sources:
+            wh.combined_sources.set(sources)
         messages.success(request, f"Warehouse '{wh.name}' created")
         return redirect(reverse('operating:warehouse_detail', args=[wh.pk]))
 
@@ -538,10 +581,7 @@ class WarehouseEdit(View):
 
     def get(self, request, pk):
         warehouse = get_object_or_404(Warehouse, pk=pk)
-        return render(request, self.template_name, {
-            'warehouse': warehouse,
-            'books': _get_book_choices(),
-        })
+        return render(request, self.template_name, _combined_form_ctx(warehouse))
 
     def post(self, request, pk):
         warehouse = get_object_or_404(Warehouse, pk=pk)
@@ -552,20 +592,27 @@ class WarehouseEdit(View):
 
         if not name:
             messages.error(request, "Name is required")
-            return render(request, self.template_name, {
-                'warehouse': warehouse, 'books': _get_book_choices()
-            })
+            return render(request, self.template_name, _combined_form_ctx(warehouse))
 
         # Allow same name as own, but block conflict with others
         if Warehouse.objects.filter(name__iexact=name).exclude(pk=warehouse.pk).exists():
             messages.error(request, "Another warehouse with this name already exists")
-            return render(request, self.template_name, {
-                'warehouse': warehouse, 'books': _get_book_choices()
-            })
+            return render(request, self.template_name, _combined_form_ctx(warehouse))
+
+        kind, sources, kind_err = _parse_combined_fields(request, exclude_pk=warehouse.pk)
+        if kind_err:
+            messages.error(request, kind_err)
+            return render(request, self.template_name, _combined_form_ctx(warehouse))
+        # A normal warehouse that already HOLDS stock can't become a
+        # virtual one — its own products would silently disappear from view.
+        if kind == 'combined' and warehouse.kind == 'normal' and warehouse.products.exists():
+            messages.error(request, "İçinde ürün olan bir depo ortak depoya çevrilemez.")
+            return render(request, self.template_name, _combined_form_ctx(warehouse))
 
         warehouse.name = name
         warehouse.location = location or None
         warehouse.description = description or None
+        warehouse.kind = kind
 
         if book_id:
             try:
@@ -577,6 +624,7 @@ class WarehouseEdit(View):
             warehouse.accounting_book = None
 
         warehouse.save()
+        warehouse.combined_sources.set(sources if kind == 'combined' else [])
         messages.success(request, f"Warehouse '{warehouse.name}' updated")
         return redirect(reverse('operating:warehouse_detail', args=[warehouse.pk]))
 
@@ -670,7 +718,13 @@ class WarehouseDetail(View):
 
         base_expr = _warehouse_base_expr()
 
-        base_qs = WarehouseProduct.objects.filter(warehouse=warehouse)
+        # A combined (ortak) warehouse browses its MEMBERS' stock — every
+        # read below filters on scope_ids instead of warehouse=self.
+        scope_ids = warehouse.scope_ids()
+
+        base_qs = (WarehouseProduct.objects
+                   .filter(warehouse_id__in=scope_ids)
+                   .select_related('warehouse'))
         if search:
             # Case-insensitive across name / SKU / product-barcode AND each
             # roll's (top's) own barcode. We OR a few Turkish-aware cased
@@ -686,7 +740,7 @@ class WarehouseDetail(View):
                               (Q(**{f"{field}__icontains": v}) for v in variants))
 
             roll_match = (WarehouseProductRoll.objects
-                          .filter(product__warehouse=warehouse)
+                          .filter(product__warehouse_id__in=scope_ids)
                           .filter(_field_q("barcode"))
                           .values('product_id'))
             base_qs = base_qs.filter(
@@ -835,13 +889,13 @@ class WarehouseDetail(View):
         if is_htmx:
             if search:
                 # The pagination footer shows "filtered from N total".
-                ctx['product_count'] = WarehouseProduct.objects.filter(warehouse=warehouse).count()
+                ctx['product_count'] = WarehouseProduct.objects.filter(warehouse_id__in=scope_ids).count()
             return render(request, "operating/partials/warehouse_product_table_body.html", ctx)
 
         # Aggregate totals across the whole warehouse (independent of
         # filter) — full page load only. Net-worth mirrors the per-product
         # purchase_price fallback, computed as ONE SQL aggregate.
-        all_products = WarehouseProduct.objects.filter(warehouse=warehouse)
+        all_products = WarehouseProduct.objects.filter(warehouse_id__in=scope_ids)
         counts = all_products.aggregate(
             n=Count('id'),
             qty=Coalesce(Sum('quantity'), Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2)),
@@ -849,14 +903,15 @@ class WarehouseDetail(View):
         # Header counts: main products (packages), variants, and rolls (tops).
         group_count = (all_products.annotate(base=base_expr)
                        .values('base').distinct().count())
-        roll_count = WarehouseProductRoll.objects.filter(product__warehouse=warehouse).count()
+        roll_count = WarehouseProductRoll.objects.filter(product__warehouse_id__in=scope_ids).count()
         total_value_usd, total_value_try = warehouse.total_values()
 
         # "Son Hareketler" preview — the latest activity in THIS warehouse
-        # (all products), linking to the full filterable ledger.
+        # (all products; members' products for a combined view), linking to
+        # the full filterable ledger.
         recent_movements = _decorate_movements(list(
             StockMovement.objects
-            .filter(product__warehouse=warehouse)
+            .filter(product__warehouse_id__in=scope_ids)
             .select_related("product", "created_by")
             .order_by("-created_at")[:6]
         ))
@@ -872,8 +927,12 @@ class WarehouseDetail(View):
             'is_admin': _is_admin(request.user),
             'suppliers': _supplier_choices(),   # manual-add dropdown
             'product_categories': _product_category_choices(),  # manual-add "Ürün Türü"
-            'dup_count': _warehouse_dup_sku_count(warehouse),  # duplicate-SKU variant groups
+            # Dup scan is a MERGE tool — merging across two real warehouses
+            # from a virtual view would move stock; disabled there.
+            'dup_count': 0 if warehouse.is_combined else _warehouse_dup_sku_count(warehouse),
             'total_quantity': counts['qty'],
+            'combined_members': (list(warehouse.combined_sources.order_by('name'))
+                                 if warehouse.is_combined else []),
         })
         return render(request, self.template_name, ctx)
 
@@ -892,8 +951,8 @@ def warehouse_group_variants(request, pk):
 
     base_expr = _warehouse_base_expr()
     CAP = 400
-    qs = (WarehouseProduct.objects.filter(warehouse=warehouse)
-          .select_related("catalog_variant__product")
+    qs = (WarehouseProduct.objects.filter(warehouse_id__in=warehouse.scope_ids())
+          .select_related("catalog_variant__product", "warehouse")
           .annotate(base=base_expr, roll_count=Count("rolls"),
                     line_usd=F("quantity") * F("cost_usd"),
                     line_try=F("quantity") * F("cost_try"),
@@ -933,11 +992,15 @@ def warehouse_barcode_lookup(request, pk):
     if not code:
         return JsonResponse({"found": False, "error": "No barcode"}, status=400)
 
+    # A combined (ortak) warehouse counts a roll as "here" when it sits in
+    # ANY of its member warehouses.
+    scope_ids = warehouse.scope_ids()
+
     matched = None
     product = None
     roll = (WarehouseProductRoll.objects
             .select_related("product", "product__catalog_variant__product")
-            .filter(product__warehouse=warehouse, barcode__iexact=code)
+            .filter(product__warehouse_id__in=scope_ids, barcode__iexact=code)
             .first())
     if roll:
         product = roll.product
@@ -946,12 +1009,32 @@ def warehouse_barcode_lookup(request, pk):
         # The barcode may be a real top received into a DIFFERENT
         # warehouse — that wins over any same-product fallback here, and
         # offers a one-click move so staff don't re-add it as brand-new
-        # stock (a silent duplicate).
+        # stock (a silent duplicate). No move INTO a combined warehouse —
+        # it's virtual; goods must land in one of its members.
         other_roll = (WarehouseProductRoll.objects
                       .select_related("product", "product__warehouse")
-                      .exclude(product__warehouse=warehouse)
+                      .exclude(product__warehouse_id__in=scope_ids)
                       .filter(barcode__iexact=code)
                       .first())
+        if other_roll and warehouse.is_combined:
+            op = other_roll.product
+            return JsonResponse({
+                "found": False,
+                "found_elsewhere": True,
+                "barcode": code,
+                "other_warehouse": {"id": op.warehouse_id, "name": op.warehouse.name},
+                "product": {
+                    "id": op.pk, "sku": op.sku, "name": op.name,
+                    "quantity": float(op.quantity or 0),
+                },
+                "roll": {
+                    "id": other_roll.pk, "barcode": other_roll.barcode,
+                    "meters": float(other_roll.meters or 0),
+                    "meters_remaining": (float(other_roll.meters_remaining)
+                                          if other_roll.meters_remaining is not None else None),
+                    "lot_number": other_roll.lot_number,
+                },
+            })
         if other_roll:
             op = other_roll.product
             return JsonResponse({
@@ -974,10 +1057,10 @@ def warehouse_barcode_lookup(request, pk):
                                     args=[warehouse.pk, other_roll.pk]),
             })
         # No roll anywhere — fall back to a product-level barcode/SKU
-        # match within THIS warehouse.
+        # match within THIS warehouse (members, for a combined view).
         product = (WarehouseProduct.objects
                    .select_related("catalog_variant__product")
-                   .filter(warehouse=warehouse)
+                   .filter(warehouse_id__in=scope_ids)
                    .filter(Q(barcode__iexact=code) | Q(sku__iexact=code))
                    .first())
         matched = ("sku" if (product and (product.sku or "").lower() == code.lower())
@@ -997,8 +1080,10 @@ def warehouse_barcode_lookup(request, pk):
             "name": product.name,
             "quantity": float(product.quantity or 0),
             "rolls_count": product.rolls.count(),
+            # Always the product's OWN warehouse — from a combined view the
+            # match lives in a member, and the detail route 404s otherwise.
             "detail_url": reverse("operating:warehouse_product_detail",
-                                  args=[warehouse.pk, product.pk]),
+                                  args=[product.warehouse_id, product.pk]),
             "main_product": (main.title if main else None),
             "main_product_url": (reverse("marketing:product_detail", args=[main.pk]) if main else None),
         },
@@ -1031,6 +1116,10 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         return JsonResponse({"success": False, "error": "POST required."}, status=405)
 
     target_warehouse = get_object_or_404(Warehouse, pk=pk)
+    if target_warehouse.is_combined:
+        # Virtual warehouse — physical goods must land in a member.
+        return JsonResponse({"success": False,
+                             "error": "Ortak depo sanaldır — top ancak üye depolardan birine taşınabilir."}, status=400)
     roll = get_object_or_404(
         WarehouseProductRoll.objects.select_related("product", "product__warehouse"),
         pk=roll_pk,
@@ -1373,6 +1462,10 @@ class WarehouseManualAdd(View):
         from marketing.models import Product as _Prod
 
         warehouse = get_object_or_404(Warehouse, pk=pk)
+        if warehouse.is_combined:
+            # Virtual view — receiving goods must target a real member depot.
+            return JsonResponse({"success": False,
+                                 "error": "Ortak depo sanaldır — ürün girişi üye depolardan birine yapılmalı."}, status=400)
         try:
             data = json.loads((request.body or b"").decode("utf-8") or "{}")
         except (ValueError, UnicodeDecodeError):
@@ -1857,6 +1950,10 @@ class WarehousePurchaseEdit(View):
         from marketing.models import Product as _Prod
 
         warehouse = get_object_or_404(Warehouse, pk=pk)
+        if warehouse.is_combined:
+            # Virtual view — receiving goods must target a real member depot.
+            return JsonResponse({"success": False,
+                                 "error": "Ortak depo sanaldır — ürün girişi üye depolardan birine yapılmalı."}, status=400)
         try:
             data = json.loads((request.body or b"").decode("utf-8") or "{}")
         except (ValueError, UnicodeDecodeError):

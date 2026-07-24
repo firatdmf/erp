@@ -965,9 +965,24 @@ class WorkStation(models.Model):
 
 
 class Warehouse(models.Model):
+    KIND_CHOICES = [
+        ("normal", "Normal"),
+        ("combined", "Ortak (birleşik)"),
+    ]
+
     name = models.CharField(max_length=150, unique=True)
     location = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    # "combined" = a VIRTUAL warehouse that merges other warehouses into
+    # one browsing/search view (e.g. Laleli Store + Factory Solids). It
+    # holds no products of its own — its detail page reads the members'
+    # stock — and intake/mutation flows are blocked on it.
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES,
+                            default="normal", db_index=True)
+    combined_sources = models.ManyToManyField(
+        "self", symmetrical=False, blank=True, related_name="combined_views",
+        help_text="Member warehouses this combined (ortak) warehouse merges",
+    )
     # Optional link to an accounting Book — warehouse net worth contributes to this book
     accounting_book = models.ForeignKey(
         'accounting.Book',
@@ -982,6 +997,19 @@ class Warehouse(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_combined(self):
+        return self.kind == "combined"
+
+    def scope_ids(self):
+        """Warehouse ids whose stock this warehouse SHOWS: its members for
+        a combined (ortak) warehouse, else just itself. Every read path on
+        the detail page filters on this instead of warehouse=self."""
+        if self.is_combined:
+            ids = list(self.combined_sources.values_list("id", flat=True))
+            return ids or [self.pk]
+        return [self.pk]
 
     def _total_value_annotations(self):
         """SQL expressions mirroring WarehouseProduct.unit_cost_usd/try's
@@ -1015,13 +1043,15 @@ class Warehouse(models.Model):
         return unit_usd, unit_try
 
     def total_values(self):
-        """(usd, try) rollups in a single aggregate query."""
+        """(usd, try) rollups in a single aggregate query. A combined
+        (ortak) warehouse rolls up its MEMBERS' stock — it owns none."""
         from decimal import Decimal
         from django.db.models import Sum, F, DecimalField
         from django.db.models.functions import Coalesce
         unit_usd, unit_try = self._total_value_annotations()
         _dec = DecimalField(max_digits=20, decimal_places=4)
-        agg = self.products.aggregate(
+        qs = WarehouseProduct.objects.filter(warehouse_id__in=self.scope_ids())
+        agg = qs.aggregate(
             usd=Coalesce(Sum(F("quantity") * unit_usd, output_field=_dec), Decimal("0"), output_field=_dec),
             trl=Coalesce(Sum(F("quantity") * unit_try, output_field=_dec), Decimal("0"), output_field=_dec),
         )

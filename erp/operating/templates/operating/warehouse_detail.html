@@ -1137,12 +1137,31 @@
     <div>
       <div class="od-head-row">
         <h1 class="od-title">{{ warehouse.name }}</h1>
+        {% if warehouse.is_combined %}
+          <span class="od-chip" style="background:#EDE9FE;color:#5B21B6;border:1px solid #DDD6FE;"
+                title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Sanal görünüm — üye depoların stoğunu tek listede gösterir{% else %}Virtual view — shows the member warehouses' stock as one{% endif %}">
+            <i class="fa fa-layer-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Ortak Depo{% else %}Combined{% endif %}
+          </span>
+        {% endif %}
         {% if warehouse.accounting_book %}
           <span class="od-chip teal">
             <i class="fa fa-book"></i>{{ warehouse.accounting_book.name }}
           </span>
         {% endif %}
       </div>
+      {% if warehouse.is_combined and combined_members %}
+      <div style="margin:4px 0 2px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+        <span style="font:600 11.5px var(--font-sans,sans-serif); color:#64748B;">
+          {% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilen depolar:{% else %}Merged warehouses:{% endif %}
+        </span>
+        {% for m in combined_members %}
+        <a href="{% url 'operating:warehouse_detail' m.pk %}"
+           style="font:700 11.5px var(--font-sans,sans-serif); color:#0F766E; background:#E9F5F3; border:1px solid rgba(20,127,116,0.25); padding:2px 9px; border-radius:999px; text-decoration:none;">
+          {{ m.name }}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% trans "No location" as no_location %}
       <div class="od-meta">
         <span>
@@ -1181,9 +1200,11 @@
         <i class="fa fa-object-group"></i>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Tekrarları birleştir{% else %}Merge duplicates{% endif %} ({{ dup_count }})
       </button>
       {% endif %}
+      {% if not warehouse.is_combined %}
       <button type="button" class="ord-btn" style="background:linear-gradient(180deg,#C9A75A,#A9852F);color:#fff;border:1px solid #8A6B22;box-shadow:0 1px 2px rgba(15,23,31,0.10),inset 0 1px 0 rgba(255,255,255,0.18);" onclick="openNewProduct()">
         <i class="fa fa-plus"></i>{% trans "New product" %}
       </button>
+      {% endif %}
       {% comment %}Scan roll button hidden for now. Scanner modal, JS and endpoint stay in place; re-enable by uncommenting.{% endcomment %}
       {% if False %}
       <button type="button" class="ord-btn primary" onclick="openRollScanner()">
@@ -1193,9 +1214,11 @@
       <button type="button" class="ord-btn" style="background:#E9F5F3;color:#0F766E;border:1px solid rgba(20,127,116,0.28);" onclick="openBarcodeLookup()">
         <i class="fa fa-barcode"></i>{% trans "Find by barcode" %}
       </button>
+      {% if not warehouse.is_combined %}
       <button type="button" class="ord-btn ghost" onclick="document.getElementById('whImportModal').classList.add('show')">
         <i class="fa fa-file-import"></i>{% trans "Sync Products" %}
       </button>
+      {% endif %}
       <a href="{% url 'operating:warehouse_edit' warehouse.pk %}" class="ord-btn ghost">
         <i class="fa fa-edit"></i>{% trans "Edit" %}
       </a>

@@ -267,6 +267,30 @@
           hx-target="#co-product-results" hx-swap="innerHTML" name="product" autocomplete="off">
       </div>
       <div id="co-product-results" class="co-autocomplete-results"></div>
+
+      {% comment %}Global "barkodla top ekle" — scan/type a roll barcode
+      with NO product selected: the endpoint resolves the top's product
+      and the form adds the line + ticks that top automatically.{% endcomment %}
+      <div class="form-group" style="margin-top:2px;">
+        <label style="display:flex;align-items:center;gap:6px;">
+          <i class="fas fa-barcode" style="color:#0F766E;"></i>
+          {% trans "Barkodla top ekle" %}
+          <span style="font-weight:500;color:#94A3B8;font-size:10.5px;">({% trans "ürün seçmeden — ürünü otomatik bulur" %})</span>
+        </label>
+        <div style="display:flex;gap:6px;">
+          <div style="position:relative;flex:1;">
+            <input type="text" id="co-global-bc" class="form-input" style="padding-right:34px;"
+                   placeholder="{% trans 'Top barkodu okutun veya yazın' %}" autocomplete="off"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault(); coScanAdd();}">
+            <button type="button" onclick="coOpenRollCamera('global')" title="{% trans 'Kamerayla okut' %}"
+                    style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:0;color:#0F766E;cursor:pointer;padding:6px;font-size:15px;line-height:1;">
+              <i class="fas fa-camera"></i>
+            </button>
+          </div>
+          <button type="button" class="ord-btn" style="white-space:nowrap;" onclick="coScanAdd()">{% trans "Ekle" %}</button>
+        </div>
+      </div>
+
       <div id="co-products-list"></div>
       <input type="hidden" id="product_json_input" name="product_json_input">
 
@@ -390,8 +414,14 @@
 
   // ── Edit-mode hydration: prefill the orderItems array from the
   //    server payload so existing line items render and the user
-  //    can add/remove/edit on top of them. ──
-  var editPayloadNode = document.getElementById('existing-order-items');
+  //    can add/remove/edit on top of them. Scoped to THIS form's own
+  //    sidebar container: the create and edit sidebars load the same
+  //    partial, and a document-wide getElementById could pick up the
+  //    OTHER (stale, hidden) sidebar's hydration payload — which made
+  //    a fresh "new order" form open pre-filled with the last edited
+  //    order's items. ──
+  var _coScopeRoot = (document.currentScript && document.currentScript.closest('.sidebar-content')) || document;
+  var editPayloadNode = _coScopeRoot.querySelector('#existing-order-items');
   var editHydratedItems = [];
   if (editPayloadNode) {
     try {
@@ -809,6 +839,34 @@
     '</div>';
   }
 
+  // ── Global "barkodla top ekle": resolve the barcode to its product,
+  //    add/reuse the order line, then run the normal pick flow so the
+  //    scanned top lands ticked on the right card. ──
+  window.coScanAddByBarcode = function (barcode) {
+    barcode = (barcode || '').trim();
+    if (!barcode) return;
+    fetch('{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(barcode))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { showToast(d.error || 'Barkod bulunamadı', 'error'); return; }
+        var skuL = (d.sku || '').toLowerCase();
+        var idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
+        if (idx === -1) {
+          selectProduct(d.sku, true, d.title, d.price, '', null, false, d.is_cost);
+          idx = orderItems.findIndex(function (it) { return (it.sku || '').toLowerCase() === skuL; });
+        }
+        if (idx === -1) { showToast('Ürün eklenemedi', 'error'); return; }
+        coAddRoll(idx, barcode);
+        var el = document.getElementById('co-global-bc');
+        if (el) { el.value = ''; el.focus(); }
+      })
+      .catch(function () { showToast('Barkod kontrol edilemedi', 'error'); });
+  };
+  window.coScanAdd = function () {
+    var el = document.getElementById('co-global-bc');
+    coScanAddByBarcode(el ? el.value : '');
+  };
+
   window.coAddRoll = function (i, barcodeOverride) {
     var item = orderItems[i];
     if (!item) return;
@@ -1005,7 +1063,8 @@
       camDebounce = { val: code, t: now };
       beep();
       if (hitEl) hitEl.textContent = code;
-      if (camTargetIndex != null) window.coAddRoll(camTargetIndex, code);
+      if (camTargetIndex === 'global') window.coScanAddByBarcode(code);
+      else if (camTargetIndex != null) window.coAddRoll(camTargetIndex, code);
     }
     function camLoop() {
       if (!camRunning) return;

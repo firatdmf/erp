@@ -1357,6 +1357,78 @@ def order_create_barcode_check(request):
 
 
 @login_required
+def order_create_barcode_resolve(request):
+    """Resolve a scanned roll barcode with NO pre-selected product — the
+    order-create/edit form's global "barkodla top ekle" bar. Finds the
+    physical top, and returns everything the form needs to mint the order
+    line itself: the variant SKU, a variant-labeled title ("2086 — ALTIN
+    A.BEYAZ", same rule as the product autocomplete), the sale price (or
+    flagged purchase cost), and the roll's availability. Read-only —
+    reserves nothing; the form then runs the normal pick flow."""
+    code = (request.GET.get("barcode") or "").strip()
+    if not code:
+        return JsonResponse({"ok": False, "error": "Barkod eksik."}, status=400)
+    from .models import WarehouseProductRoll
+    roll = (WarehouseProductRoll.objects
+            .select_related("product__warehouse",
+                            "product__catalog_variant__product")
+            .filter(barcode__iexact=code, status__in=["in_stock", "partial"])
+            .first())
+    if roll is None:
+        return JsonResponse({"ok": False, "error": "Bu barkodla bir top bulunamadı."}, status=404)
+    avail = _roll_available_meters(roll)
+    if avail <= 0:
+        return _roll_unavailable_response(roll)
+
+    wp = roll.product
+    cv = wp.catalog_variant if wp.catalog_variant_id else None
+    parent = cv.product if cv else None
+    sku = ((cv.variant_sku if cv and cv.variant_sku else None) or wp.sku or "").strip()
+    if not sku:
+        return JsonResponse({"ok": False, "error": "Bu topun ürününde SKU yok — ürünü arayarak ekleyin."}, status=409)
+
+    base_title = ((parent.title if parent else "") or "").strip()
+    disp = (wp.name or "").strip()
+    label = ""
+    if disp and base_title and disp.lower() != base_title.lower():
+        if disp.lower().startswith(base_title.lower()):
+            label = disp[len(base_title):].strip(" -–—·/")
+        else:
+            label = disp
+    if not label and cv:
+        label = ", ".join(
+            v.product_variant_attribute_value
+            for v in cv.product_variant_attribute_values.all()
+            if v.product_variant_attribute_value
+        )
+    title = (f"{base_title} — {label}" if (base_title and label)
+             else (disp or base_title or sku))
+
+    price, is_cost = 0, False
+    sale = (cv.variant_price if cv else None) or (parent.price if parent else None)
+    if sale:
+        price = sale
+    else:
+        cost = (cv.variant_cost if cv else None) or (parent.cost if parent else None)
+        if cost:
+            price, is_cost = cost, True
+
+    return JsonResponse({
+        "ok": True,
+        "sku": sku,
+        "title": title,
+        "price": float(price or 0),
+        "is_cost": bool(is_cost),
+        "roll": {
+            "id": roll.pk,
+            "barcode": roll.barcode or "",
+            "available": float(avail),
+            "warehouse": (wp.warehouse.name if wp.warehouse_id else ""),
+        },
+    })
+
+
+@login_required
 def order_create_roll_list(request):
     """Browsable list of available rolls (tops) for a SKU — lets the
     order-create/edit product card offer a click-to-pick list instead

@@ -1,0 +1,57 @@
+{
+  "products": [
+    {
+      "id": 215,
+      "sku": "1021",
+      "title": "1021",
+      "price": "5.43",
+      "b2b_price": "2.50"
+    },
+    {
+      "id": 248,
+      "sku": "MT-4003",
+      "title": "MT-4003",
+      "price": null,
+      "b2b_price": "2.50"
+    },
+    {
+      "id": 1159,
+      "sku": "K24860T",
+      "title": "K24860T",
+      "price": null,
+      "b2b_price": "2.50"
+    }
+  ],
+  "variants": [
+    {
+      "id": 587,
+      "variant_sku": "KZL000347",
+      "variant_price": "5.43",
+      "variant_b2b_price": "2.50"
+    },
+    {
+      "id": 586,
+      "variant_sku": "KZL000348",
+      "variant_price": "5.43",
+      "variant_b2b_price": "2.50"
+    },
+    {
+      "id": 2074,
+      "variant_sku": "K24860T.G44",
+      "variant_price": "5.00",
+      "variant_b2b_price": "2.50"
+    },
+    {
+      "id": 2075,
+      "variant_sku": "N1380T.G31",
+      "variant_price": "7.00",
+      "variant_b2b_price": "3.50"
+    },
+    {
+      "id": 588,
+      "variant_sku": "KZL000350",
+      "variant_price": "5.43",
+      "variant_b2b_price": "2.50"
+    }
+  ]
+}

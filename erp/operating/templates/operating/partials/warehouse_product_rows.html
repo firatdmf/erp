@@ -1,10 +1,16 @@
 {% load i18n %}
 {% if view_mode == 'variants' %}
 {% for p in variants %}
+{% comment %}Row links use the product's OWN warehouse id — on a combined
+(ortak) warehouse page the rows come from MEMBER warehouses, and linking
+them under the combined pk would 404.{% endcomment %}
 <tr class="wh-vrow" style="cursor:pointer;"
-    onclick="window.location='{% url 'operating:warehouse_product_detail' warehouse.pk p.pk %}'">
+    onclick="window.location='{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}'">
   <td data-label="SKU">
     {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    {% if warehouse.is_combined %}
+      <span style="margin-left:6px; font:700 10px var(--font-sans,sans-serif); color:#5B21B6; background:#EDE9FE; border-radius:5px; padding:1px 6px; vertical-align:middle; white-space:nowrap;">{{ p.warehouse.name }}</span>
+    {% endif %}
     {% if p.catalog_variant_id and p.catalog_variant.product_id %}
       <a href="{% url 'marketing:product_detail' p.catalog_variant.product_id %}"
          onclick="event.stopPropagation();" target="_blank" rel="noopener"

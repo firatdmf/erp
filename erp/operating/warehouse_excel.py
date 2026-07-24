@@ -36,7 +36,9 @@ def _dt(v):
 
 
 def _filtered_products(warehouse, search, sort):
-    qs = WarehouseProduct.objects.filter(warehouse=warehouse)
+    # Combined (ortak) warehouses export their MEMBERS' stock.
+    scope_ids = warehouse.scope_ids()
+    qs = WarehouseProduct.objects.filter(warehouse_id__in=scope_ids)
     if search:
         from functools import reduce
         import operator
@@ -47,7 +49,7 @@ def _filtered_products(warehouse, search, sort):
                           (Q(**{f"{field}__icontains": v}) for v in variants))
 
         roll_match = (WarehouseProductRoll.objects
-                      .filter(product__warehouse=warehouse)
+                      .filter(product__warehouse_id__in=scope_ids)
                       .filter(_field_q("barcode"))
                       .values('product_id'))
         qs = qs.filter(

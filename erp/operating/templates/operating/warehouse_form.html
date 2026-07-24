@@ -201,6 +201,45 @@
         <label>{% trans "Location" %}</label>
         <input type="text" name="location" placeholder="{% trans 'Istanbul, Turkey' %}" value="{{ warehouse.location|default:'' }}">
       </div>
+
+      <div class="wh-form-field">
+        <label>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Depo Tipi{% else %}Warehouse type{% endif %}</label>
+        <div style="display:flex; gap:8px;">
+          <label style="flex:1; display:flex; align-items:center; gap:8px; padding:11px 14px; border:1.5px solid {% if warehouse.kind == 'combined' %}#e2e8f0{% else %}#6366f1{% endif %}; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; color:#0f172a; text-transform:none; letter-spacing:0;">
+            <input type="radio" name="kind" value="normal" {% if warehouse.kind != 'combined' %}checked{% endif %} onchange="whKindToggle()" style="width:auto; accent-color:#6366f1;">
+            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Normal{% else %}Normal{% endif %}
+          </label>
+          <label style="flex:1; display:flex; align-items:center; gap:8px; padding:11px 14px; border:1.5px solid {% if warehouse.kind == 'combined' %}#6366f1{% else %}#e2e8f0{% endif %}; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; color:#0f172a; text-transform:none; letter-spacing:0;">
+            <input type="radio" name="kind" value="combined" {% if warehouse.kind == 'combined' %}checked{% endif %} onchange="whKindToggle()" style="width:auto; accent-color:#6366f1;">
+            {% if LANGUAGE_CODE|slice:":2" == "tr" %}Ortak (birleşik){% else %}Combined{% endif %}
+          </label>
+        </div>
+        <div class="hint">
+          {% if LANGUAGE_CODE|slice:":2" == "tr" %}
+            Ortak depo, seçtiğiniz depoları TEK depo gibi gösteren sanal bir görünümdür — kendi stoğu olmaz, ürün girişi üye depolara yapılır.
+          {% else %}
+            A combined warehouse is a virtual view that shows the selected warehouses as ONE — it holds no stock of its own; goods are received into the members.
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="wh-form-field" id="wh-members-field" style="display:none;">
+        <label>{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilecek depolar{% else %}Warehouses to merge{% endif %} <span style="color:#ef4444;">*</span></label>
+        <div style="display:flex; flex-direction:column; gap:6px; border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px; max-height:220px; overflow:auto;">
+          {% for w in member_choices %}
+          <label style="display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:#0f172a; text-transform:none; letter-spacing:0; cursor:pointer;">
+            <input type="checkbox" name="combined_sources" value="{{ w.pk }}"
+                   {% if w.pk in combined_selected %}checked{% endif %}
+                   style="width:auto; accent-color:#6366f1;">
+            {{ w.name }}
+            {% if w.location %}<span style="color:#94a3b8; font-weight:500; font-size:12px;">— {{ w.location }}</span>{% endif %}
+          </label>
+          {% empty %}
+          <span style="color:#94a3b8; font-size:13px;">{% if LANGUAGE_CODE|slice:":2" == "tr" %}Birleştirilecek normal depo yok.{% else %}No normal warehouses to merge.{% endif %}</span>
+          {% endfor %}
+        </div>
+        <div class="hint">{% if LANGUAGE_CODE|slice:":2" == "tr" %}En az iki depo seçin (ör. Laleli Store + Factory Solids).{% else %}Pick at least two (e.g. Laleli Store + Factory Solids).{% endif %}</div>
+      </div>
       <div class="wh-form-field">
         <label>{% trans "Accounting book" %} <span style="color:#94a3b8; font-weight:500;">({% trans "optional" %})</span></label>
         <select name="accounting_book">
@@ -225,4 +264,13 @@
     </form>
   </div>
 </div>
+
+<script>
+  function whKindToggle() {
+    var combined = document.querySelector('input[name="kind"][value="combined"]');
+    var field = document.getElementById('wh-members-field');
+    if (field) field.style.display = (combined && combined.checked) ? '' : 'none';
+  }
+  whKindToggle();
+</script>
 {% endblock %}

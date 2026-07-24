@@ -1,9 +1,15 @@
 {
   "permissions": {
     "allow": [
-     "Bash",
+      "Bash",
       "Edit",
-      "Write"
+      "Write",
+      "Bash(cd \"/c/Users/enes3/erp/erp\" && tail -20 operating/templates/operating/order_detail.html && wc -l operating/templates/operating/order_detail.html)",
+      "Read(//c/Users/enes3/erp/erp/**)",
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
+      "Bash(cd \"/c/Users/enes3/erp/erp\" && grep -n \"order_pack_scan\" operating/templates/operating/order_packing_list.html)",
+      "Bash(cd \"/c/Users/enes3/erp/erp\" && grep -n \"get_current_language\\\\|LANGUAGE_CODE\" operating/templates/operating/order_packing_list.html | head -5)",
+      "Bash(cd \"/c/Users/enes3/erp/erp\" && head -5 operating/templates/operating/order_packing_list.html && grep -n \"i18n\\\\|USE_I18N\" erp/settings.py | head -3 && grep -n \"django.template.context_processors.i18n\" erp/settings.py)"
     ]
   }
 }

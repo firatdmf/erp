@@ -4732,6 +4732,14 @@
       function closeOrderSidebar() {
         document.getElementById('orderSidebarOverlay').classList.remove('active');
         document.body.style.overflow = '';
+        // Empty the container once the slide-out finishes. Stale form DOM
+        // left behind here shares element ids with the edit sidebar's copy
+        // of the same partial — whichever sits first in the document would
+        // hijack the other's getElementById calls.
+        setTimeout(function () {
+          var c = document.getElementById('orderSidebarContent');
+          if (c && !document.getElementById('orderSidebarOverlay').classList.contains('active')) c.innerHTML = '';
+        }, 300);
       }
 
       // Edit Order Sidebar — uses htmx.ajax (same as the Create
@@ -4774,6 +4782,15 @@
         const overlay = document.getElementById('editOrderSidebarOverlay');
         if (overlay) overlay.classList.remove('active');
         document.body.style.overflow = '';
+        // Empty the container once the slide-out finishes — leaving the
+        // edit form (and its #existing-order-items hydration payload) in
+        // the DOM made a subsequently opened CREATE sidebar hydrate with
+        // the edited order's items.
+        setTimeout(function () {
+          var c = document.getElementById('editOrderSidebarContent');
+          var ov = document.getElementById('editOrderSidebarOverlay');
+          if (c && ov && !ov.classList.contains('active')) c.innerHTML = '';
+        }, 300);
       }
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeEditOrderSidebar();

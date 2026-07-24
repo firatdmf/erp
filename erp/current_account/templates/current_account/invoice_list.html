@@ -184,60 +184,39 @@
       <h1 class="iv-title">{% trans "Invoices" %}</h1>
     </div>
     <div class="iv-head-r">
+      <button type="button" class="iv-btn ghost" onclick="ivOpenSettings()" title="{% trans 'Invoice Settings' %}">
+        <i data-lucide="settings"></i>{% trans "Invoice Settings" %}
+      </button>
       <a href="{% url 'current_account:invoice_create' %}" class="iv-btn primary"><i data-lucide="plus"></i>{% trans "New Invoice" %}</a>
     </div>
   </div>
 
-  <div class="iv-stats">
-    <div class="iv-stat">
-      <div class="iv-stat-l">{% trans "Filtered" %}</div>
-      <div class="iv-stat-v">{{ n|intcomma }}</div>
-      <div class="iv-stat-s">{% trans "Total invoices" %}</div>
-    </div>
-    <div class="iv-stat">
-      <div class="iv-stat-l">{% trans "Total Amount" %}</div>
-      <div class="iv-stat-v">{{ total_sum|floatformat:2|intcomma }}</div>
-      <div class="iv-stat-s">{% trans "Sum of invoice totals" %}</div>
-    </div>
-    <div class="iv-stat">
-      <div class="iv-stat-l">{% trans "Open Balance" %}</div>
-      <div class="iv-stat-v pos">{{ unpaid_sum|floatformat:2|intcomma }}</div>
-      <div class="iv-stat-s">{% trans "Unpaid balance" %}</div>
-    </div>
-  </div>
-
   <form method="get" id="iv-filter-form">
-    {# preserve other filters when clicking status tabs #}
-    {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
-    {% if filter_type %}<input type="hidden" name="type" value="{{ filter_type }}">{% endif %}
+    <input type="hidden" name="status" id="iv-status-input" value="{{ filter_status }}">
     {% if filter_book %}<input type="hidden" name="book" value="{{ filter_book }}">{% endif %}
-    {% if date_from %}<input type="hidden" name="date_from" value="{{ date_from }}">{% endif %}
-    {% if date_to %}<input type="hidden" name="date_to" value="{{ date_to }}">{% endif %}
+    {% if filter_cari %}<input type="hidden" name="cari" value="{{ filter_cari }}">{% endif %}
 
     <div class="iv-tabs">
-      <a href="?{% if q %}q={{ q }}&{% endif %}{% if filter_type %}type={{ filter_type }}&{% endif %}{% if filter_book %}book={{ filter_book }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}" class="iv-tab {% if not filter_status %}active{% endif %}">
+      <button type="button" data-status="" class="iv-tab {% if not filter_status %}active{% endif %}">
         <i data-lucide="file-text"></i>
         <span>{% trans "All" %}</span>
-      </a>
+      </button>
       {% for val, label in status_choices %}
-        <a href="?status={{ val }}{% if q %}&q={{ q }}{% endif %}{% if filter_type %}&type={{ filter_type }}{% endif %}{% if filter_book %}&book={{ filter_book }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="iv-tab {% if filter_status == val %}active{% endif %}">
+        <button type="button" data-status="{{ val }}" class="iv-tab {% if filter_status == val %}active{% endif %}">
           <i data-lucide="{% if val == 'draft' %}edit-3{% elif val == 'issued' %}send{% elif val == 'partially_paid' %}clock{% elif val == 'paid' %}check-circle{% elif val == 'overdue' %}alert-triangle{% else %}x-circle{% endif %}"></i>
           <span>{{ label }}</span>
-        </a>
+        </button>
       {% endfor %}
       <div class="iv-tabs-r">
-        <input name="q" value="{{ q }}" class="iv-search-input" type="text"
-               placeholder="{% trans 'Search: invoice no, account, note…' %}"
-               onkeydown="if(event.key==='Enter'){this.form.submit();}">
+        <input name="q" value="{{ q }}" class="iv-search-input" id="iv-search-input" type="text"
+               placeholder="{% trans 'Search: invoice no, account, note…' %}" autocomplete="off">
       </div>
     </div>
 
     <div class="iv-toolbar">
-      {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
-
       <label class="iv-ctl" title="{% trans 'Type' %}">
         <span class="iv-ctl-lbl">{% trans "Type" %}</span>
-        <select name="type" onchange="this.form.submit()">
+        <select name="type">
           <option value="">{% trans "All" %}</option>
           {% for v,l in type_choices %}<option value="{{ v }}" {% if filter_type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
         </select>
@@ -245,81 +224,120 @@
 
       <label class="iv-ctl" title="{% trans 'From' %}">
         <span class="iv-ctl-lbl">{% trans "From" %}</span>
-        <input type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()">
+        <input type="date" name="date_from" value="{{ date_from }}">
       </label>
 
       <label class="iv-ctl" title="{% trans 'To' %}">
         <span class="iv-ctl-lbl">{% trans "To" %}</span>
-        <input type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()">
+        <input type="date" name="date_to" value="{{ date_to }}">
       </label>
 
-      <a class="iv-reset" href="{% url 'current_account:invoice_list' %}">{% trans "Clear" %}</a>
+      <a class="iv-reset" href="{% url 'current_account:invoice_list' %}" id="iv-clear">{% trans "Clear" %}</a>
     </div>
   </form>
 
-  <div class="iv-meta">
-    <div class="iv-result"><b>{{ n|intcomma }}</b> {% trans "invoices" %}</div>
+  <div id="iv-results">
+    {% include "current_account/partials/invoice_list_results.html" %}
   </div>
+</div>
 
-  {% if invoices %}
-  <div class="iv-list">
-    <table class="iv-tbl">
-      <thead>
-        <tr>
-          <th>{% trans "Invoice No" %}</th>
-          <th>{% trans "Date" %}</th>
-          <th>{% trans "Due Date" %}</th>
-          <th>{% trans "Type" %}</th>
-          <th>{% trans "Account" %}</th>
-          <th>{% trans "Status" %}</th>
-          <th class="num">{% trans "Total" %}</th>
-          <th class="num">{% trans "Balance" %}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for inv in invoices %}
-        <tr>
-          <td><a class="iv-num" href="{% url 'current_account:invoice_detail' inv.pk %}">{{ inv.series }}-{{ inv.number }}</a></td>
-          <td><span class="iv-date">{{ inv.date|date:"d.m.Y" }}</span></td>
-          <td><span class="iv-date">{{ inv.due_date|date:"d.m.Y" }}</span></td>
-          <td><span class="iv-type">{{ inv.get_type_display }}</span></td>
-          <td>
-            <div class="iv-cari-w">
-              <a class="iv-cari" href="{% url 'current_account:cari_detail' inv.cari.pk %}">{{ inv.cari.name }}</a>
-              <span class="iv-cari-code">{{ inv.cari.code }}</span>
-            </div>
-          </td>
-          <td>
-            <span class="iv-badge
-              {% if inv.status == 'draft' %}draft
-              {% elif inv.status == 'issued' %}issued
-              {% elif inv.status == 'partially_paid' %}partial
-              {% elif inv.status == 'paid' %}paid
-              {% elif inv.status == 'overdue' %}overdue
-              {% else %}cancelled{% endif %}">
-              <span class="iv-badge-dot"></span>{{ inv.get_status_display }}
-            </span>
-          </td>
-          <td class="num">{{ inv.currency.symbol }}{{ inv.total|floatformat:2|intcomma }}</td>
-          <td class="num {% if inv.balance > 0 %}pos{% elif inv.balance < 0 %}neg{% else %}zero{% endif %}">
-            {{ inv.currency.symbol }}{{ inv.balance|floatformat:2|intcomma }}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<!-- Fatura Ayarları — document language (fatura dili) modal -->
+<div id="iv-settings-overlay" style="display:none; position:fixed; inset:0; z-index:1300; background:rgba(15,23,31,.45); align-items:center; justify-content:center;" onclick="if(event.target===this)ivCloseSettings()">
+  <div style="background:#fff; border-radius:14px; width:min(420px, calc(100vw - 32px)); padding:22px 22px 18px; box-shadow:0 20px 50px rgba(15,23,31,.25);">
+    <h3 style="margin:0 0 4px; font:700 16px var(--font-sans);">{% trans "Invoice Settings" %}</h3>
+    <p style="margin:0 0 14px; font:400 12.5px var(--font-sans); color:var(--gray-600);">
+      {% trans "Language of the printable invoice document. English is the default; choose Türkçe to print invoices with Turkish labels." %}
+    </p>
+    <form method="post" action="{% url 'current_account:invoice_settings' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <label style="display:block; font:600 12px var(--font-sans); color:var(--gray-700); margin-bottom:6px;">{% trans "Invoice language" %}</label>
+      <select name="invoice_language" class="form-input" style="width:100%; padding:9px 12px; border:1px solid var(--border-color, #E2E8F0); border-radius:8px; font:500 13.5px var(--font-sans);">
+        <option value="en" {% if invoice_language == "en" %}selected{% endif %}>English</option>
+        <option value="tr" {% if invoice_language == "tr" %}selected{% endif %}>Türkçe</option>
+      </select>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button type="button" class="iv-btn ghost" onclick="ivCloseSettings()">{% trans "Close" %}</button>
+        <button type="submit" class="iv-btn primary">{% trans "Save" %}</button>
+      </div>
+    </form>
   </div>
-  {% else %}
-  <div class="iv-empty">
-    <div class="ico"><i data-lucide="file-text"></i></div>
-    <h3>{% trans "No invoices" %}</h3>
-    <p>{% trans "Adjust filters or create a new invoice." %}</p>
-    <a href="{% url 'current_account:invoice_create' %}" class="iv-btn primary"><i data-lucide="plus"></i>{% trans "New Invoice" %}</a>
-  </div>
-  {% endif %}
 </div>
 
 <script>
   if (window.lucide) lucide.createIcons();
+
+  function ivOpenSettings() {
+    var ov = document.getElementById('iv-settings-overlay');
+    ov.style.display = 'flex';
+  }
+  function ivCloseSettings() {
+    document.getElementById('iv-settings-overlay').style.display = 'none';
+  }
+
+  /* Live search/filter — mirrors the cari list: debounce the box, fetch
+     with X-Requested-With, swap only #iv-results, keep the URL shareable
+     via replaceState, and drop stale responses with a request token. */
+  (function () {
+    var form = document.getElementById('iv-filter-form');
+    var results = document.getElementById('iv-results');
+    var input = document.getElementById('iv-search-input');
+    if (!form || !results) return;
+    var reqToken = 0, debTimer = null;
+
+    function ivFetch() {
+      var token = ++reqToken;
+      var params = new URLSearchParams(new FormData(form));
+      Array.from(params.keys()).forEach(function (k) {
+        if (!params.get(k)) params.delete(k);
+      });
+      var url = location.pathname + (params.toString() ? '?' + params.toString() : '');
+      results.style.opacity = '0.45';
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          if (token !== reqToken) return;
+          results.innerHTML = html;
+          results.style.opacity = '';
+          history.replaceState(null, '', url);
+          if (window.lucide) lucide.createIcons();
+        })
+        .catch(function () { results.style.opacity = ''; });
+    }
+
+    if (input) {
+      input.addEventListener('input', function () {
+        clearTimeout(debTimer);
+        debTimer = setTimeout(ivFetch, 300);
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(debTimer); ivFetch(); }
+      });
+    }
+    form.addEventListener('submit', function (e) { e.preventDefault(); ivFetch(); });
+    form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
+      el.addEventListener('change', ivFetch);
+    });
+    form.querySelectorAll('.iv-tab[data-status]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.getElementById('iv-status-input').value = btn.getAttribute('data-status') || '';
+        form.querySelectorAll('.iv-tab').forEach(function (b) { b.classList.toggle('active', b === btn); });
+        ivFetch();
+      });
+    });
+    var clear = document.getElementById('iv-clear');
+    if (clear) {
+      clear.addEventListener('click', function (e) {
+        e.preventDefault();
+        // form.reset() would restore the server-rendered values — blank
+        // every control explicitly instead.
+        if (input) input.value = '';
+        document.getElementById('iv-status-input').value = '';
+        form.querySelectorAll('select, input[type="date"]').forEach(function (el) { el.value = ''; });
+        form.querySelectorAll('.iv-tab').forEach(function (b, i) { b.classList.toggle('active', i === 0); });
+        ivFetch();
+      });
+    }
+  })();
 </script>
 {% endblock %}

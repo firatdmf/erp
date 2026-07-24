@@ -2145,7 +2145,7 @@ msgid "Completed"
 msgstr "Tamamlandı"
 
 msgid "Cancelled"
-msgstr "İptal"
+msgstr "İptal Edildi"
 
 msgid "Open"
 msgstr "Açık"
@@ -7534,7 +7534,7 @@ msgid "Add another task"
 msgstr "Başka bir görev ekle"
 
 msgid "Amount to be Paid"
-msgstr ""
+msgstr "Ödenecek Tutar"
 
 msgid "Attach notes"
 msgstr "Not ekle"
@@ -7543,37 +7543,37 @@ msgid "Attach tasks"
 msgstr "Görev ekle"
 
 msgid "Consignee"
-msgstr ""
+msgstr "Alıcı"
 
 msgid "Currency is required."
 msgstr ""
 
 msgid "Design ID"
-msgstr ""
+msgstr "Desen No"
 
 msgid "Domestic"
-msgstr ""
+msgstr "Yurt İçi"
 
 msgid "Excel"
 msgstr ""
 
 msgid "Invoice Date"
-msgstr ""
+msgstr "Fatura Tarihi"
 
 msgid "Invoice Number"
-msgstr ""
+msgstr "Fatura No"
 
 msgid "Invoice Type"
-msgstr ""
+msgstr "Fatura Tipi"
 
 msgid "Line"
-msgstr ""
+msgstr "Satır"
 
 msgid "Open current account"
 msgstr ""
 
 msgid "Payment Due Date"
-msgstr ""
+msgstr "Ödeme Vadesi"
 
 msgid "Product name or description"
 msgstr ""
@@ -7585,7 +7585,7 @@ msgid "Remove all tasks"
 msgstr "Tüm görevleri kaldır"
 
 msgid "Scenario"
-msgstr ""
+msgstr "Senaryo"
 
 msgid ""
 "This invoice is already issued. Editing will sync the cari ledger. Continue?"
@@ -7606,7 +7606,7 @@ msgstr ""
 "önce diğerini iptal et veya sil."
 
 msgid "Total Value"
-msgstr ""
+msgstr "Toplam Tutar"
 
 msgid "Order Type"
 msgstr "Sipariş Türü"
@@ -8428,3 +8428,32 @@ msgstr "Bu depoya taşındı"
 
 msgid "Could not move."
 msgstr "Taşınamadı."
+
+msgid ""
+"This invoice's order was cancelled with it and can't be reopened, so the "
+"invoice can't be restored either. Create a new order if needed."
+msgstr ""
+"Bu faturanın siparişi de onunla birlikte iptal edildi ve tekrar açılamaz, bu"
+" yüzden fatura da geri alınamaz. Gerekirse yeni bir sipariş oluşturun."
+
+msgid "Invoice Settings"
+msgstr "Fatura Ayarları"
+
+msgid "Invoice language"
+msgstr "Fatura dili"
+
+msgid ""
+"Language of the printable invoice document. English is the default; choose "
+"Türkçe to print invoices with Turkish labels."
+msgstr ""
+"Yazdırılan fatura belgesinin dili. Varsayılan İngilizcedir; Türkçe "
+"seçerseniz fatura etiketleri Türkçe basılır."
+
+msgid "Invoice language updated."
+msgstr "Fatura dili güncellendi."
+
+msgid "Cancel invoice?"
+msgstr "Fatura iptal edilsin mi?"
+
+msgid "Rolls"
+msgstr "Toplar"

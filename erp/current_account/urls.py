@@ -27,6 +27,7 @@ urlpatterns = [
     path("fatura/<int:pk>/iptal/",   views_invoice.InvoiceCancel.as_view(),  name="invoice_cancel"),
     path("fatura/<int:pk>/geri-al/", views_invoice.InvoiceRestore.as_view(), name="invoice_restore"),
     path("fatura/<int:pk>/sil/",     views_invoice.InvoiceDelete.as_view(),  name="invoice_delete"),
+    path("fatura/ayarlar/",          views_invoice.InvoiceSettingsUpdate.as_view(), name="invoice_settings"),
 
     # --- Purchase orders (warehouse intake, not a generic invoice view) ---
     path("satin-alma/",              views_purchase.PurchaseOrderList.as_view(),   name="purchase_order_list"),

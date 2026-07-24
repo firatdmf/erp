@@ -89,14 +89,22 @@ def _filter_payments(request):
           .select_related("cari", "book", "currency", "cash_account")
           .all())
 
+    # Turkish-aware case folding (ı↔I, i↔İ) for both free-text filters —
+    # cari names are stored uppercase Turkish and SQL ILIKE only folds
+    # ASCII, so a lowercase search would otherwise never match them.
+    from .views import _tr_case_variants
+
     q = (request.GET.get("q") or "").strip()
     if q:
-        qs = qs.filter(
-            Q(number__icontains=q)
-            | Q(cari__name__icontains=q)
-            | Q(cari__code__icontains=q)
-            | Q(description__icontains=q)
-        )
+        cond = Q()
+        for v in _tr_case_variants(q):
+            cond |= (
+                Q(number__icontains=v)
+                | Q(cari__name__icontains=v)
+                | Q(cari__code__icontains=v)
+                | Q(description__icontains=v)
+            )
+        qs = qs.filter(cond)
 
     cari_id = request.GET.get("cari") or ""
     if cari_id.isdigit():
@@ -107,7 +115,10 @@ def _filter_payments(request):
     # filter bar's "Account" input.
     cari_q = (request.GET.get("cari_q") or "").strip()
     if cari_q:
-        qs = qs.filter(Q(cari__name__icontains=cari_q) | Q(cari__code__icontains=cari_q))
+        cond = Q()
+        for v in _tr_case_variants(cari_q):
+            cond |= Q(cari__name__icontains=v) | Q(cari__code__icontains=v)
+        qs = qs.filter(cond)
 
     type_ = request.GET.get("type") or ""
     if type_ in dict(Payment.PAYMENT_TYPES):
@@ -152,7 +163,7 @@ class PaymentList(View):
             payment_sum=Sum("amount", filter=Q(type__in=["payment", "refund_in"],
                                                 status="confirmed")),
         )
-        return render(request, self.template_name, {
+        ctx = {
             "payments":     qs[:500],
             "n":            totals["n"] or 0,
             "collection_sum": totals["collection_sum"] or Decimal("0.00"),
@@ -166,7 +177,12 @@ class PaymentList(View):
             "filter_direction": request.GET.get("direction", ""),
             "date_from":    request.GET.get("date_from", ""),
             "date_to":      request.GET.get("date_to", ""),
-        })
+        }
+        # Live search — the page JS refetches with X-Requested-With and
+        # swaps ONLY the results block (stats + count + table), no reload.
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return render(request, "current_account/partials/payment_list_results.html", ctx)
+        return render(request, self.template_name, ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -266,9 +282,12 @@ class PaymentCreate(View):
             for a in allocations:
                 inv = None
                 if a["invoice_id"]:
-                    inv = Invoice.objects.filter(pk=a["invoice_id"], cari=cari).first()
+                    # Cancelled invoices are terminal (no restore path) — money
+                    # allocated onto one could never be reconciled again.
+                    inv = (Invoice.objects.filter(pk=a["invoice_id"], cari=cari)
+                           .exclude(status="cancelled").first())
                     if not inv:
-                        continue  # invoice not found / wrong cari → skip silently
+                        continue  # invoice not found / wrong cari / cancelled → skip silently
                 PaymentAllocation.objects.create(
                     payment=payment,
                     invoice=inv,

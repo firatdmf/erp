@@ -345,7 +345,19 @@ def create_invoice_for_order(order, *, user=None):
             line_no += 1
             desc = ""
             if getattr(it, "product_variant_id", None) and it.product_variant:
-                desc = f"{it.product.title} [{it.product_variant.variant_sku}]"
+                # Name the VARIANT, not just the base product — staff can't
+                # tell "2086 [KZL000344]" apart; "2086 — GÜMÜŞ A.BEYAZ
+                # [KZL000344]" they can. Same labeling as the order screens.
+                label = None
+                try:
+                    from operating.views import _order_item_variant_label
+                    label = _order_item_variant_label(it)
+                except Exception:
+                    label = None
+                title = (it.product.title or "") if getattr(it, "product_id", None) else ""
+                sku = it.product_variant.variant_sku or ""
+                base = f"{title} — {label}" if (title and label) else (label or title)
+                desc = f"{base} [{sku}]" if sku else base
             elif getattr(it, "product_id", None) and it.product:
                 desc = it.product.title
             InvoiceItem.objects.create(

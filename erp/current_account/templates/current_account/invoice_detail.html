@@ -397,12 +397,17 @@
     /* Hide every chrome element the base layout injects — sidebar,
        topbar, mobile bars, drawers, toasts, modals. The print should
        show ONLY .doc. */
+    /* NOTE: mobile-shell.css activates at max-width:1024px, which MATCHES
+       the ~794px print page box — so its `.m-fav-sheet { display:flex
+       !important }` (class, 0-1-0) beats the bare `aside` selector here.
+       Every m-* shell piece must be hidden BY CLASS, not element. */
     .no-print, .iv-toolbar, .iv-side,
     .global-top-bar, nav, header, footer, aside,
-    .m-shell-bar, .m-bottomnav, .m-drawer, .m-drawer-scrim, .m-notifications,
+    .m-shell-bar, .m-bottomnav, .m-drawer, .m-drawer-overlay,
+    .m-fav-sheet, .m-fav-overlay,
     .nj-sidebar, .nj-mobile-overlay,
     .navbar, .sidebar, .toolbar,
-    .toast, .modal, .sidebar-overlay {
+    .toast, .toast-notification-global, .modal, .sidebar-overlay {
       display: none !important;
     }
     /* Some layouts add body padding for the fixed topbar / bottom
@@ -496,6 +501,9 @@
     <div class="iv-tools">
       <button onclick="window.print()" class="iv-btn ghost"><i data-lucide="printer"></i>{% trans "Print" %}</button>
       <a href="{% url 'current_account:invoice_excel' invoice.pk %}" class="iv-btn ghost"><i data-lucide="sheet"></i>{% trans "Excel" %}</a>
+      <button type="button" class="iv-btn ghost" onclick="ivOpenLangModal()" title="{% trans 'Invoice Settings' %}">
+        <i data-lucide="settings"></i><span style="text-transform:uppercase; font-size:10.5px; letter-spacing:.04em;">{{ inv_lang|default:"en" }}</span>
+      </button>
       {% if invoice.status != 'cancelled' %}
         <a href="{% url 'current_account:invoice_edit' invoice.pk %}" class="iv-btn ghost"
            {% if invoice.type == 'purchase' %}
@@ -515,27 +523,31 @@
           <button type="submit" class="iv-btn danger"><i data-lucide="trash-2"></i>{% trans "Delete" %}</button>
         </form>
       {% elif invoice.status == 'cancelled' %}
-        {% if invoice.type != 'purchase' %}
-        <form method="post" action="{% url 'current_account:invoice_restore' invoice.pk %}" style="display:inline;"
-              onsubmit="return submitInvoiceRestore(this);">
-          {% csrf_token %}
-          <input type="hidden" name="password" value="">
-          <button type="submit" class="iv-btn primary"><i data-lucide="rotate-ccw"></i>{% trans "Restore" %}</button>
-        </form>
-        {% endif %}
-        {# Purchase invoices can't be restored after cancellation — their #}
-        {# stock was hard-deleted (see PurchaseCancel / InvoiceRestore guard). #}
+        {% comment %}Cancelled is terminal — no restore, ever: cancel deletes the
+        cari movement (and cancels the linked order / removes purchase stock),
+        so there is nothing consistent to reopen.{% endcomment %}
+        <span class="iv-btn ghost" style="opacity:0.6; cursor:default;"
+              title="{% trans 'İptal edilen fatura geri açılamaz.' %}">
+          <i data-lucide="ban"></i>{% trans "Cancelled" %}
+        </span>
       {% else %}
-        <form method="post" action="{% url 'current_account:invoice_cancel' invoice.pk %}" style="display:inline;"
-              onsubmit="return confirm('{% if invoice.type == 'purchase' %}{% trans 'This permanently removes the physical stock this purchase brought in and reverses the cari debt. This cannot be undone. Continue?' %}{% else %}{% trans 'Are you sure you want to cancel this invoice? A reverse movement will be created.' %}{% endif %}');">
+        {% comment %}The confirm lives in an in-app modal (not the browser's
+        native confirm) so the warning — especially "the linked order will be
+        cancelled too" — is styled, readable, and unmistakable.{% endcomment %}
+        <form method="post" action="{% url 'current_account:invoice_cancel' invoice.pk %}" style="display:inline;" id="iv-cancel-form">
           {% csrf_token %}
-          <button type="submit" class="iv-btn danger"><i data-lucide="x-circle"></i>{% trans "Cancel" %}</button>
+          <button type="button" class="iv-btn danger" onclick="ivOpenCancelModal()"><i data-lucide="x-circle"></i>{% trans "Cancel" %}</button>
         </form>
       {% endif %}
     </div>
   </div>
 
   <!-- ============== INVOICE DOCUMENT (Karven-style) ============== -->
+  {% comment %}The document renders in its own language (fatura dili — a
+  per-book CariSettings choice, English by default), independent of the UI
+  locale: {% language %} switches every {% trans %}, get_type_display and
+  |date inside the block.{% endcomment %}
+  {% language inv_lang|default:"en" %}
   <div class="doc">
 
     <!-- Issuer block + logo placeholder. Per-invoice overrides win
@@ -661,7 +673,9 @@
             {{ it.description }}
             {% if it.display_rolls %}
             <div class="roll-chips">
-              <span class="rc-lbl">{% trans "Tops" %}</span>
+              {% comment %}"Top" (kumaş topu) = fabric roll — the correct
+              trade term in English is "Rolls", not a literal "Tops".{% endcomment %}
+              <span class="rc-lbl">{% trans "Rolls" %}</span>
               {% for r in it.display_rolls %}
               <span class="roll-chip"><code>{{ r.barcode|default:"—" }}</code>{{ r.meters|floatformat:2 }} m</span>
               {% endfor %}
@@ -712,6 +726,7 @@
     {% endif %}
 
   </div>
+  {% endlanguage %}
 
   <!-- Side: payment status (screen-only) -->
   <div class="iv-side no-print">
@@ -729,14 +744,83 @@
   </div>
 </div>
 
+<!-- Fatura Ayarları — document language (fatura dili) modal -->
+<div id="iv-lang-overlay" class="no-print" style="display:none; position:fixed; inset:0; z-index:1300; background:rgba(15,23,31,.45); align-items:center; justify-content:center;" onclick="if(event.target===this)ivCloseLangModal()">
+  <div style="background:#fff; border-radius:14px; width:min(420px, calc(100vw - 32px)); padding:22px 22px 18px; box-shadow:0 20px 50px rgba(15,23,31,.25);">
+    <h3 style="margin:0 0 4px; font:700 16px var(--font-sans);">{% trans "Invoice Settings" %}</h3>
+    <p style="margin:0 0 14px; font:400 12.5px var(--font-sans); color:var(--gray-600);">
+      {% trans "Language of the printable invoice document. English is the default; choose Türkçe to print invoices with Turkish labels." %}
+    </p>
+    <form method="post" action="{% url 'current_account:invoice_settings' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <label style="display:block; font:600 12px var(--font-sans); color:var(--gray-700); margin-bottom:6px;">{% trans "Invoice language" %}</label>
+      <select name="invoice_language" style="width:100%; padding:9px 12px; border:1px solid #E2E8F0; border-radius:8px; font:500 13.5px var(--font-sans);">
+        <option value="en" {% if inv_lang == "en" %}selected{% endif %}>English</option>
+        <option value="tr" {% if inv_lang == "tr" %}selected{% endif %}>Türkçe</option>
+      </select>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button type="button" class="iv-btn ghost" onclick="ivCloseLangModal()">{% trans "Close" %}</button>
+        <button type="submit" class="iv-btn primary">{% trans "Save" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- In-app cancel confirmation (fatura iptal uyarısı) — only rendered
+     when the Cancel button itself exists (issued/partial/paid/overdue). -->
+{% if invoice.status != 'draft' and invoice.status != 'cancelled' %}
+<div id="iv-cancel-overlay" class="no-print" style="display:none; position:fixed; inset:0; z-index:1300; background:rgba(15,23,31,.45); align-items:center; justify-content:center;" onclick="if(event.target===this)ivCloseCancelModal()">
+  <div style="background:#fff; border-radius:14px; width:min(460px, calc(100vw - 32px)); padding:22px 22px 18px; box-shadow:0 20px 50px rgba(15,23,31,.25);">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+      <span style="display:inline-flex; width:36px; height:36px; border-radius:10px; background:#FEE2E2; color:#B91C1C; align-items:center; justify-content:center;"><i data-lucide="alert-triangle" style="width:19px;height:19px;"></i></span>
+      <h3 style="margin:0; font:700 16px var(--font-sans);">{% trans "Cancel invoice?" %}</h3>
+    </div>
+    <p style="margin:0 0 6px; font:400 13px var(--font-sans); color:var(--gray-700); line-height:1.55;">
+      {% if invoice.type == 'purchase' %}
+        {% trans "This permanently removes the physical stock this purchase brought in and reverses the cari debt. This cannot be undone." %}
+      {% elif invoice.order_id %}
+        {% trans "Bu fatura iptal edilirse bağlı SİPARİŞ DE İPTAL OLUR: stoklar depoya geri döner ve cari hareketi silinir. Bu işlem geri alınamaz." %}
+      {% else %}
+        {% trans "Fatura iptal edilsin mi? Cari hareketi silinir. Bu işlem geri alınamaz." %}
+      {% endif %}
+    </p>
+    {% if invoice.order_id %}
+    <p style="margin:0; font:600 12px var(--font-sans); color:#B91C1C;">
+      <i data-lucide="package-x" style="width:13px;height:13px;vertical-align:-2px;"></i>
+      {% trans "Bağlı sipariş" %}: #{{ invoice.order_id }} — {% trans "iptal edilecek ve tekrar açılamayacak" %}
+    </p>
+    {% endif %}
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+      <button type="button" class="iv-btn ghost" onclick="ivCloseCancelModal()">{% trans "Vazgeç" %}</button>
+      <button type="button" class="iv-btn danger" onclick="document.getElementById('iv-cancel-form').submit()">
+        <i data-lucide="x-circle"></i>{% trans "Evet, İptal Et" %}
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <script>
   if (window.lucide) lucide.createIcons();
 
-  function submitInvoiceRestore(form) {
-    var pw = window.prompt('{% trans "Enter the restore password to un-cancel this invoice:" %}');
-    if (pw === null || pw.trim() === '') return false;
-    form.password.value = pw;
-    return true;
+  function ivOpenCancelModal() {
+    var ov = document.getElementById('iv-cancel-overlay');
+    if (!ov) return;
+    ov.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  }
+  function ivCloseCancelModal() {
+    var ov = document.getElementById('iv-cancel-overlay');
+    if (ov) ov.style.display = 'none';
+  }
+  function ivOpenLangModal() {
+    var ov = document.getElementById('iv-lang-overlay');
+    if (ov) { ov.style.display = 'flex'; if (window.lucide) lucide.createIcons(); }
+  }
+  function ivCloseLangModal() {
+    var ov = document.getElementById('iv-lang-overlay');
+    if (ov) ov.style.display = 'none';
   }
 </script>
 {% endblock %}

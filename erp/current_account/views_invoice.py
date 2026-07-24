@@ -14,11 +14,9 @@ Invoice views (Phase 2).
 The create/edit forms receive line items as JSON in the `items_json` field,
 so the dynamic add/remove UX stays simple and reliable.
 """
-import hmac
 import json
 from decimal import Decimal, InvalidOperation
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -91,12 +89,18 @@ def _filter_invoices(request):
 
     q = (request.GET.get("q") or "").strip()
     if q:
-        qs = qs.filter(
-            Q(number__icontains=q)
-            | Q(cari__name__icontains=q)
-            | Q(cari__code__icontains=q)
-            | Q(notes__icontains=q)
-        )
+        # Turkish-aware case folding (ı↔I, i↔İ) — SQL ILIKE only folds
+        # ASCII, so OR a few cased variants like the cari list does.
+        from .views import _tr_case_variants
+        cond = Q()
+        for v in _tr_case_variants(q):
+            cond |= (
+                Q(number__icontains=v)
+                | Q(cari__name__icontains=v)
+                | Q(cari__code__icontains=v)
+                | Q(notes__icontains=v)
+            )
+        qs = qs.filter(cond)
 
     cari_id = request.GET.get("cari") or ""
     if cari_id.isdigit():
@@ -162,8 +166,41 @@ class InvoiceList(View):
             "filter_cari": request.GET.get("cari", ""),
             "date_from":   request.GET.get("date_from", ""),
             "date_to":     request.GET.get("date_to", ""),
+            "invoice_language": (CariSettings.objects
+                                 .values_list("invoice_language", flat=True)
+                                 .first() or "en"),
         }
+        # Live search — the page JS refetches with X-Requested-With and
+        # swaps ONLY the results block (stats + count + table), no reload.
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return render(request, "current_account/partials/invoice_list_results.html", ctx)
         return render(request, self.template_name, ctx)
+
+
+# ---------------------------------------------------------------------------
+# Invoice settings (fatura ayarları) — document language
+# ---------------------------------------------------------------------------
+@method_decorator(login_required, name="dispatch")
+class InvoiceSettingsUpdate(View):
+    """Set the printable invoice document's language (fatura dili). Stored
+    per-book on CariSettings but applied to EVERY book here — the company
+    wants one behavior, and per-book divergence would only confuse."""
+
+    def post(self, request):
+        lang = (request.POST.get("invoice_language") or "en").strip().lower()
+        if lang not in dict(CariSettings.INVOICE_LANGUAGE_CHOICES):
+            lang = "en"
+        from accounting.models import Book
+        for book in Book.objects.all():
+            s = CariSettings.for_book(book)
+            if s.invoice_language != lang:
+                s.invoice_language = lang
+                s.save(update_fields=["invoice_language"])
+        messages.success(request, _g("Invoice language updated."))
+        nxt = request.POST.get("next") or ""
+        if nxt.startswith("/"):
+            return redirect(nxt)
+        return redirect("current_account:invoice_list")
 
 
 # ---------------------------------------------------------------------------
@@ -581,10 +618,16 @@ class InvoiceDetail(View):
             agg["net"] += (it.subtotal - it.discount_amount)
             agg["tax"] += it.tax_amount
 
+        # The printable document renders in its own language (fatura dili,
+        # per-book setting) — export invoices go out in English by default,
+        # regardless of the UI locale.
+        inv_lang = CariSettings.for_book(invoice.book).invoice_language or "en"
+
         return render(request, self.template_name, {
             "invoice": invoice,
             "items":   items,
             "tax_breakdown": sorted(tax_breakdown.items()),
+            "inv_lang": inv_lang,
         })
 
 
@@ -667,47 +710,19 @@ class InvoiceCancel(View):
 
 
 # ---------------------------------------------------------------------------
-# Restore (undo cancel)
+# Restore (undo cancel) — permanently disabled
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
 class InvoiceRestore(View):
+    """Cancelled invoices are TERMINAL — cancel() now deletes the posted
+    cari movement (and cascades: order terminally cancelled / purchase
+    stock hard-deleted), so there is nothing consistent to restore to.
+    The URL is kept only so old bookmarks fail with a clear message
+    instead of a 404."""
+
     def post(self, request, pk):
         invoice = get_object_or_404(Invoice, pk=pk)
-        if invoice.status != "cancelled":
-            messages.error(request, _g("Only cancelled invoices can be restored."))
-            return redirect("current_account:invoice_detail", pk=invoice.pk)
-
-        if invoice.type == "purchase":
-            # A purchase cancel HARD-DELETES the physical stock it brought
-            # in (see cancel_purchase_invoice) — restoring would resurrect
-            # a supplier debt for goods that no longer exist anywhere.
-            # Unlike a normal invoice cancel, this one is deliberately not
-            # reversible.
-            messages.error(
-                request,
-                _g("Purchase invoices can't be restored after cancellation — the physical "
-                   "stock was permanently removed. Create a new purchase if needed."),
-            )
-            return redirect("current_account:invoice_detail", pk=invoice.pk)
-
-        password = request.POST.get("password", "")
-        if not hmac.compare_digest(password, settings.INVOICE_RESTORE_PASSWORD):
-            messages.error(request, _g("Incorrect password. Invoice was not restored."))
-            return redirect("current_account:invoice_detail", pk=invoice.pk)
-
-        if invoice.order_id:
-            dup = invoice.order.invoices.exclude(status="cancelled").exclude(pk=invoice.pk).first()
-            if dup:
-                messages.warning(
-                    request,
-                    _g("This order already has an active invoice (%(num)s). Cancel or delete it before restoring this one.")
-                    % {"num": f"{dup.series}-{dup.number}"},
-                )
-                return redirect("current_account:invoice_detail", pk=invoice.pk)
-
-        reason = request.POST.get("reason", "")
-        invoice.restore(user=request.user, reason=reason)
-        messages.success(request, _g("Invoice restored."))
+        messages.error(request, _g("İptal edilen fatura geri açılamaz."))
         return redirect("current_account:invoice_detail", pk=invoice.pk)
 
 

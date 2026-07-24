@@ -23,6 +23,7 @@
   }
   .ca { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
   .ca, .ca * { box-sizing: border-box; }
+  #ca-results { transition: opacity 120ms ease; }
 
   .ca-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom: 18px; }
   .ca-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
@@ -58,9 +59,13 @@
     transform: translateY(-50%);
     color: var(--gray-500); pointer-events: none;
   }
-  .ca-search-input { width: 100%; padding: 10px 34px 10px 40px; background: #F4F7FB; border: 1px solid transparent; border-radius: 8px; font: 500 13.5px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms; }
-  .ca-search-input::placeholder { color: var(--gray-500); }
-  .ca-search-input:focus { background: white; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
+  /* base.css's global input[type="text"] rule (0,1,1) outranks a lone
+     class (0,1,0) and was silently overriding our left padding — the
+     text then started at 14px, straight under the 14px-left icon.
+     input.ca-search-input (0,1,1) + !important padding settles it. */
+  input.ca-search-input { width: 100%; padding: 10px 34px 10px 40px !important; background: #F4F7FB; border: 1px solid transparent; border-radius: 8px; font: 500 13.5px var(--font-sans); color: var(--ink); outline: none; transition: all 140ms; }
+  input.ca-search-input::placeholder { color: var(--gray-500); }
+  input.ca-search-input:focus { background: white; border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
   .ca-search-clear {
     position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
     width: 20px !important; height: 20px !important;
@@ -218,52 +223,28 @@
     </div>
   </div>
 
-  <div class="ca-stats">
-    <div class="ca-stat">
-      <div class="ca-stat-l">{% trans "Total Accounts" %}</div>
-      <div class="ca-stat-v">{{ total_count|intcomma }}</div>
-      <div class="ca-stat-s">{% trans "Filtered" %}</div>
-    </div>
-    <div class="ca-stat">
-      <div class="ca-stat-l">{% trans "Owes Us" %}</div>
-      <div class="ca-stat-v pos">${{ owes_us|floatformat:2|intcomma }}</div>
-      <div class="ca-stat-s">{% trans "USD-based total" %}</div>
-    </div>
-    <div class="ca-stat">
-      <div class="ca-stat-l">{% trans "We Owe" %}</div>
-      <div class="ca-stat-v neg">${{ we_owe|floatformat:2|intcomma }}</div>
-      <div class="ca-stat-s">{% trans "USD-based total" %}</div>
-    </div>
-    <div class="ca-stat">
-      <div class="ca-stat-l">{% trans "Net" %}</div>
-      <div class="ca-stat-v {% if net > 0 %}pos{% elif net < 0 %}neg{% endif %}">${{ net|floatformat:2|intcomma }}</div>
-      <div class="ca-stat-s">+ {% trans "in our favor" %} / − {% trans "against us" %}</div>
-    </div>
-  </div>
-
   <form method="get" id="ca-filter-form">
+    <input type="hidden" name="type" id="ca-type-input" value="{{ filter_type }}">
     <div class="ca-tabs">
-      <a href="?" class="ca-tab {% if not filter_type %}active{% endif %}">
-        <i data-lucide="users"></i>
+      <button type="button" class="ca-tab {% if not filter_type %}active{% endif %}" data-type="">
         <span>{% trans "All" %}</span>
-        <span class="ca-tab-count">{{ total_count }}</span>
-      </a>
+        <span class="ca-tab-count" id="ca-tab-count">{{ total_count }}</span>
+      </button>
       {% for val, label in type_choices %}
-        <a href="?type={{ val }}" class="ca-tab {% if filter_type == val %}active{% endif %}">
-          <i data-lucide="{% if val == 'customer' %}user{% elif val == 'supplier' %}truck{% elif val == 'both' %}users{% elif val == 'staff' %}user-check{% else %}circle{% endif %}"></i>
+        <button type="button" class="ca-tab {% if filter_type == val %}active{% endif %}" data-type="{{ val }}">
           <span>{{ label }}</span>
-        </a>
+        </button>
       {% endfor %}
       <div class="ca-tabs-r">
         <div class="ca-search-wrap">
-          <i data-lucide="search" class="ca-search-icon"></i>
+          
+          <svg class="ca-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input name="q" value="{{ q }}" class="ca-search-input" type="text" id="ca-search-input"
                  placeholder="{% trans 'Search: code, name, tax no, email, phone…' %}"
-                 autocomplete="off"
-                 onkeydown="if(event.key==='Enter'){this.form.submit();}">
+                 autocomplete="off">
           <button type="button" class="ca-search-clear" id="ca-search-clear"
                   style="{% if q %}display: flex;{% endif %}" onclick="caClearSearch()">
-            <i data-lucide="x"></i>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
       </div>
@@ -272,7 +253,7 @@
     <div class="ca-toolbar">
       <label class="ca-ctl" title="{% trans 'Balance' %}">
         <span class="ca-ctl-lbl">{% trans "Balance" %}</span>
-        <select name="balance" onchange="this.form.submit()">
+        <select name="balance">
           <option value="">{% trans "All" %}</option>
           <option value="positive"   {% if filter_balance == 'positive' %}selected{% endif %}>{% trans "Owes Us" %}</option>
           <option value="negative"   {% if filter_balance == 'negative' %}selected{% endif %}>{% trans "We Owe" %}</option>
@@ -283,7 +264,7 @@
 
       <label class="ca-ctl" title="{% trans 'Status' %}">
         <span class="ca-ctl-lbl">{% trans "Status" %}</span>
-        <select name="active" onchange="this.form.submit()">
+        <select name="active">
           <option value="1" {% if filter_active == '1' %}selected{% endif %}>{% trans "Active" %}</option>
           <option value="0" {% if filter_active == '0' %}selected{% endif %}>{% trans "Inactive" %}</option>
           <option value=""  {% if filter_active == '' %}selected{% endif %}>{% trans "All" %}</option>
@@ -292,7 +273,7 @@
 
       <label class="ca-ctl" title="{% trans 'Sort' %}">
         <span class="ca-ctl-lbl">{% trans "Sort" %}</span>
-        <select name="sort" onchange="this.form.submit()">
+        <select name="sort">
           <option value="name"     {% if sort == 'name' %}selected{% endif %}>{% trans "Name (A→Z)" %}</option>
           <option value="-name"    {% if sort == '-name' %}selected{% endif %}>{% trans "Name (Z→A)" %}</option>
           <option value="code"     {% if sort == 'code' %}selected{% endif %}>{% trans "Code (asc)" %}</option>
@@ -306,90 +287,77 @@
     </div>
   </form>
 
-  <div class="ca-meta">
-    <div class="ca-result"><b>{{ total_count|intcomma }}</b> {% trans "accounts" %}</div>
+  <div id="ca-results">
+    {% include "current_account/partials/cari_list_results.html" %}
   </div>
-
-  {% if caris %}
-  <div class="ca-list">
-    <div class="ca-list-head">
-      <div>{% trans "Code" %}</div>
-      <div>{% trans "Account" %}</div>
-      <div>{% trans "Type" %}</div>
-      <div class="num">{% trans "Balance" %}</div>
-      <div>{% trans "Recent" %}</div>
-      <div></div>
-    </div>
-    {% for c in caris %}
-    <a class="ca-row" href="{% url 'current_account:cari_detail' c.pk %}">
-      <div><span class="ca-code">{{ c.code }}</span></div>
-      <div class="ca-name-w">
-        <span class="ca-name">{{ c.name }}</span>
-        <div class="ca-badges">
-          {% if c.is_over_credit_limit %}<span class="ca-badge over">{% trans "Limit Exceeded" %}</span>{% endif %}
-          {% if not c.is_active %}<span class="ca-badge inactive">{% trans "Inactive" %}</span>{% endif %}
-        </div>
-      </div>
-      <div>
-        <span class="ca-type
-          {% if c.type == 'customer' %}customer
-          {% elif c.type == 'supplier' %}supplier
-          {% elif c.type == 'both' %}both
-          {% elif c.type == 'staff' %}staff
-          {% else %}other{% endif %}">
-          <span class="ca-type-dot"></span>{{ c.get_type_display }}
-        </span>
-      </div>
-      <div class="num">
-        <div class="ca-bal {% if c.cached_balance > 0 %}pos{% elif c.cached_balance < 0 %}neg{% else %}zero{% endif %}">
-          {{ c.display_currency_symbol }}{{ c.absolute_balance|floatformat:2|intcomma }}
-        </div>
-        <div class="ca-bal-label">{{ c.balance_label }}</div>
-      </div>
-      <div class="ca-recent">
-        {% if c.last_movement_at %}{{ c.last_movement_at|date:"d.m.Y" }}{% else %}—{% endif %}
-      </div>
-      <i class="ca-chev" data-lucide="chevron-right"></i>
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="ca-empty">
-    <div class="ico"><i data-lucide="users"></i></div>
-    <h3>{% trans "No accounts found" %}</h3>
-    <p>{% trans "Adjust filters or open a new account." %}</p>
-    <a href="{% url 'current_account:cari_create' %}" class="ca-btn primary"><i data-lucide="plus"></i>{% trans "New Account" %}</a>
-  </div>
-  {% endif %}
 </div>
 
 <script>
   if (window.lucide) lucide.createIcons();
 
-  // Belt-and-suspenders: lucide sets width/height as SVG attributes, which
-  // can outrank our class-based CSS in some browsers — pin the search/clear
-  // icon sizes directly so they never balloon to lucide's 24px default and
-  // collide with the input placeholder text.
-  document.querySelectorAll('.ca-search-icon').forEach(function (el) {
-    el.setAttribute('width', '15');
-    el.setAttribute('height', '15');
-  });
-  document.querySelectorAll('.ca-search-clear svg, .ca-search-clear i').forEach(function (el) {
-    el.setAttribute('width', '11');
-    el.setAttribute('height', '11');
-  });
-
+  // ── Dynamic search & filters — swaps ONLY #ca-results, never reloads
+  //    the page. Turkish-aware case-insensitivity lives server-side
+  //    (_tr_case_variants); a stale slow response can never overwrite a
+  //    newer one (token guard).
   (function () {
+    const form = document.getElementById('ca-filter-form');
     const input = document.getElementById('ca-search-input');
     const clearBtn = document.getElementById('ca-search-clear');
-    if (!input) return;
+    const results = document.getElementById('ca-results');
+    const typeInput = document.getElementById('ca-type-input');
+    if (!form || !results) return;
 
-    let searchTimeout;
-    input.addEventListener('input', function () {
-      const query = input.value.trim();
-      clearBtn.style.display = query ? 'flex' : 'none';
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => input.form.submit(), 500);
+    let timer = null, reqToken = 0;
+
+    function caFetch() {
+      const token = ++reqToken;
+      const params = new URLSearchParams(new FormData(form));
+      // Drop empties so the URL stays clean.
+      [...params.keys()].forEach(k => { if (!params.get(k)) params.delete(k); });
+      const qs = params.toString();
+      const url = window.location.pathname + (qs ? '?' + qs : '');
+      results.style.opacity = '0.45';
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.text())
+        .then(html => {
+          if (token !== reqToken) return;          // stale response — ignore
+          results.innerHTML = html;
+          results.style.opacity = '';
+          try { history.replaceState(null, '', url); } catch (e) {}
+          const meta = document.getElementById('ca-results-meta');
+          const badge = document.getElementById('ca-tab-count');
+          if (meta && badge) badge.textContent = meta.dataset.count;
+        })
+        .catch(() => { results.style.opacity = ''; });
+    }
+    window.__caFetch = caFetch;
+
+    // Debounced live search.
+    if (input) {
+      input.addEventListener('input', function () {
+        if (clearBtn) clearBtn.style.display = input.value.trim() ? 'flex' : 'none';
+        clearTimeout(timer);
+        timer = setTimeout(caFetch, 300);
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); caFetch(); }
+      });
+    }
+    // Never allow a classic GET submit (that's the full-page reload).
+    form.addEventListener('submit', function (e) { e.preventDefault(); caFetch(); });
+
+    // Dropdown filters.
+    form.querySelectorAll('select').forEach(sel => {
+      sel.addEventListener('change', caFetch);
+    });
+
+    // Type tabs.
+    document.querySelectorAll('.ca-tab[data-type]').forEach(btn => {
+      btn.addEventListener('click', function () {
+        typeInput.value = btn.dataset.type;
+        document.querySelectorAll('.ca-tab[data-type]').forEach(b => b.classList.toggle('active', b === btn));
+        caFetch();
+      });
     });
   })();
 
@@ -397,7 +365,7 @@
     const input = document.getElementById('ca-search-input');
     input.value = '';
     document.getElementById('ca-search-clear').style.display = 'none';
-    input.form.submit();
+    if (window.__caFetch) window.__caFetch();
   }
 </script>
 {% endblock %}

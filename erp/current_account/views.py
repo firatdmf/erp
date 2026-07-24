@@ -51,18 +51,33 @@ def _user_movement_choices():
     return [(v, l) for v, l in CariMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
 
 
+def _tr_case_variants(q):
+    """Query variants that make search genuinely case-insensitive for
+    TURKISH text. SQL ILIKE only folds ASCII (i↔I): typing lowercase
+    'kızılırmak' never matches the stored uppercase 'KIZILIRMAK'
+    because dotless 'ı' ↔ 'I' (and dotted 'i' ↔ 'İ') aren't in the
+    fold. We OR the original with Turkish-aware upper/lower versions
+    so any casing the user types finds any casing in the DB."""
+    tr_upper = q.replace("i", "İ").replace("ı", "I").upper()
+    tr_lower = q.replace("İ", "i").replace("I", "ı").lower()
+    return {q, tr_upper, tr_lower}
+
+
 def _filter_caris(request):
     qs = CariAccount.objects.select_related("book", "default_currency").all()
 
     q = (request.GET.get("q") or "").strip()
     if q:
-        qs = qs.filter(
-            Q(code__icontains=q)
-            | Q(name__icontains=q)
-            | Q(tax_number__icontains=q)
-            | Q(email__icontains=q)
-            | Q(phone__icontains=q)
-        )
+        cond = Q()
+        for v in _tr_case_variants(q):
+            cond |= (
+                Q(code__icontains=v)
+                | Q(name__icontains=v)
+                | Q(tax_number__icontains=v)
+                | Q(email__icontains=v)
+                | Q(phone__icontains=v)
+            )
+        qs = qs.filter(cond)
 
     book_id = request.GET.get("book") or ""
     if book_id.isdigit():
@@ -137,6 +152,10 @@ class CariList(View):
             "filter_active":  request.GET.get("active", "1"),
             "sort":           request.GET.get("sort", "name"),
         }
+        # Dynamic search/filter: the page JS fetches with this header and
+        # swaps ONLY the results block — no full page reload per keystroke.
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return render(request, "current_account/partials/cari_list_results.html", ctx)
         return render(request, self.template_name, ctx)
 
 

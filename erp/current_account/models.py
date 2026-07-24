@@ -12,7 +12,7 @@ Phase 2: Invoicing.
                        Items recompute Invoice totals on save.
     - Issuing a non-draft, non-proforma invoice automatically creates a
       CariMovement (which in turn mirrors to legacy AR/AP via signals).
-    - Cancelling a posted invoice creates a counter-CariMovement (audit-safe).
+    - Cancelling a posted invoice DELETES its CariMovement (terminal — no restore).
 
 Phase 3: Payments (tahsilat / ödeme).
     - Payment           : Atomic money movement between Cari and a CashAccount.
@@ -344,6 +344,13 @@ class CariSettings(models.Model):
         related_name="cari_settings_default",
     )
 
+    # Language the printable invoice DOCUMENT renders in (independent of
+    # the UI language) — export invoices go out in English by default.
+    INVOICE_LANGUAGE_CHOICES = [("en", "English"), ("tr", "Türkçe")]
+    invoice_language = models.CharField(
+        max_length=5, choices=INVOICE_LANGUAGE_CHOICES, default="en",
+    )
+
     def __str__(self):
         return f"Cari Settings ({self.book.name})"
 
@@ -457,7 +464,7 @@ class Invoice(models.Model):
     balance     = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
 
     # The CariMovement that posted this invoice to the ledger (set on issue()).
-    # Cancellation creates a counter-movement and clears this pointer.
+    # Cancellation DELETES the movement (SET_NULL clears this pointer).
     posted_movement = models.OneToOneField(
         CariMovement, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="invoice",
@@ -678,12 +685,16 @@ class Invoice(models.Model):
 
     def cancel(self, user=None, reason=""):
         """
-        Cancel an issued invoice. Posts a counter-movement so the
-        ledger balances. Amount of the counter matches the original
-        (zero for order-attached invoices, ±total for standalone),
-        which means cancelling an info-only invoice movement is also
-        a no-op on the balance — exactly what we want.
-        Audit-safe — never deletes the original.
+        Cancel an issued invoice. DELETES the posted CariMovement outright
+        (mirroring reverse_order_movement's semantics for orders) so the
+        cari history shows no trace of the dead invoice, then recomputes
+        the balance. For order-attached invoices the movement is the
+        0-amount marker, so the balance is untouched either way.
+
+        Cancellation is TERMINAL — there is no restore path (restore()
+        below refuses), which is exactly why deleting beats posting an
+        audit counter-pair here: the ledger rows would never be needed
+        again and only clutter the cari statement.
         """
         if self.status == "cancelled":
             return
@@ -692,56 +703,31 @@ class Invoice(models.Model):
             self.save(update_fields=["status", "updated_at"])
             return
 
-        if self.posted_movement_id:
-            CariMovement.objects.create(
-                cari=self.cari,
-                book=self.book,
-                date=self.date,
-                amount=-self.posted_movement.amount,
-                currency=self.currency,
-                movement_type="adjustment",
-                description=f"CANCEL — {self.get_type_display()} {self.series}-{self.number}"
-                            + (f" ({reason})" if reason else ""),
-                reference=f"CANCEL {self.series}-{self.number}",
-                source_type=ContentType.objects.get_for_model(Invoice),
-                source_id=self.pk,
-                created_by=user.member if user and hasattr(user, "member") else None,
-            )
-        self.status = "cancelled"
-        self.save(update_fields=["status", "updated_at"])
+        from django.db import transaction as _tx
+        with _tx.atomic():
+            # Atomic so a failure between the delete and the status flip
+            # can't leave an 'issued' invoice with no ledger row (which a
+            # later edit would silently re-post via resync_posted_movement).
+            if self.posted_movement_id:
+                mv = self.posted_movement
+                cari = mv.cari
+                mv.delete()   # OneToOne is SET_NULL → self.posted_movement clears
+                self.posted_movement = None
+                if cari:
+                    cari.recompute_balance(save=True)
+            self.status = "cancelled"
+            self.save(update_fields=["status", "posted_movement", "updated_at"])
 
     def restore(self, user=None, reason=""):
         """
-        Restore a cancelled invoice. Inverse of cancel(): posts a
-        counter-movement to the cancel-counter (re-establishing the
-        original posting) and puts status back into an active state.
-        Audit-safe — never deletes the cancel-counter movement.
+        Cancelled invoices are TERMINAL and can never be reopened: cancel()
+        deletes the posted ledger movement (and, for order-attached ones,
+        the order itself is terminally cancelled; for purchases the stock
+        was hard-deleted), so there is nothing consistent to restore to.
+        Kept only so any stale caller fails loudly instead of half-reviving
+        an invoice.
         """
-        if self.status != "cancelled":
-            raise ValidationError(f"Only cancelled invoices can be restored (current status: {self.status}).")
-
-        if not self.posted_movement_id:
-            self.status = "draft"
-            self.save(update_fields=["status", "updated_at"])
-            return
-
-        CariMovement.objects.create(
-            cari=self.cari,
-            book=self.book,
-            date=self.date,
-            amount=self.posted_movement.amount,
-            currency=self.currency,
-            movement_type="adjustment",
-            description=f"RESTORE — {self.get_type_display()} {self.series}-{self.number}"
-                        + (f" ({reason})" if reason else ""),
-            reference=f"RESTORE {self.series}-{self.number}",
-            source_type=ContentType.objects.get_for_model(Invoice),
-            source_id=self.pk,
-            created_by=user.member if user and hasattr(user, "member") else None,
-        )
-        self.status = "issued"
-        self.save(update_fields=["status", "updated_at"])
-        self.recompute_payment()
+        raise ValidationError("İptal edilen fatura geri açılamaz.")
 
 
 # ---------------------------------------------------------------------------

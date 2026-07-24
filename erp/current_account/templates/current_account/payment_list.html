@@ -259,49 +259,30 @@
     </div>
   </div>
 
-  <div class="pl-stats">
-    <div class="pl-stat">
-      <div class="pl-stat-l">{% trans "Filtered" %}</div>
-      <div class="pl-stat-v">{{ n|intcomma }}</div>
-      <div class="pl-stat-s">{% trans "Matching records" %}</div>
-    </div>
-    <div class="pl-stat">
-      <div class="pl-stat-l">{% trans "Total Collected" %}</div>
-      <div class="pl-stat-v pos">{{ collection_sum|floatformat:2|intcomma }}</div>
-      <div class="pl-stat-s">{% trans "From customers" %}</div>
-    </div>
-    <div class="pl-stat">
-      <div class="pl-stat-l">{% trans "Total Paid" %}</div>
-      <div class="pl-stat-v neg">{{ payment_sum|floatformat:2|intcomma }}</div>
-      <div class="pl-stat-s">{% trans "To suppliers" %}</div>
-    </div>
-  </div>
-
   <form method="get" id="pl-filter-form">
+    <input type="hidden" name="status" id="pl-status-input" value="{{ filter_status }}">
+
     <div class="pl-tabs">
-      <a href="?{% if q %}q={{ q }}&{% endif %}{% if filter_type %}type={{ filter_type }}&{% endif %}{% if filter_cari_q %}cari_q={{ filter_cari_q }}&{% endif %}{% if filter_direction %}direction={{ filter_direction }}&{% endif %}{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}{% endif %}" class="pl-tab {% if not filter_status %}active{% endif %}">
+      <button type="button" data-status="" class="pl-tab {% if not filter_status %}active{% endif %}">
         <i data-lucide="layers"></i>
         <span>{% trans "All" %}</span>
-      </a>
+      </button>
       {% for val, label in status_choices %}
-        <a href="?status={{ val }}{% if q %}&q={{ q }}{% endif %}{% if filter_type %}&type={{ filter_type }}{% endif %}{% if filter_cari_q %}&cari_q={{ filter_cari_q }}{% endif %}{% if filter_direction %}&direction={{ filter_direction }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="pl-tab {% if filter_status == val %}active{% endif %}">
+        <button type="button" data-status="{{ val }}" class="pl-tab {% if filter_status == val %}active{% endif %}">
           <i data-lucide="{% if val == 'draft' %}file-edit{% elif val == 'confirmed' %}check-circle{% elif val == 'cancelled' %}x-circle{% else %}circle{% endif %}"></i>
           <span>{{ label }}</span>
-        </a>
+        </button>
       {% endfor %}
       <div class="pl-tabs-r">
-        <input name="q" value="{{ q }}" class="pl-search-input" type="search"
-               placeholder="{% trans 'Search: payment no, account, description…' %}"
-               onkeydown="if(event.key==='Enter'){this.form.submit();}">
+        <input name="q" value="{{ q }}" class="pl-search-input" id="pl-search-input" type="search"
+               placeholder="{% trans 'Search: payment no, account, description…' %}" autocomplete="off">
       </div>
     </div>
-
-    {% if filter_status %}<input type="hidden" name="status" value="{{ filter_status }}">{% endif %}
 
     <div class="pl-toolbar">
       <label class="pl-ctl" title="{% trans 'Direction' %}">
         <span class="pl-ctl-lbl">{% trans "Direction" %}</span>
-        <select name="direction" onchange="this.form.submit()">
+        <select name="direction">
           <option value="">{% trans "All" %}</option>
           <option value="in"  {% if filter_direction == 'in' %}selected{% endif %}>{% trans "Inflows" %}</option>
           <option value="out" {% if filter_direction == 'out' %}selected{% endif %}>{% trans "Outflows" %}</option>
@@ -319,113 +300,95 @@
 
       <label class="pl-ctl" title="{% trans 'From' %}">
         <span class="pl-ctl-lbl">{% trans "From" %}</span>
-        <input type="date" name="date_from" value="{{ date_from }}" onchange="this.form.submit()">
+        <input type="date" name="date_from" value="{{ date_from }}">
       </label>
 
       <label class="pl-ctl" title="{% trans 'To' %}">
         <span class="pl-ctl-lbl">{% trans "To" %}</span>
-        <input type="date" name="date_to" value="{{ date_to }}" onchange="this.form.submit()">
+        <input type="date" name="date_to" value="{{ date_to }}">
       </label>
 
-      <a class="pl-reset" href="{% url 'current_account:payment_list' %}">{% trans "Clear" %}</a>
+      <a class="pl-reset" href="{% url 'current_account:payment_list' %}" id="pl-clear">{% trans "Clear" %}</a>
     </div>
   </form>
 
-  <div class="pl-meta">
-    <div class="pl-result"><b>{{ n|intcomma }}</b> {% trans "payments" %}</div>
+  <div id="pl-results">
+    {% include "current_account/partials/payment_list_results.html" %}
   </div>
-
-  {% if payments %}
-  <div class="pl-card">
-    <table class="pl-tbl">
-      <thead>
-        <tr>
-          <th>{% trans "No" %}</th>
-          <th>{% trans "Date" %}</th>
-          <th>{% trans "Type" %}</th>
-          <th>{% trans "Method" %}</th>
-          <th>{% trans "Account" %}</th>
-          <th>{% trans "Cash Account" %}</th>
-          <th>{% trans "Status" %}</th>
-          <th class="num">{% trans "Amount" %}</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in payments %}
-        <tr>
-          <td><a class="pl-num" href="{% url 'current_account:payment_detail' p.pk %}">{{ p.number }}</a></td>
-          <td><span class="pl-date">{{ p.date|date:"d.m.Y" }}</span></td>
-          <td>
-            <span class="pl-type
-              {% if p.type == 'collection' %}collection
-              {% elif p.type == 'payment' %}payment
-              {% else %}other{% endif %}">
-              <span class="pl-type-dot"></span>{{ p.get_type_display }}
-            </span>
-          </td>
-          <td><span class="pl-method">{{ p.get_method_display }}</span></td>
-          <td>
-            <a class="pl-cari" href="{% url 'current_account:cari_detail' p.cari.pk %}">{{ p.cari.name }}</a>
-            <div class="pl-cari-code">{{ p.cari.code }}</div>
-          </td>
-          <td><span class="pl-cash {% if not p.cash_account %}muted{% endif %}">{% if p.cash_account %}{{ p.cash_account.name }}{% else %}—{% endif %}</span></td>
-          <td>
-            <span class="pl-badge {{ p.status }}">
-              <span class="pl-badge-dot"></span>{{ p.get_status_display }}
-            </span>
-          </td>
-          <td class="num">{{ p.currency.symbol }}{{ p.amount|floatformat:2|intcomma }}</td>
-          <td class="pl-row-actions">
-            <a class="pl-go" href="{% url 'current_account:cari_detail' p.cari.pk %}"
-               title="{% trans 'Open current account' %}">
-              <i data-lucide="user-circle"></i>
-              <span>{% trans "Account" %}</span>
-              <i data-lucide="arrow-right" class="arr"></i>
-            </a>
-            {% if p.status != 'cancelled' %}
-            <form method="post" action="{% url 'current_account:payment_cancel' p.pk %}" class="pl-cancel-form"
-                  onsubmit="return confirm('{% trans "Payment will be cancelled, a reverse movement will be created. Are you sure?" %}');">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{{ request.get_full_path }}">
-              <button type="submit" class="pl-cancel" title="{% trans 'Cancel' %}">
-                <i data-lucide="x-circle"></i>
-                <span>{% trans "Cancel" %}</span>
-              </button>
-            </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="pl-empty">
-    <div class="ico"><i data-lucide="wallet"></i></div>
-    <h3>{% trans "No payments" %}</h3>
-    <p>{% trans "Adjust filters or create a new payment." %}</p>
-  </div>
-  {% endif %}
 </div>
 
 <script>
   if (window.lucide) lucide.createIcons();
 
-  // Cari "Account" filter: submit on Enter or 500ms after the user
-  // stops typing — keeps the URL clean and lets the server's
-  // icontains query do the matching.
+  /* Live search/filter — mirrors the cari list: debounce both text boxes,
+     fetch with X-Requested-With, swap only #pl-results, keep the URL
+     shareable via replaceState, drop stale responses with a token. */
   (function () {
-    const el = document.querySelector('.pl-toolbar input[name="cari_q"]');
-    if (!el) return;
-    let t = null;
-    el.addEventListener('input', () => {
-      clearTimeout(t);
-      t = setTimeout(() => el.form.submit(), 500);
+    var form = document.getElementById('pl-filter-form');
+    var results = document.getElementById('pl-results');
+    if (!form || !results) return;
+    var reqToken = 0, debTimer = null;
+
+    function plFetch() {
+      var token = ++reqToken;
+      var params = new URLSearchParams(new FormData(form));
+      Array.from(params.keys()).forEach(function (k) {
+        if (!params.get(k)) params.delete(k);
+      });
+      var url = location.pathname + (params.toString() ? '?' + params.toString() : '');
+      results.style.opacity = '0.45';
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          if (token !== reqToken) return;
+          results.innerHTML = html;
+          results.style.opacity = '';
+          history.replaceState(null, '', url);
+          if (window.lucide) lucide.createIcons();
+        })
+        .catch(function () { results.style.opacity = ''; });
+    }
+
+    function debounced() {
+      clearTimeout(debTimer);
+      debTimer = setTimeout(plFetch, 300);
+    }
+    ['pl-search-input'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', debounced);
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(debTimer); plFetch(); }
+      });
     });
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(t); el.form.submit(); }
+    var cariQ = form.querySelector('input[name="cari_q"]');
+    if (cariQ) {
+      cariQ.addEventListener('input', debounced);
+      cariQ.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(debTimer); plFetch(); }
+      });
+    }
+    form.addEventListener('submit', function (e) { e.preventDefault(); plFetch(); });
+    form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
+      el.addEventListener('change', plFetch);
     });
+    form.querySelectorAll('.pl-tab[data-status]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.getElementById('pl-status-input').value = btn.getAttribute('data-status') || '';
+        form.querySelectorAll('.pl-tab').forEach(function (b) { b.classList.toggle('active', b === btn); });
+        plFetch();
+      });
+    });
+    var clear = document.getElementById('pl-clear');
+    if (clear) {
+      clear.addEventListener('click', function (e) {
+        e.preventDefault();
+        form.querySelectorAll('input[type="search"], input[type="text"], input[type="date"], select').forEach(function (el) { el.value = ''; });
+        document.getElementById('pl-status-input').value = '';
+        form.querySelectorAll('.pl-tab').forEach(function (b, i) { b.classList.toggle('active', i === 0); });
+        plFetch();
+      });
+    }
   })();
 </script>
 {% endblock %}

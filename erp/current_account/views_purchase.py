@@ -140,7 +140,8 @@ def cancel_purchase_invoice(invoice_pk, user):
     brought in (after confirming NONE has ever been reserved into a
     customer order — checked and acted on under a row lock in the SAME
     transaction, so a concurrent scan can't slip past the check), then
-    cancels the invoice/cari via the existing, unmodified Invoice.cancel().
+    cancels the invoice/cari via Invoice.cancel() (which deletes the
+    posted supplier-debt movement and recomputes the balance).
 
     Raises PurchaseCancelBlocked (nothing mutated) if any top is reserved,
     or Invoice.DoesNotExist / ValueError if the invoice can't be cancelled.
@@ -212,10 +213,9 @@ class PurchaseCancel(View):
     partial cancel) if ANY of its tops has ever been reserved into a
     customer order.
 
-    Admin-gated like other destructive warehouse actions — this isn't an
-    audit-safe reversal like Invoice.cancel() alone; the stock is gone for
-    good, and InvoiceRestore refuses to resurrect a purchase invoice for
-    exactly that reason.
+    Admin-gated like other destructive warehouse actions — the stock is
+    gone for good, and invoice cancellation is terminal (no restore path
+    exists for any cancelled invoice).
     """
 
     def post(self, request, pk):

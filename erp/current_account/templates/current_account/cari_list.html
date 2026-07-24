@@ -24,6 +24,14 @@
   .ca { padding: 22px 28px 100px; font: 400 13.5px var(--font-sans); color: var(--ink); }
   .ca, .ca * { box-sizing: border-box; }
   #ca-results { transition: opacity 120ms ease; }
+  .ca-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding: 10px 4px; }
+  .ca-pager-info { font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+  .ca-pager-btns { display: flex; gap: 5px; align-items: center; }
+  .ca-pg-btn { min-width: 32px; height: 32px; padding: 0 8px; border: 1px solid #E5EAF0; border-radius: 8px; background: #fff; font: 600 12.5px var(--font-sans); color: var(--gray-600); cursor: pointer; transition: all 120ms; }
+  .ca-pg-btn:hover:not(:disabled):not(.active) { background: #F4F7FB; color: var(--ink); }
+  .ca-pg-btn.active { background: var(--nejum-teal-500); border-color: var(--nejum-teal-500); color: #fff; cursor: default; }
+  .ca-pg-btn:disabled { opacity: .4; cursor: default; }
+  .ca-pg-gap { color: var(--gray-500); padding: 0 2px; }
 
   .ca-head { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom: 18px; }
   .ca-eyebrow { font: 700 10.5px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--nejum-teal-600); margin-bottom: 4px; }
@@ -225,6 +233,7 @@
 
   <form method="get" id="ca-filter-form">
     <input type="hidden" name="type" id="ca-type-input" value="{{ filter_type }}">
+    <input type="hidden" name="page" id="ca-page-input" value="">
     <div class="ca-tabs">
       <button type="button" class="ca-tab {% if not filter_type %}active{% endif %}" data-type="">
         <span>{% trans "All" %}</span>
@@ -264,10 +273,13 @@
 
       <label class="ca-ctl" title="{% trans 'Status' %}">
         <span class="ca-ctl-lbl">{% trans "Status" %}</span>
+        {% comment %}"All" needs a REAL value: an empty value gets dropped
+        from the fetch URL entirely, and the server then falls back to the
+        default (Active) — making "All" behave exactly like "Active".{% endcomment %}
         <select name="active">
           <option value="1" {% if filter_active == '1' %}selected{% endif %}>{% trans "Active" %}</option>
           <option value="0" {% if filter_active == '0' %}selected{% endif %}>{% trans "Inactive" %}</option>
-          <option value=""  {% if filter_active == '' %}selected{% endif %}>{% trans "All" %}</option>
+          <option value="all" {% if filter_active == 'all' %}selected{% endif %}>{% trans "All" %}</option>
         </select>
       </label>
 
@@ -332,15 +344,22 @@
     }
     window.__caFetch = caFetch;
 
+    const pageInput = document.getElementById('ca-page-input');
+    // Any NEW search/filter starts back at page 1 — a page number only
+    // survives explicit pager clicks.
+    function caResetPage() { if (pageInput) pageInput.value = ''; }
+    window.__caResetPage = caResetPage;
+
     // Debounced live search.
     if (input) {
       input.addEventListener('input', function () {
         if (clearBtn) clearBtn.style.display = input.value.trim() ? 'flex' : 'none';
         clearTimeout(timer);
+        caResetPage();
         timer = setTimeout(caFetch, 300);
       });
       input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); caFetch(); }
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); caResetPage(); caFetch(); }
       });
     }
     // Never allow a classic GET submit (that's the full-page reload).
@@ -348,7 +367,7 @@
 
     // Dropdown filters.
     form.querySelectorAll('select').forEach(sel => {
-      sel.addEventListener('change', caFetch);
+      sel.addEventListener('change', function () { caResetPage(); caFetch(); });
     });
 
     // Type tabs.
@@ -356,8 +375,18 @@
       btn.addEventListener('click', function () {
         typeInput.value = btn.dataset.type;
         document.querySelectorAll('.ca-tab[data-type]').forEach(b => b.classList.toggle('active', b === btn));
+        caResetPage();
         caFetch();
       });
+    });
+
+    // Pager clicks — the pager re-renders with every swap, so delegate.
+    results.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-ca-page]');
+      if (!btn) return;
+      if (pageInput) pageInput.value = btn.getAttribute('data-ca-page') || '';
+      caFetch();
+      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   })();
 
@@ -365,6 +394,7 @@
     const input = document.getElementById('ca-search-input');
     input.value = '';
     document.getElementById('ca-search-clear').style.display = 'none';
+    if (window.__caResetPage) window.__caResetPage();
     if (window.__caFetch) window.__caFetch();
   }
 </script>

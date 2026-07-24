@@ -99,6 +99,9 @@ def _filter_caris(request):
             where=["cached_balance > credit_limit AND credit_limit > 0"]
         )
 
+    # Default (no param) = active only; "0" = inactive only; "all" = both.
+    # "all" is an explicit value on purpose — an empty one is stripped from
+    # the fetch URL client-side and would silently fall back to the default.
     active = request.GET.get("active") or "1"
     if active == "1":
         qs = qs.filter(is_active=True)
@@ -116,7 +119,11 @@ def _filter_caris(request):
         "recent":    "-last_movement_at",
         "-recent":   "last_movement_at",
     }
-    qs = qs.order_by(sort_map.get(sort, "name"))
+    # "id" tiebreaker: the sort fields aren't unique (duplicate names,
+    # NULL last_movement_at, equal balances), and without a total order
+    # Postgres may return the SAME row on two different pages while
+    # another never appears at all.
+    qs = qs.order_by(sort_map.get(sort, "name"), "id")
     return qs
 
 
@@ -137,8 +144,18 @@ class CariList(View):
             we_owe=Sum("cached_balance_base", filter=Q(cached_balance__lt=0)),
         )
 
+        # Paginate — stats above stay whole-filtered-set; only the rows page.
+        from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+        paginator = Paginator(qs, 50)
+        try:
+            page = paginator.page(request.GET.get("page") or 1)
+        except (EmptyPage, PageNotAnInteger):
+            page = paginator.page(1)
+
         ctx = {
-            "caris":          qs[:500],
+            "caris":          page.object_list,
+            "page":           page,
+            "paginator":      paginator,
             "total_count":    totals["n"] or 0,
             "owes_us":        totals["owes_us"] or Decimal("0.00"),
             "we_owe":         abs(totals["we_owe"] or Decimal("0.00")),

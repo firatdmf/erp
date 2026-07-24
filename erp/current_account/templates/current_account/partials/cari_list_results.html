@@ -77,6 +77,35 @@ in place instead of reloading the whole page.
   </a>
   {% endfor %}
 </div>
+
+{% if paginator.num_pages > 1 %}
+<div class="ca-pager">
+  <div class="ca-pager-info">
+    {{ page.start_index }}–{{ page.end_index }} / {{ total_count|intcomma }}
+  </div>
+  <div class="ca-pager-btns">
+    {% if page.has_previous %}
+      <button type="button" class="ca-pg-btn" data-ca-page="{{ page.previous_page_number }}">‹</button>
+    {% else %}
+      <button type="button" class="ca-pg-btn" disabled>‹</button>
+    {% endif %}
+    {% for n in paginator.page_range %}
+      {% if n == page.number %}
+        <button type="button" class="ca-pg-btn active">{{ n }}</button>
+      {% elif n == 1 or n == paginator.num_pages or n|add:"-2" <= page.number and n|add:"2" >= page.number %}
+        <button type="button" class="ca-pg-btn" data-ca-page="{{ n }}">{{ n }}</button>
+      {% elif n == page.number|add:"-3" or n == page.number|add:"3" %}
+        <span class="ca-pg-gap">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page.has_next %}
+      <button type="button" class="ca-pg-btn" data-ca-page="{{ page.next_page_number }}">›</button>
+    {% else %}
+      <button type="button" class="ca-pg-btn" disabled>›</button>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 {% else %}
 <div class="ca-empty">
   <div class="ico"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>

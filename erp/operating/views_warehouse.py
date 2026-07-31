@@ -3,7 +3,7 @@ import json
 from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Sum, F, DecimalField
+from django.db.models import Count, Sum, F, DecimalField, Q
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import JsonResponse, StreamingHttpResponse
@@ -761,7 +761,8 @@ class WarehouseDetail(View):
             # ── FLAT: list EVERY variant (WarehouseProduct) individually. ──
             flat = (base_qs
                     .select_related('catalog_variant__product')
-                    .annotate(base=base_expr, roll_count=Count('rolls'),
+                    .annotate(base=base_expr,
+                              roll_count=Count('rolls', filter=~Q(rolls__status='consumed')),
                               line_usd=F('quantity') * F('cost_usd'),
                               line_try=F('quantity') * F('cost_try'),
                               reserved=reserved_meters_subquery()))
@@ -836,7 +837,7 @@ class WarehouseDetail(View):
             if _bases:
                 _rc = (base_qs.annotate(base=base_expr)
                        .filter(base__in=_bases).values("base")
-                       .annotate(rc=Count("rolls")))
+                       .annotate(rc=Count("rolls", filter=~Q(rolls__status='consumed'))))
                 _roll_counts = {r["base"]: r["rc"] for r in _rc}
 
                 # Active reserved metres per group — computed separately
@@ -903,7 +904,9 @@ class WarehouseDetail(View):
         # Header counts: main products (packages), variants, and rolls (tops).
         group_count = (all_products.annotate(base=base_expr)
                        .values('base').distinct().count())
-        roll_count = WarehouseProductRoll.objects.filter(product__warehouse_id__in=scope_ids).count()
+        roll_count = (WarehouseProductRoll.objects
+                      .filter(product__warehouse_id__in=scope_ids)
+                      .exclude(status='consumed').count())
         total_value_usd, total_value_try = warehouse.total_values()
 
         # "Son Hareketler" preview — the latest activity in THIS warehouse
@@ -3902,7 +3905,9 @@ class WarehouseProductDetail(View):
             pk=product_pk, warehouse_id=warehouse_pk,
         )
         warehouse = product.warehouse
-        rolls = list(product.rolls.all().order_by("-scanned_at"))
+        # Hide fully-consumed rolls — their stock is 0 and they only clutter
+        # the list. Movement history below still preserves them.
+        rolls = list(product.rolls.exclude(status="consumed").order_by("-scanned_at"))
         movements = product.movements.all().select_related("roll", "created_by")[:200]
 
         # Aggregate quick stats — in/out totals in a single query.
@@ -3943,7 +3948,7 @@ class WarehouseProductDetail(View):
             "in_total": in_total,
             "out_total": out_total,
             "reserved_total": reserved_total,
-            "active_rolls_count": sum(1 for r in rolls if r.status != "consumed"),
+            "active_rolls_count": len(rolls),
             "is_admin": _is_admin(request.user),
         })
 

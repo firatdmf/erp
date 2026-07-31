@@ -42,6 +42,7 @@ from marketing.utils.bunny_storage import upload_to_bunny
 from django.utils.html import escape
 from .models import (
     OrderItem,
+    OrderRollReservation,
 )  # if it's not already in __init__.py
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.contrib import messages
@@ -2306,6 +2307,14 @@ class OrderEdit(UpdateView):
                 if deleted_items_json:
                     try:
                         deleted_items = json.loads(deleted_items_json)
+                        # Release any active roll reservations tied to these items
+                        # before deleting them — otherwise SET_NULL on order_item
+                        # orphans the reservations and rolls stay "reserved" forever.
+                        OrderRollReservation.objects.filter(
+                            order_item__pk__in=deleted_items,
+                            order=self.object,
+                            consumed=False,
+                        ).delete()
                         OrderItem.objects.filter(
                             pk__in=deleted_items, order=self.object
                         ).delete()

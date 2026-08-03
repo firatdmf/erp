@@ -53,8 +53,9 @@ def signup(request):
         myuser.last_name = lname
         print(myuser)
         myuser.save()
-        mymember = Member.objects.create(user=myuser)
-        mymember.save()
+        # Member is auto-created by post_save signal on User (see signals.py).
+        # get_or_create is idempotent — safe even if the signal is later removed.
+        Member.objects.get_or_create(user=myuser)
 
         messages.success(request, "Your acccount has been successfully created.")
         return redirect("/authentication/signin")

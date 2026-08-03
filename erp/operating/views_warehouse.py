@@ -4727,7 +4727,10 @@ class WarehouseRollEdit(View):
                 StockMovement.objects.create(
                     product=product, roll=roll, movement_type="adjustment",
                     quantity=abs(total - old_qty),
-                    reason=f"Roll meters edited ({old_qty}m → {total}m)",
+                    reason=(
+                        f"Roll meters edited (roll: {old_full:.2f}m → {new_full:.2f}m; "
+                        f"total: {old_qty:.2f}m → {total:.2f}m)"
+                    ),
                     reference=roll.barcode or f"Roll #{roll.pk}",
                     created_by=request.user if request.user.is_authenticated else None,
                 )

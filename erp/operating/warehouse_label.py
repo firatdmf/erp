@@ -65,9 +65,13 @@ def _label_pdf_bytes(product, rolls, detail_url=None):
         bc_val = (roll.barcode if (roll and roll.barcode) else (product.barcode or sku or ""))
         meters = (roll.meters if roll else product.quantity) or 0
 
-        # ── QR (top-right) — encodes the product page URL so scanning it
-        #    opens the product-info screen; falls back to the code. ──
-        qr_val = detail_url or bc_val or sku or (product.name or "")
+        # ── QR (top-right) — encodes the ROLL barcode so a QR scan flows
+        #    through the same warehouse-lookup pipeline as a 1D scan. QRs
+        #    are physically more reliable to scan than Code128, especially
+        #    on tags that get folded/scuffed. Falls back to product-level
+        #    identifiers if there's no roll (SKU/name), then to detail_url
+        #    as a last resort so the QR is never empty. ──
+        qr_val = bc_val or sku or (product.name or "") or detail_url
         qsize = 17 * mm
         if qr_val:
             qbuf = BytesIO()

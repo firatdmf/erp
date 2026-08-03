@@ -35,7 +35,7 @@ def warehouse_product_info(request, warehouse_pk, product_pk):
     })
 
 
-def _label_pdf_bytes(product, rolls, detail_url=None):
+def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import mm
     from reportlab.graphics.barcode import code128
@@ -58,6 +58,10 @@ def _label_pdf_bytes(product, rolls, detail_url=None):
     W, H = 76 * mm, 58 * mm
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=(W, H))
+    # PDF metadata → browser tab title when opened inline.
+    if title:
+        c.setTitle(title)
+        c.setSubject(title)
 
     # One label per roll; if there are no rolls, one product-level label.
     items = list(rolls) if rolls else [None]
@@ -72,10 +76,10 @@ def _label_pdf_bytes(product, rolls, detail_url=None):
         #    identifiers if there's no roll (SKU/name), then to detail_url
         #    as a last resort so the QR is never empty. ──
         qr_val = bc_val or sku or (product.name or "") or detail_url
-        qsize = 17 * mm
+        qsize = 21 * mm
         if qr_val:
             qbuf = BytesIO()
-            segno.make(str(qr_val), error="m").save(qbuf, kind="png", scale=6)
+            segno.make(str(qr_val), error="m").save(qbuf, kind="png", scale=8)
             qbuf.seek(0)
             c.drawInlineImage(Image.open(qbuf).convert("RGB"),
                               W - qsize - 4 * mm, H - qsize - 4 * mm, qsize, qsize)
@@ -172,7 +176,31 @@ def warehouse_product_label(request, warehouse_pk, product_pk):
     detail_url = request.build_absolute_uri(reverse(
         "operating:warehouse_product_info",
         kwargs={"warehouse_pk": warehouse_pk, "product_pk": product_pk}))
-    pdf = _label_pdf_bytes(product, rolls, detail_url=detail_url)
+
+    # Build a meaningful title (browser tab) and safe filename (download).
+    import re
+    product_name = (product.name or product.sku or f"Product {product.pk}").strip()
+    if len(rolls) == 1 and rolls[0].barcode:
+        title = f"Label — {product_name} — {rolls[0].barcode}"
+        stem = f"label-{product.sku or product.pk}-{rolls[0].barcode}"
+    else:
+        title = f"Label — {product_name}"
+        stem = f"label-{product.sku or product.pk}"
+    # Filename: RFC 5987 filename* carries the full Unicode (Turkish
+    # chars preserved in modern browsers), plus an ASCII-transliterated
+    # filename= fallback for older clients. Turkish İ → I via NFKD so
+    # the fallback stays readable instead of dropping the letter.
+    import unicodedata
+    from urllib.parse import quote
+    ascii_stem = (
+        unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode("ascii")
+    )
+    ascii_stem = re.sub(r"[^A-Za-z0-9._-]+", "-", ascii_stem).strip("-") or "label"
+
+    pdf = _label_pdf_bytes(product, rolls, detail_url=detail_url, title=title)
     resp = HttpResponse(pdf, content_type="application/pdf")
-    resp["Content-Disposition"] = f'inline; filename="label-{product.sku or product.pk}.pdf"'
+    resp["Content-Disposition"] = (
+        f'inline; filename="{ascii_stem}.pdf"; '
+        f"filename*=UTF-8''{quote(stem + '.pdf')}"
+    )
     return resp

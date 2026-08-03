@@ -100,7 +100,7 @@
         <div class="doc-type">{% trans "Order" %}</div>
       </td>
       <td align="right">
-        <div class="date">{{ order.created_at|date:"d M Y · H:i" }}</div>
+        <div class="date">{{ order.order_date|date:"d M Y" }}</div>
         <div style="margin-top: 4pt;">
           {% if order.contact %}<span class="kind b2b">B2B</span>
           {% elif order.company %}<span class="kind b2b">B2B</span>

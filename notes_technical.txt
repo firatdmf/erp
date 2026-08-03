@@ -119,3 +119,16 @@ ngrok http 8000
 
 
 ---
+
+
+Did a backup:
+July 31, 2026
+
+-~/backups/erp/erp_20260731_115030.dump
+
+o restore this backup (if you ever need to):
+
+
+PGPASSWORD='...' /opt/homebrew/opt/postgresql@18/bin/pg_restore \
+  -h HOST -p PORT -U USER -d DBNAME --no-owner --clean --if-exists \
+  ~/backups/erp/erp_20260731_115030.dump

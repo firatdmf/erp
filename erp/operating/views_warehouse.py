@@ -3973,6 +3973,37 @@ _ORDER_REASON_PREFIXES = ("Order ship", "Order un-ship", "Order edit")
 _ORDER_REF_RE = r"^DK\d{7,}$"
 
 
+def _reversed_pair_ids(qs):
+    """Return the set of StockMovement IDs that are part of a fully-reversed
+    pair — same roll, same reference, same absolute quantity, one 'in' + one
+    'out'. Only looks at ORDER movements (ship/un-ship etc.) since those are
+    the ones that get reversed on cancel. Pairs are matched N-to-N inside a
+    group, so if 2 ships and 2 un-ships exist for the same reference they
+    all get hidden (fully cancelled); if 2 ships but only 1 un-ship exists,
+    only 2 IDs are hidden (1 pair) and the remaining unpaired ship stays."""
+    from collections import defaultdict
+    order_qs = qs.filter(_order_movement_q()).values(
+        'id', 'roll_id', 'reference', 'quantity', 'movement_type', 'created_at'
+    )
+    # Bucket by (roll_id, reference, |quantity|)
+    buckets = defaultdict(lambda: {'in': [], 'out': []})
+    for row in order_qs:
+        if row['movement_type'] not in ('in', 'out'):
+            continue
+        key = (row['roll_id'], row['reference'] or '', abs(row['quantity']))
+        buckets[key][row['movement_type']].append((row['created_at'], row['id']))
+
+    to_hide = set()
+    for grp in buckets.values():
+        ins = sorted(grp['in'])
+        outs = sorted(grp['out'])
+        n = min(len(ins), len(outs))
+        for i in range(n):
+            to_hide.add(ins[i][1])
+            to_hide.add(outs[i][1])
+    return to_hide
+
+
 def _order_movement_q():
     from django.db.models import Q as _Q
     q = _Q(reference__regex=_ORDER_REF_RE) | _Q(reference__startswith="Order #")
@@ -4107,6 +4138,14 @@ class WarehouseMovementsAll(View):
         elif kind in ("in", "out", "adjustment"):
             qs = qs.filter(movement_type=kind).exclude(_order_movement_q())
 
+        # "Hide reversed pairs" toggle — collapses ship/un-ship that fully
+        # cancel each other so the ledger isn't cluttered with noise.
+        hide_reversed = (request.GET.get("hide_reversed") or "").strip() in ("1", "true", "on")
+        if hide_reversed:
+            hidden_ids = _reversed_pair_ids(qs)
+            if hidden_ids:
+                qs = qs.exclude(pk__in=hidden_ids)
+
         qs = qs.order_by("-created_at")
 
         paginator = Paginator(qs, 50)
@@ -4137,6 +4176,7 @@ class WarehouseMovementsAll(View):
                 "from": date_from,
                 "to": date_to,
                 "q": q,
+                "hide_reversed": hide_reversed,
             },
         })
 
@@ -4237,6 +4277,13 @@ class WarehouseMovements(View):
             wanted = [t.strip() for t in types_param.split(",") if t.strip()]
             qs = qs.filter(movement_type__in=wanted)
 
+        # "Hide reversed pairs" toggle — see _reversed_pair_ids for details.
+        hide_reversed = (request.GET.get("hide_reversed") or "").strip() in ("1", "true", "on")
+        if hide_reversed:
+            hidden_ids = _reversed_pair_ids(qs)
+            if hidden_ids:
+                qs = qs.exclude(pk__in=hidden_ids)
+
         qs = qs.order_by("-created_at")
 
         paginator = Paginator(qs, 50)
@@ -4273,6 +4320,7 @@ class WarehouseMovements(View):
                 "q": q,
                 "min_qty": min_qty,
                 "max_qty": max_qty,
+                "hide_reversed": hide_reversed,
             },
         })
 

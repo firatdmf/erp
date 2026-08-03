@@ -454,7 +454,7 @@ def post_order_movement(order, *, member=None):
         existing.amount = total
         existing.currency = currency
         existing.book = book
-        existing.date = order.created_at.date() if order.created_at else date.today()
+        existing.date = order.order_date or (order.created_at.date() if order.created_at else date.today())
         existing.description = desc
         existing.reference = ref
         # Force amount_base recompute on save.
@@ -465,7 +465,7 @@ def post_order_movement(order, *, member=None):
     return CariMovement.objects.create(
         cari=cari,
         book=book,
-        date=order.created_at.date() if order.created_at else date.today(),
+        date=order.order_date or (order.created_at.date() if order.created_at else date.today()),
         amount=total,
         currency=currency,
         movement_type="order_sale",

@@ -40,6 +40,17 @@
 
     <br />
 
+    {% if is_admin %}
+    <div id="order-date-field" style="margin: 8px 0;">
+      <label for="order_date">{% trans "Order Date" %}</label>
+      <input type="date" id="order_date" name="order_date"
+             value="{{ order.order_date|date:'Y-m-d' }}" />
+      <small style="color:#6b7280; display:block; margin-top:4px;">
+        {% trans "Admin only — use for backdating or fixing late data entry." %}
+      </small>
+    </div>
+    {% endif %}
+
     <div id="product-fields">
       <label for="product">{% trans "Add New Product" %}</label>
       <input class="border px-2 py-1 rounded w-full" id="product-input" name="product" type="text" autocomplete="off"

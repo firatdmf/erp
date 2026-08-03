@@ -353,6 +353,13 @@
       <label>{% trans "Search reason / reference / SKU / barcode" %}</label>
       <input type="text" name="q" value="{{ filters.q }}" placeholder="{% trans 'Order #, roll #, reason text...' %}">
     </div>
+    <div class="fld" style="display:flex; align-items:center; gap:6px; min-width:auto;">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
+        <input type="checkbox" name="hide_reversed" value="1"
+               {% if filters.hide_reversed %}checked{% endif %}>
+        {% trans "Hide reversed pairs" %}
+      </label>
+    </div>
     <div class="actions">
       <a href="{% url 'operating:warehouse_movements_all' %}" class="ord-btn ghost">
         <i class="fa fa-xmark"></i>{% trans "Clear" %}

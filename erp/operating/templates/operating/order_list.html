@@ -454,7 +454,7 @@
         {% endif %}
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
-          <span class="ord-date">{{ order.created_at|date:"d M Y · H:i" }}</span>
+          <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
           {% if order.contact %}
@@ -557,7 +557,7 @@
         <span class="ord-kind b2b">B2B</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
-          <span class="ord-date">{{ order.created_at|date:"d M Y · H:i" }}</span>
+          <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
           {% if order.contact %}
@@ -624,7 +624,7 @@
         <span class="ord-kind b2c">B2C</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
-          <span class="ord-date">{{ order.created_at|date:"d M Y · H:i" }}</span>
+          <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
           <div class="ord-cust-avatar" style="background: #C2A45A;">
@@ -694,7 +694,7 @@
         <span class="ord-kind retail">{% trans "Perakende" %}</span>
         <div class="ord-id">
           <span class="mono">{% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}</span>
-          <span class="ord-date">{{ order.created_at|date:"d M Y · H:i" }}</span>
+          <span class="ord-date">{{ order.order_date|date:"d M Y" }}</span>
         </div>
         <div class="ord-cust">
           <div class="ord-cust-avatar" style="background: #9F1239;">

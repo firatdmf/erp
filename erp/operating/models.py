@@ -325,6 +325,11 @@ class Order(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # User-facing date shown on invoices, prints, and lists. Defaults to
+    # today on create; only admins may change it afterwards (for backdating
+    # accounting entries or fixing late data entry). Separate from
+    # created_at so the audit trail stays intact.
+    order_date = models.DateField(blank=True, null=True, db_index=True)
 
     # Customer can be: contact (B2B), company (B2B), or web_client (B2C)
     contact = models.ForeignKey(
@@ -734,7 +739,14 @@ class Order(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate order_number for web orders (if they don't have one)
         is_new = self.pk is None
-        
+
+        # Default the user-facing order date to today when creating a new
+        # order. Existing orders keep whatever value is on the row (admins
+        # can edit it via the OrderEdit view — see _is_admin gate there).
+        if is_new and self.order_date is None:
+            from django.utils import timezone
+            self.order_date = timezone.localdate()
+
         # First save to get ID if new
         if is_new:
             super().save(*args, **kwargs)

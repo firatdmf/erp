@@ -881,7 +881,7 @@
         {% endif %}
       </div>
       <div class="od-meta">
-        <span><i class="fa fa-calendar"></i>{{ order.created_at|date:"d M Y · H:i" }}</span>
+        <span><i class="fa fa-calendar"></i>{{ order.order_date|date:"d M Y" }}</span>
         <span class="od-dot"></span>
         <span><i class="fa fa-user"></i>
           {% if order.contact %}{{ order.contact.name|capfirst }}

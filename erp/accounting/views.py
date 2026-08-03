@@ -1693,7 +1693,7 @@ class SalesDashboardView(View):
                 'id': order.id,
                 'order_number': order.order_number or f"ORD-{order.id}",
                 'customer_name': customer_name or "Unknown",
-                'date': order.created_at,
+                'date': order.order_date or order.created_at.date(),
                 'revenue': order_revenue,
                 'cost': order_cost,
                 'profit': order_profit,

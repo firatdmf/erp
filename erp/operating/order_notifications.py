@@ -242,7 +242,7 @@ def _render_order_pdf(order):
             [par(brand.upper(), 18, bold=True),
              par(subtitle, 8, color=MUT, upper=True)],
             [par(f"{_('ORDER')} {num}", 14, bold=True, align=2),
-             par(datef(order.created_at, "d M Y · H:i"), 8.5, color=MUT, align=2)],
+             par(datef(order.order_date or order.created_at, "d M Y"), 8.5, color=MUT, align=2)],
         ]], colWidths=[CW * 0.55, CW * 0.45])
         header.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
@@ -257,7 +257,7 @@ def _render_order_pdf(order):
             [par(_("Status"), 8, color=MUT, upper=True),
              par(order.get_status_display() or order.status, 10, bold=True)],
             [par(_("Order Date"), 8, color=MUT, upper=True, align=1),
-             par(datef(order.created_at, "d M Y"), 10, bold=True, align=1)],
+             par(datef(order.order_date or order.created_at, "d M Y"), 10, bold=True, align=1)],
             [par(_("Last Update"), 8, color=MUT, upper=True, align=2),
              par(datef(order.updated_at, "d M Y"), 10, bold=True, align=2)],
         ]], colWidths=[CW / 3] * 3)

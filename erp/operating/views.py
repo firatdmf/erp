@@ -2216,6 +2216,9 @@ class OrderEdit(UpdateView):
             }
             for it in items
         ]
+        # Admins get an editable order-date field in the form.
+        from .views_warehouse import _is_admin
+        context["is_admin"] = _is_admin(self.request.user)
         return context
 
     def post(self, request, *args, **kwargs):
@@ -2242,6 +2245,23 @@ class OrderEdit(UpdateView):
                 if self.object.notify_customer != new_notify:
                     self.object.notify_customer = new_notify
                     self.object.save(update_fields=["notify_customer", "updated_at"])
+
+                # Admin-only: change the user-facing order date (backdating
+                # for accounting / late data entry). Silently ignored for
+                # non-admins so the field can safely sit in the shared form.
+                from .views_warehouse import _is_admin
+                if _is_admin(self.request.user):
+                    raw_date = (self.request.POST.get("order_date") or "").strip()
+                    if raw_date:
+                        from datetime import date as _date
+                        try:
+                            y, m, d = raw_date.split("-")
+                            new_date = _date(int(y), int(m), int(d))
+                            if self.object.order_date != new_date:
+                                self.object.order_date = new_date
+                                self.object.save(update_fields=["order_date", "updated_at"])
+                        except (ValueError, TypeError):
+                            pass  # bad input — keep existing
 
                 # Handle customer update
                 customer_pk = self.request.POST.get("customer_pk")
@@ -3471,7 +3491,8 @@ def order_packing_list_pdf(request, pk):
 
     story.append(Paragraph(labels['title'], title_style))
     story.append(Paragraph(f"<b>{labels['order_no']}:</b> {order.order_number or order.pk}", normal_style))
-    story.append(Paragraph(f"<b>{labels['date']}:</b> {order.created_at.strftime('%d.%m.%Y %H:%M')}", normal_style))
+    _order_dt = order.order_date or order.created_at.date()
+    story.append(Paragraph(f"<b>{labels['date']}:</b> {_order_dt.strftime('%d.%m.%Y')}", normal_style))
     
     cust_name = ""
     if order.contact:

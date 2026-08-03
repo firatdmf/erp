@@ -64,7 +64,7 @@ def build_order_workbook(order):
     r += 1
     cell(ws, r, 1, "Order Confirmation", font=F_SUB)
     merge(ws, r, 1, 3)
-    cell(ws, r, 4, _dt(order.created_at), font=F_SUB, align=RIGHT)
+    cell(ws, r, 4, _dt(order.order_date) if order.order_date else _dt(order.created_at), font=F_SUB, align=RIGHT)
     merge(ws, r, 4, 6)
     for c in range(1, NCOLS + 1):
         ws.cell(r, c).border = RULE
@@ -79,7 +79,7 @@ def build_order_workbook(order):
         except Exception:
             payment = order.payment_status
     r = kv_pair(ws, r, "Order No", num, "Status", order.get_status_display() or order.status, NCOLS)
-    r = kv_pair(ws, r, "Order Date", _dt(order.created_at), "Payment", payment or "—", NCOLS)
+    r = kv_pair(ws, r, "Order Date", _dt(order.order_date) if order.order_date else _dt(order.created_at), "Payment", payment or "—", NCOLS)
     cari_name = order.cari.name if (order.cari_id and order.cari) else "—"
     r = kv_pair(ws, r, "Last Update", _dt(order.updated_at), "Currency", ccode, NCOLS)
     r = kv_full(ws, r, "Linked Account", cari_name, NCOLS)

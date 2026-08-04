@@ -713,6 +713,9 @@ class WarehouseDetail(View):
         search = (request.GET.get('search') or '').strip()
         sort = (request.GET.get('sort') or 'name_asc').strip()
         page_num = request.GET.get('page', '1')
+        # Hide zero-quantity WPs by default (empty variants clutter the list
+        # after transfers/sales). Opt in via the "show empty" checkbox.
+        show_empty = (request.GET.get('show_empty') or '').strip() in ('1', 'true', 'on')
 
         from django.db.models import Q
 
@@ -725,6 +728,8 @@ class WarehouseDetail(View):
         base_qs = (WarehouseProduct.objects
                    .filter(warehouse_id__in=scope_ids)
                    .select_related('warehouse'))
+        if not show_empty:
+            base_qs = base_qs.exclude(quantity=0)
         if search:
             # Case-insensitive across name / SKU / product-barcode AND each
             # roll's (top's) own barcode. We OR a few Turkish-aware cased
@@ -880,6 +885,7 @@ class WarehouseDetail(View):
             'sort': sort,
             'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
             'filtered_count': paginator.count,
+            'show_empty': show_empty,
         }
 
         # HTMX partial refresh for search/sort/page — re-renders ONLY the

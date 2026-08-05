@@ -4,38 +4,64 @@
 {% comment %}Row links use the product's OWN warehouse id — on a combined
 (ortak) warehouse page the rows come from MEMBER warehouses, and linking
 them under the combined pk would 404.{% endcomment %}
-<tr class="wh-vrow" style="cursor:pointer;"
-    onclick="window.location='{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}'">
+<tr class="wh-vrow" style="cursor:pointer;">
+  {% comment %}Every cell wraps its content in an anchor to the product
+  detail page, so right-click / middle-click / Cmd+click work anywhere
+  on the row (not just SKU or Name). Nested anchors are invalid HTML —
+  the SKU cell's external "Open linked product" link stays a sibling
+  outside the row-link wrapper.{% endcomment %}
   <td data-label="SKU">
-    {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
-    {% if warehouse.is_combined %}
-      <span style="margin-left:6px; font:700 10px var(--font-sans,sans-serif); color:#5B21B6; background:#EDE9FE; border-radius:5px; padding:1px 6px; vertical-align:middle; white-space:nowrap;">{{ p.warehouse.name }}</span>
-    {% endif %}
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit;">
+      {% if p.sku %}<span class="sku-pill">{{ p.sku }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+      {% if warehouse.is_combined %}
+        <span style="margin-left:6px; font:700 10px var(--font-sans,sans-serif); color:#5B21B6; background:#EDE9FE; border-radius:5px; padding:1px 6px; vertical-align:middle; white-space:nowrap;">{{ p.warehouse.name }}</span>
+      {% endif %}
+    </a>
+  </td>
+  <td data-label="{% trans 'Catalog' %}">
     {% if p.catalog_variant_id and p.catalog_variant.product_id %}
       <a href="{% url 'marketing:product_detail' p.catalog_variant.product_id %}"
-         onclick="event.stopPropagation();" target="_blank" rel="noopener"
-         title="{% trans 'Open linked product' %}: {{ p.catalog_variant.product.title }}"
-         style="margin-left:6px; color:#147F74; text-decoration:none; font-size:12px; white-space:nowrap;">
+         target="_blank" rel="noopener"
+         class="wh-cell-link catalog-link"
+         title="{% trans 'Open linked product' %}: {{ p.catalog_variant.product.title }}">
         <i class="fa fa-up-right-from-square"></i> {{ p.catalog_variant.product.sku|default:p.catalog_variant.product.title }}
       </a>
+    {% else %}
+      <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="color:#C5CCD3;">—</a>
     {% endif %}
   </td>
   <td data-label="{% trans 'Name' %}">
-    <div class="pname" style="font-weight:600;">{{ p.name }}</div>
-    {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+      <div class="pname" style="font-weight:600;">{{ p.name }}</div>
+      {% if p.model %}<div class="psub">{{ p.model }}</div>{% endif %}
+    </a>
   </td>
   <td class="num" data-label="{% trans 'Stock' %}">
-    <div class="qty">{{ p.quantity|floatformat:2 }} m</div>
-    {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each top has its own barcode' %}">{{ p.roll_count }} top</div>{% endif %}
-    {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} m</div>{% endif %}
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+      <div class="qty">{{ p.quantity|floatformat:2 }} m</div>
+      {% if p.roll_count %}<div class="tops-sub" title="{% trans 'Each top has its own barcode' %}">{{ p.roll_count }} top</div>{% endif %}
+      {% if p.reserved %}<div class="tops-sub" style="color:#B45309;font-weight:700;" title="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}Paketlenen siparişler için ayrılan{% else %}Reserved for packed orders{% endif %}"><i class="fa fa-lock" style="font-size:9px;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Rezerv{% else %}Reserved{% endif %}: {{ p.reserved|floatformat:2 }} m</div>{% endif %}
+    </a>
   </td>
-  <td class="num" data-label="{% trans 'Unit cost' %}">{% if p.purchase_price %}<span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
-  <td class="num" data-label="{% trans 'Total (USD)' %}">{% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
-  <td class="num" data-label="{% trans 'Total (TRY)' %}">{% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}</td>
+  <td class="num" data-label="{% trans 'Unit cost' %}">
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+      {% if p.purchase_price %}<span class="mono">{{ p.purchase_price|floatformat:2 }}</span><span class="curr-pill">{{ p.purchase_currency }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    </a>
+  </td>
+  <td class="num" data-label="{% trans 'Total (USD)' %}">
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+      {% if p.line_usd %}<span class="cost-usd">${{ p.line_usd|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    </a>
+  </td>
+  <td class="num" data-label="{% trans 'Total (TRY)' %}">
+    <a href="{% url 'operating:warehouse_product_detail' p.warehouse_id p.pk %}" class="wh-cell-link" style="text-decoration:none; color:inherit; display:block;">
+      {% if p.line_try %}<span class="cost-try">₺{{ p.line_try|floatformat:2 }}</span>{% else %}<span style="color:#C5CCD3;">—</span>{% endif %}
+    </a>
+  </td>
 </tr>
 {% empty %}
 <tr>
-  <td colspan="6">
+  <td colspan="7">
     <div class="od-empty">
       <i class="fa fa-box-open empty-ico"></i>
       <h4>{% trans "No variants in this warehouse" %}</h4>
@@ -49,7 +75,7 @@ them under the combined pk would 404.{% endcomment %}
 {% with gid=forloop.counter %}
 <tr class="wh-grp" style="cursor:pointer; background:#FBFCFE;"
     onclick="toggleWhGroup(this, {{ gid }}, '{% url 'operating:warehouse_group_variants' warehouse.pk %}?base={{ g.base|urlencode }}')">
-  <td class="wh-grp-head">
+  <td class="wh-grp-head" colspan="2">
     <div style="display:flex; align-items:center; gap:9px;">
       <i class="fa fa-chevron-right wh-grp-chev" style="color:#94A3B8; transition:transform .15s; width:10px;"></i>
       <span class="wh-grp-ico"><i class="fa fa-layer-group"></i></span>
@@ -77,7 +103,7 @@ them under the combined pk would 404.{% endcomment %}
 {% endwith %}
 {% empty %}
 <tr>
-  <td colspan="6">
+  <td colspan="7">
     <div class="od-empty">
       <i class="fa fa-box-open empty-ico"></i>
       <h4>{% trans "No products in this warehouse" %}</h4>

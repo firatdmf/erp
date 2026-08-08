@@ -147,7 +147,7 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
 
 
 def warehouse_product_code(request, warehouse_pk, product_pk):
-    """Return a QR (segno) or Code128 barcode (reportlab) PNG for a product.
+    """Return a QR (segno, PNG) or Code128 barcode (reportlab, SVG) image.
     PUBLIC (no login) so the codes load on the public info page too.
     ?kind=qr (default) | barcode
     """
@@ -159,7 +159,14 @@ def warehouse_product_code(request, warehouse_pk, product_pk):
         from reportlab.graphics.barcode import createBarcodeDrawing
         d = createBarcodeDrawing("Code128", value=str(value), barHeight=42,
                                  barWidth=1.1, humanReadable=True)
-        return HttpResponse(d.asString("png"), content_type="image/png")
+        # SVG, not PNG: rasterising a reportlab drawing goes through
+        # renderPM, which needs rlPyCairo → pycairo → system libcairo.
+        # That dependency is deliberately kept out of requirements.txt
+        # (it breaks the Nixpacks build), so asString("png") raised
+        # "cannot import desired renderPM backend rlPyCairo" and the
+        # barcode <img> rendered broken while the QR (pure-python segno)
+        # loaded fine. renderSVG is pure python and scales crisply.
+        return HttpResponse(d.asString("svg"), content_type="image/svg+xml")
 
     # QR encodes the clean info-screen URL so scanning opens the label-style
     # product info page on the phone (not just the raw barcode text).

@@ -4695,6 +4695,13 @@ class WarehouseRollEdit(View):
             roll.lot_number = lot or None
             roll_fields.append("lot_number"); changes.append("lot")
 
+        # ── Factory-second flag ──
+        # Checkbox posts "on"/"1"/"true" when ticked, absent when not.
+        new_is_second = (request.POST.get("is_second") or "").strip().lower() in ("1", "true", "on")
+        if new_is_second != bool(roll.is_second):
+            roll.is_second = new_is_second
+            roll_fields.append("is_second"); changes.append("is_second")
+
         # ── Meters (full length); keep any already-consumed amount ──
         meters_raw = (request.POST.get("meters") or "").strip().replace(",", ".")
         meters_changed = False
@@ -4755,6 +4762,7 @@ class WarehouseRollEdit(View):
                 "meters": float(roll.meters or 0),
                 "meters_remaining": float(roll.meters_remaining or 0) if roll.meters_remaining is not None else None,
                 "lot_number": roll.lot_number,
+                "is_second": bool(roll.is_second),
             },
             "product_quantity": float(product.quantity or 0),
         })

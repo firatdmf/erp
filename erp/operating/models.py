@@ -1238,6 +1238,10 @@ class WarehouseProductRoll(models.Model):
     status = models.CharField(
         max_length=16, choices=STATUS_CHOICES, default="in_stock", db_index=True,
     )
+    # Factory-second flag — imperfect roll, sold as-is at a different
+    # price / not counted with first-quality stock for order fulfilment
+    # decisions. Staff tag it manually via the roll-edit modal.
+    is_second = models.BooleanField(default=False, db_index=True)
     notes = models.TextField(blank=True, null=True)
     # Camera-scan provenance
     scanned_at = models.DateTimeField(auto_now_add=True)

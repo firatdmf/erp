@@ -150,6 +150,36 @@
   }
   .rolls-table tbody tr:last-child td { border-bottom: none; }
   .rolls-table tbody tr:hover { background: #FAFBFD; }
+  .roll-2nd-badge {
+    display: inline-flex; align-items: center;
+    margin-left: 6px; padding: 1px 6px;
+    font: 700 10px var(--font-sans, sans-serif);
+    color: #B45309; background: #FEF3C7;
+    border: 1px solid #FDE68A; border-radius: 4px;
+    vertical-align: middle; white-space: nowrap; cursor: help;
+    position: relative;
+  }
+  /* CSS tooltip — shows immediately on hover (native title has a delay). */
+  .roll-2nd-badge::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 9px; background: #0F1419; color: #FFF;
+    font: 500 11px var(--font-sans, sans-serif); white-space: nowrap;
+    border-radius: 4px; pointer-events: none;
+    opacity: 0; transition: opacity 120ms;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .roll-2nd-badge::before {
+    content: ""; position: absolute; bottom: calc(100% + 2px); left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent; border-top-color: #0F1419;
+    opacity: 0; transition: opacity 120ms; pointer-events: none;
+    z-index: 100;
+  }
+  .roll-2nd-badge:hover::after,
+  .roll-2nd-badge:hover::before { opacity: 1; }
   .roll-barcode {
     font: 600 11.5px var(--font-mono); color: var(--gray-700);
     background: #F4F7FB; padding: 3px 8px; border-radius: 6px;
@@ -620,6 +650,9 @@
                 {% else %}
                   <span style="color:#C5CCD3;">—</span>
                 {% endif %}
+                {% if r.is_second %}
+                  <span class="roll-2nd-badge" data-tip="{% trans 'Factory second — imperfect roll, not first quality.' %}">2nd</span>
+                {% endif %}
                 {% if r.lot_number %}<div style="font-size:11px;color:var(--gray-500);margin-top:2px;">Lot: {{ r.lot_number }}</div>{% endif %}
               </td>
               <td>
@@ -672,6 +705,7 @@
                           data-barcode="{{ r.barcode|default:'' }}"
                           data-meters="{% if r.meters is not None %}{{ r.meters|stringformat:'.2f' }}{% endif %}"
                           data-lot="{{ r.lot_number|default:'' }}"
+                          data-is-second="{% if r.is_second %}1{% else %}0{% endif %}"
                           onclick="openRollEdit(this)">
                     <i class="fa fa-pen"></i>
                   </button>
@@ -915,6 +949,15 @@
       <label>{% trans "Lot No" %}</label>
       <input class="so-input" type="text" id="reLot" placeholder="—">
     </div>
+    <div class="so-fld">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
+        <input type="checkbox" id="reIsSecond">
+        {% trans "Factory second (2nd quality)" %}
+      </label>
+      <small style="color:var(--gray-500); display:block; margin-top:2px;">
+        {% trans "Imperfect roll — sold as-is, kept separate from first-quality stock counts." %}
+      </small>
+    </div>
     <div class="so-actions">
       <button type="button" class="ord-btn ghost" onclick="closeRE()">{% trans "Cancel" %}</button>
       <button type="button" class="ord-btn primary" id="reSubmit" onclick="submitRollEdit()">
@@ -1037,6 +1080,7 @@
     document.getElementById('reBarcode').value = btn.dataset.barcode || '';
     document.getElementById('reMeters').value  = btn.dataset.meters || '';
     document.getElementById('reLot').value     = btn.dataset.lot || '';
+    document.getElementById('reIsSecond').checked = btn.dataset.isSecond === '1';
     document.getElementById('reOverlay').classList.add('show');
   }
   function closeRE() {
@@ -1055,6 +1099,7 @@
     fd.append('barcode', document.getElementById('reBarcode').value || '');
     fd.append('meters', document.getElementById('reMeters').value || '');
     fd.append('lot_number', document.getElementById('reLot').value || '');
+    if (document.getElementById('reIsSecond').checked) fd.append('is_second', '1');
     fetch(url, {
       method: 'POST', body: fd, credentials: 'same-origin',
       headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }

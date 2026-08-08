@@ -87,8 +87,22 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
         # ── Brand ──
         c.setFillColorRGB(0.58, 0.31, 0.02)
         c.setFont(bold, 12)
+        brand_w = c.stringWidth(brand, bold, 12)
         c.drawString(4 * mm, H - 9 * mm, brand)
         c.setFillColorRGB(0, 0, 0)
+
+        # ── "2nd" badge (right after the brand, only when factory second) ──
+        if roll and getattr(roll, 'is_second', False):
+            bx = 4 * mm + brand_w + 3 * mm
+            by = H - 9.4 * mm
+            tag = "2. KALITE"
+            c.setFont(bold, 7)
+            tw = c.stringWidth(tag, bold, 7)
+            pad = 2 * mm
+            c.setFillColorRGB(0.71, 0.32, 0.04)  # amber-ish text
+            c.roundRect(bx, by - 1.2 * mm, tw + 2 * pad, 4 * mm, 1 * mm, stroke=1, fill=0)
+            c.drawString(bx + pad, by, tag)
+            c.setFillColorRGB(0, 0, 0)
 
         # ── Field stack (left) ──
         def field(label, value, y):

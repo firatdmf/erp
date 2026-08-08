@@ -1110,7 +1110,13 @@ class WarehouseProduct(models.Model):
         max_length=4, choices=CURRENCY_CHOICES, default='USD'
     )
 
-    # Cost computed in USD and TRY (line totals = qty * unit cost)
+    # Cost computed in USD and TRY (line totals = qty * unit cost).
+    # 4 decimals ON PURPOSE: these are DERIVED through an FX division, so
+    # unlike purchase_price they carry genuine sub-cent value — ₺100.00 /
+    # 42.4318 is $2.3567, and cost_try (price × rate) is fractional on
+    # every USD purchase. Rounding at rest costs real money once metres
+    # are multiplied back in. Screens render these with floatformat:2, so
+    # they still read as plain cents next to purchase_price.
     cost_usd = models.DecimalField(
         max_digits=14, decimal_places=4, null=True, blank=True,
         help_text="Unit cost in USD"
@@ -1190,7 +1196,10 @@ class WarehouseProduct(models.Model):
         if cur == "USD":
             rate = self._usd_try_rate()
             if rate:
-                return (self.purchase_price * rate).quantize(_D("0.01"))
+                # 4dp to match unit_cost_usd() and the cost_try column —
+                # rounding to kuruş here made the fallback disagree with
+                # the stored value for the same product.
+                return (self.purchase_price * rate).quantize(_D("0.0001"))
         return None
 
     def total_cost_usd(self):

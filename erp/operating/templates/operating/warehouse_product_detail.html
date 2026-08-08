@@ -863,7 +863,7 @@
           <div class="info-row">
             <span class="info-k">{% trans "Unit cost (USD)" %}</span>
             <span class="info-v">
-              {% if product.cost_usd %}${{ product.cost_usd|floatformat:4 }}{% else %}<span class="muted">—</span>{% endif %}
+              {% if product.cost_usd %}${{ product.cost_usd|floatformat:2 }}{% else %}<span class="muted">—</span>{% endif %}
             </span>
           </div>
           <div class="info-row" style="grid-column: 1 / -1;">

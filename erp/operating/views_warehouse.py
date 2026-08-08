@@ -1676,7 +1676,7 @@ class WarehouseManualAdd(View):
                         if price is not None and price > 0:
                             if currency == "USD":
                                 cost_usd = price
-                                cost_try = (price * usd_try) if usd_try else None
+                                cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
                             elif currency == "TRY":
                                 cost_try = price
                                 if usd_try and usd_try > 0:
@@ -1855,7 +1855,7 @@ def _resolve_variant_wp(warehouse, main_product, base_name, v_in, prefix, seen_s
     if price is not None and price > 0:
         if currency == "USD":
             cost_usd = price
-            cost_try = (price * usd_try) if usd_try else None
+            cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
         elif currency == "TRY":
             cost_try = price
             if usd_try and usd_try > 0:
@@ -4402,7 +4402,7 @@ class WarehouseProductEdit(View):
                 usd_try = _get_usd_try_rate() or Decimal("1")
                 if purchase_currency == "USD":
                     product.cost_usd = pp
-                    product.cost_try = (pp * usd_try) if usd_try else None
+                    product.cost_try = (pp * usd_try).quantize(Decimal("0.0001")) if usd_try else None
                 elif purchase_currency == "TRY":
                     product.cost_try = pp
                     if usd_try and usd_try > 0:
@@ -5070,7 +5070,7 @@ class WarehouseRollScan(View):
                 usd_try = _get_usd_try_rate() or Decimal("1")
                 if purchase_currency == "USD":
                     product.cost_usd = purchase_price
-                    product.cost_try = (purchase_price * usd_try) if usd_try else None
+                    product.cost_try = (purchase_price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
                 elif purchase_currency == "TRY":
                     product.cost_try = purchase_price
                     if usd_try and usd_try > 0:

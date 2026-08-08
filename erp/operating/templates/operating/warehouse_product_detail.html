@@ -77,26 +77,35 @@
   .ord-btn.ghost.danger { color: #DC2626; border-color: #FECACA; }
   .ord-btn.ghost.danger:hover { background: #FEF2F2; border-color: #FCA5A5; }
 
-  /* Stats strip */
+  /* Stats strip — ONE bordered panel split into segments, not five
+     free-floating cards. Five separate cards on a 4-col grid left the
+     5th stranded alone on a second row; as segments of a single strip
+     a wrapped cell still reads as part of the same object. The 1px grid
+     gap over a tinted background paints the hairline dividers, so rows
+     AND columns get separators for free however the cells wrap. */
   .od-stats {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1px; background: #E2E8EE;
+    border: 1px solid #E2E8EE; border-radius: 12px; overflow: hidden;
     margin-bottom: 18px;
   }
   .od-stat {
-    background: white; border: 1px solid #E2E8EE; border-radius: 12px;
-    padding: 14px 16px;
+    background: white; border: 0; border-radius: 0;
+    padding: 11px 14px; min-width: 0;
+    text-align: center;
   }
   .od-stat-label {
-    font: 700 10.5px var(--font-sans); color: var(--gray-500);
-    letter-spacing: 0.08em; text-transform: uppercase;
-    display: flex; align-items: center; gap: 6px;
+    font: 700 10px var(--font-sans); color: var(--gray-500);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .od-stat-label i { color: var(--nejum-teal-600); }
+  .od-stat-label i { color: var(--nejum-teal-600); flex: none; }
   .od-stat-value {
-    font: 800 22px var(--font-sans); color: #0F1419; margin-top: 4px;
+    font: 800 19px var(--font-sans); color: #0F1419; margin-top: 2px;
     font-variant-numeric: tabular-nums;
   }
-  .od-stat-value .unit { font-size: 13px; font-weight: 600; color: var(--gray-500); margin-left: 4px; }
+  .od-stat-value .unit { font-size: 12px; font-weight: 600; color: var(--gray-500); margin-left: 3px; }
 
   /* 2-col grid */
   .od-grid {
@@ -339,7 +348,14 @@
   @media (max-width: 1000px) {
     .od-grid { grid-template-columns: 1fr; }
     .od-right { position: static; }
-    .od-stats { grid-template-columns: repeat(2, 1fr); }
+    /* A 6-column scaffold, because 5 tiles never wrap evenly into 3 or 4.
+       Rows become 3 across (span 2 each) then 2 across (span 3 each), so
+       every row divides the strip evenly and no tile ends up wider than
+       its neighbours — which is what would throw the centred numbers off
+       a common rhythm. */
+    .od-stats { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .od-stat { grid-column: span 2; }
+    .od-stat:nth-child(4), .od-stat:nth-child(5) { grid-column: span 3; }
   }
 
   /* ── Tablet (820px) ────────────────────────────────────────── */
@@ -347,8 +363,8 @@
     .ord { padding: 16px 16px 100px; }
     .od-title { font-size: 24px; }
 
-    /* Stats: 2 cols at tablet */
-    .od-stats { grid-template-columns: repeat(2, 1fr); }
+    /* Stats keep the 3-then-2 rhythm from the 1000px rule — at this width
+       three tiles still clear the longest label without ellipsis. */
 
     /* Head: meta wraps; action buttons go full row */
     .od-head { gap: 14px; }
@@ -403,10 +419,13 @@
     /* Stock-out button spans the full row */
     .od-head-r .ord-btn:first-child { grid-column: 1 / -1; }
 
-    /* Stats: 1 col */
-    .od-stats { grid-template-columns: 1fr; gap: 10px; margin-bottom: 14px; }
-    .od-stat { padding: 12px 14px; }
-    .od-stat-value { font-size: 20px; }
+    /* Phones: 2 across (three would ellipsise the labels), 5th spans the
+       full width as a summary row. One tile per row made the strip five
+       screens tall and pushed the rolls table below the fold. */
+    .od-stats { gap: 1px; margin-bottom: 14px; }
+    .od-stat { grid-column: span 3; padding: 10px 12px; }
+    .od-stat:nth-child(5) { grid-column: span 6; }
+    .od-stat-value { font-size: 17px; }
 
     /* Cards */
     .od-card { padding: 14px; border-radius: 12px; }

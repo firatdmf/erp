@@ -716,6 +716,8 @@ class WarehouseDetail(View):
         # Hide zero-quantity WPs by default (empty variants clutter the list
         # after transfers/sales). Opt in via the "show empty" checkbox.
         show_empty = (request.GET.get('show_empty') or '').strip() in ('1', 'true', 'on')
+        # "Only reserved" — narrow the list to stock held against an order.
+        reserved_only = (request.GET.get('reserved_only') or '').strip() in ('1', 'true', 'on')
 
         from django.db.models import Q
 
@@ -751,6 +753,18 @@ class WarehouseDetail(View):
             base_qs = base_qs.filter(
                 _field_q("name") | _field_q("sku") | _field_q("barcode")
                 | Q(id__in=roll_match)
+            )
+
+        # Keep only products holding at least one ACTIVE (packed-but-not-
+        # shipped) reservation. Same consumed=False definition the reserved
+        # metres column uses, so the filter and the number always agree.
+        # Applied to base_qs — the flat and grouped modes both build on it.
+        if reserved_only:
+            from .models import OrderRollReservation
+            base_qs = base_qs.filter(
+                id__in=(OrderRollReservation.objects
+                        .filter(consumed=False)
+                        .values("warehouse_product_id"))
             )
 
         # Two list modes: 'variants' (FLAT — every variant/roll-carrier on
@@ -886,6 +900,7 @@ class WarehouseDetail(View):
             'sort_options': [(k, v[1]) for k, v in SORT_OPTIONS.items()],
             'filtered_count': paginator.count,
             'show_empty': show_empty,
+            'reserved_only': reserved_only,
         }
 
         # HTMX partial refresh for search/sort/page — re-renders ONLY the

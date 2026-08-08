@@ -14,7 +14,7 @@
       <div class="wh-pager">
         {% if page.has_previous %}
           <button type="button" class="wh-pg-btn"
-                  hx-get="?page={{ page.previous_page_number }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}"
+                  hx-get="?page={{ page.previous_page_number }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}{% if show_empty %}&show_empty=1{% endif %}{% if reserved_only %}&reserved_only=1{% endif %}"
                   hx-target="#wh-rows" hx-swap="innerHTML">
             <i class="fa fa-chevron-left"></i> {% trans "Prev" %}
           </button>
@@ -27,7 +27,7 @@
             <button type="button" class="wh-pg-btn active">{{ n }}</button>
           {% elif n == 1 or n == page.paginator.num_pages or n|add:'-2' <= page.number and n|add:'2' >= page.number %}
             <button type="button" class="wh-pg-btn"
-                    hx-get="?page={{ n }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}"
+                    hx-get="?page={{ n }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}{% if show_empty %}&show_empty=1{% endif %}{% if reserved_only %}&reserved_only=1{% endif %}"
                     hx-target="#wh-rows" hx-swap="innerHTML">{{ n }}</button>
           {% elif n == page.number|add:'-3' or n == page.number|add:'3' %}
             <span style="padding:0 4px; color:var(--gray-400);">…</span>
@@ -36,7 +36,7 @@
 
         {% if page.has_next %}
           <button type="button" class="wh-pg-btn"
-                  hx-get="?page={{ page.next_page_number }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}"
+                  hx-get="?page={{ page.next_page_number }}&search={{ search|urlencode }}&sort={{ sort }}&view={{ view_mode }}{% if show_empty %}&show_empty=1{% endif %}{% if reserved_only %}&reserved_only=1{% endif %}"
                   hx-target="#wh-rows" hx-swap="innerHTML">
             {% trans "Next" %} <i class="fa fa-chevron-right"></i>
           </button>

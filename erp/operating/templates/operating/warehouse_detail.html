@@ -1281,7 +1281,7 @@
                    hx-get="{% url 'operating:warehouse_detail' warehouse.pk %}"
                    hx-trigger="keyup changed delay:300ms, whFilterChanged from:body"
                    hx-target="#wh-rows"
-                   hx-include="#whSortInput, #whViewInput, #whShowEmptyInput"
+                   hx-include="#whSortInput, #whViewInput, #whShowEmptyInput, #whReservedOnlyInput"
                    hx-sync="this:replace"
                    name="search">
           </div>
@@ -1294,6 +1294,14 @@
                    {% if show_empty %}checked{% endif %}
                    onchange="document.getElementById('whShowEmptyInput').value = this.checked ? '1' : ''; document.body.dispatchEvent(new Event('whFilterChanged'));">
             {% trans "Show empty products" %}
+          </label>
+          <input type="hidden" id="whReservedOnlyInput" name="reserved_only" value="{% if reserved_only %}1{% endif %}">
+          <label class="wh-empty-toggle" title="{% trans 'Show only stock reserved for an order' %}"
+                 style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; font-size:13px; color:var(--gray-700);">
+            <input type="checkbox" id="whReservedOnlyCheckbox"
+                   {% if reserved_only %}checked{% endif %}
+                   onchange="document.getElementById('whReservedOnlyInput').value = this.checked ? '1' : ''; document.body.dispatchEvent(new Event('whFilterChanged'));">
+            {% trans "Only reserved" %}
           </label>
           <div class="od-viewtoggle">
             <button type="button" class="wh-view-btn {% if view_mode != 'grouped' %}active{% endif %}" data-view="variants" onclick="setWhView('variants')" title="{% trans 'List every variant' %}">

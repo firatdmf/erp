@@ -95,7 +95,7 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
         if roll and getattr(roll, 'is_second', False):
             bx = 4 * mm + brand_w + 3 * mm
             by = H - 9.4 * mm
-            tag = "2. KALITE"
+            tag = "2ND QUALITY"
             c.setFont(bold, 7)
             tw = c.stringWidth(tag, bold, 7)
             pad = 2 * mm
@@ -115,15 +115,15 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
             return y - 9.2 * mm
 
         y = H - 15 * mm
-        y = field("DESEN", base, y)
+        y = field("PRODUCT", base, y)
         if token:
-            y = field("VARYANT", token, y)
+            y = field("VARIANT", token, y)
         y = field("SKU", sku or "—", y)
 
-        # ── METRE (right, under the QR) ──
+        # ── QUANTITY (right, under the QR) ──
         c.setFont(reg, 6.5)
         c.setFillColorRGB(0.42, 0.42, 0.42)
-        c.drawRightString(W - 4 * mm, H - qsize - 8 * mm, "METRE")
+        c.drawRightString(W - 4 * mm, H - qsize - 8 * mm, "QUANTITY")
         c.setFillColorRGB(0, 0, 0)
         c.setFont(bold, 12)
         c.drawRightString(W - 4 * mm, H - qsize - 13.5 * mm, f"{float(meters):.2f}")
@@ -136,9 +136,12 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
             if bc.width > maxw:
                 bc = code128.Code128(str(bc_val), barHeight=8.5 * mm,
                                      barWidth=bw * maxw / bc.width)
-            bc.drawOn(c, (W - bc.width) / 2, 4.5 * mm)
-            c.setFont(reg, 7)
-            c.drawCentredString(W / 2, 1.6 * mm, str(bc_val))
+            bc.drawOn(c, (W - bc.width) / 2, 6.6 * mm)
+            # Human-readable digits: bumped from 7pt so they stay legible on
+            # a scuffed sticker when the scanner can't read the bars. Baseline
+            # keeps ~3mm of quiet space below, closer to the 4mm side margins.
+            c.setFont(bold, 9.5)
+            c.drawCentredString(W / 2, 3 * mm, str(bc_val))
 
         c.showPage()
     c.save()

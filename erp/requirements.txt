@@ -14,6 +14,18 @@ contourpy==1.2.0
 crispy-bootstrap5==2025.6
 cryptography==38.0.4
 cssselect==1.3.0
+# Catalog PDF rendering (marketing/catalog_pdf.py) + its direct deps.
+# Unlike the xhtml2pdf/pycairo case noted below, WeasyPrint >= 53 needs only
+# PANGO at runtime — no cairo. The apt packages are declared in railpack.json
+# (deploy.aptPackages): libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0.
+# Verify a host can actually render with: manage.py check_catalog_pdf
+weasyprint==69.0
+pydyf==0.12.1
+tinyhtml5==2.1.0
+tinycss2==1.5.1
+cssselect2==0.9.0
+Pyphen==0.17.2
+zopfli==0.4.3
 cycler==0.12.1
 DataRecorder==3.6.2
 decorator==5.2.1
@@ -32,7 +44,7 @@ filelock==3.14.0
 Flask==2.2.5
 Flask-Cors==4.0.1
 flatbuffers==23.5.26
-fonttools==4.47.0
+fonttools==4.63.0
 fsspec==2024.5.0
 future==1.0.0
 gast==0.5.4
@@ -78,6 +90,11 @@ packaging==23.2
 pandas
 passlib==1.7.4
 Pillow>=10.4.0
+# Decodes the AVIF product photos. marketing/utils/image_optimizer.py has
+# always needed this (it skips AVIF conversion without it) but it was never
+# pinned; the catalog PDF renderer needs it too, or every photo embeds blank.
+# Not required on Pillow >= 11.3, which decodes AVIF natively.
+pillow-avif-plugin==1.5.5
 pillow-avif-plugin>=1.4.1
 proglog==0.1.12
 proto-plus==1.27.1

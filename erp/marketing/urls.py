@@ -3,6 +3,7 @@ from . import views
 from . import api_stock_update
 from . import views_csv_stock
 from . import views_product_groups
+from . import views_catalog
 app_name = "marketing"
 
 
@@ -19,6 +20,10 @@ urlpatterns = [
     path("product-groups/", views_product_groups.ProductGroupList.as_view(), name="product_group_list"),
     path("product-groups/new/", views_product_groups.ProductGroupCreate.as_view(), name="product_group_create"),
     path("product-groups/<int:pk>/", views_product_groups.ProductGroupDetail.as_view(), name="product_group_detail"),
+    # Catalog PDF — same template rendered as HTML (fast to iterate on) and
+    # through WeasyPrint. Copy is still hardcoded pending real product data.
+    path("catalog/preview/", views_catalog.catalog_preview, name="catalog_preview"),
+    path("catalog/pdf/", views_catalog.catalog_download, name="catalog_pdf"),
     # path("product_file_create/",views.ProductFileCreate.as_view(),name="product_file_create"),
     # below are for api routes
     path("api/get_product_categories",views.get_product_categories,name="get_product_categories"),

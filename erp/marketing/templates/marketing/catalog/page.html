@@ -1,0 +1,99 @@
+{% comment %}
+Catalog document — one template, two outputs.
+
+Rendered as HTML at /marketing/catalog/preview/ for fast iteration and piped
+through WeasyPrint at /marketing/catalog/pdf/. Nothing here may depend on
+JavaScript: WeasyPrint does not run it.
+
+Context:
+  catalog_css  the print stylesheet, inlined (see catalog_pdf.read_catalog_css)
+  brand        {name, collection, website, qr_svg}
+  pages        [{kicker, section, meta_top, meta_bottom, show_masthead,
+                 blocks: [...], note}]
+
+A block is one of:
+  kind="list"  {title, spec, photo, photo_side, rows:[{label, amount}],
+                columns, notes:[str]}
+  kind="set"   {title, spec, photo, photo_side, columns:[{heading, amount, rows}]}
+{% endcomment %}<meta charset="utf-8">
+<title>{{ brand.name }} — {{ page_title|default:"Catalog" }}</title>
+{% comment %}
+|safe: this is our own stylesheet file, never user input. Without it Django
+escapes every quote to &quot;, which silently breaks url() and font-family and
+drops the whole document to a fallback serif.
+{% endcomment %}
+<style>{{ catalog_css|safe }}</style>
+
+{% for page in pages %}
+<div class="page">
+
+    <div class="masthead-rule">
+        <div class="kicker">{{ page.kicker }}<br>{{ page.section }}</div>
+        <div class="line"></div>
+        <div class="masthead-meta">{{ page.meta_top }}<br>{{ page.meta_bottom }}</div>
+    </div>
+
+    {% if page.show_masthead %}
+        <div class="wordmark">{{ brand.name|upper }}</div>
+        <div class="collection">{{ brand.collection }}</div>
+    {% endif %}
+
+    {% for block in page.blocks %}
+        {% if block.kind == "set" %}
+            <div class="set">
+                <h2 class="block__title set__title">{{ block.title }}</h2>
+                {% if block.spec %}<p class="block__spec set__spec">{{ block.spec }}</p>{% endif %}
+                <div class="block {% if block.photo_side == 'right' %}block--reverse{% endif %}">
+                    {% if block.photo %}
+                        <div class="block__media">
+                            <img class="block__photo" src="{{ block.photo }}" alt="{{ block.title }}">
+                        </div>
+                    {% endif %}
+                    <div class="block__body">
+                        <div class="set__columns">
+                            {% for column in block.columns %}
+                                <div class="set__col">
+                                    <h3>{{ column.heading }} <span class="amount">{{ column.amount }}</span></h3>
+                                    <ul class="prices">
+                                        {% for row in column.rows %}<li>{{ row }}</li>{% endfor %}
+                                    </ul>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="block {% if block.photo_side == 'right' %}block--reverse{% endif %}">
+                {% if block.photo %}
+                    <div class="block__media">
+                        <img class="block__photo" src="{{ block.photo }}" alt="{{ block.title }}">
+                    </div>
+                {% endif %}
+                <div class="block__body">
+                    <h2 class="block__title">{{ block.title }}</h2>
+                    {% if block.spec %}<p class="block__spec">{{ block.spec }}</p>{% endif %}
+                    {% if block.rows %}
+                        <ul class="prices {% if block.columns %}prices--cols{% endif %} {% if block.plain %}prices--plain{% endif %}">
+                            {% for row in block.rows %}
+                                <li>{{ row.label }} <span class="amount">{{ row.amount }}</span></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% for note in block.notes %}<p class="block__note">{{ note }}</p>{% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    {% if page.note %}<p class="page-note">{{ page.note }}</p>{% endif %}
+
+    <div class="footer">
+        {% if brand.qr_svg %}
+            <div class="footer__qr">{{ brand.qr_svg|safe }}</div>
+        {% endif %}
+        <span class="footer__url">{{ brand.website }}</span>
+    </div>
+
+</div>
+{% endfor %}

@@ -485,7 +485,7 @@ class WarehouseList(View):
 def _get_book_choices():
     """Return list of accounting Book objects for dropdown (lazy import)."""
     try:
-        from current_account.models import Book
+        from accounting.models import Book
         return Book.objects.all().order_by('name')
     except Exception:
         return []
@@ -553,7 +553,7 @@ class WarehouseCreate(View):
         book = None
         if book_id:
             try:
-                from current_account.models import Book
+                from accounting.models import Book
                 book = Book.objects.filter(pk=int(book_id)).first()
             except (ValueError, TypeError):
                 pass
@@ -605,7 +605,7 @@ class WarehouseCreatePartial(View):
         book = None
         if book_id:
             try:
-                from current_account.models import Book
+                from accounting.models import Book
                 book = Book.objects.filter(pk=int(book_id)).first()
             except (ValueError, TypeError):
                 pass
@@ -665,7 +665,7 @@ class WarehouseEdit(View):
 
         if book_id:
             try:
-                from current_account.models import Book
+                from accounting.models import Book
                 warehouse.accounting_book = Book.objects.filter(pk=int(book_id)).first()
             except (ValueError, TypeError):
                 warehouse.accounting_book = None
@@ -1820,7 +1820,7 @@ class WarehouseManualAdd(View):
         purchase_info = None
         if supplier_obj and purchase_lines:
             try:
-                from current_account.services import create_purchase_invoice_for_intake
+                from accounting.services_accounts import create_purchase_invoice_for_intake
                 member = getattr(request.user, "member", None)
                 inv = create_purchase_invoice_for_intake(
                     supplier_obj, purchase_lines, member=member, user=user,
@@ -1951,7 +1951,7 @@ class WarehousePurchaseEdit(View):
 
     def get(self, request, pk, invoice_id):
         from django.db.models import Exists, OuterRef, Prefetch
-        from current_account.models import Invoice
+        from accounting.models import Invoice
         from .models import OrderRollReservation
 
         get_object_or_404(Warehouse, pk=pk)
@@ -2017,8 +2017,8 @@ class WarehousePurchaseEdit(View):
 
     def post(self, request, pk, invoice_id):
         from django.db import transaction, IntegrityError
-        from current_account.models import Invoice
-        from current_account.services import sync_purchase_invoice_items
+        from accounting.models import Invoice
+        from accounting.services_accounts import sync_purchase_invoice_items
         from .models import OrderRollReservation
         from marketing.models import Product as _Prod
 
@@ -3899,7 +3899,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # cari must reflect that final, physically-true amount,
                 # not whatever was scanned/reserved a moment earlier.
                 if order.cari_id:
-                    from current_account.services import post_order_movement
+                    from accounting.services_accounts import post_order_movement
                     post_order_movement(order, member=getattr(user, "member", None))
             elif leaving_ship:
                 restore_reservations_for_order(order, user=user)
@@ -3921,7 +3921,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                 # order is cancelled with it (its counter-movement is
                 # 0-amount, the order movement carries the receivable —
                 # see Invoice.issue()).
-                from current_account.services import reverse_order_movement
+                from accounting.services_accounts import reverse_order_movement
                 reverse_order_movement(order)
                 for _inv in order.invoices.exclude(status="cancelled"):
                     _inv.cancel(user=user, reason=f"Order #{order.pk} cancelled")
@@ -3931,7 +3931,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
             # all of it. Inside the SAME transaction so status, stock
             # and money can never diverge.
             if getattr(order, "is_retail_order", False):
-                from current_account.services import (
+                from accounting.services_accounts import (
                     post_retail_order_financials,
                     reverse_retail_order_financials,
                 )
@@ -3947,7 +3947,7 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
             # the manual fallback).
             if entering_ship:
                 try:
-                    from current_account.services import create_invoice_for_order
+                    from accounting.services_accounts import create_invoice_for_order
                     create_invoice_for_order(order, user=user)
                 except Exception:
                     import traceback

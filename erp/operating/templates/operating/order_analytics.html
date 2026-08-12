@@ -548,7 +548,7 @@
                 {% if c.kind == 'company' %}{% trans "Company" %}{% elif c.kind == 'contact' %}{% trans "Contact" %}{% else %}{% trans "Web" %}{% endif %}
               </span>
               {% if c.cari %}
-                <span class="an-cust-cari" onclick="event.preventDefault(); window.location='{% url 'current_account:cari_detail' c.cari.pk %}';" title="{% trans 'Open current account' %}">
+                <span class="an-cust-cari" onclick="event.preventDefault(); window.location='{% url 'accounts:detail' c.cari.pk %}';" title="{% trans 'Open current account' %}">
                   <i class="fa fa-wallet"></i>{{ c.cari.code }} ·
                   <span class="bal {% if c.cari.balance > 0 %}owe{% elif c.cari.balance < 0 %}credit{% endif %}">{{ c.cari.symbol }}{{ c.cari.abs_balance|floatformat:2 }} {{ c.cari.label }}</span>
                 </span>

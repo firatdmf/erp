@@ -3,7 +3,7 @@ from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from crm.models import Contact, Company
 
-# from current_account.models import (
+# from accounting.models import (
 #     AssetInventoryRawMaterial,
 #     # RawMaterialGoodsReceipt,
 #     Book,
@@ -14,7 +14,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-# from current_account.models import AssetInventoryRawMaterial
+# from accounting.models import AssetInventoryRawMaterial
 # uuid is used to generate unique identifiers for models.
 import uuid
 
@@ -100,7 +100,7 @@ class RawMaterialGood(models.Model):
 
 # when we save this model, we create an libability accounts payable
 class RawMaterialGoodReceipt(models.Model):
-    from current_account.models import Book, CurrencyCategory
+    from accounting.models import Book, CurrencyCategory
 
     class Meta:
         constraints = [
@@ -190,7 +190,7 @@ class RawMaterialGoodItem(models.Model):
         #     )
         # )
         # elif self.raw_material_good.raw_type == "indirect":
-        #     from current_account.models import EquityExpense, ExpenseCategory
+        #     from accounting.models import EquityExpense, ExpenseCategory
 
         #     expense_category = ExpenseCategory.objects.get(name="Overhead")
         #     equity_expense, created = EquityExpense.objects.create(
@@ -469,7 +469,7 @@ class Order(models.Model):
     # so cari pages can list this order's movements and so we don't
     # double-create a cari for the same customer. Web orders skip this.
     cari = models.ForeignKey(
-        "current_account.CariAccount",
+        "accounting.CariAccount",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -1318,7 +1318,7 @@ class WarehouseProductRoll(models.Model):
     # arrived. Set at intake time (WarehouseManualAdd); SET_NULL so
     # deleting/cancelling an invoice never deletes real warehouse stock.
     purchase_invoice_item = models.ForeignKey(
-        "current_account.InvoiceItem",
+        "accounting.InvoiceItem",
         on_delete=models.SET_NULL, null=True, blank=True,
         related_name="warehouse_rolls",
     )

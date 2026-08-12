@@ -27,7 +27,7 @@ from django.views.decorators.http import require_POST
 
 from .models import STATUS_CHOICES
 
-# from current_account.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
+# from accounting.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
 
 
 # segno is for making qr codes, and it is cleaner and more efficient than qrcode.
@@ -243,7 +243,7 @@ def _order_cari_snapshot(order):
     if not order.cari_id:
         return None
     try:
-        from current_account.models import CariAccount, CariMovement
+        from accounting.models import CariAccount, CariMovement
         from django.contrib.contenttypes.models import ContentType
         cari = CariAccount.objects.get(pk=order.cari_id)
         ct = ContentType.objects.get_for_model(order.__class__)
@@ -423,7 +423,7 @@ class OrderDetail(DetailView):
         from django.utils import timezone
         from decimal import Decimal, InvalidOperation
         from .models import ORDER_STATUS_CHOICES, CARRIER_CHOICES, OrderItem
-        from current_account.services import (
+        from accounting.services_accounts import (
             get_or_create_cari_for_order, post_order_movement, reverse_order_movement,
         )
 
@@ -1221,7 +1221,7 @@ def order_pack_reserve_add(request, pk):
     # Order.billable_value) — a fresh scan changes it, so re-post now
     # rather than waiting for some unrelated OrderItem save.
     if order.cari_id:
-        from current_account.services import post_order_movement
+        from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
                          "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
@@ -1257,7 +1257,7 @@ def order_pack_reserve_update(request, pk):
     r.meters = meters
     r.save(update_fields=["meters"])
     if order.cari_id:
-        from current_account.services import post_order_movement
+        from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "capped": capped, "reservation": _reservation_payload(r),
                          "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
@@ -1282,7 +1282,7 @@ def order_pack_reserve_remove(request, pk):
     removed = r.id
     r.delete()
     if order.cari_id:
-        from current_account.services import post_order_movement
+        from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     return JsonResponse({"ok": True, "removed": removed,
                          "cari": _order_cari_snapshot(order), "profit": _order_profit_snapshot(order)})
@@ -1627,7 +1627,7 @@ def order_changes(request, pk):
 def order_customer_card_view(request, pk):
     from .models import Order
     from crm.models import Contact, Company
-    from current_account.services import (
+    from accounting.services_accounts import (
         get_or_create_cari_for_order, post_order_movement, reverse_order_movement,
     )
 
@@ -2098,7 +2098,7 @@ class OrderCreate(View):
                 # post_order_movement there is idempotent so nothing
                 # double-posts on ship).
                 try:
-                    from current_account.services import (
+                    from accounting.services_accounts import (
                         get_or_create_cari_for_order, post_order_movement,
                         get_or_create_retail_cari,
                     )
@@ -2126,9 +2126,9 @@ class OrderCreate(View):
                     try:
                         from decimal import Decimal
                         from datetime import date
-                        from current_account.models import Payment
-                        from current_account.views_payment import _next_payment_number
-                        from current_account.services import get_default_book, _resolve_currency
+                        from accounting.models import Payment
+                        from accounting.views_payment import _next_payment_number
+                        from accounting.services_accounts import get_default_book, _resolve_currency
 
                         book = get_default_book()
                         currency = _resolve_currency(order)
@@ -2520,7 +2520,7 @@ class OrderEdit(UpdateView):
                 # post_order_movement() updates the amount in place
                 # for the existing source-linked movement.
                 try:
-                    from current_account.services import (
+                    from accounting.services_accounts import (
                         get_or_create_cari_for_order, post_order_movement,
                     )
                     member = getattr(self.request.user, "member", None)
@@ -4259,7 +4259,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
         from django.utils import timezone
         from django.db.models import Sum, Count, F, Value, DecimalField
         from django.db.models.functions import Coalesce, TruncDate, TruncWeek, TruncMonth
-        from current_account.models import CariAccount
+        from accounting.models import CariAccount
         from datetime import datetime, time
 
         DEC = DecimalField(max_digits=16, decimal_places=2)

@@ -143,7 +143,7 @@ class ContactCreate(generic.edit.CreateView):
                 cari_warning = None
                 if form.cleaned_data.get("create_cari", True):
                     try:
-                        from current_account.services import get_or_create_cari_for_contact
+                        from accounting.services_accounts import get_or_create_cari_for_contact
                         member = getattr(self.request.user, "member", None)
                         get_or_create_cari_for_contact(self.object, member=member)
                     except Exception as exc:
@@ -311,7 +311,7 @@ class CompanyCreate(generic.edit.CreateView):
             cari_warning = None
             if form.cleaned_data.get("create_cari", True):
                 try:
-                    from current_account.services import get_or_create_cari_for_company
+                    from accounting.services_accounts import get_or_create_cari_for_company
                     member = getattr(self.request.user, "member", None)
                     get_or_create_cari_for_company(self.object, member=member)
                 except Exception as exc:

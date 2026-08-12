@@ -286,7 +286,7 @@ def sync_order_cari_movement(sender, instance, **kwargs):
     if not getattr(order, "cari_id", None):
         return
     try:
-        from current_account.services import post_order_movement
+        from accounting.services_accounts import post_order_movement
         post_order_movement(order)
     except Exception:
         # Don't let cari sync break order edits. Errors here surface in

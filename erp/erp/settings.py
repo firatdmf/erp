@@ -174,7 +174,10 @@ INSTALLED_APPS = [
     "team",  # Team management system
     "notes", # My Notes system
     "procurement", # Procurement system
-    "current_account",  # Cari Hesap (current account / customer-supplier ledger)
+    # Migrations-only stub. The cari ledger now lives in `accounting`; this
+    # app stays registered so migration dependencies on ('current_account', …)
+    # in operating/ and its own history keep resolving. See its apps.py.
+    "current_account",
     "storefront",  # Online store CMS (header menu, home sections, featured products)
     "django_htmx",
     "crispy_forms",

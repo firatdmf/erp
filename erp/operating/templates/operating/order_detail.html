@@ -1457,7 +1457,7 @@
           <div style="display:flex; align-items:center; gap:8px;">
             {% if not has_active_invoice %}
               {% if order.order_status == "shipped" or order.order_status == "in_transit" or order.order_status == "out_for_delivery" or order.order_status == "delivered" %}
-              <a href="{% url 'current_account:invoice_create' %}?order={{ order.pk }}"
+              <a href="{% url 'accounts:invoice_create' %}?order={{ order.pk }}"
                  class="od-link"
                  style="font-size: 11.5px; padding:5px 10px; background:#147F74; color:#fff; border-radius:6px;"
                  title="{% trans 'Create invoice from this order' %}">
@@ -1470,7 +1470,7 @@
               </span>
               {% endif %}
             {% endif %}
-            <a href="{% url 'current_account:cari_detail' order.cari.pk %}"
+            <a href="{% url 'accounts:detail' order.cari.pk %}"
                class="od-link" style="font-size: 11.5px;">
               {% trans "Open account" %} <i class="fa fa-external-link-alt"></i>
             </a>
@@ -1531,7 +1531,7 @@
         </div>
         <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
           {% for inv in order_invoices %}
-          <a href="{% url 'current_account:invoice_detail' inv.pk %}"
+          <a href="{% url 'accounts:invoice_detail' inv.pk %}"
              style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:#FFF; border:1px solid #E2E8EE; border-radius:9px; text-decoration:none; transition:border-color 140ms;"
              onmouseover="this.style.borderColor='var(--nejum-teal-300,#66B5B5)'"
              onmouseout="this.style.borderColor='#E2E8EE'">

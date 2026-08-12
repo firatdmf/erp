@@ -519,7 +519,7 @@
         <i class="fas fa-warehouse"></i>
         <span class="top-bar-btn-label">{% trans "My Warehouses" %}</span>
       </a>
-      <a href="{% url 'current_account:purchase_order_list' %}" class="top-bar-btn" id="topBarPurchasesBtn" title="{% trans 'Purchases' %}">
+      <a href="{% url 'accounts:purchase_order_list' %}" class="top-bar-btn" id="topBarPurchasesBtn" title="{% trans 'Purchases' %}">
         <i class="fas fa-truck"></i>
         <span class="top-bar-btn-label">{% trans "Purchases" %}</span>
       </a>
@@ -545,7 +545,7 @@
               <span class="favorites-item-icon"><i class="fas fa-cart-plus"></i></span>
               <span class="favorites-item-label">{% trans "Create order" %}</span>
             </a>
-            <a href="{% url 'current_account:cari_list' %}" class="favorites-item">
+            <a href="{% url 'accounts:list' %}" class="favorites-item">
               <span class="favorites-item-icon"><i class="fas fa-id-card"></i></span>
               <span class="favorites-item-label">{% trans "All Accounts" %}</span>
             </a>
@@ -786,13 +786,13 @@
             <h3>{% trans "Accounts" %}</h3>
             <ul>
               <li>
-                <a href="{% url 'current_account:cari_list' %}">
+                <a href="{% url 'accounts:list' %}">
                   <i class="fas fa-id-card" aria-hidden="true"></i>
                   <span>{% trans "All Accounts" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:cari_create' %}">
+                <a href="{% url 'accounts:create' %}">
                   <i class="fas fa-user-plus" aria-hidden="true"></i>
                   <span>{% trans "New Account" %}</span>
                 </a>
@@ -803,13 +803,13 @@
             <h3>{% trans "Invoices" %}</h3>
             <ul>
               <li>
-                <a href="{% url 'current_account:invoice_list' %}">
+                <a href="{% url 'accounts:invoice_list' %}">
                   <i class="fas fa-file-invoice" aria-hidden="true"></i>
                   <span>{% trans "All Invoices" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:invoice_create' %}">
+                <a href="{% url 'accounts:invoice_create' %}">
                   <i class="fas fa-file-circle-plus" aria-hidden="true"></i>
                   <span>{% trans "New Invoice" %}</span>
                 </a>
@@ -820,13 +820,13 @@
             <h3>{% trans "Collection / Payment" %}</h3>
             <ul>
               <li>
-                <a href="{% url 'current_account:payment_list' %}">
+                <a href="{% url 'accounts:payment_list' %}">
                   <i class="fas fa-wallet" aria-hidden="true"></i>
                   <span>{% trans "All Payments" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:payment_create' %}">
+                <a href="{% url 'accounts:payment_create' %}">
                   <i class="fas fa-hand-holding-dollar" aria-hidden="true"></i>
                   <span>{% trans "New Collection / Payment" %}</span>
                 </a>
@@ -837,13 +837,13 @@
             <h3>{% trans "Check / Promissory Note" %}</h3>
             <ul>
               <li>
-                <a href="{% url 'current_account:check_list' %}">
+                <a href="{% url 'accounts:check_list' %}">
                   <i class="fas fa-scroll" aria-hidden="true"></i>
                   <span>{% trans "Portfolio" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:check_create' %}">
+                <a href="{% url 'accounts:check_create' %}">
                   <i class="fas fa-file-circle-plus" aria-hidden="true"></i>
                   <span>{% trans "New Check / Note" %}</span>
                 </a>
@@ -854,31 +854,31 @@
             <h3>{% trans "Reports" %}</h3>
             <ul>
               <li>
-                <a href="{% url 'current_account:report_index' %}">
+                <a href="{% url 'accounts:report_index' %}">
                   <i class="fas fa-chart-pie" aria-hidden="true"></i>
                   <span>{% trans "Report Center" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:report_aging' %}">
+                <a href="{% url 'accounts:report_aging' %}">
                   <i class="fas fa-clock" aria-hidden="true"></i>
                   <span>{% trans "Aging" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:report_trial_balance' %}">
+                <a href="{% url 'accounts:report_trial_balance' %}">
                   <i class="fas fa-table" aria-hidden="true"></i>
                   <span>{% trans "Trial Balance" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:report_due_calendar' %}">
+                <a href="{% url 'accounts:report_due_calendar' %}">
                   <i class="fas fa-calendar-days" aria-hidden="true"></i>
                   <span>{% trans "Due Calendar" %}</span>
                 </a>
               </li>
               <li>
-                <a href="{% url 'current_account:report_credit_limit' %}">
+                <a href="{% url 'accounts:report_credit_limit' %}">
                   <i class="fas fa-shield-halved" aria-hidden="true"></i>
                   <span>{% trans "Credit Limit" %}</span>
                 </a>
@@ -889,7 +889,7 @@
             <h3>{% trans "Help" %}</h3>
             <ul>
               <li>
-                <a href="{% url 'current_account:help' %}">
+                <a href="{% url 'accounts:help' %}">
                   <i class="fas fa-circle-question" aria-hidden="true"></i>
                   <span>📘 {% trans "User Guide" %}</span>
                 </a>

@@ -159,7 +159,7 @@ class Command(BaseCommand):
         # Re-post the cari movements so balances reflect the new billable
         # totals. The OrderItem save signal already does this, but only
         # for orders that HAVE a cari — call explicitly and report.
-        from current_account.services import post_order_movement
+        from accounting.services_accounts import post_order_movement
         repriced = 0
         for order in Order.objects.filter(pk__in=touched_orders, cari__isnull=False):
             try:

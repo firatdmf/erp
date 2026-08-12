@@ -149,7 +149,7 @@ class BookDetail(generic.DetailView):
         # Perakende book only: embedded "Son Hareketler" — the latest
         # retail sales with the SAME filters as the standalone ledger
         # page (q / from / to arrive as GET params on this page too).
-        from current_account.services import RETAIL_BOOK_NAME
+        from accounting.services_accounts import RETAIL_BOOK_NAME
         is_retail_book = (book.name or "").strip().lower() == RETAIL_BOOK_NAME.lower()
         context["is_retail_book"] = is_retail_book
         if is_retail_book:
@@ -1769,14 +1769,14 @@ class RetailLedger(View):
     """Perakende satış defteri — every completed retail order's revenue
     entry in the 'Perakende' Book, filterable by date range and search
     (order no / description). The rows are the EquityRevenue records
-    written by current_account.services.post_retail_order_financials."""
+    written by accounting.services_accounts.post_retail_order_financials."""
 
     template_name = "accounting/retail_ledger.html"
     PAGE_SIZE = 50
 
     def get(self, request):
         from django.core.paginator import Paginator
-        from current_account.services import RETAIL_BOOK_NAME, RETAIL_CASH_NAME
+        from accounting.services_accounts import RETAIL_BOOK_NAME, RETAIL_CASH_NAME
 
         book = Book.objects.filter(name__iexact=RETAIL_BOOK_NAME).first()
 

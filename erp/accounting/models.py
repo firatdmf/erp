@@ -960,3 +960,15 @@ class Metric(models.Model):
     runway = models.DecimalField(max_digits=12, decimal_places=1)
     growth_rate = models.DecimalField(max_digits=12, decimal_places=1)
     default_alive = models.BooleanField(default=True)
+
+
+# ---------------------------------------------------------------------------
+# Current-account (cari) ledger — CariAccount, CariMovement, CariSettings,
+# Invoice, InvoiceItem, Payment, PaymentAllocation, CheckOrPromissoryNote.
+#
+# Defined in models_accounts.py to keep this file navigable, and imported here
+# at the END of the module body so Book/CurrencyCategory above are already
+# bound. Django resolves their app_label from the package, so they register as
+# accounting.* models exactly as if they were declared inline.
+# ---------------------------------------------------------------------------
+from .models_accounts import *  # noqa: E402,F401,F403

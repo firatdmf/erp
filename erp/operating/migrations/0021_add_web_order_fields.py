@@ -7,7 +7,13 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('authentication', '0001_initial'),  # Adjust if needed
+        # Must be 0002, not 0001: this migration adds Order.web_client, and
+        # authentication.WebClient is created in 0002_webclient. Declaring
+        # 0001_initial let the graph schedule this before the table existed,
+        # so a from-scratch migrate died here with
+        # "Related model 'authentication.webclient' cannot be resolved".
+        # No effect on databases that already applied both.
+        ('authentication', '0002_webclient'),
         ('operating', '0020_pack_packeditem'),
     ]
 

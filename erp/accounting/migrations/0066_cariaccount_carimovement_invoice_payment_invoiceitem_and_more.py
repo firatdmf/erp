@@ -27,6 +27,12 @@ class Migration(migrations.Migration):
         ('authentication', '0014_alter_googlechatcredentials_avatar_url'),
         ('marketing', '0076_remove_productcategory_washing_instructions_and_more'),
         ('accounting', '0065_alter_liabilityaccountspayable_supplier'),
+        # The tables being renamed below are created by current_account's own
+        # migrations. Without this the graph is free to schedule the rename
+        # first, which works on a database where they already exist and fails
+        # on a fresh build with
+        #   relation "current_account_invoiceitem" does not exist
+        ('current_account', '0011_carisettings_invoice_language'),
     ]
 
     operations = [

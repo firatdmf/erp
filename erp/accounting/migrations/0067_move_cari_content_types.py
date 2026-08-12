@@ -45,25 +45,96 @@ def forwards(apps, schema_editor):
 
         # A row for the new label already exists. Move every reference onto
         # the older id, then drop the newcomer so the unique constraint holds.
-        _repoint(apps, db, new.pk, old.pk)
+        _repoint(apps, schema_editor, db, new.pk, old.pk)
         new.delete(using=db)
         old.app_label = "accounting"
         old.save(using=db)
 
 
 def backwards(apps, schema_editor):
+    """Mirror of forwards, and it has to fold duplicates for the same reason.
+
+    A blanket UPDATE back to current_account would hit the (app_label, model)
+    unique constraint wherever a current_account row still exists — which is
+    exactly the state a half-finished forwards run leaves behind, i.e. the one
+    case a rollback actually gets used in.
+    """
     ContentType = apps.get_model("contenttypes", "ContentType")
     db = schema_editor.connection.alias
-    ContentType.objects.using(db).filter(
-        app_label="accounting", model__in=MODELS
-    ).update(app_label="current_account")
+
+    for model in MODELS:
+        current = ContentType.objects.using(db).filter(
+            app_label="accounting", model=model).first()
+        if current is None:
+            continue
+
+        stale = ContentType.objects.using(db).filter(
+            app_label="current_account", model=model).first()
+        if stale is not None:
+            _repoint(apps, schema_editor, db, stale.pk, current.pk)
+            stale.delete(using=db)
+
+        current.app_label = "current_account"
+        current.save(using=db)
 
 
-def _repoint(apps, db, from_id, to_id):
-    """Point everything that references content type `from_id` at `to_id`."""
+# Through tables carrying permission grants. Existence-checked before use so
+# this keeps working if the project ever swaps in a custom user model.
+_GRANT_TABLES = [
+    ("auth_group_permissions", "group_id"),
+    ("auth_user_user_permissions", "user_id"),
+]
+
+
+def _move_grants(cursor, from_perm_id, to_perm_id):
+    """Hand src's grants to dst, dropping rows that would duplicate."""
+    for table, owner in _GRANT_TABLES:
+        cursor.execute("select to_regclass(%s)", [table])
+        if cursor.fetchone()[0] is None:
+            continue
+        cursor.execute(
+            f"UPDATE {table} t SET permission_id = %s "
+            f"WHERE t.permission_id = %s AND NOT EXISTS ("
+            f"  SELECT 1 FROM {table} d "
+            f"  WHERE d.{owner} = t.{owner} AND d.permission_id = %s)",
+            [to_perm_id, from_perm_id, to_perm_id],
+        )
+        cursor.execute(f"DELETE FROM {table} WHERE permission_id = %s",
+                       [from_perm_id])
+
+
+def _repoint(apps, schema_editor, db, from_id, to_id):
+    """Point everything that references content type `from_id` at `to_id`.
+
+    Permissions cannot simply be re-pointed. Both content types own an
+    auto-created add/change/delete/view set, and auth_permission is unique on
+    (content_type_id, codename), so bulk-updating them collides:
+
+        duplicate key value violates unique constraint
+        "auth_permission_content_type_id_codename_..."
+        DETAIL: Key (content_type_id, codename)=(152, add_invoice) already exists
+
+    That is precisely what aborted a deploy mid-flight, after the preceding
+    migration had already committed its table renames. Where the destination
+    already owns a codename we keep its row and delete the duplicate — but only
+    after handing over whatever groups or users had been granted it, since a
+    bare delete would silently revoke access.
+    """
     Permission = apps.get_model("auth", "Permission")
-    Permission.objects.using(db).filter(content_type_id=from_id).update(
-        content_type_id=to_id)
+    cursor = schema_editor.connection.cursor()
+    surviving = dict(
+        Permission.objects.using(db).filter(content_type_id=to_id)
+        .values_list("codename", "id"))
+
+    for perm in Permission.objects.using(db).filter(content_type_id=from_id):
+        twin = surviving.get(perm.codename)
+        if twin is None:
+            perm.content_type_id = to_id
+            perm.save(using=db, update_fields=["content_type_id"])
+            surviving[perm.codename] = perm.id
+        else:
+            _move_grants(cursor, perm.id, twin)
+            perm.delete(using=db)
 
     try:
         LogEntry = apps.get_model("admin", "LogEntry")

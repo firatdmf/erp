@@ -3,7 +3,7 @@ from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from crm.models import Contact, Company
 
-# from accounting.models import (
+# from current_account.models import (
 #     AssetInventoryRawMaterial,
 #     # RawMaterialGoodsReceipt,
 #     Book,
@@ -14,7 +14,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-# from accounting.models import AssetInventoryRawMaterial
+# from current_account.models import AssetInventoryRawMaterial
 # uuid is used to generate unique identifiers for models.
 import uuid
 
@@ -100,7 +100,7 @@ class RawMaterialGood(models.Model):
 
 # when we save this model, we create an libability accounts payable
 class RawMaterialGoodReceipt(models.Model):
-    from accounting.models import Book, CurrencyCategory
+    from current_account.models import Book, CurrencyCategory
 
     class Meta:
         constraints = [
@@ -190,7 +190,7 @@ class RawMaterialGoodItem(models.Model):
         #     )
         # )
         # elif self.raw_material_good.raw_type == "indirect":
-        #     from accounting.models import EquityExpense, ExpenseCategory
+        #     from current_account.models import EquityExpense, ExpenseCategory
 
         #     expense_category = ExpenseCategory.objects.get(name="Overhead")
         #     equity_expense, created = EquityExpense.objects.create(
@@ -558,10 +558,20 @@ class Order(models.Model):
         already consumed at ship time), NOT the ordered quantity. A line
         with nothing scanned yet contributes 0 here even though it has
         an ordered quantity — the unscanned portion of an order must
-        never show up on the customer's account. The one exception: a
-        product with NO warehouse/roll presence at all (nothing that
-        could ever be scanned — e.g. a catalog-only line) falls back to
-        its ordered quantity, since no scan data could ever exist for it.
+        never show up on the customer's account.
+
+        Two things are added on top of the scanned metres:
+
+        * outsourced_quantity — metres deliberately sourced OUTSIDE the
+          warehouse. No roll will ever be scanned for them, but they are
+          being sold, so they bill. Without this, an outsourced line on a
+          product that happens to be stocked was indistinguishable from
+          an unpacked one and vanished from the invoice/cari.
+        * a product with NO warehouse/roll presence at all (nothing that
+          could ever be scanned — e.g. a catalog-only line) falls back to
+          its ordered quantity, since no scan data could ever exist for
+          it. Its ordered quantity already includes any outsourced part,
+          so the two are never summed.
 
         Returns {order_item_id: Decimal}.
         """
@@ -587,7 +597,21 @@ class Order(models.Model):
         result = {}
         for it in items:
             tracked = tracked_map.get(it.pk, False)
-            result[it.pk] = scanned.get(it.pk, Decimal("0")) if tracked else (it.quantity or Decimal("0"))
+            if not tracked:
+                # Ordered quantity already covers the outsourced part.
+                result[it.pk] = it.quantity or Decimal("0")
+                continue
+            got = scanned.get(it.pk, Decimal("0"))
+            ordered = it.quantity or Decimal("0")
+            # The outsourced part only fills the gap scanning hasn't
+            # covered. If staff end up packing those metres from stock
+            # after all, the scan supersedes them instead of billing the
+            # customer twice. A genuine scan OVERAGE (got > ordered) still
+            # bills in full — that's the documented behaviour.
+            outsourced = it.outsourced_quantity or Decimal("0")
+            if outsourced > 0:
+                outsourced = max(Decimal("0"), min(outsourced, ordered - got))
+            result[it.pk] = got + outsourced
         return result
 
     def billable_value(self):
@@ -783,6 +807,25 @@ class OrderItem(models.Model):
     )
     quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    # The slice of `quantity` that is NOT coming out of our warehouse —
+    # "depo dışı", sourced elsewhere, so no roll will ever be scanned for
+    # it. Entered on the create/edit order sidebar's OUTSOURCED box.
+    #
+    # It exists because billing bills SCANNED metres (see
+    # get_billable_line_quantities): without an explicit column, an
+    # outsourced line on a product that happens to be stocked in a
+    # warehouse looked identical to a line nobody had packed yet, and was
+    # silently dropped from the invoice and the customer's cari.
+    # quantity = scanned metres + outsourced_quantity.
+    # NULL means "never recorded" (a line saved before this column
+    # existed) as opposed to an explicit 0 = "nothing outsourced". The
+    # edit sidebar needs that difference: for a legacy line it falls back
+    # to deriving the figure from quantity − reserved rolls, which is
+    # what the number meant implicitly before.
+    outsourced_quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, default=None,
+        help_text="Depo dışından temin edilecek miktar — faturaya ve cariye dahildir.",
     )
     target_quantity_per_pack = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True

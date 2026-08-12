@@ -368,9 +368,6 @@ msgstr "Satış Kanalları"
 msgid "Pricing"
 msgstr "Fiyatlandırma"
 
-msgid "Packaging"
-msgstr "Paketleme"
-
 msgid "Campaign / Discount"
 msgstr "Kampanya / İndirim"
 
@@ -779,9 +776,6 @@ msgstr "Geri"
 msgid "Status"
 msgstr "Durum"
 
-msgid "Save"
-msgstr "Kaydet"
-
 msgid "Submit"
 msgstr "Gönder"
 
@@ -1044,9 +1038,6 @@ msgstr "CRM Anasayfa"
 
 msgid "CURRENCY"
 msgstr "PARA BİRİMİ"
-
-msgid "Carrier"
-msgstr "Kargo firması"
 
 msgid "Category"
 msgstr "Kategori"
@@ -2152,9 +2143,6 @@ msgstr "Açık"
 
 msgid "Closed"
 msgstr "Kapalı"
-
-msgid "Paid"
-msgstr "Ödendi"
 
 msgid "Unpaid"
 msgstr "Ödenmedi"
@@ -3953,9 +3941,6 @@ msgstr "Takip numarası girildiğinde durum otomatik güncellenir"
 msgid "Select…"
 msgstr "Seç…"
 
-msgid "Tracking number"
-msgstr "Takip numarası"
-
 msgid "Save shipping info"
 msgstr "Kargo bilgisini kaydet"
 
@@ -5292,9 +5277,6 @@ msgstr "Tedarikçiye verildi"
 msgid "Go to account"
 msgstr "Cariye git"
 
-msgid "Grand Total"
-msgstr "Genel Toplam"
-
 msgid "Help"
 msgstr "Yardım"
 
@@ -5692,9 +5674,6 @@ msgstr "Tahsilat Tutarı"
 
 msgid "Payment Info"
 msgstr "Tahsilat Bilgisi"
-
-msgid "Payment Status"
-msgstr ""
 
 msgid "Payment Term"
 msgstr ""
@@ -6166,9 +6145,6 @@ msgstr "— Cari seç —"
 
 msgid "— Select cash account —"
 msgstr "— Kasa seç —"
-
-msgid "— Select —"
-msgstr "— Seç —"
 
 msgid "−Total"
 msgstr "−Total"
@@ -8457,3 +8433,59 @@ msgstr "Fatura iptal edilsin mi?"
 
 msgid "Rolls"
 msgstr "Toplar"
+
+msgid "pack"
+msgid_plural "packs"
+msgstr[0] "paket"
+msgstr[1] "paket"
+
+msgid "Pick a customer before saving the order."
+msgstr "Siparişi kaydetmeden önce müşteri seçin."
+
+msgid "Open account"
+msgstr "Cariyi Aç"
+
+msgid "Type a supplier name…"
+msgstr "Tedarikçi adı yazın…"
+
+msgid "No supplier matches"
+msgstr "Eşleşen tedarikçi yok"
+
+msgid "New supplier"
+msgstr "Yeni Tedarikçi"
+
+msgid "Supplier name"
+msgstr "Tedarikçi adı"
+
+msgid "Contact person (optional)"
+msgstr "Yetkili kişi (isteğe bağlı)"
+
+msgid "Phone (optional)"
+msgstr "Telefon (isteğe bağlı)"
+
+msgid "Create supplier"
+msgstr "Tedarikçi Oluştur"
+
+msgid "Change supplier"
+msgstr "Tedarikçiyi değiştir"
+
+msgid "Supplier could not be created."
+msgstr "Tedarikçi oluşturulamadı."
+
+msgid "OUTSOURCED"
+msgstr "DEPO DIŞI"
+
+msgid "Add outsourced quantity"
+msgstr "Depo dışı ilave miktar ekle"
+
+msgid "Note (optional) — e.g. to be sourced from another warehouse"
+msgstr "Not (opsiyonel) — örn. başka depodan temin edilecek"
+
+msgid "No rolls in the warehouse for this product — enter the metres below."
+msgstr "Bu ürün için depoda top bulunamadı — aşağıdan metre girin."
+
+msgid "Add roll by barcode"
+msgstr "Barkodla top ekle"
+
+msgid "Loading rolls…"
+msgstr "Toplar yükleniyor…"

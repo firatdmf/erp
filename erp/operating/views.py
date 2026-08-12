@@ -27,7 +27,7 @@ from django.views.decorators.http import require_POST
 
 from .models import STATUS_CHOICES
 
-# from accounting.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
+# from current_account.models import Book, CurrencyCategory, AssetAccountsReceivable, Invoice
 
 
 # segno is for making qr codes, and it is cleaner and more efficient than qrcode.
@@ -914,6 +914,26 @@ def _roll_unavailable_response(roll):
                          "error": "Bu topta uygun metre kalmadı."}, status=409)
 
 
+def _outsourced_qty(item_data):
+    """The OUTSOURCED ("depo dışı") metres a create/edit order line
+    submitted — the part of its quantity that will never have a roll
+    scanned against it because it's sourced outside the warehouse.
+
+    Stored explicitly on OrderItem so billing can tell it apart from a
+    line nobody has packed yet; see
+    Order.get_billable_line_quantities(). Bad/absent input is 0, never a
+    crash — a wrong quantity must not lose the whole order save.
+    """
+    raw = item_data.get("outsourced")
+    if raw in (None, ""):
+        return _PDecimal("0")
+    try:
+        val = _PDecimal(str(raw))
+    except Exception:
+        return _PDecimal("0")
+    return val if val > 0 else _PDecimal("0")
+
+
 def _lookup_roll_by_barcode_for_sku(code, target_sku):
     """Find a WarehouseProductRoll by barcode whose product matches
     target_sku (variant SKU or plain warehouse SKU) directly. Used when
@@ -1796,17 +1816,34 @@ class OrderPrint(DetailView):
         from decimal import Decimal
         ctx = super().get_context_data(**kwargs)
         order = self.object
+        # Physical packs scanned for this order (a "top"/roll for fabric,
+        # but the goods aren't only fabric — the printed document calls
+        # them packs), per line and in total. Consumed reservations count
+        # too: on a shipped order those ARE the packs that went out. The
+        # same pack scanned twice on one line is still one physical
+        # pack, hence the sets.
+        packs_by_item, all_pack_ids = {}, set()
+        for r in order.roll_reservations.values("order_item_id", "roll_id"):
+            all_pack_ids.add(r["roll_id"])
+            if r["order_item_id"]:
+                packs_by_item.setdefault(r["order_item_id"], set()).add(r["roll_id"])
+
         items = []
         total = Decimal("0.00")
+        total_qty = Decimal("0")
         for it in order.items.all().select_related("product", "product_variant"):
             qty = it.quantity or Decimal("0")
             price = it.price or Decimal("0")
             line_total = (qty * price).quantize(Decimal("0.01"))
             it.line_total_calc = line_total
+            it.pack_count = len(packs_by_item.get(it.pk, ()))
             items.append(it)
             total += line_total
+            total_qty += qty
         ctx["order_items"] = items
         ctx["order_total"] = total
+        ctx["order_total_quantity"] = total_qty
+        ctx["order_total_packs"] = len(all_pack_ids)
         ctx["is_pdf"] = True   # template can strip JS auto-print when rendering for PDF
         # Drives the Customer/Delivery card layout: show only the side(s)
         # that have real data instead of a "No customer attached" /
@@ -1861,6 +1898,21 @@ class OrderCreate(View):
 
         customer_pk = request.POST.get("customer_pk")
         customer_type = request.POST.get("customer_type")
+
+        # A customer is mandatory. An order saved without one has no cari
+        # to bill, prints with a blank Customer card, and can't be fixed
+        # from the order page afterwards — so refuse it at the door
+        # instead of creating a record nobody can attach a client to.
+        # "retail" is a valid pick (the shared Perakende cari), a CRM
+        # contact/company needs its pk.
+        if not (customer_type == "retail" or (customer_type in {"contact", "company"} and customer_pk)):
+            from django.utils.translation import gettext as _
+            msg = _("Pick a customer before saving the order.")
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": str(msg)})
+            messages.error(request, msg)
+            return render(request, "operating/create_order.html", {"form": form})
+
         product_json_input = request.POST.get("product_json_input")
         if product_json_input:
             try:
@@ -1947,6 +1999,7 @@ class OrderCreate(View):
                             product_variant=variant,
                             description=item_data.get("description", ""),
                             quantity=item_data.get("quantity", 1),
+                            outsourced_quantity=_outsourced_qty(item_data),
                             price=item_data.get("price", 0),
                             is_custom_curtain=is_custom,
                         )
@@ -2185,6 +2238,14 @@ class OrderEdit(UpdateView):
                 "variant": bool(it.product_variant),
                 "description": it.description or "",
                 "quantity": float(it.quantity) if it.quantity is not None else 0,
+                # Explicit "depo dışı" metres. null (not 0) for lines saved
+                # before the column existed, so the sidebar knows to fall
+                # back to deriving it from quantity − reservations rather
+                # than showing a real 0 as an empty box.
+                "outsourced": (
+                    float(it.outsourced_quantity)
+                    if it.outsourced_quantity is not None else None
+                ),
                 "price": float(it.price) if it.price is not None else 0,
                 # Tops already reserved for this line — shown read-only in
                 # the product card. "available" excludes this reservation's
@@ -2381,6 +2442,7 @@ class OrderEdit(UpdateView):
                                         "description", ""
                                     )
                                     order_item.quantity = item_data.get("quantity", 1)
+                                    order_item.outsourced_quantity = _outsourced_qty(item_data)
                                     order_item.price = item_data.get("price", 0)
                                     order_item.save()
                                     _order_edit_reserve_rolls(
@@ -2401,6 +2463,7 @@ class OrderEdit(UpdateView):
                                         product_variant=None,
                                         description=item_data.get("description", ""),
                                         quantity=item_data.get("quantity", 1),
+                                        outsourced_quantity=_outsourced_qty(item_data),
                                         price=item_data.get("price", 0),
                                     )
                                 elif item_data["product"]["variant"] == True:
@@ -2414,6 +2477,7 @@ class OrderEdit(UpdateView):
                                         product_variant=variant,
                                         description=item_data.get("description", ""),
                                         quantity=item_data.get("quantity", 1),
+                                        outsourced_quantity=_outsourced_qty(item_data),
                                         price=item_data.get("price", 0),
                                     )
                                 # add the qr code to the order item

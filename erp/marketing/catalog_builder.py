@@ -45,10 +45,19 @@ def _prettify(text) -> str:
     return cleaned[:1].upper() + cleaned[1:] if cleaned else ""
 
 
-def _money(amount, symbol: str = "€") -> str:
-    """2.4700 → '€2.47'; whole numbers stay whole, as in the reference."""
+# Costs are held in USD — 1,189 of 1,191 warehouse rows and every ready-made
+# cost are USD, and there is no currency column anywhere in marketing/models.py
+# to say otherwise. USD is therefore the invariant the catalog computes in; a
+# catalog only converts on the way OUT, when it is quoted to a euro buyer.
+BASE_CURRENCY = "USD"
+CURRENCY_SYMBOLS = {"USD": "$", "EUR": "€", "TRY": "₺", "GBP": "£"}
+
+
+def _money(amount, currency: str = BASE_CURRENCY) -> str:
+    """2.4700 → '$2.47'; whole numbers stay whole, as in the reference."""
     if amount is None:
         return ""
+    symbol = CURRENCY_SYMBOLS.get(currency, f"{currency} ")
     value = Decimal(str(amount)).quantize(Decimal("0.01"))
     if value == value.to_integral_value():
         return f"{symbol}{value.to_integral_value()}"
@@ -140,11 +149,59 @@ def _variant_label(variant, varying: set) -> str:
     return " / ".join(parts)
 
 
-def build_block(product, photo_side: str, symbol: str = "€") -> dict:
+class Pricing:
+    """How a catalog turns a product into a printed number.
+
+    markup=None keeps whatever price is stored on the record. Give it a
+    percentage and the price is derived from COST instead — one rate for the
+    whole document, which is how a price list is actually revised.
+
+    Cost is USD by definition (see BASE_CURRENCY). `fx` converts on the way
+    out and is fetched ONCE per catalog, not per product, so every line on a
+    sheet is quoted at the same rate.
+    """
+
+    def __init__(self, currency: str = BASE_CURRENCY, markup=None, fx=None):
+        self.currency = (currency or BASE_CURRENCY).upper()
+        self.markup = None if markup is None else Decimal(str(markup))
+        self.fx = Decimal(str(fx)) if fx is not None else self._rate()
+
+    def _rate(self) -> Decimal:
+        if self.currency == BASE_CURRENCY:
+            return Decimal("1")
+        try:
+            from accounting.services import get_exchange_rate
+            rate = get_exchange_rate(BASE_CURRENCY, self.currency)
+            if rate:
+                return Decimal(str(rate))
+        except Exception:
+            pass
+        # Quoting at a made-up rate is worse than not quoting: refuse rather
+        # than silently print USD numbers under a euro sign.
+        raise ValueError(
+            f"No {BASE_CURRENCY}->{self.currency} exchange rate available; "
+            f"cannot price this catalog."
+        )
+
+    def of(self, cost, stored_price):
+        """The printed amount for one line, or None if it cannot be priced."""
+        if self.markup is None:
+            base = stored_price
+        else:
+            base = None if cost is None else Decimal(str(cost)) * (1 + self.markup / 100)
+        if base is None:
+            return None
+        return (Decimal(str(base)) * self.fx).quantize(Decimal("0.01"))
+
+
+def build_block(product, photo_side: str, pricing: "Pricing | None" = None) -> dict:
     """One product → one catalog block."""
+    pricing = pricing or Pricing()
     variants = [v for v in product.variants.all() if v.variant_featured]
-    priced = [v for v in variants if v.variant_price is not None]
-    distinct_prices = {v.variant_price for v in priced}
+    for variant in variants:
+        variant.catalog_price = pricing.of(variant.variant_cost, variant.variant_price)
+    priced = [v for v in variants if v.catalog_price is not None]
+    distinct_prices = {v.catalog_price for v in priced}
 
     dimensions = _dimensions(variants)
     # An axis with a single value is a property of the product, not a choice.
@@ -164,8 +221,8 @@ def build_block(product, photo_side: str, symbol: str = "€") -> dict:
         # Genuinely different prices per variant — one row each, with prices.
         block["rows"] = [
             {"label": _variant_label(v, varying) or v.variant_sku,
-             "amount": _money(v.variant_price, symbol)}
-            for v in sorted(priced, key=lambda v: v.variant_price)
+             "amount": _money(v.catalog_price, pricing.currency)}
+            for v in sorted(priced, key=lambda v: v.catalog_price)
         ]
         # A long list of SHORT rows reads better in two columns (the
         # reference does this for mattress protectors). Long labels — which
@@ -177,11 +234,11 @@ def build_block(product, photo_side: str, symbol: str = "€") -> dict:
 
     # One price for the whole product: state it once, then describe each axis
     # of choice on its own line.
-    price = distinct_prices.pop() if distinct_prices else product.price
+    price = distinct_prices.pop() if distinct_prices else pricing.of(product.cost, product.price)
     if price is not None:
-        block["rows"] = [{"label": "Price:", "amount": _money(price, symbol)}]
+        block["rows"] = [{"label": "Price:", "amount": _money(price, pricing.currency)}]
         # A lone price is a statement, not a list — the reference prints it
-        # as plain "Price: €1.95" with no bullet.
+        # as plain "Price: $1.95" with no bullet.
         block["plain"] = True
     block["notes"] = [
         f"{_dimension_label(name)}: {', '.join(values)}"
@@ -192,14 +249,15 @@ def build_block(product, photo_side: str, symbol: str = "€") -> dict:
 
 def build_pages(products, *, section: str = "", kicker: str = "CATALOG",
                 meta_top: str = "HOME TEXTILES", meta_bottom: str = "",
-                symbol: str = "€") -> list[dict]:
+                pricing: "Pricing | None" = None) -> list[dict]:
     """A product iterable → the `pages` structure the template expects.
 
     Photo side alternates across the whole document (not per page) so the
     zig-zag reads continuously the way the reference catalog does.
     """
+    pricing = pricing or Pricing()
     blocks = [
-        build_block(product, "right" if index % 2 else "left", symbol)
+        build_block(product, "right" if index % 2 else "left", pricing)
         for index, product in enumerate(products)
     ]
 

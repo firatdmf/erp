@@ -150,6 +150,55 @@ def _supplier_choices():
         return []
 
 
+@login_required
+def warehouse_supplier_create(request):
+    """Create (or reuse) a supplier straight from the manual-add panel's
+    supplier box, so a delivery from a new supplier doesn't force a
+    detour through the CRM. Matching is by folded name — the same
+    Turkish-aware fold the barcode prefix uses — so "Kızılırmak" and
+    "KIZILIRMAK" resolve to the existing record instead of creating a
+    near-duplicate that would split its stock history.
+
+    Returns the supplier the caller should select, plus its derived
+    barcode prefix, and `created` so the UI can say which happened."""
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST required"}, status=405)
+
+    from crm.models import Supplier
+    from .catalog_sync import _fold
+
+    try:
+        data = json.loads(request.body or "{}")
+    except (json.JSONDecodeError, TypeError):
+        data = {}
+    name = (data.get("name") or "").strip()
+    contact_name = (data.get("contact_name") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    email = (data.get("email") or "").strip()
+
+    if not name:
+        return JsonResponse({"success": False, "error": "Supplier name is required."}, status=400)
+
+    folded = _fold(name)
+    existing = next(
+        (s for s in Supplier.objects.all() if _fold(str(s)) == folded), None
+    )
+    if existing is not None:
+        return JsonResponse({
+            "success": True, "created": False, "id": existing.id,
+            "name": str(existing), "prefix": _consonant_prefix(str(existing)),
+        })
+
+    supplier = Supplier.objects.create(
+        company_name=name, contact_name=contact_name or None,
+        phone=phone[:15], email=email,
+    )
+    return JsonResponse({
+        "success": True, "created": True, "id": supplier.id,
+        "name": str(supplier), "prefix": _consonant_prefix(str(supplier)),
+    })
+
+
 # DB category slugs → Turkish display labels for the manual-add "Ürün Türü"
 # select (unknown slugs fall back to the raw name).
 _CATEGORY_TR_LABELS = {
@@ -436,7 +485,7 @@ class WarehouseList(View):
 def _get_book_choices():
     """Return list of accounting Book objects for dropdown (lazy import)."""
     try:
-        from accounting.models import Book
+        from current_account.models import Book
         return Book.objects.all().order_by('name')
     except Exception:
         return []
@@ -504,7 +553,7 @@ class WarehouseCreate(View):
         book = None
         if book_id:
             try:
-                from accounting.models import Book
+                from current_account.models import Book
                 book = Book.objects.filter(pk=int(book_id)).first()
             except (ValueError, TypeError):
                 pass
@@ -556,7 +605,7 @@ class WarehouseCreatePartial(View):
         book = None
         if book_id:
             try:
-                from accounting.models import Book
+                from current_account.models import Book
                 book = Book.objects.filter(pk=int(book_id)).first()
             except (ValueError, TypeError):
                 pass
@@ -616,7 +665,7 @@ class WarehouseEdit(View):
 
         if book_id:
             try:
-                from accounting.models import Book
+                from current_account.models import Book
                 warehouse.accounting_book = Book.objects.filter(pk=int(book_id)).first()
             except (ValueError, TypeError):
                 warehouse.accounting_book = None

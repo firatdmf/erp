@@ -80,6 +80,12 @@
     table.items tfoot td.lbl { text-align: right; color: #374151; }
     table.items tfoot td.val { text-align: right; color: #0F1419; }
     table.items tfoot tr.grand td { border-top: 2px solid #0F1419; padding-top: 8pt; font-size: 13pt; }
+    table.items tfoot td.lbl-left { text-align: left; color: #374151; }
+    /* Pack count hangs on its own line under the Qty total, lighter so
+       the money total stays the loudest thing on the row above. */
+    table.items tfoot tr.sum td { font-size: 9.5pt; font-weight: bold; color: #6B7280;
+                                  padding-top: 0; padding-bottom: 3pt; }
+    table.items tbody td .packs { font-size: 8.5pt; font-weight: normal; color: #6B7280; margin-top: 2pt; }
 
     /* Notes */
     .notes { padding: 10pt 12pt; border-left: 3pt solid #147F74; background: #F8FAFA; font-size: 10pt; color: #374151; }
@@ -197,7 +203,9 @@
         </td>
         <td><span class="sku">{{ item.product.sku|default:"—" }}</span></td>
         <td><span class="variant">{{ item.product_variant.variant_sku|default:"—" }}</span></td>
-        <td class="num">{{ item.quantity|default:0|floatformat:2 }}</td>
+        <td class="num">{{ item.quantity|default:0|floatformat:2 }}
+          {% if item.pack_count %}<div class="packs">{{ item.pack_count }} {% blocktrans count counter=item.pack_count %}pack{% plural %}packs{% endblocktrans %}</div>{% endif %}
+        </td>
         <td class="num">${{ item.price|default:0|floatformat:2 }}</td>
         <td class="num">${{ item.line_total_calc|floatformat:2 }}</td>
       </tr>
@@ -207,10 +215,22 @@
     </tbody>
     {% if order_items %}
     <tfoot>
+      <!-- Totals line up UNDER the columns they total: quantity beneath
+           Qty, money beneath Amount, with the label out at the far
+           left. The pack count hangs on the next line, still under Qty. -->
       <tr class="grand">
-        <td colspan="5" class="lbl">{% trans "Total" %}</td>
+        <td colspan="3" class="lbl-left">{% trans "Total" %}</td>
+        <td class="val">{{ order_total_quantity|floatformat:2 }}</td>
+        <td></td>
         <td class="val">${{ order_total|floatformat:2 }}</td>
       </tr>
+      {% if order_total_packs %}
+      <tr class="sum">
+        <td colspan="3"></td>
+        <td class="val">{{ order_total_packs }} {% blocktrans count counter=order_total_packs %}pack{% plural %}packs{% endblocktrans %}</td>
+        <td colspan="2"></td>
+      </tr>
+      {% endif %}
     </tfoot>
     {% endif %}
   </table>

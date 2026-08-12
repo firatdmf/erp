@@ -6,7 +6,7 @@ from io import BytesIO
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, F, Q
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 
@@ -57,9 +57,18 @@ def _filtered_products(warehouse, search, sort):
             | Q(id__in=roll_match)
         )
 
+    # Unit cost comes from the SAME expression the warehouse page's
+    # valuation uses (Warehouse._total_value_annotations) — it falls back to
+    # purchase_price, converting from purchase_currency, when cost_usd/try is
+    # NULL. Multiplying raw cost_usd here instead silently valued those rows
+    # at 0 and left the export's TOPLAM short of the on-screen total.
+    unit_usd, unit_try = warehouse._total_value_annotations()
+    _money = DecimalField(max_digits=20, decimal_places=4)
     qs = qs.annotate(roll_count=Count('rolls'),
-                      line_usd=F('quantity') * F('cost_usd'),
-                      line_try=F('quantity') * F('cost_try'),
+                      line_usd=ExpressionWrapper(F('quantity') * unit_usd,
+                                                 output_field=_money),
+                      line_try=ExpressionWrapper(F('quantity') * unit_try,
+                                                 output_field=_money),
                       reserved=reserved_meters_subquery())
 
     _sort_map = {

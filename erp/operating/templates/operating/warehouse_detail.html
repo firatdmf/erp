@@ -963,6 +963,41 @@
   .np-input:focus, .np-select:focus { border-color: var(--nejum-teal-500); box-shadow: 0 0 0 3px rgba(20,127,116,0.12); }
   .np-hint { font: 500 11.5px var(--font-sans); color: var(--gray-500); margin-top: 6px; }
   .np-hint b { color: #A9852F; font: 700 12px var(--font-mono); letter-spacing: .5px; }
+
+  /* Supplier type-to-search + inline create */
+  .np-sup { position: relative; }
+  .np-sup-results {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40;
+    background: #fff; border: 1px solid #DDE3EA; border-radius: 10px;
+    box-shadow: 0 10px 26px rgba(15,20,25,.13); max-height: 236px; overflow-y: auto; padding: 4px;
+  }
+  .np-sup-opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 10px; border-radius: 7px; cursor: pointer;
+    font: 600 13px var(--font-sans); color: #0F1419;
+  }
+  .np-sup-opt:hover, .np-sup-opt.active { background: #EFF6F5; }
+  .np-sup-opt .pfx { font: 700 10.5px var(--font-mono); color: #A9852F; letter-spacing: .5px;
+                     background: #FDF6E7; border: 1px solid #F2E2BC; border-radius: 5px; padding: 2px 6px; }
+  .np-sup-opt.create { color: var(--nejum-teal-500, #147F74); font-weight: 700; }
+  .np-sup-empty { padding: 9px 10px; font: 500 12.5px var(--font-sans); color: var(--gray-500); }
+  .np-sup-chip {
+    display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px;
+    border: 1px solid #BFE0DB; background: #EFF6F5; border-radius: 9px;
+    font: 700 13.5px var(--font-sans); color: #0B5F60;
+  }
+  .np-sup-chip i { color: var(--nejum-teal-500, #147F74); }
+  .np-sup-chip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .np-sup-clear {
+    flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 6px; cursor: pointer;
+    background: transparent; color: #0B5F60; font-size: 19px; line-height: 1;
+  }
+  .np-sup-clear:hover { background: #DCEBE9; }
+  .np-sup-chip.locked .np-sup-clear { display: none; }
+  .np-sup-new { margin-top: 8px; padding: 12px; border: 1px solid #E2E8EE; background: #F8FAFC; border-radius: 10px; }
+  .np-sup-new-t { font: 700 11px var(--font-sans); letter-spacing: .04em; text-transform: uppercase;
+                  color: var(--gray-500); margin-bottom: 8px; }
+  .np-sup-new-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
   .np-row { display: flex; gap: 10px; }
   .np-row > * { flex: 1; min-width: 0; }
 
@@ -1756,15 +1791,53 @@
     </div>
 
     <div class="np-body">
-      <!-- Supplier → barcode prefix (whole batch — one delivery) -->
+      <!-- Supplier → barcode prefix (whole batch — one delivery).
+           Type-to-search over the loaded suppliers; no match offers an
+           inline "create" so a first-time supplier doesn't send you off
+           to the CRM mid-delivery. The <select> stays as the value
+           holder (hidden) — every other bit of npXxx JS reads its value
+           and data-prefix, so nothing else had to change. -->
       <div class="np-field">
         <label>{% trans "Supplier" %}</label>
-        <select id="npSupplier" class="np-select" onchange="npUpdatePrefix()">
+        <select id="npSupplier" style="display:none;" onchange="npUpdatePrefix()">
           <option value="">{% trans "Select supplier…" %}</option>
           {% for s in suppliers %}
             <option value="{{ s.id }}" data-prefix="{{ s.prefix }}">{{ s.name }}</option>
           {% endfor %}
         </select>
+
+        <div class="np-sup" id="npSupplierBox">
+          <input type="text" id="npSupplierSearch" class="np-input" autocomplete="off"
+                 placeholder="{% trans 'Type a supplier name…' %}"
+                 oninput="npSupSearch(this.value)" onfocus="npSupSearch(this.value)">
+          <div class="np-sup-results" id="npSupplierResults" hidden></div>
+        </div>
+
+        <!-- Selected chip — replaces the input once a supplier is picked. -->
+        <div class="np-sup-chip" id="npSupplierChip" hidden>
+          <i class="fa fa-truck-field"></i>
+          <span id="npSupplierChipName"></span>
+          <button type="button" class="np-sup-clear" onclick="npSupClear()"
+                  title="{% trans 'Change supplier' %}">&times;</button>
+        </div>
+
+        <!-- Inline create — opens pre-filled with whatever was typed. -->
+        <div class="np-sup-new" id="npSupplierNew" hidden>
+          <div class="np-sup-new-t">{% trans "New supplier" %}</div>
+          <input type="text" id="npSupNewName" class="np-input" placeholder="{% trans 'Supplier name' %}">
+          <div class="np-row" style="margin-top:8px;">
+            <input type="text" id="npSupNewContact" class="np-input" placeholder="{% trans 'Contact person (optional)' %}">
+            <input type="text" id="npSupNewPhone" class="np-input" placeholder="{% trans 'Phone (optional)' %}">
+          </div>
+          <div class="np-sup-new-foot">
+            <button type="button" class="ord-btn ghost" onclick="npSupCancelNew()">{% trans "Cancel" %}</button>
+            <button type="button" class="ord-btn" id="npSupNewSave" onclick="npSupSaveNew(this)"
+                    style="background:var(--nejum-teal-500,#147F74);color:#fff;border:1px solid #0F6B62;">
+              <i class="fa fa-plus"></i> {% trans "Create supplier" %}
+            </button>
+          </div>
+        </div>
+
         <div class="np-hint">{% trans "Barcode prefix" %}: <b id="npPrefix">GEN</b> · {% trans "each top gets its own unique barcode" %}</div>
       </div>
 
@@ -1882,6 +1955,7 @@
     ov.classList.add('show');
     ov.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
+    npSupSyncFromSelect();
     npUpdatePrefix();
     npSummaryUpdate();
   };
@@ -1907,7 +1981,9 @@
   function npResetEditMode() {
     NP_EDIT_INVOICE_ID = null;
     const sel = document.getElementById('npSupplier');
-    if (sel) sel.disabled = false;
+    if (sel) { sel.disabled = false; sel.value = ''; }
+    npSupCancelNew();
+    npSupSyncFromSelect();
     const unitSel = document.getElementById('npUnit');
     if (unitSel) unitSel.disabled = false;
     const addProductBtn = document.querySelector('.np-add-product');
@@ -2052,6 +2128,192 @@
     const a = document.getElementById('npPrefix'); if (a) a.textContent = p;
     document.querySelectorAll('#npProducts .np-product-card').forEach(function (card) { npFetchNextSku(card); });
   };
+
+  // ── Supplier picker ──────────────────────────────────────────────
+  // Type-to-search over the <select>'s options (the whole supplier list
+  // is already in the page — filtering is instant, no round trip), with
+  // an inline create for one that isn't there yet. Everything funnels
+  // through npSupSelect() so the hidden <select> stays the single source
+  // of truth for the barcode prefix and the save payload.
+  const NP_SUPPLIER_CREATE_URL = "{% url 'operating:warehouse_supplier_create' %}";
+  let npSupActive = -1;   // keyboard-highlighted row
+
+  function npSupFold(s) {
+    // Match the Turkish-aware folding the server does, so typing "kizil"
+    // finds "Kızılırmak" and "ÖZ" finds "Öz".
+    return (s || '').toLocaleUpperCase('tr')
+      .replace(/[ÇĞİIÖŞÜ]/g, function (c) { return { 'Ç':'C','Ğ':'G','İ':'I','I':'I','Ö':'O','Ş':'S','Ü':'U' }[c]; })
+      .trim();
+  }
+
+  function npSupOptions() {
+    const sel = document.getElementById('npSupplier');
+    return Array.prototype.slice.call(sel ? sel.options : []).filter(function (o) { return o.value; });
+  }
+
+  window.npSupSearch = function (q) {
+    const box = document.getElementById('npSupplierResults');
+    if (!box) return;
+    const needle = npSupFold(q);
+    const matches = npSupOptions().filter(function (o) {
+      return !needle || npSupFold(o.textContent).indexOf(needle) !== -1;
+    });
+    const exact = matches.some(function (o) { return npSupFold(o.textContent) === needle; });
+    npSupActive = -1;
+
+    let html = matches.map(function (o, i) {
+      return '<div class="np-sup-opt" data-id="' + o.value + '" data-i="' + i + '">' +
+             '<span>' + npEsc(o.textContent) + '</span>' +
+             '<span class="pfx">' + npEsc(o.getAttribute('data-prefix') || 'GEN') + '</span></div>';
+    }).join('');
+    if (!matches.length) {
+      html += '<div class="np-sup-empty">{% trans "No supplier matches" %}</div>';
+    }
+    // Offer "create" whenever what's typed isn't already an exact name.
+    if (needle && !exact) {
+      html += '<div class="np-sup-opt create" data-create="1">' +
+              '<span><i class="fa fa-plus"></i> {% trans "Create" %} “' + npEsc((q || '').trim()) + '”</span></div>';
+    }
+    box.innerHTML = html;
+    box.hidden = false;
+
+    Array.prototype.forEach.call(box.querySelectorAll('.np-sup-opt'), function (el) {
+      el.addEventListener('mousedown', function (e) {
+        e.preventDefault();   // keep focus so blur doesn't close first
+        if (el.dataset.create) { npSupOpenNew(document.getElementById('npSupplierSearch').value); }
+        else { npSupSelect(el.dataset.id, el.querySelector('span').textContent, null); }
+      });
+    });
+  };
+
+  function npEsc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+  // Point the hidden <select> at `id`, adding the option first when the
+  // supplier was just created and isn't in the list yet.
+  window.npSupSelect = function (id, name, prefix) {
+    const sel = document.getElementById('npSupplier');
+    if (!sel) return;
+    if (id && !sel.querySelector('option[value="' + id + '"]')) {
+      const opt = document.createElement('option');
+      opt.value = String(id);
+      opt.textContent = name || '';
+      opt.setAttribute('data-prefix', prefix || 'GEN');
+      sel.appendChild(opt);
+    }
+    sel.value = id ? String(id) : '';
+    npSupCancelNew();
+    npSupSyncFromSelect();
+    npUpdatePrefix();
+  };
+
+  // Mirror the <select>'s state into the visible chip / search box. Also
+  // the entry point for edit mode, which sets the select directly.
+  window.npSupSyncFromSelect = function () {
+    const sel = document.getElementById('npSupplier');
+    const chip = document.getElementById('npSupplierChip');
+    const box = document.getElementById('npSupplierBox');
+    const results = document.getElementById('npSupplierResults');
+    const search = document.getElementById('npSupplierSearch');
+    if (!sel || !chip || !box) return;
+    const opt = sel.options[sel.selectedIndex];
+    const picked = !!(opt && opt.value);
+    chip.hidden = !picked;
+    box.hidden = picked;
+    if (results) results.hidden = true;
+    if (picked) {
+      document.getElementById('npSupplierChipName').textContent = opt.textContent;
+    } else if (search) {
+      search.value = '';
+    }
+    chip.classList.toggle('locked', !!sel.disabled);
+  };
+
+  window.npSupClear = function () {
+    const sel = document.getElementById('npSupplier');
+    if (!sel || sel.disabled) return;
+    sel.value = '';
+    npSupSyncFromSelect();
+    npUpdatePrefix();
+    const search = document.getElementById('npSupplierSearch');
+    if (search) { search.value = ''; search.focus(); }
+  };
+
+  function npSupOpenNew(prefill) {
+    document.getElementById('npSupplierResults').hidden = true;
+    document.getElementById('npSupplierBox').hidden = true;
+    const panel = document.getElementById('npSupplierNew');
+    panel.hidden = false;
+    const nameEl = document.getElementById('npSupNewName');
+    nameEl.value = (prefill || '').trim();
+    nameEl.focus();
+  }
+
+  window.npSupCancelNew = function () {
+    const panel = document.getElementById('npSupplierNew');
+    if (!panel) return;
+    panel.hidden = true;
+    ['npSupNewName', 'npSupNewContact', 'npSupNewPhone'].forEach(function (id) {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const sel = document.getElementById('npSupplier');
+    if (sel && !sel.value) document.getElementById('npSupplierBox').hidden = false;
+  };
+
+  window.npSupSaveNew = function (btn) {
+    const name = (document.getElementById('npSupNewName').value || '').trim();
+    if (!name) { document.getElementById('npSupNewName').focus(); return; }
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
+    fetch(NP_SUPPLIER_CREATE_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': NP_CSRF, 'Content-Type': 'application/json',
+                 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({
+        name: name,
+        contact_name: (document.getElementById('npSupNewContact').value || '').trim(),
+        phone: (document.getElementById('npSupNewPhone').value || '').trim(),
+      }),
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.success) { alert((d && d.error) || '{% trans "Supplier could not be created." %}'); return; }
+        // `created:false` means the name already existed — we just select
+        // it rather than letting a duplicate through.
+        npSupSelect(d.id, d.name, d.prefix);
+      })
+      .catch(function () { alert('{% trans "Supplier could not be created." %}'); })
+      .finally(function () { btn.disabled = false; btn.innerHTML = orig; });
+  };
+
+  (function npSupWireKeys() {
+    const search = document.getElementById('npSupplierSearch');
+    if (!search) return;
+    search.addEventListener('keydown', function (e) {
+      const box = document.getElementById('npSupplierResults');
+      const rows = box && !box.hidden ? box.querySelectorAll('.np-sup-opt') : [];
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!rows.length) return;
+        e.preventDefault();
+        npSupActive = (npSupActive + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length;
+        Array.prototype.forEach.call(rows, function (r, i) { r.classList.toggle('active', i === npSupActive); });
+        rows[npSupActive].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const row = rows[npSupActive] || rows[0];
+        if (!row) return;
+        if (row.dataset.create) npSupOpenNew(search.value);
+        else npSupSelect(row.dataset.id, row.querySelector('span').textContent, null);
+      } else if (e.key === 'Escape') {
+        if (box) box.hidden = true;
+      }
+    });
+    search.addEventListener('blur', function () {
+      setTimeout(function () {
+        const box = document.getElementById('npSupplierResults');
+        if (box) box.hidden = true;
+      }, 120);
+    });
+  })();
 
   window.npOnNameInput = function (inputEl) {
     npRefreshVariantSkus(inputEl.closest('.np-product-card'));
@@ -2427,6 +2689,8 @@
         if (sel) {
           if (d.supplier_id) sel.value = String(d.supplier_id);
           sel.disabled = true;
+          npSupCancelNew();
+          npSupSyncFromSelect();   // chip renders locked — supplier can't change mid-edit
         }
         const unitSel = document.getElementById('npUnit');
         if (unitSel) unitSel.disabled = true;

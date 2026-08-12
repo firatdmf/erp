@@ -19,7 +19,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
-from .catalog_builder import build_pages, catalog_queryset
+from .catalog_builder import Pricing, build_pages, catalog_queryset
 from .catalog_pdf import check_image_support, read_catalog_css, render_catalog_pdf
 
 logger = logging.getLogger(__name__)
@@ -143,10 +143,17 @@ def _context(request=None):
             order=request_get.get("order") or "title",
             category=request_get.get("category") or "",
         )
+        markup = request_get.get("markup")
         pages = build_pages(
             products,
             section=(request_get.get("section") or "").upper(),
             meta_bottom=request_get.get("period") or "",
+            # No ?markup= keeps the price stored on each variant. With one,
+            # every line is re-derived from cost at that single rate.
+            pricing=Pricing(
+                currency=request_get.get("currency") or "USD",
+                markup=markup if markup not in (None, "") else None,
+            ),
         )
 
     return {

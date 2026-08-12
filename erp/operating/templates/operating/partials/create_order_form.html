@@ -274,7 +274,7 @@
       <div class="form-group" style="margin-top:2px;">
         <label style="display:flex;align-items:center;gap:6px;">
           <i class="fas fa-barcode" style="color:#0F766E;"></i>
-          {% trans "Barkodla top ekle" %}
+          {% trans "Add roll by barcode" %}
           <span style="font-weight:500;color:#94A3B8;font-size:10.5px;">({% trans "ürün seçmeden — ürünü otomatik bulur" %})</span>
         </label>
         <div style="display:flex;gap:6px;">
@@ -375,7 +375,7 @@
       <div style="font:500 11.5px 'Inter',sans-serif; color:#64748B; margin-top:2px;">
         <span id="co-total-count">0</span> {% trans "items" %}
         <span style="margin:0 4px;color:#CBD5E1;">·</span>
-        <span id="co-total-tops">0</span> {% trans "top" %}
+        <span id="co-total-tops">0</span> {% trans "rolls" %}
       </div>
     </div>
     <div id="co-total-amount"
@@ -429,13 +429,30 @@
       existing.forEach(function (it) {
         itemIndex++;
         var stableIndex = itemIndex;
+        var rolls = (it.rolls || []).map(function (r) {
+          return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', meters: parseFloat(r.meters) || 0, available: parseFloat(r.available) || 0 };
+        });
+        // Out-of-warehouse metres come straight off the saved line
+        // (OrderItem.outsourced_quantity). Legacy lines saved before that
+        // column existed carry null — fall back to "quantity minus the
+        // reserved rolls", which is what the number used to mean
+        // implicitly. Either way the box shows the real figure instead of
+        // opening empty and looking like the quantity was lost (and the
+        // first roll pick then silently overwrote it — syncQtyFromRolls).
+        var reserved = rolls.reduce(function (s, r) { return s + r.meters; }, 0);
+        var qty = parseFloat(it.quantity) || 0;
+        var manual = it.outsourced == null
+          ? (qty - reserved)
+          : (parseFloat(it.outsourced) || 0);
+        manual = Math.round(manual * 100) / 100;
+        if (manual < 0.005) manual = 0;
         orderItems.push({
           index: stableIndex,
           sku: it.sku || '',
           variant: it.variant === true || it.variant === 'true',
           title: it.title || it.sku || '',
           price: parseFloat(it.price) || 0,
-          quantity: parseFloat(it.quantity) || 1,
+          quantity: qty || 1,
           description: it.description || '',
           categoryName: '',
           is_custom_curtain: false,
@@ -451,11 +468,12 @@
           // list against the saved reservations (kept / re-cut /
           // released). A small KAYITLI tag marks the already-saved ones.
           existingRolls: [],
-          rolls: (it.rolls || []).map(function (r) {
-            return { reservation_id: r.reservation_id || null, barcode: r.barcode || '', warehouse: r.warehouse || '', meters: parseFloat(r.meters) || 0, available: parseFloat(r.available) || 0 };
-          }),
+          rolls: rolls,
           availableRolls: [], rollsLoading: true,
-          manualMeters: 0, manualNote: '', showManualEntry: false
+          manualMeters: manual || 0, manualNote: '',
+          // Keep the section open when it holds a value, otherwise a line
+          // that also has tops would hide its out-of-warehouse metres.
+          showManualEntry: manual > 0
         });
         if (it.sku) editHydratedItems.push({ stableIndex: stableIndex, sku: it.sku });
       });
@@ -644,15 +662,17 @@
       });
   }
 
-  function syncQtyFromRolls(i) {
+  // `force` = the user just changed the tops or the depo dışı metres, so
+  // the sum IS the quantity even when it drops to zero. Without it,
+  // clearing the last top / the metres box left the previous quantity
+  // behind. The unforced call is hydration only: a legacy item with no
+  // reservations and no metres keeps its original hand-typed quantity.
+  function syncQtyFromRolls(i, force) {
     var item = orderItems[i];
     if (!item) return;
     var all = (item.existingRolls || []).concat(item.rolls || []);
     var manual = parseFloat(item.manualMeters) || 0;
-    // Only override when there's actual roll/manual data — legacy items
-    // edited for the first time (no reservations yet) keep their
-    // original (possibly hand-typed) quantity untouched.
-    if (all.length || manual > 0) {
+    if (force || all.length || manual > 0) {
       var rollTotal = all.reduce(function (s, r) { return s + (parseFloat(r.meters) || 0); }, 0);
       item.quantity = rollTotal + manual;
     }
@@ -784,13 +804,13 @@
     var rowsHtml = '';
     if (noStockAtAll) {
       rowsHtml = '<div style="font-size:11.5px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;padding:7px 9px;border-radius:7px;">' +
-        '<i class="fas fa-triangle-exclamation"></i> {% trans "Bu ürün için depoda top bulunamadı — aşağıdan metre girin." %}' +
+        '<i class="fas fa-triangle-exclamation"></i> {% trans "No rolls in the warehouse for this product — enter the metres below." %}' +
       '</div>';
     } else {
       existing.forEach(function (r) { rowsHtml += rollRowHtml(i, r, 'existing', null); });
       picked.forEach(function (r, ri) { rowsHtml += rollRowHtml(i, r, 'picked', ri); });
       if (item.rollsLoading) {
-        rowsHtml += '<div style="font-size:11.5px;color:#6b7280;padding:6px 2px;">{% trans "Toplar yükleniyor…" %}</div>';
+        rowsHtml += '<div style="font-size:11.5px;color:#6b7280;padding:6px 2px;">{% trans "Loading rolls…" %}</div>';
       } else {
         candidates.forEach(function (r) { rowsHtml += rollRowHtml(i, r, 'available', null); });
       }
@@ -800,10 +820,10 @@
 
     return '<div class="co-roll-section" style="margin-top:10px;padding:10px;background:#F8FAFC;border:1px solid #E2E8EE;border-radius:8px;">' +
       '<label style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;color:#0F766E;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;">' +
-        '<i class="fas fa-layer-group"></i> {% trans "Toplar" %}' +
+        '<i class="fas fa-layer-group"></i> {% trans "Rolls" %}' +
         '<span style="font-weight:500;color:#94A3B8;text-transform:none;letter-spacing:0;font-size:10.5px;">({% trans "seçmek için tıklayın" %})</span>' +
         '<span class="co-roll-count-badge" style="margin-left:auto;font-weight:800;font-size:10.5px;letter-spacing:0;text-transform:none;color:' + (selectedCount ? '#0F766E' : '#94A3B8') + ';background:' + (selectedCount ? '#D1FAE5' : '#F1F5F9') + ';padding:2px 8px;border-radius:999px;">' +
-          selectedCount + ' {% trans "top" %}' +
+          selectedCount + ' {% trans "rolls" %}' +
         '</span>' +
       '</label>' +
       searchBlock +
@@ -825,16 +845,18 @@
     var open = item.showManualEntry || noStockAtAll;
     if (!open) {
       return '<button type="button" onclick="coToggleManualEntry(' + i + ',true)" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:8px;background:none;border:1px dashed #CBD5E1;border-radius:7px;padding:7px 10px;color:#64748B;font-size:11.5px;font-weight:600;cursor:pointer;">' +
-        '<i class="fas fa-plus"></i> {% trans "Depo dışı ilave miktar ekle" %}' +
+        '<i class="fas fa-plus"></i> {% trans "Add outsourced quantity" %}' +
       '</button>';
     }
     var removable = !noStockAtAll;
     return '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 9px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:7px;font-size:12px;flex-wrap:wrap;">' +
       '<i class="fas fa-truck-fast" style="color:#C2410C;flex-shrink:0;"></i>' +
-      '<span style="font-size:9.5px;font-weight:700;color:#9A3412;background:#FED7AA;padding:2px 6px;border-radius:5px;white-space:nowrap;flex-shrink:0;">{% trans "DEPO DIŞI" %}</span>' +
-      '<input type="number" class="form-input" style="width:76px;flex:0 0 auto;" min="0" step="0.01" value="' + (item.manualMeters || '') + '" placeholder="0" onchange="coManualMeters(' + i + ',this.value)">' +
+      '<span style="font-size:9.5px;font-weight:700;color:#9A3412;background:#FED7AA;padding:2px 6px;border-radius:5px;white-space:nowrap;flex-shrink:0;">{% trans "OUTSOURCED" %}</span>' +
+      // Wide enough for six digits plus the number spinner — a hydrated
+      // value like 101.38 was being clipped at 76px.
+      '<input type="number" class="form-input" style="width:104px;flex:0 0 auto;" min="0" step="0.01" value="' + (item.manualMeters || '') + '" placeholder="0" onchange="coManualMeters(' + i + ',this.value)">' +
       '<span style="color:#9A3412;flex-shrink:0;">m</span>' +
-      '<input type="text" class="form-input" style="flex:1;min-width:120px;" placeholder="{% trans "Not (opsiyonel) — örn. başka depodan temin edilecek" %}" value="' + escAttr(item.manualNote || '') + '" onchange="coManualNote(' + i + ',this.value)">' +
+      '<input type="text" class="form-input" style="flex:1;min-width:120px;" placeholder="{% trans "Note (optional) — e.g. to be sourced from another warehouse" %}" value="' + escAttr(item.manualNote || '') + '" onchange="coManualNote(' + i + ',this.value)">' +
       (removable ? '<button type="button" onclick="coToggleManualEntry(' + i + ',false)" style="color:#B91C1C;background:none;border:0;cursor:pointer;font-size:15px;line-height:1;padding:0 2px;flex-shrink:0;">×</button>' : '') +
     '</div>';
   }
@@ -887,7 +909,7 @@
         // to cut less; leaving it alone keeps the full amount.
         item.rolls.push({ barcode: barcode, roll_id: d.roll_id, available: d.available, warehouse: d.warehouse, meters: d.available });
         if (inputEl) inputEl.value = '';
-        syncQtyFromRolls(i);
+        syncQtyFromRolls(i, true);
         renderProducts();
       })
       .catch(function () { showToast('Barkod kontrol edilemedi', 'error'); });
@@ -907,7 +929,7 @@
     var cap = item.rolls[ri].available;
     if (m > cap) { m = cap; showToast('En fazla ' + cap + ' m girilebilir', 'warning'); }
     item.rolls[ri].meters = m;
-    syncQtyFromRolls(i);
+    syncQtyFromRolls(i, true);
     renderProducts();
   };
 
@@ -930,7 +952,7 @@
         item.availableRolls.unshift({ barcode: removed.barcode, warehouse: removed.warehouse, available: removed.available });
       }
     }
-    syncQtyFromRolls(i);
+    syncQtyFromRolls(i, true);
     renderProducts();
   };
 
@@ -939,7 +961,7 @@
     if (!item) return;
     item.showManualEntry = show;
     if (!show) { item.manualMeters = 0; item.manualNote = ''; }
-    syncQtyFromRolls(i);
+    syncQtyFromRolls(i, true);
     renderProducts();
   };
 
@@ -947,7 +969,7 @@
     var item = orderItems[i];
     if (!item) return;
     item.manualMeters = parseFloat(v) || 0;
-    syncQtyFromRolls(i);
+    syncQtyFromRolls(i, true);
     renderProducts();
   };
 
@@ -1241,6 +1263,21 @@
 
   document.getElementById('createOrderForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    // A customer is mandatory on CREATE — the backend refuses the save
+    // anyway, but catching it here keeps the sidebar open with the
+    // Customer step expanded instead of bouncing the user off a toast.
+    // Edit is deliberately exempt: an existing order may carry a web
+    // client or plain guest info, which this picker can't represent.
+    var custType = (document.getElementById('customer-type').value || '').trim();
+    var custPk = (document.getElementById('customer-pk').value || '').trim();
+    if (this.dataset.mode !== 'edit'
+        && !(custType === 'retail' || ((custType === 'contact' || custType === 'company') && custPk))) {
+      showToast({% if LANGUAGE_CODE|slice:":2" == "tr" %}'Siparişi kaydetmeden önce müşteri seçin'{% else %}'Pick a customer before saving the order'{% endif %}, 'error');
+      coToggle(3);
+      var custSearch = document.getElementById('co-customer-search');
+      if (custSearch) custSearch.focus();
+      return;
+    }
     if (!orderItems.length) { showToast('Add at least one product','error'); return; }
     // A fabric/home-textile line's quantity comes entirely from the
     // tops picked for it — zero tops means zero quantity, which is
@@ -1259,19 +1296,24 @@
     // mode) so the backend updates them instead of creating dupes.
     // New items (no existing_item_id) get added as fresh OrderItems.
     document.getElementById('product_json_input').value = JSON.stringify(orderItems.map(function(it){
-      // Preserve the "depo dışı" note on the saved order — there's no
-      // dedicated field for it, so it's folded into the description.
+      // The depo dışı METRES are already carried by the line's quantity
+      // (quantity − reserved tops), so they're re-derived on the next
+      // edit and never written into the description. Only the optional
+      // free-text note has nowhere else to live — appended once, and
+      // skipped if the description already carries it.
       var desc = it.description || '';
-      var manual = parseFloat(it.manualMeters) || 0;
-      if (manual > 0) {
-        var extra = 'Depo dışı ilave: ' + manual.toFixed(2) + ' m' + (it.manualNote ? ' (' + it.manualNote + ')' : '');
-        desc = desc ? (desc + ' — ' + extra) : extra;
+      var note = (it.manualNote || '').trim();
+      if ((parseFloat(it.manualMeters) || 0) > 0 && note && desc.indexOf(note) === -1) {
+        desc = desc ? (desc + ' — ' + note) : note;
       }
       var payload = {
         item_no: it.index,
         product: { sku: it.sku, variant: it.variant },
         description: desc,
         quantity: it.quantity,
+        // The slice of `quantity` no roll will ever be scanned for.
+        // Stored on OrderItem.outsourced_quantity so it still bills.
+        outsourced: parseFloat(it.manualMeters) || 0,
         price: it.price,
         is_custom_curtain: it.is_custom_curtain,
         custom_width: it.custom_width || null,

@@ -88,6 +88,33 @@ def _consonant_prefix(name):
     return ("".join(cons[:3]) or "GEN")[:6]
 
 
+def _drop_stale_product_barcode(wp):
+    """Clear WarehouseProduct.barcode once no live roll carries it.
+
+    The field is stamped once, from the first roll ever added to the product,
+    and never refreshed (_add_tops_to_variant only fills it when empty). So
+    when that roll is consumed the product goes on advertising a code nothing
+    on the shelf answers to — and there is no screen that edits it, so the
+    stale value can't be corrected by hand either. It showed up on the public
+    info page's Code128, in the Excel export's barcode column, and as the
+    fallback match in barcode lookup.
+
+    Nothing tracks goods by it: rolls carry their own barcodes and the SKU
+    identifies the product. So the honest value is empty, and the info page
+    falls back to the SKU on its own.
+
+    Cheap: one EXISTS query, and only when a barcode is actually set."""
+    if not wp.barcode:
+        return
+    still_carried = (wp.rolls
+                     .exclude(status="consumed")
+                     .filter(barcode__iexact=wp.barcode)
+                     .exists())
+    if not still_carried:
+        wp.barcode = None
+        wp.save(update_fields=["barcode", "updated_at"])
+
+
 def _barcode_taken(code, *, exclude_roll_ids=()):
     """True if `code` is already carried by a roll or a product, anywhere.
 
@@ -3652,6 +3679,7 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
 
                     wp.quantity = (wp.quantity or Decimal("0")) - take
                     wp.save(update_fields=["quantity", "updated_at"])
+                    _drop_stale_product_barcode(wp)
 
                     StockMovement.objects.create(
                         product=wp,
@@ -3781,6 +3809,7 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
 
             wp.quantity = (wp.quantity or Decimal("0")) - actual
             wp.save(update_fields=["quantity", "updated_at"])
+            _drop_stale_product_barcode(wp)
 
             StockMovement.objects.create(
                 product=wp, roll=roll, movement_type="out",
@@ -5048,6 +5077,7 @@ class WarehouseStockOut(View):
         # Drop the parent quantity.
         product.quantity = (product.quantity or Decimal("0")) - amount
         product.save(update_fields=["quantity", "updated_at"])
+        _drop_stale_product_barcode(product)
 
         StockMovement.objects.create(
             product=product,

@@ -138,7 +138,7 @@ class ProductList(generic.ListView):
         return queryset.select_related(
             'category',
             'primary_image',
-            'supplier'
+            'supplier_account'
         ).prefetch_related(
             'attributes',
         ).annotate(
@@ -272,7 +272,7 @@ class ProductDetail(generic.DetailView):
         queryset = Product.objects.select_related(
             'category',
             'primary_image',
-            'supplier'
+            'supplier_account'
         ).prefetch_related(
             # Prefetch product files
             Prefetch(
@@ -1516,7 +1516,7 @@ class ProductEdit(BaseProductView, generic.UpdateView):
         return Product.objects.select_related(
             'category',
             'primary_image',
-            'supplier'
+            'supplier_account'
         ).prefetch_related(
             # Prefetch product files
             Prefetch(
@@ -2926,7 +2926,7 @@ def get_product(request):
                 p.id, p.created_at, p.title, p.description, p.sku, p.barcode,
                 p.tags, p.type, p.unit_of_measurement, p.quantity, p.price,
                 p.featured, p.selling_while_out_of_stock, p.weight, p.unit_of_weight,
-                p.category_id, p.supplier_id, p.datasheet_url, p.minimum_inventory_level,
+                p.category_id, p.supplier_account_id, p.datasheet_url, p.minimum_inventory_level,
                 pi.file_url as primary_image_url,
                 pc.name as category_name,
                 COALESCE(p.minimum_order_quantity, pc.minimum_order_quantity) as min_order_qty,
@@ -2946,7 +2946,7 @@ def get_product(request):
     (p_id, p_created_at, p_title, p_description, p_sku, p_barcode,
      p_tags, p_type, p_uom, p_quantity, p_price,
      p_featured, p_selling_oos, p_weight, p_uow,
-     p_category_id, p_supplier_id, p_datasheet_url, p_min_inv,
+     p_category_id, p_supplier_account_id, p_datasheet_url, p_min_inv,
      p_primary_image_url, p_category_name,
      p_min_order_qty, p_group_care_en, p_group_care_tr) = row
 
@@ -3061,7 +3061,12 @@ def get_product(request):
         "weight": float(p_weight) if p_weight is not None else None,
         "unit_of_weight": p_uow,
         "category_id": p_category_id,
-        "supplier_id": p_supplier_id,
+        # The accurate name for what this is: the cari ACCOUNT the product
+        # is purchased from. `supplier_id` is the same value under the old
+        # key, kept because the storefront lives outside this repo and can't
+        # be updated in the same commit — drop it once nothing reads it.
+        "supplier_account_id": p_supplier_account_id,
+        "supplier_id": p_supplier_account_id,
         "datasheet_url": p_datasheet_url,
         "minimum_inventory_level": float(p_min_inv) if p_min_inv is not None else None,
         "minimum_order_quantity": float(p_min_order_qty) if p_min_order_qty is not None else None,

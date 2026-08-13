@@ -129,10 +129,12 @@
             <span class="value">{{ product.weight }} {{ product.unit_of_weight|default:"kg" }}</span>
           </div>
           {% endif %}
-          {% if product.supplier %}
+          {% if product.supplier_account %}
           <div class="info-item">
-            <span class="label">{% trans "Supplier" %}</span>
-            <span class="value">{{ product.supplier.company_name|default:product.supplier.contact_name }}</span>
+            <span class="label">{% trans "Vendor account" %}</span>
+            <span class="value">
+              <a href="{% url 'accounts:detail' product.supplier_account_id %}">{{ product.supplier_account.name }}</a>
+            </span>
           </div>
           {% endif %}
           {% if product.minimum_inventory_level %}

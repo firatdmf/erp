@@ -5,7 +5,6 @@ import time
 # Standardized labels used to identify the nature and format of a file's content
 import mimetypes
 from django.core.exceptions import ValidationError
-from crm.models import Supplier
 from django.contrib.postgres.fields import ArrayField
 
 
@@ -298,8 +297,14 @@ class Product(models.Model):
         null=True,
     )
 
-    supplier = models.ForeignKey(
-        Supplier,
+    # Who we buy this from — the CARI ACCOUNT, not a crm.Supplier. The two
+    # were separate namespaces: the balances staff actually keep live on
+    # accounts (most imported from KARVEN with no Supplier row), so a
+    # product tagged with a Supplier pointed at a record that frequently
+    # had no account behind it at all. Warehouse intake posts purchases to
+    # accounts, so the product's vendor is the same account or it's a lie.
+    supplier_account = models.ForeignKey(
+        "accounting.CariAccount",
         related_name="products",
         on_delete=models.SET_NULL,
         blank=True,

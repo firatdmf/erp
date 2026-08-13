@@ -9,7 +9,10 @@ from crm.models import Contact, Company
 #     Book,
 #     # RawMaterialGoodsReceiptItem,
 # )
-from marketing.models import Product, ProductVariant, Supplier
+from marketing.models import Product, ProductVariant
+# Straight from crm — marketing used to re-export Supplier as a side effect
+# of Product.supplier, which is now a cari account instead.
+from crm.models import Supplier
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _

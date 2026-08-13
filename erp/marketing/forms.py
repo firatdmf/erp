@@ -46,9 +46,15 @@ class ProductForm(forms.ModelForm):
         
         # Fix cursor issues by ensuring querysets are properly evaluated
         # Force fresh queryset for supplier to avoid stale cursor references
-        if 'supplier' in self.fields:
+        if 'supplier_account' in self.fields:
             # Evaluate into a list only if absolutely necessary, otherwise ensure fresh queryset
-            self.fields['supplier'].queryset = Supplier.objects.all().order_by('company_name', 'contact_name')
+            from accounting.models_accounts import CariAccount
+            from accounting.services_accounts import get_default_book
+            self.fields['supplier_account'].queryset = (
+                CariAccount.objects
+                .filter(book=get_default_book(), is_active=True)
+                .order_by('name')
+            )
         
         # If the instance has variants, set the has_variants field to True
         if self.instance and self.instance.pk:

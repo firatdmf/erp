@@ -64,7 +64,11 @@ def _filtered_products(warehouse, search, sort):
     # at 0 and left the export's TOPLAM short of the on-screen total.
     unit_usd, unit_try = warehouse._total_value_annotations()
     _money = DecimalField(max_digits=20, decimal_places=4)
-    qs = qs.annotate(roll_count=Count('rolls'),
+    # Count LIVE tops only — the warehouse list page counts the same way
+    # (~Q(rolls__status='consumed')), so counting all of them here made the
+    # export disagree with the screen it was exported from.
+    qs = qs.annotate(roll_count=Count('rolls',
+                                      filter=~Q(rolls__status='consumed')),
                       line_usd=ExpressionWrapper(F('quantity') * unit_usd,
                                                  output_field=_money),
                       line_try=ExpressionWrapper(F('quantity') * unit_try,

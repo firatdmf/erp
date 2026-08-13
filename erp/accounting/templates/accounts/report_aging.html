@@ -184,7 +184,7 @@
           </td>
           <td>
             {% if r.oldest_invoice %}
-              <a class="ag-invno" href="{% url 'accounts:invoice_detail' r.oldest_invoice.pk %}">{{ r.oldest_invoice.series }}-{{ r.oldest_invoice.number }}</a>
+              <a class="ag-invno" href="{% url 'accounts:invoice_detail' r.oldest_invoice.pk %}">{{ r.oldest_invoice.display_number }}</a>
               <div class="ag-invdate">{{ r.oldest_invoice.due_date|date:"d.m.Y" }}</div>
             {% else %}
               <span style="color: var(--gray-400);">—</span>

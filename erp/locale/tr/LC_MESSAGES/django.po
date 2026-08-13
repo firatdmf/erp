@@ -5358,11 +5358,11 @@ msgstr "Fatura iptal edildi."
 msgid "Invoice created but could not be issued: %(error)s"
 msgstr "Fatura oluştu ama kesilemedi: %(error)s"
 
-msgid "Invoice created: %(series)s-%(number)s"
-msgstr "Fatura oluşturuldu: %(series)s-%(number)s"
+msgid "Invoice created: %(num)s"
+msgstr "Fatura oluşturuldu: %(num)s"
 
-msgid "Invoice issued: %(series)s-%(number)s"
-msgstr "Fatura kesildi: %(series)s-%(number)s"
+msgid "Invoice issued: %(num)s"
+msgstr "Fatura kesildi: %(num)s"
 
 msgid "Invoice no, check no, etc."
 msgstr "Fatura no, çek no, vs."

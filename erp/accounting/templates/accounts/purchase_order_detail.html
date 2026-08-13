@@ -162,9 +162,9 @@
   function poConfirmCancel(form) {
     const typed = window.prompt(
       "{% trans 'This permanently deletes the physical stock this purchase brought in and cannot be undone. Type the purchase number to confirm:' %}\n" +
-      "{{ invoice.series }}-{{ invoice.number }}"
+      "{{ invoice.display_number }}"
     );
-    return typed === "{{ invoice.series }}-{{ invoice.number }}";
+    return typed === "{{ invoice.display_number }}";
   }
 </script>
 {% endblock %}

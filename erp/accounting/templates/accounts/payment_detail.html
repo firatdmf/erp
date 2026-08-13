@@ -233,7 +233,7 @@
             <tr>
               <td>
                 {% if a.invoice %}
-                  <a class="invno" href="{% url 'accounts:invoice_detail' a.invoice.pk %}">{{ a.invoice.series }}-{{ a.invoice.number }}</a>
+                  <a class="invno" href="{% url 'accounts:invoice_detail' a.invoice.pk %}">{{ a.invoice.display_number }}</a>
                   <div class="inv-type">{{ a.invoice.get_type_display }}</div>
                 {% else %}
                   <span class="advance"><span style="width:6px; height:6px; border-radius:50%; background:#F59E0B;"></span>{% trans "ADVANCE (to account)" %}</span>

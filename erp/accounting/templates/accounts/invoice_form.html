@@ -206,7 +206,7 @@
     </a>
     {% if invoice %}
     <span class="if-sep">/</span>
-    <span class="if-crumb-here">{{ invoice.series }}-{{ invoice.number }}</span>
+    <span class="if-crumb-here">{{ invoice.display_number }}</span>
     {% endif %}
   </div>
 
@@ -215,7 +215,7 @@
     <div>
       <div class="if-eyebrow">{% if invoice %}{% trans "Edit" %}{% else %}{% trans "Create New" %}{% endif %}</div>
       <h1 class="if-title">
-        {% if invoice %}{% trans "Edit Invoice" %}<span class="code">{{ invoice.series }}-{{ invoice.number }}</span>{% else %}{% trans "New Invoice" %}{% endif %}
+        {% if invoice %}{% trans "Edit Invoice" %}<span class="code">{{ invoice.display_number }}</span>{% else %}{% trans "New Invoice" %}{% endif %}
       </h1>
     </div>
   </div>
@@ -269,7 +269,7 @@
               </div>
               <div class="if-f">
                 <label>{% trans "Series" %}</label>
-                <input type="text" name="series" maxlength="10" value="{{ invoice.series|default:'FAT' }}">
+                <input type="text" name="series" maxlength="10" value="{{ invoice.series|default:'INV' }}">
               </div>
               <div class="if-f">
                 <label>{% trans "Currency" %}</label>

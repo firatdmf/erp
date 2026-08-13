@@ -561,9 +561,29 @@ class Invoice(models.Model):
                                    related_name="created_invoices")
 
     def __str__(self):
-        return f"{self.series}-{self.number} | {self.cari.name} | {self.total} {self.currency.code}"
+        return f"{self.display_number} | {self.cari.name} | {self.total} {self.currency.code}"
 
     # -- helpers -----------------------------------------------------------
+    @property
+    def display_number(self):
+        """How this invoice is named on screen and in ledger descriptions.
+
+        next_invoice_number() already bakes the series into the number
+        ("FAT-2026-000071"), so the long-standing habit of rendering
+        `series`-`number` printed it twice — "FAT-FAT-2026-000071", and
+        once purchases were renamed, "Purchase-Purchase-2026-000072".
+
+        Joining is kept as the fallback for rows whose number does NOT
+        embed the series: hand-typed numbers, and the brand-prefix shape
+        (BLN20260000013) used when BRAND_INVOICE_PREFIX is set."""
+        num = (self.number or "").strip()
+        series = (self.series or "").strip()
+        if not num:
+            return series
+        if not series or num.upper().startswith(series.upper() + "-"):
+            return num
+        return f"{series}-{num}"
+
     @property
     def is_outgoing(self):
         """True for sales-side invoices (we send them to customer)."""
@@ -686,8 +706,8 @@ class Invoice(models.Model):
             amount=amount_signed,
             currency=self.currency,
             movement_type=self.movement_type,
-            description=f"{self.get_type_display()} {self.series}-{self.number}",
-            reference=f"{self.series}-{self.number}",
+            description=f"{self.get_type_display()} {self.display_number}",
+            reference=f"{self.display_number}",
             source_type=ContentType.objects.get_for_model(Invoice),
             source_id=self.pk,
             created_by=user.member if user and hasattr(user, "member") else None,
@@ -719,8 +739,8 @@ class Invoice(models.Model):
             mv = CariMovement.objects.create(
                 cari=self.cari, book=self.book, date=self.date, due_date=self.due_date,
                 amount=amount, currency=self.currency, movement_type=self.movement_type,
-                description=f"{self.get_type_display()} {self.series}-{self.number}",
-                reference=f"{self.series}-{self.number}",
+                description=f"{self.get_type_display()} {self.display_number}",
+                reference=f"{self.display_number}",
                 source_type=ContentType.objects.get_for_model(Invoice),
                 source_id=self.pk,
                 created_by=user.member if user and hasattr(user, "member") else None,
@@ -734,8 +754,8 @@ class Invoice(models.Model):
         mv.date = self.date
         mv.due_date = self.due_date
         mv.currency = self.currency
-        mv.description = f"{self.get_type_display()} {self.series}-{self.number}"
-        mv.reference = f"{self.series}-{self.number}"
+        mv.description = f"{self.get_type_display()} {self.display_number}"
+        mv.reference = f"{self.display_number}"
         mv.save()   # CariMovement.save() already calls recompute_balance
         return mv
 

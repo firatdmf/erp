@@ -218,8 +218,8 @@ def create_purchase_invoice_for_intake(supplier, lines, *, member=None, user=Non
         from datetime import timedelta
         inv = Invoice.objects.create(
             cari=cari, book=book,
-            series="ALIM",
-            number=settings_obj.next_invoice_number(series="ALIM"),
+            series="Purchase",
+            number=settings_obj.next_invoice_number(series="Purchase"),
             type="purchase", status="draft",
             date=today, due_date=today + timedelta(days=term_days),
             currency=currency,
@@ -371,8 +371,8 @@ def create_invoice_for_order(order, *, user=None):
     with transaction.atomic():
         inv = Invoice.objects.create(
             cari=cari, book=book,
-            series="FAT",
-            number=settings_obj.next_invoice_number(series="FAT"),
+            series="INV",
+            number=settings_obj.next_invoice_number(series="INV"),
             type="sales", status="draft",
             date=today, due_date=today + timedelta(days=term_days),
             currency=cari.default_currency or _resolve_currency(order),

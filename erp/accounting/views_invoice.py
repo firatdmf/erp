@@ -253,7 +253,7 @@ class InvoiceCreate(View):
                     messages.warning(
                         request,
                         _g("This order already has an invoice (%(num)s). Cancel or delete it before creating a new one.")
-                        % {"num": f"{existing.series}-{existing.number}"},
+                        % {"num": existing.display_number},
                     )
                     return redirect("operating:order_detail", pk=prefilled_order.pk)
                 if prefilled_order.cari and not prefilled_cari:
@@ -356,7 +356,7 @@ class InvoiceCreate(View):
                     messages.warning(
                         request,
                         _g("This order already has an invoice (%(num)s). Cancel or delete it before creating a new one.")
-                        % {"num": f"{dup.series}-{dup.number}"},
+                        % {"num": dup.display_number},
                     )
                     return redirect("operating:order_detail", pk=order_obj.pk)
 
@@ -408,7 +408,7 @@ class InvoiceCreate(View):
                 except ValidationError as ve:
                     messages.warning(request, _g("Invoice created but could not be issued: %(error)s") % {"error": ve})
 
-        messages.success(request, _g("Invoice created: %(series)s-%(number)s") % {"series": invoice.series, "number": invoice.number})
+        messages.success(request, _g("Invoice created: %(num)s") % {"num": invoice.display_number})
         return redirect("accounts:invoice_detail", pk=invoice.pk)
 
 
@@ -640,7 +640,7 @@ class InvoiceIssue(View):
         invoice = get_object_or_404(Invoice, pk=pk)
         try:
             invoice.issue(user=request.user)
-            messages.success(request, _g("Invoice issued: %(series)s-%(number)s") % {"series": invoice.series, "number": invoice.number})
+            messages.success(request, _g("Invoice issued: %(num)s") % {"num": invoice.display_number})
         except ValidationError as ve:
             messages.error(request, _g("Issue failed: %(error)s") % {"error": ve})
         return redirect("accounts:invoice_detail", pk=invoice.pk)
@@ -736,7 +736,7 @@ class InvoiceDelete(View):
         if invoice.status != "draft":
             messages.error(request, _g("Only draft invoices can be deleted. Cancel issued invoices instead."))
             return redirect("accounts:invoice_detail", pk=invoice.pk)
-        label = f"{invoice.series}-{invoice.number}"
+        label = invoice.display_number
         invoice.delete()
         messages.success(request, _g("Draft invoice deleted: %(label)s") % {"label": label})
         return redirect("accounts:invoice_list")

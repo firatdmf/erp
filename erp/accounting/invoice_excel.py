@@ -219,7 +219,7 @@ def invoice_excel(request, pk):
     wb = build_invoice_workbook(invoice)
     buf = BytesIO()
     wb.save(buf)
-    label = f"{invoice.series}-{invoice.number}" if invoice.number else f"invoice-{invoice.pk}"
+    label = invoice.display_number if invoice.number else f"invoice-{invoice.pk}"
     resp = HttpResponse(
         buf.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

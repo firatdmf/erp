@@ -47,7 +47,7 @@ in place instead of reloading the whole page.
     <tbody>
       {% for inv in invoices %}
       <tr>
-        <td><a class="iv-num" href="{% url 'accounts:invoice_detail' inv.pk %}">{{ inv.series }}-{{ inv.number }}</a></td>
+        <td><a class="iv-num" href="{% url 'accounts:invoice_detail' inv.pk %}">{{ inv.display_number }}</a></td>
         <td><span class="iv-date">{{ inv.date|date:"d.m.Y" }}</span></td>
         <td><span class="iv-date">{{ inv.due_date|date:"d.m.Y" }}</span></td>
         <td><span class="iv-type">{{ inv.get_type_display }}</span></td>

@@ -174,7 +174,7 @@
       </div>
       {% for x in grp.items %}
       <div class="dc-row">
-        <a class="dc-num" href="{% url 'accounts:invoice_detail' x.inv.pk %}">{{ x.inv.series }}-{{ x.inv.number }}</a>
+        <a class="dc-num" href="{% url 'accounts:invoice_detail' x.inv.pk %}">{{ x.inv.display_number }}</a>
         <div>
           <a class="dc-cari" href="{% url 'accounts:detail' x.inv.cari.pk %}">{{ x.inv.cari.name }}</a>
           <div class="dc-cari-code">{{ x.inv.cari.code }}</div>

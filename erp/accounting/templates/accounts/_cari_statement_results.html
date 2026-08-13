@@ -72,7 +72,7 @@
           {% elif inv %}
             <a href="{% url 'accounts:invoice_detail' inv.pk %}"
                class="mv-ref"
-               onclick="event.stopPropagation();">{{ inv.series }}-{{ inv.number }}</a>
+               onclick="event.stopPropagation();">{{ inv.display_number }}</a>
             {% if r.is_cancel_row or inv.status != 'cancelled' %}
               <span class="mv-st mv-st-{{ inv.status }}">{{ inv.get_status_display }}</span>
             {% endif %}

@@ -135,7 +135,7 @@
       {% if it.variant %} · <span style="font-family:var(--font-mono);">{{ it.variant.variant_sku }}</span>{% endif %}
     </div>
 
-    <div class="po-rolls-h"><i data-lucide="layers"></i> {% trans "Physical tops received" %}</div>
+    <div class="po-rolls-h"><i data-lucide="layers"></i> {% trans "Physical rolls received" %}</div>
     {% if it.warehouse_rolls.all %}
     <div class="po-rolls">
       {% for r in it.warehouse_rolls.all %}
@@ -147,7 +147,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <span class="po-no-rolls">{% trans "No tops linked to this line yet." %}</span>
+    <span class="po-no-rolls">{% trans "No rolls linked to this line yet." %}</span>
     {% endif %}
   </div>
   {% endfor %}

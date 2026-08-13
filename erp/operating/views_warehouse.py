@@ -88,72 +88,106 @@ def _consonant_prefix(name):
     return ("".join(cons[:3]) or "GEN")[:6]
 
 
-def _roll_consumption_info(roll):
-    """Where a finished top went, for the scanner to report.
+def _roll_usage_info(roll):
+    """What has come off this roll, and where each cut went.
 
-    A consumed roll still answers to its barcode on purpose — scanning an
-    old label should say what happened to it rather than come back empty.
-    But "found, 0 m" reads like ordinary stock, so the scan needs to name
-    the order it shipped on (the reservation records that), falling back to
-    the last stock-out movement for metres cut by hand, which carry no
-    order. Returns None for a roll that is still live."""
-    if roll.status != "consumed":
-        return None
+    Covers a roll that is PART used as well as one used up: both answer to
+    their barcode on purpose — scanning a label should say what happened to
+    the roll rather than come back empty — and in both cases "found, N m"
+    alone leaves the scanner to guess whether metres are missing by mistake
+    or because they shipped.
 
+    Returns None while nothing has been cut. Otherwise reports metres used
+    against the roll's original length, plus one entry per withdrawal: the
+    order (with its line and packing list) for stock that shipped, or the
+    movement's own reason for metres cut by hand, which carry no order.
+
+    Shipping writes BOTH a consumed reservation and an out movement for the
+    same metres, and StockMovement carries no order FK to join them on, so
+    the pair is matched by metres: each reservation absorbs one movement of
+    equal length, and only what's left over is listed as a separate cut.
+    Matching on metres rather than the timestamp on purpose — a shipment
+    crossing midnight, or a reservation consumed at a backdated time, would
+    otherwise report every shipped roll twice. The cost is that a hand cut
+    of exactly the same length as a shipment on the same roll is absorbed
+    into it; showing one cut too few beats showing every shipment twice."""
     from django.utils.timezone import localtime
     from .models import OrderRollReservation
 
-    res = (OrderRollReservation.objects
-           .filter(roll=roll, consumed=True)
-           .select_related("order", "order_item__product",
-                           "order_item__product_variant")
-           .order_by("-consumed_at", "-id")
-           .first())
-    if res and res.order_id:
+    total = roll.meters or Decimal("0")
+    remaining = roll.meters_remaining if roll.meters_remaining is not None else total
+    used = total - (remaining or Decimal("0"))
+    if used <= 0:
+        return None
+
+    from collections import Counter
+
+    entries = []
+    claimed = Counter()      # metres already reported by a reservation
+
+    for res in (OrderRollReservation.objects
+                .filter(roll=roll, consumed=True)
+                .select_related("order", "order_item__product",
+                                "order_item__product_variant")
+                .order_by("-consumed_at", "-id")):
+        if not res.order_id:
+            continue
         order = res.order
-        # Which LINE of the order this top was cut for. One order can eat
-        # several tops across different lines, so the order number alone
-        # doesn't tell you what this particular roll became. Best-effort by
-        # design (the FK is SET_NULL), hence the None-safety.
+        # Which LINE of the order this roll was cut for. One order can eat
+        # several rolls across different lines, so the order number alone
+        # doesn't say what this particular roll became. Best-effort by design
+        # (the FK is SET_NULL), hence the None-safety.
         line = None
         item = res.order_item
         if item is not None:
             title = (item.product.title if item.product_id else "") or ""
             sku = (item.product_variant.variant_sku
                    if item.product_variant_id else "") or ""
-            line = f"{title} [{sku}]".strip() if sku else title.strip() or None
-        return {
+            line = f"{title} [{sku}]".strip() if sku else (title.strip() or None)
+        day = localtime(res.consumed_at).date() if res.consumed_at else None
+        claimed[res.meters] += 1
+        entries.append({
             "kind": "order",
             "label": str(order),
             "line": line,
             "meters": float(res.meters or 0),
-            "date": localtime(res.consumed_at).strftime("%d.%m.%Y") if res.consumed_at else None,
+            "date": day.strftime("%d.%m.%Y") if day else None,
             "url": reverse("operating:order_detail", args=[order.pk]),
-            # Straight to the packing list — the screen that shows which top
-            # went into which pack, which is the next question after "which
+            # Straight to the packing list — the screen showing which roll
+            # went into which pack, the usual next question after "which
             # order did this go on".
             "packing_url": reverse("operating:order_packing_list", args=[order.pk]),
-        }
+        })
 
-    mv = (StockMovement.objects
-          .filter(roll=roll, movement_type="out")
-          .select_related("created_by")
-          .order_by("-created_at", "-id")
-          .first())
-    if mv:
-        return {
+    for mv in (StockMovement.objects
+               .filter(roll=roll, movement_type="out")
+               .select_related("created_by")
+               .order_by("-created_at", "-id")):
+        day = localtime(mv.created_at).date() if mv.created_at else None
+        if claimed.get(mv.quantity):
+            claimed[mv.quantity] -= 1
+            continue     # the ledger half of a shipment already listed above
+        entries.append({
             "kind": "movement",
             "label": (mv.reason or mv.reference or "").strip() or None,
             "line": None,
             "meters": float(mv.quantity or 0),
-            "date": localtime(mv.created_at).strftime("%d.%m.%Y") if mv.created_at else None,
+            "date": day.strftime("%d.%m.%Y") if day else None,
             "by": mv.created_by.get_username() if mv.created_by else None,
             "url": None,
             "packing_url": None,
-        }
-    # Consumed with no trace of how — say so rather than invent a reason.
-    return {"kind": "unknown", "label": None, "line": None, "meters": None,
-            "date": None, "url": None, "packing_url": None}
+        })
+
+    return {
+        "status": roll.status,
+        "consumed": roll.status == "consumed" or (remaining or Decimal("0")) <= 0,
+        "total": float(total),
+        "remaining": float(remaining or 0),
+        "used": float(used),
+        # Metres are gone but nothing records where — say so rather than
+        # invent a reason.
+        "entries": entries,
+    }
 
 
 def _drop_stale_product_barcode(wp):
@@ -1292,7 +1326,7 @@ def warehouse_barcode_lookup(request, pk):
                     "lot_number": other_roll.lot_number,
                     "status": other_roll.status,
                     "consumed": other_roll.status == "consumed",
-                    "used_in": _roll_consumption_info(other_roll),
+                    "usage": _roll_usage_info(other_roll),
                 },
             })
         if other_roll:
@@ -1314,7 +1348,7 @@ def warehouse_barcode_lookup(request, pk):
                     "lot_number": other_roll.lot_number,
                     "status": other_roll.status,
                     "consumed": other_roll.status == "consumed",
-                    "used_in": _roll_consumption_info(other_roll),
+                    "usage": _roll_usage_info(other_roll),
                 },
                 # No move offer for a top that has already been used up —
                 # there is nothing physical left to carry over, and the row
@@ -1364,7 +1398,7 @@ def warehouse_barcode_lookup(request, pk):
             "lot_number": roll.lot_number,
             "status": roll.status,
             "consumed": roll.status == "consumed",
-            "used_in": _roll_consumption_info(roll),
+            "usage": _roll_usage_info(roll),
         } if roll else None),
     })
 

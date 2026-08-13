@@ -633,7 +633,7 @@
       <section class="od-card">
         <div class="od-card-h">
           <i class="fa fa-layer-group"></i>
-          <h3>{% trans "Rolls (tops)" %}</h3>
+          <h3>{% trans "Rolls" %}</h3>
           <span class="od-card-sub">{{ rolls_count }} {% blocktrans count counter=rolls_count %}roll{% plural %}rolls{% endblocktrans %}</span>
         </div>
         {% if rolls %}
@@ -959,7 +959,7 @@
       {% trans "Edit roll" %}
     </h3>
     <div class="so-fld">
-      <label>{% trans "Barcode" %} <small style="color:var(--gray-500);font-weight:500;">{% trans "(this roll/top)" %}</small></label>
+      <label>{% trans "Barcode" %} <small style="color:var(--gray-500);font-weight:500;">{% trans "(this roll)" %}</small></label>
       <input class="so-input" type="text" id="reBarcode" placeholder="—">
     </div>
     <div class="so-fld">

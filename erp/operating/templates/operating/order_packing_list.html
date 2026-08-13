@@ -125,7 +125,7 @@
           <div class="pk-pack-title">{% trans "Package" %} #{{ p.pack_number }}</div>
           <div class="pk-pack-code">{{ p.code }}</div>
         </div>
-        <span class="pk-pack-meta">{{ p.rows|length }} {% trans "top" %}</span>
+        <span class="pk-pack-meta">{{ p.rows|length }} {% trans "roll" %}</span>
         <div class="pk-pack-actions">
           <a class="pk-pack-btn" href="{% url 'operating:pack_pdf' p.pk %}" target="_blank" title="{% trans 'Print this package (PDF)' %}">
             <i class="fa fa-file-pdf-o"></i>
@@ -145,7 +145,7 @@
           <span class="pk-roll-m">{{ r.meters|floatformat:2 }} m</span>
         </div>
         {% empty %}
-        <div class="pk-empty">{% trans "No tops in this package yet." %}</div>
+        <div class="pk-empty">{% trans "No rolls in this package yet." %}</div>
         {% endfor %}
       </div>
     </div>
@@ -174,7 +174,7 @@
   }
 
   function pkDeletePack(packId) {
-    if (!confirm('{% trans "Delete this package? Its tops go back to unassigned." %}')) return;
+    if (!confirm('{% trans "Delete this package? Its rolls go back to unassigned." %}')) return;
     pkFetch({ action: 'delete_pack', pack_id: packId }).then(data => {
       if (!data.ok) { alert(data.error || 'Failed'); return; }
       window.location.reload();

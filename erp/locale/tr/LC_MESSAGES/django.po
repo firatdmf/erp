@@ -6683,7 +6683,7 @@ msgstr "Tedarikçi seçin…"
 msgid "Barcode prefix"
 msgstr "Barkod öneki"
 
-msgid "each top gets its own unique barcode"
+msgid "each roll gets its own unique barcode"
 msgstr "her top kendi benzersiz barkodunu alır"
 
 msgid "Main product"
@@ -6713,7 +6713,7 @@ msgstr "Adet"
 msgid "Package"
 msgstr "Paket"
 
-msgid "Variants & tops"
+msgid "Variants & rolls"
 msgstr "Varyantlar ve toplar"
 
 msgid "No variant"
@@ -6725,7 +6725,7 @@ msgstr "Varyantlı"
 msgid "Purchase price"
 msgstr "Alış fiyatı"
 
-msgid "Add top"
+msgid "Add roll"
 msgstr "Top ekle"
 
 msgid "Color / model (e.g. Beyaz)"
@@ -6749,7 +6749,7 @@ msgstr "Mevcut bir ana ürün seçin."
 msgid "Enter a main product name."
 msgstr "Bir ana ürün adı girin."
 
-msgid "Add at least one variant with a top."
+msgid "Add at least one variant with a roll."
 msgstr "En az bir top içeren bir varyant ekleyin."
 
 msgid "Enter at least one quantity."
@@ -6782,7 +6782,7 @@ msgstr "(sipariş no, belge no...)"
 msgid "(per-roll — same product, different bar code)"
 msgstr "(top başına — aynı ürün, farklı barkod)"
 
-msgid "(this roll/top)"
+msgid "(this roll)"
 msgstr "(bu top)"
 
 msgid "ADJ"
@@ -7223,7 +7223,7 @@ msgstr "Bu oturum"
 msgid "This top"
 msgstr "Bu top"
 
-msgid "Top (roll) barcode"
+msgid "Roll barcode"
 msgstr "Top barkodu"
 
 msgid "Top quantity"
@@ -7470,7 +7470,7 @@ msgstr "Ürün girişi"
 msgid "Open order"
 msgstr "Siparişi aç"
 
-msgid "Scanned top"
+msgid "Scanned roll"
 msgstr "Okutulan top"
 
 msgid "Order changes"
@@ -7628,12 +7628,12 @@ msgstr "Satın alınan ürünler"
 
 #: current_account/templates/current_account/purchase_order_list.html
 #: current_account/templates/current_account/purchase_order_detail.html
-msgid "Physical tops received"
+msgid "Physical rolls received"
 msgstr "Gelen fiziksel toplar"
 
 #: current_account/templates/current_account/purchase_order_list.html
 #: current_account/templates/current_account/purchase_order_detail.html
-msgid "No tops linked to this line yet."
+msgid "No rolls linked to this line yet."
 msgstr "Bu kaleme henüz top bağlanmadı."
 
 #: current_account/templates/current_account/purchase_order_list.html
@@ -8064,7 +8064,7 @@ msgid "Print this package (PDF)"
 msgstr "Bu paketi yazdır (PDF)"
 
 #: operating/templates/operating/order_packing_list.html
-msgid "No tops in this package yet."
+msgid "No rolls in this package yet."
 msgstr "Bu pakette henüz top yok."
 
 #: operating/templates/operating/order_packing_list.html
@@ -8072,7 +8072,7 @@ msgid "Delete package? Its tops go back to unassigned."
 msgstr "Paket silinsin mi? İçindeki toplar atanmamış duruma döner."
 
 #: operating/templates/operating/order_packing_list.html
-msgid "Delete this package? Its tops go back to unassigned."
+msgid "Delete this package? Its rolls go back to unassigned."
 msgstr "Bu paket silinsin mi? İçindeki toplar atanmamış duruma döner."
 
 #: current_account/templates/current_account/invoice_form.html
@@ -8390,7 +8390,7 @@ msgstr ""
 msgid "In a different warehouse"
 msgstr "Başka bir depoda"
 
-msgid "This top is registered in"
+msgid "This roll is registered in"
 msgstr "Bu top şurada kayıtlı:"
 
 msgid "Move to this warehouse"

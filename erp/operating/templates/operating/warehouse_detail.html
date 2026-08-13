@@ -1234,7 +1234,7 @@
           <i class="fa fa-list-ul"></i>{{ variant_count|default:0 }} {% trans "variants" %}
         </span>
         <span class="od-dot"></span>
-        <span title="{% trans 'Rolls (tops)' %}">
+        <span title="{% trans 'Rolls' %}">
           <i class="fa fa-scroll"></i>{{ roll_count|default:0 }} {% trans "rolls" %}
         </span>
         <span class="od-dot"></span>
@@ -1530,7 +1530,7 @@
           </div>
           <div class="od-stat">
             <div class="val">{{ roll_count|default:0 }}</div>
-            <div class="lbl">{% trans "Rolls (tops)" %}</div>
+            <div class="lbl">{% trans "Rolls" %}</div>
           </div>
           <div class="od-stat">
             <div class="val">{{ total_quantity|floatformat:0 }}<span style="font-size:12px;font-weight:600;color:var(--gray-500);"> m</span></div>
@@ -1752,7 +1752,7 @@
       </div>
       <div class="rse-fld"><label>{% trans "Product barcode" %}</label><input id="rseProdBc" class="rse-input" type="text" autocomplete="off"></div>
       <hr class="rse-sep">
-      <div class="rse-fld"><label>{% trans "Top (roll) barcode" %}</label><input id="rseRollBc" class="rse-input" type="text" autocomplete="off"></div>
+      <div class="rse-fld"><label>{% trans "Roll barcode" %}</label><input id="rseRollBc" class="rse-input" type="text" autocomplete="off"></div>
       <div style="display:flex; gap:10px;">
         <div class="rse-fld" style="flex:1;"><label>{% trans "Meters" %}</label><input id="rseMeters" class="rse-input" type="number" step="0.01"></div>
         <div class="rse-fld" style="flex:1;"><label>{% trans "Lot No" %}</label><input id="rseLot" class="rse-input" type="text" autocomplete="off"></div>
@@ -1846,7 +1846,7 @@
           </div>
         </div>
 
-        <div class="np-hint">{% trans "Barcode prefix" %}: <b id="npPrefix">GEN</b> · {% trans "each top gets its own unique barcode" %}</div>
+        <div class="np-hint">{% trans "Barcode prefix" %}: <b id="npPrefix">GEN</b> · {% trans "each roll gets its own unique barcode" %}</div>
       </div>
 
       <!-- Unit (generic: fabric=m, bedding=pcs, …) — whole batch -->
@@ -2045,7 +2045,7 @@
         '</div>' +
       '</div>' +
       '<div class="np-field" style="margin-bottom:8px;">' +
-        '<label>{% trans "Variants & tops" %}</label>' +
+        '<label>{% trans "Variants & rolls" %}</label>' +
         '<div class="np-seg">' +
           '<button type="button" class="np-seg-btn" data-hv="0" onclick="npSetHasVariants(this, false)">{% trans "No variant" %}</button>' +
           '<button type="button" class="np-seg-btn active" data-hv="1" onclick="npSetHasVariants(this, true)">{% trans "Has variants" %}</button>' +
@@ -2059,7 +2059,7 @@
             NP_CUR +
           '</div>' +
           '<div class="np-tops np-nv-tops"></div>' +
-          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>' +
+          '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-no-variant\').querySelector(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add roll" %}</button>' +
         '</div>' +
       '</div>' +
       '<div class="np-variants-wrap">' +
@@ -2446,7 +2446,7 @@
         NP_CUR +
       '</div>' +
       '<div class="np-tops"></div>' +
-      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>';
+      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add roll" %}</button>';
     cardEl.querySelector('.np-variants').appendChild(el);
     npSuggestVariantSku(el);
     npAddTop(el);
@@ -2478,7 +2478,7 @@
     const row = document.createElement('div');
     row.className = 'np-top';
     row.innerHTML =
-      '<span class="np-top-no">{% trans "Top" %} ' + n + '</span>' +
+      '<span class="np-top-no">{% trans "Roll" %} ' + n + '</span>' +
       '<input class="np-input np-top-qty" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" oninput="npSummaryUpdate()">' +
       '<span class="np-top-unit">' + unitShort() + '</span>' +
       // Blank = mint one from the account prefix at save. Filled = this top
@@ -2527,7 +2527,7 @@
       const v = (el.value || '').trim().toUpperCase();
       if (v && counts[v] > 1) {
         el._npDupe = true;
-        npBcMark(el, 'bad', '{% trans "This barcode is entered on more than one top." %}');
+        npBcMark(el, 'bad', '{% trans "This barcode is entered on more than one roll." %}');
       } else if (el._npDupe) {
         el._npDupe = false;
         // Fall back to whatever the server last said about this value.
@@ -2580,7 +2580,7 @@
     const tops = t && t.parentElement;
     if (t) t.remove();
     if (tops) Array.prototype.forEach.call(tops.children, function (r, i) {
-      const no = r.querySelector('.np-top-no'); if (no) no.textContent = '{% trans "Top" %} ' + (i + 1);
+      const no = r.querySelector('.np-top-no'); if (no) no.textContent = '{% trans "Roll" %} ' + (i + 1);
     });
     npBcSyncDupes();   // removing a row can clear a clash it was causing
     npSummaryUpdate();
@@ -2613,7 +2613,7 @@
     if (el) {
       el.style.color = '';
       el.innerHTML = '<b>' + pcount + '</b> {% trans "products" %} · <b>' + vcount + '</b> {% trans "variants" %} · ' +
-        '<b>' + tcount + '</b> {% trans "tops" %} · <b>' + (Math.round(total * 100) / 100) + '</b> ' + unitShort();
+        '<b>' + tcount + '</b> {% trans "rolls" %} · <b>' + (Math.round(total * 100) / 100) + '</b> ' + unitShort();
     }
   };
 
@@ -2769,7 +2769,7 @@
       '</span></div>' +
       '<div class="np-existing-tops"></div>' +
       '<div class="np-tops"></div>' +
-      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add top" %}</button>' +
+      '<button type="button" class="np-add-top" onclick="npAddTop(this.closest(\'.np-variant\'))"><i class="fa fa-plus"></i> {% trans "Add roll" %}</button>' +
       '<div class="np-price-row" style="display:' + (hasExisting ? 'none' : 'flex') + '; margin-top:9px;">' +
         '<span class="np-price-label">{% trans "Purchase price" %}</span>' +
         '<input class="np-input np-v-price" type="number" inputmode="decimal" min="0" step="0.01" value="' +
@@ -2979,7 +2979,7 @@
             price: priceEl ? priceEl.value : '', currency: curEl ? curEl.value : 'USD'
           });
         });
-        if (!variants.length) { alert(label + ': {% trans "Add at least one variant with a top." %}'); return; }
+        if (!variants.length) { alert(label + ': {% trans "Add at least one variant with a roll." %}'); return; }
       } else {
         const block = card.querySelector('.np-no-variant');
         const tops = npCollectTops(block);
@@ -3031,7 +3031,7 @@
           if (summary) {
             summary.style.color = '#0E6E4A';
             summary.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "Saved" %} · <b>' + list.length + '</b> {% trans "products" %} · ' +
-              '<b>' + vtotal + '</b> {% trans "variants" %} · <b>' + ttotal + '</b> {% trans "tops" %}';
+              '<b>' + vtotal + '</b> {% trans "variants" %} · <b>' + ttotal + '</b> {% trans "rolls" %}';
           }
           (d.warnings || []).forEach(function (w) { console.warn('catalog:', w); });
           btn.innerHTML = '<i class="fa fa-check"></i> {% trans "Done" %}';
@@ -4425,38 +4425,54 @@
         r.innerHTML = '<div class="bl-rc notfound"><span class="bl-status notfound"><i class="fa fa-triangle-exclamation"></i> {% trans "Network error" %}</span>' + blAgainBtn() + '</div>';
       });
   }
-  // A consumed top is found on purpose — scanning an old label should say
-  // what became of it. But "0 m" on its own reads like a stocking error, so
-  // spell out where it went: the order it shipped on, or the manual stock-out.
+  // A used roll is found on purpose — scanning its label should say what
+  // became of it. Metres alone read like a stocking error, so spell out how
+  // much came off and where each cut went. Covers part-used rolls as well as
+  // ones used up: both leave the scanner guessing otherwise.
   function blUsedBanner(roll) {
-    if (!roll || !roll.consumed) return '';
-    var u = roll.used_in || {};
-    var what = '';
-    if (u.kind === 'order' && u.label) {
-      what = u.url
-        ? '<a href="' + u.url + '" style="color:#92400E; text-decoration:underline;">' + blEsc(u.label) + '</a>'
-        : blEsc(u.label);
-    } else if (u.kind === 'movement') {
-      what = u.label ? blEsc(u.label) : '{% trans "a manual stock-out" %}';
-      if (u.by) what += ' · ' + blEsc(u.by);
-    } else {
-      what = '{% trans "no record of where" %}';
+    var u = roll && roll.usage;
+    if (!u) return '';
+    var head = u.consumed
+      ? '{% trans "This roll has been used up" %}'
+      : '{% trans "This roll is partly used" %}';
+    var sum = '<b>' + Number(u.used).toFixed(2) + ' m</b> {% trans "of" %} ' +
+              Number(u.total).toFixed(2) + ' m';
+    if (!u.consumed) {
+      sum += ' · <b>' + Number(u.remaining).toFixed(2) + ' m</b> {% trans "left" %}';
     }
-    var bits = [];
-    if (u.meters) bits.push(Number(u.meters).toFixed(2) + ' m');
-    if (u.date) bits.push(blEsc(u.date));
-    // The order line this top was cut for — one order can eat several tops,
-    // so the order number alone doesn't say what this roll became.
-    if (u.line) bits.push(blEsc(u.line));
-    return '<p style="color:#92400E; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
-             '<i class="fa fa-circle-check"></i> ' +
-             '{% trans "This top has been used" %}: ' + what +
-             (bits.length ? '<br><span style="font-weight:500;">' + bits.join(' · ') + '</span>' : '') +
-             (u.packing_url
-               ? '<br><a href="' + u.packing_url + '" style="color:#92400E; font-weight:600; text-decoration:underline;">' +
+
+    var rows = (u.entries || []).map(function (e) {
+      var what;
+      if (e.kind === 'order' && e.label) {
+        what = e.url
+          ? '<a href="' + e.url + '" style="color:#92400E; text-decoration:underline;">' + blEsc(e.label) + '</a>'
+          : blEsc(e.label);
+      } else {
+        what = e.label ? blEsc(e.label) : '{% trans "manual stock-out" %}';
+        if (e.by) what += ' · ' + blEsc(e.by);
+      }
+      var bits = [];
+      if (e.meters) bits.push(Number(e.meters).toFixed(2) + ' m');
+      if (e.date) bits.push(blEsc(e.date));
+      // The order line this roll was cut for — one order can eat several
+      // rolls, so the order number alone doesn't say what this one became.
+      if (e.line) bits.push(blEsc(e.line));
+      return '<div style="font-weight:500; margin-top:3px;">→ ' + what +
+             (bits.length ? ' <span style="opacity:.85;">(' + bits.join(' · ') + ')</span>' : '') +
+             (e.packing_url
+               ? ' · <a href="' + e.packing_url + '" style="color:#92400E; text-decoration:underline;">' +
                    '<i class="fa fa-box"></i> {% trans "Packing list" %}</a>'
                : '') +
-           '</p>';
+             '</div>';
+    }).join('');
+
+    if (!rows) {
+      rows = '<div style="font-weight:500; margin-top:3px;">→ {% trans "no record of where" %}</div>';
+    }
+    return '<div style="color:#92400E; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
+             '<i class="fa fa-circle-check"></i> ' + head + ': ' + sum +
+             rows +
+           '</div>';
   }
 
   function renderLookup(d, code) {
@@ -4474,7 +4490,7 @@
         if (d.roll.lot_number) sub += (sub ? ' · ' : '') + 'Lot: ' + blEsc(d.roll.lot_number);
         tiles +=
           '<div class="bl-tile hero">' +
-            '<div class="t-label"><i class="fa fa-barcode"></i> {% trans "Scanned top" %}</div>' +
+            '<div class="t-label"><i class="fa fa-barcode"></i> {% trans "Scanned roll" %}</div>' +
             '<div class="t-value">' + ((rem !== null) ? rem : rm) + '<span class="t-unit">m</span></div>' +
             (sub ? '<div class="t-sub">' + sub + '</div>' : '') +
           '</div>';
@@ -4485,14 +4501,14 @@
           '<div class="t-value">' + (p.quantity || 0).toFixed(2) + '<span class="t-unit">m</span></div>' +
         '</div>' +
         '<div class="bl-tile">' +
-          '<div class="t-label"><i class="fa fa-layer-group"></i> {% trans "Tops" %}</div>' +
+          '<div class="t-label"><i class="fa fa-layer-group"></i> {% trans "Rolls" %}</div>' +
           '<div class="t-value">' + (p.rolls_count || 0) + '<span class="t-unit">top</span></div>' +
         '</div>';
       var used = d.roll && d.roll.consumed;
       r.innerHTML =
         '<div class="bl-rc ' + (used ? 'elsewhere' : 'found') + '">' +
           (used
-            ? '<span class="bl-status elsewhere"><i class="fa fa-box-open"></i> {% trans "Used top" %}</span>'
+            ? '<span class="bl-status elsewhere"><i class="fa fa-box-open"></i> {% trans "Used roll" %}</span>'
             : '<span class="bl-status found"><i class="fa fa-circle-check"></i> {% trans "Already in this warehouse" %}</span>') +
           '<div class="bl-bc-chip"><i class="fa fa-barcode"></i>' + blEsc(code) + '</div>' +
           '<div class="bl-prod-name">' + blEsc(p.name || '—') + '</div>' +
@@ -4517,12 +4533,12 @@
           (ep.sku ? '<span class="bl-sku-pill">' + blEsc(ep.sku) + '</span>' : '') +
           '<p style="color:#92400E; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
             '<i class="fa fa-triangle-exclamation"></i> ' +
-            '{% trans "This top is registered in" %} <b>' + blEsc(ew.name) + '</b>' +
+            '{% trans "This roll is registered in" %} <b>' + blEsc(ew.name) + '</b>' +
           '</p>' +
           blUsedBanner(er) +
           '<div class="bl-tiles">' +
             '<div class="bl-tile hero">' +
-              '<div class="t-label"><i class="fa fa-barcode"></i> {% trans "Scanned top" %}</div>' +
+              '<div class="t-label"><i class="fa fa-barcode"></i> {% trans "Scanned roll" %}</div>' +
               '<div class="t-value">' + erem + '<span class="t-unit">m</span></div>' +
             '</div>' +
           '</div>' +

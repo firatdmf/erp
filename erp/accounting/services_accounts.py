@@ -47,16 +47,28 @@ def get_default_book() -> Book:
     reading.
 
     Resolution order:
-      1. settings.CARI_BOOK_ID, when set — an explicit answer always wins.
-      2. The book already holding the most cari accounts. Self-correcting:
+      1. settings.CARI_BOOK_ID — an explicit id always wins.
+      2. settings.CARI_BOOK_NAME — set per brand (DEMFIRAT for demfirat).
+         Matched by name rather than id because each brand runs in its own
+         schema, where the same ledger has a different primary key.
+      3. The book already holding the most cari accounts. Self-correcting:
          whichever book the ledger actually lives in is the one it keeps
-         using, without configuration.
-      3. Lowest id, then create — only reachable on a database with no cari
+         using, and it is what covers a brand with no name configured.
+      4. Lowest id, then create — only reachable on a database with no cari
          accounts at all, i.e. a fresh install.
+
+    Every step falls through rather than raising: a book that has been renamed
+    or a stale id must not stop an order being placed.
     """
-    pinned = getattr(settings, "CARI_BOOK_ID", None)
-    if pinned:
-        book = Book.objects.filter(pk=pinned).first()
+    pinned = getattr(settings, "CARI_BOOK_ID", "") or ""
+    if str(pinned).strip().isdigit():
+        book = Book.objects.filter(pk=int(pinned)).first()
+        if book:
+            return book
+
+    name = (getattr(settings, "CARI_BOOK_NAME", "") or "").strip()
+    if name:
+        book = Book.objects.filter(name__iexact=name).order_by("id").first()
         if book:
             return book
 

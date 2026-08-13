@@ -266,6 +266,13 @@ BRAND_DEFAULTS = {
         # (see CariSettings.next_invoice_number). Set a non-empty value
         # to switch to the compact PREFIX+YEAR+SEQ shape.
         "BRAND_INVOICE_PREFIX": "",
+        # Which Book the current-account ledger posts to. Matched by name so
+        # it survives differing ids between brand schemas. Books also carry
+        # the general ledger, so several exist that have nothing to do with
+        # cari — leaving this to "lowest id" is what put sale #273 on a
+        # shadow account in a book nobody read. Empty → fall back to
+        # whichever book already holds the most accounts.
+        "CARI_BOOK_NAME": "DEMFIRAT",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3000",
         "STOREFRONT_PREVIEW_URL": "http://localhost:3000/",
@@ -281,6 +288,9 @@ BRAND_DEFAULTS = {
         "BRAND_TAX_OFFICE": "",
         "BRAND_TAX_NUMBER": "",
         "BRAND_LOGO_URL": "",
+        # Unset on purpose: BELINO's books are its own, and the automatic
+        # rule (the book already holding the most accounts) is right there.
+        "CARI_BOOK_NAME": "",
         "BRAND_INVOICE_PREFIX": "BLN",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3010",
@@ -292,6 +302,10 @@ _brand_cfg = BRAND_DEFAULTS.get(BRAND, BRAND_DEFAULTS["demfirat"])
 # Each setting: explicit env var wins, else the brand profile default.
 UI_THEME = config("UI_THEME", default=_brand_cfg["UI_THEME"]).strip()
 DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
+# Ledger book: an explicit id wins, then the brand's book name, then the
+# automatic rule in accounting.services_accounts.get_default_book().
+CARI_BOOK_ID = config("CARI_BOOK_ID", default="").strip()
+CARI_BOOK_NAME = config("CARI_BOOK_NAME", default=_brand_cfg.get("CARI_BOOK_NAME", "")).strip()
 BRAND_NAME = config("BRAND_NAME", default=_brand_cfg["BRAND_NAME"]).strip()
 BRAND_LEGAL_SUFFIX = config("BRAND_LEGAL_SUFFIX", default=_brand_cfg.get("BRAND_LEGAL_SUFFIX", "")).strip()
 BRAND_ADDRESS = config("BRAND_ADDRESS", default=_brand_cfg.get("BRAND_ADDRESS", "")).strip()

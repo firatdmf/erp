@@ -5,7 +5,8 @@ search/filter fetches (CariList returns just this when the request
 carries X-Requested-With), so typing in the search box swaps this block
 in place instead of reloading the whole page.
 {% endcomment %}
-<span id="ca-results-meta" data-count="{{ total_count }}" hidden></span>
+<span id="ca-results-meta" data-count="{{ total_count }}"
+      data-tab-counts='{{ tab_counts_json }}' hidden></span>
 
 <div class="ca-stats">
   <div class="ca-stat">
@@ -40,6 +41,7 @@ in place instead of reloading the whole page.
     <div>{% trans "Code" %}</div>
     <div>{% trans "Account" %}</div>
     <div>{% trans "Type" %}</div>
+    <div>{% trans "Book" %}</div>
     <div class="num">{% trans "Balance" %}</div>
     <div>{% trans "Recent" %}</div>
     <div></div>
@@ -64,6 +66,7 @@ in place instead of reloading the whole page.
         <span class="ca-type-dot"></span>{{ c.get_type_display }}
       </span>
     </div>
+    <div><span class="ca-book" title="{% trans "Book" %}: {{ c.book.name }}">{{ c.book.name }}</span></div>
     <div class="num">
       <div class="ca-bal {% if c.cached_balance > 0 %}pos{% elif c.cached_balance < 0 %}neg{% else %}zero{% endif %}">
         {{ c.display_currency_symbol }}{{ c.absolute_balance|floatformat:2|intcomma }}

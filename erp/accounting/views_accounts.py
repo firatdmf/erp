@@ -9,6 +9,7 @@ Current account (Cari Hesap) views — Phase 1.
     /accounting/accounts/<id>/delete/         → CariDelete
     /accounting/accounts/<id>/movements/new/  → CariMovementCreate (manual entry)
 """
+import json
 from decimal import Decimal
 
 from django.contrib import messages
@@ -63,7 +64,15 @@ def _tr_case_variants(q):
     return {q, tr_upper, tr_lower}
 
 
-def _filter_caris(request):
+def _filter_caris(request, apply_type=True):
+    """Filtered account queryset.
+
+    apply_type=False leaves the type filter off so the tab counts can be
+    computed against everything else the user has narrowed to. A tab needs to
+    answer "how many would I get if I clicked this", which is the current
+    search, book, balance and active filters — but its own type, not the one
+    already selected.
+    """
     qs = CariAccount.objects.select_related("book", "default_currency").all()
 
     q = (request.GET.get("q") or "").strip()
@@ -84,7 +93,7 @@ def _filter_caris(request):
         qs = qs.filter(book_id=int(book_id))
 
     type_filter = request.GET.get("type") or ""
-    if type_filter in dict(CariAccount.TYPE_CHOICES):
+    if apply_type and type_filter in dict(CariAccount.TYPE_CHOICES):
         qs = qs.filter(type=type_filter)
 
     balance_filter = request.GET.get("balance") or ""
@@ -144,6 +153,25 @@ class CariList(View):
             we_owe=Sum("cached_balance_base", filter=Q(cached_balance__lt=0)),
         )
 
+        # One count per tab. Previously a single badge sat on the "All" tab and
+        # the fetch handler wrote the FILTERED count into it, so selecting
+        # Supplier left "All" reading the supplier count. Each tab now carries
+        # its own, counted with every filter except type applied.
+        untyped = _filter_caris(request, apply_type=False)
+        # .order_by() clears the sort before grouping. _filter_caris orders by
+        # name and id, and Django folds ordering fields into the GROUP BY — so
+        # without this the aggregate groups by (type, name, id) and every count
+        # comes back as 1.
+        per_type = dict(untyped.order_by().values_list("type")
+                        .annotate(n=Count("id")))
+        all_count = untyped.count()
+        # (value, label, count) so the template can just iterate — a template
+        # cannot index a dict by a loop variable without a custom filter.
+        type_tabs = [(val, label, per_type.get(val, 0))
+                     for val, label in CariAccount.TYPE_CHOICES]
+        tab_counts = {"": all_count}
+        tab_counts.update({val: n for val, _l, n in type_tabs})
+
         # Paginate — stats above stay whole-filtered-set; only the rows page.
         from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
         paginator = Paginator(qs, 50)
@@ -162,6 +190,9 @@ class CariList(View):
             "net":            (totals["owes_us"] or Decimal("0.00")) + (totals["we_owe"] or Decimal("0.00")),
             "books":          _books(),
             "type_choices":   CariAccount.TYPE_CHOICES,
+            "all_count":      all_count,
+            "type_tabs":      type_tabs,
+            "tab_counts_json": json.dumps(tab_counts),
             "q":              request.GET.get("q", ""),
             "filter_book":    request.GET.get("book", ""),
             "filter_type":    request.GET.get("type", ""),

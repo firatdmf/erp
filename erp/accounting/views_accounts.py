@@ -419,10 +419,13 @@ class CariDetail(View):
             .order_by("-date", "-id")[:20]
         )
         movements_with_balance = []
+        # cached_balance is a base-currency (USD) figure, so the walk back
+        # through it has to use amount_base too — subtracting a raw EUR
+        # `amount` from a USD balance is what made these columns disagree.
         running = cari.cached_balance
         for mv in recent_movements:
             movements_with_balance.append({"mv": mv, "balance_after": running})
-            running -= mv.amount
+            running -= mv.amount_base
         _attach_links(movements_with_balance)
 
         recent_invoices = cari.invoices.select_related("currency").order_by("-date", "-id")[:10]
@@ -533,11 +536,12 @@ class CariStatement(View):
             prior_qs = prior_qs.none()
         if status_f != "cancelled":
             prior_qs = prior_qs.exclude(all_cancel_q)
-        opening = prior_qs.aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+        # Base currency throughout — see CariAccount.recompute_balance.
+        opening = prior_qs.aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
         running = opening
 
         for mv in qs:
-            running += mv.amount
+            running += mv.amount_base
             rows.append({"mv": mv, "balance_after": running})
         _attach_links(rows)
 

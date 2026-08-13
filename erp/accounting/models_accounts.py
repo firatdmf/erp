@@ -60,6 +60,7 @@ Sync with legacy accounting (signals_accounts.py):
     so existing dashboards keep working.
 """
 from decimal import Decimal
+from functools import lru_cache
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -82,6 +83,29 @@ from crm.models import Company, Contact, Supplier
 # ---------------------------------------------------------------------------
 # 1. CariAccount — the unified customer/supplier card
 # ---------------------------------------------------------------------------
+@lru_cache(maxsize=1)
+def _base_currency_symbol():
+    """Symbol of the currency every stored balance is normalised to.
+
+    Reads the same settings key _resolve_currency() uses, so there is one
+    answer to "what is the base currency" rather than two that can drift.
+
+    Cached because it is read once per row when a list of accounts renders.
+    Falls back to the code, then to a bare "$", so a missing CurrencyCategory
+    row degrades to a label rather than a 500.
+    """
+    from django.apps import apps  # resolved lazily — accounting.models
+    # imports this module at the end of its own body, so a top-level import
+    # of CurrencyCategory would be circular (same reason the FKs above are
+    # declared as "accounting.X" strings).
+    code = getattr(settings, "BASE_CURRENCY_CODE", "USD")
+    cur = (apps.get_model("accounting", "CurrencyCategory").objects
+           .filter(code=code).first())
+    if not cur:
+        return "$"
+    return cur.symbol or cur.code
+
+
 class CariAccount(models.Model):
     class Meta:
         verbose_name = _("Current Account")
@@ -196,13 +220,29 @@ class CariAccount(models.Model):
             )
 
     def recompute_balance(self, save=True):
-        """Recalculate cached_balance from movements. Safe to call any time."""
+        """Recalculate cached_balance from movements. Safe to call any time.
+
+        BOTH figures are the base-currency (USD) sum. `amount` is whatever
+        currency the movement was entered in, so adding it across movements
+        only works while an account never mixes currencies — the moment one
+        does, summing `amount` adds EUR to USD and produces a number that is
+        not money at all. A 608.26 USD order settled by a 540 EUR collection
+        read as a balance of 68.26 when the real position was -6.91.
+
+        `amount_base` is that same movement normalised at its own recorded
+        exchange rate, so summing it is meaningful whatever mix of currencies
+        an account holds. For a USD-only account the two are identical (rate
+        1.0), which is why this changes nothing for almost every account.
+
+        cached_balance_base is kept as-is rather than dropped: it is what the
+        list view aggregates over, and the two staying equal makes the
+        redundancy harmless.
+        """
         agg = self.movements.aggregate(
-            total=Sum("amount"),
             total_base=Sum("amount_base"),
             last=models.Max("created_at"),
         )
-        self.cached_balance      = (agg["total"]      or Decimal("0.00"))
+        self.cached_balance      = (agg["total_base"] or Decimal("0.00"))
         self.cached_balance_base = (agg["total_base"] or Decimal("0.00"))
         self.last_movement_at    = agg["last"]
         if save:
@@ -231,7 +271,19 @@ class CariAccount(models.Model):
 
     @property
     def display_currency_symbol(self):
-        return self.default_currency.symbol or self.default_currency.code
+        """Symbol for the figures shown beside it — the BASE currency.
+
+        Every balance on this model (cached_balance, absolute_balance) is a
+        base-currency sum, and credit_limit is compared against it directly in
+        the over-limit filter, so all of them are USD regardless of which
+        currency the account itself trades in. Returning default_currency here
+        labelled a converted USD figure with the account's own symbol: the two
+        TRY accounts rendered "₺47.73" for what is $47.73, having previously
+        rendered "₺2,250.12" for the same position.
+
+        Cached on the class — this runs once per row on a 50-row list page.
+        """
+        return _base_currency_symbol()
 
 
 # ---------------------------------------------------------------------------

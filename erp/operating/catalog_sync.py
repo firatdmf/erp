@@ -387,9 +387,19 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
                 val = link.productvariantattributevalue
                 if val.product_variant_attribute_id == target_attr.id:
                     continue
+                # NORMALISE before the lookup. ProductVariantAttributeValue
+                # .save() rewrites this field (lower-case, spaces → "_"), so
+                # get_or_create() with a raw value searches for text the table
+                # can never hold: it misses, inserts, and save() then folds the
+                # new row onto an existing one — an IntegrityError on the
+                # (attribute, value) unique constraint rather than a reuse.
+                # Values written by paths that bypass save() (the product
+                # form's bulk_create) are stored unfolded, e.g. "Silver", and
+                # were exactly what tripped this.
                 moved, _ = ProductVariantAttributeValue.objects.get_or_create(
                     product_variant_attribute=target_attr,
-                    product_variant_attribute_value=val.product_variant_attribute_value)
+                    product_variant_attribute_value=_norm_value(
+                        val.product_variant_attribute_value))
                 Through.objects.get_or_create(
                     productvariant_id=link.productvariant_id,
                     productvariantattributevalue_id=moved.id)

@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 import traceback
 from io import BytesIO
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -81,7 +81,8 @@ def _order_lines_and_total(order):
     for it in order.items.all().select_related("product", "product_variant"):
         qty = it.quantity or Decimal("0")
         price = it.price or Decimal("0")
-        it.line_total_calc = (qty * price).quantize(Decimal("0.01"))
+        it.line_total_calc = (qty * price).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP)
         items.append(it)
         total += it.line_total_calc
     return items, total

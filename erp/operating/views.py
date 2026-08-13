@@ -1813,7 +1813,7 @@ class OrderPrint(DetailView):
     context_object_name = "order"
 
     def get_context_data(self, **kwargs):
-        from decimal import Decimal
+        from decimal import Decimal, ROUND_HALF_UP
         ctx = super().get_context_data(**kwargs)
         order = self.object
         # Physical packs scanned for this order (a "top"/roll for fabric,
@@ -1834,7 +1834,10 @@ class OrderPrint(DetailView):
         for it in order.items.all().select_related("product", "product_variant"):
             qty = it.quantity or Decimal("0")
             price = it.price or Decimal("0")
-            line_total = (qty * price).quantize(Decimal("0.01"))
+            # Half up, matching InvoiceItem.compute — an order line and
+            # the invoice raised from it must not differ by a cent.
+            line_total = (qty * price).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP)
             it.line_total_calc = line_total
             it.pack_count = len(packs_by_item.get(it.pk, ()))
             items.append(it)

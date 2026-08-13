@@ -1,7 +1,7 @@
 """Excel (.xlsx) export of an Order — bordered, document-style sheet that
 mirrors the printable order PDF and carries the full order record.
 """
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from io import BytesIO
 
 from django.conf import settings
@@ -168,7 +168,7 @@ def build_order_workbook(order):
     for it in items:
         qty = it.quantity or Decimal("0")
         price = it.price or Decimal("0")
-        line = (qty * price).quantize(Decimal("0.01"))
+        line = (qty * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         total += line
         title = getattr(it.product, "title", None) or str(it.product or "—")
         if getattr(it, "description", ""):

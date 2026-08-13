@@ -19,7 +19,7 @@ warehouse side before a markup means anything.
 """
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 # Blocks per page. Three is what the reference catalog fits on an A4 page at
 # this type size; more than that overflows the sheet.
@@ -58,7 +58,7 @@ def _money(amount, currency: str = BASE_CURRENCY) -> str:
     if amount is None:
         return ""
     symbol = CURRENCY_SYMBOLS.get(currency, f"{currency} ")
-    value = Decimal(str(amount)).quantize(Decimal("0.01"))
+    value = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     if value == value.to_integral_value():
         return f"{symbol}{value.to_integral_value()}"
     return f"{symbol}{value}"
@@ -191,7 +191,8 @@ class Pricing:
             base = None if cost is None else Decimal(str(cost)) * (1 + self.markup / 100)
         if base is None:
             return None
-        return (Decimal(str(base)) * self.fx).quantize(Decimal("0.01"))
+        return (Decimal(str(base)) * self.fx).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def build_block(product, photo_side: str, pricing: "Pricing | None" = None) -> dict:

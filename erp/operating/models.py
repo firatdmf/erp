@@ -690,21 +690,21 @@ class Order(models.Model):
         metric — NEVER include in customer-facing PDFs/invoices.
         For list views, pre-fetch items with select_related('product',
         'product_variant') to avoid N+1 queries."""
-        from decimal import Decimal
+        from decimal import Decimal, ROUND_HALF_UP
         total = Decimal("0")
         for it in self.items.all():
             total += it.gross_profit()
-        return total.quantize(Decimal("0.01"))
+        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def total_cost(self):
         """Sum of every item's unit_cost × quantity. Counterpart to
         total_value(); revenue − total_cost == gross_profit."""
-        from decimal import Decimal
+        from decimal import Decimal, ROUND_HALF_UP
         total = Decimal("0")
         for it in self.items.all():
             qty = it.quantity or Decimal("0")
             total += it.unit_cost() * qty
-        return total.quantize(Decimal("0.01"))
+        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def gross_margin_pct(self):
         """Gross profit as a percentage of revenue. Returns None when

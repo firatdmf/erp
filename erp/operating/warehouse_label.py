@@ -192,9 +192,17 @@ def warehouse_product_label(request, warehouse_pk, product_pk):
 
     roll_pk = (request.GET.get("roll") or "").strip()
     if roll_pk.isdigit():
+        # An explicitly named roll always prints, consumed or not — asking
+        # for one specific label is asking for that label.
         rolls = list(product.rolls.filter(pk=int(roll_pk)))
     else:
-        rolls = list(product.rolls.all().order_by("id"))
+        # Print what the product page shows: fully-consumed rolls are hidden
+        # there (WarehouseProductDetail excludes them), so they can't be
+        # corrected from the UI either — yet they were still coming out of
+        # the printer, carrying whatever barcode they were retired with.
+        # A label for a roll that no longer physically exists has nothing
+        # to be stuck on.
+        rolls = list(product.rolls.exclude(status="consumed").order_by("id"))
 
     from django.urls import reverse
     detail_url = request.build_absolute_uri(reverse(

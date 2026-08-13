@@ -88,14 +88,35 @@ def _consonant_prefix(name):
     return ("".join(cons[:3]) or "GEN")[:6]
 
 
-def _barcode_minter(prefix):
+def _barcode_taken(code, *, exclude_roll_ids=()):
+    """True if `code` is already carried by a roll or a product, anywhere.
+
+    Same uniqueness domain the minter avoids (rolls + products, globally),
+    so a hand-typed barcode can never land on a code the minter would
+    consider taken — or vice versa."""
+    code = (code or "").strip()
+    if not code:
+        return False
+    roll_q = WarehouseProductRoll.objects.filter(barcode__iexact=code)
+    if exclude_roll_ids:
+        roll_q = roll_q.exclude(pk__in=list(exclude_roll_ids))
+    return (roll_q.exists()
+            or WarehouseProduct.objects.filter(barcode__iexact=code).exists())
+
+
+def _barcode_minter(prefix, reserved=()):
     """Return a closure that mints fresh, GLOBALLY-UNIQUE barcodes of the form
     PREFIX + 6 digits (e.g. KZL000123). Uniqueness is checked against every
     existing roll AND product barcode, plus the ones minted in this batch, so
-    each top across the whole system gets a one-of-a-kind code."""
+    each top across the whole system gets a one-of-a-kind code.
+
+    `reserved` blocks codes that aren't in the database yet — the barcodes
+    typed by hand elsewhere in the SAME submit. Without it an auto-minted
+    top could be handed a code a manual top in the same batch is about to
+    claim, and the two would collide only at write time."""
     import re as _re
     prefix = (prefix or "GEN").upper()[:6] or "GEN"
-    existing = set()
+    existing = set(str(r).strip() for r in (reserved or ()) if str(r).strip())
     for qs in (
         WarehouseProductRoll.objects.filter(barcode__startswith=prefix)
         .values_list("barcode", flat=True),
@@ -137,34 +158,88 @@ def _slug_token(text):
     return "".join(ch for ch in folded if ch.isalnum())[:10]
 
 
-def _supplier_choices():
-    """Suppliers for the manual-add dropdown, each with its derived barcode
-    prefix so the UI can preview it instantly."""
+def _account_choices():
+    """Cari accounts for the manual-add dropdown, each with its derived
+    barcode prefix so the UI can preview it instantly.
+
+    Lists the accounts THEMSELVES rather than crm.Supplier rows. Intake
+    used to pick a Supplier and resolve its cari through the supplier FK,
+    but the accounts carrying the real balances were imported from KARVEN
+    with no Supplier row at all — so picking "MARKISS" in this panel minted
+    a brand-new supplier + cari and posted the alım there, while the money
+    staff actually track sat on the untouched imported account. Choosing
+    the account directly removes that whole class of drift: what you pick
+    is what gets credited.
+
+    All types are listed (not just type="supplier") — a cari can trade both
+    ways, and hiding the rest is what made the right account unpickable."""
     try:
-        from crm.models import Supplier
-        rows = (Supplier.objects.all()
-                .order_by("company_name", "contact_name")[:500])
-        return [{"id": s.id, "name": str(s), "prefix": _consonant_prefix(str(s))}
-                for s in rows]
+        from accounting.models_accounts import CariAccount
+        from accounting.services_accounts import get_default_book
+        rows = (CariAccount.objects
+                .filter(book=get_default_book(), is_active=True)
+                .order_by("name")[:1000])
+        return [{"id": c.id, "name": c.name,
+                 "type": c.get_type_display(),
+                 "prefix": _consonant_prefix(c.name)}
+                for c in rows]
     except Exception:
         return []
 
 
 @login_required
-def warehouse_supplier_create(request):
-    """Create (or reuse) a supplier straight from the manual-add panel's
-    supplier box, so a delivery from a new supplier doesn't force a
-    detour through the CRM. Matching is by folded name — the same
-    Turkish-aware fold the barcode prefix uses — so "Kızılırmak" and
-    "KIZILIRMAK" resolve to the existing record instead of creating a
-    near-duplicate that would split its stock history.
+def warehouse_barcode_available(request):
+    """Is this hand-typed top barcode free? Drives the inline check in the
+    manual-add panel so a clash is caught while typing rather than at save,
+    when the whole batch would bounce.
 
-    Returns the supplier the caller should select, plus its derived
+    Advisory only — the save path re-checks inside its own validation pass,
+    which is what actually guarantees uniqueness. Two people typing the same
+    code at once would both see "free" here; the second save is refused."""
+    code = (request.GET.get("code") or "").strip()
+    if not code:
+        return JsonResponse({"available": False, "reason": "empty"})
+
+    roll = (WarehouseProductRoll.objects
+            .select_related("product", "product__warehouse")
+            .filter(barcode__iexact=code).first())
+    if roll:
+        return JsonResponse({
+            "available": False, "reason": "roll",
+            "used_by": f"{roll.product.name} · {roll.product.warehouse.name}",
+        })
+    wp = (WarehouseProduct.objects.select_related("warehouse")
+          .filter(barcode__iexact=code).first())
+    if wp:
+        return JsonResponse({
+            "available": False, "reason": "product",
+            "used_by": f"{wp.name} · {wp.warehouse.name}",
+        })
+    return JsonResponse({"available": True})
+
+
+@login_required
+def warehouse_account_create(request):
+    """Create (or reuse) a cari account straight from the manual-add
+    panel's account box, so a delivery from a new supplier doesn't force
+    a detour through the accounting pages. Matching is by folded name —
+    the same Turkish-aware fold the barcode prefix uses — so "Kızılırmak"
+    and "KIZILIRMAK" resolve to the existing account instead of creating a
+    near-duplicate that would split its balance.
+
+    Creates the ACCOUNT only, deliberately not a crm.Supplier: a Supplier
+    used to be the thing minted here, and its post_save auto-created a
+    second cari alongside whatever account already held that vendor's
+    balance. Suppliers remain a CRM/procurement concept; purchases post
+    to accounts.
+
+    Returns the account the caller should select, plus its derived
     barcode prefix, and `created` so the UI can say which happened."""
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "POST required"}, status=405)
 
-    from crm.models import Supplier
+    from accounting.models_accounts import CariAccount
+    from accounting.services_accounts import get_default_book, _resolve_currency
     from .catalog_sync import _fold
 
     try:
@@ -172,30 +247,33 @@ def warehouse_supplier_create(request):
     except (json.JSONDecodeError, TypeError):
         data = {}
     name = (data.get("name") or "").strip()
-    contact_name = (data.get("contact_name") or "").strip()
     phone = (data.get("phone") or "").strip()
     email = (data.get("email") or "").strip()
 
     if not name:
-        return JsonResponse({"success": False, "error": "Supplier name is required."}, status=400)
+        return JsonResponse({"success": False, "error": "Hesap adı gerekli."}, status=400)
 
+    book = get_default_book()
     folded = _fold(name)
     existing = next(
-        (s for s in Supplier.objects.all() if _fold(str(s)) == folded), None
+        (c for c in CariAccount.objects.filter(book=book, is_active=True)
+         if _fold(c.name) == folded), None
     )
     if existing is not None:
         return JsonResponse({
             "success": True, "created": False, "id": existing.id,
-            "name": str(existing), "prefix": _consonant_prefix(str(existing)),
+            "name": existing.name, "prefix": _consonant_prefix(existing.name),
         })
 
-    supplier = Supplier.objects.create(
-        company_name=name, contact_name=contact_name or None,
-        phone=phone[:15], email=email,
+    cari = CariAccount.objects.create(
+        book=book, name=name, type="supplier",
+        default_currency=_resolve_currency(),
+        phone=phone[:30], email=email,
+        created_by=getattr(request.user, "member", None),
     )
     return JsonResponse({
-        "success": True, "created": True, "id": supplier.id,
-        "name": str(supplier), "prefix": _consonant_prefix(str(supplier)),
+        "success": True, "created": True, "id": cari.id,
+        "name": cari.name, "prefix": _consonant_prefix(cari.name),
     })
 
 
@@ -306,7 +384,11 @@ def _add_tops_to_variant(wp, tops, mint, user, *, notes_supplier=None):
         qty = _safe_decimal(t.get("qty"))
         if qty is None or qty <= 0:
             continue
-        code = mint()
+        # A top that arrived already labelled keeps ITS barcode — scanning
+        # the supplier's own label is the whole point, and re-labelling it
+        # would leave the physical roll and our record disagreeing. Callers
+        # validate the code for uniqueness BEFORE any writing starts.
+        code = (t.get("barcode") or "").strip() or mint()
         if first_barcode is None:
             first_barcode = code
         roll = WarehouseProductRoll.objects.create(
@@ -1005,7 +1087,7 @@ class WarehouseDetail(View):
             'group_count': group_count,       # main products (packages)
             'roll_count': roll_count,         # rolls (tops)
             'is_admin': _is_admin(request.user),
-            'suppliers': _supplier_choices(),   # manual-add dropdown
+            'accounts': _account_choices(),     # manual-add dropdown
             'product_categories': _product_category_choices(),  # manual-add "Ürün Türü"
             # Dup scan is a MERGE tool — merging across two real warehouses
             # from a virtual view would move stock; disabled there.
@@ -1526,7 +1608,7 @@ class WarehouseManualAdd(View):
 
     JSON body:
       {
-        "supplier_id": 5,                 # optional → barcode prefix
+        "cari_id": 163,                   # REQUIRED → barcode prefix + alım
         "barcode_prefix": "KZL",          # optional explicit override
         "unit": "mt",                     # mt | adet | kg | paket | ...
         "products": [
@@ -1566,21 +1648,28 @@ class WarehouseManualAdd(View):
         if not isinstance(products_in, list) or not products_in:
             return JsonResponse({"success": False, "error": "En az bir ürün ekleyin."}, status=400)
 
-        # ── Supplier → barcode prefix + purchase (alım) posting below ──
-        supplier_name = ""
-        supplier_obj = None
-        supplier_id = data.get("supplier_id")
-        if supplier_id:
+        # ── Cari account → barcode prefix + purchase (alım) posting below ──
+        # REQUIRED. Goods arriving are goods we owe for, so an intake with
+        # no account to post against is always a mistake — it used to be
+        # allowed, and silently added stock while the alım never happened.
+        from accounting.models_accounts import CariAccount
+        cari_obj = None
+        cari_id = data.get("cari_id")
+        if cari_id not in (None, ""):
             try:
-                from crm.models import Supplier
-                supplier_obj = Supplier.objects.filter(pk=int(supplier_id)).first()
-                if supplier_obj:
-                    supplier_name = str(supplier_obj)
-            except Exception:
-                pass
+                cari_obj = CariAccount.objects.filter(pk=int(cari_id)).first()
+            except (TypeError, ValueError):
+                cari_obj = None
+        if cari_obj is None:
+            return JsonResponse(
+                {"success": False,
+                 "error": "Cari hesap seçin — alım faturası bu hesaba işlenir."},
+                status=400)
+        account_name = cari_obj.name
+
         prefix = (data.get("barcode_prefix") or "").strip().upper()
         if not prefix:
-            prefix = _consonant_prefix(supplier_name) if supplier_name else "GEN"
+            prefix = _consonant_prefix(account_name) if account_name else "GEN"
         prefix = (prefix[:6] or "GEN")
 
         # ── Pass 1: resolve + validate EVERY product before writing anything,
@@ -1627,10 +1716,39 @@ class WarehouseManualAdd(View):
                 "variants_in": variants_in, "category": category,
             })
 
+        # ── Hand-typed top barcodes: validate the WHOLE batch up front ──
+        # A duplicate barcode makes the roll unscannable (lookup returns
+        # whichever row it hits first), so this is a hard refusal, not a
+        # warning — and it happens in pass 1, before a single roll exists,
+        # so a bad code on product #3 can't leave #1/#2 written.
+        manual_codes = []
+        seen_codes = {}
+        for i, p_in in enumerate(products_in, start=1):
+            for v_in in (p_in.get("variants") or []):
+                for t in (v_in.get("tops") or []):
+                    code = (t.get("barcode") or "").strip()
+                    if not code:
+                        continue
+                    if _safe_decimal(t.get("qty")) in (None, Decimal("0")):
+                        continue          # blank row — not being created
+                    key = code.upper()
+                    if key in seen_codes:
+                        return JsonResponse(
+                            {"success": False,
+                             "error": f"“{code}” barkodu bu listede birden fazla kez girildi."},
+                            status=400)
+                    if _barcode_taken(code):
+                        return JsonResponse(
+                            {"success": False,
+                             "error": f"“{code}” barkodu zaten kullanılıyor."},
+                            status=400)
+                    seen_codes[key] = i
+                    manual_codes.append(code)
+
         created_list = []
         warnings = []
         purchase_lines = []   # aggregated across the WHOLE batch → one alış faturası
-        mint = _barcode_minter(prefix)
+        mint = _barcode_minter(prefix, reserved=manual_codes)
         prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
         usd_try = _get_usd_try_rate() or Decimal("1")
         user = request.user if request.user.is_authenticated else None
@@ -1772,7 +1890,7 @@ class WarehouseManualAdd(View):
                                                    "cost_usd", "cost_try", "updated_at"])
 
                         added_qty, new_roll_ids = _add_tops_to_variant(
-                            wp, tops, mint, user, notes_supplier=supplier_name,
+                            wp, tops, mint, user, notes_supplier=account_name,
                         )
                         first_barcode = None
                         if new_roll_ids:
@@ -1809,7 +1927,7 @@ class WarehouseManualAdd(View):
                         # in THIS request (added_qty), never the product's full
                         # roll total, so re-adding to an existing SKU doesn't
                         # re-bill previous intakes.
-                        if supplier_obj and added_qty > 0:
+                        if added_qty > 0:
                             purchase_lines.append({
                                 "description": wp_name,
                                 "quantity": added_qty,
@@ -1828,23 +1946,23 @@ class WarehouseManualAdd(View):
             return JsonResponse({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
 
         # ── Alış faturası (purchase invoice) — the intake above IS a
-        # purchase: we now owe the supplier for these goods, across every
-        # product in the batch. Posted to the supplier's cari as ONE issued
+        # purchase: we now owe this account for the goods, across every
+        # product in the batch. Posted to the CHOSEN cari as ONE issued
         # purchase invoice so the alım shows up in the invoice list
         # (type=purchase) and the cari statement links straight back to it.
         # Best-effort: a bookkeeping hiccup must never roll back the physical
         # stock that was just added.
         purchase_info = None
-        if supplier_obj and purchase_lines:
+        if purchase_lines:
             try:
                 from accounting.services_accounts import create_purchase_invoice_for_intake
                 member = getattr(request.user, "member", None)
                 inv = create_purchase_invoice_for_intake(
-                    supplier_obj, purchase_lines, member=member, user=user,
+                    cari_obj, purchase_lines, member=member, user=user,
                 )
                 purchase_info = {
                     "invoice_id": inv.pk,
-                    "number": f"{inv.series}-{inv.number}",
+                    "number": inv.display_number,
                     "total": float(inv.total or 0),
                     "currency": inv.currency.code,
                 }
@@ -2021,13 +2139,15 @@ class WarehousePurchaseEdit(View):
                 ],
             })
 
-        supplier = invoice.cari.supplier
         return JsonResponse({
             "success": True,
             "invoice_id": invoice.pk,
-            "number": f"{invoice.series}-{invoice.number}",
-            "supplier_id": supplier.pk if supplier else None,
-            "supplier_name": str(supplier) if supplier else invoice.cari.name,
+            "number": invoice.display_number,
+            # The account itself — the panel's picker is keyed on caris now,
+            # and reading through cari.supplier returned nothing for the
+            # imported accounts, leaving the field blank mid-edit.
+            "cari_id": invoice.cari_id,
+            "cari_name": invoice.cari.name,
             "currency": invoice.currency.code,
             "products": [groups[k] for k in order],
         })
@@ -2056,11 +2176,8 @@ class WarehousePurchaseEdit(View):
         user = request.user if request.user.is_authenticated else None
 
         with transaction.atomic():
-            # NB: select_for_update() can't be combined with select_related
-            # across a NULLABLE fk (cari.supplier) — Postgres refuses FOR
-            # UPDATE on the nullable side of an outer join. Lock the
-            # invoice row alone; cari/supplier are read (not locked)
-            # separately, which is fine — they're not what concurrent
+            # NB: lock the invoice row alone — the cari is read (not
+            # locked) separately, which is fine: it's not what concurrent
             # requests race on here, the rolls are (locked individually
             # below).
             invoice = get_object_or_404(
@@ -2070,9 +2187,41 @@ class WarehousePurchaseEdit(View):
             if invoice.status == "cancelled":
                 return JsonResponse({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
 
-            supplier = invoice.cari.supplier
-            supplier_name = str(supplier) if supplier else invoice.cari.name
+            # Name the tops' notes/prefix after the ACCOUNT the alım sits
+            # on — cari.supplier is empty for every imported account, which
+            # made added tops fall back to a generic prefix mid-edit.
+            supplier_name = invoice.cari.name
             fallback_prefix = _consonant_prefix(supplier_name)
+
+            # ── Hand-typed barcodes on tops being ADDED to this alım. Same
+            # hard refusal as intake, checked before anything is written.
+            # Rolls already on this invoice are excluded from the clash
+            # test only where they're being kept — a code freed by a top
+            # this same edit removes is still treated as taken, which is
+            # the safe direction to be wrong in.
+            edit_seen = {}
+            edit_manual = []
+            for p in products_in:
+                for v in (p.get("variants") or []):
+                    for t in (v.get("new_tops") or []):
+                        code = (t.get("barcode") or "").strip()
+                        if not code:
+                            continue
+                        if (_safe_decimal(t.get("qty")) or Decimal("0")) <= 0:
+                            continue
+                        key = code.upper()
+                        if key in edit_seen:
+                            return JsonResponse(
+                                {"success": False,
+                                 "error": f"“{code}” barkodu bu listede birden fazla kez girildi."},
+                                status=400)
+                        if _barcode_taken(code):
+                            return JsonResponse(
+                                {"success": False,
+                                 "error": f"“{code}” barkodu zaten kullanılıyor."},
+                                status=400)
+                        edit_seen[key] = True
+                        edit_manual.append(code)
 
             # ── Every existing top not re-submitted as "kept" is being
             # removed. Lock + re-check each one for a live reservation
@@ -2161,7 +2310,7 @@ class WarehousePurchaseEdit(View):
                         new_roll_ids = []
                         if wp is not None and new_tops:
                             line_prefix = _barcode_prefix_from_existing(wp, fallback_prefix)
-                            line_mint = _barcode_minter(line_prefix)
+                            line_mint = _barcode_minter(line_prefix, reserved=edit_manual)
                             _added, new_roll_ids = _add_tops_to_variant(
                                 wp, new_tops, line_mint, user, notes_supplier=supplier_name,
                             )
@@ -2217,7 +2366,7 @@ class WarehousePurchaseEdit(View):
                             _resolve_variant_wp(warehouse, main_product, base_name, v,
                                                 fallback_prefix, seen_skus)
                         )
-                        line_mint = _barcode_minter(fallback_prefix)
+                        line_mint = _barcode_minter(fallback_prefix, reserved=edit_manual)
                         added_qty, new_roll_ids = _add_tops_to_variant(
                             wp, tops, line_mint, user, notes_supplier=supplier_name,
                         )

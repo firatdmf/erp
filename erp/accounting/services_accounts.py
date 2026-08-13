@@ -191,15 +191,19 @@ def _currency_by_code(code) -> CurrencyCategory:
     return _resolve_currency()
 
 
-def create_purchase_invoice_for_intake(supplier, lines, *, member=None, user=None, invoice_date=None):
+def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None, invoice_date=None):
     """Turn a warehouse stock intake into an issued PURCHASE invoice
-    (alış faturası) on the supplier's cari.
+    (alış faturası) on the given cari account.
+
+    Takes the cari DIRECTLY rather than a crm.Supplier: the intake panel
+    now picks the account staff actually keep the balance on, and most of
+    those (imported from KARVEN) have no Supplier row to resolve through.
 
     `lines` = [{"description", "quantity", "unit", "unit_price",
                 "currency", "product" (marketing.Product|None),
                 "variant" (marketing.ProductVariant|None)}, ...]
 
-    Creates Invoice(type="purchase", series="ALIM") + one InvoiceItem per
+    Creates Invoice(type="purchase", series="Purchase") + one InvoiceItem per
     line (tax 0 — the entered price is what we owe), then issue()s it,
     which posts the CariMovement(invoice_purchase, -total) with a source
     link so the cari statement row is clickable through to the invoice.
@@ -207,8 +211,10 @@ def create_purchase_invoice_for_intake(supplier, lines, *, member=None, user=Non
     """
     from .models import Invoice, InvoiceItem
 
-    book = get_default_book()
-    cari = get_or_create_cari_for_supplier(supplier, member=member)
+    # The invoice belongs in the book the account itself lives in — reading
+    # the default book here would post the alım into a different ledger
+    # than the balance it's supposed to move.
+    book = cari.book
     currency = _currency_by_code(lines[0].get("currency") if lines else None)
     settings_obj = CariSettings.for_book(book)
 

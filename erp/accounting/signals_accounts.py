@@ -34,21 +34,22 @@ def assign_cari_code(sender, instance, **kwargs):
 
 
 # ---------------------------------------------------------------------------
-# 1b. Every supplier gets a cari — created the moment the supplier is,
-#     no matter which UI path created it (full form, sidebar partial,
-#     admin). Purchases (warehouse stock intake) post debt against it.
+# 1b. Suppliers deliberately DON'T auto-create a cari any more.
+#
+#     This used to fire on every Supplier post_save, which is how the
+#     account list filled up with duplicates: the balances staff maintain
+#     were imported from KARVEN as plain caris with no Supplier link, so
+#     adding a supplier named after one of them minted a SECOND, empty
+#     account (MARKISS #210 next to MARKİSS TEKSTİL #163) — and warehouse
+#     intake, which resolved through the supplier FK, then posted alım
+#     invoices to the empty one while the real balance sat untouched.
+#
+#     Purchases now post to a cari picked directly in the intake panel
+#     (see operating.views_warehouse.WarehouseManualAdd), so nothing needs
+#     a supplier→cari bridge. Suppliers remain a CRM/procurement concept.
+#     Accounts are created explicitly: the accounting UI, or the intake
+#     panel's inline "new account" box (warehouse_account_create).
 # ---------------------------------------------------------------------------
-@receiver(post_save, sender="crm.Supplier")
-def create_cari_for_supplier(sender, instance, created, **kwargs):
-    if not created:
-        return
-    try:
-        from .services_accounts import get_or_create_cari_for_supplier
-        get_or_create_cari_for_supplier(instance)
-    except Exception:
-        # Never block supplier creation on cari bookkeeping — the helper
-        # is idempotent, so the first purchase will create it instead.
-        pass
 
 
 # ---------------------------------------------------------------------------

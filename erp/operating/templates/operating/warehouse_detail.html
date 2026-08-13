@@ -4425,6 +4425,33 @@
         r.innerHTML = '<div class="bl-rc notfound"><span class="bl-status notfound"><i class="fa fa-triangle-exclamation"></i> {% trans "Network error" %}</span>' + blAgainBtn() + '</div>';
       });
   }
+  // A consumed top is found on purpose — scanning an old label should say
+  // what became of it. But "0 m" on its own reads like a stocking error, so
+  // spell out where it went: the order it shipped on, or the manual stock-out.
+  function blUsedBanner(roll) {
+    if (!roll || !roll.consumed) return '';
+    var u = roll.used_in || {};
+    var what = '';
+    if (u.kind === 'order' && u.label) {
+      what = u.url
+        ? '<a href="' + u.url + '" style="color:#92400E; text-decoration:underline;">' + blEsc(u.label) + '</a>'
+        : blEsc(u.label);
+    } else if (u.kind === 'movement') {
+      what = u.label ? blEsc(u.label) : '{% trans "a manual stock-out" %}';
+      if (u.by) what += ' · ' + blEsc(u.by);
+    } else {
+      what = '{% trans "no record of where" %}';
+    }
+    var bits = [];
+    if (u.meters) bits.push(Number(u.meters).toFixed(2) + ' m');
+    if (u.date) bits.push(blEsc(u.date));
+    return '<p style="color:#92400E; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
+             '<i class="fa fa-circle-check"></i> ' +
+             '{% trans "This top has been used" %}: ' + what +
+             (bits.length ? '<br><span style="font-weight:500;">' + bits.join(' · ') + '</span>' : '') +
+           '</p>';
+  }
+
   function renderLookup(d, code) {
     var r = document.getElementById('blResult');
     if (d && d.found && d.product) {
@@ -4454,13 +4481,17 @@
           '<div class="t-label"><i class="fa fa-layer-group"></i> {% trans "Tops" %}</div>' +
           '<div class="t-value">' + (p.rolls_count || 0) + '<span class="t-unit">top</span></div>' +
         '</div>';
+      var used = d.roll && d.roll.consumed;
       r.innerHTML =
-        '<div class="bl-rc found">' +
-          '<span class="bl-status found"><i class="fa fa-circle-check"></i> {% trans "Already in this warehouse" %}</span>' +
+        '<div class="bl-rc ' + (used ? 'elsewhere' : 'found') + '">' +
+          (used
+            ? '<span class="bl-status elsewhere"><i class="fa fa-box-open"></i> {% trans "Used top" %}</span>'
+            : '<span class="bl-status found"><i class="fa fa-circle-check"></i> {% trans "Already in this warehouse" %}</span>') +
           '<div class="bl-bc-chip"><i class="fa fa-barcode"></i>' + blEsc(code) + '</div>' +
           '<div class="bl-prod-name">' + blEsc(p.name || '—') + '</div>' +
           (p.sku ? '<span class="bl-sku-pill">' + blEsc(p.sku) + '</span>' : '') +
           (p.main_product ? '<div class="bl-main-line">{% trans "Main product" %}: ' + blEsc(p.main_product) + '</div>' : '') +
+          blUsedBanner(d.roll) +
           '<div class="bl-tiles">' + tiles + '</div>' +
           '<div class="bl-actions">' +
             '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
@@ -4481,6 +4512,7 @@
             '<i class="fa fa-triangle-exclamation"></i> ' +
             '{% trans "This top is registered in" %} <b>' + blEsc(ew.name) + '</b>' +
           '</p>' +
+          blUsedBanner(er) +
           '<div class="bl-tiles">' +
             '<div class="bl-tile hero">' +
               '<div class="t-label"><i class="fa fa-barcode"></i> {% trans "Scanned top" %}</div>' +
@@ -4489,8 +4521,13 @@
           '</div>' +
           '<div class="bl-actions">' +
             '<button type="button" class="bl-btn ghost" onclick="lookupScanAgain()"><i class="fa fa-rotate-right"></i> {% trans "Scan again" %}</button>' +
-            '<button type="button" class="bl-btn primary" id="blMoveBtn" onclick="moveRollToThisWarehouse(' + er.id + ', this)">' +
-              '<i class="fa fa-truck-fast"></i> {% trans "Move to this warehouse" %}</button>' +
+            // No move offer for a used-up top: there are no metres to carry,
+            // and its row records where the stock went out from. The server
+            // refuses it too, so a stale screen can't sneak one through.
+            (d.move_url
+              ? '<button type="button" class="bl-btn primary" id="blMoveBtn" onclick="moveRollToThisWarehouse(' + er.id + ', this)">' +
+                  '<i class="fa fa-truck-fast"></i> {% trans "Move to this warehouse" %}</button>'
+              : '') +
           '</div>' +
         '</div>';
     } else {

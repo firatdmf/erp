@@ -88,6 +88,54 @@ def _consonant_prefix(name):
     return ("".join(cons[:3]) or "GEN")[:6]
 
 
+def _roll_consumption_info(roll):
+    """Where a finished top went, for the scanner to report.
+
+    A consumed roll still answers to its barcode on purpose — scanning an
+    old label should say what happened to it rather than come back empty.
+    But "found, 0 m" reads like ordinary stock, so the scan needs to name
+    the order it shipped on (the reservation records that), falling back to
+    the last stock-out movement for metres cut by hand, which carry no
+    order. Returns None for a roll that is still live."""
+    if roll.status != "consumed":
+        return None
+
+    from django.utils.timezone import localtime
+    from .models import OrderRollReservation
+
+    res = (OrderRollReservation.objects
+           .filter(roll=roll, consumed=True)
+           .select_related("order")
+           .order_by("-consumed_at", "-id")
+           .first())
+    if res and res.order_id:
+        order = res.order
+        return {
+            "kind": "order",
+            "label": str(order),
+            "meters": float(res.meters or 0),
+            "date": localtime(res.consumed_at).strftime("%d.%m.%Y") if res.consumed_at else None,
+            "url": reverse("operating:order_detail", args=[order.pk]),
+        }
+
+    mv = (StockMovement.objects
+          .filter(roll=roll, movement_type="out")
+          .select_related("created_by")
+          .order_by("-created_at", "-id")
+          .first())
+    if mv:
+        return {
+            "kind": "movement",
+            "label": (mv.reason or mv.reference or "").strip() or None,
+            "meters": float(mv.quantity or 0),
+            "date": localtime(mv.created_at).strftime("%d.%m.%Y") if mv.created_at else None,
+            "by": mv.created_by.get_username() if mv.created_by else None,
+            "url": None,
+        }
+    # Consumed with no trace of how — say so rather than invent a reason.
+    return {"kind": "unknown", "label": None, "meters": None, "date": None, "url": None}
+
+
 def _drop_stale_product_barcode(wp):
     """Clear WarehouseProduct.barcode once no live roll carries it.
 
@@ -1222,6 +1270,9 @@ def warehouse_barcode_lookup(request, pk):
                     "meters_remaining": (float(other_roll.meters_remaining)
                                           if other_roll.meters_remaining is not None else None),
                     "lot_number": other_roll.lot_number,
+                    "status": other_roll.status,
+                    "consumed": other_roll.status == "consumed",
+                    "used_in": _roll_consumption_info(other_roll),
                 },
             })
         if other_roll:
@@ -1241,9 +1292,16 @@ def warehouse_barcode_lookup(request, pk):
                     "meters_remaining": (float(other_roll.meters_remaining)
                                           if other_roll.meters_remaining is not None else None),
                     "lot_number": other_roll.lot_number,
+                    "status": other_roll.status,
+                    "consumed": other_roll.status == "consumed",
+                    "used_in": _roll_consumption_info(other_roll),
                 },
-                "move_url": reverse("operating:warehouse_roll_move_here",
-                                    args=[warehouse.pk, other_roll.pk]),
+                # No move offer for a top that has already been used up —
+                # there is nothing physical left to carry over, and the row
+                # is history of where the stock went out from.
+                "move_url": (None if other_roll.status == "consumed" else
+                             reverse("operating:warehouse_roll_move_here",
+                                     args=[warehouse.pk, other_roll.pk])),
             })
         # No roll anywhere — fall back to a product-level barcode/SKU
         # match within THIS warehouse (members, for a combined view).
@@ -1268,7 +1326,9 @@ def warehouse_barcode_lookup(request, pk):
             "sku": product.sku,
             "name": product.name,
             "quantity": float(product.quantity or 0),
-            "rolls_count": product.rolls.count(),
+            # Live tops, matching what the product page lists and what the
+            # Excel export counts — a used-up roll is not stock on hand.
+            "rolls_count": product.rolls.exclude(status="consumed").count(),
             # Always the product's OWN warehouse — from a combined view the
             # match lives in a member, and the detail route 404s otherwise.
             "detail_url": reverse("operating:warehouse_product_detail",
@@ -1282,6 +1342,9 @@ def warehouse_barcode_lookup(request, pk):
             "meters": float(roll.meters or 0),
             "meters_remaining": (float(roll.meters_remaining) if roll.meters_remaining is not None else None),
             "lot_number": roll.lot_number,
+            "status": roll.status,
+            "consumed": roll.status == "consumed",
+            "used_in": _roll_consumption_info(roll),
         } if roll else None),
     })
 
@@ -1318,6 +1381,16 @@ def warehouse_roll_move_here(request, pk, roll_pk):
 
     if source_wp.warehouse_id == target_warehouse.pk:
         return JsonResponse({"success": False, "error": "Bu top zaten bu depoda."}, status=400)
+
+    # A used-up top has no metres left to carry anywhere. Its row is the
+    # record of where that stock went OUT from, so moving it would relocate
+    # history and credit the receiving warehouse with a transfer of nothing.
+    # The scanner already withholds the offer; this is the same rule where
+    # it actually binds.
+    if roll.status == "consumed":
+        return JsonResponse(
+            {"success": False,
+             "error": "Bu top tükenmiş — taşınacak metre yok."}, status=400)
 
     user = request.user if request.user.is_authenticated else None
 

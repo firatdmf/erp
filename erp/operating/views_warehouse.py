@@ -396,6 +396,7 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
     their emptied parent), and deletes the emptied duplicates. Survivor = `keep`
     when given, else the lowest-id match. Returns (survivor, merged_count)."""
     from django.db import transaction as _tx
+    from .models import OrderRollReservation
     sku = (sku or "").strip()
     if not sku:
         return keep, 0
@@ -412,6 +413,12 @@ def _merge_warehouse_dupes_by_sku(warehouse, sku, keep=None):
                 continue
             WarehouseProductRoll.objects.filter(product=dup).update(product=survivor)
             StockMovement.objects.filter(product=dup).update(product=survivor)
+            # Reservations cascade on warehouse_product, so they have to be
+            # re-pointed BEFORE dup.delete() below — otherwise merging two
+            # rows of the same SKU silently drops live holds while their
+            # tops survive on the survivor.
+            OrderRollReservation.objects.filter(warehouse_product=dup).update(
+                warehouse_product=survivor)
             if not survivor.catalog_variant_id and dup.catalog_variant_id:
                 survivor.catalog_variant_id = dup.catalog_variant_id
             elif dup.catalog_variant_id and dup.catalog_variant_id != survivor.catalog_variant_id:
@@ -1184,6 +1191,7 @@ def warehouse_roll_move_here(request, pk, roll_pk):
     quantity + re-syncs the catalog for both the source and target product.
     """
     from django.db import transaction
+    from .models import OrderRollReservation
 
     if request.method != "POST":
         return JsonResponse({"success": False, "error": "POST required."}, status=405)
@@ -1230,6 +1238,15 @@ def warehouse_roll_move_here(request, pk, roll_pk):
         source_warehouse_name = source_wp.warehouse.name
         roll.product = target_wp
         roll.save(update_fields=["product"])
+        # Any live hold on this top travels WITH it. OrderRollReservation
+        # denormalises the warehouse product purely so the list/detail pages
+        # can roll up reserved metres, so leaving it pointed at the source
+        # would strand the reservation in the warehouse the top just left —
+        # and would later cut the metres out of that warehouse's quantity
+        # when the order ships. Consumed rows stay put: they record where the
+        # stock actually went out from, which is history and did not move.
+        OrderRollReservation.objects.filter(roll=roll, consumed=False).update(
+            warehouse_product=target_wp)
         StockMovement.objects.create(
             product=target_wp, roll=roll, movement_type="adjustment",
             quantity=meters,

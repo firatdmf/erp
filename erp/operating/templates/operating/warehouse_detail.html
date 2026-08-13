@@ -4445,10 +4445,17 @@
     var bits = [];
     if (u.meters) bits.push(Number(u.meters).toFixed(2) + ' m');
     if (u.date) bits.push(blEsc(u.date));
+    // The order line this top was cut for — one order can eat several tops,
+    // so the order number alone doesn't say what this roll became.
+    if (u.line) bits.push(blEsc(u.line));
     return '<p style="color:#92400E; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
              '<i class="fa fa-circle-check"></i> ' +
              '{% trans "This top has been used" %}: ' + what +
              (bits.length ? '<br><span style="font-weight:500;">' + bits.join(' · ') + '</span>' : '') +
+             (u.packing_url
+               ? '<br><a href="' + u.packing_url + '" style="color:#92400E; font-weight:600; text-decoration:underline;">' +
+                   '<i class="fa fa-box"></i> {% trans "Packing list" %}</a>'
+               : '') +
            '</p>';
   }
 

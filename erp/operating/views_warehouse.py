@@ -105,17 +105,34 @@ def _roll_consumption_info(roll):
 
     res = (OrderRollReservation.objects
            .filter(roll=roll, consumed=True)
-           .select_related("order")
+           .select_related("order", "order_item__product",
+                           "order_item__product_variant")
            .order_by("-consumed_at", "-id")
            .first())
     if res and res.order_id:
         order = res.order
+        # Which LINE of the order this top was cut for. One order can eat
+        # several tops across different lines, so the order number alone
+        # doesn't tell you what this particular roll became. Best-effort by
+        # design (the FK is SET_NULL), hence the None-safety.
+        line = None
+        item = res.order_item
+        if item is not None:
+            title = (item.product.title if item.product_id else "") or ""
+            sku = (item.product_variant.variant_sku
+                   if item.product_variant_id else "") or ""
+            line = f"{title} [{sku}]".strip() if sku else title.strip() or None
         return {
             "kind": "order",
             "label": str(order),
+            "line": line,
             "meters": float(res.meters or 0),
             "date": localtime(res.consumed_at).strftime("%d.%m.%Y") if res.consumed_at else None,
             "url": reverse("operating:order_detail", args=[order.pk]),
+            # Straight to the packing list — the screen that shows which top
+            # went into which pack, which is the next question after "which
+            # order did this go on".
+            "packing_url": reverse("operating:order_packing_list", args=[order.pk]),
         }
 
     mv = (StockMovement.objects
@@ -127,13 +144,16 @@ def _roll_consumption_info(roll):
         return {
             "kind": "movement",
             "label": (mv.reason or mv.reference or "").strip() or None,
+            "line": None,
             "meters": float(mv.quantity or 0),
             "date": localtime(mv.created_at).strftime("%d.%m.%Y") if mv.created_at else None,
             "by": mv.created_by.get_username() if mv.created_by else None,
             "url": None,
+            "packing_url": None,
         }
     # Consumed with no trace of how — say so rather than invent a reason.
-    return {"kind": "unknown", "label": None, "meters": None, "date": None, "url": None}
+    return {"kind": "unknown", "label": None, "line": None, "meters": None,
+            "date": None, "url": None, "packing_url": None}
 
 
 def _drop_stale_product_barcode(wp):

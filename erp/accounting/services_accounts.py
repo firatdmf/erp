@@ -16,8 +16,11 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from django.conf import settings
+
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Count
 
 from accounting.models import Book, CurrencyCategory
 
@@ -28,17 +31,44 @@ from .models import CariAccount, CariMovement, CariSettings
 # Book — the user wants a single shared book; no UI for selecting one.
 # ---------------------------------------------------------------------------
 def get_default_book() -> Book:
-    """Return the singleton default Book, creating one if none exists.
+    """Return the Book the current-account ledger lives in.
 
-    User constraint: the project has *one* book company-wide. We don't
-    expose Book selection in cari/order UI any more. Picking the
-    lowest-id row gives us deterministic behaviour even if multiple
-    rows happen to exist in legacy data.
+    This used to take the lowest-id Book, on the assumption that the project
+    has one book company-wide. It does not. Books also carry the general
+    ledger — cash accounts, expenses, receivables — so several exist for
+    reasons that have nothing to do with cari, and the lowest-id one
+    ("Muhammed Firat Ozturk", id 1) is not the one the ledger uses.
+
+    The cost of getting it wrong is silent. Every auto-created account landed
+    in a book nobody looked at, so a customer with a real account in the right
+    book got a second, empty one, and their order posted against that. Sale
+    #273 billed a shadow account holding 531.08 while the real account showed
+    3,116.62. Nothing errored; the money simply went somewhere no one was
+    reading.
+
+    Resolution order:
+      1. settings.CARI_BOOK_ID, when set — an explicit answer always wins.
+      2. The book already holding the most cari accounts. Self-correcting:
+         whichever book the ledger actually lives in is the one it keeps
+         using, without configuration.
+      3. Lowest id, then create — only reachable on a database with no cari
+         accounts at all, i.e. a fresh install.
     """
-    book = Book.objects.order_by("id").first()
+    pinned = getattr(settings, "CARI_BOOK_ID", None)
+    if pinned:
+        book = Book.objects.filter(pk=pinned).first()
+        if book:
+            return book
+
+    book = (Book.objects
+            .annotate(n=Count("cari_accounts"))
+            .filter(n__gt=0)
+            .order_by("-n", "id")
+            .first())
     if book:
         return book
-    return Book.objects.create(name="Main Book")
+
+    return Book.objects.order_by("id").first() or Book.objects.create(name="Main Book")
 
 
 def _resolve_currency(order=None) -> CurrencyCategory:
@@ -545,7 +575,7 @@ def _order_confirmed_collections(order, cari):
     """Sum of confirmed collections already tagged to this order on the
     retail cari (deposits + a possibly-existing auto collection)."""
     from .models import Payment
-    from django.db.models import Sum
+    from django.db.models import Sum, Count
     return (Payment.objects.filter(
         cari=cari, type="collection", status="confirmed",
         notes=f"ORD-{order.pk}",

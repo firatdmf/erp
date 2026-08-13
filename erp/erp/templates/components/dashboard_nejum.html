@@ -210,10 +210,10 @@
   </div>
 </div>
 
-{# Task edit sidebar — opens when a task card is clicked.
+{% comment %} Task edit sidebar — opens when a task card is clicked.
    `can_edit` is computed server-side in erp_tags.py: creator, assignee,
    or superuser. The onclick handler is only attached on editable cards
-   so non-editable cards stay non-interactive. #}
+   so non-editable cards stay non-interactive. {% endcomment %}
 {% include 'todo/components/task_edit_modal.html' %}
 
 <script>

@@ -522,9 +522,9 @@
     <td class="line-no">1</td>
     <td class="col-desc" data-mlabel="{% trans 'Description' %}">
       <input type="text" data-field="description" placeholder="{% trans 'Product name or description' %}" maxlength="300">
-      {# Hidden product/variant refs — written by the pre-fill step when
+      {% comment %} Hidden product/variant refs — written by the pre-fill step when
          items come from an order, read back by buildItemsJson on save
-         so the InvoiceItem.product FK is preserved. #}
+         so the InvoiceItem.product FK is preserved. {% endcomment %}
       <input type="hidden" data-field="product_id">
       <input type="hidden" data-field="variant_id">
     </td>

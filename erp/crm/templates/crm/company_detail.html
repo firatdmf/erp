@@ -600,8 +600,8 @@
                 {% with disp_status=o.order_status|default:o.status %}
                 <span class="ord-status {{ disp_status }}">
                   <span class="ord-status-dot"></span>
-                  {# Prefer production STATUS_CHOICES (English, translatable);
-                     ORDER_STATUS_CHOICES labels are hardcoded Turkish. #}
+                  {% comment %} Prefer production STATUS_CHOICES (English, translatable);
+                     ORDER_STATUS_CHOICES labels are hardcoded Turkish. {% endcomment %}
                   {% if o.get_status_display %}{{ o.get_status_display }}{% else %}{{ disp_status|capfirst }}{% endif %}
                 </span>
                 {% endwith %}

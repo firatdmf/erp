@@ -1,6 +1,6 @@
 {% load i18n %}
-{# Edit form rendered into the side panel on the company detail page.
-   No base.html chrome — the parent page provides the sidebar shell. #}
+{% comment %} Edit form rendered into the side panel on the company detail page.
+   No base.html chrome — the parent page provides the sidebar shell. {% endcomment %}
 <form id="editCompanyForm" method="post"
       action="{% url 'crm:update_company' company.id %}"
       onsubmit="submitEditCompanyForm(event); return false;">

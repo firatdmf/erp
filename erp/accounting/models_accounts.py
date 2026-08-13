@@ -59,7 +59,7 @@ Sync with legacy accounting (signals_accounts.py):
     or LiabilityAccountsPayable (when amount < 0)
     so existing dashboards keep working.
 """
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from functools import lru_cache
 
 from django.conf import settings
@@ -859,17 +859,26 @@ class InvoiceItem(models.Model):
         return f"#{self.line_no} {self.description[:40]} — {self.total}"
 
     def compute(self):
-        """Recompute the four derived amounts from inputs. Does not save."""
+        """Recompute the four derived amounts from inputs. Does not save.
+
+        Rounds half UP, explicitly. Decimal's default is ROUND_HALF_EVEN
+        (banker's rounding), which sends an exact half to the nearest EVEN
+        cent — so 56.90 m × $2.45 = $139.405 billed as $139.40, and the
+        same line at a price ending .35 would have gone up instead. Half
+        cases are common here because metre quantities carry two decimals
+        against a two-decimal price, and "half goes up" is the rule people
+        check invoices against. The same rounding is applied to each
+        amount, discount included."""
         qty   = self.quantity   or Decimal("0")
         price = self.unit_price or Decimal("0")
-        sub   = (qty * price).quantize(Decimal("0.01"))
+        sub   = (qty * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         disc_rate = (self.discount_rate or Decimal("0")) / Decimal("100")
-        disc      = (sub * disc_rate).quantize(Decimal("0.01"))
+        disc      = (sub * disc_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         net       = sub - disc
         tax_rate  = (self.tax_rate or Decimal("0")) / Decimal("100")
-        tax       = (net * tax_rate).quantize(Decimal("0.01"))
+        tax       = (net * tax_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         self.subtotal        = sub
         self.discount_amount = disc

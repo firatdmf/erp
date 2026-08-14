@@ -1163,26 +1163,28 @@
 
     // When the value can't be saved, the note says why in place of the alert
     // that used to appear after pressing Save.
-    const blocked = '<div style="margin-top:3px;color:#C0392B;font-weight:600;">' +
-      '{% trans "Cannot be below" %} <b>' + floor.toFixed(2) + ' m</b>' +
-      (_reOut > 0 ? ' — {% trans "that much has already gone out of this roll" %}' : '') +
-      '</div>';
-
-    if (_reOut > 0) {
+    if (invalid) {
+      // Only the reason. The used/left pair describes a length this value
+      // can't be, so leaving it on screen next to the refusal just gives the
+      // eye two things to reconcile while Save is shut anyway.
+      hint.innerHTML = bar +
+        '<div style="color:#C0392B;font-weight:600;">' +
+          '{% trans "Cannot be below" %} <b>' + floor.toFixed(2) + ' m</b>' +
+          (_reOut > 0 ? ' — {% trans "that much has already gone out of this roll" %}' : '') +
+        '</div>';
+    } else if (_reOut > 0) {
       hint.innerHTML = bar +
         '<span style="color:' + colour + ';"><b>' + _reOut.toFixed(2) + ' m</b> {% trans "used" %}</span>' +
         ' · <b>' + left.toFixed(2) + ' m</b> {% trans "left" %}' +
-        (invalid ? blocked :
-          '<div style="margin-top:3px;color:var(--gray-500);">' +
-            '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
-            '<b>' + _reOut.toFixed(2) + ' m</b>' +
-          '</div>');
+        '<div style="margin-top:3px;color:var(--gray-500);">' +
+          '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
+          '<b>' + _reOut.toFixed(2) + ' m</b>' +
+        '</div>';
     } else {
       hint.innerHTML = bar +
         '<b>' + total.toFixed(2) + ' m</b> · {% trans "none used" %}' +
-        (invalid ? blocked :
-          '<div style="margin-top:3px;color:var(--gray-500);">' +
-            '{% trans "Full length, not the remainder" %}</div>');
+        '<div style="margin-top:3px;color:var(--gray-500);">' +
+          '{% trans "Full length, not the remainder" %}</div>';
     }
   }
 

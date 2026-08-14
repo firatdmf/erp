@@ -72,9 +72,14 @@ def _parse_allocations(raw):
 
 
 def _next_payment_number(book, ptype):
-    """Generate TAH-2026-000001 / OD-2026-000001."""
+    """Generate COL-2026-000001 / PAY-2026-000001.
+
+    These used to be TAH (tahsilat) and OD (ödeme); the documents already
+    carrying those prefixes keep them. The sequence itself is shared and
+    carries straight on, so renaming the prefixes leaves no gap.
+    """
     settings_obj = CariSettings.for_book(book)
-    prefix = "TAH" if ptype in ("collection", "refund_out") else "OD"
+    prefix = "COL" if ptype in ("collection", "refund_out") else "PAY"
     with transaction.atomic():
         locked = CariSettings.objects.select_for_update().get(pk=settings_obj.pk)
         year = timezone.now().year

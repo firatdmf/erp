@@ -70,22 +70,36 @@ class Command(BaseCommand):
                             help="Also re-post each order's cari movement to the frozen "
                                  "value. MOVES MONEY. Requires --apply.")
         parser.add_argument("--order", type=int, default=None,
-                            help="Restrict to a single order id.")
+                            help="Restrict to a single order id. Named explicitly, an "
+                                 "already-frozen order is re-done rather than skipped.")
+        parser.add_argument("--bill-ordered", action="store_true",
+                            help="Freeze at the ORDERED quantities instead of "
+                                 "reconstructing from scans — for an order that shipped "
+                                 "without being scanned, where the ordered quantity is "
+                                 "what actually went out. Requires --order, so this can "
+                                 "only ever be a deliberate, per-order judgement.")
 
     def handle(self, *args, **opts):
         apply_ = opts["apply"]
         repost = opts["repost"]
         only = opts["order"]
+        bill_ordered = opts["bill_ordered"]
 
         if repost and not apply_:
             self.stderr.write(self.style.ERROR("--repost requires --apply."))
             return
+        if bill_ordered and not only:
+            self.stderr.write(self.style.ERROR(
+                "--bill-ordered requires --order: overriding what an order billed is a "
+                "per-order judgement, never a sweep."))
+            return
 
-        qs = (Order.objects
-              .filter(order_status__in=SHIPPED_CLASS, billed_line_quantities__isnull=True)
-              .order_by("pk"))
+        qs = Order.objects.filter(order_status__in=SHIPPED_CLASS).order_by("pk")
         if only:
+            # Naming an order is an explicit instruction to redo it, freeze or no.
             qs = qs.filter(pk=only)
+        else:
+            qs = qs.filter(billed_line_quantities__isnull=True)
 
         ct = ContentType.objects.get_for_model(Order)
         from accounting.models_accounts import CariMovement
@@ -104,7 +118,12 @@ class Command(BaseCommand):
                     f"{order.pk:>6}  no ship date — skipped, needs a human"))
                 continue
 
-            frozen_map = order.compute_billable_line_quantities(as_of=as_of)
+            if bill_ordered:
+                frozen_map = {it.pk: (it.quantity or Decimal("0"))
+                              for it in order.items.all()}
+                basis = "ordered"
+            else:
+                frozen_map = order.compute_billable_line_quantities(as_of=as_of)
             live_map = order.compute_billable_line_quantities()
             frozen_val = _value_of(order, frozen_map)
             live_val = _value_of(order, live_map)

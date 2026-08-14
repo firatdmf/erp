@@ -468,6 +468,26 @@ class Order(models.Model):
     # later edits change the live OrderItem rows. Never written to again.
     original_snapshot = models.JSONField(null=True, blank=True)
 
+    # The billable quantity of every line, frozen at the moment the order
+    # shipped — {order_item_id (as str): quantity (as str)}.
+    #
+    # Without this, billable_value() re-derives what a line bills from
+    # get_billable_line_quantities(), which asks whether the line's SKU
+    # has a WarehouseProduct TODAY. A line with no warehouse presence
+    # bills its full ordered quantity ("nothing could ever be scanned");
+    # the day someone receives stock for that SKU it becomes scannable,
+    # and a shipped order — which will never be scanned again — silently
+    # drops that line to 0 and the customer's receivable shrinks. Order
+    # #240 lost 245.00 across three lines that way, weeks after shipping,
+    # purely because unrelated stock arrived.
+    #
+    # So: the ship is the moment of truth. Freeze what each line billed
+    # then, and never let later warehouse activity rewrite history.
+    # Cleared on un-ship, since the order goes back to the packing floor
+    # and its lines are genuinely open to change again.
+    billed_line_quantities = models.JSONField(null=True, blank=True)
+    billed_quantities_frozen_at = models.DateTimeField(null=True, blank=True)
+
     # Current-account link — auto-populated on save() for manual orders
     # so cari pages can list this order's movements and so we don't
     # double-create a cari for the same customer. Web orders skip this.
@@ -481,12 +501,16 @@ class Order(models.Model):
     )
 
     def total_value(self):
-        # round makes it have two decimals
-        return round(sum(item.subtotal() for item in self.items.all()), 2)
+        """Sum of the line amounts. subtotal() has already rounded each
+        line to cents, so this total equals what you get adding up the
+        amounts printed next to the lines — on the page, in the Excel
+        export, and on the invoice."""
+        from decimal import Decimal
+        return sum((item.subtotal() for item in self.items.all()), Decimal("0.00"))
 
         # Now whenever an OrderItem is added, updated, or deleted, the overall Order.status will update automatically.
 
-    def classify_items_by_tracking(self, items=None):
+    def classify_items_by_tracking(self, items=None, as_of=None):
         """Which order lines have ANY warehouse/roll presence ("tracked" —
         can be barcode-scanned) vs. which are catalog/trade-only
         ("untracked" — physically nothing to scan, e.g. goods bought and
@@ -499,7 +523,14 @@ class Order(models.Model):
         This is the single source of truth for "tracked" — used by
         get_billable_line_quantities() (what bills the cari/invoice) and
         by the packing screen (which lines get a scan/pack UI vs. a
-        plain checklist entry). Returns {order_item_id: bool}.
+        plain checklist entry).
+
+        as_of pins the answer to a past moment by ignoring warehouse
+        entries created after it — used ONLY by the one-off backfill that
+        reconstructs what a already-shipped order billed on its ship day.
+        Live callers leave it None and get today's picture.
+
+        Returns {order_item_id: bool}.
         """
         from functools import reduce
         import operator as _op
@@ -529,9 +560,11 @@ class Order(models.Model):
                 wq |= _Q(catalog_variant__product_id__in=product_ids)
             if skus:
                 wq |= reduce(_op.or_, (_Q(sku__iexact=s) for s in skus))
-            for cv, cvp, wsku in (WarehouseProduct.objects.filter(wq)
-                                  .values_list("catalog_variant_id",
-                                               "catalog_variant__product_id", "sku")):
+            wqs = WarehouseProduct.objects.filter(wq)
+            if as_of is not None:
+                wqs = wqs.filter(created_at__lte=as_of)
+            for cv, cvp, wsku in (wqs.values_list("catalog_variant_id",
+                                                  "catalog_variant__product_id", "sku")):
                 if cv:
                     tracked_variants.add(cv)
                 if cvp:
@@ -555,6 +588,71 @@ class Order(models.Model):
         return result
 
     def get_billable_line_quantities(self):
+        """What each line bills, honouring the ship-time freeze.
+
+        For a shipped order this replays billed_line_quantities instead
+        of re-deriving anything, so a warehouse receipt booked next month
+        can't retroactively change what a customer was charged. Lines
+        added AFTER the freeze (an edit on a shipped order) aren't in the
+        map and fall through to the live computation — they have no
+        frozen truth to replay.
+
+        Returns {order_item_id: Decimal}.
+        """
+        from decimal import Decimal, InvalidOperation
+
+        frozen = self.billed_line_quantities
+        if not frozen:
+            return self.compute_billable_line_quantities()
+
+        live = None
+        result = {}
+        for it in self.items.all():
+            raw = frozen.get(str(it.pk))
+            if raw is None:
+                if live is None:
+                    live = self.compute_billable_line_quantities()
+                result[it.pk] = live.get(it.pk, Decimal("0"))
+                continue
+            try:
+                result[it.pk] = Decimal(str(raw))
+            except (InvalidOperation, TypeError, ValueError):
+                # A corrupt entry must not silently bill 0 — fall back to
+                # the live figure rather than wipe the line.
+                if live is None:
+                    live = self.compute_billable_line_quantities()
+                result[it.pk] = live.get(it.pk, Decimal("0"))
+        return result
+
+    def freeze_billable_quantities(self, save=True):
+        """Capture what every line bills, right now. Called at ship time
+        AFTER reservations are consumed, so it records the metres
+        physically cut rather than whatever was reserved a moment
+        earlier. Idempotent: re-freezing an already-frozen order just
+        overwrites with the same figures."""
+        from django.utils import timezone
+        live = self.compute_billable_line_quantities()
+        self.billed_line_quantities = {str(k): str(v) for k, v in live.items()}
+        self.billed_quantities_frozen_at = timezone.now()
+        if save:
+            type(self).objects.filter(pk=self.pk).update(
+                billed_line_quantities=self.billed_line_quantities,
+                billed_quantities_frozen_at=self.billed_quantities_frozen_at,
+            )
+        return self.billed_line_quantities
+
+    def release_billable_freeze(self, save=True):
+        """Drop the freeze on un-ship — the order is back on the packing
+        floor and its lines are live again."""
+        self.billed_line_quantities = None
+        self.billed_quantities_frozen_at = None
+        if save:
+            type(self).objects.filter(pk=self.pk).update(
+                billed_line_quantities=None,
+                billed_quantities_frozen_at=None,
+            )
+
+    def compute_billable_line_quantities(self, as_of=None):
         """Per-order-item quantity that should actually be BILLED (cari +
         invoice) — the metres physically scanned into this order's
         packing (OrderRollReservation, whether still a pending hold or
@@ -576,6 +674,11 @@ class Order(models.Model):
           it. Its ordered quantity already includes any outsourced part,
           so the two are never summed.
 
+        This reads CURRENT warehouse state, so its answer for a given
+        line can change over time. Callers that bill money want
+        get_billable_line_quantities() instead, which pins a shipped
+        order to what it billed on the day it shipped.
+
         Returns {order_item_id: Decimal}.
         """
         from decimal import Decimal
@@ -595,7 +698,7 @@ class Order(models.Model):
                       .filter(order_item__isnull=False)
                       .values("order_item_id").annotate(s=Sum("meters")))
         }
-        tracked_map = self.classify_items_by_tracking(items)
+        tracked_map = self.classify_items_by_tracking(items, as_of=as_of)
 
         result = {}
         for it in items:
@@ -621,13 +724,17 @@ class Order(models.Model):
         """The amount that should reflect on the cari/invoice — price ×
         billable (scanned) quantity per line, summed. See
         get_billable_line_quantities() for exactly what counts."""
-        from decimal import Decimal
+        from decimal import Decimal, ROUND_HALF_UP
         qmap = self.get_billable_line_quantities()
-        total = Decimal("0")
+        total = Decimal("0.00")
         for it in self.items.all():
             qty = qmap.get(it.pk, it.quantity or Decimal("0"))
-            total += (it.price or Decimal("0")) * qty
-        return round(total, 2)
+            # Round per line, like subtotal(), so a fully-scanned order
+            # bills exactly its total_value().
+            total += ((it.price or Decimal("0")) * qty).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        return total
 
     def build_snapshot(self):
         """A frozen JSON copy of this order's state, called ONCE right
@@ -690,21 +797,14 @@ class Order(models.Model):
         metric — NEVER include in customer-facing PDFs/invoices.
         For list views, pre-fetch items with select_related('product',
         'product_variant') to avoid N+1 queries."""
-        from decimal import Decimal, ROUND_HALF_UP
-        total = Decimal("0")
-        for it in self.items.all():
-            total += it.gross_profit()
-        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        from decimal import Decimal
+        return sum((it.gross_profit() for it in self.items.all()), Decimal("0.00"))
 
     def total_cost(self):
         """Sum of every item's unit_cost × quantity. Counterpart to
         total_value(); revenue − total_cost == gross_profit."""
-        from decimal import Decimal, ROUND_HALF_UP
-        total = Decimal("0")
-        for it in self.items.all():
-            qty = it.quantity or Decimal("0")
-            total += it.unit_cost() * qty
-        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        from decimal import Decimal
+        return sum((it.line_cost() for it in self.items.all()), Decimal("0.00"))
 
     def gross_margin_pct(self):
         """Gross profit as a percentage of revenue. Returns None when
@@ -937,7 +1037,13 @@ class OrderItem(models.Model):
         self.save()
 
     def subtotal(self):
-        return self.price * self.quantity
+        """Line amount, rounded to cents here rather than by whoever
+        displays it. A line IS money, so it can't carry sub-cent tails
+        into a total — see Order.total_value()."""
+        from decimal import Decimal, ROUND_HALF_UP
+        return (self.price * self.quantity).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
     def unit_cost(self):
         """Cost per unit for gross-profit calc. Prefer the variant's
@@ -950,12 +1056,23 @@ class OrderItem(models.Model):
             return self.product.cost
         return Decimal("0")
 
-    def gross_profit(self):
-        """Revenue minus cost for this single line."""
-        from decimal import Decimal
+    def line_cost(self):
+        """Cost of this whole line, rounded to cents like subtotal()."""
+        from decimal import Decimal, ROUND_HALF_UP
         qty = self.quantity or Decimal("0")
-        price = self.price or Decimal("0")
-        return (price - self.unit_cost()) * qty
+        return (self.unit_cost() * qty).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+    def gross_profit(self):
+        """Revenue minus cost for this single line. Built from the two
+        already-rounded halves rather than rounding (price - cost) * qty
+        on its own, so subtotal() - line_cost() == gross_profit() holds
+        exactly and the three never disagree by a cent."""
+        from decimal import Decimal
+        if self.price is None or self.quantity is None:
+            return Decimal("0.00")
+        return self.subtotal() - self.line_cost()
 
     def display_name(self):
         if self.product_variant:

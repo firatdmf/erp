@@ -4256,6 +4256,13 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                                       "shipped_at", "delivered_at", "updated_at"])
             if entering_ship:
                 consume_reservations_for_order(order, user=user)
+                # Freeze what each line bills BEFORE anything reads it —
+                # after consumption (so it records the metres physically
+                # cut) and before post_order_movement below. From here on
+                # this order's value is history, immune to warehouse
+                # stock arriving for its SKUs later. See
+                # Order.billed_line_quantities.
+                order.freeze_billable_quantities()
                 # A roll can have had less on it than was reserved by the
                 # time it's actually cut (consume_reservations_for_order
                 # clamps r.meters down to what was really available) — the
@@ -4266,6 +4273,10 @@ def apply_order_status_change(order, new_status, carrier=None, tracking=None,
                     post_order_movement(order, member=getattr(user, "member", None))
             elif leaving_ship:
                 restore_reservations_for_order(order, user=user)
+                # Back on the packing floor — the lines are live again,
+                # so the ship-time freeze no longer describes anything.
+                # Re-shipping takes a fresh one.
+                order.release_billable_freeze()
                 # Un-shipped order is no longer a completed sale — its
                 # invoice may not stay live (invoices only exist for
                 # completed orders). Re-shipping issues a fresh one.

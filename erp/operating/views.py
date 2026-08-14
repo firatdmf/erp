@@ -4261,7 +4261,7 @@ class OrderAnalytics(LoginRequiredMixin, View):
     def get(self, request):
         from django.utils import timezone
         from django.db.models import Sum, Count, F, Value, DecimalField
-        from django.db.models.functions import Coalesce, TruncDate, TruncWeek, TruncMonth
+        from django.db.models.functions import Coalesce, Round, TruncDate, TruncWeek, TruncMonth
         from accounting.models import CariAccount
         from datetime import datetime, time
 
@@ -4338,8 +4338,15 @@ class OrderAnalytics(LoginRequiredMixin, View):
             F("product_variant__variant_cost"), F("product__cost"),
             Value(Decimal("0")), output_field=DEC,
         )
-        line_rev = F("quantity") * F("price")
-        line_cost = F("quantity") * unit_cost_expr
+        #    Each line is rounded to cents BEFORE it is summed, exactly as
+        #    OrderItem.subtotal() does in Python, so these rollups add up to
+        #    the same money the order pages and the Excel export show. Summing
+        #    the raw products instead lets sub-cent tails pool into a total
+        #    that is off by a cent or more from the orders behind it.
+        #    Postgres ROUND(numeric, 2) rounds half away from zero, which is
+        #    the ROUND_HALF_UP the model side uses.
+        line_rev = Round(F("quantity") * F("price"), 2, output_field=DEC)
+        line_cost = Round(F("quantity") * unit_cost_expr, 2, output_field=DEC)
 
         items = OrderItem.objects.filter(order_id__in=filtered_ids)
         if product_type == "custom":

@@ -26,7 +26,7 @@ from datetime import timedelta
 import decimal
 
 # import yfinance as yf
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import math
 import time
 from django.core.exceptions import ObjectDoesNotExist
@@ -1645,7 +1645,11 @@ class SalesDashboardView(View):
             
             for item in order.items.all():
                 qty = item.quantity or Decimal('1')
-                item_revenue = item.price * qty
+                # Rounded per line, like OrderItem.subtotal(), so this
+                # report's revenue matches the order pages to the cent.
+                item_revenue = (item.price * qty).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP
+                )
                 order_revenue += item_revenue
                 
                 # Calculate profit based on item type

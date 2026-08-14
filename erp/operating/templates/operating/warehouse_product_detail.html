@@ -1137,10 +1137,15 @@
       hint.innerHTML = bar +
         '<span style="color:' + colour + ';"><b>' + out.toFixed(2) + ' m</b> {% trans "used" %}</span>' +
         ' · <b>' + left.toFixed(2) + ' m</b> {% trans "left" %}' +
+        // No "did you mean stock out?" offer here. This dialog corrects what
+        // was RECORDED about a roll; a stock-out changes what is physically
+        // on it. And the guess behind such an offer is usually wrong: metres
+        // normally leave on an order, where shipping cuts the roll itself —
+        // a manual stock-out on a roll an order is holding eats the metres
+        // that order needs, and shipping then clamps to what is left and
+        // files a shortage. Suggesting it invites that.
         '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "Full length, not the remainder" %} · {% trans "min" %} <b>' + out.toFixed(2) + ' m</b> · ' +
-          '<a href="javascript:void(0)" onclick="closeRE();document.getElementById(\'soOverlay\').classList.add(\'show\');"' +
-          ' style="color:var(--nejum-teal-700);text-decoration:underline;">{% trans "Record stock out" %}</a>' +
+          '{% trans "Full length, not the remainder" %} · {% trans "min" %} <b>' + out.toFixed(2) + ' m</b>' +
         '</div>';
     } else {
       mInput.min = '0.01';

@@ -5109,6 +5109,21 @@ class WarehouseRollEdit(View):
                 meters_changed = True
                 changes.append("meters")
 
+                # Status follows the metres. Correcting a length can drive
+                # remaining to zero — or lift it back off zero — and leaving
+                # the old status behind is what left roll #3195 flagged
+                # "partial" with nothing on it: counted as live stock, listed
+                # on the product page, and pickable for packing. Same rule
+                # the stock-out and shipping paths apply.
+                rem = roll.meters_remaining or Decimal("0")
+                if rem <= 0:
+                    roll.status = "consumed"
+                elif rem < new_full:
+                    roll.status = "partial"
+                else:
+                    roll.status = "in_stock"
+                roll_fields.append("status")
+
         if roll_fields:
             roll.save(update_fields=list(set(roll_fields)))
 

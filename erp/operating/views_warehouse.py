@@ -98,21 +98,16 @@ def _roll_usage_info(roll):
     or because they shipped.
 
     Returns None while nothing has been cut. Otherwise reports metres used
-    against the roll's original length, plus one entry per withdrawal: the
-    order (with its line and packing list) for stock that shipped, or the
-    movement's own reason for metres cut by hand, which carry no order.
+    against the roll's original length, plus one entry per withdrawal.
 
-    Shipping writes BOTH a consumed reservation and an out movement for the
-    same metres, and StockMovement carries no order FK to join them on, so
-    the pair is matched by metres: each reservation absorbs one movement of
-    equal length, and only what's left over is listed as a separate cut.
-    Matching on metres rather than the timestamp on purpose — a shipment
-    crossing midnight, or a reservation consumed at a backdated time, would
-    otherwise report every shipped roll twice. The cost is that a hand cut
-    of exactly the same length as a shipment on the same roll is absorbed
-    into it; showing one cut too few beats showing every shipment twice."""
+    The out-movements ARE the list: every cut writes exactly one, and each
+    now records what caused it (StockMovement.reservation / .order), so the
+    order, its line and its packing list are read from the row rather than
+    inferred. Shipping also marks a reservation consumed for the same
+    metres, but that is the same event and is reached THROUGH the movement,
+    so it can no longer be counted twice. A cut with no order attached is
+    metres taken by hand and reads from its own reason."""
     from django.utils.timezone import localtime
-    from .models import OrderRollReservation
 
     total = roll.meters or Decimal("0")
     remaining = roll.meters_remaining if roll.meters_remaining is not None else total
@@ -120,63 +115,53 @@ def _roll_usage_info(roll):
     if used <= 0:
         return None
 
-    from collections import Counter
-
     entries = []
-    claimed = Counter()      # metres already reported by a reservation
-
-    for res in (OrderRollReservation.objects
-                .filter(roll=roll, consumed=True)
-                .select_related("order", "order_item__product",
-                                "order_item__product_variant")
-                .order_by("-consumed_at", "-id")):
-        if not res.order_id:
-            continue
-        order = res.order
-        # Which LINE of the order this roll was cut for. One order can eat
-        # several rolls across different lines, so the order number alone
-        # doesn't say what this particular roll became. Best-effort by design
-        # (the FK is SET_NULL), hence the None-safety.
-        line = None
-        item = res.order_item
-        if item is not None:
-            title = (item.product.title if item.product_id else "") or ""
-            sku = (item.product_variant.variant_sku
-                   if item.product_variant_id else "") or ""
-            line = f"{title} [{sku}]".strip() if sku else (title.strip() or None)
-        day = localtime(res.consumed_at).date() if res.consumed_at else None
-        claimed[res.meters] += 1
-        entries.append({
-            "kind": "order",
-            "label": str(order),
-            "line": line,
-            "meters": float(res.meters or 0),
-            "date": day.strftime("%d.%m.%Y") if day else None,
-            "url": reverse("operating:order_detail", args=[order.pk]),
-            # Straight to the packing list — the screen showing which roll
-            # went into which pack, the usual next question after "which
-            # order did this go on".
-            "packing_url": reverse("operating:order_packing_list", args=[order.pk]),
-        })
-
     for mv in (StockMovement.objects
                .filter(roll=roll, movement_type="out")
-               .select_related("created_by")
+               .select_related("created_by", "order",
+                               "reservation__order_item__product",
+                               "reservation__order_item__product_variant")
                .order_by("-created_at", "-id")):
         day = localtime(mv.created_at).date() if mv.created_at else None
-        if claimed.get(mv.quantity):
-            claimed[mv.quantity] -= 1
-            continue     # the ledger half of a shipment already listed above
-        entries.append({
-            "kind": "movement",
-            "label": (mv.reason or mv.reference or "").strip() or None,
-            "line": None,
-            "meters": float(mv.quantity or 0),
-            "date": day.strftime("%d.%m.%Y") if day else None,
-            "by": mv.created_by.get_username() if mv.created_by else None,
-            "url": None,
-            "packing_url": None,
-        })
+        date = day.strftime("%d.%m.%Y") if day else None
+        order = mv.order or (mv.reservation.order if mv.reservation_id else None)
+
+        if order is not None:
+            # Which LINE of the order this roll was cut for. One order can
+            # eat several rolls across different lines, so the order number
+            # alone doesn't say what this particular roll became. Only the
+            # packing-scan path knows it, and order_item is SET_NULL, hence
+            # the None-safety.
+            line = None
+            item = mv.reservation.order_item if mv.reservation_id else None
+            if item is not None:
+                title = (item.product.title if item.product_id else "") or ""
+                sku = (item.product_variant.variant_sku
+                       if item.product_variant_id else "") or ""
+                line = f"{title} [{sku}]".strip() if sku else (title.strip() or None)
+            entries.append({
+                "kind": "order",
+                "label": str(order),
+                "line": line,
+                "meters": float(mv.quantity or 0),
+                "date": date,
+                "url": reverse("operating:order_detail", args=[order.pk]),
+                # Straight to the packing list — the screen showing which
+                # roll went into which pack, the usual next question after
+                # "which order did this go on".
+                "packing_url": reverse("operating:order_packing_list", args=[order.pk]),
+            })
+        else:
+            entries.append({
+                "kind": "movement",
+                "label": (mv.reason or mv.reference or "").strip() or None,
+                "line": None,
+                "meters": float(mv.quantity or 0),
+                "date": date,
+                "by": mv.created_by.get_username() if mv.created_by else None,
+                "url": None,
+                "packing_url": None,
+            })
 
     return {
         "status": roll.status,
@@ -184,8 +169,8 @@ def _roll_usage_info(roll):
         "total": float(total),
         "remaining": float(remaining or 0),
         "used": float(used),
-        # Metres are gone but nothing records where — say so rather than
-        # invent a reason.
+        # Metres are gone but nothing records where — the caller says so
+        # rather than inventing a reason.
         "entries": entries,
     }
 
@@ -3815,6 +3800,9 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
                         quantity=take,
                         reason=f"{reason_prefix} {order_ref}",
                         reference=str(order_ref),
+                        # No packing-scan hold on this path, but the cut
+                        # still belongs to the order.
+                        order=order,
                         created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
                     )
                     results.append({
@@ -3942,6 +3930,9 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
                 product=wp, roll=roll, movement_type="out",
                 quantity=actual, reason=f"{reason_prefix} {order_ref}",
                 reference=str(order_ref),
+                # This ledger row and the hold it realises are the same
+                # event — recorded, so nothing downstream has to infer it.
+                order=order, reservation=r,
                 created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
             )
             # If the roll physically had less than was reserved (it got cut

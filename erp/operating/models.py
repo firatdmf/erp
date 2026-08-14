@@ -1371,6 +1371,34 @@ class StockMovement(models.Model):
         max_length=128, blank=True, null=True,
         help_text="Free-form reference, e.g. order number, document id",
     )
+    # What caused this movement, recorded rather than described.
+    #
+    # `reason`/`reference` are free text ("Order ship Order #241"), which
+    # is fine to read and useless to join on. Shipping writes BOTH a
+    # consumed OrderRollReservation and this ledger row for the same
+    # metres, and with nothing linking them, code reporting where a roll
+    # went had to guess which pairs were the same event — by amount, since
+    # timestamps can straddle midnight. These two FKs make the pairing a
+    # fact: `reservation` is set when a packing-scan hold becomes a real
+    # cut, and `order` on any cut made for an order, including the
+    # fallback path that consumes stock without a per-roll scan.
+    #
+    # SET_NULL on both: deleting an order or releasing a hold must never
+    # delete the record that metres physically left the warehouse.
+    order = models.ForeignKey(
+        "Order",
+        on_delete=models.SET_NULL,
+        null=True, blank=True, db_index=True,
+        related_name="stock_movements",
+        help_text="The order this movement was made for, when applicable.",
+    )
+    reservation = models.ForeignKey(
+        "OrderRollReservation",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="stock_movements",
+        help_text="The packing-scan hold this cut realised, when applicable.",
+    )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey(
         "auth.User",

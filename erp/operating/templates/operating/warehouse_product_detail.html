@@ -1114,27 +1114,40 @@
     document.getElementById('reLot').value     = btn.dataset.lot || '';
     document.getElementById('reIsSecond').checked = btn.dataset.isSecond === '1';
 
-    // Spell out which number this box holds, and what it may not go under.
+    // Show the split as a bar first — how much of the roll is gone reads
+    // instantly, where two numbers in a sentence do not. The floor is the
+    // metres already OUT, not the metres left: a roll cannot have had more
+    // cut from it than it was ever long, so shortening it below what shipped
+    // is what gets refused.
     const total = parseFloat(btn.dataset.meters || '0') || 0;
     const left  = parseFloat(btn.dataset.remaining || btn.dataset.meters || '0') || 0;
     const out   = Math.max(0, Math.round((total - left) * 100) / 100);
+    const pct   = total > 0 ? Math.min(100, (out / total) * 100) : 0;
+    const colour = pct >= 85 ? '#C0392B' : (pct >= 50 ? '#D97706' : '#147F74');
     const mInput = document.getElementById('reMeters');
     const hint = document.getElementById('reMetersHint');
+
+    const bar =
+      '<div style="height:7px;border-radius:999px;background:#E5E7EB;overflow:hidden;margin:2px 0 5px;">' +
+        '<div style="height:100%;width:' + pct.toFixed(1) + '%;background:' + colour + ';"></div>' +
+      '</div>';
+
     if (out > 0) {
-      // Already part used: the floor is what has gone out, and the browser
-      // enforces it as well as the server.
       mInput.min = out.toFixed(2);
-      hint.innerHTML =
-        '<b>' + out.toFixed(2) + ' m</b> {% trans "has already gone out of this roll" %} · ' +
-        '<b>' + left.toFixed(2) + ' m</b> {% trans "left" %}.<br>' +
-        '{% trans "Change this only to correct the length recorded at intake — it cannot go below" %} ' +
-        '<b>' + out.toFixed(2) + ' m</b>. ' +
-        '{% trans "To record metres going out, use Record stock out instead." %}';
-      hint.style.color = '#92400E';
+      hint.innerHTML = bar +
+        '<span style="color:' + colour + ';"><b>' + out.toFixed(2) + ' m</b> {% trans "used" %}</span>' +
+        ' · <b>' + left.toFixed(2) + ' m</b> {% trans "left" %}' +
+        '<div style="margin-top:3px;color:var(--gray-500);">' +
+          '{% trans "Full length, not the remainder" %} · {% trans "min" %} <b>' + out.toFixed(2) + ' m</b> · ' +
+          '<a href="javascript:void(0)" onclick="closeRE();document.getElementById(\'soOverlay\').classList.add(\'show\');"' +
+          ' style="color:var(--nejum-teal-700);text-decoration:underline;">{% trans "Record stock out" %}</a>' +
+        '</div>';
     } else {
       mInput.min = '0.01';
-      hint.innerHTML = '{% trans "Nothing has gone out of this roll yet, so this is also what is left." %}';
-      hint.style.color = 'var(--gray-600)';
+      hint.innerHTML = bar +
+        '<b>' + total.toFixed(2) + ' m</b> · {% trans "none used" %}' +
+        '<div style="margin-top:3px;color:var(--gray-500);">' +
+          '{% trans "Full length, not the remainder" %}</div>';
     }
     document.getElementById('reOverlay').classList.add('show');
   }

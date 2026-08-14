@@ -920,10 +920,10 @@
 
         <div class="form-group">
           <label for="id_supplier_account">{% trans "Vendor account" %}</label>
-          {# The vendor is a cari account now, so the old "add supplier"
+          {% comment %} The vendor is a cari account now, so the old "add supplier"
              button is gone: it opened the CRM supplier sidebar, which
              creates a record this field can no longer point at. New
-             vendors are created as accounts. #}
+             vendors are created as accounts. {% endcomment %}
           {{ form.supplier_account }}
           <div style="margin-top:6px; font-size:12px;">
             <a href="{% url 'accounts:create' %}" target="_blank" rel="noopener"

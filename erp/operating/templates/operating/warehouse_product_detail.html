@@ -963,13 +963,13 @@
       <label>{% trans "Barcode" %} <small style="color:var(--gray-500);font-weight:500;">{% trans "(this roll)" %}</small></label>
       <input class="so-input" type="text" id="reBarcode" placeholder="—">
     </div>
-    {# The field is the roll's FULL length as received, and it arrives
+    {% comment %} The field is the roll's FULL length as received, and it arrives
        prefilled with exactly that. Without saying so, the obvious reading
        of a bare "Meters" box on a part-used roll is "metres left" — so
        someone corrects 50 to 20 believing they are recording the remainder,
        and silently rewrites the roll's history instead. The hint states
        which number is being asked for, what has already gone out, and the
-       floor the value cannot go under. #}
+       floor the value cannot go under. {% endcomment %}
     <div class="so-fld">
       <label>{% trans "Total length (m)" %}
         <small style="color:var(--gray-500);font-weight:500;">{% trans "(the whole roll, as received)" %}</small>

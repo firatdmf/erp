@@ -974,7 +974,8 @@
       <label>{% trans "Total length (m)" %}
         <small style="color:var(--gray-500);font-weight:500;">{% trans "(the whole roll, as received)" %}</small>
       </label>
-      <input class="so-input" type="number" step="0.01" id="reMeters" placeholder="0.00">
+      <input class="so-input" type="number" step="0.01" id="reMeters" placeholder="0.00"
+             oninput="renderRollMetersHint()">
       <div id="reMetersHint" style="margin-top:6px; font:500 12px var(--font-sans); color:var(--gray-600);"></div>
     </div>
     <div class="so-fld">
@@ -1107,6 +1108,56 @@
 
   // ── Roll edit ────────────────────────────────────────────────
   let _reRollId = null;
+  let _reOut = 0;            // metres already gone — fixed while editing
+  let _reStoredTotal = 0;    // the length on record, for an empty box
+
+  // Redrawn on every keystroke. Metres already out never move; what the typed
+  // total changes is how much is LEFT, so the bar and the numbers follow the
+  // box. Typing below the floor fills the bar red and shows 0 m left — the
+  // same answer the server gives, without waiting for the round trip.
+  //
+  // No "did you mean stock out?" offer here: this dialog corrects what was
+  // RECORDED about a roll, while a stock-out changes what is physically on
+  // it, and metres normally leave on an order anyway.
+  function renderRollMetersHint() {
+    const mInput = document.getElementById('reMeters');
+    const hint = document.getElementById('reMetersHint');
+    if (!mInput || !hint) return;
+
+    const typed = parseFloat((mInput.value || '').replace(',', '.'));
+    const hasTyped = isFinite(typed) && typed > 0;
+    // An empty or junk box falls back to the length on record, so the bar
+    // never blanks out mid-edit.
+    const total = hasTyped ? typed : _reStoredTotal;
+    const under = hasTyped && typed < _reOut;
+
+    const left = Math.max(0, Math.round((total - _reOut) * 100) / 100);
+    const pct = total > 0 ? Math.min(100, (_reOut / total) * 100) : 0;
+    const colour = (under || pct >= 85) ? '#C0392B'
+                 : (pct >= 50 ? '#D97706' : '#147F74');
+
+    const bar =
+      '<div style="height:7px;border-radius:999px;background:#E5E7EB;overflow:hidden;margin:2px 0 5px;">' +
+        '<div style="height:100%;width:' + (under ? 100 : pct).toFixed(1) + '%;' +
+        'background:' + colour + ';transition:width 120ms linear;"></div>' +
+      '</div>';
+
+    if (_reOut > 0) {
+      hint.innerHTML = bar +
+        '<span style="color:' + colour + ';"><b>' + _reOut.toFixed(2) + ' m</b> {% trans "used" %}</span>' +
+        ' · <b>' + left.toFixed(2) + ' m</b> {% trans "left" %}' +
+        '<div style="margin-top:3px;color:' + (under ? '#C0392B' : 'var(--gray-500)') + ';">' +
+          '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
+          '<b>' + _reOut.toFixed(2) + ' m</b>' +
+        '</div>';
+    } else {
+      hint.innerHTML = bar +
+        '<b>' + total.toFixed(2) + ' m</b> · {% trans "none used" %}' +
+        '<div style="margin-top:3px;color:var(--gray-500);">' +
+          '{% trans "Full length, not the remainder" %}</div>';
+    }
+  }
+
   function openRollEdit(btn) {
     _reRollId = btn.dataset.rollId;
     document.getElementById('reBarcode').value = btn.dataset.barcode || '';
@@ -1114,46 +1165,15 @@
     document.getElementById('reLot').value     = btn.dataset.lot || '';
     document.getElementById('reIsSecond').checked = btn.dataset.isSecond === '1';
 
-    // Show the split as a bar first — how much of the roll is gone reads
-    // instantly, where two numbers in a sentence do not. The floor is the
-    // metres already OUT, not the metres left: a roll cannot have had more
-    // cut from it than it was ever long, so shortening it below what shipped
-    // is what gets refused.
-    const total = parseFloat(btn.dataset.meters || '0') || 0;
-    const left  = parseFloat(btn.dataset.remaining || btn.dataset.meters || '0') || 0;
-    const out   = Math.max(0, Math.round((total - left) * 100) / 100);
-    const pct   = total > 0 ? Math.min(100, (out / total) * 100) : 0;
-    const colour = pct >= 85 ? '#C0392B' : (pct >= 50 ? '#D97706' : '#147F74');
-    const mInput = document.getElementById('reMeters');
-    const hint = document.getElementById('reMetersHint');
+    // The floor is the metres already OUT, not the metres left: a roll cannot
+    // have had more cut from it than it was ever long, so shortening it below
+    // what shipped is what gets refused.
+    _reStoredTotal = parseFloat(btn.dataset.meters || '0') || 0;
+    const left = parseFloat(btn.dataset.remaining || btn.dataset.meters || '0') || 0;
+    _reOut = Math.max(0, Math.round((_reStoredTotal - left) * 100) / 100);
+    document.getElementById('reMeters').min = _reOut > 0 ? _reOut.toFixed(2) : '0.01';
 
-    const bar =
-      '<div style="height:7px;border-radius:999px;background:#E5E7EB;overflow:hidden;margin:2px 0 5px;">' +
-        '<div style="height:100%;width:' + pct.toFixed(1) + '%;background:' + colour + ';"></div>' +
-      '</div>';
-
-    if (out > 0) {
-      mInput.min = out.toFixed(2);
-      hint.innerHTML = bar +
-        '<span style="color:' + colour + ';"><b>' + out.toFixed(2) + ' m</b> {% trans "used" %}</span>' +
-        ' · <b>' + left.toFixed(2) + ' m</b> {% trans "left" %}' +
-        // No "did you mean stock out?" offer here. This dialog corrects what
-        // was RECORDED about a roll; a stock-out changes what is physically
-        // on it. And the guess behind such an offer is usually wrong: metres
-        // normally leave on an order, where shipping cuts the roll itself —
-        // a manual stock-out on a roll an order is holding eats the metres
-        // that order needs, and shipping then clamps to what is left and
-        // files a shortage. Suggesting it invites that.
-        '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "Full length, not the remainder" %} · {% trans "min" %} <b>' + out.toFixed(2) + ' m</b>' +
-        '</div>';
-    } else {
-      mInput.min = '0.01';
-      hint.innerHTML = bar +
-        '<b>' + total.toFixed(2) + ' m</b> · {% trans "none used" %}' +
-        '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "Full length, not the remainder" %}</div>';
-    }
+    renderRollMetersHint();
     document.getElementById('reOverlay').classList.add('show');
   }
   function closeRE() {

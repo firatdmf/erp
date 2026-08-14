@@ -1,0 +1,27 @@
+#!/bin/sh
+# Refuse a commit containing a multi-line {# #} Django template comment,
+# which renders as visible page text instead of being a comment.
+#
+# Install (per clone — git does not version .git/hooks):
+#     ln -sf ../../scripts/hooks/pre-commit .git/hooks/pre-commit
+#
+# Skip once, if you really mean it:  git commit --no-verify
+
+files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.html$')
+[ -z "$files" ] && exit 0
+
+root=$(git rev-parse --show-toplevel)
+py="$root/vir_env/bin/python"
+[ -x "$py" ] || py=python3
+
+# Paths come out repo-relative; manage.py runs from erp/.
+rel=$(echo "$files" | sed 's|^erp/||')
+cd "$root/erp" || exit 0
+
+# shellcheck disable=SC2086
+"$py" manage.py lint_templates $rel 2>/dev/null || {
+  echo ""
+  echo "Commit blocked. Fix the comment above, or: git commit --no-verify"
+  exit 1
+}
+exit 0

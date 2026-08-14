@@ -1124,37 +1124,65 @@
     const hint = document.getElementById('reMetersHint');
     if (!mInput || !hint) return;
 
-    const typed = parseFloat((mInput.value || '').replace(',', '.'));
+    const raw = (mInput.value || '').trim();
+    const typed = parseFloat(raw.replace(',', '.'));
     const hasTyped = isFinite(typed) && typed > 0;
     // An empty or junk box falls back to the length on record, so the bar
-    // never blanks out mid-edit.
+    // never blanks out mid-edit. An empty box is legitimate — it means "leave
+    // the length alone" — so it is not treated as invalid.
     const total = hasTyped ? typed : _reStoredTotal;
-    const under = hasTyped && typed < _reOut;
+    // The lowest length this roll could honestly be: what has already gone
+    // out of it, or a bare minimum when nothing has. Anything under it is what
+    // the server refuses, so Save is held closed instead of letting someone
+    // press it and collect an alert.
+    const floor = _reOut > 0 ? _reOut : 0.01;
+    const invalid = raw !== '' && (!isFinite(typed) || typed < floor);
 
     const left = Math.max(0, Math.round((total - _reOut) * 100) / 100);
     const pct = total > 0 ? Math.min(100, (_reOut / total) * 100) : 0;
-    const colour = (under || pct >= 85) ? '#C0392B'
+    const colour = (invalid || pct >= 85) ? '#C0392B'
                  : (pct >= 50 ? '#D97706' : '#147F74');
+
+    const save = document.getElementById('reSubmit');
+    if (save) {
+      save.disabled = invalid;
+      save.style.opacity = invalid ? '0.45' : '';
+      save.style.cursor = invalid ? 'not-allowed' : '';
+    }
 
     const bar =
       '<div style="height:7px;border-radius:999px;background:#E5E7EB;overflow:hidden;margin:2px 0 5px;">' +
-        '<div style="height:100%;width:' + (under ? 100 : pct).toFixed(1) + '%;' +
+        // Fill to 100% only when a real number below the floor was typed —
+        // that total genuinely implies nothing left. For junk or zero the box
+        // holds no length at all, so the bar keeps showing the recorded split
+        // (red, because Save is blocked) rather than contradicting the "left"
+        // figure beside it.
+        '<div style="height:100%;width:' + ((invalid && hasTyped) ? 100 : pct).toFixed(1) + '%;' +
         'background:' + colour + ';transition:width 120ms linear;"></div>' +
+      '</div>';
+
+    // When the value can't be saved, the note says why in place of the alert
+    // that used to appear after pressing Save.
+    const blocked = '<div style="margin-top:3px;color:#C0392B;font-weight:600;">' +
+      '{% trans "Cannot be below" %} <b>' + floor.toFixed(2) + ' m</b>' +
+      (_reOut > 0 ? ' — {% trans "that much has already gone out of this roll" %}' : '') +
       '</div>';
 
     if (_reOut > 0) {
       hint.innerHTML = bar +
         '<span style="color:' + colour + ';"><b>' + _reOut.toFixed(2) + ' m</b> {% trans "used" %}</span>' +
         ' · <b>' + left.toFixed(2) + ' m</b> {% trans "left" %}' +
-        '<div style="margin-top:3px;color:' + (under ? '#C0392B' : 'var(--gray-500)') + ';">' +
-          '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
-          '<b>' + _reOut.toFixed(2) + ' m</b>' +
-        '</div>';
+        (invalid ? blocked :
+          '<div style="margin-top:3px;color:var(--gray-500);">' +
+            '{% trans "Full length, not the remainder" %} · {% trans "min" %} ' +
+            '<b>' + _reOut.toFixed(2) + ' m</b>' +
+          '</div>');
     } else {
       hint.innerHTML = bar +
         '<b>' + total.toFixed(2) + ' m</b> · {% trans "none used" %}' +
-        '<div style="margin-top:3px;color:var(--gray-500);">' +
-          '{% trans "Full length, not the remainder" %}</div>';
+        (invalid ? blocked :
+          '<div style="margin-top:3px;color:var(--gray-500);">' +
+            '{% trans "Full length, not the remainder" %}</div>');
     }
   }
 
@@ -1198,11 +1226,13 @@
       headers: { 'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest' }
     }).then(r => r.json()).then(data => {
       btn.disabled = false; btn.innerHTML = orig;
+      renderRollMetersHint();   // re-assert the floor state
       if (!data.success) { alert(data.error || '{% trans "Failed" %}'); return; }
       closeRE();
       window.location.reload();
     }).catch(() => {
       btn.disabled = false; btn.innerHTML = orig;
+      renderRollMetersHint();   // re-assert the floor state
       alert('{% trans "Network error" %}');
     });
   }

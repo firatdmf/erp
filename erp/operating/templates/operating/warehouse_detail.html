@@ -4425,6 +4425,34 @@
         r.innerHTML = '<div class="bl-rc notfound"><span class="bl-status notfound"><i class="fa fa-triangle-exclamation"></i> {% trans "Network error" %}</span>' + blAgainBtn() + '</div>';
       });
   }
+  // Rolls already picked for an order. The hold takes nothing off the roll
+  // until the order ships, so without this the roll scans as free stock and
+  // someone can walk off with metres another order is counting on. Shown
+  // whether or not the order ever reached a packing list.
+  function blHeldBanner(roll) {
+    var h = roll && roll.reserved;
+    if (!h) return '';
+    var rows = (h.entries || []).map(function (e) {
+      var who = e.url
+        ? '<a href="' + e.url + '" style="color:#1E40AF; text-decoration:underline;">' + blEsc(e.label) + '</a>'
+        : blEsc(e.label);
+      var bits = [];
+      if (e.meters) bits.push(Number(e.meters).toFixed(2) + ' m');
+      if (e.date) bits.push(blEsc(e.date));
+      if (e.line) bits.push(blEsc(e.line));
+      return '<div style="font-weight:500; margin-top:3px;">→ ' + who +
+             (bits.length ? ' <span style="opacity:.85;">(' + bits.join(' · ') + ')</span>' : '') +
+             '</div>';
+    }).join('');
+    return '<div style="color:#1E40AF; background:#EFF6FF; border:1px solid #BFDBFE;' +
+           ' border-radius:8px; padding:8px 10px; font:600 13px var(--font-sans); margin:8px 0 4px;">' +
+             '<i class="fa fa-hand"></i> {% trans "Reserved for an order" %} · ' +
+             '<b>' + Number(h.meters).toFixed(2) + ' m</b> {% trans "held" %} ' +
+             '<span style="font-weight:500;">({% trans "not yet shipped" %})</span>' +
+             rows +
+           '</div>';
+  }
+
   // A used roll is found on purpose — scanning its label should say what
   // became of it. Metres alone read like a stocking error, so spell out how
   // much came off and where each cut went. Covers part-used rolls as well as
@@ -4514,6 +4542,7 @@
           '<div class="bl-prod-name">' + blEsc(p.name || '—') + '</div>' +
           (p.sku ? '<span class="bl-sku-pill">' + blEsc(p.sku) + '</span>' : '') +
           (p.main_product ? '<div class="bl-main-line">{% trans "Main product" %}: ' + blEsc(p.main_product) + '</div>' : '') +
+          blHeldBanner(d.roll) +
           blUsedBanner(d.roll) +
           '<div class="bl-tiles">' + tiles + '</div>' +
           '<div class="bl-actions">' +
@@ -4535,6 +4564,7 @@
             '<i class="fa fa-triangle-exclamation"></i> ' +
             '{% trans "This roll is registered in" %} <b>' + blEsc(ew.name) + '</b>' +
           '</p>' +
+          blHeldBanner(er) +
           blUsedBanner(er) +
           '<div class="bl-tiles">' +
             '<div class="bl-tile hero">' +

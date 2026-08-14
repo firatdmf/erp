@@ -1397,7 +1397,7 @@ class StockMovement(models.Model):
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="stock_movements",
-        help_text="The packing-scan hold this cut realised, when applicable.",
+        help_text="The reservation this deduction realised, when applicable.",
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_by = models.ForeignKey(
@@ -1419,8 +1419,11 @@ class StockMovement(models.Model):
 
 
 class OrderRollReservation(models.Model):
-    """A soft hold on a specific physical roll (top) for an order,
-    created during the packing-scan step.
+    """A soft hold on a specific physical roll for an order, created the
+    moment that roll is picked for it — by scanning a barcode into a line
+    on the order create/edit form, by the packing scan, or by the retail
+    flow. Packing is one entry point among three, not where holds begin:
+    an order can be fully reserved and never see a packing list.
 
     It does NOT touch physical stock: the roll's meters_remaining and
     the WarehouseProduct.quantity stay exactly as they are. The scanned

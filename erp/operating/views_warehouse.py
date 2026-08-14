@@ -88,6 +88,53 @@ def _consonant_prefix(name):
     return ("".join(cons[:3]) or "GEN")[:6]
 
 
+def _roll_reservation_info(roll):
+    """Orders this roll is already spoken for, with nothing deducted yet.
+
+    A hold exists from the moment the roll is picked for an order — a
+    barcode scanned into a line on the order form, the packing scan, or the
+    retail flow — and holds nothing back physically: meters_remaining and
+    the product quantity are untouched until the order ships. So a reserved
+    roll scans as ordinary free stock unless we say otherwise, and someone
+    can walk off with metres another order is counting on.
+
+    Returns None when the roll is free."""
+    from django.utils.timezone import localtime
+    from .models import OrderRollReservation
+
+    held = []
+    total = Decimal("0")
+    for res in (OrderRollReservation.objects
+                .filter(roll=roll, consumed=False)
+                .select_related("order", "order_item__product",
+                                "order_item__product_variant")
+                .order_by("-created_at", "-id")):
+        if not res.order_id:
+            continue
+        order = res.order
+        line = None
+        item = res.order_item
+        if item is not None:
+            title = (item.product.title if item.product_id else "") or ""
+            sku = (item.product_variant.variant_sku
+                   if item.product_variant_id else "") or ""
+            line = f"{title} [{sku}]".strip() if sku else (title.strip() or None)
+        total += res.meters or Decimal("0")
+        held.append({
+            "label": str(order),
+            "line": line,
+            "meters": float(res.meters or 0),
+            "date": (localtime(res.created_at).strftime("%d.%m.%Y")
+                     if res.created_at else None),
+            "url": reverse("operating:order_detail", args=[order.pk]),
+            "packing_url": reverse("operating:order_packing_list", args=[order.pk]),
+        })
+
+    if not held:
+        return None
+    return {"meters": float(total), "entries": held}
+
+
 def _roll_usage_info(roll):
     """What has come off this roll, and where each cut went.
 
@@ -1312,6 +1359,7 @@ def warehouse_barcode_lookup(request, pk):
                     "status": other_roll.status,
                     "consumed": other_roll.status == "consumed",
                     "usage": _roll_usage_info(other_roll),
+                    "reserved": _roll_reservation_info(other_roll),
                 },
             })
         if other_roll:
@@ -1334,6 +1382,7 @@ def warehouse_barcode_lookup(request, pk):
                     "status": other_roll.status,
                     "consumed": other_roll.status == "consumed",
                     "usage": _roll_usage_info(other_roll),
+                    "reserved": _roll_reservation_info(other_roll),
                 },
                 # No move offer for a top that has already been used up —
                 # there is nothing physical left to carry over, and the row
@@ -1384,6 +1433,7 @@ def warehouse_barcode_lookup(request, pk):
             "status": roll.status,
             "consumed": roll.status == "consumed",
             "usage": _roll_usage_info(roll),
+            "reserved": _roll_reservation_info(roll),
         } if roll else None),
     })
 

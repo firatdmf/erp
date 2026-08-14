@@ -5143,6 +5143,25 @@ class WarehouseRollEdit(View):
             consumed = Decimal("0")
             if roll.meters_remaining is not None and old_full:
                 consumed = max(Decimal("0"), old_full - roll.meters_remaining)
+
+            # A roll cannot have had more taken off it than it was ever
+            # long. Shortening it below what has already gone out used to be
+            # accepted: the remainder clamped to zero so stock stayed right,
+            # while the roll's own history claimed more metres shipped than
+            # ever existed — a contradiction no report can resolve later.
+            #
+            # If those two numbers disagree it is the OUTGOING record that is
+            # wrong, not the length, so the fix belongs on the shipment or
+            # stock-out. Refuse and name the figure to correct against.
+            # Equal is fine: that is a roll used up exactly.
+            if new_full < consumed:
+                return JsonResponse({
+                    "success": False,
+                    "error": (f"Bu toptan {consumed:.2f} m çıkış yapılmış — "
+                              f"uzunluk bundan kısa olamaz. Önce ilgili "
+                              f"sevkiyatı veya stok çıkışını düzeltin."),
+                }, status=400)
+
             if new_full != old_full:
                 roll.meters = new_full
                 roll.meters_remaining = max(Decimal("0"), new_full - consumed)

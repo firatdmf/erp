@@ -143,6 +143,7 @@
 {% endblock %}
 
 {% block content %}
+{% get_current_language as LANGUAGE_CODE %}
 <div class="pf">
 
   <a class="pf-back" href="{% url 'accounts:payment_list' %}">
@@ -216,7 +217,7 @@
             <div class="pf-row">
               <div class="pf-f">
                 <label>{% trans "Amount" %}</label>
-                <input type="number" step="0.01" name="amount" id="paymentAmount" required min="0.01" placeholder="0.00">
+                <input type="number" step="0.01" name="amount" id="paymentAmount" required min="0.01" placeholder="{{ 0|floatformat:2 }}">
               </div>
               <div class="pf-f">
                 <label>{% trans "Currency" %}</label>
@@ -280,11 +281,11 @@
             </div>
 
             <div class="pf-alloc-bar">
-              <span class="lbl">{% trans "Payment:" %}</span><span class="val" id="barAmount">0,00</span>
+              <span class="lbl">{% trans "Payment:" %}</span><span class="val" id="barAmount">{{ 0|floatformat:2 }}</span>
               <span class="pf-alloc-sep"></span>
-              <span class="lbl">{% trans "Allocated:" %}</span><span class="val" id="barAllocated">0,00</span>
+              <span class="lbl">{% trans "Allocated:" %}</span><span class="val" id="barAllocated">{{ 0|floatformat:2 }}</span>
               <span class="pf-alloc-sep"></span>
-              <span class="lbl">{% trans "Remaining (advance):" %}</span><span class="val" id="barRemaining">0,00</span>
+              <span class="lbl">{% trans "Remaining (advance):" %}</span><span class="val" id="barRemaining">{{ 0|floatformat:2 }}</span>
               <div class="pf-alloc-bar-r">
                 <button type="button" id="autoAllocBtn"><i data-lucide="zap"></i> {% trans "Auto Match (FIFO)" %}</button>
                 <button type="button" id="clearAllocBtn" class="clear">{% trans "Clear" %}</button>
@@ -319,9 +320,9 @@
               <h3>{% trans "Summary" %}</h3>
             </div>
             <div class="pf-sum">
-              <div class="row"><span class="lbl">{% trans "Payment Amount" %}</span><span class="val" id="sumAmount">0,00</span></div>
-              <div class="row"><span class="lbl">{% trans "Applied to Invoices" %}</span><span class="val" id="sumAlloc">0,00</span></div>
-              <div class="row grand"><span class="lbl">{% trans "Remaining as Advance" %}</span><span class="val" id="sumRemaining">0,00</span></div>
+              <div class="row"><span class="lbl">{% trans "Payment Amount" %}</span><span class="val" id="sumAmount">{{ 0|floatformat:2 }}</span></div>
+              <div class="row"><span class="lbl">{% trans "Applied to Invoices" %}</span><span class="val" id="sumAlloc">{{ 0|floatformat:2 }}</span></div>
+              <div class="row grand"><span class="lbl">{% trans "Remaining as Advance" %}</span><span class="val" id="sumRemaining">{{ 0|floatformat:2 }}</span></div>
             </div>
 
             <div class="pf-actions">
@@ -350,7 +351,9 @@
   const emptyMsg = document.getElementById('emptyMsg');
   const allocJson = document.getElementById('allocationsJson');
 
-  const fmt = (n) => (Number(n) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Match the numbers Django renders for the active language: tr → 1.234,56, en → 1,234.56
+  const NUM_LOCALE = '{{ LANGUAGE_CODE }}'.startsWith('tr') ? 'tr-TR' : 'en-US';
+  const fmt = (n) => (Number(n) || 0).toLocaleString(NUM_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   function renderOpenInvoices() {
     if (!invBody) return;
@@ -374,7 +377,7 @@
         <td><span class="pf-inv-type">${inv.type}</span></td>
         <td class="amt">${fmt(inv.total)} ${inv.currency}</td>
         <td class="amt"><span class="pf-inv-bal">${fmt(inv.balance)}</span></td>
-        <td class="amt"><input type="number" step="0.01" min="0" max="${inv.balance}" class="inv-alloc" data-i="${i}" placeholder="0,00"></td>
+        <td class="amt"><input type="number" step="0.01" min="0" max="${inv.balance}" class="inv-alloc" data-i="${i}" placeholder="${fmt(0)}"></td>
       `;
       invBody.appendChild(tr);
     });

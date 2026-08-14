@@ -648,7 +648,9 @@
     const totalEl   = document.getElementById('b2bTotal');
     const ctaBtn    = document.getElementById('b2bAddToQuote');
 
-    const fmt = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Match the numbers Django renders for the active language: tr → 1.234,56, en → 1,234.56
+    const NUM_LOCALE = '{{ DJ_LANG }}'.startsWith('tr') ? 'tr-TR' : 'en-US';
+    const fmt = n => '$' + n.toLocaleString(NUM_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     function activeFlatPercentage() {
       // Percentage campaign honoured only if not expired

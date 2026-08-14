@@ -3285,6 +3285,8 @@
   const csrftoken = '{{ csrf_token }}';
   const importUrl = "{% url 'operating:warehouse_product_import' warehouse.pk %}";
   let whSelectedFile = null;
+  // Group digits the way Django does for the active language, not the browser's
+  const NUM_LOCALE = '{{ LANGUAGE_CODE }}'.startsWith('tr') ? 'tr-TR' : 'en-US';
 
   // Expand/collapse a main-product group. Variants are lazy-loaded once
   // (a base can hold thousands), then cached and just shown/hidden.
@@ -4290,7 +4292,7 @@
             const bar = document.getElementById('whProgressBar');
             const text = document.getElementById('whProgressText');
             if (bar) bar.style.width = pct.toFixed(1) + '%';
-            if (text) text.innerHTML = `<b>${msg.current.toLocaleString()}</b> / ${msg.total.toLocaleString()} · {% trans "created:" %} <b>${msg.created}</b> · {% trans "updated:" %} <b>${msg.updated}</b> · {% trans "unchanged:" %} <b>${msg.unchanged}</b>`;
+            if (text) text.innerHTML = `<b>${msg.current.toLocaleString(NUM_LOCALE)}</b> / ${msg.total.toLocaleString(NUM_LOCALE)} · {% trans "created:" %} <b>${msg.created}</b> · {% trans "updated:" %} <b>${msg.updated}</b> · {% trans "unchanged:" %} <b>${msg.unchanged}</b>`;
           } else if (msg.phase === 'saving') {
             const title = document.getElementById('whProgressTitle');
             if (title) title.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + (msg.message || '{% trans "Saving..." %}');
@@ -4308,7 +4310,7 @@
             </div>
             <div style="font:500 12.5px var(--font-sans); color:#047857;">
               {% trans "Created:" %} <b>${finalData.created}</b> · {% trans "Updated:" %} <b>${finalData.updated}</b> · {% trans "Unchanged:" %} <b>${finalData.unchanged}</b> · {% trans "Skipped:" %} <b>${finalData.skipped}</b><br>
-              {% trans "Total processed:" %} <b>${finalData.total.toLocaleString()}</b> · {% trans "USD/TRY rate:" %} <b>${finalData.usd_to_try_rate}</b>
+              {% trans "Total processed:" %} <b>${finalData.total.toLocaleString(NUM_LOCALE)}</b> · {% trans "USD/TRY rate:" %} <b>${finalData.usd_to_try_rate}</b>
             </div>
           </div>`;
         setTimeout(() => location.reload(), 1500);

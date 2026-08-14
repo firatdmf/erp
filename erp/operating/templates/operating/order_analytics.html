@@ -327,6 +327,7 @@
 {% endblock %}
 
 {% block content %}
+{% get_current_language as LANGUAGE_CODE %}
 <div class="an-wrap">
 
   <!-- Header -->
@@ -630,8 +631,10 @@
     Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
     Chart.defaults.color = '#64748B';
 
+    // Match the numbers Django renders for the active language: tr → 1.234,56, en → 1,234.56
+    var NUM_LOCALE = '{{ LANGUAGE_CODE }}'.startsWith('tr') ? 'tr-TR' : 'en-US';
     var money = function (v) {
-      return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      return '$' + Number(v).toLocaleString(NUM_LOCALE, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     };
 
     // ── Revenue trend (line) ──
@@ -656,7 +659,7 @@
             legend: { display: false },
             tooltip: {
               backgroundColor: '#0F1419', padding: 11, cornerRadius: 8, displayColors: false,
-              callbacks: { label: function (c) { return '$' + c.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } }
+              callbacks: { label: function (c) { return '$' + c.parsed.y.toLocaleString(NUM_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } }
             }
           },
           scales: {
@@ -683,7 +686,7 @@
           plugins: {
             legend: { display: false },
             tooltip: { backgroundColor: '#0F1419', padding: 10, cornerRadius: 8,
-              callbacks: { label: function (c) { return c.label + ': $' + c.parsed.toLocaleString('en-US', { minimumFractionDigits: 2 }); } } }
+              callbacks: { label: function (c) { return c.label + ': $' + c.parsed.toLocaleString(NUM_LOCALE, { minimumFractionDigits: 2 }); } } }
           }
         }
       });
@@ -702,7 +705,7 @@
           plugins: {
             legend: { display: false },
             tooltip: { backgroundColor: '#0F1419', padding: 10, cornerRadius: 8, displayColors: false,
-              callbacks: { label: function (c) { return '$' + c.parsed.x.toLocaleString('en-US', { minimumFractionDigits: 2 }); } } }
+              callbacks: { label: function (c) { return '$' + c.parsed.x.toLocaleString(NUM_LOCALE, { minimumFractionDigits: 2 }); } } }
           },
           scales: {
             x: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { callback: function (v) { return money(v); } } },

@@ -197,6 +197,7 @@
 {% endblock %}
 
 {% block content %}
+{% get_current_language as LANGUAGE_CODE %}
 <div class="if">
 
   <!-- CRUMBS -->
@@ -494,11 +495,11 @@
                 <h3>{% trans "Totals" %}</h3>
               </div>
               <div class="if-totals">
-                <div class="row"><span class="lbl">{% trans "Subtotal" %}</span><span class="val" id="sumSubtotal">0,00</span></div>
-                <div class="row"><span class="lbl">{% trans "Discount" %}</span><span class="val" id="sumDiscount">0,00</span></div>
-                <div class="row col-vat" id="sumTaxRow"><span class="lbl">{% trans "VAT" %}</span><span class="val" id="sumTax">0,00</span></div>
-                <div class="row"><span class="lbl">{% trans "Other Charges" %}</span><span class="val" id="sumOther">0,00</span></div>
-                <div class="row grand"><span>{% trans "Grand Total" %}</span><span class="val" id="sumGrand">0,00</span></div>
+                <div class="row"><span class="lbl">{% trans "Subtotal" %}</span><span class="val" id="sumSubtotal">{{ 0|floatformat:2 }}</span></div>
+                <div class="row"><span class="lbl">{% trans "Discount" %}</span><span class="val" id="sumDiscount">{{ 0|floatformat:2 }}</span></div>
+                <div class="row col-vat" id="sumTaxRow"><span class="lbl">{% trans "VAT" %}</span><span class="val" id="sumTax">{{ 0|floatformat:2 }}</span></div>
+                <div class="row"><span class="lbl">{% trans "Other Charges" %}</span><span class="val" id="sumOther">{{ 0|floatformat:2 }}</span></div>
+                <div class="row grand"><span>{% trans "Grand Total" %}</span><span class="val" id="sumGrand">{{ 0|floatformat:2 }}</span></div>
               </div>
 
               <div class="if-actions">
@@ -533,7 +534,7 @@
     <td data-mlabel="{% trans 'Unit Price' %}"><input type="number" class="amt" data-field="unit_price" step="0.01" value="0.00" min="0"></td>
     <td class="col-disc" data-mlabel="{% trans 'Disc %' %}"><input type="number" class="amt" data-field="discount_rate" step="0.01" value="0" min="0" max="100"></td>
     <td class="col-vat" data-mlabel="{% trans 'VAT %' %}"><input type="number" class="amt" data-field="tax_rate" step="0.01" value="20" min="0"></td>
-    <td class="col-total row-total" data-mlabel="{% trans 'Total' %}">0,00</td>
+    <td class="col-total row-total" data-mlabel="{% trans 'Total' %}">{{ 0|floatformat:2 }}</td>
     <td class="col-del"><button type="button" class="btn-del" title="{% trans 'Delete' %}"><i data-lucide="trash-2" style="width:16px; height:16px;"></i></button></td>
   </tr>
 </template>
@@ -554,8 +555,10 @@
   const dateInput = document.getElementById('dateInput');
   const dueDateInput = document.getElementById('dueDateInput');
 
+  // Match the numbers Django renders for the active language: tr → 1.234,56, en → 1,234.56
+  const NUM_LOCALE = '{{ LANGUAGE_CODE }}'.startsWith('tr') ? 'tr-TR' : 'en-US';
   const fmt = (n) => {
-    return (Number(n) || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (Number(n) || 0).toLocaleString(NUM_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   function computeRow(row) {

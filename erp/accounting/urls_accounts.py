@@ -33,6 +33,7 @@ urlpatterns = [
     path("",                          views.CariList.as_view(),           name="list"),
     path("new/",                      views.CariCreate.as_view(),         name="create"),
     path("statement/all/",            views.CariStatementAll.as_view(),   name="statement_all"),
+    path("retail/",                   views.RetailCariRedirect.as_view(), name="retail"),
     path("<int:pk>/",                 views.CariDetail.as_view(),         name="detail"),
     path("<int:pk>/statement/",       views.CariStatement.as_view(),      name="statement"),
     path("<int:pk>/edit/",            views.CariEdit.as_view(),           name="edit"),

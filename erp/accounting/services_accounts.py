@@ -331,21 +331,115 @@ def sync_purchase_invoice_items(invoice, line_updates, *, member=None):
     return invoice
 
 
+def _invoice_line_desc(order_item):
+    """How an order line is named on the invoice.
+
+    Names the VARIANT, not just the base product — staff can't tell
+    "2086 [KZL000344]" apart; "2086 — GÜMÜŞ A.BEYAZ [KZL000344]" they
+    can. Same labeling as the order screens. Shared by the initial cut
+    and by sync_invoice_for_order so a re-synced line never renames
+    itself.
+    """
+    it = order_item
+    desc = ""
+    if getattr(it, "product_variant_id", None) and it.product_variant:
+        label = None
+        try:
+            from operating.views import _order_item_variant_label
+            label = _order_item_variant_label(it)
+        except Exception:
+            label = None
+        title = (it.product.title or "") if getattr(it, "product_id", None) else ""
+        sku = it.product_variant.variant_sku or ""
+        base = f"{title} — {label}" if (title and label) else (label or title)
+        desc = f"{base} [{sku}]" if sku else base
+    elif getattr(it, "product_id", None) and it.product:
+        desc = it.product.title
+    return (desc or "Item")[:300]
+
+
+def sync_invoice_for_order(order):
+    """Re-align a live order-attached invoice with its order.
+
+    The account, the invoice and the order screen must show the same
+    number. post_order_movement already re-posts the cari the moment an
+    OrderItem changes, but the invoice was cut once and never looked
+    again: editing order #136 from 419.20 m to 416.09 m moved the cari
+    to 1486.48 and left invoice FAT-2026-000008 sitting at 1486.75.
+
+    Rewrites the invoice's lines from the order's (updating matched
+    lines in place so their ids survive), recomputes the totals and
+    resyncs the ledger row.
+
+    Two invoices are deliberately left alone:
+      * draft — nothing is posted yet; issue() builds its lines then.
+      * e-Arşiv filed (earsiv_uuid set) — that document went to the tax
+        authority and cannot be quietly rewritten. It needs a credit
+        note, which is a human decision, so we return it untouched for
+        the caller to surface rather than silently diverging.
+
+    Returns the Invoice it synced, or None.
+    """
+    from .models import Invoice, InvoiceItem
+
+    if not order or not order.pk:
+        return None
+    inv = order.invoices.exclude(status="cancelled").order_by("-id").first()
+    if inv is None or inv.status == "draft" or inv.earsiv_uuid:
+        return None
+
+    qty_map = order.get_billable_line_quantities()
+    with transaction.atomic():
+        kept, line_no = [], 0
+        for it in order.items.all():
+            qty = qty_map.get(it.pk, it.quantity or Decimal("0"))
+            if not qty or qty <= 0:
+                continue
+            line_no += 1
+            row = InvoiceItem.objects.filter(invoice=inv, order_item=it).first()
+            if row:
+                row.line_no = line_no
+                row.quantity = qty
+                row.unit_price = it.price or Decimal("0")
+                row.description = _invoice_line_desc(it)
+                row.save()
+            else:
+                row = InvoiceItem.objects.create(
+                    invoice=inv, line_no=line_no,
+                    product=it.product,
+                    variant=getattr(it, "product_variant", None),
+                    order_item=it,
+                    description=_invoice_line_desc(it),
+                    quantity=qty,
+                    unit="mt",
+                    unit_price=it.price or Decimal("0"),
+                    discount_rate=Decimal("0"),
+                    tax_rate=Decimal("0"),
+                )
+            kept.append(row.pk)
+        # Lines deleted off the order come off the invoice too.
+        InvoiceItem.objects.filter(invoice=inv).exclude(pk__in=kept).delete()
+        inv.recompute_totals(save=True)
+        inv.refresh_from_db()
+        inv.resync_posted_movement()
+    return inv
+
+
 def create_invoice_for_order(order, *, user=None):
     """Auto-issue the sales invoice for a completed (shipped) order.
 
     Called from apply_order_status_change the moment an order enters a
     shipped status — the invoice is the paper trail of the completed
-    sale. Lines mirror the order items, but their QUANTITY is the
-    actually scanned/packed amount (order.get_billable_line_quantities()),
-    not the ordered quantity — packing and the order detail can genuinely
-    disagree (extra or short rolls scanned), and the invoice/cari must
-    bill reality, not the original request. 0% tax so the invoice total
-    equals order.billable_value(), i.e. exactly the receivable the
+    sale. Lines mirror the order items at their ORDERED quantity
+    (order.get_billable_line_quantities()), so the invoice, the cari and
+    the order screen all state the same number. 0% tax so the invoice
+    total equals order.billable_value(), i.e. exactly the receivable the
     order_sale movement already posted (issue() posts a 0-amount marker
-    for order-linked invoices — no double counting). A line whose
-    billable quantity is 0 (nothing scanned, e.g. it was dropped/never
-    packed) is skipped entirely rather than invoiced as zero.
+    for order-linked invoices — no double counting). A line ordered at 0
+    is skipped rather than invoiced as zero.
+
+    Stays in step afterwards via sync_invoice_for_order, which re-aligns
+    it whenever the order is edited.
 
     Idempotent: an order that already has a non-cancelled invoice is
     left alone (re-ship after un-ship creates a fresh one only because
@@ -391,29 +485,12 @@ def create_invoice_for_order(order, *, user=None):
             if not qty or qty <= 0:
                 continue
             line_no += 1
-            desc = ""
-            if getattr(it, "product_variant_id", None) and it.product_variant:
-                # Name the VARIANT, not just the base product — staff can't
-                # tell "2086 [KZL000344]" apart; "2086 — GÜMÜŞ A.BEYAZ
-                # [KZL000344]" they can. Same labeling as the order screens.
-                label = None
-                try:
-                    from operating.views import _order_item_variant_label
-                    label = _order_item_variant_label(it)
-                except Exception:
-                    label = None
-                title = (it.product.title or "") if getattr(it, "product_id", None) else ""
-                sku = it.product_variant.variant_sku or ""
-                base = f"{title} — {label}" if (title and label) else (label or title)
-                desc = f"{base} [{sku}]" if sku else base
-            elif getattr(it, "product_id", None) and it.product:
-                desc = it.product.title
             InvoiceItem.objects.create(
                 invoice=inv, line_no=line_no,
                 product=it.product,
                 variant=getattr(it, "product_variant", None),
                 order_item=it,
-                description=(desc or "Item")[:300],
+                description=_invoice_line_desc(it),
                 quantity=qty,
                 unit="mt",
                 unit_price=it.price or Decimal("0"),
@@ -452,16 +529,12 @@ def post_order_movement(order, *, member=None):
     invoice_sale; the customer's cari balance reflects pending orders
     even before a formal invoice is issued.
 
-    The amount is order.billable_value() — price × ACTUALLY SCANNED/
-    PACKED quantity per line (see Order.get_billable_line_quantities) —
-    not the ordered total. An order sitting there with items but nothing
-    scanned yet posts 0 and carries no receivable; the receivable grows
-    live as staff scan barcodes into packing, and reflects real
-    shortages/overages if what got scanned differs from what was
-    ordered. Called both by the OrderItem save signal (order edits) and
-    by every packing/reservation endpoint (scan add/update/remove/
-    assign-pack, consume/restore at ship/un-ship) so the cari tracks
-    packing in real time, not just order edits.
+    The amount is order.billable_value() — price × ORDERED quantity per
+    line (see Order.get_billable_line_quantities), i.e. the order total
+    the order screen shows, whatever the warehouse has or hasn't
+    scanned. Called both by the OrderItem save signal (order edits) and
+    by every packing/reservation endpoint, so the cari matches the order
+    from the moment it is saved.
 
     Idempotent: re-running after an edit updates the amount in place
     instead of creating a duplicate movement.
@@ -473,8 +546,7 @@ def post_order_movement(order, *, member=None):
     if not cari:
         return None
 
-    # Compute total from what was actually scanned/packed, not what was
-    # ordered — see Order.billable_value().
+    # The order total — see Order.billable_value().
     try:
         total = Decimal(str(order.billable_value() or 0))
     except Exception:
@@ -548,12 +620,15 @@ def reverse_order_movement(order):
 # movement plus an automatic cash collection for whatever a deposit
 # hasn't already covered — retail is paid at the counter, so the cari
 # balance nets to ~0 and the account reads as a retail revenue journal.
-# The same completion also writes an EquityRevenue row into the
-# "Perakende" accounting Book so the defter mirrors the sale.
+#
+# That cari IS the retail record — there is no second copy. Completion
+# used to also mirror the sale into a separate "Perakende" accounting
+# Book (EquityRevenue + its own till), which meant every walk-in sale
+# was written twice in two places that could and did drift apart. The
+# book, its till and its revenue rows were removed; read retail off the
+# PERAKENDE cari and its statement.
 # ---------------------------------------------------------------------------
 RETAIL_CARI_CODE = "PERAKENDE"
-RETAIL_BOOK_NAME = "Perakende"
-RETAIL_CASH_NAME = "Perakende Kasa"
 _RETAIL_AUTO_DESC = "Perakende otomatik tahsilat"
 
 
@@ -571,24 +646,6 @@ def get_or_create_retail_cari(member=None) -> CariAccount:
     )
 
 
-def _get_retail_book():
-    book = Book.objects.filter(name__iexact=RETAIL_BOOK_NAME).first()
-    if book:
-        return book
-    return Book.objects.create(name=RETAIL_BOOK_NAME)
-
-
-def _get_retail_cash_account(currency):
-    from accounting.models import CashAccount
-    book = _get_retail_book()
-    acc = CashAccount.objects.filter(book=book, name=RETAIL_CASH_NAME,
-                                     currency=currency).first()
-    if acc:
-        return acc
-    return CashAccount.objects.create(book=book, name=RETAIL_CASH_NAME,
-                                      currency=currency, balance=0)
-
-
 def _order_confirmed_collections(order, cari):
     """Sum of confirmed collections already tagged to this order on the
     retail cari (deposits + a possibly-existing auto collection)."""
@@ -604,18 +661,18 @@ def post_retail_order_financials(order, user=None):
     """Idempotent completion posting for a retail order:
       1. attach the shared retail cari + post the order_sale movement;
       2. auto-collect the not-yet-collected remainder (cash, no
-         cash_account — physical cash is tracked by the defter side);
-      3. mirror the sale into the Perakende Book as EquityRevenue
-         (+ CashTransactionEntry + till balance via the standard
-         handle_equity_transaction machinery).
+         cash_account — the counter till is not modelled separately).
     Safe to re-run (re-ship after un-ship): each leg checks its own
     marker before writing."""
     from .models import Payment
     from .views_payment import _next_payment_number
-    from accounting.models import EquityRevenue
 
     member = getattr(user, "member", None) if user else None
-    total = Decimal(str(order.total_value() or 0))
+    # Collect exactly what the sale leg debited. Both are the order
+    # total now, so the two net to zero by construction; reading a
+    # different figure here is what once parked a phantom -75.00 "we owe
+    # the customer" on the shared retail cari.
+    total = Decimal(str(order.billable_value() or 0))
     if total <= 0:
         return
 
@@ -642,28 +699,12 @@ def post_retail_order_financials(order, user=None):
         )
         pay.confirm(user=user)
 
-    # ── defter (Perakende Book) mirror ───────────────────────────
-    retail_book = _get_retail_book()
-    if not EquityRevenue.objects.filter(order=order, book=retail_book).exists():
-        cash_acc = _get_retail_cash_account(currency)
-        rev = EquityRevenue.objects.create(
-            book=retail_book, cash_account=cash_acc, currency=currency,
-            amount=total, date=date.today(),
-            description=f"Perakende satış — Sipariş #{order.pk}",
-            order=order, revenue_type="sales",
-        )
-        from accounting.views import handle_equity_transaction
-        handle_equity_transaction(retail_book, total, currency, rev, rev.pk, cash_acc)
-
 
 def reverse_retail_order_financials(order, user=None):
     """Undo post_retail_order_financials when a retail order leaves the
-    shipped state (un-ship / cancel): remove the sale movement, cancel
-    the AUTO collection (manual deposits are left alone), and reverse
-    the defter revenue + till cash."""
+    shipped state (un-ship / cancel): remove the sale movement and
+    cancel the AUTO collection (manual deposits are left alone)."""
     from .models import Payment
-    from accounting.models import EquityRevenue, CashAccount, CashTransactionEntry
-    from django.db.models import F as _F
 
     reverse_order_movement(order)
 
@@ -675,17 +716,3 @@ def reverse_retail_order_financials(order, user=None):
                 notes=f"ORD-{order.pk}",
                 description__startswith=_RETAIL_AUTO_DESC):
             pay.cancel(user=user, reason="Sipariş sevk iptali")
-
-    retail_book = Book.objects.filter(name__iexact=RETAIL_BOOK_NAME).first()
-    if retail_book:
-        for rev in EquityRevenue.objects.filter(order=order, book=retail_book):
-            # Pull the cash back out of the till + drop the ledger rows.
-            # queryset.update bypasses CashAccount.clean's >=0 guard on
-            # purpose: the reversal must post even if the till was
-            # drained by other entries in the meantime.
-            CashAccount.objects.filter(pk=rev.cash_account_id).update(
-                balance=_F("balance") - rev.amount)
-            ct = ContentType.objects.get_for_model(EquityRevenue)
-            CashTransactionEntry.objects.filter(
-                book=retail_book, content_type=ct, content_pk=rev.pk).delete()
-            rev.delete()

@@ -279,15 +279,22 @@ def sync_catalog_stock_on_order_status_change(sender, instance, created, **kwarg
 @receiver([post_save, post_delete], sender=OrderItem)
 def sync_order_cari_movement(sender, instance, **kwargs):
     """Whenever an OrderItem changes (qty/price/add/remove), keep the
-    linked cari movement amount in sync so the customer's balance
-    reflects the latest order total in real time — regardless of which
-    view did the save."""
+    linked cari movement AND the order's live invoice in sync so the
+    customer's balance and their invoice both reflect the latest order
+    total in real time — regardless of which view did the save.
+
+    The invoice half matters because it used to be cut once and never
+    revisited: an edit moved the cari but left the invoice on the old
+    figure, so the two documents disagreed with nothing flagging it."""
     order = instance.order
     if not getattr(order, "cari_id", None):
         return
     try:
-        from accounting.services_accounts import post_order_movement
+        from accounting.services_accounts import (
+            post_order_movement, sync_invoice_for_order,
+        )
         post_order_movement(order)
+        sync_invoice_for_order(order)
     except Exception:
         # Don't let cari sync break order edits. Errors here surface in
         # the order's "Open cari" view instead.

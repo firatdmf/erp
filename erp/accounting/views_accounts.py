@@ -435,6 +435,33 @@ def _attach_links(rows):
 # ---------------------------------------------------------------------------
 # Detail
 # ---------------------------------------------------------------------------
+class RetailCariRedirect(View):
+    """Jump to the shared walk-in sales account.
+
+    Retail used to have a defter of its own (a "Perakende" Book with its
+    own till and EquityRevenue rows) alongside this cari, which recorded
+    every walk-in sale twice in two places that drifted apart. The book
+    is gone; the PERAKENDE cari is the single retail record, so the
+    nav's "Perakende Satışları" entry lands here.
+
+    Resolved by code rather than a hardcoded pk because each brand runs
+    its own schema — cari 17 on demfirat is not cari 17 on belino.
+    """
+
+    def get(self, request):
+        from accounting.services_accounts import (
+            RETAIL_CARI_CODE, get_or_create_retail_cari,
+        )
+
+        cari = CariAccount.objects.filter(code=RETAIL_CARI_CODE).first()
+        if not cari:
+            # Nothing sold at the counter yet — create the account so the
+            # link never dead-ends on a fresh install.
+            cari = get_or_create_retail_cari(
+                member=getattr(request.user, "member", None))
+        return redirect("accounts:detail", pk=cari.pk)
+
+
 class CariDetail(View):
     template_name = "accounts/cari_detail.html"
 

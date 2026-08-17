@@ -483,13 +483,22 @@
               <div class="ord-cust-n">{{ order.web_client.name|default:order.web_client.username }}</div>
               <div class="ord-cust-c">{% trans "Web customer" %}</div>
             </div>
-          {% elif order.is_guest_order %}
+          {% elif order.is_retail_order or order.is_guest_order %}
+            {% comment %}
+              A walk-in has no contact/company/web_client, so without this
+              branch it fell through to "Unassigned" — which read as an
+              order nobody had attached a customer to. It IS attached: to
+              the shared PERAKENDE cari every retail sale posts to. Only
+              the older retail orders carry a guest name, so name the
+              account when there isn't one.
+            {% endcomment %}
             <div class="ord-cust-avatar" style="background: #9F1239;">
               {% if order.guest_first_name %}{{ order.guest_first_name|slice:":2"|upper }}{% else %}PK{% endif %}
             </div>
             <div>
-              <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name }} {{ order.guest_last_name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
-              <div class="ord-cust-c">{% trans "Perakende" %}</div>
+              {# default_if_none, not a bare render: "Tamer Bulgaristan None". #}
+              <div class="ord-cust-n">{% if order.guest_first_name or order.guest_last_name %}{{ order.guest_first_name|default_if_none:"" }} {{ order.guest_last_name|default_if_none:"" }}{% elif order.cari %}{{ order.cari.name }}{% else %}{% trans "Retail customer" %}{% endif %}</div>
+              <div class="ord-cust-c">{% trans "Perakende" %}{% if order.cari %} · {{ order.cari.code }}{% endif %}</div>
             </div>
           {% else %}
             <div class="ord-cust-avatar" style="background: #9CA3AF;">—</div>

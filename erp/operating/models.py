@@ -588,41 +588,75 @@ class Order(models.Model):
         return result
 
     def get_billable_line_quantities(self):
-        """What each line bills, honouring the ship-time freeze.
+        """What each line bills: its ORDERED quantity, always.
 
-        For a shipped order this replays billed_line_quantities instead
-        of re-deriving anything, so a warehouse receipt booked next month
-        can't retroactively change what a customer was charged. Lines
-        added AFTER the freeze (an edit on a shipped order) aren't in the
-        map and fall through to the live computation — they have no
-        frozen truth to replay.
+        The customer's account and their invoice must show the order
+        total, whether or not the goods were scanned, packed or tracked
+        in a warehouse at all. Billing therefore reads the order and
+        nothing else — the same number the order screen prints — so the
+        three can never disagree.
+
+        This deliberately replaces billing off scanned metres. That rule
+        (bill only what was packed) meant an order shipped without
+        scanning billed nothing at all: order #145 showed a 116.80 total
+        while 75.00 of it would never reach the cari, and the gap was
+        invisible on every screen. Under-scanning is a warehouse problem
+        to surface — see scan_shortfall() and the warning it drives on
+        the order page — not a silent discount.
+
+        compute_billable_line_quantities() still derives the scanned
+        picture and freeze_billable_quantities() still records it at
+        ship; neither decides money any more.
 
         Returns {order_item_id: Decimal}.
         """
-        from decimal import Decimal, InvalidOperation
+        from decimal import Decimal
+        return {it.pk: (it.quantity or Decimal("0")) for it in self.items.all()}
 
-        frozen = self.billed_line_quantities
-        if not frozen:
-            return self.compute_billable_line_quantities()
+    def scan_shortfall(self):
+        """Ordered minus actually-scanned value, for lines that COULD be
+        scanned. Zero when everything is covered (or nothing is
+        warehouse-tracked). Drives the order page's warning — billing
+        itself ignores it, by design; see
+        get_billable_line_quantities().
 
-        live = None
-        result = {}
-        for it in self.items.all():
-            raw = frozen.get(str(it.pk))
-            if raw is None:
-                if live is None:
-                    live = self.compute_billable_line_quantities()
-                result[it.pk] = live.get(it.pk, Decimal("0"))
-                continue
+        Returns (shortfall_amount, [(item, ordered_qty, scanned_qty)]).
+        """
+        from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
+        items = list(self.items.all().select_related("product", "product_variant"))
+        if not items:
+            return Decimal("0.00"), []
+        # A shipped order is judged on what was scanned ON ITS SHIP DAY,
+        # not on today's warehouse. Re-deriving live said order #241 was
+        # 177.80 short when its real ship-day gap was 2.80 — the rolls it
+        # consumed have since moved on.
+        scanned_map = None
+        if self.billed_line_quantities:
             try:
-                result[it.pk] = Decimal(str(raw))
+                scanned_map = {
+                    it.pk: Decimal(str(self.billed_line_quantities[str(it.pk)]))
+                    for it in items if str(it.pk) in self.billed_line_quantities
+                }
             except (InvalidOperation, TypeError, ValueError):
-                # A corrupt entry must not silently bill 0 — fall back to
-                # the live figure rather than wipe the line.
-                if live is None:
-                    live = self.compute_billable_line_quantities()
-                result[it.pk] = live.get(it.pk, Decimal("0"))
-        return result
+                scanned_map = None
+        if scanned_map is None:
+            scanned_map = self.compute_billable_line_quantities()
+        tracked_map = self.classify_items_by_tracking(items)
+
+        short_total = Decimal("0.00")
+        rows = []
+        for it in items:
+            if not tracked_map.get(it.pk):
+                continue
+            ordered = it.quantity or Decimal("0")
+            got = scanned_map.get(it.pk, Decimal("0"))
+            if got >= ordered:
+                continue
+            gap = (ordered - got) * (it.price or Decimal("0"))
+            short_total += gap.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            rows.append((it, ordered, got))
+        return short_total, rows
 
     def freeze_billable_quantities(self, save=True):
         """Capture what every line bills, right now. Called at ship time
@@ -721,9 +755,12 @@ class Order(models.Model):
         return result
 
     def billable_value(self):
-        """The amount that should reflect on the cari/invoice — price ×
-        billable (scanned) quantity per line, summed. See
-        get_billable_line_quantities() for exactly what counts."""
+        """The amount that reflects on the cari/invoice — price × ORDERED
+        quantity per line, summed. Equals total_value() by construction:
+        the account, the invoice and the order screen all show the one
+        number. Kept as its own method because every money caller reads
+        it, so the rule has a single documented home. See
+        get_billable_line_quantities()."""
         from decimal import Decimal, ROUND_HALF_UP
         qmap = self.get_billable_line_quantities()
         total = Decimal("0.00")

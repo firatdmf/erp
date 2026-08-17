@@ -340,7 +340,10 @@
   }
   .od-prods th.num, .od-prods td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .od-prods tr:last-child td { border-bottom: none; }
-  .od-prods .mono { font: 500 11.5px var(--font-mono); color: var(--gray-600); }
+  /* Same overflow trap as .od-variant-name below: SKUs are unbroken
+     tokens ("ÇEŞTEPEDOSSE") that outrun the fixed 90px SKU column. */
+  .od-prods .mono { font: 500 11.5px var(--font-mono); color: var(--gray-600);
+    overflow-wrap: anywhere; }
 
   /* Fixed column widths so every editable cell (Qty / Price / Cost /
      Amount) stays the same size — without this the table-auto layout
@@ -532,8 +535,16 @@
   .od-top-pill .tag.cut { color: #475569; background: #F1F5F9; }
   .od-top-pill .tag.pack { color: #005354; background: #E5F1F0; }
   .od-tops-none { font: 500 11px var(--font-sans); color: #94A3B8; }
-  .od-variant-name { font: 600 12.5px var(--font-sans); color: #0F1419; line-height: 1.3; }
-  .od-variant-sku { display: inline-block; margin-top: 2px; font-size: 10.5px; color: #94A3B8; }
+  /* Variant labels come from free text staff type — warehouse product
+     names or attribute values — and are routinely joined with + and _
+     rather than spaces ("mirle_gümüş+lale+gülkurusu"). CSS sees one
+     unbreakable word, and since the Variant column is a fixed 105px
+     under table-layout:fixed, it painted straight over Qty and Price.
+     `anywhere` lets the break land mid-token so the label stays boxed. */
+  .od-variant-name { font: 600 12.5px var(--font-sans); color: #0F1419; line-height: 1.3;
+    overflow-wrap: anywhere; }
+  .od-variant-sku { display: inline-block; margin-top: 2px; font-size: 10.5px; color: #94A3B8;
+    overflow-wrap: anywhere; }
   .od-num-val { font: 700 13px var(--font-sans); font-variant-numeric: tabular-nums; color: #0F1419; }
   .od-untracked-note { display: inline-flex; align-items: center; gap: 6px;
     font: 600 10.5px var(--font-sans); color: #64748B; background: #F4F7FB;
@@ -1266,6 +1277,32 @@
             <span>{% trans "Grand total" %}</span>
             <span data-order-total>${{ order.total_value|floatformat:2 }}</span>
           </div>
+          {% if scan_shortfall %}
+          {% comment %}
+            The account and the invoice always bill the ordered quantity,
+            so this changes no money — it only says the warehouse has not
+            covered the whole order yet. Silent before: an order could
+            ship with nothing scanned and no screen ever mentioned it.
+          {% endcomment %}
+          <div class="od-tot-row" style="margin-top:6px; padding:8px 10px; background:#FFFBEB;
+                      border:1px dashed #FDE68A; border-radius:8px; color:#92400E; align-items:flex-start;">
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <i class="fa fa-triangle-exclamation" style="font-size:10px; opacity:.7;"></i>
+              {% if LANGUAGE_CODE|slice:":2" == "tr" %}Okutulmamış miktar{% else %}Not yet scanned{% endif %}
+            </span>
+            <span style="text-align:right;">
+              <span style="font-weight:700;">${{ scan_shortfall|floatformat:2 }}</span>
+              <span style="display:block; font-weight:500; font-size:10.5px; opacity:.85;">
+                {% if LANGUAGE_CODE|slice:":2" == "tr" %}Tamamı yine de faturalanır{% else %}Billed in full regardless{% endif %}
+              </span>
+              {% for it, ordered, got in scan_shortfall_rows %}
+              <span style="display:block; font-weight:500; font-size:10.5px; opacity:.75;">
+                {{ it.product.title|default:"—"|truncatechars:26 }}: {{ got|floatformat:"-2" }} / {{ ordered|floatformat:"-2" }} m
+              </span>
+              {% endfor %}
+            </span>
+          </div>
+          {% endif %}
           {% if total_scanned_count %}
           <div class="od-tot-row" style="color:#005354;">
             <span><i class="fa fa-layer-group" style="font-size:10px; opacity:.7;"></i> {% if LANGUAGE_CODE|slice:":2" == "tr" %}Toplam okutulan{% else %}Total scanned{% endif %}</span>

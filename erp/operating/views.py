@@ -289,6 +289,12 @@ class OrderDetail(DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        # Billing follows the ORDERED quantity, so a line nobody scanned
+        # still charges in full — correct, but worth saying out loud.
+        # Surfaces as a warning on the totals block; it changes no money.
+        short_amount, short_rows = self.object.scan_shortfall()
+        ctx["scan_shortfall"] = short_amount
+        ctx["scan_shortfall_rows"] = short_rows
         # Attach available-stock metadata to each item so the template
         # can show "Stok: N" next to the qty input and compute the max
         # the user can bump it to (current qty + remaining stock).
@@ -2639,10 +2645,11 @@ class OrderList(ListView):
         # `items__product` and `items__product_variant` are needed because
         # the gross_profit() helper reads cost from those — without
         # prefetching, each order row would fire two extra queries per
-        # line item.
+        # line item. `cari` joins for the same reason: the customer cell
+        # names the account a retail order posts to.
         return (
             Order.objects
-            .select_related('contact', 'company', 'web_client')
+            .select_related('contact', 'company', 'web_client', 'cari')
             .prefetch_related('items__product', 'items__product_variant')
             .order_by("-created_at")
         )

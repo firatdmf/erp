@@ -162,6 +162,12 @@
       </div>
     </div>
     <div class="pd-head-r">
+      {% if payment.status != 'cancelled' %}
+        <a href="{% url 'accounts:payment_edit' payment.pk %}" class="pd-btn ghost"
+           {% if payment.status == 'confirmed' %}onclick="return confirm('{% trans "This payment is already confirmed. Editing reposts the account movement, the cash balance and the invoices it touches. Continue?" %}');"{% endif %}>
+          <i data-lucide="edit-3"></i> {% trans "Edit" %}
+        </a>
+      {% endif %}
       {% if payment.status == 'draft' %}
         <form method="post" action="{% url 'accounts:payment_confirm' payment.pk %}" class="pd-inline-form">
           {% csrf_token %}

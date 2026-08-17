@@ -288,7 +288,8 @@
             {% for o in recent_orders %}
             <tr>
               <td>
-                <a class="invno" href="{% url 'operating:order_detail' o.pk %}">
+                <a class="invno" href="{% url 'operating:order_detail' o.pk %}"
+                   target="_blank" rel="noopener">
                   {% if o.order_number %}{{ o.order_number }}{% else %}#{{ o.pk }}{% endif %}
                 </a>
               </td>

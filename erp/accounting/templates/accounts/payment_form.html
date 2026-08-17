@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load l10n %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -137,6 +138,10 @@
   .pf-sum .row.grand .lbl { color: var(--ink); font-weight: 800; font-size: 13.5px; }
   .pf-sum .row.grand .val { font: 800 18px var(--font-sans); color: var(--ink); }
 
+  /* Editing something already posted — say what saving will move */
+  .pf-warn { display:flex; align-items:center; gap: 9px; margin-bottom: 18px; padding: 11px 15px; background: #FFFAF0; border: 1px solid #FED7AA; border-radius: 10px; font: 500 12.5px var(--font-sans); color: #92400E; }
+  .pf-warn i { width: 15px; height: 15px; flex-shrink: 0; }
+
   .pf-actions { display:flex; flex-direction: column; gap: 8px; margin-top: 18px; }
   .pf-actions .pf-btn { justify-content: center; width: 100%; }
 </style>
@@ -146,16 +151,32 @@
 {% get_current_language as LANGUAGE_CODE %}
 <div class="pf">
 
+  {% if payment %}
+  <a class="pf-back" href="{% url 'accounts:payment_detail' payment.pk %}">
+    <i data-lucide="arrow-left"></i> {{ payment.number }}
+  </a>
+  {% else %}
   <a class="pf-back" href="{% url 'accounts:payment_list' %}">
     <i data-lucide="arrow-left"></i> {% trans "Payments" %}
   </a>
+  {% endif %}
 
   <div class="pf-head">
     <div>
-      <div class="pf-eyebrow">{% trans "Create" %}</div>
-      <h1 class="pf-title">{% trans "New Collection / Payment" %}</h1>
+      <div class="pf-eyebrow">{% if payment %}{% trans "Edit" %}{% else %}{% trans "Create" %}{% endif %}</div>
+      <h1 class="pf-title">
+        {% if payment %}{% blocktrans with number=payment.number %}Edit {{ number }}{% endblocktrans %}
+        {% else %}{% trans "New Collection / Payment" %}{% endif %}
+      </h1>
     </div>
   </div>
+
+  {% if payment.status == 'confirmed' %}
+  <div class="pf-warn">
+    <i data-lucide="alert-triangle"></i>
+    {% trans "This payment is already confirmed. Saving reposts it: the account movement, the cash balance and every invoice it touches are updated to match." %}
+  </div>
+  {% endif %}
 
   <form id="paymentForm" method="post">
     {% csrf_token %}
@@ -180,7 +201,7 @@
               <span class="code">{{ prefilled_cari.code }}</span>
               <span class="name">{{ prefilled_cari.name }}</span>
               <span class="balance">· {% trans "Balance:" %} {{ prefilled_cari.display_currency_symbol }}{{ prefilled_cari.absolute_balance|floatformat:2|intcomma }} ({{ prefilled_cari.balance_label }})</span>
-              <a href="{% url 'accounts:payment_create' %}" class="change">{% trans "change" %}</a>
+              {% if not payment %}<a href="{% url 'accounts:payment_create' %}" class="change">{% trans "change" %}</a>{% endif %}
             </div>
             {% else %}
             <div class="pf-row wide" style="margin-bottom: 14px;">
@@ -199,30 +220,33 @@
               <div class="pf-f">
                 <label>{% trans "Type" %}</label>
                 <select name="type" id="paymentType">
-                  {% for v,l in type_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+                  {% for v,l in type_choices %}<option value="{{ v }}" {% if payment and payment.type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
                 </select>
               </div>
               <div class="pf-f">
                 <label>{% trans "Method" %}</label>
                 <select name="method">
-                  {% for v,l in method_choices %}<option value="{{ v }}" {% if v == 'bank_transfer' %}selected{% endif %}>{{ l }}</option>{% endfor %}
+                  {% for v,l in method_choices %}<option value="{{ v }}" {% if payment %}{% if payment.method == v %}selected{% endif %}{% elif v == 'bank_transfer' %}selected{% endif %}>{{ l }}</option>{% endfor %}
                 </select>
               </div>
               <div class="pf-f">
                 <label>{% trans "Date" %}</label>
-                <input type="date" name="date" id="paymentDate" required>
+                <input type="date" name="date" id="paymentDate" value="{{ payment.date|date:'Y-m-d' }}" required>
               </div>
             </div>
 
             <div class="pf-row">
               <div class="pf-f">
                 <label>{% trans "Amount" %}</label>
-                <input type="number" step="0.01" name="amount" id="paymentAmount" required min="0.01" placeholder="{{ 0|floatformat:2 }}">
+                {# unlocalized: a number input only accepts a dot decimal, never 1234,56 #}
+                <input type="number" step="0.01" name="amount" id="paymentAmount" required min="0.01"
+                       value="{% if payment %}{{ payment.amount|unlocalize }}{% endif %}"
+                       placeholder="{{ 0|floatformat:2 }}">
               </div>
               <div class="pf-f">
                 <label>{% trans "Currency" %}</label>
                 <select name="currency">
-                  {% for c in currencies %}<option value="{{ c.id }}" {% if prefilled_cari and prefilled_cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
+                  {% for c in currencies %}<option value="{{ c.id }}" {% if payment %}{% if payment.currency_id == c.id %}selected{% endif %}{% elif prefilled_cari and prefilled_cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
                 </select>
               </div>
               <div class="pf-f">
@@ -230,7 +254,7 @@
                 <select name="cash_account">
                   <option value="">{% trans "— Select (optional) —" %}</option>
                   {% for ca in cash_accounts %}
-                    <option value="{{ ca.id }}">{{ ca.name }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
+                    <option value="{{ ca.id }}" {% if payment and payment.cash_account_id == ca.id %}selected{% endif %}>{{ ca.name }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
                   {% endfor %}
                 </select>
               </div>
@@ -239,7 +263,7 @@
             <div class="pf-row wide">
               <div class="pf-f">
                 <label>{% trans "Description" %}</label>
-                <input type="text" name="description" maxlength="300" placeholder="{% trans 'What is this payment / collection about?' %}">
+                <input type="text" name="description" maxlength="300" value="{{ payment.description|default:'' }}" placeholder="{% trans 'What is this payment / collection about?' %}">
               </div>
             </div>
           </div>
@@ -304,7 +328,7 @@
             </div>
             <div class="pf-row wide">
               <div class="pf-f">
-                <textarea name="notes" placeholder="{% trans 'Internal note about this payment...' %}"></textarea>
+                <textarea name="notes" placeholder="{% trans 'Internal note about this payment...' %}">{{ payment.notes|default:'' }}</textarea>
               </div>
             </div>
           </div>
@@ -326,13 +350,20 @@
             </div>
 
             <div class="pf-actions">
+              {% if payment.status == 'confirmed' %}
+              {# Already posted — the only move left is saving the changes back. #}
+              <button type="submit" class="pf-btn primary">
+                <i data-lucide="save"></i> {% trans "Save Changes" %}
+              </button>
+              {% else %}
               <button type="submit" class="pf-btn confirm" name="auto_confirm" value="1">
                 <i data-lucide="check-circle"></i> {% trans "Save & Confirm" %}
               </button>
               <button type="submit" class="pf-btn primary">
                 <i data-lucide="save"></i> {% trans "Save as Draft" %}
               </button>
-              <a href="{% url 'accounts:payment_list' %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+              {% endif %}
+              <a href="{% if payment %}{% url 'accounts:payment_detail' payment.pk %}{% else %}{% url 'accounts:payment_list' %}{% endif %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
             </div>
           </div>
         </div>
@@ -366,18 +397,21 @@
     if (emptyMsg) emptyMsg.style.display = 'none';
     if (invTable) invTable.style.display = '';
     openInvoices.forEach((inv, i) => {
+      // `applied` is what this payment already puts on the invoice (edit
+      // mode only) — the row opens ticked and filled with that amount.
+      const applied = parseFloat(inv.applied) || 0;
       const tr = document.createElement('tr');
       tr.dataset.invId = inv.id;
       tr.dataset.balance = inv.balance;
       tr.innerHTML = `
-        <td><input type="checkbox" class="inv-check" data-i="${i}"></td>
+        <td><input type="checkbox" class="inv-check" data-i="${i}" ${applied > 0 ? 'checked' : ''}></td>
         <td><span class="pf-inv-num">${inv.label}</span></td>
         <td>${inv.date}</td>
         <td>${inv.due_date}</td>
         <td><span class="pf-inv-type">${inv.type}</span></td>
         <td class="amt">${fmt(inv.total)} ${inv.currency}</td>
         <td class="amt"><span class="pf-inv-bal">${fmt(inv.balance)}</span></td>
-        <td class="amt"><input type="number" step="0.01" min="0" max="${inv.balance}" class="inv-alloc" data-i="${i}" placeholder="${fmt(0)}"></td>
+        <td class="amt"><input type="number" step="0.01" min="0" max="${inv.balance}" class="inv-alloc" data-i="${i}" value="${applied > 0 ? applied.toFixed(2) : ''}" placeholder="${fmt(0)}"></td>
       `;
       invBody.appendChild(tr);
     });

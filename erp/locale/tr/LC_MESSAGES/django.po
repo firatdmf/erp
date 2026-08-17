@@ -8489,3 +8489,26 @@ msgstr "Barkodla top ekle"
 
 msgid "Loading rolls…"
 msgstr "Toplar yükleniyor…"
+
+msgid "Edit %(number)s"
+msgstr "%(number)s Düzenle"
+
+msgid ""
+"This payment is already confirmed. Saving reposts it: the account movement, "
+"the cash balance and every invoice it touches are updated to match."
+msgstr ""
+"Bu ödeme onaylanmış durumda. Kaydettiğinizde yeniden işlenir: cari hareketi, "
+"kasa bakiyesi ve ilişkili tüm faturalar yeni değerlere göre güncellenir."
+
+msgid ""
+"This payment is already confirmed. Editing reposts the account movement, the "
+"cash balance and the invoices it touches. Continue?"
+msgstr ""
+"Bu ödeme onaylanmış durumda. Düzenlemek cari hareketini, kasa bakiyesini ve "
+"ilişkili faturaları yeniden işler. Devam edilsin mi?"
+
+msgid "Cancelled payments can't be edited. Create a new one if needed."
+msgstr "İptal edilmiş ödemeler düzenlenemez. Gerekiyorsa yeni bir ödeme oluşturun."
+
+msgid "Payment updated: %(number)s"
+msgstr "Ödeme güncellendi: %(number)s"

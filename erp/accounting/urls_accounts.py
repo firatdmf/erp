@@ -60,6 +60,7 @@ urlpatterns = [
     path("payments/",                    views_payment.PaymentList.as_view(),    name="payment_list"),
     path("payments/new/",                views_payment.PaymentCreate.as_view(),  name="payment_create"),
     path("payments/<int:pk>/",           views_payment.PaymentDetail.as_view(),  name="payment_detail"),
+    path("payments/<int:pk>/edit/",      views_payment.PaymentEdit.as_view(),    name="payment_edit"),
     path("payments/<int:pk>/confirm/",   views_payment.PaymentConfirm.as_view(), name="payment_confirm"),
     path("payments/<int:pk>/cancel/",    views_payment.PaymentCancel.as_view(),  name="payment_cancel"),
     path("payments/<int:pk>/delete/",    views_payment.PaymentDelete.as_view(),  name="payment_delete"),

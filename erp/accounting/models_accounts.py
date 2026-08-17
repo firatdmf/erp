@@ -1052,6 +1052,74 @@ class Payment(models.Model):
 
         return movement
 
+    def resync_posted_movement(self, user=None):
+        """Refresh the ledger row after an edit to an already-confirmed payment.
+
+        The SAME CariMovement is updated in place — never delete+recreate,
+        because `posted_movement`, the statement and the legacy AR/AP
+        mirror all reference it by id. Draft payments have posted nothing
+        yet and cancelled ones are terminal, so both are no-ops.
+
+        If `posted_movement` is somehow missing on a confirmed payment
+        (confirm() always sets it in the same transaction, so this should
+        not happen), post a fresh one rather than silently leaving the
+        cari balance stale.
+        """
+        if self.status != "confirmed":
+            return None
+
+        amount = self.amount * Decimal(self.ledger_sign)
+        description = f"{self.get_type_display()} — {self.number}"
+
+        mv = self.posted_movement
+        if mv is None:
+            mv = CariMovement.objects.create(
+                cari=self.cari,
+                book=self.book,
+                date=self.date,
+                amount=amount,
+                currency=self.currency,
+                movement_type=self.movement_type,
+                description=description,
+                reference=self.number,
+                source_type=ContentType.objects.get_for_model(Payment),
+                source_id=self.pk,
+                created_by=user.member if user and hasattr(user, "member") else None,
+            )
+            self.posted_movement = mv
+            self.save(update_fields=["posted_movement", "updated_at"])
+            return mv
+
+        # Changing the type flips the ledger sign, which moves the row from
+        # the receivable side of the legacy mirror to the payable side (or
+        # back). Drop the row it used to mirror into first — the post_save
+        # mirror only ever writes the side that matches the new sign, so
+        # the old one would otherwise linger forever.
+        if (mv.amount > 0) != (amount > 0):
+            self._drop_legacy_mirror(mv)
+
+        mv.amount = amount
+        mv.amount_base = Decimal("0")   # force recompute on save
+        mv.date = self.date
+        mv.currency = self.currency
+        mv.movement_type = self.movement_type
+        mv.description = description
+        mv.reference = self.number
+        mv.save()   # CariMovement.save() already calls recompute_balance
+        return mv
+
+    @staticmethod
+    def _drop_legacy_mirror(mv):
+        """Delete the legacy AR/AP row this movement mirrors into and clear
+        the back-references, so the caller's mv.save() re-mirrors clean."""
+        from accounting.models import AssetAccountsReceivable, LiabilityAccountsPayable
+        if mv.legacy_ar_id:
+            AssetAccountsReceivable.objects.filter(pk=mv.legacy_ar_id).delete()
+        if mv.legacy_ap_id:
+            LiabilityAccountsPayable.objects.filter(pk=mv.legacy_ap_id).delete()
+        mv.legacy_ar_id = None
+        mv.legacy_ap_id = None
+
     def cancel(self, user=None, reason=""):
         """Cancel a confirmed payment. Reverses CariMovement, cash, and invoice allocations."""
         if self.status == "cancelled":

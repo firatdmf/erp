@@ -875,22 +875,39 @@ def _match_roll_to_order(roll, items, variant_ids, product_ids, skus):
     return None
 
 
-def _roll_available_meters(roll, exclude_reservation_id=None):
+def _roll_available_meters(roll, exclude_reservation_id=None, exclude_order_id=None):
     """Physical metres on the roll minus what OTHER active reservations
-    already hold — the ceiling so a roll can't be over-committed."""
+    already hold — the ceiling so a roll can't be over-committed.
+
+    `exclude_order_id` drops one order's own holds from that subtraction.
+    The edit form needs it: a top this order already reserved is not
+    competition for itself, and counting it made an unticked top read as
+    "reserved by #276" to the very form editing #276 — so it could never
+    be re-picked. What the order finally holds is decided by the save's
+    reconcile, not by these read-only availability lookups.
+    """
     from .models import OrderRollReservation
     from django.db.models import Sum
     phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
     phys = phys or _PDecimal("0")
-    other = (OrderRollReservation.objects
-             .filter(roll=roll, consumed=False)
-             .exclude(pk=exclude_reservation_id)
-             .aggregate(s=Sum("meters"))["s"] or _PDecimal("0"))
+    qs = OrderRollReservation.objects.filter(roll=roll, consumed=False)
+    if exclude_reservation_id is not None:
+        qs = qs.exclude(pk=exclude_reservation_id)
+    if exclude_order_id is not None:
+        qs = qs.exclude(order_id=exclude_order_id)
+    other = qs.aggregate(s=Sum("meters"))["s"] or _PDecimal("0")
     avail = phys - other
     return avail if avail > 0 else _PDecimal("0")
 
 
-def _roll_unavailable_response(roll):
+def _editing_order_id(request):
+    """The order an availability lookup is being made ON BEHALF OF, from
+    the edit sidebar's `?order=` — its own holds don't block it."""
+    raw = (request.GET.get("order") or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def _roll_unavailable_response(roll, exclude_order_id=None):
     """JSON error for a roll with no reservable metres — says WHY: a
     physically-empty roll and a roll fully held by other orders' active
     reservations are different problems for the staff scanning it, so
@@ -900,8 +917,10 @@ def _roll_unavailable_response(roll):
     phys = phys or _PDecimal("0")
     if phys > 0:
         refs = []
-        for h in (OrderRollReservation.objects
-                  .filter(roll=roll, consumed=False).select_related("order")):
+        holds = OrderRollReservation.objects.filter(roll=roll, consumed=False)
+        if exclude_order_id is not None:
+            holds = holds.exclude(order_id=exclude_order_id)
+        for h in holds.select_related("order"):
             ref = (getattr(h.order, "order_number", None) or f"#{h.order_id}")
             if ref not in refs:
                 refs.append(ref)
@@ -990,6 +1009,42 @@ def _create_roll_reservation(order, order_item, roll, req_meters, user):
             created_by=user if (user and getattr(user, "is_authenticated", False)) else None,
         )
     return r, capped, None
+
+
+def _order_edit_release_unticked(order, items_payload):
+    """Release, across the WHOLE order, every unconsumed hold whose top
+    was unticked in the submission — before any line reserves anything.
+
+    Order matters. The per-line reconcile below releases at the end, so a
+    top moved from line A to line B in one save would try to reserve for B
+    while A still held it, see nothing available, and drop the pick. Doing
+    all the releases first makes the freed metres visible to the adds.
+
+    Only lines actually present in the submission are considered, and only
+    tops with a barcode — a hold with no barcode on its roll can't be
+    matched against the form's selection either way, so it is left alone
+    rather than silently released.
+    """
+    from .models import OrderRollReservation
+    submitted = {}
+    for item_data in items_payload:
+        raw_id = item_data.get("item_id")
+        if not raw_id:
+            continue
+        keys = set()
+        for roll_data in (item_data.get("rolls") or []):
+            bc = (roll_data.get("barcode") or "").strip().lower()
+            if bc:
+                keys.add(bc)
+        submitted[int(raw_id)] = keys
+    if not submitted:
+        return
+    for r in (OrderRollReservation.objects
+              .filter(order=order, consumed=False, order_item_id__in=submitted)
+              .select_related("roll")):
+        bc = ((r.roll.barcode or "").strip().lower() if r.roll else "")
+        if bc and bc not in submitted[r.order_item_id]:
+            r.delete()
 
 
 def _order_edit_reserve_rolls(order, order_item, rolls_data, user, failed_barcodes):
@@ -1366,9 +1421,10 @@ def order_create_barcode_check(request):
         return JsonResponse({"ok": False, "kind": "not_found", "error": "Bu barkodla bir top bulunamadı."}, status=404)
     if err == "wrong_product":
         return JsonResponse({"ok": False, "kind": "wrong_product", "error": "Bu top bu ürüne ait değil."}, status=409)
-    avail = _roll_available_meters(roll)
+    editing = _editing_order_id(request)
+    avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
-        return _roll_unavailable_response(roll)
+        return _roll_unavailable_response(roll, exclude_order_id=editing)
     return JsonResponse({
         "ok": True,
         "roll_id": roll.pk,
@@ -1397,9 +1453,10 @@ def order_create_barcode_resolve(request):
             .first())
     if roll is None:
         return JsonResponse({"ok": False, "error": "Bu barkodla bir top bulunamadı."}, status=404)
-    avail = _roll_available_meters(roll)
+    editing = _editing_order_id(request)
+    avail = _roll_available_meters(roll, exclude_order_id=editing)
     if avail <= 0:
-        return _roll_unavailable_response(roll)
+        return _roll_unavailable_response(roll, exclude_order_id=editing)
 
     wp = roll.product
     cv = wp.catalog_variant if wp.catalog_variant_id else None
@@ -1469,9 +1526,23 @@ def order_create_roll_list(request):
         .filter(Q(product__catalog_variant__variant_sku__iexact=sku) | Q(product__sku__iexact=sku))
         .order_by("-scanned_at")[:60]
     )
+    editing = _editing_order_id(request)
+    rolls = list(rolls)
+    # One grouped aggregate for the whole page of tops, not
+    # _roll_available_meters() per roll — that was a SUM query each, and
+    # against a remote database 60 tops meant 60 round trips before the
+    # card's list could render at all.
+    from django.db.models import Sum
+    from .models import OrderRollReservation
+    holds = OrderRollReservation.objects.filter(roll__in=rolls, consumed=False)
+    if editing is not None:
+        holds = holds.exclude(order_id=editing)
+    reserved = dict(holds.values_list("roll_id").annotate(s=Sum("meters")))
+
     out = []
     for roll in rolls:
-        avail = _roll_available_meters(roll)
+        phys = roll.meters_remaining if roll.meters_remaining is not None else roll.meters
+        avail = (phys or _PDecimal("0")) - reserved.get(roll.pk, _PDecimal("0"))
         if avail <= 0:
             continue
         out.append({
@@ -2433,6 +2504,11 @@ class OrderEdit(UpdateView):
                         #     "price": 3,
                         #     "item_id": 8
                         #   }]
+
+                        # Unticked tops go back to the pool BEFORE any line
+                        # reserves, so a top moved between lines in one save
+                        # isn't blocked by its own soon-to-be-dropped hold.
+                        _order_edit_release_unticked(self.object, product_json_input)
 
                         for item_data in product_json_input:
                             if "item_id" in item_data:

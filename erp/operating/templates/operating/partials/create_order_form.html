@@ -469,6 +469,15 @@
           // released). A small KAYITLI tag marks the already-saved ones.
           existingRolls: [],
           rolls: rolls,
+          // barcode → the hold this order already has on that top. These
+          // holds live until the save reconciles them, so anything in
+          // here can be re-ticked without asking the server whether it is
+          // still free: it is ours the whole time the form is open.
+          ownHolds: rolls.reduce(function (m, r) {
+            var k = (r.barcode || '').toLowerCase();
+            if (k) m[k] = r;
+            return m;
+          }, {}),
           availableRolls: [], rollsLoading: true,
           manualMeters: manual || 0, manualNote: '',
           // Keep the section open when it holds a value, otherwise a line
@@ -598,6 +607,12 @@
   };
 
   const ROLL_LIST_URL = "{% url 'operating:order_create_roll_list' %}";
+  // Edit mode: every availability lookup must say WHICH order is asking,
+  // so this order's own holds don't count against it. Without it an
+  // unticked top still reads as "reserved" — by this very order — and
+  // could never be re-picked.
+  const CO_ORDER_ID = {% if order %}{{ order.pk }}{% else %}null{% endif %};
+  function coOrderParam() { return CO_ORDER_ID ? ('&order=' + CO_ORDER_ID) : ''; }
 
   window.selectProduct = function(sku, variant, title, price, categoryName, stock, allowOversell, isCost) {
     if (orderItems.some(i => i.sku === sku)) { showToast('Product already added', 'warning'); return; }
@@ -647,7 +662,7 @@
   // stable index, not array position — items can shift/be removed while
   // this is in flight). Re-renders when it resolves.
   function fetchAvailableRolls(stableIndex, sku) {
-    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku))
+    fetch(ROLL_LIST_URL + '?sku=' + encodeURIComponent(sku) + coOrderParam())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var item = orderItems.find(function (it) { return it.index === stableIndex; });
@@ -780,9 +795,22 @@
     var picked = item.rolls || [];
     var pickedBarcodes = picked.map(function (r) { return (r.barcode || '').toLowerCase(); });
     var existingBarcodes = existing.map(function (r) { return (r.barcode || '').toLowerCase(); });
+    // Tops held by ANOTHER line of this same order: the availability
+    // lookup no longer counts this order's own holds, so they come back
+    // as candidates here — but they're already spoken for, so don't
+    // offer them a second time.
+    var elsewhereBarcodes = [];
+    orderItems.forEach(function (other) {
+      if (other === item) return;
+      (other.existingRolls || []).concat(other.rolls || []).forEach(function (r) {
+        elsewhereBarcodes.push((r.barcode || '').toLowerCase());
+      });
+    });
     var candidates = item.rollsLoading ? [] : (item.availableRolls || []).filter(function (r) {
       var bc = (r.barcode || '').toLowerCase();
-      return pickedBarcodes.indexOf(bc) === -1 && existingBarcodes.indexOf(bc) === -1;
+      return pickedBarcodes.indexOf(bc) === -1
+          && existingBarcodes.indexOf(bc) === -1
+          && elsewhereBarcodes.indexOf(bc) === -1;
     });
     // Nothing in the warehouse for this product at all — skip the
     // barcode/camera scaffolding (there'd be nothing valid to scan)
@@ -867,7 +895,7 @@
   window.coScanAddByBarcode = function (barcode) {
     barcode = (barcode || '').trim();
     if (!barcode) return;
-    fetch('{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(barcode))
+    fetch('{% url "operating:order_create_barcode_resolve" %}?barcode=' + encodeURIComponent(barcode) + coOrderParam())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { showToast(d.error || 'Barkod bulunamadı', 'error'); return; }
@@ -895,12 +923,38 @@
     var inputEl = document.getElementById('co-roll-bc-' + i);
     var barcode = (barcodeOverride != null ? barcodeOverride : (inputEl ? inputEl.value : '') || '').trim();
     if (!barcode) return;
-    var already = (item.existingRolls || []).concat(item.rolls || []);
-    if (already.some(function (r) { return (r.barcode || '').toLowerCase() === barcode.toLowerCase(); })) {
+    // Checked across EVERY line, not just this one: the order's own holds
+    // no longer block its availability lookups, so nothing else stops the
+    // same top being ticked on two lines — and the save would reserve it
+    // once and report the second as failed.
+    var bcL = barcode.toLowerCase();
+    var clash = orderItems.some(function (it) {
+      return (it.existingRolls || []).concat(it.rolls || []).some(function (r) {
+        return (r.barcode || '').toLowerCase() === bcL;
+      });
+    });
+    if (clash) {
       showToast('Bu barkod zaten eklendi', 'warning');
       return;
     }
-    fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku))
+    // A top we unticked a moment ago is still reserved to US until the
+    // form is saved, so nobody else can have taken it and there is
+    // nothing to re-validate. Re-tick it straight from the data already
+    // in hand — the server round trip made putting a top back feel much
+    // slower than taking it off.
+    var known = (item.ownHolds || {})[bcL];
+    if (known) {
+      if (!item.rolls) item.rolls = [];
+      item.rolls.push({
+        reservation_id: known.reservation_id, barcode: known.barcode,
+        warehouse: known.warehouse, available: known.available, meters: known.available,
+      });
+      if (inputEl) inputEl.value = '';
+      syncQtyFromRolls(i, true);
+      renderProducts();
+      return;
+    }
+    fetch('{% url "operating:order_create_barcode_check" %}?barcode=' + encodeURIComponent(barcode) + '&sku=' + encodeURIComponent(item.sku) + coOrderParam())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { showToast(d.error || 'Barkod doğrulanamadı', 'error'); return; }
@@ -949,7 +1003,13 @@
       });
       if (!already) {
         item.availableRolls = item.availableRolls || [];
-        item.availableRolls.unshift({ barcode: removed.barcode, warehouse: removed.warehouse, available: removed.available });
+        // Keep reservation_id on the way back: it says "this hold is
+        // still ours", which is what lets a re-tick skip the server
+        // round trip in coAddRoll.
+        item.availableRolls.unshift({
+          reservation_id: removed.reservation_id, barcode: removed.barcode,
+          warehouse: removed.warehouse, available: removed.available,
+        });
       }
     }
     syncQtyFromRolls(i, true);

@@ -154,6 +154,42 @@ The ledger book is named per brand in `BRAND_DEFAULTS["<brand>"]
 ["CARI_BOOK_NAME"]`, matched by name because each brand runs in its own schema
 where the same book has a different id.
 
+Deleting a book is the most destructive single action in this codebase.
+Everything hanging off it is `CASCADE` and nothing is `PROTECT`, so Postgres
+will not stop you — a book with no current accounts still held 14 cash
+accounts, 43 cash transactions and 34 expenses. Check first, and note that the
+obvious two ways of checking are both wrong:
+
+- `Book._meta.related_objects` counts only direct children, missing anything
+  that cascades a second time (a cash account takes its transactions with it).
+- Summing `Collector.data` plus `Collector.fast_deletes` double-counts, because
+  a row reachable by two foreign keys is queued once per path.
+  `CashTransactionEntry` points at both `book` and `cash_account`, so it
+  appears twice.
+
+Collect with Django's own `Collector`, then **deduplicate by primary key**:
+
+```python
+seen = defaultdict(set)
+for model, rows in collector.data.items():
+    seen[model].update(o.pk for o in rows)
+for qs in collector.fast_deletes:
+    seen[qs.model].update(qs.values_list("pk", flat=True))
+```
+
+## 🔁 Legacy AR/AP mirrors
+
+Every `CariMovement` copies itself into `AssetAccountsReceivable` (amount > 0)
+or `LiabilityAccountsPayable` (amount < 0) so the older dashboards keep
+working. The mirror is written with `book=movement.book` **at creation only**,
+and `CariMovement.legacy_ar_id` / `legacy_ap_id` hold the link.
+
+Anything that moves a movement between books has to move its mirror too.
+Consolidating the accounts stranded 34 mirrors on the old book, which is why
+that book's page kept listing receivables for customers whose accounts had
+already left it. `move_cari_accounts` now carries them; anything new that
+touches `CariMovement.book` must do the same.
+
 ---
 
 Thanks again for helping build Nejum!

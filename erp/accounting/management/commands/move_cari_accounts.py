@@ -35,8 +35,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from accounting.models import (
-    CariAccount, CariMovement, CariSettings, CheckOrPromissoryNote, Invoice,
-    Payment,
+    AssetAccountsReceivable, CariAccount, CariMovement, CariSettings,
+    CheckOrPromissoryNote, Invoice, LiabilityAccountsPayable, Payment,
 )
 
 # Models holding both a cari FK and their own book column.
@@ -189,6 +189,26 @@ class Command(BaseCommand):
             for pay in renum_pay:
                 Payment.objects.filter(pk=pay.pk).update(number=new_pay[pay.pk])
             for a in accounts:
+                # The legacy AR/AP mirrors must follow their movements. Every
+                # CariMovement copies itself into AssetAccountsReceivable or
+                # LiabilityAccountsPayable with book=movement.book, but only at
+                # creation — moving the movement alone strands the mirror,
+                # which is how book 1 kept listing receivables for customers
+                # whose accounts had already left it.
+                mv_ids = list(CariMovement.objects.filter(cari=a)
+                              .values_list("id", flat=True))
+                if mv_ids:
+                    ar_ids = CariMovement.objects.filter(
+                        id__in=mv_ids, legacy_ar_id__isnull=False
+                    ).values_list("legacy_ar_id", flat=True)
+                    ap_ids = CariMovement.objects.filter(
+                        id__in=mv_ids, legacy_ap_id__isnull=False
+                    ).values_list("legacy_ap_id", flat=True)
+                    AssetAccountsReceivable.objects.filter(
+                        id__in=list(ar_ids)).update(book_id=target)
+                    LiabilityAccountsPayable.objects.filter(
+                        id__in=list(ap_ids)).update(book_id=target)
+
                 for model in CARRIERS:
                     model.objects.filter(cari=a).update(book_id=target)
                 upd = {"book_id": target}

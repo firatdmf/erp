@@ -7,6 +7,9 @@ from django.utils import timezone
 from django.db.models import Sum
 from datetime import timedelta
 import decimal
+# Explicit: `Decimal` otherwise arrives only via the `accounting.forms`
+# wildcard below, which re-exports it by accident of its own imports.
+from decimal import Decimal
 from accounting.models import EquityExpense, Book
 from accounting.forms import *
 import time
@@ -86,11 +89,39 @@ def exchange_rates_component():
         if currency == base_currency:
             continue
         rate = get_exchange_rate(currency.code, base_currency.code)
-        if rate is not None:
-            rates.append({
-                "from_currency": currency,
-                "rate": rate,
-            })
+        if rate is None:
+            continue
+        rate = Decimal(str(rate))
+        if rate <= 0:
+            # A non-positive rate has no inverse and no meaning.
+            continue
+
+        inverse = Decimal(1) / rate
+
+        # Lead with whichever direction reads as a number rather than a
+        # decimal with leading zeros. Stored is always X→base, which for
+        # a weak currency gives 0.02087 — true, and useless to anyone who
+        # thinks in lira per dollar. The label names its own direction,
+        # so flipping stays unambiguous.
+        #
+        # The inverse is derived here rather than fetched: asking the API
+        # for base→X would cache a second rate per pair per day, and the
+        # provider's figure will not be exactly 1/rate. Two stored rates
+        # that disagree by a hair is a reconciliation problem waiting to
+        # happen.
+        flipped = rate < 1
+        rates.append({
+            "from_currency": currency,
+            "rate": rate,
+            "inverse": inverse,
+            "flipped": flipped,
+            "lead_from": base_currency if flipped else currency,
+            "lead_to": currency if flipped else base_currency,
+            "lead_value": inverse if flipped else rate,
+            "other_from": currency if flipped else base_currency,
+            "other_to": base_currency if flipped else currency,
+            "other_value": rate if flipped else inverse,
+        })
 
     context = {
         "base_currency": base_currency,

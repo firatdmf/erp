@@ -5,12 +5,12 @@
   {# tabindex: hover is unavailable on a phone, where these get checked #}
   <div class="rate-item" tabindex="0">
     <span class="rate-currency">{{ item.from_currency.code }}</span>
-    <span class="rate-value">1 {{ item.from_currency.code }} =
+    <span class="rate-value">
       <span class="rate-num">
-        <span class="rate-short">{{ item.rate|format_money }}</span>
-        <span class="rate-full">{{ item.rate|format_rate }}</span>
+        <span class="rate-short">1 {{ item.lead_from.code }} = {{ item.lead_value|format_money }} {{ item.lead_to.code }}</span>
+        <span class="rate-full">1 {{ item.lead_from.code }} = {{ item.lead_value|format_rate }} {{ item.lead_to.code }}<span class="rate-other"> · 1 {{ item.other_from.code }} = {{ item.other_value|format_rate }} {{ item.other_to.code }}</span></span>
       </span>
-      {{ base_currency.code }}</span>
+    </span>
   </div>
   {% empty %}
   <div style="color: #94a3b8; font-size: 0.9rem;">No exchange rates available.</div>

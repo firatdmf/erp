@@ -12,13 +12,19 @@ from accounting.models import (
     CashAccount,
     CurrencyCategory,
     EquityCapital,
+    ShareIssuance,
     StakeholderBook,
 )
 from authentication.models import Member
 
 
-class CapitalWithoutIssuingSharesTest(TestCase):
-    """Putting cash into a book should not force a share decision."""
+class CapitalDoesNotTouchSharesTest(TestCase):
+    """A contribution and an equity issuance are separate events.
+
+    Capital records cash going in. Shares move only through
+    ShareIssuance rows on the book's shares page, where the change is
+    dated and attributed.
+    """
 
     def setUp(self):
         User = get_user_model()
@@ -36,8 +42,13 @@ class CapitalWithoutIssuingSharesTest(TestCase):
         owner.save()
         self.member = Member.objects.get(user=owner)
         self.holding = StakeholderBook.objects.create(
-            member=self.member, book=self.book, shares=10000000
+            member=self.member, book=self.book, shares=0
         )
+        ShareIssuance.objects.create(
+            stakeholder=self.holding, shares=10000000, date="2026-08-19",
+            reason="opening",
+        )
+        self.holding.refresh_from_db()
 
     def url(self):
         return reverse("accounting:add_equity_capital", kwargs={"pk": self.book.pk})
@@ -53,35 +64,42 @@ class CapitalWithoutIssuingSharesTest(TestCase):
         data.update(over)
         return data
 
-    def test_the_field_is_optional_on_the_form(self):
+    def test_the_form_does_not_ask_about_shares(self):
         form = self.client.get(self.url()).context["form"]
-        self.assertFalse(form.fields["new_shares_issued"].required)
+        self.assertNotIn("new_shares_issued", form.fields)
 
-    def test_capital_posts_with_the_field_left_blank(self):
-        response = self.client.post(self.url(), self.payload(new_shares_issued=""))
+    def test_capital_posts_without_mentioning_shares(self):
+        response = self.client.post(self.url(), self.payload())
         self.assertEqual(response.status_code, 302)
         capital = EquityCapital.objects.get()
         self.assertEqual(capital.amount, Decimal("600.00"))
         self.assertEqual(capital.new_shares_issued, 0)
 
-    def test_a_blank_field_does_not_move_the_holding(self):
-        """0 issued means the owner's stake is untouched — the whole
-        point of the default."""
-        self.client.post(self.url(), self.payload(new_shares_issued=""))
+    def test_the_holding_is_untouched(self):
+        self.client.post(self.url(), self.payload())
         self.holding.refresh_from_db()
         self.assertEqual(self.holding.shares, 10000000)
 
+    def test_a_posted_share_count_is_ignored(self):
+        """The field is off the form, so a crafted post must not move
+        ownership through the back door."""
+        self.client.post(self.url(), self.payload(new_shares_issued="5000000"))
+        self.holding.refresh_from_db()
+        self.assertEqual(self.holding.shares, 10000000)
+        self.assertEqual(EquityCapital.objects.get().new_shares_issued, 0)
+
     def test_the_cash_lands_in_the_account(self):
-        self.client.post(self.url(), self.payload(new_shares_issued=""))
+        self.client.post(self.url(), self.payload())
         self.cash.refresh_from_db()
         self.assertEqual(self.cash.balance, Decimal("600.00"))
 
-    def test_shares_can_still_be_issued_when_that_is_the_intent(self):
-        self.holding.shares = 0
-        self.holding.save()
-        self.client.post(self.url(), self.payload(new_shares_issued="10000000"))
-        self.holding.refresh_from_db()
-        self.assertEqual(self.holding.shares, 10000000)
+    def test_a_non_stakeholder_still_cannot_contribute(self):
+        outsider = get_user_model().objects.create_user(username="yabanci", password="pw")
+        response = self.client.post(
+            self.url(), self.payload(member=Member.objects.get(user=outsider).pk)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("member", response.context["form"].errors)
 
     def test_the_model_defaults_to_zero(self):
         capital = EquityCapital.objects.create(

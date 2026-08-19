@@ -16,6 +16,8 @@ from django.forms import modelformset_factory
 from datetime import datetime
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.utils.translation import gettext as _g
 
 
 from django.http import JsonResponse
@@ -122,102 +124,138 @@ class CreateBook(generic.edit.CreateView):
         return reverse_lazy("accounting:book_detail", kwargs={"pk": self.object.pk})
 
 
-def _shares_payload(book):
-    """What both share editors hand back, so the header can redraw
-    without a reload: every holding, its stake, and the pool."""
-    pool = book.total_shares or 0
-    issued = sum(sb.shares for sb in book.stakeholders.all())
-    return {
-        "success": True,
-        "pool": pool,
-        "issued": issued,
-        "stakeholders": [
-            {
-                "pk": sb.pk,
+@method_decorator(login_required, name="dispatch")
+class BookShares(View):
+    """Manage a book's cap table on a page of its own.
+
+    Holdings used to be editable in place in the book header, which was
+    convenient and wrong twice over: it overwrote ownership with no
+    record of who changed it or why, and it put a legally significant
+    number behind a click on a summary. Changes are recorded here, as
+    dated rows.
+    """
+
+    template_name = "accounting/book_shares.html"
+
+    def get_book(self):
+        return get_object_or_404(Book, pk=self.kwargs.get("pk"))
+
+    def rows(self, book):
+        pool = book.total_shares or 0
+        out = []
+        for sb in book.stakeholders.select_related("member__user").order_by("-shares", "pk"):
+            out.append({
+                "sb": sb,
+                "member": sb.member,
                 "shares": sb.shares,
                 "pct": (
-                    str((Decimal(sb.shares) / Decimal(pool) * 100).quantize(Decimal("0.1")))
-                    if pool
-                    else None
+                    (Decimal(sb.shares) / Decimal(pool) * 100).quantize(Decimal("0.01"))
+                    if pool else None
                 ),
-            }
-            for sb in book.stakeholders.all()
-        ],
-    }
+                "issuances": list(
+                    sb.issuances.select_related("created_by__user", "capital")
+                ),
+            })
+        return out
 
+    def context(self, book, **extra):
+        rows = self.rows(book)
+        issued = sum(r["shares"] for r in rows)
+        pool = book.total_shares or 0
+        context = {
+            "book": book,
+            "rows": rows,
+            "shares_issued": issued,
+            "shares_pool": pool,
+            "shares_unissued": max(pool - issued, 0),
+            "reasons": ShareIssuance.REASONS,
+            "today": timezone.now().date().isoformat(),
+        }
+        context.update(extra)
+        return context
 
-@method_decorator(login_required, name="dispatch")
-class SetStakeholderShares(View):
-    """Set one stakeholder's holding, in place on the book page.
-
-    Capital events still add to this number; this is for recording or
-    correcting a split directly, which was previously only possible by
-    deleting the stakeholder and starting again.
-    """
-
-    def post(self, request, pk, sb_pk):
-        book = get_object_or_404(Book, pk=pk)
-        sb = get_object_or_404(StakeholderBook, pk=sb_pk, book=book)
-        raw = (request.POST.get("shares") or "").replace(",", "").strip()
-        try:
-            shares = int(raw)
-        except ValueError:
-            return JsonResponse(
-                {"success": False, "error": "Enter a whole number of shares."}, status=400
-            )
-        if shares < 0:
-            return JsonResponse(
-                {"success": False, "error": "Shares cannot be negative."}, status=400
-            )
-
-        error = validate_share_allocation(book, shares, exclude_pk=sb.pk)
-        if error:
-            return JsonResponse({"success": False, "error": error}, status=400)
-
-        sb.shares = shares
-        sb.save(update_fields=["shares"])
-        book.refresh_from_db()
-        return JsonResponse(_shares_payload(book))
-
-
-@method_decorator(login_required, name="dispatch")
-class SetBookTotalShares(View):
-    """Resize a book's share pool.
-
-    Never below what is already allocated — the pool is the denominator
-    for every stake on the page, so shrinking past the issued total would
-    silently put the book over 100% owned.
-    """
+    def get(self, request, pk):
+        book = self.get_book()
+        return render(request, self.template_name, self.context(book))
 
     def post(self, request, pk):
-        book = get_object_or_404(Book, pk=pk)
+        book = self.get_book()
+        action = request.POST.get("action")
+        if action == "pool":
+            return self._set_pool(request, book)
+        return self._record_issuance(request, book)
+
+    def _set_pool(self, request, book):
         raw = (request.POST.get("total_shares") or "").replace(",", "").strip()
         try:
             total = int(raw)
         except ValueError:
-            return JsonResponse(
-                {"success": False, "error": "Enter a whole number of shares."}, status=400
-            )
+            return self._fail(request, book, "Enter a whole number of shares.")
         if total < 1:
-            return JsonResponse(
-                {"success": False, "error": "A book needs at least one share."},
-                status=400,
-            )
+            return self._fail(request, book, "A book needs at least one share.")
 
         issued = sum(sb.shares for sb in book.stakeholders.all())
         if total < issued:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "%s shares are already allocated — the pool cannot be smaller."
-                    % f"{issued:,}",
-                },
-                status=400,
+            return self._fail(
+                request, book,
+                "%s shares are already allocated — the pool cannot be smaller."
+                % f"{issued:,}",
             )
 
         book.total_shares = total
         book.save(update_fields=["total_shares"])
-        return JsonResponse(_shares_payload(book))
+        messages.success(request, _g("Share pool set to %s.") % f"{total:,}")
+        return redirect("accounting:book_shares", pk=book.pk)
+
+    def _record_issuance(self, request, book):
+        sb = StakeholderBook.objects.filter(
+            pk=request.POST.get("stakeholder"), book=book
+        ).first()
+        if sb is None:
+            return self._fail(request, book, "Pick a stakeholder.")
+
+        raw = (request.POST.get("shares") or "").replace(",", "").strip()
+        try:
+            shares = int(raw)
+        except ValueError:
+            return self._fail(request, book, "Enter a whole number of shares.")
+        if shares == 0:
+            return self._fail(request, book, "Nothing to record — enter a non-zero number.")
+
+        # Negative rows take shares back, so the floor is the holder's own
+        # position: you cannot claw back more than they hold.
+        if sb.shares + shares < 0:
+            return self._fail(
+                request, book,
+                "%s holds %s shares — you cannot take back more than that."
+                % (sb.member, f"{sb.shares:,}"),
+            )
+        if shares > 0:
+            error = validate_share_allocation(book, sb.shares + shares, exclude_pk=sb.pk)
+            if error:
+                return self._fail(request, book, error)
+
+        ShareIssuance.objects.create(
+            stakeholder=sb,
+            shares=shares,
+            date=request.POST.get("date") or timezone.now().date(),
+            reason=request.POST.get("reason") or "capital",
+            note=(request.POST.get("note") or "").strip(),
+            created_by=getattr(request.user, "member", None),
+        )
+        messages.success(
+            request,
+            _g("Recorded %(n)s shares for %(who)s.")
+            % {"n": f"{shares:+,}", "who": sb.member},
+        )
+        return redirect("accounting:book_shares", pk=book.pk)
+
+    def _fail(self, request, book, message):
+        return render(
+            request, self.template_name,
+            self.context(book, error=message, form_data=request.POST),
+            status=400,
+        )
 
 
 @method_decorator(login_required, name="dispatch")
@@ -652,14 +690,12 @@ class AddEquityCapital(generic.edit.CreateView):
         # Set the currency to the deposited_cash_account's currency
         currency = cash_account.currency
 
-        # Example: update stakeholder shares
+        # The contributor must be a stakeholder of this book, but the
+        # contribution does not move their holding: shares are issued as
+        # ShareIssuance rows on the book's shares page, and a bare += here
+        # would be wiped by the next recompute anyway.
         member = form.cleaned_data["member"]
-        # a stakeholderbook object has a book and a member
-        try:
-            stakeholderbook = StakeholderBook.objects.get(member=member, book=book)
-            stakeholderbook.shares += form.cleaned_data["new_shares_issued"]
-            stakeholderbook.save(update_fields=["shares"])
-        except ObjectDoesNotExist:
+        if not StakeholderBook.objects.filter(member=member, book=book).exists():
             form.add_error("member", "Couldn't fetch the member properly")
             return self.form_invalid(form)
 

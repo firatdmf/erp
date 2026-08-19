@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="book-detail-page">
+  <div class="breadcrumb">
+    <a href="{% url 'accounting:index' %}"><i class="fas fa-book"></i> Books</a>
+    <span>/</span>
+    <a href="{% url 'accounting:book_detail' book.pk %}">{{ book.name }}</a>
+    <span>/</span>
+    <span class="current">Shares</span>
+  </div>
+
+  <div class="page-header">
+    <div class="header-main-info">
+      <div class="header-icon-box"><i class="fas fa-chart-pie"></i></div>
+      <div class="header-text">
+        <h1>Shares</h1>
+        <p>Who owns {{ book.name }}, and every change on the record</p>
+      </div>
+    </div>
+    <div class="shares-pool-box">
+      <form method="post" class="pool-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="pool">
+        <label for="poolInput">Share pool</label>
+        <div class="pool-row">
+          <input type="text" id="poolInput" name="total_shares" inputmode="numeric"
+                 value="{{ shares_pool|intcomma }}">
+          <button type="submit">Set</button>
+        </div>
+      </form>
+      <div class="pool-meta">
+        {{ shares_issued|intcomma }} allocated ·
+        <strong>{{ shares_unissued|intcomma }}</strong> unissued
+      </div>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="shares-error"><i class="fas fa-triangle-exclamation"></i> {{ error }}</div>
+  {% endif %}
+
+  {% if messages %}
+    {% for message in messages %}
+    <div class="shares-flash">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Cap table -->
+  <div class="financial-overview-card">
+    <div class="card-header-title">
+      <i class="fas fa-users purple-icon"></i> Cap Table
+      <a class="cash-account-add" href="{% url 'accounting:add_stakeholderbook' book.pk %}">
+        <i class="fas fa-plus"></i> Add Stakeholder
+      </a>
+    </div>
+
+    {% if rows %}
+    <table class="assets-table cap-table">
+      <thead>
+        <tr>
+          <th>Stakeholder</th>
+          <th class="num">Shares</th>
+          <th class="num">Ownership</th>
+          <th>Record</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr class="cap-row">
+          <td>
+            <span class="hs-initials">{{ r.member.user.first_name|first }}{{ r.member.user.last_name|first }}</span>
+            <span class="cap-name">{{ r.member }}</span>
+          </td>
+          <td class="num">{{ r.shares|intcomma }}</td>
+          <td class="num cap-pct {% if not r.shares %}zero{% endif %}">
+            {% if r.pct is None %}—{% else %}{{ r.pct }}%{% endif %}
+          </td>
+          <td>
+            {% if r.issuances %}
+            <ul class="cap-history">
+              {% for i in r.issuances %}
+              <li>
+                <span class="ci-shares {% if i.shares < 0 %}neg{% endif %}">
+                  {% if i.shares > 0 %}+{% endif %}{{ i.shares|intcomma }}
+                </span>
+                <span class="ci-date">{{ i.date|date:"d.m.Y" }}</span>
+                <span class="ci-reason">{{ i.get_reason_display }}</span>
+                {% if i.note %}<span class="ci-note">{{ i.note }}</span>{% endif %}
+                {% if i.created_by %}<span class="ci-by">by {{ i.created_by }}</span>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <span class="cap-empty">No shares issued yet.</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="cash-accounts-empty">
+      {{ book.name }} has no stakeholders yet.
+      <a href="{% url 'accounting:add_stakeholderbook' book.pk %}">Add the first one</a>.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Record an issuance -->
+  {% if rows %}
+  <div class="financial-overview-card">
+    <div class="card-header-title">
+      <i class="fas fa-file-signature green-icon"></i> Record a Share Movement
+    </div>
+    <form method="post" class="issue-form">
+      {% csrf_token %}
+      <div class="issue-grid">
+        <div class="issue-field">
+          <label for="stakeholderSelect">Stakeholder</label>
+          <select id="stakeholderSelect" name="stakeholder" required>
+            {% for r in rows %}
+            <option value="{{ r.sb.pk }}">{{ r.member }} — {{ r.shares|intcomma }} sh</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="issue-field">
+          <label for="sharesInput">Shares</label>
+          <input type="text" id="sharesInput" name="shares" inputmode="numeric"
+                 placeholder="e.g. 250000 or -50000" required>
+          <p class="issue-help">Negative takes shares back.</p>
+        </div>
+        <div class="issue-field">
+          <label for="dateInput">Date</label>
+          <input type="date" id="dateInput" name="date" value="{{ today }}" required>
+        </div>
+        <div class="issue-field">
+          <label for="reasonSelect">Reason</label>
+          <select id="reasonSelect" name="reason">
+            {% for v, l in reasons %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="issue-field wide">
+        <label for="noteInput">Note</label>
+        <input type="text" id="noteInput" name="note" maxlength="300"
+               placeholder="What this movement is for">
+      </div>
+      <div class="issue-actions">
+        <button type="submit" class="cash-account-submit">Record</button>
+        <a class="cash-account-back" href="{% url 'accounting:book_detail' book.pk %}">Back to book</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

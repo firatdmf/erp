@@ -152,6 +152,84 @@ class StakeholderBook(models.Model):
     def __str__(self):
         return f"{self.member.user.first_name + self.member.user.last_name} - {self.book.name} {self.shares}%"
 
+    def recompute_shares(self, save=True):
+        """Re-derive the holding from its issuance records.
+
+        `shares` is a cache, the way CariAccount.cached_balance caches its
+        movements. The issuances are the truth — every existing read of
+        `.shares` keeps working, and nothing can change a holding without
+        leaving a record of why.
+        """
+        total = self.issuances.aggregate(n=models.Sum("shares"))["n"] or 0
+        self.shares = max(total, 0)
+        if save:
+            super().save(update_fields=["shares"])
+        return self.shares
+
+    @property
+    def issued_total(self):
+        """The raw sum, unclamped — a negative means the records are
+        inconsistent and should be visible rather than silently floored."""
+        return self.issuances.aggregate(n=models.Sum("shares"))["n"] or 0
+
+
+class ShareIssuance(models.Model):
+    """One movement of shares into or out of a holding.
+
+    Ownership is legally significant, so it is not a number somebody
+    overwrites: every change is a dated, attributed row, and the holding
+    is the sum of them. Shares are signed — a buyback or a correction is
+    a negative row, never a deletion, so the history stays readable.
+    """
+
+    class Meta:
+        verbose_name_plural = "Share Issuances"
+        ordering = ["-date", "-id"]
+        indexes = [models.Index(fields=["stakeholder", "-date"])]
+
+    REASONS = [
+        ("opening", "Opening holding"),
+        ("capital", "Capital contribution"),
+        ("transfer", "Transfer between holders"),
+        ("buyback", "Buyback / cancellation"),
+        ("correction", "Correction"),
+    ]
+
+    stakeholder = models.ForeignKey(
+        StakeholderBook, on_delete=models.PROTECT, related_name="issuances"
+    )
+    # Signed: positive issues shares, negative takes them back.
+    shares = models.IntegerField()
+    date = models.DateField()
+    reason = models.CharField(max_length=20, choices=REASONS, default="capital")
+    note = models.CharField(max_length=300, blank=True)
+
+    # Set when the issuance was made against a capital contribution, so
+    # the money and the equity it bought stay tied together.
+    capital = models.ForeignKey(
+        "EquityCapital", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="issuances",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        Member, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="recorded_share_issuances",
+    )
+
+    def __str__(self):
+        sign = "+" if self.shares >= 0 else ""
+        return f"{sign}{self.shares} to {self.stakeholder.member} on {self.date}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.stakeholder.recompute_shares(save=True)
+
+    def delete(self, *args, **kwargs):
+        stakeholder = self.stakeholder
+        super().delete(*args, **kwargs)
+        stakeholder.recompute_shares(save=True)
+
 
 # We will use this to keep track of the currency of the cash accounts, and the transactions
 class CurrencyCategory(models.Model):

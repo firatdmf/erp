@@ -72,11 +72,9 @@ class BookHeaderStakeholdersTest(TestCase):
         response = self.client.get(self.url())
         self.assertEqual(response.context["shares_issued"], 4000000)
         self.assertEqual(response.context["shares_pool"], 10000000)
-        html = response.content.decode()
-        # The two figures sit in their own spans — the pool is clickable.
-        self.assertIn('<span class="hs-issued">4,000,000</span>', html)
-        self.assertIn(">10,000,000</span>", html)
-        self.assertIn("shares issued", html)
+        self.assertIn(
+            "4,000,000 of 10,000,000 shares issued", response.content.decode()
+        )
 
     def test_a_fully_issued_book_still_shows_the_pool(self):
         """The pool line is the handle for resizing the pool, so it stays

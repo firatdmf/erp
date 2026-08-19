@@ -173,9 +173,18 @@ class LiabilityAccountsPayableForm(forms.ModelForm):
 
 
 class EquityCapitalForm(forms.ModelForm):
+    """Record cash going into a book.
+
+    `new_shares_issued` is not asked for here. A contribution and an
+    equity issuance are different events — most deposits issue nothing —
+    and shares are now recorded as ShareIssuance rows on the book's
+    shares page, where the change is dated and attributed. The model
+    field stays at its default of 0.
+    """
+
     class Meta:
         model = EquityCapital
-        fields = "__all__"
+        exclude = ["new_shares_issued"]
         widgets = {
             "date_invested": forms.DateInput(attrs={"type": "date"}),
             # Hide the book field, and pass the value from the view (url)
@@ -205,18 +214,6 @@ class EquityCapitalForm(forms.ModelForm):
             self.fields["cash_account"].queryset = CashAccount.objects.filter(
                 book=book
             ).select_related("currency", "book").order_by("name")
-
-    def clean_new_shares_issued(self):
-        """Blank means none.
-
-        The field is blank=True with a default of 0, but the input is
-        still rendered, so an untouched form posts "" rather than
-        omitting it — and "" cleans to None, which the not-null column
-        rejects and which AddEquityCapital would then try to add to the
-        stakeholder's holding.
-        """
-        return self.cleaned_data.get("new_shares_issued") or 0
-
 
 class EquityRevenueForm(forms.ModelForm):
     class Meta:

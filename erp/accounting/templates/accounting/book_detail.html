@@ -57,21 +57,24 @@
       </div>
       <div class="hs-list">
         {% for s in stakeholders %}
-        <div class="hs-item">
+        <div class="hs-item" data-sb="{{ s.pk }}"
+             data-url="{% url 'accounting:set_stakeholder_shares' book.id s.pk %}">
           <span class="hs-initials">{{ s.member.user.first_name|first }}{{ s.member.user.last_name|first }}</span>
           <span class="hs-name">{{ s.member }}</span>
-          <span class="hs-shares">{{ s.shares|intcomma }} sh</span>
-          <span class="hs-pct {% if not s.shares %}zero{% endif %}">
-            {% if s.pct is None %}—{% else %}{{ s.pct }}%{% endif %}
-          </span>
+          <span class="hs-shares" role="button" tabindex="0"
+                title="Click to set this holding">{{ s.shares|intcomma }} sh</span>
+          <span class="hs-pct {% if not s.shares %}zero{% endif %}">{% if s.pct is None %}—{% else %}{{ s.pct }}%{% endif %}</span>
         </div>
         {% endfor %}
       </div>
-      {% if shares_issued < shares_pool %}
       <div class="hs-foot">
-        {{ shares_issued|intcomma }} of {{ shares_pool|intcomma }} shares issued
+        <span class="hs-issued">{{ shares_issued|intcomma }}</span> of
+        <span class="hs-pool" role="button" tabindex="0"
+              data-url="{% url 'accounting:set_book_total_shares' book.id %}"
+              title="Click to resize the share pool">{{ shares_pool|intcomma }}</span>
+        shares issued
       </div>
-      {% endif %}
+      <p class="hs-error" hidden></p>
     </div>
     {% else %}
     <div class="header-stakeholders empty">
@@ -457,4 +460,115 @@
     });
   })();
 </script>
+
+<script>
+  // Shares are edited where they are printed: click a holding or the
+  // pool, type a number, Enter. The server is the authority on whether
+  // the split still adds up, so its reply redraws every figure here.
+  (function () {
+    const box = document.querySelector('.header-stakeholders');
+    if (!box) return;
+    const error = box.querySelector('.hs-error');
+    const csrf = '{{ csrf_token }}';
+
+    function showError(message) {
+      if (!error) return;
+      error.textContent = message;
+      error.hidden = false;
+    }
+
+    function clearError() {
+      if (error) error.hidden = true;
+    }
+
+    // One reply repaints the lot — a holding changing moves everyone
+    // else's percentage, so redrawing only the edited row would leave
+    // the others quietly stale.
+    function repaint(data) {
+      box.querySelectorAll('.hs-item').forEach(function (row) {
+        const found = data.stakeholders.find(function (s) {
+          return String(s.pk) === row.dataset.sb;
+        });
+        if (!found) return;
+        row.querySelector('.hs-shares').textContent = found.shares.toLocaleString('en-US') + ' sh';
+        const pct = row.querySelector('.hs-pct');
+        pct.textContent = found.pct === null ? '—' : found.pct + '%';
+        pct.classList.toggle('zero', !found.shares);
+      });
+      box.querySelector('.hs-issued').textContent = data.issued.toLocaleString('en-US');
+      box.querySelector('.hs-pool').textContent = data.pool.toLocaleString('en-US');
+    }
+
+    function edit(el, field, url) {
+      if (el.querySelector('input')) return;
+      const before = el.textContent.trim();
+      const current = before.replace(/[^0-9]/g, '');
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.className = 'hs-input';
+      input.value = current;
+      el.textContent = '';
+      el.appendChild(input);
+      input.focus();
+      input.select();
+
+      let done = false;
+      function restore(text) {
+        if (done) return;
+        done = true;
+        el.textContent = text;
+      }
+
+      function save() {
+        if (done) return;
+        const body = new FormData();
+        body.append(field, input.value);
+        fetch(url, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+          body: body
+        })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+          .then(function (res) {
+            if (!res.ok || !res.data.success) {
+              restore(before);
+              showError((res.data && res.data.error) || 'Could not save that.');
+              return;
+            }
+            done = true;
+            clearError();
+            repaint(res.data);
+          })
+          .catch(function () { restore(before); showError('Could not reach the server.'); });
+      }
+
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+        else if (e.key === 'Escape') { e.preventDefault(); restore(before); }
+      });
+      input.addEventListener('blur', save);
+    }
+
+    box.addEventListener('click', function (e) {
+      const holding = e.target.closest('.hs-shares');
+      if (holding) return edit(holding, 'shares', holding.closest('.hs-item').dataset.url);
+      const pool = e.target.closest('.hs-pool');
+      if (pool) return edit(pool, 'total_shares', pool.dataset.url);
+    });
+
+    // Same two targets from the keyboard.
+    box.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const holding = e.target.closest('.hs-shares');
+      const pool = e.target.closest('.hs-pool');
+      if (!holding && !pool) return;
+      e.preventDefault();
+      if (holding) edit(holding, 'shares', holding.closest('.hs-item').dataset.url);
+      else edit(pool, 'total_shares', pool.dataset.url);
+    });
+  })();
+</script>
+
 {% endblock %}

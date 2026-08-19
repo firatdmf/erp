@@ -72,15 +72,22 @@ class BookHeaderStakeholdersTest(TestCase):
         response = self.client.get(self.url())
         self.assertEqual(response.context["shares_issued"], 4000000)
         self.assertEqual(response.context["shares_pool"], 10000000)
-        self.assertIn("4,000,000 of 10,000,000 shares issued", response.content.decode())
+        html = response.content.decode()
+        # The two figures sit in their own spans — the pool is clickable.
+        self.assertIn('<span class="hs-issued">4,000,000</span>', html)
+        self.assertIn(">10,000,000</span>", html)
+        self.assertIn("shares issued", html)
 
-    def test_a_fully_issued_book_does_not_nag_about_the_pool(self):
+    def test_a_fully_issued_book_still_shows_the_pool(self):
+        """The pool line is the handle for resizing the pool, so it stays
+        even when there is nothing left unissued to report."""
         StakeholderBook.objects.create(
             member=self.member("cuma", "Cuma", "Öztürk"), book=self.book, shares=10000000
         )
         html = self.client.get(self.url()).content.decode()
         self.assertIn("100.0%", html)
-        self.assertNotIn("shares issued", html)
+        self.assertIn("shares issued", html)
+        self.assertIn("10,000,000", html)
 
     def test_a_book_with_no_shares_pool_shows_no_percentage(self):
         """total_shares=0 would divide by nothing — show a dash, not a crash."""

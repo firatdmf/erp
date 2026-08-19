@@ -88,6 +88,15 @@ class CashAccountForm(forms.ModelForm):
 
 
 class StakeholderBookForm(forms.ModelForm):
+    """Add a stakeholder to a book, with the holding they own.
+
+    `shares` used to be excluded here, on the theory that shares are only
+    ever issued through a capital event. That left no way to record an
+    ownership split that already exists — a new stakeholder always
+    started at 0% and stayed there until someone posted capital. It is a
+    normal field now, and capital events still add to it on top.
+    """
+
     class Meta:
         model = StakeholderBook
         fields = "__all__"
@@ -98,8 +107,37 @@ class StakeholderBookForm(forms.ModelForm):
             "book": forms.HiddenInput(),
         }
 
-        # We don't want to manually enter this data.
-        exclude = ["shares"]
+    def clean(self):
+        cleaned = super().clean()
+        book = cleaned.get("book")
+        shares = cleaned.get("shares")
+        if book is not None and shares is not None:
+            error = validate_share_allocation(book, shares, exclude_pk=self.instance.pk)
+            if error:
+                self.add_error("shares", error)
+        return cleaned
+
+
+def validate_share_allocation(book, shares, exclude_pk=None):
+    """Refuse an allocation that would put the book over 100% owned.
+
+    Returns an error message, or None when the holding fits. Shared by
+    the add form and the inline editor so both refuse the same thing —
+    the pool is what every stake is measured against, so overshooting it
+    silently makes every percentage on the page a lie.
+    """
+    others = StakeholderBook.objects.filter(book=book)
+    if exclude_pk:
+        others = others.exclude(pk=exclude_pk)
+    held = sum(sb.shares for sb in others)
+    pool = book.total_shares or 0
+    if held + shares > pool:
+        return (
+            "Only %s of the book's %s shares are unallocated. "
+            "Raise the book's total shares, or lower this holding."
+            % (f"{pool - held:,}", f"{pool:,}")
+        )
+    return None
 
 
 class AssetAccountsReceivableForm(forms.ModelForm):

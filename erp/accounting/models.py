@@ -648,7 +648,10 @@ class EquityCapital(models.Model):
         max_digits=10,
         decimal_places=2,
     )
-    new_shares_issued = models.PositiveIntegerField()
+    # Defaults to 0: most capital entries are cash going into the book,
+    # not an equity round. Holdings can be set directly on the book page,
+    # so forcing a share count on every deposit only invites a wrong one.
+    new_shares_issued = models.PositiveIntegerField(default=0, blank=True)
 
     note = models.TextField(null=True, blank=True)
 

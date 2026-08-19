@@ -206,6 +206,17 @@ class EquityCapitalForm(forms.ModelForm):
                 book=book
             ).select_related("currency", "book").order_by("name")
 
+    def clean_new_shares_issued(self):
+        """Blank means none.
+
+        The field is blank=True with a default of 0, but the input is
+        still rendered, so an untouched form posts "" rather than
+        omitting it — and "" cleans to None, which the not-null column
+        rejects and which AddEquityCapital would then try to add to the
+        stakeholder's holding.
+        """
+        return self.cleaned_data.get("new_shares_issued") or 0
+
 
 class EquityRevenueForm(forms.ModelForm):
     class Meta:

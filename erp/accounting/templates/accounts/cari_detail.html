@@ -101,6 +101,12 @@
   .cd-info .val a { color: var(--nejum-teal-700); text-decoration: none; }
   .cd-info .val a:hover { color: var(--nejum-teal-500); }
   .cd-info .val.muted { color: var(--gray-500); font-weight: 500; }
+  /* CRM record link — the arrow says "this leaves the page" (new tab). */
+  .cd-crm-link { display: inline-flex; align-items: center; gap: 6px; }
+  /* Both selectors: lucide REPLACES the <i> with an <svg>, so a rule
+     written against `i` alone stops matching the moment icons render. */
+  .cd-crm-link i, .cd-crm-link svg { width: 12px; height: 12px; stroke-width: 2; opacity: 0.5; transition: opacity 140ms; flex-shrink: 0; }
+  .cd-crm-link:hover i, .cd-crm-link:hover svg { opacity: 1; }
 
   /* Tables in detail cards */
   .cd-tbl { width: 100%; border-collapse: collapse; font: 400 13px var(--font-sans); }
@@ -376,7 +382,7 @@
                 {% endif %}
               </td>
               <td>
-                {{ m.mv.description|default:"—" }}
+                {{ m.description|default:"—" }}
                 {% if m.mv.created_by %}<div style="font-size: 11px; color: var(--gray-500); margin-top: 2px;">{% blocktrans with name=m.mv.created_by %}by {{ name }}{% endblocktrans %}</div>{% endif %}
               </td>
               <td style="font-size: 12.5px;">
@@ -481,9 +487,44 @@
             <h3>{% trans "CRM Link" %}</h3>
           </div>
           <div class="cd-info">
-            {% if cari.contact %}<div class="row" style="grid-column: 1/-1;"><div class="lbl">{% trans "Contact" %}</div><div class="val">{{ cari.contact }}</div></div>{% endif %}
-            {% if cari.company %}<div class="row" style="grid-column: 1/-1;"><div class="lbl">{% trans "Company" %}</div><div class="val">{{ cari.company }}</div></div>{% endif %}
-            {% if cari.supplier %}<div class="row" style="grid-column: 1/-1;"><div class="lbl">{% trans "Supplier" %}</div><div class="val">{{ cari.supplier }}</div></div>{% endif %}
+            {% comment %}
+              Each row opens its CRM record in a NEW TAB: this card is
+              read while working the ledger below it, so following the
+              link shouldn't cost the account page you're standing on.
+            {% endcomment %}
+            {% if cari.contact %}
+            <div class="row" style="grid-column: 1/-1;">
+              <div class="lbl">{% trans "Contact" %}</div>
+              <div class="val">
+                <a class="cd-crm-link" href="{% url 'crm:contact_detail' cari.contact.pk %}"
+                   target="_blank" rel="noopener" title="{% trans 'Open in CRM (new tab)' %}">
+                  {{ cari.contact }}<i data-lucide="external-link"></i>
+                </a>
+              </div>
+            </div>
+            {% endif %}
+            {% if cari.company %}
+            <div class="row" style="grid-column: 1/-1;">
+              <div class="lbl">{% trans "Company" %}</div>
+              <div class="val">
+                <a class="cd-crm-link" href="{% url 'crm:company_detail' cari.company.pk %}"
+                   target="_blank" rel="noopener" title="{% trans 'Open in CRM (new tab)' %}">
+                  {{ cari.company }}<i data-lucide="external-link"></i>
+                </a>
+              </div>
+            </div>
+            {% endif %}
+            {% if cari.supplier %}
+            <div class="row" style="grid-column: 1/-1;">
+              <div class="lbl">{% trans "Supplier" %}</div>
+              <div class="val">
+                <a class="cd-crm-link" href="{% url 'crm:supplier_detail' cari.supplier.pk %}"
+                   target="_blank" rel="noopener" title="{% trans 'Open in CRM (new tab)' %}">
+                  {{ cari.supplier }}<i data-lucide="external-link"></i>
+                </a>
+              </div>
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>

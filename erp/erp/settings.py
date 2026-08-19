@@ -31,9 +31,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # changes for that deployment.
 #
 # When ENV_PROFILE=foo is set, we load .env.foo instead. Lets one ERP
-# codebase serve multiple brands (Belino, future tenants) where each
-# brand has its own DB credentials and target schema.
-#   ENV_PROFILE=belino python manage.py runserver 8001
+# codebase serve multiple brands (future tenants) where each brand has
+# its own DB credentials and target schema.
+#   ENV_PROFILE=acme python manage.py runserver 8001
 # ----------------------------------------------------------------------
 _env_profile = os.environ.get("ENV_PROFILE", "").strip()
 if _env_profile:
@@ -87,9 +87,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.up.railway.app",   # any Railway-hosted service URL
     "https://*.onrender.com",     # Render fallback
     "https://48c4e0a19cf1.ngrok-free.app",
-    # Inline image upload from Belino dev server (cross-origin POST).
-    "http://localhost:3010",
-    "http://127.0.0.1:3010",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -115,8 +112,6 @@ CSRF_COOKIE_SECURE = not DEBUG
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:3010",  # Belino B2B frontend
-    "http://127.0.0.1:3010",
     "https://karvenhome.com",
     "https://www.karvenhome.com",
     "https://demfirat.com",
@@ -178,7 +173,6 @@ INSTALLED_APPS = [
     # app stays registered so migration dependencies on ('current_account', …)
     # in operating/ and its own history keep resolving. See its apps.py.
     "current_account",
-    "storefront",  # Online store CMS (header menu, home sections, featured products)
     "django_htmx",
     "crispy_forms",
     "crispy_bootstrap5",
@@ -243,7 +237,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "erp.urls"
 
 # ------------------------------------------------------------------
-# BRAND switch — in production, set ONE env var (BRAND=belino) and
+# BRAND switch — in production, set ONE env var (BRAND=<tenant>) and
 # every brand-specific setting flips together. Individual env vars
 # (DB_SCHEMA, BRAND_NAME, …) still take precedence when set, so a
 # deployment can override any single value without losing the rest.
@@ -275,26 +269,6 @@ BRAND_DEFAULTS = {
         "CARI_BOOK_NAME": "DEMFIRAT",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3000",
-        "STOREFRONT_PREVIEW_URL": "http://localhost:3000/",
-    },
-    "belino": {
-        "DB_SCHEMA": "BELINO",
-        "BRAND_NAME": "Belino",
-        "BRAND_LEGAL_SUFFIX": "SAN. TİC. LTD. ŞTİ.",
-        "BRAND_ADDRESS": "",
-        "BRAND_PHONE": "",
-        "BRAND_FAX": "",
-        "BRAND_EMAIL": "",
-        "BRAND_TAX_OFFICE": "",
-        "BRAND_TAX_NUMBER": "",
-        "BRAND_LOGO_URL": "",
-        # Unset on purpose: BELINO's books are its own, and the automatic
-        # rule (the book already holding the most accounts) is right there.
-        "CARI_BOOK_NAME": "",
-        "BRAND_INVOICE_PREFIX": "BLN",
-        "UI_THEME": "nejum",
-        "CLIENT_PUBLIC_URL": "http://localhost:3010",
-        "STOREFRONT_PREVIEW_URL": "http://localhost:3010/",
     },
 }
 _brand_cfg = BRAND_DEFAULTS.get(BRAND, BRAND_DEFAULTS["demfirat"])
@@ -317,10 +291,7 @@ BRAND_TAX_NUMBER = config("BRAND_TAX_NUMBER", default=_brand_cfg.get("BRAND_TAX_
 BRAND_LOGO_URL = config("BRAND_LOGO_URL", default=_brand_cfg.get("BRAND_LOGO_URL", "")).strip()
 BRAND_INVOICE_PREFIX = config("BRAND_INVOICE_PREFIX", default=_brand_cfg.get("BRAND_INVOICE_PREFIX", "")).strip()
 CLIENT_PUBLIC_URL = config("CLIENT_PUBLIC_URL", default=_brand_cfg["CLIENT_PUBLIC_URL"]).strip()
-STOREFRONT_PREVIEW_URL = config(
-    "STOREFRONT_PREVIEW_URL", default=_brand_cfg["STOREFRONT_PREVIEW_URL"]
-).strip()
-print(f"[BRAND] Active brand: {BRAND} (schema={DB_SCHEMA}, preview={STOREFRONT_PREVIEW_URL})")
+print(f"[BRAND] Active brand: {BRAND} (schema={DB_SCHEMA})")
 
 _template_dirs = [os.path.join(BASE_DIR, "templates")]
 if UI_THEME:
@@ -386,11 +357,11 @@ DATABASES = {
             "connect_timeout": 10,
             # Per-brand schema isolation. Uses the already-resolved
             # DB_SCHEMA constant (line ~258) which honours BRAND_DEFAULTS,
-            # so `BRAND=belino` correctly scopes the connection to the
-            # BELINO schema even when .env has no explicit DB_SCHEMA.
+            # so `BRAND=<tenant>` correctly scopes the connection to that
+            # brand's schema even when .env has no explicit DB_SCHEMA.
             # NOTE: Re-calling config("DB_SCHEMA", default="public") here
             # ignores BRAND_DEFAULTS and silently fell back to public —
-            # exactly the bug that hid Belino data behind the demfirat
+            # exactly the bug that hid a tenant's data behind the demfirat
             # connection.
             "options": (
                 f'-c search_path="{DB_SCHEMA}",public'

@@ -132,7 +132,7 @@ class Command(BaseCommand):
         profile_name = schema.lower()
         stub = (
             f"# Save the following as .env.{profile_name} next to your other env files\n"
-            f"# (alongside .env.belino), then start ERP with:\n"
+            f"# (alongside your other .env.<brand> files), then start ERP with:\n"
             f"#     ENV_PROFILE={profile_name} python manage.py runserver 8002\n"
             f"# (use a port that's not already taken by another brand instance)\n"
             f"\n"

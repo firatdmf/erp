@@ -347,7 +347,7 @@
 
     function fold(s) {
       // Locale-aware lowercase + diacritic stripping. Use tr-TR so
-      // Turkish I/i pairs fold the same way the Belino frontend does;
+      // Turkish I/i pairs fold the same way the storefront frontend does;
       // English content passes through unchanged.
       return (s || '').toLocaleLowerCase('tr-TR')
         .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i');

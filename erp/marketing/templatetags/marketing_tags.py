@@ -19,8 +19,8 @@ class DecimalEncoder(json.JSONEncoder):
 @register.filter
 def product_name(product, locale="tr"):
     """
-    Resolve the user-facing product name. Belino stores the localized
-    title inside `description` as JSON:
+    Resolve the user-facing product name. Some storefronts keep the
+    localized title inside `description` as JSON:
         {"translations": {"tr": {"title": "..."}, "en": {"title": "..."}}}
     Fall back to product.title when description is plain HTML or missing.
     """

@@ -45,8 +45,8 @@
   /* Compact filter bar — same chip pattern as payment_list. */
   .st-toolbar {
     display: grid;
-    /* Pills (wide) | Baş | Bit | Temizle */
-    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    /* Pills (wide) | Baş | Bit | Sıra | Temizle */
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) auto auto;
     gap: 8px;
     align-items: center;
     padding: 8px 10px;
@@ -227,6 +227,48 @@
   .mv-st-overdue   { background: #FECACA; color: #991B1B; }
   .mv-type::before { content:''; width: 5px; height: 5px; border-radius: 50%; background: var(--gray-500); }
 
+  /* Row actions — one small segmented control that only materialises on
+     hover, so the ledger reads as a ledger and not as a wall of buttons.
+     The column keeps its width whatever the state, so nothing shifts. */
+  .st-tbl th.st-actions-h,
+  .st-tbl td.st-actions { width: 1%; white-space: nowrap; text-align: right; padding-left: 16px; padding-right: 12px; }
+  .st-act-group {
+    display: inline-flex; align-items: center; gap: 3px;
+    opacity: 0; transition: opacity 120ms ease;
+  }
+  .st-tbl tbody tr:hover .st-act-group,
+  .st-act-group:focus-within { opacity: 1; }
+  .st-act {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
+    background: none; color: #A3AFBB; cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  /* Lucide draws at stroke-width 2 by default, which reads heavy at this
+     size — and the bin heavier than the pencil beside it. */
+  .st-act i, .st-act svg { width: 13px; height: 13px; stroke-width: 1.75; }
+  .st-act:hover { background: var(--nejum-teal-50); color: var(--nejum-teal-700); }
+  .st-act.danger:hover { background: #FEF2F2; color: #B23B12; }
+  .st-act:focus-visible { outline: 2px solid var(--nejum-teal-500); outline-offset: 1px; }
+  .st-act-form { display: inline-flex; }
+  /* Invisible controls must not be clickable — a delete button you can't
+     see shouldn't be one you can hit. Tabbing still reveals the group
+     through :focus-within, and focus isn't blocked by pointer-events. */
+  .st-tbl tbody tr:not(:hover) .st-act-group:not(:focus-within) .st-act { pointer-events: none; }
+  /* Touch has no hover state — keep them there, just muted. */
+  @media (hover: none) {
+    .st-act-group { opacity: 0.75; }
+    .st-tbl tbody tr .st-act-group .st-act { pointer-events: auto; }
+  }
+  .st-act-none { color: #DDE3E9; font-size: 11px; }
+
+  /* Reading-order toggle — sits with Clear, styled as a quiet control
+     rather than a fifth pill competing with the filters. */
+  .st-sort { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; background: white; border: 1px solid #E0E6EE; border-radius: 8px; font: 600 12px var(--font-sans); color: var(--gray-700); cursor: pointer; white-space: nowrap; transition: all 140ms; }
+  .st-sort i, .st-sort svg { width: 13px; height: 13px; opacity: 0.6; }
+  .st-sort:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .st-sort:hover i, .st-sort:hover svg { opacity: 1; }
+
   .st-empty { padding: 80px 24px; text-align: center; }
   .st-empty .ico { display:inline-flex; align-items:center; justify-content:center; width: 64px; height: 64px; border-radius: 50%; background: var(--nejum-teal-50); color: var(--nejum-teal-700); margin-bottom: 20px; }
   .st-empty .ico i { width: 28px; height: 28px; }
@@ -275,7 +317,7 @@
       <button type="button"
               data-dir="" data-status=""
               class="st-pill {% if not filter_direction and not filter_status %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}{% endif %}"
+              hx-get="{% url 'accounts:statement' cari.pk %}?{% if date_from %}date_from={{ date_from }}&{% endif %}{% if date_to %}date_to={{ date_to }}&{% endif %}{% if sort == 'desc' %}sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -284,7 +326,7 @@
       <button type="button"
               data-dir="in" data-status=""
               class="st-pill st-pill-in {% if filter_direction == 'in' and not filter_status %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?direction=in{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+              hx-get="{% url 'accounts:statement' cari.pk %}?direction=in{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -293,7 +335,7 @@
       <button type="button"
               data-dir="out" data-status=""
               class="st-pill st-pill-out {% if filter_direction == 'out' and not filter_status %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?direction=out{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+              hx-get="{% url 'accounts:statement' cari.pk %}?direction=out{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -302,7 +344,7 @@
       <button type="button"
               data-dir="" data-status="cancelled"
               class="st-pill st-pill-void {% if filter_status == 'cancelled' %}active{% endif %}"
-              hx-get="{% url 'accounts:statement' cari.pk %}?status=cancelled{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+              hx-get="{% url 'accounts:statement' cari.pk %}?status=cancelled{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}{% if sort == 'desc' %}&sort=desc{% endif %}"
               hx-target="#stmt-results"
               hx-swap="innerHTML"
               hx-push-url="true">
@@ -311,6 +353,7 @@
     </div>
     <input type="hidden" name="direction" id="dirInput" value="{{ filter_direction }}">
     <input type="hidden" name="status"    id="statusInput" value="{{ filter_status }}">
+    <input type="hidden" name="sort"      id="sortInput"   value="{{ sort }}">
 
     <label class="st-ctl" title="{% trans 'From' %}">
       <span class="st-ctl-lbl">{% trans "From" %}</span>
@@ -321,6 +364,16 @@
       <span class="st-ctl-lbl">{% trans "To" %}</span>
       <input type="date" name="date_to" value="{{ date_to }}">
     </label>
+
+    <button type="button" class="st-sort"
+            title="{% trans 'Change the reading order' %}"
+            hx-get="{% url 'accounts:statement' cari.pk %}?sort={% if sort == 'desc' %}asc{% else %}desc{% endif %}{% if filter_direction %}&direction={{ filter_direction }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
+            hx-target="#stmt-results"
+            hx-swap="innerHTML"
+            hx-push-url="true">
+      <i data-lucide="{% if sort == 'desc' %}arrow-down-narrow-wide{% else %}arrow-up-narrow-wide{% endif %}"></i>
+      <span>{% if sort == 'desc' %}{% trans "Newest first" %}{% else %}{% trans "Oldest first" %}{% endif %}</span>
+    </button>
 
     <a href="{% url 'accounts:statement' cari.pk %}" class="clear-link">{% trans "Clear" %}</a>
   </form>

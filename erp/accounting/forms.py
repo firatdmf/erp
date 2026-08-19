@@ -12,6 +12,81 @@ class BookForm(forms.ModelForm):
         fields = "__all__"
 
 
+class BookNameForm(forms.ModelForm):
+    """Rename-only form for the book detail header.
+
+    Deliberately NOT BookForm: that one is fields="__all__", and
+    total_shares is what every stakeholder's percentage is divided by.
+    A rename has no business carrying it.
+    """
+
+    class Meta:
+        model = Book
+        fields = ["name"]
+
+
+class CashAccountForm(forms.ModelForm):
+    """Edit a cash account from its book.
+
+    `balance` is deliberately not a field. It is a running total kept by
+    handle_equity_transaction and by Payment.confirm/cancel, so typing a
+    new figure here would silently desync the account from the
+    CashTransactionEntry history that explains it. A wrong balance is
+    corrected with a transaction, not by overwriting the total.
+
+    `book` is not a field either — it comes from the URL. An account is
+    created and edited through the book it belongs to, and moving one
+    between books afterwards would strand its history.
+
+    A new account also starts at a zero balance: money arrives through a
+    transaction, which is what the balance is a running total of.
+    """
+
+    class Meta:
+        model = CashAccount
+        fields = ["name", "currency"]
+
+    def __init__(self, *args, book=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The book always comes from the URL. Set before validation, so
+        # clean() has it for the uniqueness check and save() for the
+        # column.
+        if book is not None:
+            self.instance.book = book
+        if self.instance.pk and self.instance.is_in_use:
+            # Balances are summed per currency across the book, so
+            # re-denominating an account that already holds movements
+            # would restate every total it feeds without touching a
+            # single transaction.
+            self.fields["currency"].disabled = True
+            self.fields["currency"].help_text = (
+                "Locked — this account already has activity. The currency "
+                "can only be changed while an account is still unused."
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        name = cleaned.get("name")
+        currency = cleaned.get("currency")
+        # (book, name, currency) is unique, but `book` is not on the form
+        # so the model's own check skips it. Do it here to get a usable
+        # message instead of an IntegrityError.
+        if name and currency and self.instance.book_id:
+            clash = (
+                CashAccount.objects.filter(
+                    book_id=self.instance.book_id, name=name, currency=currency
+                )
+                .exclude(pk=self.instance.pk)
+                .exists()
+            )
+            if clash:
+                self.add_error(
+                    "name",
+                    "This book already has an account with that name and currency.",
+                )
+        return cleaned
+
+
 class StakeholderBookForm(forms.ModelForm):
     class Meta:
         model = StakeholderBook

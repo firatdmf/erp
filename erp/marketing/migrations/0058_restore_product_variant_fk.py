@@ -2,7 +2,7 @@
 
 The column had been dropped by hand from the production database. This
 migration was written to put it back, and it did its job there and on the
-BELINO schema.
+other brand schemas.
 
 It is redundant on any database built by replaying the migrations, because
 marketing/0013 already adds the field — state going into this migration
@@ -21,7 +21,7 @@ column and does nothing on one that is not:
     column exists.
 
 Databases that already applied this keep it marked applied and never re-run
-it, so nothing changes for production or BELINO.
+it, so nothing changes for production or any existing brand schema.
 
 Note: the repair path adds only the column, not the foreign key constraint
 and index that 0013 creates alongside it. That is deliberate — the only

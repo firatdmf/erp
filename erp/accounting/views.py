@@ -123,6 +123,95 @@ class CreateBook(generic.edit.CreateView):
 
 
 @method_decorator(login_required, name="dispatch")
+class AddCashAccount(generic.edit.CreateView):
+    """Create a cash account on a book.
+
+    The book comes from the URL rather than a form field, so an account
+    can only ever be created onto the book whose page you started from.
+    """
+
+    model = CashAccount
+    form_class = CashAccountForm
+    template_name = "accounting/cash_account_form.html"
+
+    def get_book(self):
+        return get_object_or_404(Book, pk=self.kwargs.get("pk"))
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["book"] = self.get_book()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["book"] = self.get_book()
+        return context
+
+    def get_success_url(self):
+        return reverse("accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")})
+
+
+@method_decorator(login_required, name="dispatch")
+class EditCashAccount(generic.edit.UpdateView):
+    """Edit one of a book's cash accounts.
+
+    Reached from the Cash Accounts card on the book detail page, and
+    scoped to that book: an account belongs to exactly one book, so
+    /books/3/cash_accounts/9/edit/ must 404 when account 9 lives in
+    another book rather than quietly editing it.
+    """
+
+    model = CashAccount
+    form_class = CashAccountForm
+    template_name = "accounting/cash_account_form.html"
+    pk_url_kwarg = "account_pk"
+    context_object_name = "cash_account"
+
+    def get_queryset(self):
+        return CashAccount.objects.filter(
+            book=self.kwargs.get("pk")
+        ).select_related("book", "currency")
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["book"] = self.object.book
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["book"] = self.object.book
+        return context
+
+    def get_success_url(self):
+        return reverse("accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")})
+
+
+@method_decorator(login_required, name="dispatch")
+class RenameBook(generic.edit.UpdateView):
+    """Rename a book in place from its detail page header.
+
+    POST-only and JSON-only — the page swaps the <h1> for an input and
+    posts here, so there is no GET form to render and no redirect to
+    follow. Uniqueness and length come from the model field, so a
+    clashing or empty name comes back as a 400 the header can show
+    without leaving the page.
+    """
+
+    model = Book
+    form_class = BookNameForm
+    http_method_names = ["post"]
+
+    def form_valid(self, form):
+        self.object = form.save()
+        return JsonResponse({"success": True, "name": self.object.name})
+
+    def form_invalid(self, form):
+        return JsonResponse(
+            {"success": False, "errors": form.errors.get_json_data()}, status=400
+        )
+
+
+@method_decorator(login_required, name="dispatch")
 class BookDetail(generic.DetailView):
     model = Book
     template_name = "accounting/book_detail.html"
@@ -144,6 +233,11 @@ class BookDetail(generic.DetailView):
             .filter(book=book)
             .select_related("currency", "supplier", "paid_with_cash_account")
             .order_by("-created_at")
+        )
+        context["cash_accounts"] = (
+            CashAccount.objects.filter(book=book)
+            .select_related("currency")
+            .order_by("currency__code", "name")
         )
 
         return context
@@ -853,6 +947,17 @@ class SalesView(generic.TemplateView):
 class EquityExpenseList(generic.ListView):
     model = EquityExpense
     template_name = "accounting/equity_expense_list.html"
+
+    def get_queryset(self):
+        # Scoped to the book in the URL — the page is reached from that
+        # book's detail view, so showing every book's expenses would be
+        # wrong on a multi-book install (and leak between them).
+        book_pk = self.kwargs.get("pk")
+        return (
+            EquityExpense.objects.filter(book=book_pk)
+            .select_related("category", "cash_account", "currency")
+            .order_by("-date", "-pk")
+        )
 
 
 @method_decorator(login_required, name="dispatch")

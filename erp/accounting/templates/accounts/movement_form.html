@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% load humanize %}
+{% load l10n %}
 
 {% block css %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -110,13 +111,13 @@
 {% block content %}
 <div class="mf">
 
-  <a class="mf-back" href="{% url 'accounts:detail' cari.pk %}">
-    <i data-lucide="arrow-left"></i> {{ cari.name }}
+  <a class="mf-back" href="{% if movement %}{% url 'accounts:statement' cari.pk %}{% else %}{% url 'accounts:detail' cari.pk %}{% endif %}">
+    <i data-lucide="arrow-left"></i> {% if movement %}{% trans "Statement" %}{% else %}{{ cari.name }}{% endif %}
   </a>
 
   <div class="mf-head">
-    <div class="mf-eyebrow">{% trans "Add Movement" %}</div>
-    <h1 class="mf-title">{% trans "New Movement" %}</h1>
+    <div class="mf-eyebrow">{% if movement %}{% trans "Edit Movement" %}{% else %}{% trans "Add Movement" %}{% endif %}</div>
+    <h1 class="mf-title">{% if movement %}{% trans "Edit Movement" %}{% else %}{% trans "New Movement" %}{% endif %}</h1>
   </div>
 
   <form method="post">
@@ -141,19 +142,19 @@
 
           <div class="mf-f">
             <label>{% trans "Date" %}<span class="req">*</span></label>
-            <input type="date" name="date" required value="{{ today|date:'Y-m-d' }}">
+            <input type="date" name="date" required value="{% if movement %}{{ movement.date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
           </div>
 
           <div class="mf-f">
             <label>{% trans "Due Date (optional)" %}</label>
-            <input type="date" name="due_date">
+            <input type="date" name="due_date" value="{{ movement.due_date|date:'Y-m-d' }}">
           </div>
 
           <div class="mf-f">
             <label>{% trans "Movement Type" %}<span class="req">*</span></label>
             <select name="movement_type" required>
               {% for val,label in movement_type_choices %}
-                <option value="{{ val }}" {% if val == 'adjustment' %}selected{% endif %}>{{ label }}</option>
+                <option value="{{ val }}" {% if movement %}{% if movement.movement_type == val %}selected{% endif %}{% elif val == 'adjustment' %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>
@@ -162,7 +163,7 @@
             <label>{% trans "Currency" %}</label>
             <select name="currency">
               {% for c in currencies %}
-                <option value="{{ c.id }}" {% if c.id == cari.default_currency_id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
+                <option value="{{ c.id }}" {% if movement %}{% if movement.currency_id == c.id %}selected{% endif %}{% elif c.id == cari.default_currency_id %}selected{% endif %}>{{ c.code }} — {{ c.name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -171,14 +172,14 @@
             <label>{% trans "Direction" %}<span class="req">*</span></label>
             <div class="mf-dir">
               <label class="debit">
-                <input type="radio" name="direction" value="debit" checked>
+                <input type="radio" name="direction" value="debit" {% if not movement or movement.amount >= 0 %}checked{% endif %}>
                 <div class="lbl-w">
                   <b>{% trans "Debit (+)" %}</b>
                   <span>{% trans "Account now owes us" %}</span>
                 </div>
               </label>
               <label class="credit">
-                <input type="radio" name="direction" value="credit">
+                <input type="radio" name="direction" value="credit" {% if movement and movement.amount < 0 %}checked{% endif %}>
                 <div class="lbl-w">
                   <b>{% trans "Credit (−)" %}</b>
                   <span>{% trans "Account paid / refunded" %}</span>
@@ -189,17 +190,19 @@
 
           <div class="mf-f">
             <label>{% trans "Amount" %}<span class="req">*</span></label>
-            <input type="number" step="0.01" name="amount" required min="0.01" placeholder="0.00">
+            {# magnitude only — the debit/credit radio carries the sign; unlocalized so a number input accepts it #}
+            <input type="number" step="0.01" name="amount" required min="0.01"
+                   value="{% if movement %}{{ abs_amount|unlocalize }}{% endif %}" placeholder="0.00">
           </div>
 
           <div class="mf-f">
             <label>{% trans "Reference" %}</label>
-            <input type="text" name="reference" maxlength="50" placeholder="{% trans 'Invoice no, check no, etc.' %}">
+            <input type="text" name="reference" maxlength="50" value="{{ movement.reference|default:'' }}" placeholder="{% trans 'Invoice no, check no, etc.' %}">
           </div>
 
           <div class="mf-f span-2">
             <label>{% trans "Description" %}</label>
-            <input type="text" name="description" maxlength="300" placeholder="{% trans 'What is this movement about?' %}">
+            <input type="text" name="description" maxlength="300" value="{{ movement.description|default:'' }}" placeholder="{% trans 'What is this movement about?' %}">
           </div>
 
         </div>
@@ -211,9 +214,9 @@
           {% trans "Debit increases the balance owed to us. Credit reduces it." %}
         </div>
         <div class="mf-foot-r">
-          <a href="{% url 'accounts:detail' cari.pk %}" class="mf-btn ghost">{% trans "Cancel" %}</a>
+          <a href="{% if movement %}{% url 'accounts:statement' cari.pk %}{% else %}{% url 'accounts:detail' cari.pk %}{% endif %}" class="mf-btn ghost">{% trans "Cancel" %}</a>
           <button type="submit" class="mf-btn primary">
-            <i data-lucide="check"></i>{% trans "Save Movement" %}
+            <i data-lucide="check"></i>{% if movement %}{% trans "Save Changes" %}{% else %}{% trans "Save Movement" %}{% endif %}
           </button>
         </div>
       </div>

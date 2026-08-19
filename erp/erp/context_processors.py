@@ -19,8 +19,6 @@ def ui_theme(request):
     invoice/proforma document template for the issuer header block.
     Leave them unset and the template falls back to dashes.
     """
-    base = getattr(_settings, "STOREFRONT_PREVIEW_URL", "http://localhost:3010/")
-    sep = "&" if "?" in base else "?"
     return {
         "UI_THEME": getattr(_settings, "UI_THEME", ""),
         "DB_SCHEMA": getattr(_settings, "DB_SCHEMA", "public"),
@@ -33,8 +31,6 @@ def ui_theme(request):
         "BRAND_LOGO_URL": getattr(_settings, "BRAND_LOGO_URL", ""),
         "BRAND_TAX_OFFICE": getattr(_settings, "BRAND_TAX_OFFICE", ""),
         "BRAND_TAX_NUMBER": getattr(_settings, "BRAND_TAX_NUMBER", ""),
-        "STOREFRONT_PREVIEW_URL": base,
-        "STOREFRONT_PREVIEW_URL_WITH_EDIT": f"{base}{sep}edit=1",
     }
 
 # This is for base view functions to work on everywhere

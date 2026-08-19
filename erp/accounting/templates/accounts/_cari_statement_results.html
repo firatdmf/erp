@@ -32,13 +32,22 @@
         <th class="num">{% trans "Debit" %}</th>
         <th class="num">{% trans "Credit" %}</th>
         <th class="num">{% trans "Balance" %}</th>
+        <th class="st-actions-h no-print"></th>
       </tr>
     </thead>
     <tbody>
+      {% comment %}
+        The opening balance is where the running balance STARTS, so it
+        belongs at whichever end the reading starts from: above the rows
+        oldest-first, below them newest-first.
+      {% endcomment %}
+      {% if sort != 'desc' %}
       <tr class="opening">
         <td colspan="7">{% trans "Opening Balance" %}</td>
         <td class="num">{{ opening|floatformat:2|intcomma }}</td>
+        <td class="no-print"></td>
       </tr>
+      {% endif %}
       {% for r in rows %}
         {% with link_url='' pay=r.linked_payment inv=r.linked_invoice %}
           {% if pay %}{% url 'accounts:payment_detail' pay.pk as link_url %}
@@ -58,7 +67,7 @@
           {% endif %}
         </td>
         <td>
-          <span class="st-desc {% if not r.mv.description %}muted{% endif %}">{{ r.mv.description|default:"—" }}</span>
+          <span class="st-desc {% if not r.description %}muted{% endif %}">{{ r.description|default:"—" }}</span>
           {% if r.mv.created_by %}<div style="font-size: 11px; color: var(--gray-500); margin-top: 2px;">{% blocktrans with name=r.mv.created_by %}by {{ name }}{% endblocktrans %}</div>{% endif %}
         </td>
         <td>
@@ -83,9 +92,49 @@
         <td class="num {% if r.mv.amount > 0 %}pos{% else %}muted{% endif %}">{% if r.mv.amount > 0 %}{{ r.mv.amount|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
         <td class="num {% if r.mv.amount < 0 %}neg{% else %}muted{% endif %}">{% if r.mv.amount < 0 %}{{ r.mv.amount|floatformat:2|intcomma|cut:'-' }}{% else %}—{% endif %}</td>
         <td class="num">{{ r.balance_after|floatformat:2|intcomma }}</td>
+        <td class="st-actions no-print">
+          {% if r.editable %}
+            <span class="st-act-group">
+              <a class="st-act" href="{% url 'accounts:movement_edit' cari.pk r.mv.pk %}"
+                 title="{% trans 'Edit this row' %}" onclick="event.stopPropagation();">
+                <i data-lucide="pencil"></i>
+              </a>
+              <form class="st-act-form" method="post"
+                    action="{% url 'accounts:movement_delete' cari.pk r.mv.pk %}"
+                    onclick="event.stopPropagation();"
+                    onsubmit="return confirm('{% trans "This movement will be deleted and the balance recalculated. Are you sure?" %}');">
+                {% csrf_token %}
+                <button type="submit" class="st-act danger" title="{% trans 'Delete this row' %}">
+                  <i data-lucide="trash-2"></i>
+                </button>
+              </form>
+            </span>
+          {% elif r.owner_edit_url %}
+            {% comment %}
+              Posted by a document — it recomputes this row, so the edit
+              lives there. A different icon, because this navigates away
+              rather than opening the row itself.
+            {% endcomment %}
+            <span class="st-act-group">
+              <a class="st-act" href="{{ r.owner_edit_url }}" onclick="event.stopPropagation();"
+                 title="{% blocktrans with doc=r.owner_label %}Edit in the {{ doc }}{% endblocktrans %}">
+                <i data-lucide="external-link"></i>
+              </a>
+            </span>
+          {% else %}
+            <span class="st-act-none" title="{{ r.owner_label }}">—</span>
+          {% endif %}
+        </td>
       </tr>
         {% endwith %}
       {% endfor %}
+      {% if sort == 'desc' %}
+      <tr class="opening">
+        <td colspan="7">{% trans "Opening Balance" %}</td>
+        <td class="num">{{ opening|floatformat:2|intcomma }}</td>
+        <td class="no-print"></td>
+      </tr>
+      {% endif %}
     </tbody>
     <tfoot>
       <tr>
@@ -93,6 +142,7 @@
         <td class="num pos">+{{ debit_total|floatformat:2|intcomma }}</td>
         <td class="num neg">−{{ credit_total|floatformat:2|intcomma }}</td>
         <td class="num">{{ closing|floatformat:2|intcomma }}</td>
+        <td class="no-print"></td>
       </tr>
     </tfoot>
   </table>

@@ -573,15 +573,17 @@ class CashAccount(models.Model):
             )
         ]
 
-    # Each book will have its own set of cash accounts
-    book = models.ForeignKey(
-        Book, on_delete=models.CASCADE, blank=False, null=False, default=1
-    )
+    # Each book will have its own set of cash accounts. No default: a
+    # cash account belongs to the book it was created from, and a
+    # default would let a caller that forgets to say which one attach it
+    # to book 1 instead of failing.
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
 
     name = models.CharField(max_length=50, blank=False, null=False)  # Chase USD
 
+    # Same reasoning — an unnamed currency is a bug, not "US Dollars".
     currency = models.ForeignKey(
-        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False, default=1
+        CurrencyCategory, on_delete=models.CASCADE, blank=False, null=False
     )
 
     # We will keep updating it so that the most recent entries balance will be our current cash balance of that account.
@@ -589,6 +591,24 @@ class CashAccount(models.Model):
 
     def __str__(self):
         return f"{self.name} | {self.currency.code} | Balance: {self.currency.symbol}{self.balance} ({self.book})"
+
+    @property
+    def is_in_use(self):
+        """True when anything at all references this account.
+
+        Walked generically over the reverse relations rather than a hand
+        written list: fourteen models point at CashAccount today and the
+        list only grows, and one missed here would mean quietly letting a
+        live account be re-denominated.
+        """
+        for rel in self._meta.related_objects:
+            accessor = rel.get_accessor_name()
+            if rel.one_to_one:
+                if hasattr(self, accessor):
+                    return True
+            elif getattr(self, accessor).exists():
+                return True
+        return False
 
     def clean(self):
         if self.balance < 0:

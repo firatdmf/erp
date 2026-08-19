@@ -970,6 +970,16 @@ header .header-link i {
 /* ------------------------------------------------ */
 /* Modern Buttons */
 /* ------------------------------------------------ */
+/* `hidden` means "not relevant", so it has to outrank the display below.
+   That display is an author rule and the UA sheet's `[hidden] { display:
+   none }` is not, so without this every hidden <button> renders anyway —
+   and so does one whose own component class sets a display of its own,
+   since `button[hidden]` outranks a single class. */
+button[hidden],
+.btn[hidden] {
+  display: none !important;
+}
+
 button,
 .btn {
   padding: 0.625rem 1.25rem;

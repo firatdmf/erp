@@ -14,7 +14,7 @@
       <i class="fas fa-book"></i> Books
     </a>
     <span>/</span>
-    <span class="current">{{ book.name }}</span>
+    <span class="current" id="bookCrumbName">{{ book.name }}</span>
   </div>
 
   <!-- Header -->
@@ -24,7 +24,22 @@
         <i class="fas fa-wallet"></i>
       </div>
       <div class="header-text">
-        <h1>{{ book.name }}</h1>
+        <div class="book-title-row">
+          <h1 id="bookTitle" data-rename-url="{% url 'accounting:rename_book' book.pk %}">{{ book.name }}</h1>
+          <button type="button" class="book-title-btn edit" id="bookTitleEditBtn"
+            title="Rename book" aria-label="Rename book">
+            <i class="fas fa-pen"></i>
+          </button>
+          <button type="button" class="book-title-btn save" id="bookTitleSave"
+            title="Save" aria-label="Save name" hidden>
+            <i class="fas fa-check"></i>
+          </button>
+          <button type="button" class="book-title-btn cancel" id="bookTitleCancel"
+            title="Cancel" aria-label="Cancel rename" hidden>
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <p class="book-title-error" id="bookTitleError" hidden></p>
         <p>Manage your book entries, transactions, and stakeholders</p>
       </div>
     </div>
@@ -59,6 +74,49 @@
       <i class="fas fa-balance-scale orange-icon"></i> Net Worth
     </div>
     {% net_worth_component book_pk=book.pk %}
+  </div>
+
+  <!-- Cash Accounts Card -->
+  <div class="financial-overview-card">
+    <div class="card-header-title">
+      <i class="fas fa-cash-register blue-icon"></i> Cash Accounts
+      <a class="cash-account-add" href="{% url 'accounting:add_cash_account' book.pk %}">
+        <i class="fas fa-plus"></i> Add Cash Account
+      </a>
+    </div>
+    {% if cash_accounts %}
+    <table class="assets-table cash-accounts-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Currency</th>
+          <th class="num">Balance</th>
+          <th class="cash-account-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for account in cash_accounts %}
+        <tr>
+          <td class="cash-account-name">{{ account.name }}</td>
+          <td><span class="cash-account-currency">{{ account.currency.code }}</span></td>
+          <td class="num">{{ account.currency.symbol }}{{ account.balance|format_money }}</td>
+          <td class="cash-account-actions">
+            <a class="cash-account-edit"
+               href="{% url 'accounting:edit_cash_account' book.pk account.pk %}"
+               title="Edit {{ account.name }}" aria-label="Edit {{ account.name }}">
+              <i class="fas fa-pen"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="cash-accounts-empty">
+      This book has no cash accounts yet.
+      <a href="{% url 'accounting:add_cash_account' book.pk %}">Add the first one</a>.
+    </div>
+    {% endif %}
   </div>
 
   <!-- Quick Actions Grid -->
@@ -271,4 +329,128 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+  // Rename the book by editing the printed title itself — the <h1> goes
+  // contenteditable in place, so the text never moves or changes shape.
+  (function () {
+    const MAX = 50;
+    const title = document.getElementById('bookTitle');
+    const crumb = document.getElementById('bookCrumbName');
+    const error = document.getElementById('bookTitleError');
+    const editBtn = document.getElementById('bookTitleEditBtn');
+    const saveBtn = document.getElementById('bookTitleSave');
+    const cancelBtn = document.getElementById('bookTitleCancel');
+    if (!title || !editBtn) return;
+
+    let original = title.textContent.trim();
+    let editing = false;
+
+    function setEditing(on) {
+      editing = on;
+      title.contentEditable = on ? 'true' : 'false';
+      title.classList.toggle('editing', on);
+      editBtn.hidden = on;
+      saveBtn.hidden = !on;
+      cancelBtn.hidden = !on;
+      if (!on) error.hidden = true;
+    }
+
+    function selectAll() {
+      const range = document.createRange();
+      range.selectNodeContents(title);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    function start() {
+      original = title.textContent.trim();
+      setEditing(true);
+      title.focus();
+      selectAll();
+    }
+
+    function cancel() {
+      title.textContent = original;
+      setEditing(false);
+    }
+
+    function showError(message) {
+      error.textContent = message;
+      error.hidden = false;
+    }
+
+    function save() {
+      // contenteditable yields whatever was typed or pasted, so collapse
+      // any newlines the browser let in before this becomes a name.
+      const name = title.textContent.replace(/\s+/g, ' ').trim();
+      if (!name) { showError('Name cannot be empty.'); title.focus(); return; }
+      if (name.length > MAX) {
+        showError('Name cannot be longer than ' + MAX + ' characters.');
+        title.focus();
+        return;
+      }
+      if (name === original) { cancel(); return; }
+
+      const body = new FormData();
+      body.append('name', name);
+
+      fetch(title.dataset.renameUrl, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: body
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.data.success) {
+            const errs = (res.data && res.data.errors) || {};
+            const first = errs.name && errs.name[0] && errs.name[0].message;
+            showError(first || 'Could not rename this book.');
+            title.focus();
+            return;
+          }
+          // The name is printed twice on this page.
+          title.textContent = res.data.name;
+          if (crumb) crumb.textContent = res.data.name;
+          original = res.data.name;
+          setEditing(false);
+        })
+        .catch(function () { showError('Could not reach the server.'); title.focus(); });
+    }
+
+    editBtn.addEventListener('click', start);
+    saveBtn.addEventListener('click', save);
+    cancelBtn.addEventListener('click', cancel);
+
+    title.addEventListener('keydown', function (e) {
+      if (!editing) return;
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    });
+
+    // A heading is not a text input: paste arrives as markup unless we
+    // take it apart ourselves.
+    title.addEventListener('paste', function (e) {
+      if (!editing) return;
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, text.replace(/\s+/g, ' '));
+    });
+
+    // Clicking the save button blurs the heading first, so let that land
+    // before deciding an outside click means "give up".
+    title.addEventListener('blur', function () {
+      setTimeout(function () {
+        if (editing && !title.contains(document.activeElement) &&
+            document.activeElement !== saveBtn && document.activeElement !== cancelBtn) {
+          cancel();
+        }
+      }, 150);
+    });
+  })();
+</script>
 {% endblock %}

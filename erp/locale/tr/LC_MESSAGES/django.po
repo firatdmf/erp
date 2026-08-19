@@ -1326,10 +1326,13 @@ msgid "Excerpt (TR) *"
 msgstr "Excerpt (TR) *"
 
 msgid "Expense #"
-msgstr "Expense #"
+msgstr "Gider No"
 
 msgid "Expenses Table"
-msgstr "Expenses Table"
+msgstr "Gider Tablosu"
+
+msgid "No expenses recorded for this book yet."
+msgstr "Bu deftere henüz gider kaydedilmemiş."
 
 msgid "Extra Footer Content (Scripts)"
 msgstr "Extra Footer Content (Scripts)"
@@ -4242,9 +4245,6 @@ msgstr "Yeni bölüm ekle"
 
 msgid "live preview"
 msgstr "canlı önizleme"
-
-msgid "Belino preview"
-msgstr "Belino önizleme"
 
 msgid "Basics"
 msgstr "Temel"
@@ -8512,3 +8512,56 @@ msgstr "İptal edilmiş ödemeler düzenlenemez. Gerekiyorsa yeni bir ödeme olu
 
 msgid "Payment updated: %(number)s"
 msgstr "Ödeme güncellendi: %(number)s"
+
+msgid "Edit Movement"
+msgstr "Hareketi Düzenle"
+
+msgid "Movement updated."
+msgstr "Hareket güncellendi."
+
+msgid "Movement deleted."
+msgstr "Hareket silindi."
+
+msgid "Edit this row"
+msgstr "Bu satırı düzenle"
+
+msgid "Delete this row"
+msgstr "Bu satırı sil"
+
+msgid ""
+"This movement will be deleted and the balance recalculated. Are you sure?"
+msgstr "Hareket silinecek ve bakiye yeniden hesaplanacak. Emin misiniz?"
+
+msgid "Edit in the %(doc)s"
+msgstr "%(doc)s üzerinden düzenle"
+
+msgid ""
+"This row belongs to a %(doc)s — edit it there and the statement follows."
+msgstr ""
+"Bu satır bir %(doc)s kaydına ait — oradan düzenleyin, ekstre kendiliğinden "
+"güncellenir."
+
+msgid ""
+"This row belongs to a %(doc)s and can't be edited from the statement."
+msgstr "Bu satır bir %(doc)s kaydına ait ve ekstreden düzenlenemez."
+
+msgid "Cancellation record"
+msgstr "İptal kaydı"
+
+msgid "Cancellation"
+msgstr "İptal"
+
+msgid "Linked document"
+msgstr "Bağlı belge"
+
+msgid "Open in CRM (new tab)"
+msgstr "CRM'de aç (yeni sekme)"
+
+msgid "Newest first"
+msgstr "Önce en yeni"
+
+msgid "Oldest first"
+msgstr "Önce en eski"
+
+msgid "Change the reading order"
+msgstr "Sıralamayı değiştir"

@@ -804,3 +804,284 @@
     padding: 0.5rem;
   }
 }
+
+/* ── Inline book rename (page header) ── */
+/* inline-flex so the row hugs the title text — hovering the NAME is what
+   reveals the pencil, not hovering anywhere in the header band. */
+.book-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The heading is edited in place, so it must keep its own type at every
+   moment. Only the outline and tint change — outline draws outside the
+   box, so switching to edit mode shifts nothing on the page. */
+.header-text h1.editing {
+  outline: 2px solid #3b82f6;
+  outline-offset: 6px;
+  border-radius: 4px;
+  background: #f8fafc;
+  caret-color: #3b82f6;
+  cursor: text;
+}
+
+.header-text h1.editing:focus {
+  outline: 2px solid #3b82f6;
+}
+
+.book-title-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: opacity var(--transition-base), color var(--transition-base),
+    background var(--transition-base), border-color var(--transition-base);
+}
+
+/* The pencil stays out of the way until the title is hovered, but a
+   keyboard user must still be able to reach it. */
+.book-title-btn.edit {
+  opacity: 0;
+}
+
+.book-title-row:hover .book-title-btn.edit,
+.book-title-btn.edit:focus-visible {
+  opacity: 1;
+}
+
+.book-title-btn.edit:hover {
+  color: #3b82f6;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.book-title-btn.save {
+  color: #16a34a;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.book-title-btn.save:hover {
+  background: #dcfce7;
+}
+
+.book-title-btn.cancel {
+  color: #94a3b8;
+  border-color: var(--border-light);
+  background: #ffffff;
+}
+
+.book-title-btn.cancel:hover {
+  color: #ef4444;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.book-title-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin: 0.55rem 0 0.35rem 0;
+}
+
+/* ── Cash Accounts card ── */
+.cash-accounts-table {
+  margin-bottom: 0;
+}
+
+.cash-accounts-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-account-name {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.cash-account-currency {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.cash-accounts-table th.cash-account-actions,
+.cash-accounts-table td.cash-account-actions {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Same restraint as the title pencil: out of the way until the row is
+   hovered, but always reachable from the keyboard. */
+.cash-account-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  color: #94a3b8;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity var(--transition-base), color var(--transition-base),
+    background var(--transition-base), border-color var(--transition-base);
+}
+
+.cash-accounts-table tr:hover .cash-account-edit,
+.cash-account-edit:focus-visible {
+  opacity: 1;
+}
+
+.cash-account-edit:hover {
+  color: #3b82f6;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.cash-accounts-empty {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  padding: 0.5rem 0;
+}
+
+/* ── Cash account edit form ── */
+.cash-account-form {
+  max-width: 26rem;
+}
+
+.cash-account-field {
+  margin-bottom: 1.25rem;
+}
+
+.cash-account-field label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.cash-account-field input,
+.cash-account-field select {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.925rem;
+  color: var(--text-main);
+  background: #ffffff;
+}
+
+.cash-account-field input:focus,
+.cash-account-field select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.cash-account-field select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.cash-account-readonly {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-account-help {
+  margin: 0.4rem 0 0 0;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  line-height: 1.45;
+}
+
+.cash-account-form-error {
+  margin: 0.4rem 0 0 0;
+  color: #ef4444;
+  font-size: 0.825rem;
+}
+
+.cash-account-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+.cash-account-submit {
+  background: #3b82f6;
+  border: 1px solid #3b82f6;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.55rem 1.4rem;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background var(--transition-base), border-color var(--transition-base);
+}
+
+.cash-account-submit:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.cash-account-back {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.cash-account-back:hover {
+  color: #ef4444;
+}
+
+/* Push the card's add action to the far edge of its header row. */
+.cash-account-add {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm, 6px);
+  background: #eff6ff;
+  color: #3b82f6;
+  font-size: 0.825rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition-base), border-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.cash-account-add:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.cash-accounts-empty a {
+  color: #3b82f6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.cash-accounts-empty a:hover {
+  text-decoration: underline;
+}

@@ -29,8 +29,8 @@
 
   {% comment %}
     Nejum design system overlay — only loaded when the active brand
-    opts in via UI_THEME in its env profile (.env.belino sets
-    UI_THEME=nejum). Loaded after base.css so its overrides win.
+    opts in via UI_THEME in its env profile (set UI_THEME=nejum in
+    .env.<brand>). Loaded after base.css so its overrides win.
     Demfirat (no UI_THEME set) gets the original ERP look untouched.
     Removing UI_THEME from the profile + restart reverts the look.
   {% endcomment %}

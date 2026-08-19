@@ -8,8 +8,11 @@ Current account (Cari Hesap) views — Phase 1.
     /accounting/accounts/<id>/edit/           → CariEdit
     /accounting/accounts/<id>/delete/         → CariDelete
     /accounting/accounts/<id>/movements/new/  → CariMovementCreate (manual entry)
+    /accounting/accounts/<id>/movements/<mid>/edit/    → CariMovementEdit
+    /accounting/accounts/<id>/movements/<mid>/delete/  → CariMovementDelete (POST)
 """
 import json
+import re
 from decimal import Decimal
 
 from django.contrib import messages
@@ -50,6 +53,18 @@ _HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "payment", "check_in", "chec
 
 def _user_movement_choices():
     return [(v, l) for v, l in CariMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
+
+
+def _movement_choices_including(current):
+    """The dropdown for an EXISTING row: the normal choices, plus the
+    row's own type when that isn't one we offer (an opening balance, a
+    legacy marker). Keeps editing a description from quietly re-typing
+    the movement."""
+    choices = _user_movement_choices()
+    if current and current not in {v for v, _l in choices}:
+        label = dict(CariMovement.MOVEMENT_TYPES).get(current, current)
+        choices = [(current, label)] + choices
+    return choices
 
 
 def _tr_case_variants(q):
@@ -376,6 +391,72 @@ class CariEdit(View):
         return redirect("accounts:detail", pk=cari.pk)
 
 
+def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=False):
+    """Which document OWNS this ledger row, and where it is edited.
+
+    A movement posted by a payment, an invoice or an order is not an
+    entry anyone should edit in place: those documents recompute it
+    (Payment.resync_posted_movement, Invoice.resync_posted_movement,
+    post_order_movement), so a hand-edit here is overwritten the next
+    time the document is touched — silently, and only sometimes. Such a
+    row therefore sends the user to the document instead.
+
+    Returns (label, url, editable_here). A manual movement — opening
+    balance, adjustment, interest, discount — owns itself, and that is
+    the only kind this app edits directly.
+    """
+    if is_cancel_row:
+        # Half of a cancellation pair. Reversing a cancellation is not an
+        # edit; it is a new document.
+        return _("Cancellation record"), None, False
+    if linked_payment is not None:
+        return (_("Collection / Payment"),
+                reverse("accounts:payment_edit", args=[linked_payment.pk]), False)
+    if linked_invoice is not None:
+        return (_("Invoice"),
+                reverse("accounts:invoice_edit", args=[linked_invoice.pk]), False)
+    if mv.source_id and mv.source_type_id:
+        model = mv.source_type.model_class()
+        if model is not None and model.__name__ == "Order":
+            return (_("Order"),
+                    reverse("operating:order_detail", args=[mv.source_id]), False)
+        # Some other document we don't have a route for — still not ours
+        # to edit, since whatever posted it can repost it.
+        return _("Linked document"), None, False
+    return None, None, True
+
+
+def _row_description(mv, linked_payment=None, linked_invoice=None, is_cancel_row=False):
+    """The text the Description column should print for this ledger row.
+
+    A movement posted by a document gets an auto-generated description
+    ("Tahsilat — COL-2026-000001", "Satis Faturasi FTR-2026-000004"),
+    which is the Type column and the Reference column read back to the
+    user a second time. So for those rows print what the *document*
+    says instead: the note whoever entered the payment actually typed.
+    Nothing to say is better than saying the number again, so when the
+    document carries no text of its own the cell stays empty.
+
+    Only a hand-entered movement — opening balance, adjustment, interest
+    — has a description that is genuinely its own, and that one is
+    printed as written.
+    """
+    if is_cancel_row:
+        # "CANCEL — Tahsilat COL-2026-000001 (reason)". The reason is
+        # the only part that isn't already on the row; without it the
+        # row would read as a plain adjustment, so keep a label.
+        reason = re.search(r"\(([^()]*)\)\s*$", mv.description or "")
+        reason = reason.group(1).strip() if reason else ""
+        return "%s — %s" % (_("Cancellation"), reason) if reason else _("Cancellation")
+    if linked_payment is not None:
+        return (linked_payment.description or "").strip()
+    if linked_invoice is not None:
+        # Invoices have no description of their own — only internal
+        # notes, which are not for the statement.
+        return ""
+    return (mv.description or "").strip()
+
+
 def _attach_links(rows):
     """Annotate each {'mv': ..., 'balance_after': ...} row with the
     Payment/Invoice it relates to and whether it is the cancellation
@@ -429,6 +510,17 @@ def _attach_links(rows):
         r["linked_payment"] = linked_pay
         r["linked_invoice"] = linked_inv
         r["is_cancel_row"] = is_cancel
+        r["description"] = _row_description(mv, linked_pay, linked_inv, is_cancel)
+
+        owner_label, owner_url, editable = _movement_owner(
+            mv, linked_pay, linked_inv, is_cancel)
+        r["owner_label"] = owner_label
+        r["owner_edit_url"] = owner_url
+        r["editable"] = editable
+        r["edit_url"] = (
+            reverse("accounts:movement_edit", args=[mv.cari_id, mv.pk])
+            if editable else owner_url
+        )
     return rows
 
 
@@ -445,7 +537,7 @@ class RetailCariRedirect(View):
     nav's "Perakende Satışları" entry lands here.
 
     Resolved by code rather than a hardcoded pk because each brand runs
-    its own schema — cari 17 on demfirat is not cari 17 on belino.
+    its own schema — cari 17 on demfirat is not cari 17 on another brand.
     """
 
     def get(self, request):
@@ -603,6 +695,13 @@ class CariStatement(View):
             rows.append({"mv": mv, "balance_after": running})
         _attach_links(rows)
 
+        # Reading order is a DISPLAY choice, made after the walk. The
+        # query itself has to stay oldest-first whatever the user picks:
+        # every row's balance is the opening balance plus everything
+        # before it, so computing it backwards would print a different
+        # number on every line.
+        sort = "desc" if request.GET.get("sort") == "desc" else "asc"
+
         # Totals match the filtered rows. For cancelled-only view this
         # naturally shows the cancelled amount (debit/credit both sum
         # since each cancellation has +X and -X) and closing = 0.
@@ -615,9 +714,13 @@ class CariStatement(View):
             else:
                 credit_total += abs(mv.amount)
 
+        if sort == "desc":
+            rows = list(reversed(rows))
+
         ctx = {
             "cari":         cari,
             "rows":         rows,
+            "sort":         sort,
             "opening":      opening,
             "closing":      running,
             "debit_total":  debit_total,
@@ -725,6 +828,123 @@ class CariMovementCreate(View):
         # gets a matching Payment, not just this view.
         messages.success(request, _g("Movement added."))
         return redirect("accounts:detail", pk=cari.pk)
+
+
+# ---------------------------------------------------------------------------
+# Movement edit / delete — hand-entered rows only
+# ---------------------------------------------------------------------------
+def _own_movement_or_redirect(request, cari, mv_pk):
+    """Fetch a movement of THIS account and refuse it if a document owns
+    it. Enforced server-side, not just by hiding the pencil: a typed or
+    bookmarked URL must not be able to edit a row that a payment,
+    invoice or order will recompute anyway.
+
+    Returns (movement, None) or (None, redirect_response).
+    """
+    mv = get_object_or_404(CariMovement, pk=mv_pk, cari=cari)
+    rows = _attach_links([{"mv": mv, "balance_after": Decimal("0")}])
+    row = rows[0]
+    if row["editable"]:
+        return mv, None
+
+    label = row["owner_label"]
+    if row["owner_edit_url"]:
+        messages.info(request,
+                      _g("This row belongs to a %(doc)s — edit it there and the "
+                         "statement follows.") % {"doc": label})
+        return None, redirect(row["owner_edit_url"])
+    messages.warning(request,
+                     _g("This row belongs to a %(doc)s and can't be edited "
+                        "from the statement.") % {"doc": label})
+    return None, redirect("accounts:statement", pk=cari.pk)
+
+
+@method_decorator(login_required, name="dispatch")
+class CariMovementEdit(View):
+    """Edit a hand-entered ledger row — an opening balance, an
+    adjustment, interest, a discount.
+
+    Amount, direction, date, currency, type and the free text are all
+    fair game. Saving re-derives the account balance (CariMovement.save)
+    and refreshes the legacy AR/AP mirror through the same post_save
+    signal that created it.
+    """
+    template_name = "accounts/movement_form.html"
+
+    def get(self, request, pk, mv_pk):
+        cari = get_object_or_404(CariAccount, pk=pk)
+        mv, blocked = _own_movement_or_redirect(request, cari, mv_pk)
+        if blocked:
+            return blocked
+        return render(request, self.template_name, {
+            "cari": cari,
+            "movement": mv,
+            # The form asks for a magnitude plus a debit/credit radio;
+            # the stored amount carries the sign.
+            "abs_amount": abs(mv.amount),
+            # The stored type can be one we never offer in the dropdown
+            # (an "opening" row, a legacy marker). Add it rather than
+            # silently re-typing the row on the first save.
+            "movement_type_choices": _movement_choices_including(mv.movement_type),
+            "currencies": _currencies(),
+        })
+
+    def post(self, request, pk, mv_pk):
+        cari = get_object_or_404(CariAccount, pk=pk)
+        mv, blocked = _own_movement_or_redirect(request, cari, mv_pk)
+        if blocked:
+            return blocked
+
+        try:
+            amount = Decimal(request.POST.get("amount") or "0")
+        except Exception:
+            messages.error(request, _g("Invalid amount."))
+            return redirect("accounts:movement_edit", pk=cari.pk, mv_pk=mv.pk)
+        if amount == 0:
+            messages.error(request, _g("Amount cannot be zero."))
+            return redirect("accounts:movement_edit", pk=cari.pk, mv_pk=mv.pk)
+
+        direction = request.POST.get("direction") or "debit"
+        mv.amount = abs(amount) if direction == "debit" else -abs(amount)
+        # amount_base is what the balance is summed from, and
+        # CariMovement.save() only recomputes it when it is falsy —
+        # leaving it as-is would save a new amount that never reached
+        # the balance.
+        mv.amount_base = Decimal("0")
+        mv.date = request.POST.get("date") or mv.date
+        mv.due_date = request.POST.get("due_date") or None
+        currency_id = request.POST.get("currency")
+        if currency_id:
+            mv.currency_id = int(currency_id)
+
+        movement_type = request.POST.get("movement_type") or mv.movement_type
+        # Same supplier normalisation as the create form — the dropdown
+        # only ever shows "collection".
+        if movement_type == "collection" and cari.type == "supplier":
+            movement_type = "payment"
+        mv.movement_type = movement_type
+
+        mv.description = request.POST.get("description", "")
+        mv.reference = request.POST.get("reference", "")
+        mv.save()   # recomputes amount_base + the account balance
+
+        messages.success(request, _g("Movement updated."))
+        return redirect("accounts:statement", pk=cari.pk)
+
+
+@method_decorator(login_required, name="dispatch")
+class CariMovementDelete(View):
+    """Delete a hand-entered ledger row. The post_delete signal drops the
+    legacy AR/AP mirror and recomputes the balance."""
+
+    def post(self, request, pk, mv_pk):
+        cari = get_object_or_404(CariAccount, pk=pk)
+        mv, blocked = _own_movement_or_redirect(request, cari, mv_pk)
+        if blocked:
+            return blocked
+        mv.delete()
+        messages.success(request, _g("Movement deleted."))
+        return redirect("accounts:statement", pk=cari.pk)
 
 
 # ---------------------------------------------------------------------------

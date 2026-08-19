@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="book-detail-page">
+  <div class="breadcrumb">
+    <a href="{% url 'accounting:index' %}">
+      <i class="fas fa-book"></i> Books
+    </a>
+    <span>/</span>
+    <a href="{% url 'accounting:book_detail' book.pk %}">{{ book.name }}</a>
+    <span>/</span>
+    <span class="current">{% if cash_account %}{{ cash_account.name }}{% else %}New Cash Account{% endif %}</span>
+  </div>
+
+  <div class="financial-overview-card">
+    <div class="card-header-title">
+      <i class="fas fa-cash-register blue-icon"></i>
+      {% if cash_account %}Edit Cash Account{% else %}New Cash Account{% endif %}
+    </div>
+
+    <form method="post" class="cash-account-form">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="cash-account-form-error">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      {% for field in form %}
+      <div class="cash-account-field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}
+        <p class="cash-account-help">{{ field.help_text }}</p>
+        {% endif %}
+        {% for err in field.errors %}
+        <p class="cash-account-form-error">{{ err }}</p>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <div class="cash-account-field">
+        <label>Balance</label>
+        {% if cash_account %}
+        <p class="cash-account-readonly">
+          {{ cash_account.currency.symbol }}{{ cash_account.balance }}
+        </p>
+        <p class="cash-account-help">
+          Balance is the running total of this account's transactions, so it
+          is not editable here. Correct it by recording a transaction.
+        </p>
+        {% else %}
+        <p class="cash-account-readonly">0.00</p>
+        <p class="cash-account-help">
+          A new account starts empty. Put money in it with a transaction —
+          Add Capital, Add Revenue or a transfer — so the balance always has
+          a history behind it.
+        </p>
+        {% endif %}
+      </div>
+
+      <div class="cash-account-form-actions">
+        <button type="submit" class="cash-account-submit">{% if cash_account %}Save{% else %}Create Account{% endif %}</button>
+        <a class="cash-account-back" href="{% url 'accounting:book_detail' book.pk %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

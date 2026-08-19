@@ -240,6 +240,29 @@ class BookDetail(generic.DetailView):
             .order_by("currency__code", "name")
         )
 
+        # Stakeholders, with the stake each one's shares actually buy.
+        # Book.total_shares is the pool every holding is measured against
+        # ("used to calculate stake of each owner based on their shares"),
+        # so an unissued book leaves everyone at 0% rather than dividing
+        # by nothing.
+        pool = book.total_shares or 0
+        context["stakeholders"] = [
+            {
+                "member": sb.member,
+                "shares": sb.shares,
+                "pct": (
+                    (Decimal(sb.shares) / Decimal(pool) * 100).quantize(Decimal("0.1"))
+                    if pool
+                    else None
+                ),
+            }
+            for sb in book.stakeholders.select_related("member__user").order_by(
+                "-shares", "pk"
+            )
+        ]
+        context["shares_pool"] = pool
+        context["shares_issued"] = sum(sb.shares for sb in book.stakeholders.all())
+
         return context
 
     def get_object(self):

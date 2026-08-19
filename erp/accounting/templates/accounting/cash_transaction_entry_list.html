@@ -43,7 +43,7 @@
           {% endif %}
           <td>{{ transaction.content_type }}</td>
           <td>{{ transaction.content_pk }}</td>
-          <td>{{ transaction.cash_account.name }}</td>
+          <td>{{ transaction.cash_account.name }} <span class="ccy">{{ transaction.cash_account.currency.code }}</span></td>
           <td>{{ transaction.cash_account.currency.symbol }}{{ transaction.cash_account_balance|format_money }}</td>
           <td>{{ base_currency_symbol }}{{ transaction.total_base_currency_balance|format_money }}</td>
         </tr>

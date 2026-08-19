@@ -226,7 +226,7 @@
               <div class="pf-f">
                 <label>{% trans "Method" %}</label>
                 <select name="method">
-                  {% for v,l in method_choices %}<option value="{{ v }}" {% if payment %}{% if payment.method == v %}selected{% endif %}{% elif v == 'bank_transfer' %}selected{% endif %}>{{ l }}</option>{% endfor %}
+                  {% for v,l in method_choices %}<option value="{{ v }}" {% if payment %}{% if payment.method == v %}selected{% endif %}{% elif v == 'cash' %}selected{% endif %}>{{ l }}</option>{% endfor %}
                 </select>
               </div>
               <div class="pf-f">
@@ -245,16 +245,16 @@
               </div>
               <div class="pf-f">
                 <label>{% trans "Currency" %}</label>
-                <select name="currency">
+                <select name="currency" id="paymentCurrency">
                   {% for c in currencies %}<option value="{{ c.id }}" {% if payment %}{% if payment.currency_id == c.id %}selected{% endif %}{% elif prefilled_cari and prefilled_cari.default_currency_id == c.id %}selected{% endif %}>{{ c.code }}</option>{% endfor %}
                 </select>
               </div>
               <div class="pf-f">
                 <label>{% trans "Cash Account" %}</label>
-                <select name="cash_account">
+                <select name="cash_account" id="paymentCashAccount">
                   <option value="">{% trans "— Select (optional) —" %}</option>
                   {% for ca in cash_accounts %}
-                    <option value="{{ ca.id }}" {% if payment and payment.cash_account_id == ca.id %}selected{% endif %}>{{ ca.name }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
+                    <option value="{{ ca.id }}" data-currency="{{ ca.currency_id }}" {% if payment and payment.cash_account_id == ca.id %}selected{% endif %}>{{ ca.name }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
                   {% endfor %}
                 </select>
               </div>
@@ -515,5 +515,53 @@
 })();
 
 if (window.lucide) lucide.createIcons();
+
+  // The cash account has to be in the currency being collected — an
+  // account carries one currency and the payment lands in it whole. So
+  // the list follows the currency select rather than offering every
+  // account and failing later.
+  (function () {
+    var currencySel = document.getElementById('paymentCurrency');
+    var cashSel = document.getElementById('paymentCashAccount');
+    if (!currencySel || !cashSel) return;
+
+    // Snapshot once and rebuild on each change: hiding <option> elements
+    // is not honoured by every browser, removing them is.
+    var placeholder = cashSel.querySelector('option[value=""]');
+    var all = Array.prototype.slice.call(cashSel.options)
+      .filter(function (o) { return o.value; })
+      .map(function (o) {
+        return { value: o.value, label: o.textContent.trim(), currency: o.dataset.currency };
+      });
+
+    function sync() {
+      var wanted = currencySel.value;
+      var previous = cashSel.value;
+      var matches = all.filter(function (o) { return o.currency === wanted; });
+
+      cashSel.innerHTML = '';
+      if (placeholder) cashSel.appendChild(placeholder.cloneNode(true));
+      matches.forEach(function (o) {
+        var opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        cashSel.appendChild(opt);
+      });
+
+      // Keep an existing choice when it still fits the currency; take the
+      // only account when there is exactly one; leave it open otherwise
+      // rather than guessing between several.
+      if (matches.some(function (o) { return o.value === previous; })) {
+        cashSel.value = previous;
+      } else if (matches.length === 1) {
+        cashSel.value = matches[0].value;
+      } else {
+        cashSel.value = '';
+      }
+    }
+
+    currencySel.addEventListener('change', sync);
+    sync();
+  })();
 </script>
 {% endblock %}

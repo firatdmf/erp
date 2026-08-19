@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load accounting_tags %}
+{% load humanize %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">
@@ -44,10 +45,39 @@
       </div>
     </div>
 
-    {% if book.stakeholders.count > 0 %}
-    <div class="stakeholder-count-badge">
-      <i class="fas fa-users" style="margin-right: 6px;"></i>
-      {{ book.stakeholders.count }} Stakeholder{{ book.stakeholders.count|pluralize:"s" }}
+    {% if stakeholders %}
+    <div class="header-stakeholders">
+      <div class="hs-head">
+        <i class="fas fa-users"></i>
+        {{ stakeholders|length }} Stakeholder{{ stakeholders|pluralize:"s" }}
+        <a class="hs-add" href="{% url 'accounting:add_stakeholderbook' book.id %}"
+           title="Add stakeholder" aria-label="Add stakeholder">
+          <i class="fas fa-plus"></i>
+        </a>
+      </div>
+      <div class="hs-list">
+        {% for s in stakeholders %}
+        <div class="hs-item">
+          <span class="hs-initials">{{ s.member.user.first_name|first }}{{ s.member.user.last_name|first }}</span>
+          <span class="hs-name">{{ s.member }}</span>
+          <span class="hs-shares">{{ s.shares|intcomma }} sh</span>
+          <span class="hs-pct {% if not s.shares %}zero{% endif %}">
+            {% if s.pct is None %}—{% else %}{{ s.pct }}%{% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% if shares_issued < shares_pool %}
+      <div class="hs-foot">
+        {{ shares_issued|intcomma }} of {{ shares_pool|intcomma }} shares issued
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="header-stakeholders empty">
+      <a href="{% url 'accounting:add_stakeholderbook' book.id %}">
+        <i class="fas fa-user-plus"></i> Add a stakeholder
+      </a>
     </div>
     {% endif %}
   </div>
@@ -302,32 +332,6 @@
     </div>
   </div>
 
-
-  <!-- Current Stakeholders Footer -->
-  <div class="stakeholders-footer-card">
-    <div class="card-header-title" style="margin-bottom: 1rem;">
-      <i class="fas fa-users purple-icon"></i> Current Stakeholders
-    </div>
-
-    {% if book.stakeholders.count > 0 %}
-    <div class="stakeholders-list-container">
-      {% for stakeholder in book.stakeholders.all %}
-      <div class="current-stakeholder-item">
-        <div class="stakeholder-initials">
-          {{ stakeholder.member.user.first_name|first }}{{ stakeholder.member.user.last_name|first }}
-        </div>
-        <div class="stakeholder-name">
-          {{ stakeholder.member.user.first_name }} {{ stakeholder.member.user.last_name }}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div style="color: #94a3b8; font-size: 0.9rem; padding: 0.5rem 0;">
-      No stakeholders added yet.
-    </div>
-    {% endif %}
-  </div>
 </div>
 
 <script>

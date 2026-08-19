@@ -26,7 +26,7 @@
           <td>{{ expense.category|default:"—" }}</td>
           <td style="color:red;">{{ expense.currency.symbol }}{{ expense.amount|format_money }}</td>
           <td>{{ expense.description|default:"—" }}</td>
-          <td>{{ expense.cash_account.name }}</td>
+          <td>{{ expense.cash_account.name }} <span class="ccy">{{ expense.cash_account.currency.code }}</span></td>
         </tr>
       {% empty %}
         <tr>

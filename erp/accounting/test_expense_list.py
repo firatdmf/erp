@@ -85,6 +85,9 @@ class EquityExpenseListTest(TestCase):
         self.assertIn("Ağustos ofis kirası", html)
         self.assertIn("Kira", html)
         self.assertIn("Ziraat TRY", html)
+        # Accounts are named for the place, not the currency ("Cash"), so
+        # the code has to be printed beside the name to tell them apart.
+        self.assertIn('<span class="ccy">TRY</span>', html)
         # Amounts are thousands-separated, not raw decimals.
         self.assertIn("₺12,500.00", html)
         self.assertNotIn("Sunucu kirası", html)

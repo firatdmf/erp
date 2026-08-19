@@ -21,3 +21,17 @@ td {
 .cash_transaction_entry_list_page h1 {
   color: saddlebrown;
 }
+
+/* Cash accounts are named for the place ("Cash"), not the currency, so
+   the code has to travel with the name wherever only the name is shown. */
+.ccy {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  vertical-align: 1px;
+}

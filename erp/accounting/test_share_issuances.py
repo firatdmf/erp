@@ -33,6 +33,19 @@ class SharesTestBase(TestCase):
     def url(self, book=None):
         return reverse("accounting:book_shares", kwargs={"pk": (book or self.book).pk})
 
+    def capital_entry(self, book=None, amount="600.00"):
+        from decimal import Decimal
+        from accounting.models import CashAccount, CurrencyCategory, EquityCapital
+        book = book or self.book
+        usd, _ = CurrencyCategory.objects.get_or_create(
+            code="USD", defaults={"name": "US Dollar", "symbol": "$"}
+        )
+        cash = CashAccount.objects.create(book=book, name="Cash", currency=usd)
+        return EquityCapital.objects.create(
+            book=book, member=self.cuma.member, date_invested="2026-08-19",
+            cash_account=cash, currency=usd, amount=Decimal(amount),
+        )
+
 
 class HoldingIsDerivedTest(SharesTestBase):
     """`shares` is a cache of the issuance rows, like the cari balance."""
@@ -160,6 +173,32 @@ class BookSharesPageTest(SharesTestBase):
         self.assertEqual(response.status_code, 400)
         self.book.refresh_from_db()
         self.assertEqual(self.book.total_shares, 10000000)
+
+    def test_an_issuance_can_name_the_capital_that_bought_it(self):
+        capital = self.capital_entry()
+        self.client.post(self.url(), {
+            "stakeholder": self.cuma.pk, "shares": "1000",
+            "date": "2026-08-19", "capital": capital.pk,
+        })
+        self.assertEqual(ShareIssuance.objects.get().capital, capital)
+
+    def test_the_link_is_optional(self):
+        """Most movements are transfers or corrections with no
+        contribution behind them."""
+        self.client.post(self.url(), {
+            "stakeholder": self.cuma.pk, "shares": "1000",
+            "date": "2026-08-19", "capital": "",
+        })
+        self.assertIsNone(ShareIssuance.objects.get().capital)
+
+    def test_capital_from_another_book_is_not_linked(self):
+        """It would tie the shares to money that never entered this book."""
+        stranger = self.capital_entry(book=Book.objects.create(name="Başka", total_shares=10))
+        self.client.post(self.url(), {
+            "stakeholder": self.cuma.pk, "shares": "1000",
+            "date": "2026-08-19", "capital": stranger.pk,
+        })
+        self.assertIsNone(ShareIssuance.objects.get().capital)
 
     def test_login_required(self):
         self.client.logout()

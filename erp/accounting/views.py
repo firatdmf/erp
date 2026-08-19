@@ -170,6 +170,14 @@ class BookShares(View):
             "shares_unissued": max(pool - issued, 0),
             "reasons": ShareIssuance.REASONS,
             "today": timezone.now().date().isoformat(),
+            # Offered so an issuance can name the money that bought it.
+            # Optional: most movements are transfers or corrections and
+            # have no contribution behind them at all.
+            "capital_entries": (
+                EquityCapital.objects.filter(book=book)
+                .select_related("currency", "member__user")
+                .order_by("-date_invested", "-id")
+            ),
         }
         context.update(extra)
         return context
@@ -235,12 +243,19 @@ class BookShares(View):
             if error:
                 return self._fail(request, book, error)
 
+        # A contribution from another book would tie this issuance to
+        # money that never entered it.
+        capital = EquityCapital.objects.filter(
+            pk=request.POST.get("capital") or 0, book=book
+        ).first()
+
         ShareIssuance.objects.create(
             stakeholder=sb,
             shares=shares,
             date=request.POST.get("date") or timezone.now().date(),
             reason=request.POST.get("reason") or "capital",
             note=(request.POST.get("note") or "").strip(),
+            capital=capital,
             created_by=getattr(request.user, "member", None),
         )
         messages.success(

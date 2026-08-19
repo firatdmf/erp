@@ -55,6 +55,26 @@ def format_money(value):
     return f"{value:,.2f}"
 
 
+@register.filter
+def format_rate(value):
+    """An exchange rate at the precision it is stored, not money's 2dp.
+
+    format_money is right for a balance and wrong for a rate: TRY→USD is
+    0.020870, which rounds to 0.02 and implies 50 lira to the dollar
+    instead of 47.92. Trailing zeros are dropped so EUR reads 1.1576
+    rather than 1.157600, but never below two decimals, so a rate of 1
+    still looks like a number and not a count.
+    """
+    if not isinstance(value, (int, float, Decimal)):
+        return value
+    text = f"{Decimal(str(value)):,.6f}"
+    if "." in text:
+        whole, _, frac = text.partition(".")
+        frac = frac.rstrip("0").ljust(2, "0")
+        text = f"{whole}.{frac}"
+    return text
+
+
 @register.simple_tag
 def exchange_rates_component():
     from accounting.services import get_exchange_rate

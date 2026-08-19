@@ -1406,3 +1406,39 @@
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* ── Exchange rate precision on hover ── */
+/* Both readings occupy the same grid cell, so the item is already as
+   wide as the longer one and nothing reflows when they swap. */
+.rate-num {
+  display: inline-grid;
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-num > span {
+  grid-area: 1 / 1;
+  text-align: left;
+}
+
+.rate-full {
+  visibility: hidden;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.rate-item:hover .rate-short,
+.rate-item:focus-within .rate-short,
+.rate-item:focus .rate-short {
+  visibility: hidden;
+}
+
+.rate-item:hover .rate-full,
+.rate-item:focus-within .rate-full,
+.rate-item:focus .rate-full {
+  visibility: visible;
+}
+
+.rate-item:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}

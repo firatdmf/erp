@@ -41,6 +41,9 @@
   .po-btn { display:inline-flex; align-items:center; gap:7px; padding: 8px 14px; border-radius: 10px; font: 600 13px var(--font-sans); cursor: pointer; transition: all 140ms; white-space: nowrap; text-decoration: none; border: none; }
   .po-btn.ghost { background: white; border:1px solid #E0E6EE; color: var(--gray-700); box-shadow: 0 1px 2px rgba(15,23,31,0.04); }
   .po-btn.ghost:hover { background:#F8FAFC; border-color:#C5CCD3; color: var(--ink); }
+  .po-btn.primary { background: linear-gradient(180deg,#16897D,#0F6B62); border:1px solid #0F6B62; color:#fff; box-shadow: 0 1px 2px rgba(15,23,31,0.10); }
+  .po-btn.primary:hover { background: linear-gradient(180deg,#12776C,#0B5C55); color:#fff; }
+  .po-btn i { width: 15px; height: 15px; }
 
   .po-list { background: white; border: 1px solid #E2E8EE; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,31,0.03); }
   .po-tbl { width: 100%; border-collapse: collapse; }
@@ -87,6 +90,9 @@
       <h1 class="po-title">{% trans "Purchase orders" %}</h1>
       <div class="po-sub">{% trans "What was bought, from which supplier, and which physical rolls arrived — not a generic invoice view." %}</div>
     </div>
+    <a class="po-btn primary" href="{% url 'accounts:goods_receipt' %}">
+      <i data-lucide="package-plus"></i>{% trans "New purchase order" %}
+    </a>
   </div>
 
   <div class="po-stats">
@@ -144,7 +150,7 @@
           <td class="num po-total">{{ inv.currency.symbol|default:"$" }}{{ inv.total|floatformat:2|intcomma }}</td>
           <td class="po-row-actions">
             {% if inv.status != 'cancelled' and inv.warehouse_id_for_edit %}
-              <a class="po-edit-ic" href="{% url 'operating:warehouse_detail' inv.warehouse_id_for_edit %}?edit_purchase={{ inv.pk }}"
+              <a class="po-edit-ic" href="{% url 'accounts:goods_receipt_edit' inv.pk %}"
                  title="{% trans 'Edit' %}"><i data-lucide="pencil"></i></a>
             {% endif %}
           </td>
@@ -157,7 +163,10 @@
   <div class="po-empty">
     <div class="ico"><i data-lucide="package-search"></i></div>
     <h3>{% trans "No purchases yet" %}</h3>
-    <p>{% trans "Purchases are created automatically when new stock is added to a warehouse with a supplier selected." %}</p>
+    <p>{% trans "Write an order down now and receive it when it arrives — or receive a delivery that is already here." %}</p>
+    <a class="po-btn primary" style="margin-top:14px;" href="{% url 'accounts:goods_receipt' %}">
+      <i data-lucide="package-plus"></i>{% trans "New purchase order" %}
+    </a>
   </div>
   {% endif %}
 </div>

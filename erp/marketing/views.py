@@ -2696,8 +2696,22 @@ def get_products(request):
             WITH pids AS (SELECT unnest(%(pids)s::bigint[]) AS id),
             variants AS (
                 SELECT json_agg(sub) as data FROM (
+                    -- Stock comes from the warehouse for anything it carries
+                    -- (summed, so a SKU in two depots reports both); the stored
+                    -- column is the fallback for storefront-only variants that
+                    -- have no warehouse row. See ProductVariant.live_quantity.
                     SELECT id, product_id, variant_sku, variant_price,
-                           variant_quantity, variant_featured
+                           COALESCE(
+                               (SELECT SUM(wp.quantity)
+                                  FROM operating_warehouseproduct wp
+                                 WHERE wp.catalog_variant_id = marketing_productvariant.id),
+                               variant_quantity
+                           ) AS variant_quantity, variant_featured,
+                           -- False = the warehouse doesn't carry this variant, so
+                           -- there is no quantity to quote: it's made to order.
+                           EXISTS (SELECT 1 FROM operating_warehouseproduct wp2
+                                    WHERE wp2.catalog_variant_id = marketing_productvariant.id)
+                             AS stock_tracked
                     FROM marketing_productvariant
                     WHERE product_id IN (SELECT id FROM pids)
                 ) sub
@@ -2842,6 +2856,7 @@ def get_products(request):
             "variant_prices": _convert_price(v["variant_price"], rates),
             "variant_quantity": float(v["variant_quantity"]) if v["variant_quantity"] is not None else None,
             "variant_featured": v.get("variant_featured", True),
+            "stock_tracked": bool(v.get("stock_tracked")),
             "product_variant_attribute_values": variant_av_map.get(v["id"], []),
         }
         for v in variant_rows
@@ -2983,8 +2998,19 @@ def get_product(request):
             ),
             variants AS (
                 SELECT json_agg(sub) as data FROM (
-                    SELECT id, variant_sku, variant_barcode, variant_quantity, variant_price,
-                           variant_featured, product_id
+                    -- See the list query above: warehouse rows win, stored
+                    -- column is the fallback.
+                    SELECT id, variant_sku, variant_barcode,
+                           COALESCE(
+                               (SELECT SUM(wp.quantity)
+                                  FROM operating_warehouseproduct wp
+                                 WHERE wp.catalog_variant_id = marketing_productvariant.id),
+                               variant_quantity
+                           ) AS variant_quantity, variant_price,
+                           variant_featured, product_id,
+                           EXISTS (SELECT 1 FROM operating_warehouseproduct wp2
+                                    WHERE wp2.catalog_variant_id = marketing_productvariant.id)
+                             AS stock_tracked
                     FROM marketing_productvariant
                     WHERE product_id = %(pid)s
                 ) sub
@@ -3138,6 +3164,7 @@ def get_product(request):
             "variant_price": float(v["variant_price"]) if v["variant_price"] is not None else None,
             "variant_prices": _convert_price(v["variant_price"], rates),
             "variant_featured": v["variant_featured"],
+            "stock_tracked": bool(v.get("stock_tracked")),
             "product_id": v["product_id"],
             "primary_image": variant_primary_map.get(v["id"]),
             "product_variant_attribute_values": variant_av_map.get(v["id"], []),

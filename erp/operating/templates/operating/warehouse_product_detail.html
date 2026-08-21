@@ -622,6 +622,17 @@
       <div class="od-stat-label"><i class="fa fa-arrow-up" style="color:#DC2626;"></i>{% trans "Stock out (total)" %}</div>
       <div class="od-stat-value" style="color:#DC2626;">{{ out_total|floatformat:2 }}<span class="unit">m</span></div>
     </div>
+    {% comment %}Deleting a roll is a CORRECTION, not a sale, so it is never
+    counted as stock out — which left in/out unable to explain the current
+    stock. This is the difference, so the row adds up again.{% endcomment %}
+    {% if adjust_total %}
+    <div class="od-stat">
+      <div class="od-stat-label" title="{% trans 'Deleted rolls, transfers and other corrections — not sales' %}">
+        <i class="fa fa-sliders" style="color:#B45309;"></i>{% trans "Corrections" %}
+      </div>
+      <div class="od-stat-value" style="color:#B45309;">{{ adjust_total|floatformat:2 }}<span class="unit">m</span></div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- 2-col layout -->

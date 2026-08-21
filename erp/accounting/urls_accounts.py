@@ -56,7 +56,13 @@ urlpatterns = [
 
     # --- Purchase orders (warehouse intake, not a generic invoice view) ---
     path("purchases/",                   views_purchase.PurchaseOrderList.as_view(),   name="purchase_order_list"),
+    path("purchases/new/",               views_purchase.GoodsReceipt.as_view(),        name="goods_receipt"),
+    path("purchases/order/",             views_purchase.PurchaseOrderSave.as_view(),   name="purchase_order_save"),
+    path("purchases/<int:pk>/order/",    views_purchase.PurchaseOrderSave.as_view(),   name="purchase_order_update"),
+    path("purchases/<int:pk>/confirm/",  views_purchase.PurchaseOrderConfirm.as_view(), name="purchase_order_confirm"),
+    path("purchases/<int:pk>/print/",    views_purchase.PurchaseOrderPrint.as_view(),  name="purchase_order_print"),
     path("purchases/<int:pk>/",          views_purchase.PurchaseOrderDetail.as_view(), name="purchase_order_detail"),
+    path("purchases/<int:pk>/edit/",     views_purchase.GoodsReceipt.as_view(),        name="goods_receipt_edit"),
     path("purchases/<int:pk>/cancel/",   views_purchase.PurchaseCancel.as_view(),      name="purchase_cancel"),
 
     # --- Payments (tahsilat) ---

@@ -1,0 +1,159 @@
+{% load i18n %}{% load humanize %}<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{% if is_order %}{% trans "Purchase order" %}{% else %}{% trans "Goods receipt" %}{% endif %} {{ invoice.number }}</title>
+  <style>
+    /* Printed by the BROWSER (Save as PDF), like the sales order — the
+       layout survives that and doesn't survive xhtml2pdf. */
+    @page { size: a4 portrait; margin: 0; }
+    body {
+      font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color: #0F1419;
+      line-height: 1.35; padding: 14mm 14mm 16mm 14mm; margin: 0;
+    }
+    @media print { html, body { margin: 0 !important; } .noprint { display: none !important; } }
+
+    .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 10pt; margin-bottom: 14pt; }
+    .hdr td { vertical-align: top; }
+    .hdr .brand { font-size: 14pt; font-weight: bold; line-height: 1.25; max-width: 105mm; }
+    .hdr .doc-type { font-size: 9pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
+    .hdr .num { font-size: 20pt; font-weight: bold; text-align: right; }
+    .hdr .date { font-size: 9pt; color: #4B5563; text-align: right; }
+    .hdr .kind { padding: 2pt 6pt; font-size: 8pt; font-weight: bold; letter-spacing: 1pt; }
+    .hdr .kind.order { background: #FEF3C7; color: #8B5A00; }
+    .hdr .kind.received { background: #D1FAE5; color: #065F46; }
+
+    h3 { font-size: 9pt; color: #6B7280; letter-spacing: 1.2pt; text-transform: uppercase; margin: 12pt 0 6pt; font-weight: bold; }
+
+    .twocol { width: 100%; }
+    .twocol td { width: 50%; vertical-align: top; padding-right: 8pt; }
+    .twocol td:last-child { padding-right: 0; padding-left: 8pt; }
+    .card { background: #FAFBFD; border: 1px solid #E2E8EE; padding: 10pt 12pt; }
+    .card .name { font-size: 12pt; font-weight: bold; }
+    .card .role { font-size: 8pt; color: #147F74; font-weight: bold; letter-spacing: 0.8pt; text-transform: uppercase; margin-top: 2pt; }
+    .card .line { font-size: 10pt; color: #374151; margin-top: 4pt; }
+    .card .line b { color: #6B7280; font-weight: bold; }
+
+    table.items { width: 100%; border-collapse: collapse; margin-top: 4pt; }
+    table.items thead th {
+      background: #FAFBFD; border-bottom: 1px solid #E2E8EE; text-align: left;
+      font-size: 8pt; letter-spacing: 0.8pt; text-transform: uppercase; color: #6B7280;
+      padding: 6pt 6pt; font-weight: bold;
+    }
+    table.items td { border-bottom: 1px solid #F1F5F9; padding: 7pt 6pt; font-size: 10pt; vertical-align: top; }
+    table.items th.num, table.items td.num { text-align: right; white-space: nowrap; }
+    table.items td.desc { font-weight: bold; }
+
+    .totals { width: 100%; margin-top: 10pt; }
+    .totals td { padding: 3pt 6pt; font-size: 10pt; }
+    .totals td.lbl { text-align: right; color: #6B7280; }
+    .totals td.val { text-align: right; width: 34mm; font-weight: bold; }
+    .totals tr.grand td { font-size: 12pt; border-top: 1.5pt solid #0F1419; padding-top: 6pt; }
+
+    .note { margin-top: 12pt; font-size: 9.5pt; color: #374151; white-space: pre-wrap; }
+    .foot { margin-top: 18pt; border-top: 1px solid #E2E8EE; padding-top: 6pt; font-size: 8pt; color: #6B7280; width: 100%; }
+    .foot td:last-child { text-align: right; }
+
+    .noprint { margin-bottom: 10pt; }
+    .noprint button, .noprint a {
+      font: 600 11pt Helvetica, Arial, sans-serif; padding: 6pt 12pt; border-radius: 6pt;
+      border: 1px solid #E0E6EE; background: #fff; cursor: pointer; text-decoration: none; color: #374151;
+    }
+  </style>
+</head>
+<body>
+
+<div class="noprint">
+  <button onclick="window.print()">{% trans "Print" %}</button>
+  <a href="{% url 'accounts:purchase_order_detail' invoice.pk %}">{% trans "Back" %}</a>
+</div>
+
+<table class="hdr">
+  <tr>
+    <td>
+      <div class="brand">{{ brand_line }}</div>
+      <div class="doc-type">
+        {% if is_order %}{% trans "PURCHASE ORDER" %}{% else %}{% trans "GOODS RECEIPT" %}{% endif %}
+        <span class="kind {% if is_order %}order{% else %}received{% endif %}">
+          {% if is_order %}{% trans "NOT YET RECEIVED" %}{% else %}{% trans "RECEIVED" %}{% endif %}
+        </span>
+      </div>
+    </td>
+    <td>
+      <div class="num">{{ invoice.number }}</div>
+      <div class="date">
+        {% trans "Order date" %}: {{ invoice.date|date:"d.m.Y" }}
+        {% if invoice.delivery_date %}<br>{% trans "Expected" %}: {{ invoice.delivery_date|date:"d.m.Y" }}{% endif %}
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="twocol">
+  <tr>
+    <td>
+      <h3>{% trans "Supplier" %}</h3>
+      <div class="card">
+        <div class="name">{{ invoice.cari.name }}</div>
+        <div class="role">{{ invoice.cari.get_type_display }}</div>
+        {% if invoice.cari.phone %}<div class="line"><b>{% trans "Phone" %}:</b> {{ invoice.cari.phone }}</div>{% endif %}
+        {% if invoice.cari.email %}<div class="line"><b>{% trans "E-mail" %}:</b> {{ invoice.cari.email }}</div>{% endif %}
+        {% if invoice.cari.tax_number %}<div class="line"><b>{% trans "Tax no" %}:</b> {{ invoice.cari.tax_number }}</div>{% endif %}
+      </div>
+    </td>
+    <td>
+      <h3>{% trans "Deliver to" %}</h3>
+      <div class="card">
+        <div class="name">{{ warehouse.name|default:"—" }}</div>
+        <div class="role">{% trans "Warehouse" %}</div>
+        {% if warehouse.location %}<div class="line">{{ warehouse.location }}</div>{% endif %}
+        <div class="line"><b>{% trans "Payment term" %}:</b> {{ invoice.due_date|date:"d.m.Y" }}</div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<h3>{% trans "Ordered goods" %}</h3>
+<table class="items">
+  <thead>
+    <tr>
+      <th style="width:8mm;">#</th>
+      <th>{% trans "Description" %}</th>
+      <th class="num">{% trans "Rolls" %}</th>
+      <th class="num">{% trans "Quantity" %}</th>
+      <th class="num">{% trans "Unit price" %}</th>
+      <th class="num">{% trans "Total" %}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for it in items %}
+    <tr>
+      <td>{{ it.line_no }}</td>
+      <td class="desc">{{ it.description }}</td>
+      <td class="num">{{ it.roll_count }}</td>
+      <td class="num">{{ it.quantity|floatformat:2 }} {{ it.unit }}</td>
+      <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.unit_price|floatformat:2 }}</td>
+      <td class="num">{{ invoice.currency.symbol|default:"$" }}{{ it.total|floatformat:2|intcomma }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<table class="totals">
+  <tr class="grand">
+    <td class="lbl">{% trans "Total" %}</td>
+    <td class="val">{{ invoice.currency.symbol|default:"$" }}{{ invoice.total|floatformat:2|intcomma }}</td>
+  </tr>
+</table>
+
+{% if invoice.notes %}<div class="note"><b>{% trans "Notes" %}:</b> {{ invoice.notes }}</div>{% endif %}
+
+<table class="foot">
+  <tr>
+    <td>{{ brand_line }} · {% if is_order %}{% trans "Purchase order" %}{% else %}{% trans "Goods receipt" %}{% endif %}</td>
+    <td>{{ invoice.number }}</td>
+  </tr>
+</table>
+
+</body>
+</html>

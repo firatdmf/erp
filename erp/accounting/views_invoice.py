@@ -23,7 +23,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _, gettext as _g
@@ -440,7 +439,7 @@ class InvoiceEdit(View):
         WarehouseProductRoll.purchase_invoice_item (SET_NULL) and never
         touches stock quantities at all. Redirect (server-side, so a
         bookmarked/typed URL can't bypass this either) to the dedicated
-        warehouse-sidebar edit flow instead. Returns a redirect response,
+        goods-receipt edit page instead. Returns a redirect response,
         or None if this isn't a purchase invoice."""
         if invoice.type != "purchase":
             return None
@@ -452,10 +451,7 @@ class InvoiceEdit(View):
             .first()
         )
         if warehouse_id:
-            return redirect(
-                reverse("operating:warehouse_detail", args=[warehouse_id])
-                + f"?edit_purchase={invoice.pk}"
-            )
+            return redirect("accounts:goods_receipt_edit", pk=invoice.pk)
         messages.warning(
             request,
             _g("This purchase's stock links are missing, so it can't be edited from here — "

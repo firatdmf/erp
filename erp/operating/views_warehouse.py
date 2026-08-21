@@ -320,7 +320,7 @@ def _slug_token(text):
 
 
 def _account_choices():
-    """Cari accounts for the manual-add dropdown, each with its derived
+    """Cari accounts for the goods-receipt account picker, each with its derived
     barcode prefix so the UI can preview it instantly.
 
     Lists the accounts THEMSELVES rather than crm.Supplier rows. Intake
@@ -1248,8 +1248,6 @@ class WarehouseDetail(View):
             'group_count': group_count,       # main products (packages)
             'roll_count': roll_count,         # rolls (tops)
             'is_admin': _is_admin(request.user),
-            'accounts': _account_choices(),     # manual-add dropdown
-            'product_categories': _product_category_choices(),  # manual-add "Ürün Türü"
             # Dup scan is a MERGE tool — merging across two real warehouses
             # from a virtual view would move stock; disabled there.
             'dup_count': 0 if warehouse.is_combined else _warehouse_dup_sku_count(warehouse),
@@ -1560,11 +1558,12 @@ def catalog_base_search(request, pk):
     warehouse data (see catalog_sync.py) — staff recognize stock by its
     WarehouseProduct name, not the catalog's title (which can drift, e.g.
     after a manual rename on one side only). So search matches either
-    side, but the name shown is always sourced from the linked
-    WarehouseProduct when one exists."""
+    side — but what a row is NAMED by is the product's own SKU, which is
+    the one thing that identifies it. Warehouse names describe a single
+    variant, so using one as the product's name mislabels every product
+    with more than one colour."""
     from django.db.models import Q
     from marketing.models import Product
-    from .catalog_sync import parse_label_name
     q = (request.GET.get("q") or "").strip()
     results = []
     if q:
@@ -1573,20 +1572,25 @@ def catalog_base_search(request, pk):
         # a filter that itself joins through "variants" (the warehouse-name
         # match) makes Django fold the WHERE into the same join, so the
         # count would reflect only the MATCHING variant(s), not the
-        # product's true total. Capped at 12 results, so N+1 is cheap.
+        # product's true total. One cheap count per row, capped at 12.
         qs = (Product.objects.filter(featured=False)
               .filter(Q(title__icontains=q) | Q(sku__icontains=q) |
                       Q(variants__warehouse_products__name__icontains=q) |
                       Q(variants__warehouse_products__sku__icontains=q))
               .distinct().order_by("title")[:12])
         for p in qs:
-            wp = (WarehouseProduct.objects.filter(catalog_variant__product=p)
-                  .order_by("id").first())
-            title = p.title
-            if wp:
-                base = parse_label_name(wp.name)["base_name"]
-                title = base or wp.name
-            results.append({"id": p.id, "title": title, "sku": p.sku or "",
+            # The SKU is the product's identity, so it is what the row is
+            # named by; the title rides along as context and the page only
+            # shows it when it says something the SKU doesn't (894 of 920
+            # warehouse-side products are titled with their own SKU).
+            #
+            # This used to derive the name from a linked WarehouseProduct
+            # instead, on the theory that staff recognise stock by what is
+            # written in the warehouse. Those names are per-VARIANT, so the
+            # lowest-id row of N1464T ("PETROL+MARLETTO") ended up labelling
+            # the whole product "PETROL" — and it cost one query per result
+            # on every keystroke to get there.
+            results.append({"id": p.id, "title": p.title or "", "sku": p.sku or "",
                             "variants": p.variants.count()})
     return JsonResponse({"results": results})
 
@@ -1626,11 +1630,13 @@ def catalog_product_variants(request, pk, product_id):
     product = Product.objects.filter(pk=product_id, featured=False).first()
     if product is None:
         return JsonResponse({"results": []})
-    variants = (product.variants
-                .filter(warehouse_products__isnull=False)
-                .prefetch_related("product_variant_attribute_values__product_variant_attribute",
-                                  "warehouse_products")
-                .distinct().order_by("variant_sku"))
+    from marketing.models import with_live_quantity
+    variants = with_live_quantity(
+        product.variants
+        .filter(warehouse_products__isnull=False)
+        .prefetch_related("product_variant_attribute_values__product_variant_attribute",
+                          "warehouse_products")
+        .distinct().order_by("variant_sku"))
     results = []
     for v in variants:
         av = (v.product_variant_attribute_values.all()[:1] or [None])[0]
@@ -1644,7 +1650,9 @@ def catalog_product_variants(request, pk, product_id):
             "attribute_name": (av.product_variant_attribute.name if av else None),
             "variant_sku": v.variant_sku,
             "variant_barcode": v.variant_barcode,
-            "variant_quantity": float(v.variant_quantity or 0),
+            # Live, not the stored mirror: a variant whose only roll was
+            # deleted read "33.66" here long after its stock hit zero.
+            "variant_quantity": float(v.live_quantity or 0),
         })
     return JsonResponse({"results": results})
 
@@ -1665,17 +1673,29 @@ def catalog_variant_match(request, pk, product_id):
     from marketing.models import Product, ProductVariant
 
     name = (request.GET.get("name") or "").strip()
-    if not name:
+    sku = (request.GET.get("sku") or "").strip()
+    if not name and not sku:
         return JsonResponse({"exists": False, "attribute_name": None, "attribute_value": None})
 
-    eng = translate_color(name)
+    eng = translate_color(name) if name else None
     attribute_name = "color" if eng else "model"
     attribute_value = eng or name
 
     # Scoped to hidden/warehouse products only — see catalog_product_variants.
     product = Product.objects.filter(pk=product_id, featured=False).first()
     match = None
-    if product is not None:
+    if product is not None and sku:
+        # SKU first, because that is what the save actually dedups on
+        # ("same SKU = same variant" — see perform_intake). Colour matching
+        # only ever worked for names translate_color recognises, so a variant
+        # catalogued as "petrol+marletto" or "MARLETTOO" read as NEW here and
+        # was then reused by the save — the preview and the save disagreeing
+        # is exactly what this endpoint exists to prevent.
+        match = (ProductVariant.objects
+                 .filter(product=product, warehouse_products__isnull=False,
+                         variant_sku__iexact=sku)
+                 .first())
+    if match is None and product is not None and name:
         match = (ProductVariant.objects
                  .filter(product=product,
                          warehouse_products__isnull=False,
@@ -1689,7 +1709,7 @@ def catalog_variant_match(request, pk, product_id):
             "attribute_name": attribute_name,
             "attribute_value": attribute_value,
             "variant_sku": match.variant_sku,
-            "variant_quantity": float(match.variant_quantity or 0),
+            "variant_quantity": float(match.live_quantity or 0),
         })
     return JsonResponse({
         "exists": False,
@@ -1700,8 +1720,8 @@ def catalog_variant_match(request, pk, product_id):
 
 @login_required
 def warehouse_next_sku(request, pk):
-    """Preview the next auto product SKU for a supplier prefix so the New-product
-    panel can show it (and root the variant SKUs on it) BEFORE saving. Indicative
+    """Preview the next auto product SKU for a supplier prefix so the goods-receipt
+    page can show it (and root the variant SKUs on it) BEFORE saving. Indicative
     only — the final SKU is minted authoritatively on save."""
     prefix = (request.GET.get("prefix") or "").strip().upper()[:6] or "GEN"
     try:
@@ -1782,12 +1802,440 @@ class WarehouseMergeDuplicates(View):
         return JsonResponse({"success": True, "groups": groups, "merged": merged_total})
 
 
+class IntakeError(Exception):
+    """Aborts an intake with a user-facing message.
+
+    Carries the exact payload/status the endpoint used to return inline, so
+    perform_intake() can be called from anywhere (the warehouse endpoint, the
+    purchase-order confirm) while every caller still reports failures the
+    same way.
+    """
+
+    def __init__(self, payload, status=400):
+        self.payload = (payload if isinstance(payload, dict)
+                        else {"success": False, "error": payload})
+        self.status = status
+        super().__init__(self.payload.get("error", ""))
+
+
+def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
+    """Receive a delivery into `warehouse`: create the products, variants and
+    physical tops described by `data`, then post the purchase invoice.
+
+    `data` is the goods-receipt payload (see WarehouseManualAdd for its
+    shape). Raises IntakeError on any validation failure, having written
+    nothing.
+
+    `invoice` — an existing DRAFT purchase order being confirmed. Its lines
+    are refilled from what actually arrived and it is issued, instead of a
+    new invoice being minted. Callers passing this MUST wrap the call in a
+    transaction: with an invoice in play the bookkeeping step stops being
+    best-effort, so an aborted confirm leaves neither stock nor a posting.
+
+    Returns {"created": [...], "warnings": [...], "prefix": str,
+             "purchase": {...}|None}.
+    """
+    import re as _re_sku
+    from django.db import transaction, IntegrityError
+    from .catalog_sync import (
+        translate_color, sync_roll_to_catalog, CatalogSyncConflict,
+    )
+    from marketing.models import Product as _Prod
+
+    unit = (data.get("unit") or "mt").strip()[:20] or "mt"
+    products_in = data.get("products")
+    if not isinstance(products_in, list) or not products_in:
+        raise IntakeError({"success": False, "error": "En az bir ürün ekleyin."}, status=400)
+
+    # ── Cari account → barcode prefix + purchase (alım) posting below ──
+    # REQUIRED. Goods arriving are goods we owe for, so an intake with
+    # no account to post against is always a mistake — it used to be
+    # allowed, and silently added stock while the alım never happened.
+    from accounting.models_accounts import CariAccount
+    cari_obj = None
+    cari_id = data.get("cari_id")
+    if cari_id not in (None, ""):
+        try:
+            cari_obj = CariAccount.objects.filter(pk=int(cari_id)).first()
+        except (TypeError, ValueError):
+            cari_obj = None
+    if cari_obj is None:
+        raise IntakeError(
+            {"success": False,
+             "error": "Cari hesap seçin — alım faturası bu hesaba işlenir."},
+            status=400)
+    account_name = cari_obj.name
+
+    prefix = (data.get("barcode_prefix") or "").strip().upper()
+    if not prefix:
+        prefix = _consonant_prefix(account_name) if account_name else "GEN"
+    prefix = (prefix[:6] or "GEN")
+
+    # ── Pass 1: resolve + validate EVERY product before writing anything,
+    # so a mistake on product #3 never leaves #1/#2 half-saved. ──
+    from marketing.models import ProductCategory as _PCat
+    fabric_cat = _default_fabric_category()
+    resolved = []
+    for i, p_in in enumerate(products_in, start=1):
+        # Ürün türü (category) — panel sends the chosen id; anything
+        # missing/invalid falls back to fabric (kumaş), the house default.
+        category = None
+        cat_id = str(p_in.get("category_id") or "").strip()
+        if cat_id.isdigit():
+            category = _PCat.objects.filter(pk=int(cat_id)).first()
+        if category is None:
+            category = fabric_cat
+        variants_in = p_in.get("variants") or []
+        if not isinstance(variants_in, list) or not variants_in:
+            raise IntakeError({"success": False, "error": f"Ürün {i}: en az bir varyant ekleyin."}, status=400)
+        mp = p_in.get("main_product") or {}
+        mode = (mp.get("mode") or "new").strip()
+        main_product = None
+        if mode == "existing" and str(mp.get("id") or "").isdigit():
+            main_product = _Prod.objects.filter(pk=int(mp["id"]), featured=False).first()
+        base_name = (mp.get("name") or "").strip()
+        if main_product is not None:
+            base_name = main_product.title
+        elif not base_name:
+            raise IntakeError({"success": False, "error": f"Ürün {i}: ana ürün adı gerekli."}, status=400)
+
+        has_variants = p_in.get("has_variants")
+        if has_variants is None:
+            has_variants = True
+        # Main-product SKU. Two different things arrive in this field:
+        #
+        #   AUTO — the previewed "PREFIX###" code the page showed (so what
+        #     the user saw is what gets saved). Advisory: if it was taken
+        #     in the meantime we just mint the next one.
+        #   TYPED — the mill's own code (e.g. "K24644"). NOT advisory: this
+        #     is the product's real identity, so it is used verbatim or the
+        #     batch is refused. Quietly minting "KRV002" over a code the
+        #     user typed is how a product ends up filed under a number
+        #     nobody recognizes.
+        desired_sku = (mp.get("sku") or "").strip().upper()[:64]
+        sku_is_auto = bool(_re_sku.match(
+            r"^" + _re_sku.escape(prefix) + r"\d{3,}$", desired_sku or ""))
+        if desired_sku and not sku_is_auto:
+            clash = _Prod.objects.filter(sku__iexact=desired_sku).first()
+            if clash is not None:
+                raise IntakeError(
+                    {"success": False,
+                     "error": f"Ürün {i}: “{desired_sku}” SKU'su zaten "
+                              f"“{clash.title}” ürününde kullanılıyor — ana ürünü "
+                              f"“Mevcut”tan seçin ya da başka bir SKU yazın."},
+                    status=400)
+
+        resolved.append({
+            "main_product": main_product, "base_name": base_name,
+            "desired_sku": desired_sku, "sku_is_auto": sku_is_auto,
+            "has_variants": has_variants,
+            "variants_in": variants_in, "category": category,
+        })
+
+    # ── Hand-typed top barcodes: validate the WHOLE batch up front ──
+    # A duplicate barcode makes the roll unscannable (lookup returns
+    # whichever row it hits first), so this is a hard refusal, not a
+    # warning — and it happens in pass 1, before a single roll exists,
+    # so a bad code on product #3 can't leave #1/#2 written.
+    manual_codes = []
+    seen_codes = {}
+    for i, p_in in enumerate(products_in, start=1):
+        for v_in in (p_in.get("variants") or []):
+            for t in (v_in.get("tops") or []):
+                code = (t.get("barcode") or "").strip()
+                if not code:
+                    continue
+                if _safe_decimal(t.get("qty")) in (None, Decimal("0")):
+                    continue          # blank row — not being created
+                key = code.upper()
+                if key in seen_codes:
+                    raise IntakeError(
+                        {"success": False,
+                         "error": f"“{code}” barkodu bu listede birden fazla kez girildi."},
+                        status=400)
+                if _barcode_taken(code):
+                    raise IntakeError(
+                        {"success": False,
+                         "error": f"“{code}” barkodu zaten kullanılıyor."},
+                        status=400)
+                seen_codes[key] = i
+                manual_codes.append(code)
+
+    created_list = []
+    warnings = []
+    purchase_lines = []   # aggregated across the WHOLE batch → one alış faturası
+    mint = _barcode_minter(prefix, reserved=manual_codes)
+    prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
+    usd_try = _get_usd_try_rate() or Decimal("1")
+
+    try:
+        with transaction.atomic():
+            for item in resolved:
+                main_product = item["main_product"]
+                base_name = item["base_name"]
+                desired_sku = item["desired_sku"]
+                has_variants = item["has_variants"]
+                variants_in = item["variants_in"]
+                category = item["category"]
+
+                created = {"main_product": None, "variants": 0, "tops": 0,
+                           "barcodes": [], "variant_skus": []}
+
+                # NEW main product → the typed SKU if there was one, else an
+                # AUTO, globally-unique code = supplier prefix + number (e.g.
+                # KZL004): try the previewed one first, then mint, with an
+                # IntegrityError retry so a concurrent request can't win the
+                # DB-unique Product.sku race. Either way we pre-create WITH the
+                # sku and pass existing_base_product below, so sync_roll_to_catalog
+                # never re-derives or nulls it.
+                if main_product is None:
+                    def _mint_main(sku):
+                        return _Prod.objects.create(
+                            title=base_name, sku=sku, featured=False,
+                            unit_of_measurement=prod_unit, quantity=Decimal("0"),
+                            category=category,
+                        )
+                    if desired_sku and not item["sku_is_auto"]:
+                        # A code the user typed — never substituted. It was
+                        # checked as free in pass 1, so an IntegrityError here
+                        # means a concurrent request took it: say so.
+                        try:
+                            with transaction.atomic():   # savepoint
+                                main_product = _mint_main(desired_sku)
+                        except IntegrityError:
+                            raise RuntimeError(
+                                f"“{desired_sku}” SKU'su bu sırada başka bir ürüne "
+                                f"verildi — tekrar deneyin.")
+                    else:
+                        sku_mint = _product_sku_minter(prefix)
+                        for _attempt in range(8):
+                            if _attempt == 0 and desired_sku and not _Prod.objects.filter(sku__iexact=desired_sku).exists():
+                                candidate = desired_sku
+                            else:
+                                candidate = sku_mint()
+                            try:
+                                with transaction.atomic():   # savepoint
+                                    main_product = _mint_main(candidate)
+                                break
+                            except IntegrityError:
+                                main_product = None
+                                continue
+                        if main_product is None:
+                            raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
+                elif not main_product.category_id and category:
+                    # Existing main product with no type yet — backfill it so
+                    # its invoices stop showing a blank "Ürün Tipi" column.
+                    main_product.category = category
+                    main_product.save(update_fields=["category"])
+                created["main_product"] = {
+                    "id": main_product.id, "title": main_product.title,
+                    "sku": main_product.sku,
+                }
+
+                # No-variant ("simple product") mode → collapse to ONE implicit
+                # variant that IS the product (no colour/model, sku = main sku).
+                if not has_variants:
+                    src = variants_in[0] if variants_in else {}
+                    variants_in = [{
+                        "name": "", "sku": main_product.sku or "",
+                        "tops": src.get("tops") or [],
+                        "price": src.get("price"), "currency": src.get("currency"),
+                    }]
+
+                seen_skus = set()
+                for idx, v in enumerate(variants_in, start=1):
+                    v_name = (v.get("name") or "").strip()
+                    typed_sku = (v.get("sku") or "").strip()[:20]
+                    v_sku = typed_sku
+                    tops = v.get("tops") or []
+                    if not v_name and not v_sku and not tops:
+                        continue
+                    if not v_sku:
+                        # AUTO variant SKU rooted on the (minted) main product SKU.
+                        root = (main_product.sku or base_name or "SKU").strip()
+                        suffix = _slug_token(v_name) or str(idx)
+                        v_sku = f"{root}-{suffix}"[:20]
+
+                    def _bump(s, n):
+                        tail = str(n)
+                        return f"{s[:max(1, 20 - len(tail))]}{tail}"
+
+                    base_v = v_sku
+                    dup = 1
+                    if typed_sku:
+                        # Respect a typed SKU; only avoid clashing within THIS product
+                        # (a global clash surfaces as a CatalogSyncConflict warning).
+                        while v_sku in seen_skus:
+                            dup += 1
+                            v_sku = _bump(base_v, dup)
+                    else:
+                        # AUTO SKU: keep it unique product-wide AND globally.
+                        while v_sku in seen_skus or _variant_sku_exists(v_sku):
+                            dup += 1
+                            v_sku = _bump(base_v, dup)
+                    seen_skus.add(v_sku)
+
+                    # Colour vs model attribute, derived from the variant name.
+                    eng = translate_color(v_name) if v_name else None
+                    attr_name = ("color" if eng else ("model" if v_name else None))
+                    attr_value = (eng or v_name) or None
+
+                    # Purchase price (alış fiyatı) → unit cost in USD/TRY so the
+                    # warehouse value rollup reflects it.
+                    price = _safe_decimal(v.get("price"))
+                    currency = (v.get("currency") or "USD").strip().upper()
+                    if currency not in ("USD", "TRY", "EUR"):
+                        currency = "USD"
+                    cost_usd = cost_try = None
+                    if price is not None and price > 0:
+                        if currency == "USD":
+                            cost_usd = price
+                            cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
+                        elif currency == "TRY":
+                            cost_try = price
+                            if usd_try and usd_try > 0:
+                                cost_usd = (price / usd_try).quantize(Decimal("0.0001"))
+                        elif currency == "EUR":
+                            cost_usd = price   # coarse EUR≈USD for the rollup
+
+                    wp_name = (f"{base_name} {v_name}".strip()) or v_sku
+                    # Reuse an existing same-SKU product in this warehouse rather
+                    # than creating a duplicate row (same SKU = same variant).
+                    wp = (WarehouseProduct.objects
+                          .filter(warehouse=warehouse, sku__iexact=v_sku).first())
+                    if wp is None:
+                        wp = WarehouseProduct.objects.create(
+                            warehouse=warehouse, name=wp_name, sku=v_sku,
+                            quantity=Decimal("0"),
+                            purchase_price=(price if (price and price > 0) else None),
+                            purchase_currency=currency,
+                            cost_usd=cost_usd, cost_try=cost_try,
+                        )
+                    elif price and price > 0:
+                        wp.purchase_price = price
+                        wp.purchase_currency = currency
+                        wp.cost_usd = cost_usd
+                        wp.cost_try = cost_try
+                        wp.save(update_fields=["purchase_price", "purchase_currency",
+                                               "cost_usd", "cost_try", "updated_at"])
+
+                    added_qty, new_roll_ids = _add_tops_to_variant(
+                        wp, tops, mint, user, notes_supplier=account_name,
+                    )
+                    first_barcode = None
+                    if new_roll_ids:
+                        new_barcodes = list(
+                            WarehouseProductRoll.objects
+                            .filter(pk__in=new_roll_ids)
+                            .order_by("id")
+                            .values_list("barcode", flat=True)
+                        )
+                        first_barcode = new_barcodes[0] if new_barcodes else None
+                        created["barcodes"].extend(new_barcodes)
+                    created["tops"] += len(new_roll_ids)
+                    total = wp.quantity
+
+                    cat_variant_obj = None
+                    try:
+                        _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
+                            base_name=base_name,
+                            attribute_name=attr_name,
+                            attribute_value=attr_value,
+                            variant_sku=v_sku, variant_barcode=first_barcode,
+                            quantity=total, cost=cost_usd,
+                            existing_base_product=main_product,
+                        )
+                        wp.catalog_variant = cat_variant
+                        wp.save(update_fields=["catalog_variant"])
+                        cat_variant_obj = cat_variant
+                    except CatalogSyncConflict as exc:
+                        warnings.append(f"{v_sku}: {exc}")
+                    created["variants"] += 1
+                    created["variant_skus"].append(v_sku)
+
+                    # Purchase-invoice line — only for stock actually added
+                    # in THIS request (added_qty), never the product's full
+                    # roll total, so re-adding to an existing SKU doesn't
+                    # re-bill previous intakes.
+                    if added_qty > 0:
+                        purchase_lines.append({
+                            "description": wp_name,
+                            "quantity": added_qty,
+                            "unit": unit,
+                            "unit_price": price if (price and price > 0) else Decimal("0"),
+                            "currency": currency,
+                            "product": main_product,
+                            "variant": cat_variant_obj,
+                            "roll_ids": new_roll_ids,
+                        })
+
+                created_list.append(created)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise IntakeError({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
+
+    # ── Alış faturası (purchase invoice) — the intake above IS a
+    # purchase: we now owe this account for the goods, across every
+    # product in the batch. Posted to the CHOSEN cari as ONE issued
+    # purchase invoice so the alım shows up in the invoice list
+    # (type=purchase) and the cari statement links straight back to it.
+    # Best-effort: a bookkeeping hiccup must never roll back the physical
+    # stock that was just added.
+    purchase_info = None
+    if purchase_lines:
+        try:
+            from accounting.services_accounts import create_purchase_invoice_for_intake
+            inv = create_purchase_invoice_for_intake(
+                cari_obj, purchase_lines, member=member, user=user,
+                invoice=invoice,
+            )
+            purchase_info = {
+                "invoice_id": inv.pk,
+                "number": inv.display_number,
+                "total": float(inv.total or 0),
+                "currency": inv.currency.code,
+            }
+            # Link each physical top back to the invoice line it was
+            # received against — items are created in the same order
+            # as purchase_lines, so zipping by line_no is exact.
+            inv_items = list(inv.items.order_by("line_no"))
+            for line, item in zip(purchase_lines, inv_items):
+                roll_ids = line.get("roll_ids") or []
+                if roll_ids:
+                    WarehouseProductRoll.objects.filter(pk__in=roll_ids).update(
+                        purchase_invoice_item=item
+                    )
+            if not any(l["unit_price"] > 0 for l in purchase_lines):
+                warnings.append(
+                    "Alış faturası 0 tutarla oluşturuldu — fiyat girilmedi. "
+                    "Faturayı cari sayfasından düzenleyebilirsiniz."
+                )
+        except Exception as exc:
+            if invoice is not None:
+                # Confirming an order: the caller wraps this in a transaction,
+                # so a bookkeeping failure must abort the whole confirm rather
+                # than leave stock standing against a still-draft order (which
+                # a second confirm would then duplicate).
+                raise IntakeError(
+                    {"success": False,
+                     "error": f"Alım faturası kaydedilemedi: {exc}"}, status=500)
+            warnings.append(f"Stok eklendi ama alış faturası oluşturulamadı: {exc}")
+
+    return {
+        "created": created_list,
+        "warnings": warnings,
+        "prefix": prefix,
+        "purchase": purchase_info,
+    }
+
+
 @method_decorator(login_required, name='dispatch')
 class WarehouseManualAdd(View):
     """Create one or more brand-new (un-labelled) products straight into the
     warehouse in a SINGLE atomic submit. A delivery often contains several
     unrelated products, not just variants of one — the whole batch is built
-    in one panel and posted here as ONE request; if any product in the batch
+    on one goods-receipt page and posted here as ONE request; if any product in the batch
     is invalid, nothing in the batch is saved.
 
     Each product = ONE main product (group) → its VARIANTS → each variant's
@@ -1815,12 +2263,16 @@ class WarehouseManualAdd(View):
     """
 
     def post(self, request, pk):
-        import re as _re_sku
-        from django.db import transaction, IntegrityError
-        from .catalog_sync import (
-            translate_color, sync_roll_to_catalog, CatalogSyncConflict,
-        )
-        from marketing.models import Product as _Prod
+        from accounting.views_purchase import can_confirm_purchase
+
+        # Receiving in one step is the same act as confirming an order —
+        # stock in, debt posted — so it answers to the same permission.
+        # Without it a purchase can still be written down as an order.
+        if not can_confirm_purchase(request.user):
+            return JsonResponse(
+                {"success": False,
+                 "error": "Mal kabul yetkiniz yok — siparişi kaydedip yetkili birinin "
+                          "onaylamasını isteyin."}, status=403)
 
         warehouse = get_object_or_404(Warehouse, pk=pk)
         if warehouse.is_combined:
@@ -1832,352 +2284,16 @@ class WarehouseManualAdd(View):
         except (ValueError, UnicodeDecodeError):
             return JsonResponse({"success": False, "error": "Geçersiz veri."}, status=400)
 
-        unit = (data.get("unit") or "mt").strip()[:20] or "mt"
-        products_in = data.get("products")
-        if not isinstance(products_in, list) or not products_in:
-            return JsonResponse({"success": False, "error": "En az bir ürün ekleyin."}, status=400)
-
-        # ── Cari account → barcode prefix + purchase (alım) posting below ──
-        # REQUIRED. Goods arriving are goods we owe for, so an intake with
-        # no account to post against is always a mistake — it used to be
-        # allowed, and silently added stock while the alım never happened.
-        from accounting.models_accounts import CariAccount
-        cari_obj = None
-        cari_id = data.get("cari_id")
-        if cari_id not in (None, ""):
-            try:
-                cari_obj = CariAccount.objects.filter(pk=int(cari_id)).first()
-            except (TypeError, ValueError):
-                cari_obj = None
-        if cari_obj is None:
-            return JsonResponse(
-                {"success": False,
-                 "error": "Cari hesap seçin — alım faturası bu hesaba işlenir."},
-                status=400)
-        account_name = cari_obj.name
-
-        prefix = (data.get("barcode_prefix") or "").strip().upper()
-        if not prefix:
-            prefix = _consonant_prefix(account_name) if account_name else "GEN"
-        prefix = (prefix[:6] or "GEN")
-
-        # ── Pass 1: resolve + validate EVERY product before writing anything,
-        # so a mistake on product #3 never leaves #1/#2 half-saved. ──
-        from marketing.models import ProductCategory as _PCat
-        fabric_cat = _default_fabric_category()
-        resolved = []
-        for i, p_in in enumerate(products_in, start=1):
-            # Ürün türü (category) — panel sends the chosen id; anything
-            # missing/invalid falls back to fabric (kumaş), the house default.
-            category = None
-            cat_id = str(p_in.get("category_id") or "").strip()
-            if cat_id.isdigit():
-                category = _PCat.objects.filter(pk=int(cat_id)).first()
-            if category is None:
-                category = fabric_cat
-            variants_in = p_in.get("variants") or []
-            if not isinstance(variants_in, list) or not variants_in:
-                return JsonResponse({"success": False, "error": f"Ürün {i}: en az bir varyant ekleyin."}, status=400)
-            mp = p_in.get("main_product") or {}
-            mode = (mp.get("mode") or "new").strip()
-            main_product = None
-            if mode == "existing" and str(mp.get("id") or "").isdigit():
-                main_product = _Prod.objects.filter(pk=int(mp["id"]), featured=False).first()
-            base_name = (mp.get("name") or "").strip()
-            if main_product is not None:
-                base_name = main_product.title
-            elif not base_name:
-                return JsonResponse({"success": False, "error": f"Ürün {i}: ana ürün adı gerekli."}, status=400)
-
-            has_variants = p_in.get("has_variants")
-            if has_variants is None:
-                has_variants = True
-            # Previewed auto SKU the panel showed (so what the user sees is what
-            # gets saved). Honoured only if it's a valid prefix+digits auto-code
-            # AND still free; otherwise we mint the next one.
-            desired_sku = (mp.get("sku") or "").strip().upper()
-            if not _re_sku.match(r"^" + _re_sku.escape(prefix) + r"\d{3,}$", desired_sku or ""):
-                desired_sku = ""
-
-            resolved.append({
-                "main_product": main_product, "base_name": base_name,
-                "desired_sku": desired_sku, "has_variants": has_variants,
-                "variants_in": variants_in, "category": category,
-            })
-
-        # ── Hand-typed top barcodes: validate the WHOLE batch up front ──
-        # A duplicate barcode makes the roll unscannable (lookup returns
-        # whichever row it hits first), so this is a hard refusal, not a
-        # warning — and it happens in pass 1, before a single roll exists,
-        # so a bad code on product #3 can't leave #1/#2 written.
-        manual_codes = []
-        seen_codes = {}
-        for i, p_in in enumerate(products_in, start=1):
-            for v_in in (p_in.get("variants") or []):
-                for t in (v_in.get("tops") or []):
-                    code = (t.get("barcode") or "").strip()
-                    if not code:
-                        continue
-                    if _safe_decimal(t.get("qty")) in (None, Decimal("0")):
-                        continue          # blank row — not being created
-                    key = code.upper()
-                    if key in seen_codes:
-                        return JsonResponse(
-                            {"success": False,
-                             "error": f"“{code}” barkodu bu listede birden fazla kez girildi."},
-                            status=400)
-                    if _barcode_taken(code):
-                        return JsonResponse(
-                            {"success": False,
-                             "error": f"“{code}” barkodu zaten kullanılıyor."},
-                            status=400)
-                    seen_codes[key] = i
-                    manual_codes.append(code)
-
-        created_list = []
-        warnings = []
-        purchase_lines = []   # aggregated across the WHOLE batch → one alış faturası
-        mint = _barcode_minter(prefix, reserved=manual_codes)
-        prod_unit = _PRODUCT_UNIT_MAP.get(unit, "units")
-        usd_try = _get_usd_try_rate() or Decimal("1")
-        user = request.user if request.user.is_authenticated else None
-
         try:
-            with transaction.atomic():
-                for item in resolved:
-                    main_product = item["main_product"]
-                    base_name = item["base_name"]
-                    desired_sku = item["desired_sku"]
-                    has_variants = item["has_variants"]
-                    variants_in = item["variants_in"]
-                    category = item["category"]
+            result = perform_intake(
+                warehouse, data,
+                user=request.user if request.user.is_authenticated else None,
+                member=getattr(request.user, "member", None),
+            )
+        except IntakeError as exc:
+            return JsonResponse(exc.payload, status=exc.status)
+        return JsonResponse({"success": True, **result})
 
-                    created = {"main_product": None, "variants": 0, "tops": 0,
-                               "barcodes": [], "variant_skus": []}
-
-                    # NEW main product → AUTO, globally-unique SKU = supplier prefix
-                    # + number (e.g. KZL004). Try the previewed code first, then mint;
-                    # create with an IntegrityError retry so a concurrent request can't
-                    # win the DB-unique Product.sku race. We always pre-create WITH the
-                    # sku and pass existing_base_product below, so sync_roll_to_catalog
-                    # never re-derives or nulls it.
-                    if main_product is None:
-                        sku_mint = _product_sku_minter(prefix)
-                        for _attempt in range(8):
-                            if _attempt == 0 and desired_sku and not _Prod.objects.filter(sku__iexact=desired_sku).exists():
-                                candidate = desired_sku
-                            else:
-                                candidate = sku_mint()
-                            try:
-                                with transaction.atomic():   # savepoint
-                                    main_product = _Prod.objects.create(
-                                        title=base_name, sku=candidate, featured=False,
-                                        unit_of_measurement=prod_unit, quantity=Decimal("0"),
-                                        category=category,
-                                    )
-                                break
-                            except IntegrityError:
-                                main_product = None
-                                continue
-                        if main_product is None:
-                            raise RuntimeError("Benzersiz ürün SKU üretilemedi, tekrar deneyin.")
-                    elif not main_product.category_id and category:
-                        # Existing main product with no type yet — backfill it so
-                        # its invoices stop showing a blank "Ürün Tipi" column.
-                        main_product.category = category
-                        main_product.save(update_fields=["category"])
-                    created["main_product"] = {
-                        "id": main_product.id, "title": main_product.title,
-                        "sku": main_product.sku,
-                    }
-
-                    # No-variant ("simple product") mode → collapse to ONE implicit
-                    # variant that IS the product (no colour/model, sku = main sku).
-                    if not has_variants:
-                        src = variants_in[0] if variants_in else {}
-                        variants_in = [{
-                            "name": "", "sku": main_product.sku or "",
-                            "tops": src.get("tops") or [],
-                            "price": src.get("price"), "currency": src.get("currency"),
-                        }]
-
-                    seen_skus = set()
-                    for idx, v in enumerate(variants_in, start=1):
-                        v_name = (v.get("name") or "").strip()
-                        typed_sku = (v.get("sku") or "").strip()[:20]
-                        v_sku = typed_sku
-                        tops = v.get("tops") or []
-                        if not v_name and not v_sku and not tops:
-                            continue
-                        if not v_sku:
-                            # AUTO variant SKU rooted on the (minted) main product SKU.
-                            root = (main_product.sku or base_name or "SKU").strip()
-                            suffix = _slug_token(v_name) or str(idx)
-                            v_sku = f"{root}-{suffix}"[:20]
-
-                        def _bump(s, n):
-                            tail = str(n)
-                            return f"{s[:max(1, 20 - len(tail))]}{tail}"
-
-                        base_v = v_sku
-                        dup = 1
-                        if typed_sku:
-                            # Respect a typed SKU; only avoid clashing within THIS product
-                            # (a global clash surfaces as a CatalogSyncConflict warning).
-                            while v_sku in seen_skus:
-                                dup += 1
-                                v_sku = _bump(base_v, dup)
-                        else:
-                            # AUTO SKU: keep it unique product-wide AND globally.
-                            while v_sku in seen_skus or _variant_sku_exists(v_sku):
-                                dup += 1
-                                v_sku = _bump(base_v, dup)
-                        seen_skus.add(v_sku)
-
-                        # Colour vs model attribute, derived from the variant name.
-                        eng = translate_color(v_name) if v_name else None
-                        attr_name = ("color" if eng else ("model" if v_name else None))
-                        attr_value = (eng or v_name) or None
-
-                        # Purchase price (alış fiyatı) → unit cost in USD/TRY so the
-                        # warehouse value rollup reflects it.
-                        price = _safe_decimal(v.get("price"))
-                        currency = (v.get("currency") or "USD").strip().upper()
-                        if currency not in ("USD", "TRY", "EUR"):
-                            currency = "USD"
-                        cost_usd = cost_try = None
-                        if price is not None and price > 0:
-                            if currency == "USD":
-                                cost_usd = price
-                                cost_try = (price * usd_try).quantize(Decimal("0.0001")) if usd_try else None
-                            elif currency == "TRY":
-                                cost_try = price
-                                if usd_try and usd_try > 0:
-                                    cost_usd = (price / usd_try).quantize(Decimal("0.0001"))
-                            elif currency == "EUR":
-                                cost_usd = price   # coarse EUR≈USD for the rollup
-
-                        wp_name = (f"{base_name} {v_name}".strip()) or v_sku
-                        # Reuse an existing same-SKU product in this warehouse rather
-                        # than creating a duplicate row (same SKU = same variant).
-                        wp = (WarehouseProduct.objects
-                              .filter(warehouse=warehouse, sku__iexact=v_sku).first())
-                        if wp is None:
-                            wp = WarehouseProduct.objects.create(
-                                warehouse=warehouse, name=wp_name, sku=v_sku,
-                                quantity=Decimal("0"),
-                                purchase_price=(price if (price and price > 0) else None),
-                                purchase_currency=currency,
-                                cost_usd=cost_usd, cost_try=cost_try,
-                            )
-                        elif price and price > 0:
-                            wp.purchase_price = price
-                            wp.purchase_currency = currency
-                            wp.cost_usd = cost_usd
-                            wp.cost_try = cost_try
-                            wp.save(update_fields=["purchase_price", "purchase_currency",
-                                                   "cost_usd", "cost_try", "updated_at"])
-
-                        added_qty, new_roll_ids = _add_tops_to_variant(
-                            wp, tops, mint, user, notes_supplier=account_name,
-                        )
-                        first_barcode = None
-                        if new_roll_ids:
-                            new_barcodes = list(
-                                WarehouseProductRoll.objects
-                                .filter(pk__in=new_roll_ids)
-                                .order_by("id")
-                                .values_list("barcode", flat=True)
-                            )
-                            first_barcode = new_barcodes[0] if new_barcodes else None
-                            created["barcodes"].extend(new_barcodes)
-                        created["tops"] += len(new_roll_ids)
-                        total = wp.quantity
-
-                        cat_variant_obj = None
-                        try:
-                            _p, cat_variant, _pc, _vc = sync_roll_to_catalog(
-                                base_name=base_name,
-                                attribute_name=attr_name,
-                                attribute_value=attr_value,
-                                variant_sku=v_sku, variant_barcode=first_barcode,
-                                quantity=total, cost=cost_usd,
-                                existing_base_product=main_product,
-                            )
-                            wp.catalog_variant = cat_variant
-                            wp.save(update_fields=["catalog_variant"])
-                            cat_variant_obj = cat_variant
-                        except CatalogSyncConflict as exc:
-                            warnings.append(f"{v_sku}: {exc}")
-                        created["variants"] += 1
-                        created["variant_skus"].append(v_sku)
-
-                        # Purchase-invoice line — only for stock actually added
-                        # in THIS request (added_qty), never the product's full
-                        # roll total, so re-adding to an existing SKU doesn't
-                        # re-bill previous intakes.
-                        if added_qty > 0:
-                            purchase_lines.append({
-                                "description": wp_name,
-                                "quantity": added_qty,
-                                "unit": unit,
-                                "unit_price": price if (price and price > 0) else Decimal("0"),
-                                "currency": currency,
-                                "product": main_product,
-                                "variant": cat_variant_obj,
-                                "roll_ids": new_roll_ids,
-                            })
-
-                    created_list.append(created)
-        except Exception as exc:
-            import traceback
-            traceback.print_exc()
-            return JsonResponse({"success": False, "error": f"Kayıt hatası: {exc}"}, status=500)
-
-        # ── Alış faturası (purchase invoice) — the intake above IS a
-        # purchase: we now owe this account for the goods, across every
-        # product in the batch. Posted to the CHOSEN cari as ONE issued
-        # purchase invoice so the alım shows up in the invoice list
-        # (type=purchase) and the cari statement links straight back to it.
-        # Best-effort: a bookkeeping hiccup must never roll back the physical
-        # stock that was just added.
-        purchase_info = None
-        if purchase_lines:
-            try:
-                from accounting.services_accounts import create_purchase_invoice_for_intake
-                member = getattr(request.user, "member", None)
-                inv = create_purchase_invoice_for_intake(
-                    cari_obj, purchase_lines, member=member, user=user,
-                )
-                purchase_info = {
-                    "invoice_id": inv.pk,
-                    "number": inv.display_number,
-                    "total": float(inv.total or 0),
-                    "currency": inv.currency.code,
-                }
-                # Link each physical top back to the invoice line it was
-                # received against — items are created in the same order
-                # as purchase_lines, so zipping by line_no is exact.
-                inv_items = list(inv.items.order_by("line_no"))
-                for line, item in zip(purchase_lines, inv_items):
-                    roll_ids = line.get("roll_ids") or []
-                    if roll_ids:
-                        WarehouseProductRoll.objects.filter(pk__in=roll_ids).update(
-                            purchase_invoice_item=item
-                        )
-                if not any(l["unit_price"] > 0 for l in purchase_lines):
-                    warnings.append(
-                        "Alış faturası 0 tutarla oluşturuldu — fiyat girilmedi. "
-                        "Faturayı cari sayfasından düzenleyebilirsiniz."
-                    )
-            except Exception as exc:
-                warnings.append(f"Stok eklendi ama alış faturası oluşturulamadı: {exc}")
-
-        return JsonResponse({
-            "success": True, "created": created_list,
-            "warnings": warnings, "prefix": prefix,
-            "purchase": purchase_info,
-        })
 
 
 def _resolve_variant_wp(warehouse, main_product, base_name, v_in, prefix, seen_skus):
@@ -2258,14 +2374,14 @@ def _resolve_variant_wp(warehouse, main_product, base_name, v_in, prefix, seen_s
 @method_decorator(login_required, name='dispatch')
 class WarehousePurchaseEdit(View):
     """Edit an existing purchase (Invoice(type="purchase")) from the SAME
-    "New product" sidebar used to receive stock, pre-filled with its
-    existing lines/tops. Tops (WarehouseProductRoll) that are already
+    goods-receipt form used to receive stock (accounts:goods_receipt_edit),
+    pre-filled with its existing lines/tops. Tops (WarehouseProductRoll) that are already
     reserved into a customer order (OrderRollReservation, however
     unconsumed) can never be removed here — that's a hard, permanent
     invariant used elsewhere in the app too.
 
     GET  → JSON describing the purchase's current products/variants/tops
-           for the sidebar to render (see `get`).
+           for the goods-receipt page to render (see `get`).
     POST → applies the diff: removes unreserved tops the client dropped,
            adds any new tops/lines, and syncs the purchase invoice + the
            supplier's cari balance to match. All-or-nothing: if ANY
@@ -2345,8 +2461,16 @@ class WarehousePurchaseEdit(View):
         from django.db import transaction, IntegrityError
         from accounting.models import Invoice
         from accounting.services_accounts import sync_purchase_invoice_items
+        from accounting.views_purchase import can_confirm_purchase
         from .models import OrderRollReservation
         from marketing.models import Product as _Prod
+
+        # Editing a received purchase adds and removes real tops and moves
+        # what we owe — same permission as receiving one.
+        if not can_confirm_purchase(request.user):
+            return JsonResponse(
+                {"success": False,
+                 "error": "Mal kabul yetkiniz yok — bu alım düzenlenemez."}, status=403)
 
         warehouse = get_object_or_404(Warehouse, pk=pk)
         if warehouse.is_combined:
@@ -4364,6 +4488,12 @@ class WarehouseProductDetail(View):
         )
         in_total = _io["i"] or _Dec("0")
         out_total = _io["o"] or _Dec("0")
+        # What corrections account for. DERIVED rather than summed over the
+        # adjustment movements themselves: those are written with an
+        # inconsistent sign across the app (a deleted roll records +33.66, a
+        # cancelled purchase −30.00), so adding them up would not reconcile.
+        # This always does, by construction: in − out + corrections = stock.
+        adjust_total = (product.quantity or _Dec("0")) - (in_total - out_total)
 
         # Active (unconsumed) reservations = packed-but-not-shipped metres
         # held against this product's rolls. Shown as a "Rezerv stok" card
@@ -4391,6 +4521,7 @@ class WarehouseProductDetail(View):
             "rolls_count": len(rolls),
             "in_total": in_total,
             "out_total": out_total,
+            "adjust_total": adjust_total,
             "reserved_total": reserved_total,
             "active_rolls_count": len(rolls),
             "is_admin": _is_admin(request.user),
@@ -5008,6 +5139,11 @@ class WarehouseRollDelete(View):
         )
 
         roll.delete()
+        # The catalog variant mirrors this row's quantity; without this it
+        # keeps the pre-delete figure forever, so a variant with no stock
+        # left still reads "33.66" everywhere the catalog is quoted — the
+        # intake chips, the existing-variant badge, the storefront.
+        _resync_wp_catalog(product)
 
         return JsonResponse({
             "success": True,
@@ -5087,6 +5223,7 @@ class WarehouseRollBulkDelete(View):
                 deleted += 1
             product.quantity = qty
             product.save(update_fields=["quantity", "updated_at"])
+        _resync_wp_catalog(product)   # see WarehouseRollDelete
 
         return JsonResponse({
             "success": True, "deleted": deleted, "skipped": skipped,

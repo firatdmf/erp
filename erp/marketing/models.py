@@ -395,6 +395,11 @@ class ProductVariant(models.Model):
         max_length=14, null=True, blank=True, db_index=True
     )
 
+    # STORED stock. Authoritative only for variants the warehouse does not
+    # carry — storefront-only goods kept by CSV import / the stock API.
+    # For anything with WarehouseProduct rows behind it the physical rolls
+    # are the truth and this column is a stale mirror: read `live_quantity`
+    # (or annotate with with_live_quantity()) instead of this field.
     variant_quantity = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True
     )
@@ -449,6 +454,67 @@ class ProductVariant(models.Model):
 
     attribute_summary.short_description = "Attributes"
     # --------------
+
+    @property
+    def live_quantity(self):
+        """How much of this variant there actually is.
+
+        The warehouse is the authority for anything it carries: a variant's
+        stock is the SUM of every WarehouseProduct linked to it, so a SKU
+        held in two depots reports both. `variant_quantity` is only consulted
+        for variants the warehouse does NOT carry — storefront-only goods
+        whose count comes from the CSV import or the stock API.
+
+        Reading it rather than mirroring it into the column is deliberate.
+        The column had five separate writers (intake, order deductions, CSV,
+        the stock API, a reconciler) which is how 81 rows drifted out of step
+        and 2,978 variants with no warehouse row behind them ended up
+        advertising stock.
+
+        One query per access — fine for a handful of variants. For lists use
+        with_live_quantity() below, which resolves it in the same query and
+        assigns it through the setter, so both routes read the same way.
+        """
+        cached = self.__dict__.get("_live_quantity")
+        if cached is not None:
+            return cached
+        from django.db.models import Sum
+        total = (self.warehouse_products
+                 .aggregate(s=Sum("quantity"))["s"])
+        return total if total is not None else self.variant_quantity
+
+    @live_quantity.setter
+    def live_quantity(self, value):
+        # Django assigns annotations onto the instance; without a setter the
+        # annotated queryset would raise rather than fill the property.
+        self.__dict__["_live_quantity"] = value
+
+
+def with_live_quantity(queryset):
+    """Annotate `live_quantity` onto a ProductVariant queryset — the same
+    rule as the property, resolved in SQL so a list costs one query."""
+    from django.db.models import DecimalField, OuterRef, Subquery, Sum
+    from django.db.models.functions import Coalesce
+    warehouse_total = (
+        _warehouse_product_model().objects
+        .filter(catalog_variant=OuterRef("pk"))
+        .values("catalog_variant")
+        .annotate(total=Sum("quantity"))
+        .values("total")[:1]
+    )
+    return queryset.annotate(
+        live_quantity=Coalesce(
+            Subquery(warehouse_total, output_field=DecimalField(max_digits=14, decimal_places=2)),
+            "variant_quantity",
+        )
+    )
+
+
+def _warehouse_product_model():
+    """Imported lazily: marketing must not import operating at module load
+    (operating already imports marketing)."""
+    from operating.models import WarehouseProduct
+    return WarehouseProduct
 
 
 # Example: Size and Color Attributes

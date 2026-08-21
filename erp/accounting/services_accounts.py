@@ -28,10 +28,41 @@ from .models import CariAccount, CariMovement, CariSettings
 
 
 # ---------------------------------------------------------------------------
-# Book — the user wants a single shared book; no UI for selecting one.
+# Book — which business a record belongs to.
 # ---------------------------------------------------------------------------
-def get_default_book() -> Book:
-    """Return the Book the current-account ledger lives in.
+def acting_member():
+    """The Member whose request we are inside, or None.
+
+    Read from the thread-local CurrentUserMiddleware already keeps for
+    the audit trail, because get_default_book is called from ~15 places
+    that have no member in scope (signals, model saves, form querysets)
+    and threading one through all of them would be a lot of churn for a
+    value the request already knows.
+
+    Returns None outside a request — a management command, a cron job, a
+    test — which is correct: work nobody is doing has no member's book.
+    """
+    from operating.audit import get_current_user
+    user = get_current_user()
+    if user is None:
+        return None
+    return getattr(user, "member", None)
+
+
+def get_default_book(member=None) -> Book:
+    """Return the Book a new customer account or invoice lands in when
+    the caller has not said which.
+
+    Not "the" ledger — every Book is its own ledger for its own
+    business, and there will be several. This answers a narrower
+    question the code is currently forced to answer: an Order carries no
+    book, so ensure_cari_for_order has to pick one.
+
+    The best answer to "which business is this?" is WHO IS ENTERING IT.
+    One install runs several businesses at once; which one a record
+    belongs to is a fact about the person at the keyboard, not about the
+    server. So the acting member's own book wins, and the app-level flag
+    is only what covers a member who has not picked one.
 
     This used to take the lowest-id Book, on the assumption that the project
     has one book company-wide. It does not. Books also carry the general
@@ -46,31 +77,59 @@ def get_default_book() -> Book:
     3,116.62. Nothing errored; the money simply went somewhere no one was
     reading.
 
+    The answer to that was settings.CARI_BOOK_NAME — a brand constant naming
+    the book, matched here at read time. That turned out to be the same bug
+    wearing a different hat. A book's name is a mutable label people edit from
+    the UI; the constant lives in a deploy and cannot follow. Rename the book
+    and the match quietly stops matching, dropping resolution back to a guess.
+    That is exactly what happened: neither book was called "DEMFIRAT" any more,
+    so the name step had been dead for a while and only the account-count
+    tiebreak was holding accounts in the right place. That constant is gone —
+    a book is referenced by id or by a flag on the row, never by its name.
+
     Resolution order:
-      1. settings.CARI_BOOK_ID — an explicit id always wins.
-      2. settings.CARI_BOOK_NAME — set per brand (DEMFIRAT for demfirat).
-         Matched by name rather than id because each brand runs in its own
-         schema, where the same ledger has a different primary key.
-      3. The book already holding the most cari accounts. Self-correcting:
-         whichever book the ledger actually lives in is the one it keeps
-         using, and it is what covers a brand with no name configured.
-      4. Lowest id, then create — only reachable on a database with no cari
+
+      1. Member.default_book — the member passed in, else whoever is making
+         the request. The most specific signal there is: this person works
+         for that business.
+      2. settings.CARI_BOOK_ID — pins the FALLBACK from a deploy, for a
+         member who has not picked a book (and for work with no member at
+         all: cron, imports, the shell).
+      3. Book.is_default_cari_target — the app-wide fallback, unique by
+         constraint. Set from the book's own page.
+      4. The book already holding the most cari accounts, WHICH IS THEN
+         WRITTEN TO THE FLAG. This step is the old guess, kept only to answer
+         the question once on a database where nobody has set the flag; by
+         recording its answer it stops being a guess made fresh on every
+         call, and the result becomes visible on the book's page where
+         somebody can correct it. A brand-new second book has no accounts,
+         so adding one never moves the target.
+      5. Lowest id, then create — only reachable on a database with no cari
          accounts at all, i.e. a fresh install.
 
-    Every step falls through rather than raising: a book that has been renamed
-    or a stale id must not stop an order being placed.
+    Every step falls through rather than raising: a stale id or a book nobody
+    has flagged must not stop an order being placed.
+
+    (Step 4 adopts rather than a data migration doing it, because a migration
+    would have to reach `cari_accounts` through a HISTORICAL Book, and at that
+    point in the graph CariAccount still answers to its pre-move
+    `current_account_*` table — which no longer exists.)
     """
+    if member is None:
+        member = acting_member()
+    book = getattr(member, "default_book", None) if member is not None else None
+    if book is not None:
+        return book
+
     pinned = getattr(settings, "CARI_BOOK_ID", "") or ""
     if str(pinned).strip().isdigit():
         book = Book.objects.filter(pk=int(pinned)).first()
         if book:
             return book
 
-    name = (getattr(settings, "CARI_BOOK_NAME", "") or "").strip()
-    if name:
-        book = Book.objects.filter(name__iexact=name).order_by("id").first()
-        if book:
-            return book
+    book = Book.objects.filter(is_default_cari_target=True).first()
+    if book:
+        return book
 
     book = (Book.objects
             .annotate(n=Count("cari_accounts"))
@@ -78,9 +137,55 @@ def get_default_book() -> Book:
             .order_by("-n", "id")
             .first())
     if book:
+        _adopt_as_default_cari_target(book)
         return book
 
     return Book.objects.order_by("id").first() or Book.objects.create(name="Main Book")
+
+
+def _adopt_as_default_cari_target(book) -> None:
+    """Record the book step 3 picked, so the choice is made once.
+
+    Best-effort on purpose. This runs inside reads — placing an order,
+    printing a packing list — and none of them may fail because the flag
+    could not be written (a read-only replica, a concurrent adopter
+    losing the unique-constraint race). Losing the write just means the
+    next call works it out again, exactly as before.
+    """
+    from django.db import transaction
+    try:
+        with transaction.atomic():
+            updated = (Book.objects
+                       .filter(pk=book.pk, is_default_cari_target=False)
+                       .update(is_default_cari_target=True))
+        if updated:
+            book.is_default_cari_target = True
+    except Exception:
+        pass
+
+
+def brand_name_for(book=None) -> str:
+    """The name a customer-facing document signs with.
+
+    One resolver for invoices, order emails and packing lists so the
+    three never disagree about who sent them. Pass the book the document
+    belongs to (an Invoice has one); order-side documents have no book
+    of their own, so they get the ledger's — the same book their money
+    posts to.
+
+    Falls back to settings.BRAND_DISPLAY_NAME, then BRAND_NAME. It never
+    raises: a document must still print on a database with no books.
+    """
+    if book is None:
+        try:
+            book = get_default_book()
+        except Exception:
+            book = None
+    if book is not None:
+        return book.effective_brand_name
+    return (getattr(settings, "BRAND_DISPLAY_NAME", "")
+            or getattr(settings, "BRAND_NAME", "")
+            or "Nejum")
 
 
 def _resolve_currency(order=None) -> CurrencyCategory:
@@ -133,7 +238,7 @@ def get_or_create_cari_for_contact(contact, *, member=None) -> CariAccount:
     """Find (or create) the contact's cari — every B2B contact gets one
     so orders/invoices can post against it. Idempotent via the
     uniq_cari_book_contact constraint (one cari per book+contact)."""
-    book = get_default_book()
+    book = get_default_book(member)
     cari = CariAccount.objects.filter(book=book, contact=contact).first()
     if cari:
         return cari
@@ -150,7 +255,7 @@ def get_or_create_cari_for_company(company, *, member=None) -> CariAccount:
     """Find (or create) the company's cari — every B2B company gets one
     so orders/invoices can post against it. Idempotent via the
     uniq_cari_book_company constraint (one cari per book+company)."""
-    book = get_default_book()
+    book = get_default_book(member)
     cari = CariAccount.objects.filter(book=book, company=company).first()
     if cari:
         return cari
@@ -167,7 +272,7 @@ def get_or_create_cari_for_supplier(supplier, *, member=None) -> CariAccount:
     """Find (or create) the supplier's cari — every supplier gets one so
     purchases (stock intake) can post debt against it. Idempotent via
     the uniq_cari_book_supplier constraint (one cari per book+supplier)."""
-    book = get_default_book()
+    book = get_default_book(member)
     cari = CariAccount.objects.filter(book=book, supplier=supplier).first()
     if cari:
         return cari
@@ -191,7 +296,8 @@ def _currency_by_code(code) -> CurrencyCategory:
     return _resolve_currency()
 
 
-def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None, invoice_date=None):
+def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None,
+                                       invoice_date=None, invoice=None):
     """Turn a warehouse stock intake into an issued PURCHASE invoice
     (alış faturası) on the given cari account.
 
@@ -207,6 +313,12 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None, i
     line (tax 0 — the entered price is what we owe), then issue()s it,
     which posts the CariMovement(invoice_purchase, -total) with a source
     link so the cari statement row is clickable through to the invoice.
+    `invoice` — an existing DRAFT purchase order being confirmed. Its number,
+    dates and account are already settled, so only its lines are rebuilt (from
+    what actually arrived) before it is issued. Safe to wipe its items first:
+    a draft has no rolls pointing at them yet, which is exactly what makes the
+    order editable right up to the moment it is confirmed.
+
     Returns the issued Invoice.
     """
     from .models import Invoice, InvoiceItem
@@ -217,6 +329,29 @@ def create_purchase_invoice_for_intake(cari, lines, *, member=None, user=None, i
     book = cari.book
     currency = _currency_by_code(lines[0].get("currency") if lines else None)
     settings_obj = CariSettings.for_book(book)
+
+    if invoice is not None:
+        with transaction.atomic():
+            invoice.items.all().delete()
+            for i, line in enumerate(lines, start=1):
+                InvoiceItem.objects.create(
+                    invoice=invoice, line_no=i,
+                    product=line.get("product"),
+                    variant=line.get("variant"),
+                    description=(line.get("description") or "")[:300],
+                    quantity=line.get("quantity") or Decimal("0"),
+                    unit=(line.get("unit") or "mt")[:20],
+                    unit_price=line.get("unit_price") or Decimal("0"),
+                    discount_rate=Decimal("0"),
+                    tax_rate=Decimal("0"),
+                )
+            if invoice.currency_id != currency.pk:
+                invoice.currency = currency
+                invoice.save(update_fields=["currency", "updated_at"])
+            invoice.recompute_totals(save=True)
+            invoice.refresh_from_db()
+            invoice.issue(user=user)
+        return invoice
 
     with transaction.atomic():
         today = invoice_date or date.today()
@@ -563,7 +698,10 @@ def post_order_movement(order, *, member=None):
             cari.recompute_balance(save=True)
         return None
 
-    book = get_default_book()
+    # The movement lives with the account it posts to, not with whoever
+    # happens to be saving the order — a receivable in one book against
+    # an account in another does not add up in either.
+    book = cari.book
     currency = _resolve_currency(order)
     ref = order.order_number or f"ORD-{order.pk}"
     desc = f"Order #{order.pk}"
@@ -634,7 +772,7 @@ _RETAIL_AUTO_DESC = "Perakende otomatik tahsilat"
 
 def get_or_create_retail_cari(member=None) -> CariAccount:
     """The single shared cari all retail orders post to."""
-    book = get_default_book()
+    book = get_default_book(member)
     cari = CariAccount.objects.filter(book=book, code=RETAIL_CARI_CODE).first()
     if cari:
         return cari
@@ -687,7 +825,9 @@ def post_retail_order_financials(order, user=None):
     collected = _order_confirmed_collections(order, cari)
     remainder = total - collected
     if remainder > 0:
-        book = get_default_book()
+        # Same rule as the movement above: the collection belongs to the
+        # book its cari is in.
+        book = cari.book
         pay = Payment.objects.create(
             cari=cari, book=book,
             number=_next_payment_number(book, "collection"),

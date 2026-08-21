@@ -508,6 +508,25 @@ class Invoice(models.Model):
     exchange_rate = models.DecimalField(max_digits=14, decimal_places=6,
                                         default=Decimal("1.000000"))
 
+    # ── Purchases: the two-step order → goods-receipt flow ────────────
+    # A purchase is entered as a DRAFT order first (no stock, no debt) and
+    # only becomes real stock when it is confirmed. These two fields are
+    # what carries it across that gap; both stay set afterwards.
+    #
+    # intake_warehouse — the depot this purchase is (or was) received into.
+    #   Previously re-derived from surviving rolls, which quietly made a
+    #   purchase uneditable once its roll links were orphaned, and can't
+    #   work at all for a draft that has no rolls yet.
+    # intake_plan — the receipt exactly as the goods-receipt page posts it
+    #   (products → variants → rolls, with the intended SKUs and any typed
+    #   barcodes). Draft: this IS the document, replayed on confirm.
+    #   Confirmed: kept as the record of what was received.
+    intake_warehouse = models.ForeignKey(
+        "operating.Warehouse", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="purchase_invoices",
+    )
+    intake_plan = models.JSONField(null=True, blank=True)
+
     # Totals (auto-recomputed from items)
     subtotal        = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     discount_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -564,6 +583,29 @@ class Invoice(models.Model):
         return f"{self.display_number} | {self.cari.name} | {self.total} {self.currency.code}"
 
     # -- helpers -----------------------------------------------------------
+    @property
+    def issuer_display_name(self):
+        """Who this invoice says it is from.
+
+        Precedence: the per-invoice snapshot, then the issuing book's
+        brand name, then the brand profile in settings.
+
+        BRAND_LEGAL_SUFFIX is appended only to that last, settings-level
+        fallback. A name typed on the invoice or on the book is taken as
+        complete — otherwise a lockup like "DEMFIRAT® | Karven Home
+        Collection" would print with a "SAN. TİC. LTD. ŞTİ." bolted onto
+        the end of the marketing half of it.
+        """
+        from django.conf import settings
+        explicit = (self.issuer_name or "").strip()
+        if not explicit and self.book_id:
+            explicit = (self.book.brand_name or "").strip()
+        if explicit:
+            return explicit
+        base = getattr(settings, "BRAND_NAME", "") or "Nejum ERP"
+        suffix = (getattr(settings, "BRAND_LEGAL_SUFFIX", "") or "").strip()
+        return f"{base} {suffix}".strip() if suffix else base
+
     @property
     def display_number(self):
         """How this invoice is named on screen and in ledger descriptions.

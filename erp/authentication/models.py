@@ -11,6 +11,13 @@ ACCESS_LEVEL_CHOICES_DICT = {
     ),
     "employee": ("Employee", "Can access and manage their own tasks and projects."),
     "guest": ("Guest", "Has limited access to view certain resources."),
+    # Granted per person rather than implied by rank: confirming a purchase
+    # order turns it into real warehouse stock AND posts the debt to the
+    # supplier, so it is held separately from "manager".
+    "purchase_confirm": (
+        "Confirm purchases",
+        "Can confirm a purchase order into warehouse stock (goods receipt).",
+    ),
 }
 
 # Convert dictionary to list of tuples for name choices
@@ -41,6 +48,26 @@ class Member(models.Model):
     user = models.OneToOneField(User, null=True, on_delete=models.CASCADE)
     permissions = models.ManyToManyField(Permission, related_name="members", blank=True)
     # company_name = models.CharField(max_length=100)
+
+    # Which business this member works for. Orders they create, and the
+    # customer accounts and invoices those raise, land in this book.
+    #
+    # Per MEMBER rather than per deployment: one install runs several
+    # businesses, and which one a record belongs to is a fact about who
+    # entered it, not about the server. Staff at the Laleli branch enter
+    # Laleli's orders whatever anybody else is doing at the same moment.
+    #
+    # Null → fall back to Book.is_default_cari_target, so a member who
+    # has never picked one still books somewhere sensible rather than
+    # being blocked. See accounting.services_accounts.get_default_book.
+    default_book = models.ForeignKey(
+        "accounting.Book",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="members",
+        verbose_name="Working book",
+        help_text="Orders this member creates are booked here.",
+    )
 
     def __str__(self):
         if self.user.first_name and self.user.last_name:

@@ -8059,6 +8059,12 @@ msgstr ""
 msgid "Download full list (PDF)"
 msgstr "Tüm listeyi indir (PDF)"
 
+msgid "Open packing list (PDF)"
+msgstr "Çeki listesini aç (PDF)"
+
+msgid "Download Excel (editable)"
+msgstr "Excel indir (düzenlenebilir)"
+
 #: operating/templates/operating/order_packing_list.html
 msgid "Print this package (PDF)"
 msgstr "Bu paketi yazdır (PDF)"
@@ -8565,3 +8571,228 @@ msgstr "Önce en eski"
 
 msgid "Change the reading order"
 msgstr "Sıralamayı değiştir"
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid "Goods receipt"
+msgstr "Mal kabul"
+
+msgid "New goods receipt"
+msgstr "Yeni mal kabul"
+
+msgid "Edit goods receipt"
+msgstr "Mal kabulünü düzenle"
+
+msgid "Save goods receipt"
+msgstr "Mal kabulünü kaydet"
+
+msgid "Editing"
+msgstr "Düzenleniyor"
+
+msgid "Incoming delivery"
+msgstr "Gelen sevkiyat"
+
+msgid "No warehouse to receive into"
+msgstr "Mal kabul edilecek depo yok"
+
+msgid "Select warehouse…"
+msgstr "Depo seçin…"
+
+msgid "Receive a delivery into a warehouse. One submit creates the stock — products, variants and each physical roll with its own barcode — and the supplier purchase invoice behind it."
+msgstr "Gelen sevkiyatı depoya alın. Tek kayıtla hem stok — ürünler, varyantlar ve her biri kendi barkoduna sahip toplar — hem de arkasındaki alış faturası oluşur."
+
+msgid "Add or remove the physical rolls on this purchase. Rolls already reserved for a customer order are locked, and the account can't change here."
+msgstr "Bu alımdaki topları ekleyin veya çıkarın. Bir müşteri siparişine ayrılmış toplar kilitlidir ve cari hesap burada değiştirilemez."
+
+msgid "Create a warehouse first — goods are received into a real depot, not a combined view."
+msgstr "Önce bir depo oluşturun — mal kabul gerçek bir depoya yapılır, ortak görünüme değil."
+
+msgid "Where it lands, who it's bought from, and how it's measured."
+msgstr "Nereye girecek, kimden alındı ve hangi birimle ölçülüyor."
+
+msgid "Set at intake — a purchase can't move between warehouses."
+msgstr "Girişte belirlenir — bir alım depolar arasında taşınamaz."
+
+msgid "Changing this clears the products below."
+msgstr "Bunu değiştirmek aşağıdaki ürünleri temizler."
+
+msgid "A delivery can carry several unrelated products — they're all entered here and saved together."
+msgstr "Bir sevkiyat birbiriyle ilgisiz birçok ürün taşıyabilir — hepsi burada girilir ve birlikte kaydedilir."
+
+msgid "Changing the warehouse clears the products entered below. Continue?"
+msgstr "Depoyu değiştirmek aşağıda girilen ürünleri temizler. Devam edilsin mi?"
+
+msgid "Select the warehouse this delivery is received into."
+msgstr "Bu sevkiyatın gireceği depoyu seçin."
+
+msgid "A purchase is created when a delivery is received into a warehouse."
+msgstr "Bir depoya mal kabul yapıldığında alım kaydı oluşur."
+
+msgid "A cancelled purchase can no longer be edited."
+msgstr "İptal edilmiş bir alım artık düzenlenemez."
+
+msgid "This purchase's stock links are missing, so it can't be edited — view or cancel it from the purchases page instead."
+msgstr "Bu alımın stok bağlantıları kayıp, bu yüzden düzenlenemiyor — alımlar sayfasından görüntüleyin veya iptal edin."
+
+msgid "auto and unique — overwrite it with the code the mill uses, to file the product under that. Groups the variants below."
+msgstr "otomatik ve benzersiz — ürünün kendi kodunu (ör. K24644) yazarsanız ürün o kodla kaydedilir. Altındaki varyantları gruplar."
+
+#: accounting/templates/accounts/goods_receipt_form.html
+msgid "Account could not be created."
+msgstr "Cari oluşturulamadı."
+
+msgid "Account name"
+msgstr "Cari adı"
+
+msgid "Already used by"
+msgstr "Şunda kullanılıyor"
+
+msgid "Barcode (auto)"
+msgstr "Barkod (otomatik)"
+
+msgid "Change account"
+msgstr "Cariyi değiştir"
+
+msgid "Color / model"
+msgstr "Renk / model"
+
+msgid "Create account"
+msgstr "Cari oluştur"
+
+msgid "Existing main product"
+msgstr "Mevcut ana ürün"
+
+msgid "Fix the marked barcodes first"
+msgstr "Önce işaretli barkodları düzeltin"
+
+msgid "New account"
+msgstr "Yeni cari"
+
+msgid "No account matches"
+msgstr "Eşleşen cari yok"
+
+msgid "Rolls on this purchase"
+msgstr "Bu alımdaki toplar"
+
+msgid "Search by name or SKU…"
+msgstr "Ada veya SKU ile arayın…"
+
+msgid "Select account…"
+msgstr "Cari seçin…"
+
+msgid "Select the account this delivery is purchased from."
+msgstr "Bu sevkiyatın alındığı cariyi seçin."
+
+msgid "This barcode is already in use."
+msgstr "Bu barkod zaten kullanılıyor."
+
+msgid "This barcode is entered on more than one roll."
+msgstr "Bu barkod birden fazla topa girildi."
+
+msgid "Type an account name…"
+msgstr "Cari adı yazın…"
+
+msgid "Variant SKU"
+msgstr "Varyant SKU"
+
+msgid "auto"
+msgstr "otomatik"
+
+msgid "e.g. Beyaz"
+msgstr "ör. Beyaz"
+
+msgid "e.g. GREK"
+msgstr "ör. GREK"
+
+msgid "e.g. Karven"
+msgstr "ör. Karven"
+
+msgid "auto and unique — overwrite it with the code the mill uses."
+msgstr "otomatik ve benzersiz — ürünün kendi kodunu (ör. K24644) yazabilirsiniz."
+
+#: accounting/templates/accounts/purchase_order_print.html
+msgid "Ask an admin for the purchase-confirm permission."
+msgstr "Yöneticinizden alım onaylama yetkisi isteyin."
+
+msgid "Cancel order"
+msgstr "Siparişi iptal et"
+
+msgid "Confirm & receive"
+msgstr "Onayla ve mal kabul et"
+
+msgid "Deliver to"
+msgstr "Teslim edilecek yer"
+
+msgid "E-mail"
+msgstr "E-posta"
+
+msgid "Expected"
+msgstr "Beklenen"
+
+msgid "Expected delivery"
+msgstr "Beklenen teslim"
+
+msgid "GOODS RECEIPT"
+msgstr "MAL KABUL"
+
+msgid "NOT YET RECEIVED"
+msgstr "HENÜZ TESLİM ALINMADI"
+
+msgid "New purchase order"
+msgstr "Yeni alım siparişi"
+
+msgid "Nothing has reached the warehouse yet, so everything here is still editable. Confirming it receives the goods and posts what you owe the supplier."
+msgstr "Depoya henüz hiçbir şey girmedi, bu yüzden burada her şey düzenlenebilir. Onaylandığında mal kabul edilir ve cariye borç işlenir."
+
+msgid "Nothing has reached the warehouse yet. Confirming receives the goods and posts what you owe the supplier."
+msgstr "Depoya henüz hiçbir şey girmedi. Onaylandığında mal kabul edilir ve cariye borç işlenir."
+
+msgid "Order date"
+msgstr "Sipariş tarihi"
+
+msgid "Order — not yet received"
+msgstr "Sipariş — henüz teslim alınmadı"
+
+msgid "Ordered goods"
+msgstr "Sipariş edilen mallar"
+
+msgid "PURCHASE ORDER"
+msgstr "ALIM SİPARİŞİ"
+
+msgid "Payment term"
+msgstr "Vade"
+
+msgid "Purchase order — not yet received"
+msgstr "Alım siparişi — henüz teslim alınmadı"
+
+msgid "RECEIVED"
+msgstr "TESLİM ALINDI"
+
+msgid "Receive now"
+msgstr "Şimdi mal kabul et"
+
+msgid "Receive this order into the warehouse? The stock and the supplier invoice are created now."
+msgstr "Bu sipariş depoya alınsın mı? Stok ve alış faturası şimdi oluşturulacak."
+
+msgid "Receiving needs permission"
+msgstr "Mal kabul için yetki gerekli"
+
+msgid "Save order"
+msgstr "Siparişi kaydet"
+
+msgid "Shown on the printed order"
+msgstr "Yazdırılan siparişte görünür"
+
+msgid "Tax no"
+msgstr "Vergi no"
+
+msgid "Write an order down now and receive it when it arrives — or receive a delivery that is already here."
+msgstr "Siparişi şimdi yazın, geldiğinde mal kabul edin — ya da hâlihazırda gelmiş bir sevkiyatı doğrudan kabul edin."
+
+msgid "Write the delivery down first and receive it when it arrives — or receive it straight away if it is already here. Receiving creates the stock (products, variants and each roll with its own barcode) and the supplier invoice behind it."
+msgstr "Sevkiyatı önce yazın, geldiğinde mal kabul edin — ya da zaten geldiyse hemen kabul edin. Mal kabul; stoğu (ürünler, varyantlar ve her biri kendi barkoduna sahip toplar) ve arkasındaki alış faturasını oluşturur."
+
+msgid "What was bought, from which supplier, and which physical rolls arrived — not a generic invoice view."
+msgstr "Ne alındı, hangi cariden ve hangi toplar geldi — genel fatura görünümü değil."
+
+msgid "This permanently deletes the physical stock this purchase brought in and cannot be undone. Type the purchase number to confirm:"
+msgstr "Bu işlem alımla giren fiziksel stoğu kalıcı olarak siler ve geri alınamaz. Onaylamak için alım numarasını yazın:"

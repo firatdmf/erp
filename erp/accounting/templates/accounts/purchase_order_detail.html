@@ -74,22 +74,43 @@
 
   <div class="po-head">
     <div>
-      <div class="po-eyebrow">{% trans "Purchase order" %}</div>
+      <div class="po-eyebrow">
+        {% if is_order %}{% trans "Purchase order — not yet received" %}{% else %}{% trans "Goods receipt" %}{% endif %}
+      </div>
       <h1 class="po-title">{{ invoice.number }}</h1>
+      {% if is_order %}
+        <div class="po-sub">{% trans "Nothing has reached the warehouse yet. Confirming receives the goods and posts what you owe the supplier." %}</div>
+      {% endif %}
     </div>
-    <div style="display:flex; align-items:center; gap:8px;">
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
       <span class="po-badge {{ invoice.status }}">{{ invoice.get_status_display }}</span>
+      <a class="po-back" href="{% url 'accounts:purchase_order_print' invoice.pk %}" target="_blank">
+        <i class="fa fa-print"></i> {% trans "Print" %}
+      </a>
       {% if invoice.status != 'cancelled' %}
-        {% if warehouse_id %}
-          <a class="po-back" href="{% url 'operating:warehouse_detail' warehouse_id %}?edit_purchase={{ invoice.pk }}">
+        {% if is_order or warehouse_id %}
+          <a class="po-back" href="{% url 'accounts:goods_receipt_edit' invoice.pk %}">
             <i class="fa fa-pen"></i> {% trans "Edit" %}
           </a>
+        {% endif %}
+        {% if is_order %}
+          {% if can_confirm %}
+            <button type="button" class="po-back" id="poConfirmBtn" onclick="poConfirm(this)"
+                    style="background:linear-gradient(180deg,#16897D,#0F6B62); border-color:#0F6B62; color:#fff; cursor:pointer;">
+              <i class="fa fa-check"></i> {% trans "Confirm & receive" %}
+            </button>
+          {% else %}
+            <span class="po-back" style="color:#94A3B8; border-style:dashed;">
+              <i class="fa fa-lock"></i> {% trans "Receiving needs permission" %}
+            </span>
+          {% endif %}
         {% endif %}
         <form method="post" action="{% url 'accounts:purchase_cancel' invoice.pk %}" style="display:inline;"
               onsubmit="return poConfirmCancel(this);">
           {% csrf_token %}
           <button type="submit" class="po-back" style="color:#B91C1C; border-color:#FCA5A5; cursor:pointer;">
-            <i class="fa fa-ban"></i> {% trans "Cancel purchase" %}
+            <i class="fa fa-ban"></i>
+            {% if is_order %}{% trans "Cancel order" %}{% else %}{% trans "Cancel purchase" %}{% endif %}
           </button>
         </form>
       {% endif %}
@@ -166,5 +187,24 @@
     );
     return typed === "{{ invoice.display_number }}";
   }
+</script>
+<script>
+  // Confirm turns this order into stock; it is deliberately a POST with an
+  // explicit "are you sure", since there is no undo short of cancelling the
+  // whole purchase (which deletes the tops it created).
+  window.poConfirm = function (btn) {
+    if (!confirm("{% trans 'Receive this order into the warehouse? The stock and the supplier invoice are created now.' %}")) return;
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> {% trans "Saving…" %}';
+    fetch("{% url 'accounts:purchase_order_confirm' invoice.pk %}", {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.success) { window.location.reload(); }
+        else { alert((d && d.error) || 'Kaydedilemedi.'); btn.disabled = false; btn.innerHTML = orig; }
+      }).catch(function () { alert('Ağ hatası.'); btn.disabled = false; btn.innerHTML = orig; });
+  };
 </script>
 {% endblock %}

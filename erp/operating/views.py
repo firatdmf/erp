@@ -288,7 +288,11 @@ class OrderDetail(DetailView):
         )
 
     def get_context_data(self, **kwargs):
+        from accounting.services_accounts import brand_name_for
         ctx = super().get_context_data(**kwargs)
+        # What the print-header box hints at when it is left blank — the
+        # book's brand name, i.e. what the documents will actually say.
+        ctx["brand_line"] = brand_name_for()
         # Billing follows the ORDERED quantity, so a line nobody scanned
         # still charges in full — correct, but worth saying out loud.
         # Surfaces as a warning on the totals block; it changes no money.
@@ -1891,8 +1895,14 @@ class OrderPrint(DetailView):
 
     def get_context_data(self, **kwargs):
         from decimal import Decimal, ROUND_HALF_UP
+        from accounting.services_accounts import brand_name_for
         ctx = super().get_context_data(**kwargs)
         order = self.object
+        # Who the document signs as: the order's own print header, else
+        # the ledger book's brand name. Resolved here rather than in the
+        # template so the printed order, its Excel and the invoice
+        # raised from it all go through one rule.
+        ctx["brand_line"] = (order.print_header or "").strip() or brand_name_for()
         # Physical packs scanned for this order (a "top"/roll for fabric,
         # but the goods aren't only fabric — the printed document calls
         # them packs), per line and in total. Consumed reservations count
@@ -2789,6 +2799,52 @@ class OrderItemUnitScanPack(View):
         return render(request, self.template_name, context)
 
 
+def _product_type_label(product):
+    """What KIND of thing a packed roll is — "Fabric", "Curtain", … The
+    product group is the real classification; Product.type is the older
+    free-text field kept as a fallback for catalog rows that predate
+    groups. Same precedence the invoice print uses, so a customer
+    reading both documents sees the same word. Group names are stored
+    slugged and lowercase (`bed_linen`), so un-slug them for print."""
+    if product is None:
+        return "-"
+    name = (product.category.name if product.category_id else None) or product.type
+    if not name:
+        return "-"
+    return name.replace("_", " ").strip().title()
+
+
+def _variant_label(variant):
+    """Which variant of the product this is — for a fabric that is its
+    colour ("Light Cream"), for other groups whatever attributes the
+    variant carries, joined. Attribute VALUES are stored slugged and
+    lowercase (`light_cream`, see catalog_sync._norm_value), so un-slug
+    them the same way the warehouse variant picker does. A product with
+    no variants prints a dash: it is not that the variant is unknown,
+    it is that there is only one of it."""
+    if variant is None:
+        return "-"
+    values = [v.product_variant_attribute_value
+              for v in variant.product_variant_attribute_values.all()
+              if v.product_variant_attribute_value]
+    if not values:
+        return "-"
+    return " / ".join(v.replace("_", " ").strip().title() for v in values)
+
+
+def _packing_list_customer(order):
+    """The customer name as it prints. Order.get_client() hands back the
+    related object rather than a label, and web clients keep their name
+    on a different field than contacts do, so resolve it in one place."""
+    if order.contact:
+        return order.contact.name
+    if order.company:
+        return order.company.name
+    if order.web_client:
+        return order.web_client.name or order.web_client.username
+    return ""
+
+
 def _pack_roll_rows(pack):
     """The physical tops actually assigned to a Pack, sourced from
     OrderRollReservation.pack — the SAME data order_pack_scan.html's
@@ -2796,19 +2852,35 @@ def _pack_roll_rows(pack):
     happens; packing_list/PDF only ever READ this, they never let
     staff re-assign, so there's no second place to "pack" an order."""
     rows = []
+    # The variant's attributes are a M2M, so they are prefetched rather
+    # than joined — one extra query for the pack, not one per roll.
+    attr_values = ("product_variant_attribute_values__product_variant_attribute")
     for r in (pack.roll_reservations
-              .select_related("roll", "order_item__product", "order_item__product_variant",
-                              "warehouse_product")
+              .select_related("roll",
+                              "order_item__product__category",
+                              "order_item__product_variant",
+                              "warehouse_product__catalog_variant__product__category")
+              .prefetch_related(f"order_item__product_variant__{attr_values}",
+                                f"warehouse_product__catalog_variant__{attr_values}")
               .order_by("id")):
         if r.order_item_id and r.order_item.product_id:
-            title = r.order_item.product.title
-            sku = (r.order_item.product_variant.variant_sku
-                   if r.order_item.product_variant_id else (r.order_item.product.sku or "-"))
+            product = r.order_item.product
+            variant = (r.order_item.product_variant
+                       if r.order_item.product_variant_id else None)
+            title = product.title
+            sku = variant.variant_sku if variant else (product.sku or "-")
         else:
-            title = r.warehouse_product.name if r.warehouse_product_id else "-"
-            sku = r.warehouse_product.sku if (r.warehouse_product_id and r.warehouse_product.sku) else "-"
+            wp = r.warehouse_product if r.warehouse_product_id else None
+            # A warehouse row carries no group of its own; it borrows the
+            # one from the catalog variant its scans are mapped to.
+            variant = getattr(wp, "catalog_variant", None)
+            product = getattr(variant, "product", None)
+            title = wp.name if wp else "-"
+            sku = wp.sku if (wp and wp.sku) else "-"
         rows.append({
             "title": title, "sku": sku,
+            "variant": _variant_label(variant),
+            "product_type": _product_type_label(product),
             "barcode": r.roll.barcode if r.roll_id else "-",
             "meters": r.meters,
         })
@@ -2849,8 +2921,15 @@ class OrderPackingList(View):
                 and order.order_status not in {"cancelled", "returned"}):
             Pack.objects.create(order=order, pack_number=1)
         packs = list(order.packs.order_by("pack_number"))
+        # Item numbers run 1..N across the whole order rather than
+        # restarting inside each package, so a number read off this
+        # screen means the same thing on the printed list and the Excel.
+        item_no = 0
         for p in packs:
             p.rows = _pack_roll_rows(p)
+            for r in p.rows:
+                item_no += 1
+                r["item_no"] = item_no
 
         unassigned_count = order.roll_reservations.filter(pack__isnull=True).count()
 
@@ -2932,73 +3011,136 @@ from openpyxl.utils import get_column_letter
 
 
 def export_packing_list_excel(request, pk):
+    """The same list as the PDF, as a workbook you download and edit —
+    that split is deliberate: the PDF is served inline for reading, this
+    is the copy staff amend by hand before sending it on. Same columns,
+    same item numbering, so the two documents can be read side by side."""
+    from decimal import Decimal
+    from accounting.services_accounts import brand_name_for
+    from openpyxl.styles import PatternFill
+
     order = Order.objects.get(pk=pk)
-    packs = order.packs.order_by("pack_number")
+    packs = list(order.packs.order_by("pack_number"))
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = f"Packing List - Order {pk}"
+    ws.title = f"Packing List {pk}"
 
-    ws.merge_cells("A1:E1")
-    ws["A1"] = f"Packing List for Order #{pk} — {order.get_client()} "
-    ws["A1"].font = Font(size=14, bold=True)
-    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    headers = ["Pack", "No", "Product", "Variant", "Product Type", "SKU",
+               "Barcode", "Metres"]
+    last_col = len(headers)
+    last_letter = get_column_letter(last_col)
 
-    headers = ["Pack Number", "Product", "SKU", "Barcode", "Metres"]
-    header_font = Font(bold=True)
+    brand_line = (order.print_header or "").strip() or brand_name_for()
+    _order_dt = order.order_date or order.created_at.date()
+
+    teal = "FF00696A"
+    ws.merge_cells(f"A1:{last_letter}1")
+    ws["A1"] = brand_line
+    ws["A1"].font = Font(size=11, bold=True, color=teal)
+
+    ws.merge_cells(f"A2:{last_letter}2")
+    ws["A2"] = f"Packing List {order.pk}"
+    ws["A2"].font = Font(size=16, bold=True)
+
+    ws["A3"] = "Order No"
+    ws["B3"] = order.order_number or str(order.pk)
+    ws["A4"] = "Date"
+    ws["B4"] = _long_date(_order_dt, False)
+    ws["A5"] = "Customer"
+    ws["B5"] = _packing_list_customer(order) or "-"
+    for r in (3, 4, 5):
+        ws.cell(row=r, column=1).font = Font(bold=True)
+
+    HEADER_ROW = 7
+    header_fill = PatternFill("solid", fgColor="FFEAF2F1")
     for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=2, column=col_num, value=header)
-        cell.font = header_font
+        cell = ws.cell(row=HEADER_ROW, column=col_num, value=header)
+        cell.font = Font(bold=True, color=teal)
+        cell.fill = header_fill
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin"),
-    )
-    thick_border = Border(
-        left=Side(style="thick"), right=Side(style="thick"),
-        top=Side(style="thick"), bottom=Side(style="thick"),
-    )
+    thin = Side(style="thin", color="FFD8DFE7")
+    medium = Side(style="medium", color="FFC9D3DC")
+    grid = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    row = 3
+    row = HEADER_ROW + 1
+    # Numbered 1..N across the whole order, matching the "No" column on
+    # the PDF and the screen — not restarted inside each package.
+    item_no = 0
+    total_meters = Decimal("0")
     for pack in packs:
         pack_start_row = row
         rows = _pack_roll_rows(pack)
 
         for r in rows:
-            values = [pack.pack_number, r["title"], r["sku"], r["barcode"], float(r["meters"] or 0)]
+            item_no += 1
+            total_meters += Decimal(r["meters"] or 0)
+            values = [pack.pack_number, item_no, r["title"], r["variant"],
+                      r["product_type"], r["sku"], r["barcode"],
+                      float(r["meters"] or 0)]
             for col_index, value in enumerate(values, start=1):
                 cell = ws.cell(row=row, column=col_index, value=value)
-                cell.border = thin_border
-                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.border = grid
+                cell.alignment = Alignment(
+                    horizontal="right" if col_index in (2, last_col) else "left",
+                    vertical="center")
+            ws.cell(row=row, column=last_col).number_format = '0.00" m"'
             row += 1
 
         if not rows:
-            cell = ws.cell(row=row, column=1, value=pack.pack_number)
-            cell.border = thin_border
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            empty_cell = ws.cell(row=row, column=2, value="(empty)")
-            empty_cell.border = thin_border
-            for c in range(3, 6):
-                ws.cell(row=row, column=c).border = thin_border
+            ws.cell(row=row, column=1, value=pack.pack_number)
+            ws.cell(row=row, column=3, value="(empty)")
+            for c in range(1, last_col + 1):
+                ws.cell(row=row, column=c).border = grid
             row += 1
 
-        for r in range(pack_start_row, row):
-            for c in range(1, 6):
-                ws.cell(row=r, column=c).border = thick_border
-
+        # The pack number is one merged block down its own items, the way
+        # it prints — plus a heavier rule where the package changes.
         if row - pack_start_row > 1:
-            ws.merge_cells(start_row=pack_start_row, start_column=1, end_row=row - 1, end_column=1)
-            merged_cell = ws.cell(row=pack_start_row, column=1)
-            merged_cell.alignment = Alignment(horizontal="center", vertical="center")
+            ws.merge_cells(start_row=pack_start_row, start_column=1,
+                           end_row=row - 1, end_column=1)
+        merged_cell = ws.cell(row=pack_start_row, column=1)
+        merged_cell.alignment = Alignment(horizontal="center", vertical="center")
+        merged_cell.font = Font(bold=True, color=teal)
+        for c in range(1, last_col + 1):
+            cell = ws.cell(row=row - 1, column=c)
+            cell.border = Border(left=thin, right=thin, top=thin, bottom=medium)
 
-    for col in range(1, 6):
-        ws.column_dimensions[get_column_letter(col)].width = 22
+    # ── Totals, under the table, mirroring the PDF ───────────────────
+    totals_row = row + 1
+    for offset, (label, value) in enumerate((
+        ("Total Packages", len(packs)),
+        ("Total Items", item_no),
+        ("Total Metres", float(total_meters)),
+    )):
+        r = totals_row + offset
+        lbl = ws.cell(row=r, column=last_col - 1, value=label)
+        lbl.alignment = Alignment(horizontal="right")
+        val = ws.cell(row=r, column=last_col, value=value)
+        val.font = Font(bold=True)
+        val.alignment = Alignment(horizontal="right")
+        if label == "Total Metres":
+            val.number_format = '0.00" m"'
+            lbl.fill = header_fill
+            val.fill = header_fill
+
+    ws.column_dimensions["A"].width = 8
+    ws.column_dimensions["B"].width = 6
+    ws.column_dimensions["C"].width = 38
+    ws.column_dimensions["D"].width = 22
+    for col in range(5, last_col + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 20
+    # Header stays put while the list scrolls, and the filter lets staff
+    # pull out one product type or one package before editing.
+    ws.freeze_panes = ws.cell(row=HEADER_ROW + 1, column=1)
+    if item_no:
+        ws.auto_filter.ref = f"A{HEADER_ROW}:{last_letter}{row - 1}"
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    filename = f"packing_list_order_{pk}.xlsx"
+    filename = f"packing_list_{order.order_number or order.pk}.xlsx"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     wb.save(response)
     return response
@@ -3566,40 +3708,83 @@ def get_pack_qr_image(pack):
     return Image.open(buf).convert("RGB")
 
 
+def _long_date(d, is_tr):
+    """August 20, 2026 / 20 Agustos 2026. strftime("%B") spells the month
+    in the server process's C locale, which on the deploy box is neither
+    of ours — so the names live here instead."""
+    months_en = ["January", "February", "March", "April", "May", "June",
+                 "July", "August", "September", "October", "November", "December"]
+    months_tr = ["Ocak", "\u015eubat", "Mart", "Nisan", "May\u0131s", "Haziran",
+                 "Temmuz", "A\u011fustos", "Eyl\u00fcl", "Ekim", "Kas\u0131m", "Aral\u0131k"]
+    if is_tr:
+        return f"{d.day} {months_tr[d.month - 1]} {d.year}"
+    return f"{months_en[d.month - 1]} {d.day}, {d.year}"
+
+
+def _packing_list_doc_qr(order):
+    """One QR for the whole document, top-right. Per-PACKAGE QRs stay on
+    the A6 box labels (pack_pdf) where a scanner meets a package; on the
+    combined list they were one-per-table and left no room for the pack
+    column, so this identifies the order instead."""
+    import json
+    import segno
+    from PIL import Image
+    buf = BytesIO()
+    segno.make(json.dumps({"order_id": order.pk, "doc": "packing_list"}),
+               error="m").save(buf, kind="png", scale=6, border=1)
+    buf.seek(0)
+    return Image.open(buf).convert("RGB")
+
+
 def order_packing_list_pdf(request, pk):
-    from django.utils.translation import gettext as _
+    """The whole order on ONE table, not a table per package: the package
+    is a column of merged cells instead, so item numbers, column widths
+    and the totals read continuously down the page. Served inline —
+    it opens in a browser tab; the Excel export is the one you download
+    and edit."""
+    from decimal import Decimal
+    from accounting.services_accounts import brand_name_for
     from django.utils.translation import get_language
-    from .models import Order, Pack
+    from .models import Order
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib import colors
     from reportlab.lib.styles import ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.platypus import Image as RLImage
     from .order_notifications import _ensure_pdf_fonts
-    
+
     order = get_object_or_404(Order, pk=pk)
-    packs = order.packs.all().order_by("pack_number")
-    
-    # Determine the active language
+    packs = list(order.packs.all().order_by("pack_number"))
+
     lang = (get_language() or 'tr').lower()
     is_tr = lang.startswith('tr')
-    
-    # Text labels mapping dynamically based on active language
+
     labels = {
-        'title': "Sipariş Paket Listesi" if is_tr else "Order Packing List",
-        'order_no': "Sipariş No" if is_tr else "Order No",
+        'title': "\u00c7eki Listesi" if is_tr else "Packing List",
+        'order_no': "Sipari\u015f No" if is_tr else "Order No",
         'date': "Tarih" if is_tr else "Date",
-        'customer': "Müşteri" if is_tr else "Customer",
-        'package': "Paket" if is_tr else "Package",
-        'product': "Ürün" if is_tr else "Product",
-        'sku': "SKU",
+        'customer': "M\u00fc\u015fteri" if is_tr else "Customer",
+        'item_no': "No",
+        'pack': "Paket" if is_tr else "Pack",
+        'product': "\u00dcr\u00fcn" if is_tr else "Product",
+        'variant': "Varyant" if is_tr else "Variant",
+        'product_type': "\u00dcr\u00fcn Tipi" if is_tr else "Product Type",
         'barcode': "Barkod" if is_tr else "Barcode",
         'meters': "Metre" if is_tr else "Metres",
+        'total_packages': "Toplam Paket" if is_tr else "Total Packages",
+        'total_items': "Toplam Kalem" if is_tr else "Total Items",
+        'total_meters': "Toplam Metre" if is_tr else "Total Metres",
+        'empty_pack': "(bo\u015f)" if is_tr else "(empty)",
+        'no_items': "Bu sipari\u015fte paketlenmi\u015f \u00fcr\u00fcn yok." if is_tr else "Nothing has been packed for this order yet.",
     }
-    
+
     font = _ensure_pdf_fonts() or "Helvetica"
     font_bold = f"{font}-Bold" if font != "Helvetica" else "Helvetica-Bold"
+
+    TEAL = colors.HexColor("#00696A")
+    RULE = colors.HexColor("#E2E8EE")
+    MUTED = colors.HexColor("#6B7280")
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -3609,108 +3794,190 @@ def order_packing_list_pdf(request, pk):
         leftMargin=15 * mm,
         topMargin=15 * mm,
         bottomMargin=15 * mm,
-        title=f"{labels['title']} #{order.pk}"
+        title=f"{labels['title']} {order.pk}",
     )
-    
-    story = []
-    
+    FULL_W = 180 * mm  # A4 minus the 15mm margins
+
+    brand_style = ParagraphStyle(
+        name="BrandStyle", fontName=font_bold, fontSize=11, leading=14,
+        textColor=TEAL, spaceAfter=2,
+    )
     title_style = ParagraphStyle(
-        name="TitleStyle",
-        fontName=font_bold,
-        fontSize=18,
-        textColor=colors.HexColor("#111111"),
-        spaceAfter=15
+        name="TitleStyle", fontName=font_bold, fontSize=20, leading=24,
+        textColor=colors.HexColor("#0F1419"), spaceAfter=8,
     )
-    
     normal_style = ParagraphStyle(
-        name="NormalStyle",
-        fontName=font,
-        fontSize=10,
+        name="NormalStyle", fontName=font, fontSize=10, leading=14,
         textColor=colors.HexColor("#333333"),
-        leading=14
     )
-    
-    heading_style = ParagraphStyle(
-        name="HeadingStyle",
-        fontName=font_bold,
-        fontSize=12,
-        textColor=colors.HexColor("#00696A"),
-        spaceBefore=15,
-        spaceAfter=5
+    cell_style = ParagraphStyle(
+        name="CellStyle", parent=normal_style, fontSize=9, leading=11.5,
+        textColor=colors.HexColor("#111111"),
+    )
+    num_style = ParagraphStyle(name="NumStyle", parent=cell_style, alignment=2)
+    ctr_style = ParagraphStyle(
+        name="CtrStyle", parent=cell_style, alignment=1, fontName=font_bold,
+        textColor=TEAL,
+    )
+    th_style = ParagraphStyle(
+        name="ThStyle", parent=cell_style, fontName=font_bold, fontSize=8,
+        textColor=TEAL,
+    )
+    th_ctr_style = ParagraphStyle(name="ThCtrStyle", parent=th_style, alignment=1)
+    th_num_style = ParagraphStyle(name="ThNumStyle", parent=th_style, alignment=2)
+    totals_lbl_style = ParagraphStyle(
+        name="TotalsLbl", parent=cell_style, alignment=2, textColor=MUTED,
+    )
+    totals_val_style = ParagraphStyle(
+        name="TotalsVal", parent=cell_style, alignment=2, fontName=font_bold,
     )
 
-    story.append(Paragraph(labels['title'], title_style))
-    story.append(Paragraph(f"<b>{labels['order_no']}:</b> {order.order_number or order.pk}", normal_style))
+    story = []
+
+    # ── Header: brand + document identity left, document QR top-right ──
+    cust_name = _packing_list_customer(order)
+
+    brand_line = (order.print_header or "").strip() or brand_name_for()
     _order_dt = order.order_date or order.created_at.date()
-    story.append(Paragraph(f"<b>{labels['date']}:</b> {_order_dt.strftime('%d.%m.%Y')}", normal_style))
-    
-    cust_name = ""
-    if order.contact:
-        cust_name = order.contact.name
-    elif order.company:
-        cust_name = order.company.name
-    elif order.web_client:
-        cust_name = order.web_client.name or order.web_client.username
-    story.append(Paragraph(f"<b>{labels['customer']}:</b> {cust_name or '-'}", normal_style))
-    
-    story.append(Spacer(1, 10))
-    
+
+    head_left = [
+        Paragraph(brand_line, brand_style),
+        # The list is numbered by the order's own id — the same 270 that
+        # is in the URL of the packing screen this PDF prints.
+        Paragraph(f"{labels['title']} {order.pk}", title_style),
+        Paragraph(f"<b>{labels['order_no']}:</b> {order.order_number or order.pk}", normal_style),
+        Paragraph(f"<b>{labels['date']}:</b> {_long_date(_order_dt, is_tr)}", normal_style),
+        Paragraph(f"<b>{labels['customer']}:</b> {cust_name or '-'}", normal_style),
+    ]
+
+    qr_io = BytesIO()
+    _packing_list_doc_qr(order).save(qr_io, format="PNG")
+    qr_io.seek(0)
+    qr_img = RLImage(qr_io, width=26 * mm, height=26 * mm)
+    qr_img.hAlign = 'RIGHT'
+
+    head_tbl = Table([[head_left, qr_img]], colWidths=[FULL_W - 30 * mm, 30 * mm])
+    head_tbl.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (0, 0), 'BOTTOM'),
+        ('VALIGN', (1, 0), (1, 0), 'TOP'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(head_tbl)
+    story.append(Spacer(1, 14))
+
+    # ── One table for every package ──────────────────────────────────
+    data = [[
+        Paragraph(labels['pack'], th_ctr_style),
+        Paragraph(labels['item_no'], th_style),
+        Paragraph(labels['product'], th_style),
+        Paragraph(labels['variant'], th_style),
+        Paragraph(labels['product_type'], th_style),
+        Paragraph(labels['barcode'], th_style),
+        Paragraph(labels['meters'], th_num_style),
+    ]]
+    # (first_row, last_row) per package, so the pack column can be merged
+    # down across every item that shares it.
+    spans = []
+    item_no = 0
+    total_meters = Decimal("0")
+
     for pack in packs:
-        pack_story = []
-        pack_story.append(Paragraph(f"{labels['package']} #{pack.pack_number} ({pack.code})", heading_style))
-        
-        qr_pil = get_pack_qr_image(pack)
-        
-        items_data = [[
-            Paragraph(f"<b>{labels['product']}</b>", normal_style),
-            Paragraph(f"<b>{labels['barcode']}</b>", normal_style),
-            Paragraph(f"<b>{labels['meters']}</b>", normal_style)
-        ]]
-
-        for row in _pack_roll_rows(pack):
-            items_data.append([
-                Paragraph(f"{row['title']} ({row['sku']})", normal_style),
-                Paragraph(str(row['barcode']), normal_style),
-                Paragraph(f"{row['meters']:.2f} m" if row['meters'] is not None else "-", normal_style),
+        rows = _pack_roll_rows(pack)
+        first = len(data)
+        if not rows:
+            data.append([
+                Paragraph(str(pack.pack_number), ctr_style),
+                "",
+                Paragraph(labels['empty_pack'], cell_style),
+                "", "", "", "",
             ])
+        for row in rows:
+            item_no += 1
+            if row['meters'] is not None:
+                total_meters += row['meters']
+            data.append([
+                Paragraph(str(pack.pack_number), ctr_style),
+                Paragraph(str(item_no), cell_style),
+                Paragraph(
+                    f"{row['title']}<br/><font size=8 color='#6B7280'>{row['sku']}</font>",
+                    cell_style),
+                Paragraph(row['variant'], cell_style),
+                Paragraph(row['product_type'], cell_style),
+                Paragraph(str(row['barcode']), cell_style),
+                Paragraph(f"{row['meters']:.2f} m" if row['meters'] is not None else "-",
+                          num_style),
+            ])
+        spans.append((first, len(data) - 1))
 
-        col_widths = [85 * mm, 38 * mm, 20 * mm]
-        tbl = Table(items_data, colWidths=col_widths)
-        tbl.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8EE")),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#F9FAFB")),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    if len(data) == 1:
+        story.append(Paragraph(labels['no_items'], normal_style))
+    else:
+        tbl = Table(data,
+                    # Product Type needs 28mm to keep its header on one
+                    # line; the barcode column gives it up, a 13-digit
+                    # EAN at 9pt still clears 28mm.
+                    colWidths=[14 * mm, 10 * mm, 50 * mm, 26 * mm,
+                               28 * mm, 28 * mm, 24 * mm],
+                    repeatRows=1)
+        style_cmds = [
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#EAF2F1")),
+            ('LINEBELOW', (0, 0), (-1, 0), 0.8, TEAL),
+            ('LINEBELOW', (0, 1), (-1, -1), 0.4, RULE),
+            ('BOX', (0, 0), (-1, -1), 0.6, colors.HexColor("#C9D3DC")),
+            ('LINEAFTER', (0, 0), (1, -1), 0.4, RULE),
+            ('BACKGROUND', (0, 1), (0, -1), colors.HexColor("#FAFCFB")),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ]
+        for first, last in spans:
+            if last > first:
+                style_cmds.append(('SPAN', (0, first), (0, last)))
+            # A rule the full width of the table wherever the package
+            # changes, so the merged cell reads as one block.
+            style_cmds.append(('LINEBELOW', (0, last), (-1, last), 0.8,
+                               colors.HexColor("#C9D3DC")))
+        tbl.setStyle(TableStyle(style_cmds))
+        story.append(tbl)
+
+        # ── Totals, right-aligned under the table ────────────────────
+        story.append(Spacer(1, 10))
+        totals = [
+            (labels['total_packages'], str(len(packs))),
+            (labels['total_items'], str(item_no)),
+            (labels['total_meters'], f"{total_meters:.2f} m"),
+        ]
+        totals_tbl = Table(
+            [[Paragraph(lbl, totals_lbl_style), Paragraph(val, totals_val_style)]
+             for lbl, val in totals],
+            colWidths=[40 * mm, 30 * mm], hAlign='RIGHT',
+        )
+        totals_tbl.setStyle(TableStyle([
+            ('LINEABOVE', (0, 0), (-1, 0), 0.8, TEAL),
+            ('LINEABOVE', (0, -1), (-1, -1), 0.4, RULE),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor("#EAF2F1")),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ]))
-        
-        qr_io = BytesIO()
-        qr_pil.save(qr_io, format="PNG")
-        qr_io.seek(0)
-        rl_qr_img = RLImage(qr_io, width=32 * mm, height=32 * mm)
-        rl_qr_img.hAlign = 'CENTER'
-        
-        layout_table = Table([[tbl, rl_qr_img]], colWidths=[143 * mm, 37 * mm])
-        layout_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ]))
-        
-        pack_story.append(layout_table)
-        pack_story.append(Spacer(1, 10))
-        
-        story.append(KeepTogether(pack_story))
-        
+        story.append(totals_tbl)
+
     doc.build(story)
     buffer.seek(0)
-    
-    response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="packing_list_{order.order_number or order.pk}.pdf"'
-    return response
 
+    response = HttpResponse(buffer, content_type='application/pdf')
+    # inline, not attachment: this one is for reading in a browser tab.
+    # Downloading-and-editing is what the Excel export is for.
+    response['Content-Disposition'] = (
+        f'inline; filename="packing_list_{order.order_number or order.pk}.pdf"')
+    return response
 
 def pack_pdf(request, pack_pk):
     from django.utils.translation import gettext as _

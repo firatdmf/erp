@@ -43,8 +43,10 @@ def build_invoice_workbook(invoice):
     def s(name):
         return getattr(settings, name, "") or ""
 
-    # Issuer = per-invoice snapshot, else brand defaults.
-    iname = invoice.issuer_name or s("BRAND_NAME") or "Nejum"
+    # Issuer = per-invoice snapshot, else the book's brand name, else
+    # brand defaults — resolved on the model so this and the printed
+    # invoice can never name two different senders.
+    iname = invoice.issuer_display_name
     iaddr = invoice.issuer_address or s("BRAND_ADDRESS")
     iphone = invoice.issuer_phone or s("BRAND_PHONE")
     ifax = invoice.issuer_fax or s("BRAND_FAX")

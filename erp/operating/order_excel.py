@@ -42,7 +42,11 @@ def _firstv(v):
 def build_order_workbook(order):
     from openpyxl import Workbook
 
-    brand = (getattr(settings, "BRAND_NAME", "") or "Nejum")
+    # The order's own print header wins, then the ledger book's brand
+    # name — same precedence as order_print.html, so the two documents
+    # for one order sign with the same name.
+    from accounting.services_accounts import brand_name_for
+    brand = (order.print_header or "").strip() or brand_name_for()
     ccode = (order.original_currency or order.paid_currency or "USD")
     money = f'#,##0.00" {ccode}"'
 
@@ -57,7 +61,7 @@ def build_order_workbook(order):
 
     # ── Header ──
     r = 1
-    cell(ws, r, 1, brand.upper(), font=F_TITLE)
+    cell(ws, r, 1, brand, font=F_TITLE)
     merge(ws, r, 1, 3)
     cell(ws, r, 4, f"ORDER {num}", font=F_DOCNO, align=RIGHT)
     merge(ws, r, 4, 6)

@@ -821,6 +821,184 @@
   margin: 0.55rem 0 0.35rem 0;
 }
 
+/* ── Document name (page header) ── */
+/* Sits under the ledger name and reads as secondary: this is what the
+   book PRINTS as, not what it is called in dropdowns. Read-only by
+   default — the pencil follows the same hover rule as the title's. */
+/* "Prints on documents" says what it DOES; this says what it IS. */
+.book-brand-heading {
+  margin: 0.6rem 0 0.1rem 0;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.book-brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.15rem 0;
+  flex-wrap: wrap;
+}
+
+.book-brand-label {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.book-brand-value {
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #334155;
+}
+
+/* Blank is a real value — it means "use the brand default" — so say so
+   rather than showing an inherited name as though it were entered. */
+.book-brand-inherited {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.book-brand-input {
+  /* Same type as .book-brand-value — family included, which a bare
+     input does NOT inherit. */
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #334155;
+  /* Sized in ch so the box tracks the text rather than a fixed pixel
+     width, and padding stays small enough not to shift the row. */
+  width: 34ch;
+  max-width: 100%;
+  padding: 0.1rem 0.35rem;
+  margin: -0.1rem 0;
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: var(--radius-sm, 6px);
+  background: #ffffff;
+}
+
+.book-brand-input:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+  border-color: #3b82f6;
+}
+
+.book-brand-input::placeholder {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.book-brand-row:hover .book-title-btn.edit,
+.book-brand-row .book-title-btn.edit:focus-visible {
+  opacity: 1;
+}
+
+.book-brand-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.book-brand-status.is-error {
+  color: #ef4444;
+}
+
+/* ── Default target for new customer accounts (page header) ── */
+.book-ledger-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0.15rem 0;
+}
+
+/* A statement of fact, not a control — the flag moves by promoting
+   ANOTHER book, never by switching this one off. Deliberately quiet:
+   it does not rank this book above the others, it just says where an
+   account with no book stated ends up. */
+.book-ledger-badge.is-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.book-ledger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px dashed var(--border-light, #e2e8f0);
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--transition-base), border-color var(--transition-base),
+    background var(--transition-base);
+}
+
+.book-ledger-btn:hover {
+  color: #3b82f6;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  border-style: solid;
+}
+
+/* The member's own working book — stronger than the app-wide default
+   badge below it, because this is the one that decides where YOUR work
+   goes. */
+.book-ledger-badge.is-mine {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Which book they are leaving, so switching is not a blind change. */
+.book-ledger-note {
+  margin-left: 0.3rem;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.book-ledger-btn.subtle {
+  border-color: transparent;
+  color: #cbd5e1;
+}
+
+.book-ledger-btn.subtle:hover {
+  color: #ef4444;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
 /* ── Cash Accounts card ── */
 .cash-accounts-table {
   margin-bottom: 0;

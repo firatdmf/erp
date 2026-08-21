@@ -41,6 +41,85 @@
           </button>
         </div>
         <p class="book-title-error" id="bookTitleError" hidden></p>
+        {% comment %}The name the book's DOCUMENTS sign with, separate
+        from the ledger name above it — invoices, packing lists and
+        order emails all print this one. Read-only until the pencil is
+        pressed, like the title above, so the header does not look like
+        a form nobody asked for.
+        {% endcomment %}
+        <div class="book-brand-heading">Brand name</div>
+        <div class="book-brand-row" id="bookBrandRow"
+             data-url="{% url 'accounting:set_book_brand_name' book.pk %}"
+             data-saved="{{ book.brand_name }}">
+          <span class="book-brand-label">Prints on documents</span>
+          <span class="book-brand-value" id="bookBrandValue">{{ book.effective_brand_name }}</span>
+          {% if not book.brand_name %}
+          <span class="book-brand-inherited" id="bookBrandInherited">default</span>
+          {% endif %}
+          <input type="text" id="bookBrandInput" class="book-brand-input"
+                 maxlength="200" value="{{ book.brand_name }}"
+                 placeholder="{{ book.effective_brand_name }}"
+                 title="Name printed on invoices, packing lists and order emails"
+                 hidden>
+          <button type="button" class="book-title-btn edit" id="bookBrandEdit"
+                  title="Edit document name" aria-label="Edit document name">
+            <i class="fas fa-pen"></i>
+          </button>
+          {% comment %}Only appears once the value actually differs from
+          what is stored — a confirm button for a field nobody changed is
+          just a thing to mis-click.{% endcomment %}
+          <button type="button" class="book-title-btn save" id="bookBrandSave"
+                  title="Save" aria-label="Save document name" hidden>
+            <i class="fas fa-check"></i>
+          </button>
+          <button type="button" class="book-title-btn cancel" id="bookBrandCancel"
+                  title="Cancel" aria-label="Cancel" hidden>
+            <i class="fas fa-times"></i>
+          </button>
+          <span class="book-brand-status" id="bookBrandStatus" hidden></span>
+        </div>
+        {% comment %}Where a customer account or invoice lands when the
+        caller did not say which book — NOT a claim that this book
+        outranks the others. Shown here because it is a property OF THE
+        BOOK; it used to be a book name in settings, which a rename
+        silently broke.{% endcomment %}
+        {% comment %}Per-MEMBER: orders this person creates are booked
+        here. Sits above the app-wide default because it is the one that
+        decides where your own work lands.{% endcomment %}
+        <div class="book-ledger-row">
+          {% if is_my_working_book %}
+          <span class="book-ledger-badge is-mine">
+            <i class="fas fa-user-check"></i> You work in this book
+          </span>
+          <button type="button" class="book-ledger-btn subtle" id="bookWorkClear"
+                  data-url="{% url 'accounting:set_my_working_book' book.pk %}"
+                  title="Stop booking your work here">
+            <i class="fas fa-xmark"></i> Clear
+          </button>
+          {% else %}
+          <button type="button" class="book-ledger-btn" id="bookWorkBtn"
+                  data-url="{% url 'accounting:set_my_working_book' book.pk %}"
+                  title="Orders you create will be booked into this book">
+            <i class="fas fa-user-check"></i> Work in this book
+            {% if my_working_book %}<span class="book-ledger-note">(now: {{ my_working_book.name }})</span>{% endif %}
+          </button>
+          {% endif %}
+          <span class="book-brand-status" id="bookWorkStatus" hidden></span>
+        </div>
+        <div class="book-ledger-row">
+          {% if book.is_default_cari_target %}
+          <span class="book-ledger-badge is-on">
+            <i class="fas fa-check-circle"></i> Default for new customer accounts
+          </span>
+          {% else %}
+          <button type="button" class="book-ledger-btn" id="bookLedgerBtn"
+                  data-url="{% url 'accounting:set_default_cari_target' book.pk %}"
+                  title="New customer accounts and invoices will land in this book when nothing else says which">
+            <i class="fas fa-arrow-right-arrow-left"></i> Make this the default for new customer accounts
+          </button>
+          {% endif %}
+          <span class="book-brand-status" id="bookLedgerStatus" hidden></span>
+        </div>
         <p>Manage your book entries, transactions, and stakeholders</p>
       </div>
     </div>
@@ -331,6 +410,151 @@
 </div>
 
 <script>
+  // Edit the document name: read-only until the pencil, and the green
+  // check only shows once the value actually differs from what is
+  // stored. Blank is a real value here — it means "use the brand
+  // default" — so "changed" is measured against the SAVED string, not
+  // against emptiness.
+  (function () {
+    const row = document.getElementById('bookBrandRow');
+    if (!row) return;
+    const value = document.getElementById('bookBrandValue');
+    const inherited = document.getElementById('bookBrandInherited');
+    const input = document.getElementById('bookBrandInput');
+    const editBtn = document.getElementById('bookBrandEdit');
+    const saveBtn = document.getElementById('bookBrandSave');
+    const cancelBtn = document.getElementById('bookBrandCancel');
+    const status = document.getElementById('bookBrandStatus');
+    let saved = row.dataset.saved;
+
+    function setEditing(on) {
+      input.hidden = !on;
+      value.hidden = on;
+      if (inherited) inherited.hidden = on;
+      editBtn.hidden = on;
+      cancelBtn.hidden = !on;
+      if (!on) saveBtn.hidden = true;
+      status.hidden = true;
+    }
+
+    function refreshSave() {
+      saveBtn.hidden = input.value.trim() === saved;
+    }
+
+    function start() {
+      input.value = saved;
+      setEditing(true);
+      refreshSave();
+      input.focus();
+      input.select();
+    }
+
+    function show(message, ok) {
+      status.textContent = message;
+      status.classList.toggle('is-error', !ok);
+      status.hidden = false;
+      if (ok) setTimeout(function () { status.hidden = true; }, 2500);
+    }
+
+    function save() {
+      const body = new FormData();
+      body.append('brand_name', input.value.trim());
+      fetch(row.dataset.url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}',
+                   'X-Requested-With': 'XMLHttpRequest' },
+        body,
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data.success) { show('Could not save.', false); return; }
+          saved = data.brand_name;
+          row.dataset.saved = saved;
+          // Blank falls back, so show what it resolved to, flagged as
+          // inherited rather than silently looking like an entered value.
+          value.textContent = data.effective;
+          input.placeholder = data.effective;
+          if (inherited) inherited.hidden = !!saved;
+          setEditing(false);
+          show('Saved', true);
+        })
+        .catch(function () { show('Could not save.', false); });
+    }
+
+    editBtn.addEventListener('click', start);
+    cancelBtn.addEventListener('click', function () { setEditing(false); });
+    saveBtn.addEventListener('click', save);
+    input.addEventListener('input', refreshSave);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!saveBtn.hidden) save();
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+    });
+  })();
+
+  // Pick this book as the logged-in member's working book, or clear it.
+  // No confirm: it changes only where THIS person's future work lands,
+  // and it is one click to undo.
+  (function () {
+    const status = document.getElementById('bookWorkStatus');
+    function post(btn, clearing) {
+      const body = new FormData();
+      if (clearing) body.append('clear', '1');
+      fetch(btn.dataset.url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}',
+                   'X-Requested-With': 'XMLHttpRequest' },
+        body,
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data.success) throw new Error();
+          window.location.reload();
+        })
+        .catch(function () {
+          status.textContent = 'Could not save.';
+          status.classList.add('is-error');
+          status.hidden = false;
+        });
+    }
+    const set = document.getElementById('bookWorkBtn');
+    const clear = document.getElementById('bookWorkClear');
+    if (set) set.addEventListener('click', function () { post(set, false); });
+    if (clear) clear.addEventListener('click', function () { post(clear, true); });
+  })();
+
+  // Move the default target to this book. Confirmed first: it decides
+  // where every new customer account and invoice lands while orders
+  // still carry no book of their own, and the damage from getting it
+  // wrong is invisible until someone reads a balance.
+  (function () {
+    const btn = document.getElementById('bookLedgerBtn');
+    const status = document.getElementById('bookLedgerStatus');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      if (!confirm('Send NEW customer accounts and invoices to this book '
+                   + 'when nothing else says which?\n\n'
+                   + 'Existing records stay where they are.')) return;
+      fetch(btn.dataset.url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}',
+                   'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.success) throw new Error();
+          window.location.reload();
+        })
+        .catch(() => {
+          status.textContent = 'Could not save.';
+          status.classList.add('is-error');
+          status.hidden = false;
+        });
+    });
+  })();
+
   // Rename the book by editing the printed title itself — the <h1> goes
   // contenteditable in place, so the text never moves or changes shape.
   (function () {

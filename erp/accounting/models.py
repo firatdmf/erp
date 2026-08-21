@@ -125,12 +125,93 @@ class Book(models.Model):
     created_at = models.DateTimeField(auto_now=True)
     # The name of the book, this is the name of the business division, or the project, or the company that the book is created for.
     name = models.CharField(max_length=50, unique=True)
+    # How this book signs the documents it produces — invoices, order
+    # confirmations and packing lists all print this, not `name`.
+    #
+    # They are different things. `name` is the internal handle for the
+    # ledger ("DEMFIRAT"), short and unique because people pick a book
+    # by it in dropdowns; this is the customer-facing lockup
+    # ("DEMFIRAT® | Karven Home Collection"), which is longer, carries
+    # its own casing and need not be unique — two books of one company
+    # can well trade under the same name.
+    #
+    # Blank → falls back to settings.BRAND_DISPLAY_NAME, so a fresh
+    # book still prints something sensible before anyone fills this in.
+    brand_name = models.CharField(
+        max_length=200, blank=True,
+        help_text="Name printed on invoices, packing lists and order "
+                  "emails. Blank → the brand default.",
+    )
+    # Does a new customer account or invoice land here when nothing
+    # else says which book it belongs to?
+    #
+    # NOT a statement that this book is more important than the others.
+    # Every book is its own ledger for its own business. This flag only
+    # answers a question the code is forced to answer today: an Order
+    # carries no book, so ensure_cari_for_order has to put the account
+    # somewhere. Once orders (or their warehouse, which already has
+    # Warehouse.accounting_book) name their own book, the caller will
+    # pass one and this stops being consulted.
+    #
+    # It used to be worked out from settings.CARI_BOOK_NAME — a brand
+    # constant holding a book's NAME, matched at read time. A book's
+    # name is edited from the UI and the constant could not follow, so
+    # the first rename silently broke the match and resolution dropped
+    # to guessing by account count. A flag on the row survives a rename
+    # because it does not care what the row is called.
+    #
+    # At most one book may hold it (enforced below); none is allowed,
+    # and get_default_book() still falls back for that case.
+    is_default_cari_target = models.BooleanField(
+        default=False,
+        verbose_name="Default for new customer accounts",
+        help_text="New customer accounts and invoices land in this book "
+                  "when nothing else says which. Only one book can hold it.",
+    )
     # Number of shares available. Will be used to calculate stake of each owner based on their shares
     total_shares = models.PositiveIntegerField(default=10000000)
+
+    class Meta:
+        constraints = [
+            # A partial unique index: many rows may be False, only one
+            # may be True. Makes "there is exactly one ledger" a
+            # database fact rather than something callers hope for.
+            models.UniqueConstraint(
+                fields=["is_default_cari_target"],
+                condition=models.Q(is_default_cari_target=True),
+                name="only_one_default_cari_target_book",
+            ),
+        ]
 
     # This is how a data entry gets displayed in the admin panel and forms
     def __str__(self):
         return self.name
+
+    def make_default_cari_target(self):
+        """Move the default-target flag to this book, clearing it
+        elsewhere.
+
+        Two statements in one transaction because the unique constraint
+        would reject the second write if the first book still held it.
+        """
+        from django.db import transaction
+        with transaction.atomic():
+            Book.objects.filter(is_default_cari_target=True).exclude(
+                pk=self.pk).update(is_default_cari_target=False)
+            if not self.is_default_cari_target:
+                self.is_default_cari_target = True
+                self.save(update_fields=["is_default_cari_target"])
+
+    @property
+    def effective_brand_name(self) -> str:
+        """What to print. Same override-then-default shape as
+        Product.effective_*: the book's own value wins, else the brand
+        profile in settings, else the short internal name."""
+        from django.conf import settings
+        return ((self.brand_name or "").strip()
+                or getattr(settings, "BRAND_DISPLAY_NAME", "")
+                or getattr(settings, "BRAND_NAME", "")
+                or self.name)
 
 
 # We need the below model to link stakeholders to books. (A stakeholder is someone who has some ownership in one or more books)

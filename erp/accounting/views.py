@@ -362,6 +362,86 @@ class RenameBook(generic.edit.UpdateView):
         )
 
 
+class SetBookBrandName(generic.edit.UpdateView):
+    """Set the name this book's documents print with.
+
+    Same POST-only, JSON-only shape as RenameBook — the detail page
+    edits the value in place. Blank is a legitimate value here (unlike
+    `name`): it means "fall back to the brand default", so the response
+    returns the EFFECTIVE name for the page to show.
+    """
+
+    model = Book
+    form_class = BookBrandNameForm
+    http_method_names = ["post"]
+
+    def form_valid(self, form):
+        self.object = form.save()
+        return JsonResponse({
+            "success": True,
+            "brand_name": self.object.brand_name,
+            "effective": self.object.effective_brand_name,
+        })
+
+    def form_invalid(self, form):
+        return JsonResponse(
+            {"success": False, "errors": form.errors.get_json_data()}, status=400
+        )
+
+
+class SetDefaultCariTarget(generic.detail.SingleObjectMixin, generic.View):
+    """Make this book the one the current-account ledger posts to.
+
+    POST-only and JSON-only, like the other header editors. Not a
+    ModelForm: the flag is unique across books, so setting it here has
+    to clear it there, which is Book.make_default_cari_target's job rather than
+    a per-row form's.
+
+    Turning the flag OFF is deliberately not offered. "No book is the
+    ledger" sends get_default_book() back to guessing by account count,
+    which is the failure this replaced — you move the ledger to another
+    book, you do not unset it.
+    """
+
+    model = Book
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        book = self.get_object()
+        book.make_default_cari_target()
+        return JsonResponse({"success": True, "book": book.pk, "name": book.name})
+
+
+@method_decorator(login_required, name="dispatch")
+class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
+    """Make this the book the logged-in member's work is booked into.
+
+    Per member, not per app: several businesses run on one install and
+    which one a record belongs to follows the person entering it. Unlike
+    the app-level default, this one CAN be cleared — a member who works
+    across businesses falls back to the app default, which is a
+    legitimate way to work rather than a broken state.
+    """
+
+    model = Book
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        book = self.get_object()
+        member = getattr(request.user, "member", None)
+        if member is None:
+            return JsonResponse(
+                {"success": False, "error": "No member profile."}, status=400)
+        clearing = request.POST.get("clear") == "1"
+        member.default_book = None if clearing else book
+        member.save(update_fields=["default_book"])
+        return JsonResponse({
+            "success": True,
+            "book": None if clearing else book.pk,
+            "name": None if clearing else book.name,
+        })
+
+
 @method_decorator(login_required, name="dispatch")
 class BookDetail(generic.DetailView):
     model = Book
@@ -371,6 +451,12 @@ class BookDetail(generic.DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         book = self.object
+        # Is this the logged-in member's own working book? Drives the
+        # header toggle — per member, so it cannot be read off the row.
+        member = getattr(self.request.user, "member", None)
+        context["is_my_working_book"] = bool(
+            member and member.default_book_id == book.pk)
+        context["my_working_book"] = getattr(member, "default_book", None)
         # Legacy Asset Accounts Receivable + Liability Accounts Payable for this book
         context["accounts_receivable"] = (
             AssetAccountsReceivable.objects

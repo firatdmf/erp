@@ -214,7 +214,10 @@ def _render_order_pdf(order):
         MUT = colors.HexColor("#555555")
         HAIR = colors.HexColor("#BBBBBB")
         cur = _currency_symbol(order)
-        brand = (getattr(settings, "BRAND_NAME", "") or "Nejum")
+        from accounting.services_accounts import brand_name_for
+        # The order's own print header wins, else the ledger book's
+        # brand name — the same name the invoice for this order signs.
+        brand = (order.print_header or "").strip() or brand_name_for()
         items, total = _order_lines_and_total(order)
         CW = A4[0] - 30 * mm   # content width (15mm margins)
 
@@ -417,7 +420,8 @@ def send_order_event_email(order, event, attach_pdf=True, extra_context=None):
         # nullable) so the templates never call order.total_value()/
         # it.subtotal() and crash on a NULL quantity.
         order_items, order_total = _order_lines_and_total(order)
-        brand_name = getattr(settings, "BRAND_NAME", "") or "Nejum"
+        from accounting.services_accounts import brand_name_for
+        brand_name = (order.print_header or "").strip() or brand_name_for()
         brand_email = getattr(settings, "BRAND_EMAIL", "") or ""
 
         # Render subject + HTML body. Per-event templates first, fall

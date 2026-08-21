@@ -17,7 +17,7 @@
           <!-- Header (bgcolor= is the Outlook fallback for the gradient) -->
           <tr>
             <td bgcolor="#0F766E" style="padding:22px 32px;background:#0F766E;background:linear-gradient(135deg,#147F74,#0F766E);color:#FFFFFF;">
-              <div style="font-size:18px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">{{ BRAND_NAME|default:"Nejum" }}</div>
+              <div style="font-size:18px;font-weight:800;letter-spacing:.01em;">{{ BRAND_NAME|default:"Nejum" }}</div>
               <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:10px;color:#D7F2EE;">{{ event_label }}</div>
               <div style="font-size:21px;font-weight:700;margin-top:3px;">
                 Order {% if order.order_number %}{{ order.order_number }}{% else %}#{{ order.pk }}{% endif %}

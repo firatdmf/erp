@@ -29,7 +29,10 @@
     /* Header */
     .hdr { width: 100%; border-bottom: 2px solid #0F1419; padding-bottom: 10pt; margin-bottom: 14pt; }
     .hdr td { vertical-align: top; }
-    .hdr .brand { font-size: 18pt; font-weight: bold; color: #0F1419; }
+    /* 14pt, not 18: the default header is now a phrase ("DEMFIRAT® |
+       Karven Home Collection"), not the single word it used to be, and
+       at 18pt it crowded the order number on the right. */
+    .hdr .brand { font-size: 14pt; font-weight: bold; color: #0F1419; line-height: 1.25; max-width: 105mm; }
     .hdr .doc-type { font-size: 9pt; letter-spacing: 1pt; color: #147F74; font-weight: bold; margin-top: 2pt; }
     .hdr .num { font-size: 20pt; font-weight: bold; text-align: right; }
     .hdr .date { font-size: 9pt; color: #4B5563; text-align: right; }
@@ -102,7 +105,7 @@
   <table class="hdr" cellspacing="0" cellpadding="0">
     <tr>
       <td>
-        <div class="brand">{% if order.print_header %}{{ order.print_header }}{% else %}{{ BRAND_NAME|default:"Nejum ERP"|upper }}{% endif %}</div>
+        <div class="brand">{{ brand_line|default:"Nejum ERP" }}</div>
         <div class="doc-type">{% trans "Order" %}</div>
       </td>
       <td align="right">
@@ -244,7 +247,7 @@
   <!-- FOOTER -->
   <table class="foot" cellspacing="0" cellpadding="0">
     <tr>
-      <td>{% if order.print_header %}{{ order.print_header }}{% else %}{{ BRAND_NAME|default:"Nejum ERP"|upper }}{% endif %} · {% trans "Order" %}</td>
+      <td>{{ brand_line|default:"Nejum ERP" }} · {% trans "Order" %}</td>
       <td class="right">{% now "d M Y · H:i" %}</td>
     </tr>
   </table>

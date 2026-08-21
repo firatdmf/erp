@@ -25,6 +25,20 @@ class BookNameForm(forms.ModelForm):
         fields = ["name"]
 
 
+class BookBrandNameForm(forms.ModelForm):
+    """Edit only the name the book's documents print with.
+
+    Separate from BookNameForm for the same reason that one is separate
+    from BookForm: a ModelForm blanks every field it owns that the POST
+    omits, so an editor that touches `brand_name` must not also hold
+    `name` — the two are edited from different controls on the page.
+    """
+
+    class Meta:
+        model = Book
+        fields = ["brand_name"]
+
+
 class CashAccountForm(forms.ModelForm):
     """Edit a cash account from its book.
 

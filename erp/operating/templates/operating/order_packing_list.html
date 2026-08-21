@@ -65,7 +65,10 @@
   .pk-rolls { padding: 4px 0; }
   .pk-roll-row { display: flex; align-items: center; gap: 12px; padding: 9px 16px; border-bottom: 1px solid #F4F7FB; }
   .pk-roll-row:last-child { border-bottom: none; }
+  .pk-roll-no { width: 26px; flex-shrink: 0; text-align: right; font: 700 11.5px var(--font-mono); color: var(--gray-400); font-variant-numeric: tabular-nums; }
   .pk-roll-name { font: 700 12.5px var(--font-sans); color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pk-roll-variant { flex-shrink: 0; font: 600 11px var(--font-sans); color: var(--gray-600); background: #F4F7FB; border-radius: 5px; padding: 2px 8px; white-space: nowrap; }
+  .pk-roll-type { flex-shrink: 0; font: 700 10.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--nejum-teal-700); background: var(--nejum-teal-50); border: 1px solid var(--nejum-teal-100); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
   .pk-roll-sku { font: 500 11px var(--font-mono); color: var(--gray-500); }
   .pk-roll-bc { font: 600 11px var(--font-mono); color: var(--gray-700); background: #F4F7FB; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
   .pk-roll-m { font: 800 12.5px var(--font-sans); color: var(--nejum-teal-700); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -102,8 +105,11 @@
   {% endif %}
 
   <div class="pk-toolbar">
-    <a href="{% url 'operating:order_packing_list_pdf' order.pk %}" class="pk-btn primary" target="_blank">
-      <i class="fa fa-file-pdf-o"></i> {% trans "Download full list (PDF)" %}
+    <a href="{% url 'operating:order_packing_list_pdf' order.pk %}" class="pk-btn primary" target="_blank" rel="noopener">
+      <i class="fa fa-file-pdf-o"></i> {% trans "Open packing list (PDF)" %}
+    </a>
+    <a href="{% url 'operating:export_packing_list_excel' order.pk %}" class="pk-btn ghost">
+      <i class="fa fa-file-excel-o"></i> {% trans "Download Excel (editable)" %}
     </a>
     {% if not shipped %}
     <button type="button" class="pk-btn ghost" onclick="pkAddPack()">
@@ -111,9 +117,6 @@
     </button>
     {% endif %}
     <span class="spacer"></span>
-    <a href="{% url 'operating:export_packing_list_excel' order.pk %}" class="pk-btn ghost">
-      <i class="fa fa-file-excel-o"></i> Excel
-    </a>
   </div>
 
   <div class="pk-packs" id="packsList">
@@ -125,7 +128,7 @@
           <div class="pk-pack-title">{% trans "Package" %} #{{ p.pack_number }}</div>
           <div class="pk-pack-code">{{ p.code }}</div>
         </div>
-        <span class="pk-pack-meta">{{ p.rows|length }} {% trans "roll" %}</span>
+        <span class="pk-pack-meta">{{ p.rows|length }} {% trans "items" %}</span>
         <div class="pk-pack-actions">
           <a class="pk-pack-btn" href="{% url 'operating:pack_pdf' p.pk %}" target="_blank" title="{% trans 'Print this package (PDF)' %}">
             <i class="fa fa-file-pdf-o"></i>
@@ -140,7 +143,13 @@
       <div class="pk-rolls">
         {% for r in p.rows %}
         <div class="pk-roll-row">
+          {% comment %}item_no is numbered 1..N across the WHOLE order in
+          the view, not restarted per package — it matches the "No" column
+          on the printed list so staff can read off the same number.{% endcomment %}
+          <span class="pk-roll-no">{{ r.item_no }}</span>
           <span class="pk-roll-name">{{ r.title }} <span class="pk-roll-sku">{{ r.sku }}</span></span>
+          {% if r.variant != "-" %}<span class="pk-roll-variant">{{ r.variant }}</span>{% endif %}
+          <span class="pk-roll-type">{{ r.product_type }}</span>
           <code class="pk-roll-bc">{{ r.barcode }}</code>
           <span class="pk-roll-m">{{ r.meters|floatformat:2 }} m</span>
         </div>

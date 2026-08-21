@@ -552,10 +552,10 @@
 
     <!-- Issuer block + logo placeholder. Per-invoice overrides win
          over the brand defaults so users can correct or customise. -->
-    {% with iname=invoice.issuer_name|default:BRAND_NAME iaddr=invoice.issuer_address|default:BRAND_ADDRESS iphone=invoice.issuer_phone|default:BRAND_PHONE ifax=invoice.issuer_fax|default:BRAND_FAX iemail=invoice.issuer_email|default:BRAND_EMAIL itax_office=invoice.issuer_tax_office|default:BRAND_TAX_OFFICE itax_number=invoice.issuer_tax_number|default:BRAND_TAX_NUMBER %}
+    {% with iname=invoice.issuer_display_name iaddr=invoice.issuer_address|default:BRAND_ADDRESS iphone=invoice.issuer_phone|default:BRAND_PHONE ifax=invoice.issuer_fax|default:BRAND_FAX iemail=invoice.issuer_email|default:BRAND_EMAIL itax_office=invoice.issuer_tax_office|default:BRAND_TAX_OFFICE itax_number=invoice.issuer_tax_number|default:BRAND_TAX_NUMBER %}
     <div class="doc-issuer-row">
       <div class="doc-issuer">
-        <div class="name">{{ iname|default:"Nejum ERP"|upper }}{% if BRAND_LEGAL_SUFFIX %} {{ BRAND_LEGAL_SUFFIX }}{% endif %}</div>
+        <div class="name">{{ iname|default:"Nejum ERP" }}</div>
         {% if iaddr %}<div class="line">{{ iaddr }}</div>{% else %}<div class="line">—</div>{% endif %}
         {% if iphone %}<div class="line">P: {{ iphone }}</div>{% endif %}
         {% if ifax %}<div class="line">F: {{ ifax }}</div>{% endif %}
@@ -571,7 +571,7 @@
         {% if BRAND_LOGO_URL %}
           <img src="{{ BRAND_LOGO_URL }}" alt="{{ BRAND_NAME }}">
         {% else %}
-          {{ iname|default:"NEJUM"|upper }}
+          {{ iname|default:"NEJUM" }}
         {% endif %}
       </div>
     </div>

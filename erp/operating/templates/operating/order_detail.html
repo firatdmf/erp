@@ -909,7 +909,7 @@
       <div id="ophWrap" class="oph-wrap no-print" style="display:inline-flex;align-items:center;gap:8px;">
         <input id="ophInput" class="od-input oph-input" type="text" maxlength="120"
                title="{% trans 'Top-left title shown on the printed PDF (blank = brand)' %}"
-               placeholder="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}PDF başlığı (örn. {{ BRAND_NAME|default:'Nejum' }}){% else %}PDF header (e.g. {{ BRAND_NAME|default:'Nejum' }}){% endif %}"
+               placeholder="{% if LANGUAGE_CODE|slice:':2' == 'tr' %}PDF başlığı (varsayılan: {{ brand_line|default:'Nejum' }}){% else %}PDF header (default: {{ brand_line|default:'Nejum' }}){% endif %}"
                value="{{ order.print_header|default:'' }}"
                onkeydown="if(event.key==='Enter'){event.preventDefault();saveOrderPrintHeader(this.nextElementSibling);}">
         <button type="button" class="ord-btn ghost" onclick="saveOrderPrintHeader(this)">

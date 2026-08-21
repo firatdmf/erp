@@ -248,6 +248,14 @@ BRAND_DEFAULTS = {
     "demfirat": {
         "DB_SCHEMA": "public",
         "BRAND_NAME": "Demfirat",
+        # How the brand signs the top of a customer-facing print — the
+        # full marketing lockup, where BRAND_NAME is the short internal
+        # label used in UI chrome. Blank → falls back to BRAND_NAME.
+        #
+        # This is only the DEFAULT: each ledger Book carries its own
+        # brand_name and overrides it, so two books of one deployment
+        # can trade under different names. See Book.effective_brand_name.
+        "BRAND_DISPLAY_NAME": "DEMFIRAT® | Karven Home Collection",
         "BRAND_LEGAL_SUFFIX": "SAN. TİC. LTD. ŞTİ.",
         "BRAND_ADDRESS": "Ergene 1. OSB Mahallesi, D100 Cad. no.38 Ergene / TEKİRDAĞ",
         "BRAND_PHONE": "+90 (501) 057-1884",
@@ -260,13 +268,6 @@ BRAND_DEFAULTS = {
         # (see CariSettings.next_invoice_number). Set a non-empty value
         # to switch to the compact PREFIX+YEAR+SEQ shape.
         "BRAND_INVOICE_PREFIX": "",
-        # Which Book the current-account ledger posts to. Matched by name so
-        # it survives differing ids between brand schemas. Books also carry
-        # the general ledger, so several exist that have nothing to do with
-        # cari — leaving this to "lowest id" is what put sale #273 on a
-        # shadow account in a book nobody read. Empty → fall back to
-        # whichever book already holds the most accounts.
-        "CARI_BOOK_NAME": "DEMFIRAT",
         "UI_THEME": "nejum",
         "CLIENT_PUBLIC_URL": "http://localhost:3000",
     },
@@ -276,11 +277,18 @@ _brand_cfg = BRAND_DEFAULTS.get(BRAND, BRAND_DEFAULTS["demfirat"])
 # Each setting: explicit env var wins, else the brand profile default.
 UI_THEME = config("UI_THEME", default=_brand_cfg["UI_THEME"]).strip()
 DB_SCHEMA = config("DB_SCHEMA", default=_brand_cfg["DB_SCHEMA"]).strip()
-# Ledger book: an explicit id wins, then the brand's book name, then the
-# automatic rule in accounting.services_accounts.get_default_book().
+# Which book new customer accounts and invoices post to when nothing
+# else says. An id, never a name: a book's name is edited from the UI
+# and a constant here cannot follow, so name-matching silently stopped
+# matching the first time a book was renamed. Normally left empty — the
+# answer lives on the row as Book.is_default_cari_target, editable from
+# the book's own page. This is the escape hatch for pinning it from a
+# deploy. See accounting.services_accounts.get_default_book().
 CARI_BOOK_ID = config("CARI_BOOK_ID", default="").strip()
-CARI_BOOK_NAME = config("CARI_BOOK_NAME", default=_brand_cfg.get("CARI_BOOK_NAME", "")).strip()
 BRAND_NAME = config("BRAND_NAME", default=_brand_cfg["BRAND_NAME"]).strip()
+BRAND_DISPLAY_NAME = config(
+    "BRAND_DISPLAY_NAME", default=_brand_cfg.get("BRAND_DISPLAY_NAME", "")
+).strip() or BRAND_NAME
 BRAND_LEGAL_SUFFIX = config("BRAND_LEGAL_SUFFIX", default=_brand_cfg.get("BRAND_LEGAL_SUFFIX", "")).strip()
 BRAND_ADDRESS = config("BRAND_ADDRESS", default=_brand_cfg.get("BRAND_ADDRESS", "")).strip()
 BRAND_PHONE = config("BRAND_PHONE", default=_brand_cfg.get("BRAND_PHONE", "")).strip()

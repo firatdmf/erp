@@ -15,6 +15,11 @@ def ui_theme(request):
     .env.<ENV_PROFILE>) and stores them as Django constants. Templates
     use `{{ UI_THEME }}`, `{{ DB_SCHEMA }}`, `{{ BRAND_NAME }}`.
 
+    BRAND_NAME is the SHORT label, for UI chrome. The name a customer-
+    facing document signs with lives on the ledger Book instead
+    (Book.brand_name), because it is editable per book — views resolve
+    it with accounting.services_accounts.brand_name_for().
+
     BRAND_* (address/phone/email/etc.) are optional — used by the
     invoice/proforma document template for the issuer header block.
     Leave them unset and the template falls back to dashes.

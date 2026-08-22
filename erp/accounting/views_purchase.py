@@ -30,6 +30,7 @@ from django.views import View
 from .models import Invoice, InvoiceItem
 from .models_accounts import CariAccount, CariSettings
 from .services_accounts import _currency_by_code
+from marketing.models import SKU_MAX_LENGTH
 from operating.models import (
     StockMovement, Warehouse, WarehouseProduct, WarehouseProductRoll,
 )
@@ -241,6 +242,7 @@ class GoodsReceipt(View):
             "back_url": back_url,
             "accounts": _account_choices(),
             "product_categories": _product_category_choices(),
+            "sku_max_length": SKU_MAX_LENGTH,
         })
 
 

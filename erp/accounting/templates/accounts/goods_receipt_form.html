@@ -500,9 +500,11 @@
         </div>
         <div class="np-field">
           <label>{% trans "Notes" %}</label>
+          {% comment %}Editable even after receiving — see WarehousePurchaseEdit.
+          The dates, account and warehouse beside it are not: they are posted to
+          the ledger or hold physical stock.{% endcomment %}
           <textarea id="npNotes" class="np-input np-notes"
-                    placeholder="{% trans 'Shown on the printed order' %}"
-                    {% if edit_invoice %}disabled{% endif %}>{{ order_invoice.notes|default:"" }}</textarea>
+                    placeholder="{% trans 'Shown on the printed order' %}">{% if order_invoice %}{{ order_invoice.notes }}{% elif edit_invoice %}{{ edit_invoice.notes }}{% endif %}</textarea>
         </div>
       </div>
     </section>
@@ -597,6 +599,7 @@
   const NP_CAT_SEL = '<select class="np-select np-main-cat">' +
     NP_CATS.map(function (c) { return '<option value="' + c.id + '"' + (c.is_default ? ' selected' : '') + '>' + c.label + '</option>'; }).join('') +
     '</select>';
+  const GR_SKU_MAX = {{ sku_max_length }};   // marketing.models.SKU_MAX_LENGTH
   const GR_EDIT_ID = {% if edit_invoice %}{{ edit_invoice.pk }}{% else %}null{% endif %};
   const GR_ORDER_ID = {% if order_invoice %}{{ order_invoice.pk }}{% else %}null{% endif %};
   const GR_ORDER_URL = "{% url 'accounts:purchase_order_save' %}";
@@ -737,7 +740,7 @@
             '</div>' +
             '<div class="np-col np-col-sku">' +
               '<label>{% trans "Product SKU" %}</label>' +
-              '<input class="np-input np-main-sku" placeholder="' + npCurPrefix() + '###" spellcheck="false"' +
+              '<input class="np-input np-main-sku" maxlength="' + GR_SKU_MAX + '" placeholder="' + npCurPrefix() + '###" spellcheck="false"' +
                 ' oninput="npMainSkuInput(this)" onblur="npMainSkuBlur(this)">' +
               // Sits under the field it describes, not under the name beside it.
               '<div class="np-hint">{% trans "auto and unique — overwrite it with the code the mill uses." %}</div>' +
@@ -1090,7 +1093,7 @@
     const card = vEl.closest('.np-product-card');
     const root = npBaseSku(card);
     const sfx = slug(nameI.value) || vEl.dataset.vid;
-    skuI.value = root ? (root + '.' + sfx).slice(0, 20) : '';
+    skuI.value = root ? (root + '.' + sfx).slice(0, GR_SKU_MAX) : '';
   };
 
   // Debounced existing/new classification of a variant card's name, ONLY
@@ -1187,7 +1190,7 @@
         '</div>' +
         '<div class="np-col np-col-sku">' +
           '<label>{% trans "Variant SKU" %}</label>' +
-          '<input class="np-input np-v-sku" placeholder="{% trans "auto" %}" oninput="npUnlockVariantSku(this)">' +
+          '<input class="np-input np-v-sku" maxlength="' + GR_SKU_MAX + '" placeholder="{% trans "auto" %}" oninput="npUnlockVariantSku(this)">' +
         '</div>' +
       '</div>' +
       '<div class="np-v-match"></div>' +
@@ -1652,6 +1655,7 @@
     }
     const payload = {
       unit: (document.getElementById('npUnit') || {}).value || 'mt',
+      notes: (document.getElementById('npNotes') || {}).value || '',
       products: npCollectEditPayload(),
     };
     btn.disabled = true;

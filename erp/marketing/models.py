@@ -175,6 +175,14 @@ class ProductCategory(models.Model):
         return f"{self.name}"
 
 
+# How long a SKU may be, for products and variants alike. Was 20, which is
+# less than it sounds: "PETEK.FONLUK KUMAŞ." is 19 characters on its own, so
+# a code like PETEK.FONLUK KUMAŞ.200.310 was silently cut to one character
+# past the prefix and then de-duplicated into .1/.2/.3. Matches
+# WarehouseProduct.sku so the two sides can always hold the same string.
+SKU_MAX_LENGTH = 64
+
+
 class Product(models.Model):
     created_at = models.DateTimeField(auto_now=True, blank=False, null=False)
     QUANTITY_UNIT_TYPE_CHOICES = [
@@ -193,7 +201,7 @@ class Product(models.Model):
     # This should be unique also
     # If the product has a variant, this should be null
     sku = models.CharField(
-        max_length=20, null=True, blank=False, unique=True, db_index=True
+        max_length=SKU_MAX_LENGTH, null=True, blank=False, unique=True, db_index=True
     )
     # Barcode (ISBN, UPC, GTIN, etc.) might delete this later
     barcode = models.CharField(max_length=14, null=True, blank=True, db_index=True)
@@ -388,7 +396,7 @@ class ProductVariant(models.Model):
         blank=False,
     )
     variant_sku = models.CharField(
-        max_length=20, null=False, blank=False, db_index=True, unique=True,
+        max_length=SKU_MAX_LENGTH, null=False, blank=False, db_index=True, unique=True,
     )
     # Barcode (ISBN, UPC, GTIN, etc.)
     variant_barcode = models.CharField(

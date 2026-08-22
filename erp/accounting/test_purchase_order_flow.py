@@ -189,3 +189,85 @@ class PurchaseOrderFlowTest(TestCase):
         self.client.post(reverse("accounts:purchase_order_confirm", args=[inv_id]))
         r2 = self.client.get(reverse("accounts:purchase_order_print", args=[inv_id]))
         self.assertFalse(r2.context["is_order"])
+
+
+class ReceivedPurchaseEditTest(TestCase):
+    """What stays editable once a purchase has reached the warehouse.
+
+    Its account, warehouse and product lines are locked — they are posted to
+    the ledger or hold physical stock. Its notes are not: nothing hangs off
+    them, and a received purchase that can never be annotated is just an
+    inconvenience.
+    """
+
+    def setUp(self):
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Demfirat")
+        self.cari = CariAccount.objects.create(
+            book=self.book, code="C-KRV", name="Karven", type="supplier",
+            default_currency=self.usd)
+        self.wh = Warehouse.objects.create(name="Fabrika")
+        self.admin = get_user_model().objects.create_superuser(
+            username="edit_admin", password="pw", email="e@d.t")
+        self.client.force_login(self.admin)
+
+        r = self.client.post(
+            reverse("accounts:purchase_order_save"),
+            data=json.dumps({
+                "warehouse_id": self.wh.pk, "cari_id": self.cari.pk, "unit": "mt",
+                "date": "2026-08-21", "notes": "first note",
+                "products": [{
+                    "main_product": {"mode": "new", "name": "K24644", "sku": "K24644"},
+                    "has_variants": True,
+                    "variants": [{"name": "G07", "sku": "K24644.G07", "price": "3.50",
+                                  "currency": "USD", "tops": [{"qty": 30}]}],
+                }],
+            }), content_type="application/json")
+        self.invoice_id = r.json()["invoice_id"]
+        self.client.post(reverse("accounts:purchase_order_confirm", args=[self.invoice_id]))
+
+    def _edit_url(self):
+        return reverse("operating:warehouse_purchase_edit", args=[self.wh.pk, self.invoice_id])
+
+    def _current_diff(self):
+        """The payload the form posts: every existing line, every roll kept."""
+        d = self.client.get(self._edit_url(),
+                            headers={"x-requested-with": "XMLHttpRequest"}).json()
+        return [{
+            "main_product": {"mode": "existing"},
+            "variants": [{
+                "invoice_item_id": v["invoice_item_id"],
+                "warehouse_product_id": v["warehouse_product_id"],
+                "kept_roll_ids": [t["roll_id"] for t in v["tops"]],
+                "new_tops": [],
+            } for v in group["variants"]],
+        } for group in d["products"]]
+
+    def test_the_notes_can_still_be_changed(self):
+        r = self.client.post(
+            self._edit_url(),
+            data=json.dumps({"unit": "mt", "notes": "arrived damaged, 2 tops short",
+                             "products": self._current_diff()}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Invoice.objects.get(pk=self.invoice_id).notes,
+                         "arrived damaged, 2 tops short")
+        # ...and the stock it already had is untouched.
+        self.assertEqual(WarehouseProductRoll.objects.count(), 1)
+
+    def test_omitting_notes_leaves_them_alone(self):
+        """The field is only touched when the client actually sends it."""
+        self.client.post(
+            self._edit_url(),
+            data=json.dumps({"unit": "mt", "products": self._current_diff()}),
+            content_type="application/json")
+        self.assertEqual(Invoice.objects.get(pk=self.invoice_id).notes, "first note")
+
+    def test_the_form_shows_the_existing_notes_and_locks_the_rest(self):
+        r = self.client.get(reverse("accounts:goods_receipt_edit", args=[self.invoice_id]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "first note")
+        body = r.content.decode()
+        self.assertRegex(body, r'id="npWarehouse"[^>]*disabled')
+        self.assertRegex(body, r'id="npOrderDate"[^>]*disabled')
+        self.assertNotRegex(body, r'id="npNotes"[^>]*disabled')

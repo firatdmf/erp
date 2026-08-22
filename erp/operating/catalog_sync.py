@@ -27,6 +27,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import Sum
+from marketing.models import SKU_MAX_LENGTH
 
 
 class CatalogSyncConflict(Exception):
@@ -250,7 +251,7 @@ def sync_roll_to_catalog(*, base_name, attribute_name, attribute_value,
         """The main-product SKU is the base code (K1245.G13 → 'K1245').
         Product.sku is globally unique, so never collide with another
         product's SKU — fall back to null if it's already taken."""
-        b = (base or "").strip()[:20]
+        b = (base or "").strip()[:SKU_MAX_LENGTH]
         if not b:
             return None
         if Product.objects.filter(sku__iexact=b).exists():

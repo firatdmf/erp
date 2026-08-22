@@ -13,6 +13,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 
 from .models import Warehouse, WarehouseProduct, WarehouseProductRoll, StockMovement
+from marketing.models import SKU_MAX_LENGTH
 
 
 def _env(key, default=None):
@@ -220,33 +221,6 @@ def _roll_usage_info(roll):
         # rather than inventing a reason.
         "entries": entries,
     }
-
-
-def _drop_stale_product_barcode(wp):
-    """Clear WarehouseProduct.barcode once no live roll carries it.
-
-    The field is stamped once, from the first roll ever added to the product,
-    and never refreshed (_add_tops_to_variant only fills it when empty). So
-    when that roll is consumed the product goes on advertising a code nothing
-    on the shelf answers to — and there is no screen that edits it, so the
-    stale value can't be corrected by hand either. It showed up on the public
-    info page's Code128, in the Excel export's barcode column, and as the
-    fallback match in barcode lookup.
-
-    Nothing tracks goods by it: rolls carry their own barcodes and the SKU
-    identifies the product. So the honest value is empty, and the info page
-    falls back to the SKU on its own.
-
-    Cheap: one EXISTS query, and only when a barcode is actually set."""
-    if not wp.barcode:
-        return
-    still_carried = (wp.rolls
-                     .exclude(status="consumed")
-                     .filter(barcode__iexact=wp.barcode)
-                     .exists())
-    if not still_carried:
-        wp.barcode = None
-        wp.save(update_fields=["barcode", "updated_at"])
 
 
 def _barcode_taken(code, *, exclude_roll_ids=()):
@@ -512,7 +486,7 @@ def _product_sku_minter(prefix):
     def mint():
         while True:
             state["n"] += 1
-            code = f"{prefix}{state['n']:03d}"[:20]
+            code = f"{prefix}{state['n']:03d}"[:SKU_MAX_LENGTH]
             if code.upper() not in existing:
                 existing.add(code.upper())
                 return code
@@ -573,9 +547,13 @@ def _add_tops_to_variant(wp, tops, mint, user, *, notes_supplier=None):
         rem = rr.meters_remaining if rr.meters_remaining is not None else (rr.meters or Decimal("0"))
         total += rem or Decimal("0")
     wp.quantity = total
-    if first_barcode and not wp.barcode:
-        wp.barcode = first_barcode[:64]
-    wp.save(update_fields=["quantity", "barcode", "updated_at"])
+    # WarehouseProduct.barcode is NOT set from a roll. A barcode identifies
+    # one physical top; a product is many of them, so stamping the first
+    # one's code onto the parent made it advertise a code that belonged to a
+    # single roll — and kept that code reserved after the roll was gone, so
+    # re-entering the same top was refused as a duplicate. The field stays
+    # for a product's own article barcode, entered by hand.
+    wp.save(update_fields=["quantity", "updated_at"])
     return added_qty, new_roll_ids
 
 
@@ -1912,7 +1890,10 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
         #     batch is refused. Quietly minting "KRV002" over a code the
         #     user typed is how a product ends up filed under a number
         #     nobody recognizes.
-        desired_sku = (mp.get("sku") or "").strip().upper()[:64]
+        # Only meaningful when a main product is about to be CREATED. Picking
+        # an existing one sends its own SKU back for redisplay, and checking
+        # that for clashes made a product collide with itself.
+        desired_sku = "" if main_product is not None else (mp.get("sku") or "").strip().upper()[:64]
         sku_is_auto = bool(_re_sku.match(
             r"^" + _re_sku.escape(prefix) + r"\d{3,}$", desired_sku or ""))
         if desired_sku and not sku_is_auto:
@@ -2045,7 +2026,7 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                 seen_skus = set()
                 for idx, v in enumerate(variants_in, start=1):
                     v_name = (v.get("name") or "").strip()
-                    typed_sku = (v.get("sku") or "").strip()[:20]
+                    typed_sku = (v.get("sku") or "").strip()[:SKU_MAX_LENGTH]
                     v_sku = typed_sku
                     tops = v.get("tops") or []
                     if not v_name and not v_sku and not tops:
@@ -2054,11 +2035,11 @@ def perform_intake(warehouse, data, *, user=None, member=None, invoice=None):
                         # AUTO variant SKU rooted on the (minted) main product SKU.
                         root = (main_product.sku or base_name or "SKU").strip()
                         suffix = _slug_token(v_name) or str(idx)
-                        v_sku = f"{root}-{suffix}"[:20]
+                        v_sku = f"{root}-{suffix}"[:SKU_MAX_LENGTH]
 
                     def _bump(s, n):
                         tail = str(n)
-                        return f"{s[:max(1, 20 - len(tail))]}{tail}"
+                        return f"{s[:max(1, SKU_MAX_LENGTH - len(tail))]}{tail}"
 
                     base_v = v_sku
                     dup = 1
@@ -2308,16 +2289,16 @@ def _resolve_variant_wp(warehouse, main_product, base_name, v_in, prefix, seen_s
     from .catalog_sync import translate_color
 
     v_name = (v_in.get("name") or "").strip()
-    typed_sku = (v_in.get("sku") or "").strip()[:20]
+    typed_sku = (v_in.get("sku") or "").strip()[:SKU_MAX_LENGTH]
     v_sku = typed_sku
     if not v_sku:
         root = (main_product.sku or base_name or "SKU").strip()
         suffix = _slug_token(v_name) or str(len(seen_skus) + 1)
-        v_sku = f"{root}-{suffix}"[:20]
+        v_sku = f"{root}-{suffix}"[:SKU_MAX_LENGTH]
 
     def _bump(s, n):
         tail = str(n)
-        return f"{s[:max(1, 20 - len(tail))]}{tail}"
+        return f"{s[:max(1, SKU_MAX_LENGTH - len(tail))]}{tail}"
 
     base_v = v_sku
     dup = 1
@@ -2499,6 +2480,15 @@ class WarehousePurchaseEdit(View):
             )
             if invoice.status == "cancelled":
                 return JsonResponse({"success": False, "error": "İptal edilmiş alım düzenlenemez."}, status=400)
+
+            # Notes are just words about the delivery — nothing physical or
+            # financial hangs off them, so unlike the account, the warehouse
+            # and the product lines they stay editable after receiving.
+            if "notes" in data:
+                notes = (data.get("notes") or "")[:2000]
+                if notes != (invoice.notes or ""):
+                    invoice.notes = notes
+                    invoice.save(update_fields=["notes", "updated_at"])
 
             # Name the tops' notes/prefix after the ACCOUNT the alım sits
             # on — cari.supplier is empty for every imported account, which
@@ -3965,7 +3955,6 @@ def consume_for_order_items(order, user=None, reason_prefix="Order"):
 
                     wp.quantity = (wp.quantity or Decimal("0")) - take
                     wp.save(update_fields=["quantity", "updated_at"])
-                    _drop_stale_product_barcode(wp)
 
                     StockMovement.objects.create(
                         product=wp,
@@ -4098,7 +4087,6 @@ def consume_reservations_for_order(order, user=None, reason_prefix="Order ship")
 
             wp.quantity = (wp.quantity or Decimal("0")) - actual
             wp.save(update_fields=["quantity", "updated_at"])
-            _drop_stale_product_barcode(wp)
 
             StockMovement.objects.create(
                 product=wp, roll=roll, movement_type="out",
@@ -5223,7 +5211,7 @@ class WarehouseRollBulkDelete(View):
                 deleted += 1
             product.quantity = qty
             product.save(update_fields=["quantity", "updated_at"])
-        _resync_wp_catalog(product)   # see WarehouseRollDelete
+        _resync_wp_catalog(product)            # see WarehouseRollDelete
 
         return JsonResponse({
             "success": True, "deleted": deleted, "skipped": skipped,
@@ -5427,7 +5415,6 @@ class WarehouseStockOut(View):
         # Drop the parent quantity.
         product.quantity = (product.quantity or Decimal("0")) - amount
         product.save(update_fields=["quantity", "updated_at"])
-        _drop_stale_product_barcode(product)
 
         StockMovement.objects.create(
             product=product,

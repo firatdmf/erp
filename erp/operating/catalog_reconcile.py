@@ -29,6 +29,7 @@ from decimal import Decimal
 from django.db.models import Sum
 
 from .catalog_sync import _fold, _norm_attr, _norm_value, derive_catalog
+from marketing.models import SKU_MAX_LENGTH
 
 
 def _norm(s):
@@ -165,9 +166,9 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                     summary["products_created"] += 1
                     summary["actions"].append(f"NEW PRODUCT '{base}' (hidden) for {sku}")
                     if apply:
-                        taken = Product.objects.filter(sku__iexact=base[:20]).exists()
+                        taken = Product.objects.filter(sku__iexact=base[:SKU_MAX_LENGTH]).exists()
                         parent = Product.objects.create(
-                            title=base, sku=(None if taken else (base[:20] or None)),
+                            title=base, sku=(None if taken else (base[:SKU_MAX_LENGTH] or None)),
                             featured=False, unit_of_measurement="mt",
                             quantity=Decimal("0"),
                         )
@@ -179,7 +180,7 @@ def reconcile_all_warehouse_links(apply=False, skus=None):
                     f"NEW VARIANT {sku} under '{parent.title if parent else base}'")
                 if apply:
                     variant = ProductVariant.objects.create(
-                        product=parent, variant_sku=sku[:20],
+                        product=parent, variant_sku=sku[:SKU_MAX_LENGTH],
                         variant_featured=False,
                         variant_barcode=(barcode or None) and barcode[:14],
                         variant_quantity=total_qty, variant_cost=cost,

@@ -88,6 +88,31 @@ class ManualAddMainProductSkuTest(TestCase):
         # Nothing was written.
         self.assertFalse(WarehouseProduct.objects.filter(warehouse=self.warehouse).exists())
 
+    def test_picking_the_existing_product_does_not_clash_with_itself(self):
+        """Existing mode sends the picked product's own SKU back (the saved
+        order redisplays from it). That must not read as a duplicate."""
+        from marketing.models import Product
+        self._post("K24644")                       # creates it
+        existing = Product.objects.get(sku="K24644")
+
+        r = self.client.post(
+            reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
+            data=json.dumps({
+                "cari_id": self.cari.pk, "unit": "mt",
+                "products": [{
+                    "main_product": {"mode": "existing", "id": existing.pk,
+                                     "title": "K24644", "sku": "K24644"},
+                    "has_variants": True,
+                    "variants": [{"name": "G09", "sku": "K24644.G09", "price": "3.50",
+                                  "currency": "USD", "tops": [{"qty": 12}]}],
+                }],
+            }), content_type="application/json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.json()["success"], r.json())
+        self.assertEqual(Product.objects.filter(sku="K24644").count(), 1)
+        self.assertEqual(
+            WarehouseProduct.objects.filter(sku="K24644.G09").get().quantity, Decimal("12.00"))
+
     def test_variant_sku_is_kept_verbatim(self):
         self._post("K24644")
         wp = WarehouseProduct.objects.get(warehouse=self.warehouse)
@@ -236,3 +261,58 @@ class VariantMatchBySkuTest(TestCase):
         """Names that translate cleanly keep working — nothing regressed for
         the products that were matching before."""
         self.assertFalse(self._match(name="MARLETTOO")["exists"])
+
+
+class LongVariantSkuTest(TestCase):
+    """A SKU must survive being typed.
+
+    variant_sku was 20 characters, and "PETEK.FONLUK KUMAŞ." is 19 of them —
+    so eight tops entered as PETEK.FONLUK KUMAŞ.<colour> were all cut to one
+    character past the prefix, collided, and were de-duplicated into .1/.2/.3.
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_superuser(
+            username="long_sku", password="pw", email="l@s.k")
+        self.client.force_login(self.user)
+        self.usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        self.book = Book.objects.create(name="Demfirat")
+        self.cari = CariAccount.objects.create(
+            book=self.book, code="C-KRV", name="Karven", type="supplier",
+            default_currency=self.usd)
+        self.warehouse = Warehouse.objects.create(name="Fabrika")
+
+    def _post(self, variants):
+        return self.client.post(
+            reverse("operating:warehouse_manual_add", args=[self.warehouse.pk]),
+            data=json.dumps({
+                "cari_id": self.cari.pk, "unit": "mt",
+                "products": [{
+                    "main_product": {"mode": "new", "name": "PETEK FONLUK KUMAŞ",
+                                     "sku": "PETEK FONLUK KUMAŞ"},
+                    "has_variants": True, "variants": variants,
+                }],
+            }), content_type="application/json")
+
+    def test_a_long_typed_sku_is_stored_whole(self):
+        sku = "PETEK.FONLUK KUMAŞ.200.310"
+        self.assertGreater(len(sku), 20)
+        r = self._post([{"name": "200", "sku": sku, "price": "1", "currency": "USD",
+                         "tops": [{"qty": 25}]}])
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(WarehouseProduct.objects.get(warehouse=self.warehouse).sku, sku)
+        from marketing.models import ProductVariant
+        self.assertEqual(ProductVariant.objects.get(variant_sku=sku).variant_sku, sku)
+
+    def test_codes_that_only_differ_late_stay_distinct(self):
+        """They used to collapse onto each other once truncated."""
+        variants = [
+            {"name": n, "sku": f"PETEK.FONLUK KUMAŞ.{n}", "price": "1",
+             "currency": "USD", "tops": [{"qty": 10}]}
+            for n in ("193", "200", "209", "224")
+        ]
+        r = self._post(variants)
+        self.assertEqual(r.status_code, 200, r.content)
+        stored = set(WarehouseProduct.objects.filter(warehouse=self.warehouse)
+                     .values_list("sku", flat=True))
+        self.assertEqual(stored, {f"PETEK.FONLUK KUMAŞ.{n}" for n in ("193", "200", "209", "224")})

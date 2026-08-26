@@ -21,9 +21,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
@@ -71,6 +73,24 @@ def _parse_allocations(raw):
             "amount": amount,
         })
     return out
+
+
+def _entered_rate(request):
+    """The rate typed on the form, or None if the field was left alone.
+
+    None means "nobody said", which is what lets the published rate for the
+    date apply instead. Zero and unparseable input mean the same thing —
+    they cannot be a rate, and treating them as one would convert the
+    payment to nothing.
+    """
+    raw = (request.POST.get("exchange_rate") or "").strip()
+    if not raw:
+        return None
+    try:
+        rate = Decimal(raw)
+    except (InvalidOperation, ValueError):
+        return None
+    return rate if rate > 0 else None
 
 
 def _shift_cash(cash_account_id, delta):
@@ -203,6 +223,52 @@ class PaymentList(View):
 
 
 # ---------------------------------------------------------------------------
+@login_required
+def fx_rate_lookup(request):
+    """The published rate for a currency pair on a given day, as JSON.
+
+    Used by the payment form to show what a foreign-currency amount comes to
+    in the book's own currency before it is saved. The form may override the
+    number it gets back — whoever is entering the payment may well know the
+    rate they actually got better than any published source does.
+
+    Always answers 200. A rate that cannot be fetched is a blank field on the
+    form for the user to fill in themselves, not an error to interrupt them
+    with.
+    """
+    from accounting.services import get_exchange_rate
+
+    source = (request.GET.get("from") or "").upper()
+    target = (request.GET.get("to") or "").upper()
+    if not source or not target:
+        return JsonResponse({"rate": None, "reason": "currency missing"})
+    if source == target:
+        # No conversion to make; the form hides the row entirely.
+        return JsonResponse({"rate": None, "reason": "same currency"})
+
+    on_date = parse_date(request.GET.get("date") or "") or timezone.localdate()
+    try:
+        rate = get_exchange_rate(source, target, on_date=on_date)
+    except Exception:
+        rate = None
+    return JsonResponse({
+        "rate": str(rate) if rate else None,
+        "date": on_date.isoformat(),
+    })
+
+
+def _fx_context(book):
+    """What the form's converter needs, as JSON for the script tag.
+
+    "null" when there is no book yet — the account has not been picked — and
+    the script reads that as nothing to convert to and stays out of the way.
+    """
+    if book is None:
+        return "null"
+    base = book.effective_base_currency
+    return json.dumps({"id": base.pk, "code": base.code, "symbol": base.symbol})
+
+
 # Create
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
@@ -251,6 +317,7 @@ class PaymentCreate(View):
             "type_choices":   Payment.PAYMENT_TYPES,
             "method_choices": Payment.METHOD_CHOICES,
             "initial_type":   initial_type,
+            "base_currency": _fx_context(prefilled_cari.book if prefilled_cari else None),
             "open_invoices_json": json.dumps(_serialize_invoices(open_invoices), default=str),
         })
 
@@ -297,6 +364,7 @@ class PaymentCreate(View):
                 amount=amount,
                 currency_id=currency_id,
                 cash_account_id=int(cash_account_id) if cash_account_id else None,
+                exchange_rate=_entered_rate(request),
                 description=request.POST.get("description", ""),
                 notes=request.POST.get("notes", ""),
                 created_by=getattr(request.user, "member", None),
@@ -451,6 +519,7 @@ class PaymentEdit(View):
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices":   Payment.PAYMENT_TYPES,
             "method_choices": Payment.METHOD_CHOICES,
+            "base_currency": _fx_context(payment.book or payment.cari.book),
             "open_invoices_json": json.dumps(_edit_invoice_rows(payment), default=str),
         })
 
@@ -496,6 +565,7 @@ class PaymentEdit(View):
                 payment.currency_id = int(currency_id)
             cash_account_id = request.POST.get("cash_account") or None
             payment.cash_account_id = int(cash_account_id) if cash_account_id else None
+            payment.exchange_rate = _entered_rate(request)
             payment.description = request.POST.get("description", "")
             payment.notes = request.POST.get("notes", "")
             # `number` deliberately stays as issued, prefix and all: a

@@ -75,6 +75,24 @@
   .pf-row + .pf-row { margin-top: 14px; }
   @media (max-width: 720px) { .pf-row, .pf-row.two { grid-template-columns: 1fr; } }
 
+  /* Currency conversion — only rendered when there is one to make. */
+  .pf-fx-grid { display: grid; grid-template-columns: 1fr auto 1.4fr auto; gap: 8px;
+                align-items: center; }
+  .pf-fx-eq { color: #8A96A6; font-weight: 600; }
+  .pf-fx-total { position: relative; display: flex; align-items: center; }
+  .pf-fx-total input { width: 100%; padding-right: 3.2rem; }
+  .pf-fx-code { position: absolute; right: .7rem; font-size: .8rem; color: #8A96A6;
+                pointer-events: none; }
+  .pf-fx-reset { border: 1px solid #D7DFE8; background: #fff; border-radius: 8px;
+                 padding: .5rem .7rem; font-size: .78rem; color: #46546A;
+                 cursor: pointer; white-space: nowrap; }
+  .pf-fx-reset:hover { border-color: #B9C6D4; }
+  .pf-fx-note { margin-left: .4rem; font-size: .74rem; font-weight: 400; color: #8A96A6; }
+  @media (max-width: 720px) {
+    .pf-fx-grid { grid-template-columns: 1fr; }
+    .pf-fx-eq { display: none; }
+  }
+
   .pf-f { display:flex; flex-direction: column; gap: 6px; }
   .pf-f label { font: 600 11.5px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--gray-600); }
   .pf-f .hint { font: 400 11.5px var(--font-sans); color: var(--gray-500); margin-top: 2px; }
@@ -257,6 +275,42 @@
                     <option value="{{ ca.id }}" data-currency="{{ ca.currency_id }}" {% if payment and payment.cash_account_id == ca.id %}selected{% endif %}>{{ ca.name }} ({{ ca.currency.code }}) · {{ ca.book.name }}</option>
                   {% endfor %}
                 </select>
+              </div>
+            </div>
+
+            {% comment %}
+              Shown only when the payment's currency differs from the book's
+              own. Same currency means nothing is converted, and a rate of 1
+              beside a repeated figure tells the reader nothing.
+
+              The rate and the converted total are the same relationship read
+              from either end, so either can be typed and the other follows.
+              Whichever was touched last is the one held fixed — the person
+              entering a cash exchange knows the rate they actually got, and
+              a published mid-market number should not overwrite it.
+            {% endcomment %}
+            <div class="pf-row wide pf-fx" id="fxRow" style="display:none;">
+              <div class="pf-f">
+                <label>
+                  {% trans "Exchange rate" %}
+                  <span class="pf-fx-note" id="fxNote"></span>
+                </label>
+                <div class="pf-fx-grid">
+                  <input type="number" step="0.000001" min="0" name="exchange_rate"
+                         id="paymentRate" placeholder="0.000000"
+                         value="{% if payment and payment.exchange_rate %}{{ payment.exchange_rate|unlocalize }}{% endif %}">
+                  <span class="pf-fx-eq">=</span>
+                  <div class="pf-fx-total">
+                    <input type="number" step="0.01" min="0" id="paymentBaseTotal"
+                           placeholder="{{ 0|floatformat:2 }}">
+                    <span class="pf-fx-code" id="fxBaseCode"></span>
+                  </div>
+                  <button type="button" class="pf-fx-reset" id="fxResetBtn"
+                          title="{% trans 'Use the published rate for this date' %}">
+                    {% trans "Use published" %}
+                  </button>
+                </div>
+                <span class="hint">{% trans "Leave as fetched, or type the rate you actually got — either box updates the other." %}</span>
               </div>
             </div>
 
@@ -565,6 +619,119 @@ if (window.lucide) lucide.createIcons();
 
     currencySel.addEventListener('change', function () { sync(false); });
     sync(true);
+  })();
+
+  // Currency conversion: what this payment comes to in the book's own
+  // currency, and at what rate.
+  //
+  // Only relevant when the two differ. The rate and the converted total are
+  // one relationship read from either end, so editing either updates the
+  // other. A rate the user typed is never overwritten by a fetched one —
+  // they were there and the published mid-market number was not.
+  (function () {
+    var BASE = {{ base_currency|safe }};
+    var row = document.getElementById('fxRow');
+    if (!row || !BASE) return;
+
+    var amountEl = document.getElementById('paymentAmount');
+    var currencyEl = document.getElementById('paymentCurrency');
+    var dateEl = document.getElementById('paymentDate');
+    var rateEl = document.getElementById('paymentRate');
+    var totalEl = document.getElementById('paymentBaseTotal');
+    var noteEl = document.getElementById('fxNote');
+    var resetBtn = document.getElementById('fxResetBtn');
+    document.getElementById('fxBaseCode').textContent = BASE.code;
+
+    // Set as soon as the user types a rate or a total, and from an existing
+    // saved rate on an edit. While true, nothing fetched replaces it.
+    var userSet = Boolean(rateEl.value);
+    var lastKey = null;
+
+    function amount() { return parseFloat(amountEl.value) || 0; }
+
+    function applies() {
+      var opt = currencyEl.options[currencyEl.selectedIndex];
+      return opt && String(BASE.id) !== String(opt.value);
+    }
+
+    function recalcTotal() {
+      var rate = parseFloat(rateEl.value);
+      totalEl.value = rate > 0 ? (amount() * rate).toFixed(2) : '';
+    }
+
+    function recalcRate() {
+      var total = parseFloat(totalEl.value);
+      rateEl.value = total > 0 && amount() > 0
+        ? (total / amount()).toFixed(6) : '';
+    }
+
+    function fetchRate(force) {
+      if (!applies()) return;
+      if (userSet && !force) { recalcTotal(); return; }
+
+      var opt = currencyEl.options[currencyEl.selectedIndex];
+      var code = opt ? opt.textContent.trim() : '';
+      var key = code + '|' + (dateEl.value || '');
+      if (!force && key === lastKey) { recalcTotal(); return; }
+      lastKey = key;
+
+      noteEl.textContent = '{% trans "fetching…" %}';
+      var url = '{% url "accounts:fx_rate_lookup" %}'
+        + '?from=' + encodeURIComponent(code)
+        + '&to=' + encodeURIComponent(BASE.code)
+        + '&date=' + encodeURIComponent(dateEl.value || '');
+
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.rate) {
+            rateEl.value = parseFloat(data.rate).toFixed(6);
+            userSet = false;
+            noteEl.textContent = '{% trans "published rate for" %} ' + (data.date || '');
+          } else {
+            // No source had it. An empty box the user can fill beats a
+            // wrong number presented as authoritative.
+            noteEl.textContent = '{% trans "no published rate — enter it" %}';
+          }
+          recalcTotal();
+        })
+        .catch(function () {
+          noteEl.textContent = '{% trans "could not fetch — enter it" %}';
+        });
+    }
+
+    function sync() {
+      if (!applies()) {
+        row.style.display = 'none';
+        // Cleared so a payment switched back to the book's own currency
+        // does not submit a rate belonging to the currency it used to be.
+        rateEl.value = '';
+        totalEl.value = '';
+        userSet = false;
+        lastKey = null;
+        return;
+      }
+      row.style.display = '';
+      fetchRate(false);
+    }
+
+    rateEl.addEventListener('input', function () {
+      userSet = true;
+      noteEl.textContent = '{% trans "your rate" %}';
+      recalcTotal();
+    });
+    totalEl.addEventListener('input', function () {
+      userSet = true;
+      noteEl.textContent = '{% trans "your rate" %}';
+      recalcRate();
+    });
+    resetBtn.addEventListener('click', function () { fetchRate(true); });
+    amountEl.addEventListener('input', recalcTotal);
+    currencyEl.addEventListener('change', sync);
+    dateEl.addEventListener('change', function () { fetchRate(false); });
+
+    sync();
+    if (userSet) { noteEl.textContent = '{% trans "your rate" %}'; recalcTotal(); }
   })();
 </script>
 {% endblock %}

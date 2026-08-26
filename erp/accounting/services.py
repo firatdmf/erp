@@ -1,5 +1,5 @@
 import requests
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from .models import CurrencyExchangeRate
 
@@ -27,6 +27,7 @@ def _fetch_rate(from_currency: str, to_currency: str, on_date=None) -> Decimal:
     if fc == tc:
         return Decimal("1")
 
+    on_date = _as_date(on_date)
     if on_date and on_date < date.today():
         day = on_date.isoformat()
         sources = (
@@ -64,6 +65,24 @@ def _fetch_rate(from_currency: str, to_currency: str, on_date=None) -> Decimal:
 _RATE_MEMO = {}
 
 
+def _as_date(value):
+    """Coerce to a date, because callers hand over both kinds.
+
+    A model field assigned "2026-08-17" holds the string until the instance
+    is reloaded, so a date reaching here from an unsaved row is as likely to
+    be text as a date. It used to be compared against date.today() as-is,
+    which raises TypeError, which was caught as "no source had the rate" —
+    the conversion then failed for a reason that had nothing to do with FX.
+    """
+    if isinstance(value, str):
+        from django.utils.dateparse import parse_date
+
+        return parse_date(value)
+    if isinstance(value, datetime):
+        return value.date()
+    return value
+
+
 def get_exchange_rate(from_currency: str, to_currency: str, on_date=None) -> Decimal:
     """The rate from one currency to another, on a given day.
 
@@ -72,7 +91,7 @@ def get_exchange_rate(from_currency: str, to_currency: str, on_date=None) -> Dec
     Rates are cached per (pair, day), so asking for an old day repeatedly
     costs one fetch ever.
     """
-    day = on_date or date.today()
+    day = _as_date(on_date) or date.today()
     ck = (from_currency, to_currency, day)
     if ck in _RATE_MEMO:
         return _RATE_MEMO[ck]

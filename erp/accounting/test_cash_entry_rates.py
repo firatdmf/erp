@@ -142,3 +142,56 @@ class BookBaseCurrencyTests(TestCase):
         )
         book = Book.objects.create(name="Unset Book")
         self.assertEqual(book.effective_base_currency.code, "USD")
+
+
+class RateDateCoercionTests(TestCase):
+    """A date can reach the rate lookup as text, and must still work.
+
+    A model field assigned "2026-08-17" holds the string until the row is
+    reloaded, so an unsaved entry hands over text. Comparing that to
+    date.today() raises TypeError, which the fetcher caught as "no source
+    had it" — the conversion then failed for a reason unrelated to FX.
+    """
+
+    def test_a_string_date_is_understood(self):
+        from accounting.services import _as_date
+
+        self.assertEqual(_as_date("2026-08-17"), date(2026, 8, 17))
+
+    def test_a_real_date_passes_through(self):
+        from accounting.services import _as_date
+
+        self.assertEqual(_as_date(date(2026, 8, 17)), date(2026, 8, 17))
+
+    def test_none_stays_none(self):
+        from accounting.services import _as_date
+
+        self.assertIsNone(_as_date(None))
+
+    def test_an_entry_dated_with_a_string_converts_at_that_date(self):
+        usd = CurrencyCategory.objects.create(code="USD", name="US Dollar", symbol="$")
+        try_ = CurrencyCategory.objects.create(
+            code="TRY", name="Turkish Lira", symbol="₺"
+        )
+        book = Book.objects.create(name="Book", base_currency=usd)
+        account = CashAccount.objects.create(
+            book=book, name="Cash", currency=try_, balance=Decimal("0.00")
+        )
+        expense = EquityExpense.objects.create(
+            book=book, cash_account=account, currency=try_,
+            amount=Decimal("200.00"), date="2026-08-17", description="",
+        )
+        with mock.patch("accounting.services._fetch_rate") as fetch:
+            fetch.return_value = Decimal("0.025")
+            entry = CashTransactionEntry.objects.create(
+                book=book,
+                content_type=ContentType.objects.get_for_model(EquityExpense),
+                content_pk=expense.pk,
+                amount=Decimal("200.00"),
+                is_amount_positive=False,
+                currency=try_,
+                cash_account=account,
+            )
+
+        self.assertEqual(fetch.call_args.kwargs["on_date"], date(2026, 8, 17))
+        self.assertEqual(entry.amount_in_base_currency, Decimal("5.00"))

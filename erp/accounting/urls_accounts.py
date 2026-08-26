@@ -67,6 +67,7 @@ urlpatterns = [
 
     # --- Payments (tahsilat) ---
     path("payments/",                    views_payment.PaymentList.as_view(),    name="payment_list"),
+    path("payments/fx-rate/",            views_payment.fx_rate_lookup,           name="fx_rate_lookup"),
     path("payments/new/",                views_payment.PaymentCreate.as_view(),  name="payment_create"),
     path("payments/<int:pk>/",           views_payment.PaymentDetail.as_view(),  name="payment_detail"),
     path("payments/<int:pk>/edit/",      views_payment.PaymentEdit.as_view(),    name="payment_edit"),

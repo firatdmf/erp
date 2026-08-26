@@ -27,6 +27,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import timedelta
 import decimal
+import json
 
 # import yfinance as yf
 from decimal import Decimal, ROUND_HALF_UP
@@ -897,6 +898,12 @@ class AddEquityCapital(generic.edit.CreateView):
     form_class = EquityCapitalForm
     template_name = "accounting/add_equity_capital.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        book = Book.objects.filter(pk=self.kwargs.get("pk")).first()
+        context["base_currency"] = fx_context_json(book)
+        return context
+
     def get_template_names(self):
         if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return ["accounting/partials/capital_form.html"]
@@ -1091,6 +1098,12 @@ class AddEquityExpense(generic.edit.CreateView):
     form_class = EquityExpenseForm
     template_name = "accounting/add_equity_expense.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        book = Book.objects.filter(pk=self.kwargs.get("pk")).first()
+        context["base_currency"] = fx_context_json(book)
+        return context
+
     def get_template_names(self):
         if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return ["accounting/partials/expense_form.html"]
@@ -1176,6 +1189,12 @@ class AddEquityDivident(generic.edit.CreateView):
     model = EquityDivident
     form_class = EquityDividentForm
     template_name = "accounting/add_equity_divident.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        book = Book.objects.filter(pk=self.kwargs.get("pk")).first()
+        context["base_currency"] = fx_context_json(book)
+        return context
 
     def get_template_names(self):
         if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1382,6 +1401,18 @@ def _source_queryset(model):
         related.append("member__user")
     queryset = model._default_manager.all()
     return queryset.select_related(*related) if related else queryset
+
+
+def fx_context_json(book):
+    """The book's base currency as JSON, for the forms' rate converter.
+
+    A dict would render as Python's repr in a template — single quotes, not
+    JSON — so it is serialised here rather than in the template.
+    """
+    if book is None:
+        return "null"
+    base = book.effective_base_currency
+    return json.dumps({"id": base.pk, "code": base.code, "symbol": base.symbol})
 
 
 def running_cash_balances(book_pk):

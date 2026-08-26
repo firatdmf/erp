@@ -1,0 +1,152 @@
+{% load i18n %}
+{% comment %}
+  Turns the plain `exchange_rate` input that {{ form.as_p }} renders into the
+  converter: the rate, and beside it what the entry comes to in the book's
+  own currency. Either box can be typed and the other follows.
+
+  Written to work on a form rendered generically rather than field by field,
+  because these three forms are, so it finds the inputs by their auto ids and
+  builds the companion box itself. Include it after the form.
+
+  Needs `base_currency` in the context (JSON from views.fx_context_json) and
+  a `date_field` — capital calls its date `date_invested`, the others `date`.
+{% endcomment %}
+<script>
+(function () {
+  var BASE = {{ base_currency|default:"null"|safe }};
+  var rateEl = document.getElementById('id_exchange_rate');
+  var accountEl = document.getElementById('id_cash_account');
+  var amountEl = document.getElementById('id_amount');
+  var dateEl = document.getElementById('id_{{ date_field|default:"date" }}');
+  if (!BASE || !rateEl || !accountEl || !amountEl) return;
+
+  // The <p> the rate sits in, so the whole labelled row can be hidden when
+  // there is nothing to convert.
+  var row = rateEl.closest('p') || rateEl.parentElement;
+
+  // Companion box: the converted total, and a way back to the published rate.
+  var extra = document.createElement('span');
+  extra.className = 'fx-extra';
+  extra.innerHTML =
+    '<span class="fx-eq">=</span>' +
+    '<input type="number" step="0.01" min="0" class="fx-total" placeholder="0.00">' +
+    '<span class="fx-code"></span>' +
+    '<button type="button" class="fx-reset">{% translate "Use published" %}</button>' +
+    '<span class="fx-note"></span>';
+  rateEl.insertAdjacentElement('afterend', extra);
+
+  var totalEl = extra.querySelector('.fx-total');
+  var noteEl = extra.querySelector('.fx-note');
+  var resetBtn = extra.querySelector('.fx-reset');
+  extra.querySelector('.fx-code').textContent = BASE.code;
+
+  // True once the user types either box, and on an edit that already has a
+  // rate. While true, nothing fetched replaces it.
+  var userSet = Boolean(rateEl.value);
+  var lastKey = null;
+
+  function amount() { return parseFloat(amountEl.value) || 0; }
+
+  function selectedCurrency() {
+    var opt = accountEl.options[accountEl.selectedIndex];
+    return opt ? {
+      id: opt.getAttribute('data-currency'),
+      code: opt.getAttribute('data-currency-code')
+    } : null;
+  }
+
+  function applies() {
+    var cur = selectedCurrency();
+    return Boolean(cur && cur.id && String(cur.id) !== String(BASE.id));
+  }
+
+  function recalcTotal() {
+    var rate = parseFloat(rateEl.value);
+    totalEl.value = rate > 0 ? (amount() * rate).toFixed(2) : '';
+  }
+
+  function recalcRate() {
+    var total = parseFloat(totalEl.value);
+    rateEl.value = total > 0 && amount() > 0 ? (total / amount()).toFixed(6) : '';
+  }
+
+  function fetchRate(force) {
+    if (!applies()) return;
+    if (userSet && !force) { recalcTotal(); return; }
+
+    var cur = selectedCurrency();
+    var when = dateEl ? (dateEl.value || '') : '';
+    var key = cur.code + '|' + when;
+    if (!force && key === lastKey) { recalcTotal(); return; }
+    lastKey = key;
+
+    noteEl.textContent = '{% translate "fetching…" %}';
+    fetch('{% url "accounts:fx_rate_lookup" %}'
+          + '?from=' + encodeURIComponent(cur.code)
+          + '&to=' + encodeURIComponent(BASE.code)
+          + '&date=' + encodeURIComponent(when),
+          { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.rate) {
+          rateEl.value = parseFloat(data.rate).toFixed(6);
+          userSet = false;
+          noteEl.textContent = '{% translate "published rate for" %} ' + (data.date || '');
+        } else {
+          // An empty box to fill beats a wrong number presented as fact.
+          noteEl.textContent = '{% translate "no published rate — enter it" %}';
+        }
+        recalcTotal();
+      })
+      .catch(function () {
+        noteEl.textContent = '{% translate "could not fetch — enter it" %}';
+      });
+  }
+
+  function sync() {
+    if (!applies()) {
+      row.style.display = 'none';
+      // Cleared so an entry switched to a base-currency account cannot
+      // submit a rate belonging to the currency it used to be in.
+      rateEl.value = '';
+      totalEl.value = '';
+      userSet = false;
+      lastKey = null;
+      return;
+    }
+    row.style.display = '';
+    fetchRate(false);
+  }
+
+  rateEl.addEventListener('input', function () {
+    userSet = true;
+    noteEl.textContent = '{% translate "your rate" %}';
+    recalcTotal();
+  });
+  totalEl.addEventListener('input', function () {
+    userSet = true;
+    noteEl.textContent = '{% translate "your rate" %}';
+    recalcRate();
+  });
+  resetBtn.addEventListener('click', function () { fetchRate(true); });
+  amountEl.addEventListener('input', recalcTotal);
+  accountEl.addEventListener('change', sync);
+  if (dateEl) dateEl.addEventListener('change', function () { fetchRate(false); });
+
+  sync();
+  if (userSet) { noteEl.textContent = '{% translate "your rate" %}'; recalcTotal(); }
+})();
+</script>
+
+<style>
+  .fx-extra { display: flex; align-items: center; gap: .5rem; margin-top: .5rem;
+              flex-wrap: wrap; }
+  .fx-extra .fx-eq { color: #8A96A6; font-weight: 600; }
+  .fx-extra .fx-total { flex: 1 1 8rem; min-width: 6rem; }
+  .fx-extra .fx-code { font-size: .85rem; color: #6B7280; }
+  .fx-extra .fx-reset { padding: .45rem .7rem; font-size: .78rem; color: #374151;
+                        background: #fff; border: 1px solid #d1d5db;
+                        border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .fx-extra .fx-reset:hover { background: #f3f4f6; border-color: #9ca3af; }
+  .fx-extra .fx-note { flex-basis: 100%; font-size: .78rem; color: #6B7280; }
+</style>

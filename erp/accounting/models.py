@@ -848,6 +848,15 @@ class EquityCapital(models.Model):
     # so forcing a share count on every deposit only invites a wrong one.
     new_shares_issued = models.PositiveIntegerField(default=0, blank=True)
 
+    # The rate to the book's base currency that whoever recorded this says
+    # applies. Null means they did not say, and the published rate for the
+    # date is used instead — see CashTransactionEntry.resolve_exchange_rate.
+    exchange_rate = models.DecimalField(
+        max_digits=20, decimal_places=6, blank=True, null=True,
+        help_text="Rate to the book's base currency. "
+                  "Blank → the published rate for the date.",
+    )
+
     note = models.TextField(null=True, blank=True)
 
     def clean(self):
@@ -933,6 +942,14 @@ class EquityExpense(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
+    # The rate to the book's base currency that whoever recorded this says
+    # applies. Null means they did not say, and the published rate for the
+    # date is used instead — see CashTransactionEntry.resolve_exchange_rate.
+    exchange_rate = models.DecimalField(
+        max_digits=20, decimal_places=6, blank=True, null=True,
+        help_text="Rate to the book's base currency. "
+                  "Blank → the published rate for the date.",
+    )
     description = models.CharField(max_length=200, unique=False, blank=True)
     # account_balance = models.DecimalField(
     #     max_digits=10, decimal_places=2, unique=False, blank=True
@@ -960,6 +977,14 @@ class EquityDivident(models.Model):
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
+    # The rate to the book's base currency that whoever recorded this says
+    # applies. Null means they did not say, and the published rate for the
+    # date is used instead — see CashTransactionEntry.resolve_exchange_rate.
+    exchange_rate = models.DecimalField(
+        max_digits=20, decimal_places=6, blank=True, null=True,
+        help_text="Rate to the book's base currency. "
+                  "Blank → the published rate for the date.",
+    )
     description = models.CharField(max_length=200, unique=False, blank=True)
 
 

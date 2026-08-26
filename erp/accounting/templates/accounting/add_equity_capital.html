@@ -8,4 +8,6 @@
     {{ form.as_p }}
     <input type="submit" value="Save">
 </form>
+
+{% include "accounting/partials/fx_rate_field.html" with date_field="date_invested" %}
 {% endblock %}

@@ -186,7 +186,51 @@ class LiabilityAccountsPayableForm(forms.ModelForm):
         }
 
 
-class EquityCapitalForm(forms.ModelForm):
+class CashAccountCurrencySelect(forms.Select):
+    """A cash-account select whose options carry their currency.
+
+    The equity forms derive an entry's currency from the account it moves
+    through, and decide server-side. The browser has to make the same call
+    to know whether a conversion applies, so each option says which currency
+    it is in rather than the script having to guess from the label text.
+    """
+
+    def create_option(self, name, value, *args, **kwargs):
+        option = super().create_option(name, value, *args, **kwargs)
+        account = getattr(value, "instance", None)
+        if account is not None and account.currency_id:
+            option["attrs"]["data-currency"] = account.currency_id
+            option["attrs"]["data-currency-code"] = account.currency.code
+        return option
+
+
+class ExchangeRateFormMixin:
+    """Shared setup for the equity forms that can carry an entered rate.
+
+    The rate is optional on all of them: blank means nobody stated one, and
+    the published rate for the entry's date applies instead. Only the widget
+    wiring lives here — what the rate is then used for is
+    CashTransactionEntry.resolve_exchange_rate's business.
+    """
+
+    def _setup_exchange_rate(self, book=None):
+        rate = self.fields.get("exchange_rate")
+        if rate is not None:
+            rate.required = False
+            rate.label = "Exchange rate"
+            rate.widget.attrs.update({
+                "step": "0.000001", "min": "0", "placeholder": "0.000000",
+            })
+        account = self.fields.get("cash_account")
+        if account is not None:
+            account.widget = CashAccountCurrencySelect(
+                choices=account.widget.choices
+            )
+        if book is not None:
+            self.book_base_currency = book.effective_base_currency
+
+
+class EquityCapitalForm(ExchangeRateFormMixin, forms.ModelForm):
     """Record cash going into a book.
 
     `new_shares_issued` is not asked for here. A contribution and an
@@ -229,6 +273,9 @@ class EquityCapitalForm(forms.ModelForm):
                 book=book
             ).select_related("currency", "book").order_by("name")
 
+        self._setup_exchange_rate(book)
+
+
 class EquityRevenueForm(forms.ModelForm):
     class Meta:
         model = EquityRevenue
@@ -254,7 +301,7 @@ class EquityRevenueForm(forms.ModelForm):
             # self.fields["book"].queryset = Book.objects.filter(book=book)
 
 
-class EquityExpenseForm(forms.ModelForm):
+class EquityExpenseForm(ExchangeRateFormMixin, forms.ModelForm):
     class Meta:
         model = EquityExpense
         fields = "__all__"
@@ -279,8 +326,10 @@ class EquityExpenseForm(forms.ModelForm):
             ).select_related("currency", "book").order_by("name")
             # self.fields["book"].queryset = Book.objects.filter(book=book)
 
+        self._setup_exchange_rate(book)
 
-class EquityDividentForm(forms.ModelForm):
+
+class EquityDividentForm(ExchangeRateFormMixin, forms.ModelForm):
     class Meta:
         model = EquityDivident
         fields = "__all__"
@@ -304,6 +353,8 @@ class EquityDividentForm(forms.ModelForm):
                 "member", flat=True
             )
             self.fields["member"].queryset = Member.objects.filter(id__in=members).select_related("user")
+
+        self._setup_exchange_rate(book)
 
 
 class InTransferForm(forms.ModelForm):

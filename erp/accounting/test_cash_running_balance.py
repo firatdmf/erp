@@ -265,13 +265,13 @@ class CashEntryListPageTests(CashEntryTestBase):
         self.assertContains(response, "hamal cuval")
 
     def test_a_source_with_no_description_still_says_something(self):
-        """A capital deposit has only a note; blank, it should name the member."""
-        entry = self._entry("600.00", True)  # note left empty
+        """A capital deposit with a blank note is identified by its member."""
+        self._entry("600.00", True)  # note left empty
         response = self.client.get(self.url())
         self.assertContains(response, str(self.member))
-        self.assertEqual(
-            response.context["object_list"][0].source_description, str(self.member)
-        )
+        row = response.context["object_list"][0]
+        self.assertEqual(row.source_party, str(self.member))
+        self.assertEqual(row.source_description, "")
 
     def test_filtering_narrows_to_one_cash_account(self):
         self._entry("600.00", True)  # lands in self.kasa
@@ -387,3 +387,100 @@ class CashEntryExchangeDescriptionTests(CashEntryTestBase):
         self.assertEqual(
             self._describe(transfer), "$500.00 Cash → $500.00 Vault"
         )
+
+
+class CashEntryPartyTests(CashEntryTestBase):
+    """Who the money moved with, shown alongside the note rather than instead."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(get_user_model().objects.get(username="teller"))
+
+    def url(self):
+        return reverse(
+            "accounting:cash_transaction_entry_list", kwargs={"pk": self.book.pk}
+        )
+
+    def test_a_described_capital_deposit_still_names_its_member(self):
+        """The bug: a typed description used to hide the counterparty."""
+        capital = EquityCapital.objects.create(
+            book=self.book,
+            member=self.member,
+            date_invested="2026-08-20",
+            cash_account=self.kasa,
+            currency=self.usd,
+            amount=Decimal("1000.00"),
+            note="dükkanda elden verdi",
+        )
+        CashAccount.objects.filter(pk=self.kasa.pk).update(balance=Decimal("1000.00"))
+        self.kasa.refresh_from_db()
+        CashTransactionEntry.objects.create(
+            book=self.book,
+            content_type=ContentType.objects.get_for_model(EquityCapital),
+            content_pk=capital.pk,
+            amount=Decimal("1000.00"),
+            is_amount_positive=True,
+            currency=self.usd,
+            cash_account=self.kasa,
+        )
+
+        row = self.client.get(self.url()).context["object_list"][0]
+        self.assertEqual(row.source_party, str(self.member))
+        self.assertEqual(row.source_description, "dükkanda elden verdi")
+
+    def test_an_exchange_has_no_party(self):
+        """Nobody is on the other side of moving your own money."""
+        from accounting.models import CurrencyExchange
+        from accounting.views import cash_entry_party
+
+        vault = CashAccount.objects.create(
+            book=self.book, name="Vault", currency=self.usd, balance=Decimal("0.00")
+        )
+        exchange = CurrencyExchange.objects.create(
+            book=self.book,
+            from_cash_account=self.kasa,
+            to_cash_account=vault,
+            from_amount=Decimal("10.00"),
+            to_amount=Decimal("10.00"),
+            date="2026-08-21",
+        )
+        self.assertEqual(cash_entry_party(exchange), "")
+
+
+class CashEntryHtmxTests(CashEntryTestBase):
+    """Filtering swaps a fragment in rather than reloading the page."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(get_user_model().objects.get(username="teller"))
+        self._entry("600.00", True)
+
+    def url(self):
+        return reverse(
+            "accounting:cash_transaction_entry_list", kwargs={"pk": self.book.pk}
+        )
+
+    def test_an_htmx_request_returns_only_the_fragment(self):
+        response = self.client.get(self.url(), HTTP_HX_REQUEST="true")
+        self.assertEqual(
+            response.template_name,
+            ["accounting/partials/cash_transaction_results.html"],
+        )
+        body = response.content.decode()
+        self.assertNotIn("<html", body)
+        self.assertIn("tx-filter", body)  # tabs come along, so "on" moves
+
+    def test_an_ordinary_request_still_returns_the_whole_page(self):
+        response = self.client.get(self.url())
+        self.assertIn(
+            "accounting/cash_transaction_entry_list.html", response.template_name
+        )
+        self.assertIn('id="tx-results"', response.content.decode())
+
+    def test_the_fragment_and_the_page_agree_on_the_rows(self):
+        """One definition of the markup — the page includes the partial."""
+        page = self.client.get(self.url()).content.decode()
+        fragment = self.client.get(
+            self.url(), HTTP_HX_REQUEST="true"
+        ).content.decode()
+        self.assertIn(fragment.strip(), page)

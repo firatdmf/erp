@@ -44,6 +44,9 @@
 
     .tx-what { color: #46546A; max-width: 22rem; }
     .tx-what .none { color: #B3BDC9; }
+    /* Who the money moved to or from leads the cell; the typed note sits
+       under it as detail rather than replacing it. */
+    .tx-what .who { display: block; font-weight: 600; color: #33405A; }
 
     /* Scrolls sideways on a narrow screen instead of wrapping into a
        ragged block — the number of accounts grows with the book. */
@@ -64,100 +67,14 @@
   </style>
 
   <div class="financial-overview-card">
-    <div class="card-header-title">
-      <i class="fas fa-list blue-icon"></i> Transactions
-      <span class="tx-count">{{ paginator.count }} entr{{ paginator.count|pluralize:"y,ies" }}</span>
-    </div>
-
-    {% if cash_accounts %}
-    <div class="tx-filter">
-      <a href="?" class="{% if not selected_account %}on{% endif %}">
-        All <span class="n">{{ total_count }}</span>
-      </a>
-      {% for row in cash_accounts %}
-      <a href="?account={{ row.account.pk }}"
-         class="{% if selected_account.pk == row.account.pk %}on{% endif %}">
-        {{ row.account.name }} {{ row.account.currency.code }}
-        <span class="n">{{ row.count }}</span>
-      </a>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if object_list %}
-    <table class="assets-table">
-      <thead>
-        <tr>
-          <th>When</th>
-          <th>Source</th>
-          <th>Description</th>
-          <th>Cash account</th>
-          <th class="num">Amount</th>
-          <th class="num">Account balance</th>
-          <th class="num">Book total ({{ base_currency_symbol }})</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in object_list %}
-        <tr>
-          <td class="tx-when">
-            {{ t.date|date:"d M Y" }}
-            {% comment %}
-              The date the money moved is the headline. Show the time it was
-              recorded underneath, unless it was recorded on a different day
-              — then say so, so a backdated row is never mistaken for one
-              entered that day.
-            {% endcomment %}
-            {% if t.created_at|date:"Y-m-d" == t.date|date:"Y-m-d" %}
-              <span class="t">{{ t.created_at|date:"H:i" }}</span>
-            {% else %}
-              <span class="t">entered {{ t.created_at|date:"d M" }}</span>
-            {% endif %}
-          </td>
-          <td><span class="tx-kind">{{ t.content_type.name|default:"—" }}</span></td>
-          <td class="tx-what">
-            {% if t.source_description %}{{ t.source_description }}
-            {% else %}<span class="none">—</span>{% endif %}
-          </td>
-          <td>{{ t.cash_account.name }} <span class="tx-muted">{{ t.currency.code }}</span></td>
-          <td class="num {% if t.is_amount_positive %}tx-in{% else %}tx-out{% endif %}">
-            {% if t.is_amount_positive %}+{% else %}&minus;{% endif %}{{ t.currency.symbol }}{{ t.amount|format_money }}
-          </td>
-          <td class="num">{{ t.currency.symbol }}{{ t.cash_account_balance|format_money }}</td>
-          <td class="num tx-muted">{{ base_currency_symbol }}{{ t.total_base_currency_balance|format_money }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    {% if is_paginated %}
     {% comment %}
-      Carry the account filter through the pager. Without it, paging out of
-      page 1 silently drops back to every account.
+      htmx swaps this div's contents when an account tab or a pager link is
+      clicked. Everything that depends on the filter lives inside it; the
+      styles above and the breadcrumb do not, so they are not re-sent.
     {% endcomment %}
-    <div class="tx-pager">
-      {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}{% if selected_account %}&account={{ selected_account.pk }}{% endif %}">&larr; Newer</a>
-      {% endif %}
-      <span class="spacer"></span>
-      <span>Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
-      <span class="spacer"></span>
-      {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}{% if selected_account %}&account={{ selected_account.pk }}{% endif %}">Older &rarr;</a>
-      {% endif %}
+    <div id="tx-results">
+      {% include "accounting/partials/cash_transaction_results.html" %}
     </div>
-    {% endif %}
-
-    {% else %}
-    <div class="cash-accounts-empty">
-      {% if selected_account %}
-        No cash has moved through {{ selected_account.name }}
-        {{ selected_account.currency.code }} yet.
-      {% else %}
-        No cash has moved on this book yet.
-      {% endif %}
-    </div>
-    {% endif %}
   </div>
 </div>
 {% endblock %}

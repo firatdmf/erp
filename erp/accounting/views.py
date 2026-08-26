@@ -1382,12 +1382,31 @@ def _source_queryset(model):
     return queryset.select_related(*related) if related else queryset
 
 
+def cash_entry_party(obj):
+    """Who the money moved to or from, if the source names anyone.
+
+    Kept apart from the description rather than used as a fallback for it.
+    They are not alternatives: the counterparty is who a collection came
+    from, and the typed note is why. Folding them into one field meant
+    whichever was checked first hid the other, so a payment that had been
+    given a description stopped naming its account.
+    """
+    if obj is None:
+        return ""
+    for field in ("cari", "member", "supplier"):
+        related = getattr(obj, field, None)
+        if related is not None:
+            return str(related)
+    return ""
+
+
 def describe_cash_entry_source(obj, accounts=None):
     """The line of text that says what a cash entry was for.
 
-    Prefers whatever was typed when the row was entered. A source with no
-    such field — a currency exchange has none — is described from what it
-    is instead, because a blank column teaches the reader nothing.
+    Whatever was typed when the row was entered. A source with no such
+    field — a currency exchange has none — is described from what it is
+    instead, because a blank column teaches the reader nothing. Who it was
+    with is cash_entry_party's job, and is shown alongside this.
 
     `accounts` is a {pk: CashAccount} map for the book, so describing an
     exchange costs no extra queries; the view already loads it for the
@@ -1420,12 +1439,6 @@ def describe_cash_entry_source(obj, accounts=None):
                 left += f" {source.name}"
                 right += f" {target.name}"
             return f"{left} → {right}"
-
-    # A payment names its account; a capital deposit names its member.
-    for field in ("cari", "member", "supplier"):
-        related = getattr(obj, field, None)
-        if related is not None:
-            return str(related)
 
     return ""
 
@@ -1485,12 +1498,19 @@ class CashTransactionEntryList(generic.ListView):
             )
 
         for entry in entries:
-            entry.source_description = describe_cash_entry_source(
-                sources.get(entry.content_type_id, {}).get(entry.content_pk),
-                accounts,
-            )
+            source = sources.get(entry.content_type_id, {}).get(entry.content_pk)
+            entry.source_party = cash_entry_party(source)
+            entry.source_description = describe_cash_entry_source(source, accounts)
         context["object_list"] = entries
         return context
+
+    def get_template_names(self):
+        # An htmx request is a filter or page click from a page already on
+        # screen, so it gets only the part that changes. Same context, same
+        # markup — the full page renders that partial through an include.
+        if self.request.headers.get("HX-Request"):
+            return ["accounting/partials/cash_transaction_results.html"]
+        return [self.template_name]
 
     def get_queryset(self):
         # Ordered here rather than by piping the page through

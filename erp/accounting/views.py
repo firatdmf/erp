@@ -1365,6 +1365,71 @@ class EquityExpenseList(generic.ListView):
         )
 
 
+# The relations describe_cash_entry_source falls back to when a source has
+# no text of its own. Followed up front, because reaching them one row at a
+# time is how a 50-row page turns into 100 extra queries.
+DESCRIPTION_RELATIONS = ("cari", "member", "supplier")
+
+
+def _source_queryset(model):
+    """A queryset for a cash entry's source, with description FKs followed."""
+    names = {field.name for field in model._meta.fields if field.is_relation}
+    related = [name for name in DESCRIPTION_RELATIONS if name in names]
+    if "member" in related:
+        # Member.__str__ reads the user's name, which is another hop.
+        related.append("member__user")
+    queryset = model._default_manager.all()
+    return queryset.select_related(*related) if related else queryset
+
+
+def describe_cash_entry_source(obj, accounts=None):
+    """The line of text that says what a cash entry was for.
+
+    Prefers whatever was typed when the row was entered. A source with no
+    such field — a currency exchange has none — is described from what it
+    is instead, because a blank column teaches the reader nothing.
+
+    `accounts` is a {pk: CashAccount} map for the book, so describing an
+    exchange costs no extra queries; the view already loads it for the
+    filter.
+    """
+    if obj is None:
+        # The source row was deleted out from under the entry.
+        return ""
+
+    for field in ("description", "note"):
+        text = (getattr(obj, field, "") or "").strip()
+        if text:
+            return text
+
+    # An exchange or transfer: name the two sides.
+    from_id = getattr(obj, "from_cash_account_id", None)
+    if from_id is not None and accounts:
+        source = accounts.get(from_id)
+        target = accounts.get(getattr(obj, "to_cash_account_id", None))
+        if source and target:
+            # InTransfer moves one amount; CurrencyExchange has two.
+            out = getattr(obj, "from_amount", None) or getattr(obj, "amount", None)
+            into = getattr(obj, "to_amount", None) or out
+            left = f"{source.currency.symbol}{out:,.2f}"
+            right = f"{target.currency.symbol}{into:,.2f}"
+            if source.currency_id == target.currency_id:
+                # Same currency both sides, so the symbols cannot say which
+                # account is which. Name them. Across currencies the symbols
+                # already do, and the names would only repeat themselves.
+                left += f" {source.name}"
+                right += f" {target.name}"
+            return f"{left} → {right}"
+
+    # A payment names its account; a capital deposit names its member.
+    for field in ("cari", "member", "supplier"):
+        related = getattr(obj, field, None)
+        if related is not None:
+            return str(related)
+
+    return ""
+
+
 @method_decorator(login_required, name="dispatch")
 class CashTransactionEntryList(generic.ListView):
     model = CashTransactionEntry
@@ -1372,10 +1437,59 @@ class CashTransactionEntryList(generic.ListView):
 
     paginate_by = 50
 
+    def get_selected_account(self, accounts):
+        """The cash account being filtered to, or None for all of them."""
+        raw = self.request.GET.get("account") or ""
+        if raw.isdigit():
+            return accounts.get(int(raw))
+        return None
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        book = Book.objects.get(pk=self.kwargs.get("pk"))
         context["base_currency_symbol"] = str(get_base_currency().symbol)
-        context["book"] = Book.objects.get(pk=self.kwargs.get("pk"))
+        context["book"] = book
+
+        accounts = {
+            a.pk: a
+            for a in CashAccount.objects.filter(book=book).select_related("currency")
+        }
+        # One query for every tab's count, rather than one per tab.
+        counts = dict(
+            CashTransactionEntry.objects.filter(book=book)
+            .values_list("cash_account")
+            .annotate(n=Count("pk"))
+        )
+        context["cash_accounts"] = [
+            {"account": a, "count": counts.get(a.pk, 0)}
+            for a in sorted(accounts.values(), key=lambda a: (a.name, a.currency.code))
+        ]
+        context["total_count"] = sum(counts.values())
+        context["selected_account"] = self.get_selected_account(accounts)
+
+        # entry.content is a GenericForeignKey, so reading it in the template
+        # loop would cost a query per row. Group the page's rows by content
+        # type and fetch each source table once instead.
+        entries = list(context["object_list"])
+        by_type = {}
+        for entry in entries:
+            by_type.setdefault(entry.content_type_id, set()).add(entry.content_pk)
+
+        sources = {}
+        for content_type in ContentType.objects.filter(pk__in=by_type):
+            model = content_type.model_class()
+            if model is None:
+                continue  # a model that no longer exists in the codebase
+            sources[content_type.pk] = (
+                _source_queryset(model).in_bulk(by_type[content_type.pk])
+            )
+
+        for entry in entries:
+            entry.source_description = describe_cash_entry_source(
+                sources.get(entry.content_type_id, {}).get(entry.content_pk),
+                accounts,
+            )
+        context["object_list"] = entries
         return context
 
     def get_queryset(self):
@@ -1390,12 +1504,20 @@ class CashTransactionEntryList(generic.ListView):
         # day it was entered. created_at still breaks ties, so several rows
         # sharing a date keep the order they were recorded in.
         book_pk = self.kwargs.get("pk")
-        return (
+        queryset = (
             CashTransactionEntry.objects
             .filter(book=book_pk)
             .select_related("cash_account", "currency", "content_type")
             .order_by("-date", "-created_at", "-pk")
         )
+        # ?account=<pk> narrows to one cash account. Filtered on the id
+        # straight from the query string rather than resolving the account
+        # first: an id from another book simply matches nothing, which is
+        # the right answer for a hand-edited URL.
+        account = self.request.GET.get("account") or ""
+        if account.isdigit():
+            queryset = queryset.filter(cash_account_id=int(account))
+        return queryset
 
 
 # @method_decorator(login_required, name='dispatch')

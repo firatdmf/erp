@@ -2,10 +2,13 @@
 # python manage.py test accounting.test_cash_running_balance
 
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import connection, models
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 
 from accounting.models import (
     Book,
@@ -13,6 +16,8 @@ from accounting.models import (
     CashTransactionEntry,
     CurrencyCategory,
     EquityCapital,
+    EquityExpense,
+    ExpenseCategory,
 )
 from django.contrib.auth import get_user_model
 
@@ -214,4 +219,171 @@ class CashEntryDateBackfillTests(CashEntryTestBase):
 
         self.assertFalse(
             CashTransactionEntry.objects.filter(date__isnull=True).exists()
+        )
+
+
+class CashEntryListPageTests(CashEntryTestBase):
+    """The transactions page: descriptions, and filtering by cash account."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(get_user_model().objects.get(username="teller"))
+        self.other = CashAccount.objects.create(
+            book=self.book, name="Vault", currency=self.usd, balance=Decimal("0.00")
+        )
+
+    def url(self, **params):
+        base = reverse(
+            "accounting:cash_transaction_entry_list", kwargs={"pk": self.book.pk}
+        )
+        return base + ("?" + urlencode(params) if params else "")
+
+    def test_the_description_typed_on_the_source_is_shown(self):
+        category = ExpenseCategory.objects.create(name="Contract Labor")
+        expense = EquityExpense.objects.create(
+            book=self.book,
+            category=category,
+            cash_account=self.kasa,
+            currency=self.usd,
+            amount=Decimal("815.00"),
+            date="2026-08-20",
+            description="hamal cuval",
+        )
+        CashAccount.objects.filter(pk=self.kasa.pk).update(balance=Decimal("1000.00"))
+        self.kasa.refresh_from_db()
+        CashTransactionEntry.objects.create(
+            book=self.book,
+            content_type=ContentType.objects.get_for_model(EquityExpense),
+            content_pk=expense.pk,
+            amount=Decimal("815.00"),
+            is_amount_positive=False,
+            currency=self.usd,
+            cash_account=self.kasa,
+        )
+
+        response = self.client.get(self.url())
+        self.assertContains(response, "hamal cuval")
+
+    def test_a_source_with_no_description_still_says_something(self):
+        """A capital deposit has only a note; blank, it should name the member."""
+        entry = self._entry("600.00", True)  # note left empty
+        response = self.client.get(self.url())
+        self.assertContains(response, str(self.member))
+        self.assertEqual(
+            response.context["object_list"][0].source_description, str(self.member)
+        )
+
+    def test_filtering_narrows_to_one_cash_account(self):
+        self._entry("600.00", True)  # lands in self.kasa
+        CashTransactionEntry.objects.create(
+            book=self.book,
+            content_type=ContentType.objects.get_for_model(EquityCapital),
+            content_pk=EquityCapital.objects.first().pk,
+            amount=Decimal("25.00"),
+            is_amount_positive=True,
+            currency=self.usd,
+            cash_account=self.other,
+        )
+
+        everything = self.client.get(self.url())
+        self.assertEqual(len(everything.context["object_list"]), 2)
+
+        just_vault = self.client.get(self.url(account=self.other.pk))
+        rows = just_vault.context["object_list"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].cash_account_id, self.other.pk)
+        self.assertEqual(just_vault.context["selected_account"], self.other)
+
+    def test_every_cash_account_in_the_book_gets_a_tab_with_its_count(self):
+        self._entry("600.00", True)
+        response = self.client.get(self.url())
+        tabs = {r["account"].name: r["count"] for r in response.context["cash_accounts"]}
+        self.assertEqual(tabs, {"Cash": 1, "Vault": 0})
+        self.assertEqual(response.context["total_count"], 1)
+        self.assertIsNone(response.context["selected_account"])
+
+    def test_an_account_id_from_another_book_matches_nothing(self):
+        self._entry("600.00", True)
+        stranger = CashAccount.objects.create(
+            book=Book.objects.create(name="Nejum"),
+            name="Theirs",
+            currency=self.usd,
+            balance=Decimal("0.00"),
+        )
+        response = self.client.get(self.url(account=stranger.pk))
+        self.assertEqual(len(response.context["object_list"]), 0)
+        self.assertIsNone(response.context["selected_account"])
+
+    def test_a_junk_account_parameter_falls_back_to_all(self):
+        self._entry("600.00", True)
+        response = self.client.get(self.url(account="; drop table"))
+        self.assertEqual(len(response.context["object_list"]), 1)
+        self.assertIsNone(response.context["selected_account"])
+
+    def test_the_page_does_not_query_once_per_row(self):
+        """Descriptions come from a GenericForeignKey — the trap is N+1.
+
+        Asserted as "the count does not grow with the rows" rather than a
+        fixed number, because base.html's context processors dominate the
+        total and would make any literal here a chore to maintain.
+        """
+        for _ in range(3):
+            self._entry("10.00", True)
+        with CaptureQueriesContext(connection) as few:
+            self.client.get(self.url())
+
+        for _ in range(9):
+            self._entry("10.00", True)
+        with CaptureQueriesContext(connection) as many:
+            self.client.get(self.url())
+
+        self.assertEqual(len(many.captured_queries), len(few.captured_queries))
+
+
+class CashEntryExchangeDescriptionTests(CashEntryTestBase):
+    """An exchange or transfer has no description field; it gets described."""
+
+    def _describe(self, obj):
+        from accounting.views import describe_cash_entry_source
+
+        accounts = {
+            a.pk: a for a in CashAccount.objects.filter(book=self.book)
+        }
+        return describe_cash_entry_source(obj, accounts)
+
+    def test_across_currencies_the_symbols_carry_it(self):
+        from accounting.models import CurrencyExchange
+
+        try_ = CurrencyCategory.objects.get_or_create(
+            code="TRY", defaults={"name": "Turkish Lira", "symbol": "₺"}
+        )[0]
+        lira = CashAccount.objects.create(
+            book=self.book, name="Cash", currency=try_, balance=Decimal("0.00")
+        )
+        exchange = CurrencyExchange.objects.create(
+            book=self.book,
+            from_cash_account=self.kasa,
+            to_cash_account=lira,
+            from_amount=Decimal("200.00"),
+            to_amount=Decimal("9560.00"),
+            date="2026-08-21",
+        )
+        self.assertEqual(self._describe(exchange), "$200.00 → ₺9,560.00")
+
+    def test_within_one_currency_the_accounts_are_named(self):
+        from accounting.models import InTransfer
+
+        vault = CashAccount.objects.create(
+            book=self.book, name="Vault", currency=self.usd, balance=Decimal("0.00")
+        )
+        transfer = InTransfer.objects.create(
+            book=self.book,
+            from_cash_account=self.kasa,
+            to_cash_account=vault,
+            amount=Decimal("500.00"),
+            currency=self.usd,
+            date="2026-08-21",
+        )
+        self.assertEqual(
+            self._describe(transfer), "$500.00 Cash → $500.00 Vault"
         )

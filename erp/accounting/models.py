@@ -72,6 +72,10 @@ def allowed_equity_models():
         "currencyexchange",
         "assetaccountsreceivable",
         "liabilityaccountspayable",
+        # A confirmed Payment moves cash too (models_accounts.Payment.post
+        # updates CashAccount.balance directly), so it belongs in the cash
+        # ledger alongside the equity movements.
+        "payment",
     ]
     # allowed_cts = ContentType.objects.filter(model__in=allowed_models)
     return {
@@ -1039,6 +1043,21 @@ class CashTransactionEntry(models.Model):
     # TransactionEntry.objects.filter(content_type=ContentType.objects.get_for_model(EquityCapital), equity_pk=some_id)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # When the money actually moved — NOT when the row was typed in.
+    #
+    # These are different dates and the ledger used to show only the second
+    # one, because created_at was all it had. An exchange entered on the 26th
+    # for the 21st filed itself under the 26th, and the list said so however
+    # carefully the date had been picked on the form.
+    #
+    # Every source that moves cash carries its own date (CurrencyExchange,
+    # InTransfer, Payment and the equity models all do), so this is derived
+    # from the content object rather than asked of each caller — one place to
+    # be right, and the existing call sites need no change. Nullable only so
+    # the column could be added to a live table; save() always fills it.
+    date = models.DateField(blank=True, null=True)
+
     book = models.ForeignKey(Book, on_delete=models.CASCADE, blank=False, null=False)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     is_amount_positive = models.BooleanField()
@@ -1071,8 +1090,28 @@ class CashTransactionEntry(models.Model):
     #     # return str(get_base_currency().symbol)
     #     return "hello"
 
+    # Where each source keeps the date the money moved. Anything not listed
+    # (the legacy AR/AP mirrors) has no date of its own and falls back to
+    # when the row was recorded.
+    SOURCE_DATE_FIELDS = ("date", "date_invested")
+
+    def derive_date(self):
+        """The date the money moved, read off the source row."""
+        content = self.content
+        if content is not None:
+            for field in self.SOURCE_DATE_FIELDS:
+                value = getattr(content, field, None)
+                if value:
+                    return value
+        # No dated source: the moment it was recorded is the best we have.
+        # created_at is unset until the first save, hence the now() fallback.
+        return (self.created_at or timezone.now()).date()
+
     def save(self, *args, **kwargs):
         base_currency = get_base_currency()  # always get fresh
+
+        if self.date is None:
+            self.date = self.derive_date()
 
         # set account balance if not provided
         if self.cash_account_balance is None:
@@ -1093,35 +1132,52 @@ class CashTransactionEntry(models.Model):
         else:
             self.amount_in_base_currency = self.amount
 
-        # update running balance
-        try:
+        # Running total of the book's cash, in base currency.
+        #
+        # Read live off the cash accounts rather than chained off the
+        # previous row's stored total. Chaining drifts, because this table
+        # is not the only thing that moves cash: Payment.post() writes
+        # straight to CashAccount.balance with a raw F() UPDATE (see
+        # models_accounts.Payment) and records nothing here, so the chain
+        # never saw that money and kept counting from a stale figure. Book 2
+        # read $59.60 against a real $1,804.98 that way. Chaining was also
+        # wrong in the other direction: an AssetAccountsReceivable /
+        # LiabilityAccountsPayable row records what is owed and moves no
+        # cash, yet it shifted the running total anyway.
+        #
+        # Every caller updates CashAccount.balance before creating the
+        # entry, so the live total here is the book's real position at the
+        # moment this row is written — whatever moved it, and whether or not
+        # that something bothered to write an entry.
+        #
+        # Only stamped as the row is created. Re-saving an existing entry
+        # leaves the stored figure alone, so history is not rewritten to
+        # today's total (and services.update_cash_transaction_entry_total_
+        # base_currency_balance can still re-stamp a row deliberately).
+        if self._state.adding or self.total_base_currency_balance is None:
             from .views import get_total_base_currency_balance
 
-            latest_entry = CashTransactionEntry.objects.filter(book=self.book).latest(
-                "pk"
-            )
-            prev_balance = (
-                latest_entry.total_base_currency_balance
-                or get_total_base_currency_balance(book_pk=self.book.pk)
-            )
-            if self.is_amount_positive:
+            try:
+                self.total_base_currency_balance = get_total_base_currency_balance(
+                    book_pk=self.book_id
+                )
+            except ValidationError:
+                # A currency we hold has no rate right now. Recording the
+                # cash movement still has to succeed — falling back to the
+                # old chained arithmetic keeps the column approximately
+                # right, and the next entry saved with rates available
+                # re-anchors it to the live total.
+                prev_balance = (
+                    CashTransactionEntry.objects.filter(book=self.book)
+                    .order_by("-pk")
+                    .values_list("total_base_currency_balance", flat=True)
+                    .first()
+                ) or Decimal("0.00")
                 self.total_base_currency_balance = (
                     prev_balance + self.amount_in_base_currency
+                    if self.is_amount_positive
+                    else prev_balance - self.amount_in_base_currency
                 )
-            else:
-                self.total_base_currency_balance = (
-                    prev_balance - self.amount_in_base_currency
-                )
-        except CashTransactionEntry.DoesNotExist:
-            # prev_balance = get_total_base_currency_balance(book_pk=self.book.pk)
-            # prev_balance = Decimal("0.00")
-            self.total_base_currency_balance = get_total_base_currency_balance(
-                book_pk=self.book.pk
-            )
-
-        # round down very small numbers
-        if self.total_base_currency_balance < Decimal("0.01"):
-            self.total_base_currency_balance = Decimal("0.00")
 
         super().save(*args, **kwargs)
 

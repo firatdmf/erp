@@ -65,8 +65,18 @@
         {% for t in object_list %}
         <tr>
           <td class="tx-when">
-            {{ t.created_at|date:"d M Y" }}
-            <span class="t">{{ t.created_at|date:"H:i" }}</span>
+            {{ t.date|date:"d M Y" }}
+            {% comment %}
+              The date the money moved is the headline. Show the time it was
+              recorded underneath, unless it was recorded on a different day
+              — then say so, so a backdated row is never mistaken for one
+              entered that day.
+            {% endcomment %}
+            {% if t.created_at|date:"Y-m-d" == t.date|date:"Y-m-d" %}
+              <span class="t">{{ t.created_at|date:"H:i" }}</span>
+            {% else %}
+              <span class="t">entered {{ t.created_at|date:"d M" }}</span>
+            {% endif %}
           </td>
           <td><span class="tx-kind">{{ t.content_type.name|default:"—" }}</span></td>
           <td>{{ t.cash_account.name }} <span class="tx-muted">{{ t.currency.code }}</span></td>

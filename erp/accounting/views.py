@@ -1384,12 +1384,17 @@ class CashTransactionEntryList(generic.ListView):
         # paginator had already chosen, so "newest first" was true within a
         # page and false across the list. select_related keeps the row loop
         # off a query per cash account, currency and content type.
+        #
+        # By `date` — when the money moved — not `created_at`, which is when
+        # someone typed it in. Backdating an entry used to file it under the
+        # day it was entered. created_at still breaks ties, so several rows
+        # sharing a date keep the order they were recorded in.
         book_pk = self.kwargs.get("pk")
         return (
             CashTransactionEntry.objects
             .filter(book=book_pk)
             .select_related("cash_account", "currency", "content_type")
-            .order_by("-created_at", "-pk")
+            .order_by("-date", "-created_at", "-pk")
         )
 
 

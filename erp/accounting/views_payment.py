@@ -526,6 +526,11 @@ class PaymentEdit(View):
                 _shift_cash(old_cash_id, -old_cash_delta)
                 _shift_cash(payment.cash_account_id,
                             payment.amount * Decimal(payment.cash_sign))
+                # ...and move the cash ledger row with it. Without this the
+                # balance changed while the transactions page showed nothing,
+                # which is exactly what linking an account after the fact
+                # used to do: the money appeared, the row never did.
+                payment.sync_cash_entry()
 
             payment.resync_posted_movement(user=request.user)
 

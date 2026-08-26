@@ -1087,12 +1087,65 @@ class Payment(models.Model):
             self.status = "confirmed"
             self.save(update_fields=["status", "posted_movement", "updated_at"])
 
+            # 4) Record the cash movement in the cash ledger. After the
+            #    balance shift above and the status flip, so the row stamps
+            #    the position the payment leaves behind.
+            self.sync_cash_entry()
+
             # 4) Re-derive paid_amount/status on every allocated invoice
             for alloc in self.allocations.select_related("invoice").all():
                 if alloc.invoice_id:
                     alloc.invoice.recompute_payment(save=True)
 
         return movement
+
+    def sync_cash_entry(self):
+        """Make the cash ledger row match this payment's cash effect.
+
+        A payment moves cash by writing straight to CashAccount.balance —
+        confirm() does it, the edit view does it, cancel() reverses it. None
+        of them used to record anything in CashTransactionEntry, so money
+        moved that the transactions page never showed and its running total
+        never counted. That is how book 2 came to read $59.60 against a real
+        $1,804.98.
+
+        Call this AFTER the balance has been shifted: the entry stamps the
+        account balance and the book total as it finds them.
+
+        Idempotent, and covers every direction — a payment that gains a cash
+        account gets a row, one that loses it (or is cancelled, or reverts to
+        draft) has its row removed, and an edited amount updates in place
+        rather than leaving a second row behind.
+        """
+        from accounting.models import CashTransactionEntry
+
+        content_type = ContentType.objects.get_for_model(Payment)
+        existing = CashTransactionEntry.objects.filter(
+            content_type=content_type, content_pk=self.pk
+        ).first()
+
+        # Only a confirmed payment against a cash account moves cash.
+        if self.status != "confirmed" or not self.cash_account_id:
+            if existing:
+                existing.delete()
+            return None
+
+        entry = existing or CashTransactionEntry(
+            content_type=content_type, content_pk=self.pk
+        )
+        entry.book = self.book
+        entry.amount = self.amount
+        entry.is_amount_positive = self.cash_sign > 0
+        entry.currency = self.currency
+        entry.cash_account_id = self.cash_account_id
+        entry.date = self.date
+        # Blanked so save() re-derives them from the accounts as they stand
+        # now; the figures the row was first written with describe a cash
+        # position that the edit has just changed.
+        entry.cash_account_balance = None
+        entry.total_base_currency_balance = None
+        entry.save()
+        return entry
 
     def resync_posted_movement(self, user=None):
         """Refresh the ledger row after an edit to an already-confirmed payment.
@@ -1202,6 +1255,10 @@ class Payment(models.Model):
             #    filters by payment.status == 'confirmed')
             self.status = "cancelled"
             self.save(update_fields=["status", "posted_movement", "updated_at"])
+
+            # The cash went back, so the cash ledger row goes with it —
+            # sync_cash_entry drops it now that the status is cancelled.
+            self.sync_cash_entry()
 
             # 4) Re-derive invoices
             for alloc in self.allocations.select_related("invoice").all():

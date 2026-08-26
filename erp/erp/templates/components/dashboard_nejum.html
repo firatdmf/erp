@@ -137,6 +137,7 @@
                   </div>
                   <span class="task-aging aging-{{ t.aging_tone }}">{{ t.aging_label }}</span>
                 </div>
+                {% if t.description %}<div class="task-desc">{{ t.description }}</div>{% endif %}
                 <div class="task-meta">
                   <span class="task-assignee">
                     <span class="avatar {% if t.kind == 'team' %}avatar-purple{% else %}avatar-teal{% endif %}">{{ t.avatar_letter }}</span>
@@ -346,9 +347,10 @@
     var prioFilter = new Set();   // empty = no filter (show all)
 
     function fold(s) {
-      // Locale-aware lowercase + diacritic stripping. Use tr-TR so
-      // Turkish I/i pairs fold the same way the storefront frontend does;
-      // English content passes through unchanged.
+      // Shared with every other client-side search via text_fold.js,
+      // which mirrors the server's unaccent folding. The inline copy
+      // is a fallback in case this block runs before that script.
+      if (window.foldText) return window.foldText(s);
       return (s || '').toLocaleLowerCase('tr-TR')
         .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i');
     }
@@ -361,6 +363,7 @@
         if (hasFilter && !prioFilter.has(t.priority)) return false;
         if (q) {
           if (fold(t.name).indexOf(q) < 0 &&
+              fold(t.description || '').indexOf(q) < 0 &&
               fold(t.assignee || '').indexOf(q) < 0) return false;
         }
         return true;
@@ -543,6 +546,7 @@
         '<div class="task-text">' + teamPill + escapeHtml(t.name) + '</div>' +
         '<span class="task-aging aging-' + escapeHtml(t.aging_tone) + '">' + escapeHtml(t.aging_label) + '</span>' +
         '</div>' +
+        (t.description ? '<div class="task-desc">' + escapeHtml(t.description) + '</div>' : '') +
         '<div class="task-meta">' +
         '<span class="task-assignee"><span class="avatar ' + avatarCls + '">' + escapeHtml(t.avatar_letter) + '</span><span>' + escapeHtml(t.assignee) + '</span></span>' +
         (t.entity_name

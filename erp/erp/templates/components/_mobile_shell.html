@@ -1,4 +1,5 @@
 {% load i18n %}
+{% load erp_tags %}
 {% load static %}
 {% comment %}
   Mobile shell — top app-bar + bottom nav + slide-in drawer.
@@ -77,292 +78,36 @@
   </div>
 
   {% comment %}
-    Mirrors the desktop sidebar (templates/themes/nejum/components/_sidebar_nejum.html)
-    section content/items 1:1 — but with Operations (has the warehouse) and
-    Accounts (Cari) pulled to the FRONT per explicit request, since this
-    user's daily flow is warehouse → orders → cari. Everything else keeps
-    its previous relative order. Keep in sync whenever the desktop
-    sidebar's flyouts change; icons are Lucide data-lucide (already
-    loaded globally + swapped by the sidebar's own lucide.createIcons()
-    call) so both navs render IDENTICAL icons.
+    Every entry comes from erp/nav.py — the SAME list the desktop
+    sidebar renders, so the two menus cannot drift apart again (the
+    drawer once went a long stretch with no way to create a task at
+    all). What differs here is only presentation: the desktop's hover
+    flyouts become full-width labelled sections, its group titles become
+    sub-headings, and the link-only tiles are gathered into one
+    "Workspace" section. Order is the phone's daily flow — warehouse →
+    orders → cari first; see nav.MOBILE_FIRST.
   {% endcomment %}
   <div class="m-drawer-body" id="mobileDrawerBody">
 
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Operations" %}</div>
-      <a class="m-drawer-item" href="{% url 'operating:warehouse_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="warehouse"></i></span>
-        <span class="m-drawer-label">{% trans "My warehouses" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="#" onclick="mobileToggleDrawer(); openOrderSidebar(); return false;">
-        <span class="m-drawer-ico"><i data-lucide="plus-circle"></i></span>
-        <span class="m-drawer-label">{% trans "Create order" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'operating:order_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="list"></i></span>
-        <span class="m-drawer-label">{% trans "Order list" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'operating:scan_order_item_unit' %}">
-        <span class="m-drawer-ico"><i data-lucide="qr-code"></i></span>
-        <span class="m-drawer-label">{% trans "QR scan" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'operating:scan_order_item_unit_pack' %}">
-        <span class="m-drawer-ico"><i data-lucide="package-2"></i></span>
-        <span class="m-drawer-label">{% trans "QR scan package" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'operating:raw_material_good_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="list"></i></span>
-        <span class="m-drawer-label">{% trans "Raw material list" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="#" onclick="mobileToggleDrawer(); openRawMaterialSidebar(); return false;">
-        <span class="m-drawer-ico"><i data-lucide="box"></i></span>
-        <span class="m-drawer-label">{% trans "Create raw material" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="#" onclick="mobileToggleDrawer(); openRawMaterialReceiptSidebar(); return false;">
-        <span class="m-drawer-ico"><i data-lucide="file-text"></i></span>
-        <span class="m-drawer-label">{% trans "Raw material receipt" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="#" onclick="mobileToggleDrawer(); openRawMaterialItemSidebar(); return false;">
-        <span class="m-drawer-ico"><i data-lucide="plus-square"></i></span>
-        <span class="m-drawer-label">{% trans "Raw material item" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Accounts" context "sidebar" %}</div>
-      <a class="m-drawer-item" href="{% url 'accounts:list' %}">
-        <span class="m-drawer-ico"><i data-lucide="id-card"></i></span>
-        <span class="m-drawer-label">{% trans "All Accounts" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:create' %}">
-        <span class="m-drawer-ico"><i data-lucide="user-plus"></i></span>
-        <span class="m-drawer-label">{% trans "New Account" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:invoice_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="file-text"></i></span>
-        <span class="m-drawer-label">{% trans "All Invoices" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:invoice_create' %}">
-        <span class="m-drawer-ico"><i data-lucide="file-plus"></i></span>
-        <span class="m-drawer-label">{% trans "New Invoice" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:payment_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="wallet"></i></span>
-        <span class="m-drawer-label">{% trans "All Payments" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:payment_create' %}">
-        <span class="m-drawer-ico"><i data-lucide="hand-coins"></i></span>
-        <span class="m-drawer-label">{% trans "New Collection / Payment" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:check_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="scroll-text"></i></span>
-        <span class="m-drawer-label">{% trans "Portfolio" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:check_create' %}">
-        <span class="m-drawer-ico"><i data-lucide="plus-circle"></i></span>
-        <span class="m-drawer-label">{% trans "New Check / Note" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:report_index' %}">
-        <span class="m-drawer-ico"><i data-lucide="pie-chart"></i></span>
-        <span class="m-drawer-label">{% trans "Report Center" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:report_aging' %}">
-        <span class="m-drawer-ico"><i data-lucide="clock"></i></span>
-        <span class="m-drawer-label">{% trans "Aging" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:report_trial_balance' %}">
-        <span class="m-drawer-ico"><i data-lucide="layout-grid"></i></span>
-        <span class="m-drawer-label">{% trans "Trial Balance" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:report_due_calendar' %}">
-        <span class="m-drawer-ico"><i data-lucide="calendar-clock"></i></span>
-        <span class="m-drawer-label">{% trans "Due Calendar" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:report_credit_limit' %}">
-        <span class="m-drawer-ico"><i data-lucide="shield-alert"></i></span>
-        <span class="m-drawer-label">{% trans "Credit Limit" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:help' %}">
-        <span class="m-drawer-ico"><i data-lucide="book-open"></i></span>
-        <span class="m-drawer-label">📘 {% trans "User Guide" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Workspace" %}</div>
-      <a class="m-drawer-item" href="/" data-mdrawer="home">
-        <span class="m-drawer-ico"><i data-lucide="layout-grid"></i></span>
-        <span class="m-drawer-label">{% trans "Dashboard" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'operating:order_analytics' %}">
-        <span class="m-drawer-ico"><i data-lucide="line-chart"></i></span>
-        <span class="m-drawer-label">{% trans "Analytics" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "My Team" %}</div>
-      <a class="m-drawer-item" href="{% url 'team:team_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="list"></i></span>
-        <span class="m-drawer-label">{% trans "Team members" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'team:team_tasks' %}">
-        <span class="m-drawer-ico"><i data-lucide="list-checks"></i></span>
-        <span class="m-drawer-label">{% trans "Assign task" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'team:team_messages' %}">
-        <span class="m-drawer-ico"><i data-lucide="message-circle"></i></span>
-        <span class="m-drawer-label">{% trans "Messages" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'team:team_roles' %}">
-        <span class="m-drawer-ico"><i data-lucide="shield"></i></span>
-        <span class="m-drawer-label">{% trans "Manage roles" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'team:team_meetings' %}">
-        <span class="m-drawer-ico"><i data-lucide="video"></i></span>
-        <span class="m-drawer-label">{% trans "Schedule meeting" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Accounting" %}</div>
-      <a class="m-drawer-item" href="{% url 'accounting:index' %}">
-        <span class="m-drawer-ico"><i data-lucide="book"></i></span>
-        <span class="m-drawer-label">{% trans "View ledgers" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="#" onclick="mobileToggleDrawer(); openBookSidebar(); return false;">
-        <span class="m-drawer-ico"><i data-lucide="plus-circle"></i></span>
-        <span class="m-drawer-label">{% trans "Create ledger" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:retail' %}">
-        <span class="m-drawer-ico"><i data-lucide="shopping-basket"></i></span>
-        <span class="m-drawer-label">Perakende Satışları</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounting:sales_dashboard' %}">
-        <span class="m-drawer-ico"><i data-lucide="bar-chart-3"></i></span>
-        <span class="m-drawer-label">{% trans "Sales dashboard" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Marketing" %}</div>
-      <a class="m-drawer-item" href="{% url 'marketing:product_create' %}">
-        <span class="m-drawer-ico"><i data-lucide="plus-circle"></i></span>
-        <span class="m-drawer-label">{% trans "Create product" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'marketing:product_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="list"></i></span>
-        <span class="m-drawer-label">{% trans "Product list" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'crm:company_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="building-2"></i></span>
-        <span class="m-drawer-label">{% trans "Companies" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'crm:contact_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="users"></i></span>
-        <span class="m-drawer-label">{% trans "Contacts" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'marketing:blog_create' %}">
-        <span class="m-drawer-ico"><i data-lucide="plus-circle"></i></span>
-        <span class="m-drawer-label">{% trans "Create blog post" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'marketing:blog_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="book-open"></i></span>
-        <span class="m-drawer-label">{% trans "Blog list" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Procurement" %}</div>
-      <a class="m-drawer-item" href="{% url 'accounts:invoice_list' %}?type=purchase">
-        <span class="m-drawer-ico"><i data-lucide="package-plus"></i></span>
-        <span class="m-drawer-label">{% trans "Purchases" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'procurement:request_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="file-text"></i></span>
-        <span class="m-drawer-label">{% trans "Purchase requests" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'accounts:purchase_order_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="receipt"></i></span>
-        <span class="m-drawer-label">{% trans "Purchase orders" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'crm:supplier_list' %}">
-        <span class="m-drawer-ico"><i data-lucide="truck"></i></span>
-        <span class="m-drawer-label">{% trans "Supplier list" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="#" onclick="mobileToggleDrawer(); openAddSupplierSidebar(); return false;">
-        <span class="m-drawer-ico"><i data-lucide="plus-circle"></i></span>
-        <span class="m-drawer-label">{% trans "Add supplier" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Mail" %}</div>
-      <a class="m-drawer-item" href="{% url 'email_automation:dashboard' %}">
-        <span class="m-drawer-ico"><i data-lucide="gauge"></i></span>
-        <span class="m-drawer-label">{% trans "Email automation" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-      <a class="m-drawer-item" href="{% url 'email_automation:my_emails' %}">
-        <span class="m-drawer-ico"><i data-lucide="inbox"></i></span>
-        <span class="m-drawer-label">{% trans "My emails" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
-
-    <div class="m-drawer-section">
-      <div class="m-drawer-section-title">{% trans "Notes" %}</div>
-      <a class="m-drawer-item" href="{% url 'notes:index' %}">
-        <span class="m-drawer-ico"><i data-lucide="sticky-note"></i></span>
-        <span class="m-drawer-label">{% trans "Notes" %}</span>
-        <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-      </a>
-    </div>
+    {% nav_sections "mobile" as sections %}
+    {% for s in sections %}
+      <div class="m-drawer-section">
+        <div class="m-drawer-section-title">{{ s.title|default:s.label }}</div>
+        {% for g in s.groups %}
+          {% if g.title %}<div class="m-drawer-group-title">{{ g.title }}</div>{% endif %}
+          {% for it in g.items %}
+            <a class="m-drawer-item"
+               {% if it.action %}href="#" onclick="mobileToggleDrawer(); {{ it.action }}(); return false;"
+               {% elif it.url %}href="{% url it.url %}{{ it.query|default:'' }}"
+               {% else %}href="{{ it.href }}"{% endif %}>
+              <span class="m-drawer-ico"><i data-lucide="{{ it.icon }}"></i></span>
+              <span class="m-drawer-label">{% if it.emoji %}{{ it.emoji }} {% endif %}{{ it.label }}</span>
+              <span class="m-drawer-chev"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    {% endfor %}
 
     {% comment %}Mobile-only utility section — Settings/Sign out already live in the desktop TOPBAR (not its sidebar), so there is no desktop sidebar equivalent to mirror here; kept for mobile convenience since the drawer is the only full-screen nav surface on mobile.{% endcomment %}
     <div class="m-drawer-section">
@@ -462,11 +207,24 @@
     document.body.style.overflow = open ? 'hidden' : '';
   };
   window.mobileFilterDrawer = function (q) {
-    var query = (q || '').trim().toLowerCase();
+    // foldText (erp/js/text_fold.js) so "sise" finds "Şişe" here too.
+    var fold = window.foldText || function (x) { return String(x || '').toLowerCase(); };
+    var query = fold(q).trim();
     document.querySelectorAll('#mobileDrawerBody .m-drawer-item').forEach(function (item) {
-      var label = (item.querySelector('.m-drawer-label')?.textContent || '').toLowerCase();
+      var label = fold(item.querySelector('.m-drawer-label')?.textContent || '');
       var match = !query || label.includes(query);
       item.style.display = match ? '' : 'none';
+    });
+    var visible = function (el) { return el.style.display !== 'none'; };
+    // A group heading belongs to the items after it, up to the next
+    // heading — hide it once the filter has emptied that run.
+    document.querySelectorAll('#mobileDrawerBody .m-drawer-group-title').forEach(function (title) {
+      var any = false;
+      for (var el = title.nextElementSibling; el; el = el.nextElementSibling) {
+        if (el.classList.contains('m-drawer-group-title')) break;
+        if (el.classList.contains('m-drawer-item') && visible(el)) { any = true; break; }
+      }
+      title.style.display = any ? '' : 'none';
     });
     document.querySelectorAll('#mobileDrawerBody .m-drawer-section').forEach(function (sec) {
       var visibleItems = sec.querySelectorAll('.m-drawer-item:not([style*="display: none"])').length;

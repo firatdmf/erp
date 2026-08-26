@@ -354,6 +354,11 @@
     word-break: break-word !important;
     overflow-wrap: anywhere !important;
   }
+  .task-desc {
+    font: 500 12.5px 'Plus Jakarta Sans', sans-serif !important;
+    line-height: 1.4 !important;
+    margin-top: 4px !important;
+  }
   .task-aging {
     flex-shrink: 0 !important;
     font: 700 10px 'Plus Jakarta Sans', sans-serif !important;
@@ -527,6 +532,7 @@
     border-color: #2A3038 !important;
   }
   [data-theme="dark"] .task-card .task-text { color: #F1F5F8 !important; }
+  [data-theme="dark"] .task-card .task-desc { color: #9AA5AD !important; }
   [data-theme="dark"] .task-actions { border-top-color: #262C34 !important; }
   [data-theme="dark"] .task-actions .btn-view {
     background: #11161C !important;

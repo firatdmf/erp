@@ -158,10 +158,19 @@
   }
   .np-sup-chip i { color: var(--nejum-teal-500, #147F74); }
   .np-sup-chip > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Drawn, not typed — see .no-sup-clear on the new-order page: a "×" glyph
+     is baseline-aligned, so it never lands in the middle of its box. */
   .np-sup-clear {
     flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 6px; cursor: pointer;
-    background: transparent; color: #0B5F60; font-size: 19px; line-height: 1;
+    background: transparent; color: #0B5F60; padding: 0; position: relative;
+    font-size: 0; line-height: 0;
   }
+  .np-sup-clear::before, .np-sup-clear::after {
+    content: ''; position: absolute; top: 50%; left: 50%; width: 11px; height: 1.8px;
+    background: currentColor; border-radius: 2px;
+  }
+  .np-sup-clear::before { transform: translate(-50%, -50%) rotate(45deg); }
+  .np-sup-clear::after  { transform: translate(-50%, -50%) rotate(-45deg); }
   .np-sup-clear:hover { background: #DCEBE9; }
   .np-sup-chip.locked .np-sup-clear { display: none; }
   /* An author `display` beats the UA sheet's [hidden] rule, so the chip has

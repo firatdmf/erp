@@ -1,14 +1,106 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load accounting_tags %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">
+{% endblock %}
+
 {% block content %}
-  {% load static %}
-  {% block css %}
-    {% comment %} <link rel="stylesheet" href="{% static 'accounting/css/transaction_list.css' %}" /> {% endcomment %}
-  {% endblock %}
+<div class="book-detail-page">
+  <div class="breadcrumb">
+    <a href="{% url 'accounting:index' %}"><i class="fas fa-book"></i> Books</a>
+    <span>/</span>
+    <a href="{% url 'accounting:book_detail' book.pk %}">{{ book.name }}</a>
+    <span>/</span>
+    <span class="current">Currency Exchange</span>
+  </div>
 
-  <form  method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <input type="submit" value="Submit">
-</form>
+  <style>
+    .fx-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; align-items: start; }
+    @media (max-width: 900px) { .fx-layout { grid-template-columns: 1fr; } }
+    .fx-form p { margin: 0 0 1rem; display: flex; flex-direction: column; gap: .35rem; }
+    .fx-form label {
+      font-size: .74rem; font-weight: 700; letter-spacing: .05em;
+      text-transform: uppercase; color: #6B7A8D;
+    }
+    .fx-form input[type="text"], .fx-form input[type="number"],
+    .fx-form input[type="date"], .fx-form select, .fx-form textarea {
+      width: 100%; padding: .55rem .7rem; font-size: .92rem; color: #1F2A37;
+      border: 1px solid #D7DFE8; border-radius: 8px; background: #fff;
+      font-family: inherit;
+    }
+    .fx-form input:focus, .fx-form select:focus, .fx-form textarea:focus {
+      outline: none; border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+    }
+    .fx-form .helptext { font-size: .78rem; color: #8A96A6; }
+    .fx-form ul.errorlist {
+      margin: 0; padding: 0; list-style: none;
+      font-size: .8rem; color: #9C2C1B;
+    }
+    .fx-actions { display: flex; gap: .6rem; padding-top: .4rem; }
+    .fx-submit {
+      background: #1F6FEB; color: #fff; border: none; border-radius: 8px;
+      padding: .6rem 1.3rem; font-size: .9rem; font-weight: 600; cursor: pointer;
+    }
+    .fx-submit:hover { background: #1A5FCC; }
+    .fx-cancel {
+      border: 1px solid #D7DFE8; border-radius: 8px; background: #fff;
+      padding: .6rem 1.1rem; font-size: .9rem; color: #46546A; text-decoration: none;
+      display: inline-flex; align-items: center;
+    }
+    .fx-note { font-size: .84rem; color: #6B7A8D; line-height: 1.55; }
+    .fx-rate-row { display: flex; justify-content: space-between; font-size: .86rem; padding: .3rem 0; }
+    .fx-rate-row .v { font-variant-numeric: tabular-nums; }
+  </style>
 
-  {% endblock %}
+  <div class="fx-layout">
+    <div class="financial-overview-card">
+      <div class="card-header-title">
+        <i class="fas fa-right-left blue-icon"></i> Currency Exchange
+      </div>
+      <form method="post" class="fx-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="fx-actions">
+          <button type="submit" class="fx-submit">Record exchange</button>
+          <a class="fx-cancel" href="{% url 'accounting:book_detail' book.pk %}">Cancel</a>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <div class="financial-overview-card">
+        <div class="card-header-title">
+          <i class="fas fa-wallet green-icon"></i> Cash on hand
+        </div>
+        {% if cash_accounts %}
+        <table class="assets-table">
+          <tbody>
+            {% for a in cash_accounts %}
+            <tr>
+              <td>{{ a.name }} <span class="bal-code">{{ a.currency.code }}</span></td>
+              <td class="num">{{ a.currency.symbol }}{{ a.balance|format_money }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="cash-accounts-empty">No cash accounts on this book.</div>
+        {% endif %}
+      </div>
+
+      <div class="financial-overview-card">
+        <div class="card-header-title">
+          <i class="fas fa-circle-info orange-icon"></i> How this posts
+        </div>
+        <div class="fx-note">
+          The amount leaves the source account and the converted amount lands in the
+          destination, both on this book. Two transaction entries are written &mdash;
+          one out, one in &mdash; so the exchange stays traceable from either side.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

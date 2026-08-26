@@ -1163,7 +1163,16 @@ class Payment(models.Model):
         mv.legacy_ap_id = None
 
     def cancel(self, user=None, reason=""):
-        """Cancel a confirmed payment. Reverses CariMovement, cash, and invoice allocations."""
+        """Cancel a confirmed payment. Removes the CariMovement, reverses
+        cash, and re-derives the invoice allocations.
+
+        The posted movement is DELETED rather than reversed with a
+        counter-row, matching Invoice.cancel(): cancellation is terminal
+        (no restore path exists for either), so the pair would never be
+        needed again and only made every cancelled payment read as two
+        lines on the statement. The audit trail lives on the Payment,
+        which keeps its number, dates and status=cancelled.
+        """
         if self.status == "cancelled":
             return
         if self.status == "draft":
@@ -1172,22 +1181,14 @@ class Payment(models.Model):
             return
 
         with transaction.atomic():
-            # 1) Counter cari movement
+            # 1) Drop the cari ledger row
             if self.posted_movement_id:
-                CariMovement.objects.create(
-                    cari=self.cari,
-                    book=self.book,
-                    date=self.date,
-                    amount=-self.posted_movement.amount,
-                    currency=self.currency,
-                    movement_type="adjustment",
-                    description=f"CANCEL — {self.get_type_display()} {self.number}"
-                                + (f" ({reason})" if reason else ""),
-                    reference=f"CANCEL {self.number}",
-                    source_type=ContentType.objects.get_for_model(Payment),
-                    source_id=self.pk,
-                    created_by=user.member if user and hasattr(user, "member") else None,
-                )
+                mv = self.posted_movement
+                cari = mv.cari
+                mv.delete()   # OneToOne is SET_NULL → posted_movement clears
+                self.posted_movement = None
+                if cari:
+                    cari.recompute_balance(save=True)
 
             # 2) Reverse cash
             if self.cash_account_id:
@@ -1200,7 +1201,7 @@ class Payment(models.Model):
             # 3) Flip status (allocations now no longer count, because Invoice.recompute_payment
             #    filters by payment.status == 'confirmed')
             self.status = "cancelled"
-            self.save(update_fields=["status", "updated_at"])
+            self.save(update_fields=["status", "posted_movement", "updated_at"])
 
             # 4) Re-derive invoices
             for alloc in self.allocations.select_related("invoice").all():
@@ -1463,41 +1464,55 @@ class CheckOrPromissoryNote(models.Model):
             self.save(update_fields=["status", "updated_at"])
 
     def cancel(self, user=None, reason=""):
-        """Cancel the instrument and reverse the initial cari movement."""
+        """Cancel the instrument and remove every ledger row it posted.
+
+        The rows are DELETED rather than reversed with counter-movements,
+        matching Payment.cancel() and Invoice.cancel(): cancellation is
+        terminal for all three (none has a restore path), so a
+        counter-pair would never be needed again and only made a
+        cancelled instrument read as two lines on the statement.
+
+        Three rows can be involved — the initial receipt/hand-over, an
+        endorsement onto another account, and a bounce. The bounce goes
+        too: cancelling the instrument undoes both the receipt and the
+        come-back, which leaves each account exactly where it stood
+        before the check was entered. `reason` is no longer recorded on
+        the ledger (there is no row to carry it) — the instrument's own
+        status and notes are where that belongs.
+        """
         if self.status == "cancelled":
             return
         with transaction.atomic():
-            if self.posted_movement_id:
-                CariMovement.objects.create(
-                    cari=self.cari,
-                    book=self.book,
-                    date=timezone.now().date(),
-                    amount=-self.posted_movement.amount,
-                    currency=self.currency,
-                    movement_type="adjustment",
-                    description=f"CANCEL — {self.get_instrument_display()} #{self.serial_no}"
-                                + (f" ({reason})" if reason else ""),
-                    reference=f"CANCEL {self.serial_no}",
-                    source_type=ContentType.objects.get_for_model(CheckOrPromissoryNote),
-                    source_id=self.pk,
-                    created_by=user.member if user and hasattr(user, "member") else None,
-                )
-            # If endorsed, reverse that too
-            if self.endorse_movement_id and self.endorsed_to_id:
-                CariMovement.objects.create(
-                    cari=self.endorsed_to,
-                    book=self.book,
-                    date=timezone.now().date(),
-                    amount=-self.endorse_movement.amount,
-                    currency=self.currency,
-                    movement_type="adjustment",
-                    description=f"CANCEL Endorsement — {self.get_instrument_display()} #{self.serial_no}",
-                    reference=f"CANCEL ENDORSE {self.serial_no}",
-                    source_type=ContentType.objects.get_for_model(CheckOrPromissoryNote),
-                    source_id=self.pk,
-                    created_by=user.member if user and hasattr(user, "member") else None,
-                )
+            touched = []
+
+            # Initial movement (this cari) and the endorsement (the cari
+            # it was handed to). Both are OneToOne SET_NULL, so deleting
+            # the row clears the FK — assign None as well so the instance
+            # in hand matches what was just saved.
+            for field in ("posted_movement", "endorse_movement"):
+                mv = getattr(self, field)
+                if mv is None:
+                    continue
+                touched.append(mv.cari)
+                mv.delete()
+                setattr(self, field, None)
+
+            # The BOUNCED counter-row, if this one came back unpaid.
+            bounced = CariMovement.objects.filter(
+                source_type=ContentType.objects.get_for_model(CheckOrPromissoryNote),
+                source_id=self.pk,
+                reference__startswith="BOUNCE",
+            )
+            touched.extend(mv.cari for mv in bounced)
+            bounced.delete()
+
+            # De-duplicate by pk: the same account can own more than one
+            # of the rows above, and recomputing it twice is wasted work.
+            for cari in {c.pk: c for c in touched if c}.values():
+                cari.recompute_balance(save=True)
+
             self.status = "cancelled"
-            self.save(update_fields=["status", "updated_at"])
+            self.save(update_fields=["status", "posted_movement",
+                                     "endorse_movement", "updated_at"])
 
 

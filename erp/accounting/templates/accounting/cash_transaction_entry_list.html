@@ -1,66 +1,104 @@
 {% extends 'base.html' %}
-{% load i18n %}
+{% load static %}
+{% load accounting_tags %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'accounting/css/book_detail.css' %}">
+{% endblock %}
+
 {% block content %}
-  {% load static %}
-  {% load accounting_tags %}
-  {% block css %}
-    <link rel="stylesheet" href="{% static 'accounting/css/cash_transaction_entry_list.css' %}" />
-  {% endblock %}
-
-  <div class="cash_transaction_entry_list_page">
-    <h1>{% trans "Transaction Table" %}</h1>
-    <table>
-      <tr>
-        <th>{% trans "Transaction #" %}</th>
-        {% comment %} <th>{% trans "Transaction #" %}</th> {% endcomment %}
-        <th>{% trans "Date" %}</th>
-        {% comment %} <th>{% trans "Currency" %}</th> {% endcomment %}
-        <th>{% trans "Amount" %}</th>
-        <th>{% trans "Content Type" %}</th>
-        <th>{% trans "Content Type #" %}</th>
-        <th>{% trans "Account" %}</th>
-        <th>{% trans "Account Balance" %}</th>
-        <th>Total Balance in {{base_currency_symbol}} </th>
-        {% comment %} <th>{% trans "Total Balance" %}</th> {% endcomment %}
-      </tr>
-
-      {% for transaction in object_list|dictsortreversed:'pk'|dictsortreversed:'created_at' %}
-        <tr>
-          <td>{{ transaction.pk }}</td>
-
-          {% comment %} <td>2</td> {% endcomment %}
-          <td>{{ transaction.created_at }}</td>
-          {% comment %} <td>{{ expense.currency }}</td> {% endcomment %}
-          
-          {% if transaction.is_amount_positive or  transaction.content_type.model == 'equitycapital' or transaction.content_type.model == 'equityrevenue'%}
-          {% comment %} {% if transaction.is_amount_positive  %} {% endcomment %}
-            <td style="color:green;">{{ transaction.currency.symbol }}{{ transaction.amount|format_money }}</td>
-          {% elif not transaction.is_amount_positive or transaction.content_type.model == 'equityexpense' or transaction.content_type.model == 'equitydivident' %}
-          {% comment %} {% elif not transaction.is_amount_positive %} {% endcomment %}
-            <td style="color:red;">{{ transaction.currency.symbol }}{{ transaction.amount|format_money }}</td>
-          {% else %}
-            <td>{{ transaction.currency.symbol }}{{ transaction.amount|format_money }}</td>
-          {% endif %}
-          <td>{{ transaction.content_type }}</td>
-          <td>{{ transaction.content_pk }}</td>
-          <td>{{ transaction.cash_account.name }} <span class="ccy">{{ transaction.cash_account.currency.code }}</span></td>
-          <td>{{ transaction.cash_account.currency.symbol }}{{ transaction.cash_account_balance|format_money }}</td>
-          <td>{{ base_currency_symbol }}{{ transaction.total_base_currency_balance|format_money }}</td>
-        </tr>
-      {% empty %}
-        <tr>
-          <td>N/A</td>
-          {% comment %} <td>N/A</td> {% endcomment %}
-          <td>N/A</td>
-          <td>N/A</td>
-          {% comment %} <td>N/A</td> {% endcomment %}
-          <td>N/A</td>
-          <td>N/A</td>
-          <td>N/A</td>
-          <td>N/A</td>
-          <td>N/A</td>
-        </tr>
-      {% endfor %}
-    </table>
+<div class="book-detail-page">
+  <div class="breadcrumb">
+    <a href="{% url 'accounting:index' %}"><i class="fas fa-book"></i> Books</a>
+    <span>/</span>
+    <a href="{% url 'accounting:book_detail' book.pk %}">{{ book.name }}</a>
+    <span>/</span>
+    <span class="current">Transactions</span>
   </div>
+
+  <style>
+    .tx-count {
+      margin-left: auto; font-size: .74rem; font-weight: 600; color: #6B7A8D;
+      background: #EEF2F6; padding: .15rem .55rem; border-radius: 999px;
+    }
+    .tx-when { white-space: nowrap; }
+    .tx-when .t { display: block; font-size: .76rem; color: #8A96A6; }
+    .tx-kind {
+      display: inline-block; font-size: .74rem; font-weight: 600;
+      padding: .15rem .55rem; border-radius: 999px;
+      background: #EEF2F6; color: #46546A; text-transform: capitalize;
+    }
+    .tx-in  { color: #1B7A4B; font-weight: 600; }
+    .tx-out { color: #9C2C1B; font-weight: 600; }
+    .tx-muted { color: #8A96A6; }
+    .tx-pager {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; padding: .9rem 0 0; font-size: .86rem; color: #6B7A8D;
+    }
+    .tx-pager a {
+      border: 1px solid #D7DFE8; border-radius: 8px; background: #fff;
+      padding: .4rem .85rem; color: #46546A; text-decoration: none;
+    }
+    .tx-pager a:hover { border-color: #B9C6D4; }
+    .tx-pager .spacer { flex: 1; }
+  </style>
+
+  <div class="financial-overview-card">
+    <div class="card-header-title">
+      <i class="fas fa-list blue-icon"></i> Transactions
+      <span class="tx-count">{{ paginator.count }} entr{{ paginator.count|pluralize:"y,ies" }}</span>
+    </div>
+
+    {% if object_list %}
+    <table class="assets-table">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Source</th>
+          <th>Cash account</th>
+          <th class="num">Amount</th>
+          <th class="num">Account balance</th>
+          <th class="num">Book total ({{ base_currency_symbol }})</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in object_list %}
+        <tr>
+          <td class="tx-when">
+            {{ t.created_at|date:"d M Y" }}
+            <span class="t">{{ t.created_at|date:"H:i" }}</span>
+          </td>
+          <td><span class="tx-kind">{{ t.content_type.name|default:"—" }}</span></td>
+          <td>{{ t.cash_account.name }} <span class="tx-muted">{{ t.currency.code }}</span></td>
+          <td class="num {% if t.is_amount_positive %}tx-in{% else %}tx-out{% endif %}">
+            {% if t.is_amount_positive %}+{% else %}&minus;{% endif %}{{ t.currency.symbol }}{{ t.amount|format_money }}
+          </td>
+          <td class="num">{{ t.currency.symbol }}{{ t.cash_account_balance|format_money }}</td>
+          <td class="num tx-muted">{{ base_currency_symbol }}{{ t.total_base_currency_balance|format_money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if is_paginated %}
+    <div class="tx-pager">
+      {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}">&larr; Newer</a>
+      {% endif %}
+      <span class="spacer"></span>
+      <span>Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+      <span class="spacer"></span>
+      {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}">Older &rarr;</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="cash-accounts-empty">
+      No cash has moved on this book yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

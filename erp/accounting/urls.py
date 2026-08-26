@@ -4,8 +4,34 @@ from .views import *
 # from django.contrib.auth.decorators import login_required
 
 app_name = 'accounting'
+
+# Book-scoped actions reached from the sidebar. The menu is built from
+# erp/nav.py, which cannot pass a book id, so each of these resolves the
+# member's working book and forwards. Named `go_*` so a reader can tell at
+# a glance that the route is a redirect and not a page of its own.
+_working_book_routes = [
+    ("go_add_capital",      "accounting:add_equity_capital"),
+    ("go_add_revenue",      "accounting:add_equity_revenue"),
+    ("go_add_expense",      "accounting:add_equity_expense"),
+    ("go_pay_dividend",     "accounting:add_equity_divident"),
+    ("go_add_asset",        "accounting:add_fixed_asset"),
+    ("go_add_cash_account", "accounting:add_cash_account"),
+    ("go_transactions",     "accounting:cash_transaction_entry_list"),
+    ("go_expenses",         "accounting:equity_expense_list"),
+    ("go_transfer",         "accounting:make_in_transfer"),
+    ("go_currency_exchange", "accounting:make_currency_exchange"),
+    ("go_cap_table",        "accounting:book_shares"),
+    ("go_add_stakeholder",  "accounting:add_stakeholderbook"),
+]
+
 urlpatterns = [
     path("", index.as_view(),name="index"),
+    *[
+        path(f"go/{name.removeprefix('go_')}/",
+             WorkingBookRedirect.as_view(target=target),
+             name=name)
+        for name, target in _working_book_routes
+    ],
     # path('report_expense/', ExpenseView.as_view(), name='report_expense'),
     path('category_search/', CategorySearchView.as_view(), name='category_search'),
     path('sales/',SalesView.as_view(),name="sales_view"),

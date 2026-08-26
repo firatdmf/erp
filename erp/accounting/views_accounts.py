@@ -43,13 +43,16 @@ def _currencies():
 # Movement types we expose to the user in dropdowns. We deliberately
 # strip:
 # - legacy_ar / legacy_ap → internal migration markers, never user-picked
-# - payment              → consolidated under "collection"; cari.type
-#                          decides direction at save time, so the user
-#                          only ever sees ONE "Tahsilat" option
 # - check_in / check_out → handled by the dedicated Check/Note form
 #                          (Quick Actions → "Check / Note"), no point
 #                          duplicating them in the generic dropdown
-_HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "payment", "check_in", "check_out"}
+#
+# "collection" and "payment" are both offered: a supplier account picking
+# "Collection" is still normalised to "payment" at save time below (so a
+# habit formed before "payment" was exposed keeps working), but the user
+# can now pick "Payment" directly on any account — e.g. a refund paid out
+# to a customer.
+_HIDDEN_MOVEMENT_TYPES = {"legacy_ar", "legacy_ap", "check_in", "check_out"}
 
 def _user_movement_choices():
     return [(v, l) for v, l in CariMovement.MOVEMENT_TYPES if v not in _HIDDEN_MOVEMENT_TYPES]
@@ -457,6 +460,56 @@ def _row_description(mv, linked_payment=None, linked_invoice=None, is_cancel_row
     return (mv.description or "").strip()
 
 
+def _cancelled_movement_q():
+    """Ledger rows that belong to a cancelled payment, invoice or check.
+
+    Both shapes are historical. Payment.cancel(), Invoice.cancel() and
+    CheckOrPromissoryNote.cancel() all delete the posted rows outright
+    now, so a cancellation made from here on leaves no ledger trace at
+    all — but the database still holds pairs from before that:
+
+      (a) the CANCEL counter-adjustment Payment.cancel() used to post,
+          matched by its source FK plus the CANCEL prefix, and
+      (b) the original row of a document cancelled back then, linked
+          either by source FK or by the posted_movement reverse
+          OneToOne (movements added by hand and mirrored into a Payment
+          only ever had the reverse leg — without it, cancelled manual
+          collections leaked into Girişler).
+
+    Excluding both halves is safe for a running balance: they sum to
+    zero.
+    """
+    from django.contrib.contenttypes.models import ContentType
+    from .models_accounts import CheckOrPromissoryNote
+
+    pay_ct = ContentType.objects.get_for_model(Payment)
+    inv_ct = ContentType.objects.get_for_model(Invoice)
+    chk_ct = ContentType.objects.get_for_model(CheckOrPromissoryNote)
+    counter_q = (
+        Q(movement_type="adjustment")
+        & Q(source_type__in=[pay_ct, inv_ct, chk_ct])
+        & Q(source_id__isnull=False)
+        & (Q(reference__startswith="CANCEL") | Q(description__startswith="CANCEL"))
+    )
+    cancelled_pay_ids = list(
+        Payment.objects.filter(status="cancelled").values_list("pk", flat=True))
+    cancelled_inv_ids = list(
+        Invoice.objects.filter(status="cancelled").values_list("pk", flat=True))
+    cancelled_chk_ids = list(
+        CheckOrPromissoryNote.objects.filter(status="cancelled")
+        .values_list("pk", flat=True))
+    original_q = (
+        (Q(source_type=pay_ct) & Q(source_id__in=cancelled_pay_ids))
+        | (Q(source_type=inv_ct) & Q(source_id__in=cancelled_inv_ids))
+        | (Q(source_type=chk_ct) & Q(source_id__in=cancelled_chk_ids))
+        | Q(payment__status="cancelled")
+        | Q(invoice__status="cancelled")
+        | Q(check_initial__status="cancelled")
+        | Q(check_endorsement__status="cancelled")
+    )
+    return counter_q | original_q
+
+
 def _attach_links(rows):
     """Annotate each {'mv': ..., 'balance_after': ...} row with the
     Payment/Invoice it relates to and whether it is the cancellation
@@ -563,10 +616,12 @@ class CariDetail(View):
                                                "contact", "company", "supplier"),
             pk=pk,
         )
+        # A few more than the 20 shown, because cancelled pairs are
+        # dropped below and would otherwise shorten the list.
         recent_movements = (
             cari.movements
             .select_related("currency", "created_by__user")
-            .order_by("-date", "-id")[:20]
+            .order_by("-date", "-id")[:30]
         )
         movements_with_balance = []
         # cached_balance is a base-currency (USD) figure, so the walk back
@@ -576,6 +631,19 @@ class CariDetail(View):
         for mv in recent_movements:
             movements_with_balance.append({"mv": mv, "balance_after": running})
             running -= mv.amount_base
+        # Old cancel pairs read as the same collection listed twice, one
+        # of the halves looking live. The statement has always hidden
+        # them; hide them here too. Dropping AFTER the walk keeps every
+        # surviving row's balance the one it actually had, and a pair
+        # sums to zero so nothing downstream shifts.
+        cancelled_ids = set(
+            cari.movements.filter(_cancelled_movement_q())
+            .values_list("pk", flat=True)
+        )
+        movements_with_balance = [
+            r for r in movements_with_balance
+            if r["mv"].pk not in cancelled_ids
+        ][:20]
         _attach_links(movements_with_balance)
 
         recent_invoices = cari.invoices.select_related("currency").order_by("-date", "-id")[:10]
@@ -607,8 +675,6 @@ class CariStatement(View):
     template_name = "accounts/cari_statement.html"
 
     def get(self, request, pk):
-        from django.contrib.contenttypes.models import ContentType
-
         cari = get_object_or_404(CariAccount, pk=pk)
 
         # ── Filters from query string ──────────────────────────────
@@ -617,38 +683,10 @@ class CariStatement(View):
         direction = (request.GET.get("direction") or "").strip()   # in / out
         status_f  = (request.GET.get("status") or "").strip()      # cancelled
 
-        # Cancellation predicate — match BOTH halves of each cancel pair:
-        #   (a) the counter-CANCEL adjustment row (source FK + CANCEL
-        #       prefix in description/reference)
-        #   (b) the ORIGINAL payment/invoice row, whichever way it's
-        #       linked. Two link paths exist for historical reasons:
-        #       - source_type/source_id FK (set by Payment.confirm)
-        #       - posted_movement OneToOne reverse (`mv.payment` /
-        #         `mv.invoice`) — present even when the source FK was
-        #         never populated (e.g. movements added via the
-        #         "Add Movement" form that the signal then mirrored
-        #         into a Payment).
-        # Without the reverse-FK leg, cancelled collections added via
-        # the manual form leak into Girişler.
-        pay_ct = ContentType.objects.get_for_model(Payment)
-        inv_ct = ContentType.objects.get_for_model(Invoice)
-        cancel_counter_q = (
-            Q(movement_type="adjustment")
-            & Q(source_type__in=[pay_ct, inv_ct])
-            & Q(source_id__isnull=False)
-            & (Q(reference__startswith="CANCEL") | Q(description__startswith="CANCEL"))
-        )
-        cancelled_pay_ids = list(Payment.objects.filter(status="cancelled").values_list("pk", flat=True))
-        cancelled_inv_ids = list(Invoice.objects.filter(status="cancelled").values_list("pk", flat=True))
-        cancelled_original_q = (
-            # explicit FK side
-            (Q(source_type=pay_ct) & Q(source_id__in=cancelled_pay_ids))
-            | (Q(source_type=inv_ct) & Q(source_id__in=cancelled_inv_ids))
-            # reverse OneToOne side
-            | Q(payment__status="cancelled")
-            | Q(invoice__status="cancelled")
-        )
-        all_cancel_q = cancel_counter_q | cancelled_original_q
+        # Both halves of any pre-existing cancel pair — see
+        # _cancelled_movement_q. Cancelling now deletes the row instead,
+        # so this only filters history.
+        all_cancel_q = _cancelled_movement_q()
 
         # Base queryset — date range first so the prior-balance
         # calculation stays correct.

@@ -773,13 +773,16 @@
   // Search filter (filters only the All Orders pane rows)
   const input = document.getElementById('ord-search-input');
   if (input) {
+    // Both sides go through foldText (erp/js/text_fold.js) so Turkish
+    // letters match their plain counterparts — "sise" finds "Şişe".
+    const fold = (s) => (window.foldText ? window.foldText(s) : String(s || '').toLowerCase());
     input.addEventListener('input', (e) => {
-      const q = e.target.value.toLowerCase().trim();
+      const q = fold(e.target.value).trim();
       const activePane = document.querySelector('.ord-list-wrap.active');
       if (!activePane) return;
       let visible = 0;
       activePane.querySelectorAll('.ord-row').forEach(row => {
-        const txt = (row.dataset.search || row.textContent).toLowerCase();
+        const txt = fold(row.dataset.search || row.textContent);
         const show = !q || txt.includes(q);
         row.style.display = show ? '' : 'none';
         if (show) visible++;

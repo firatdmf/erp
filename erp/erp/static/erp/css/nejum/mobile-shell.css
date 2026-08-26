@@ -415,6 +415,18 @@
     color: #9AA5AF;
   }
 
+  /* The desktop flyout's group headings, carried over so both menus
+     show the same structure (see erp/nav.py). Lighter than a section
+     title — it divides within a section, it doesn't open one. */
+  .m-drawer-group-title {
+    padding: 10px 10px 2px;
+    font: 700 9.5px 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #B4BDC5;
+  }
+  .m-drawer-section-title + .m-drawer-group-title { padding-top: 2px; }
+
   .m-drawer-item {
     display: flex; align-items: center; gap: 13px;
     padding: 10px 12px;
@@ -617,6 +629,7 @@
   }
   [data-theme="dark"] .m-drawer-search::placeholder { color: #6B7680; }
   [data-theme="dark"] .m-drawer-section-title { color: #6B7680; }
+  [data-theme="dark"] .m-drawer-group-title { color: #58616B; }
   [data-theme="dark"] .m-drawer-section + .m-drawer-section { border-top-color: #232930; }
   [data-theme="dark"] .m-drawer-item { color: #F1F5F8; }
   [data-theme="dark"] .m-drawer-item.is-active {

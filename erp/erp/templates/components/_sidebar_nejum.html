@@ -1,10 +1,13 @@
 {% load i18n %}
+{% load erp_tags %}
 {% comment %}
   Nejum-exact sidebar partial. Loaded from base.html only when
   ui_theme == "nejum". Uses Nejum's <aside class="sidebar"> structure
-  + Lucide icons + CSS-driven hover flyouts. All Django URLs and
-  legacy onclick handlers (openTaskSidebar, openOrderSidebar, etc.)
-  are preserved verbatim from the old sidebar.
+  + Lucide icons + CSS-driven hover flyouts.
+
+  The entries themselves live in erp/nav.py and are shared with the
+  mobile drawer (components/_mobile_shell.html) — add a menu item
+  there, not here.
 {% endcomment %}
 
 <aside class="nj-sidebar">
@@ -13,427 +16,51 @@
     <span class="nj-pulse"></span>
   </a>
 
-  {# ============ ADD (+) ============ #}
-  <div class="nj-nav-item nj-add" data-flyout="add">
-    <i data-lucide="plus"></i>
-    <span class="nj-label">{% trans "Add" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="plus-circle"></i></span>
-        <span class="nj-fly-title">{% trans "Add new record" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "ADD SINGLE RECORD" %}</div>
-          <a class="nj-fly-item" href="#" onclick="openMainContactSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="user"></i></span>
-            <span class="nj-fi-label">{% trans "Contact" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openCompanySidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="building-2"></i></span>
-            <span class="nj-fi-label">{% trans "Company" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openTaskSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="check-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Task" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'marketing:product_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="tag"></i></span>
-            <span class="nj-fi-label">{% trans "Product" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openOrderSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="shopping-cart"></i></span>
-            <span class="nj-fi-label">{% trans "Order" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'marketing:blog_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="book-open"></i></span>
-            <span class="nj-fi-label">{% trans "Blog post" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openAddSupplierSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="truck"></i></span>
-            <span class="nj-fi-label">{% trans "Supplier" %}</span>
-          </a>
+  {% comment %}
+    Every entry comes from erp/nav.py — the SAME list the mobile drawer
+    renders, so the two menus cannot drift apart again. A section with
+    `groups` is a hover flyout; one without is a plain tile. `key`
+    becomes data-flyout, which shell.css targets by name.
+  {% endcomment %}
+  {% nav_sections as sections %}
+  {% for s in sections %}
+    {% if s.groups %}
+      <div class="nj-nav-item{% if s.key == 'add' %} nj-add{% endif %}" data-flyout="{{ s.key }}">
+        <i data-lucide="{{ s.icon }}"></i>
+        <span class="nj-label">{{ s.label }}</span>
+        <i data-lucide="chevron-right" class="nj-chev"></i>
+        <div class="nj-flyout">
+          <div class="nj-fly-arrow"></div>
+          <div class="nj-fly-head">
+            <span class="nj-fly-icon"><i data-lucide="{{ s.title_icon|default:s.icon }}"></i></span>
+            <span class="nj-fly-title">{{ s.title|default:s.label }}</span>
+          </div>
+          <div class="nj-fly-body">
+            {% for g in s.groups %}
+              <div class="nj-fly-group">
+                {% if g.title %}<div class="nj-fly-group-title">{{ g.title }}</div>{% endif %}
+                {% for it in g.items %}
+                  <a class="nj-fly-item"
+                     {% if it.action %}href="#" onclick="{{ it.action }}(); return false;"
+                     {% elif it.url %}href="{% url it.url %}{{ it.query|default:'' }}"
+                     {% else %}href="{{ it.href }}"{% endif %}>
+                    <span class="nj-fi-icon"><i data-lucide="{{ it.icon }}"></i></span>
+                    <span class="nj-fi-label">{% if it.emoji %}{{ it.emoji }} {% endif %}{{ it.label }}</span>
+                  </a>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-
-  {# ============ DASHBOARD ============ #}
-  <a class="nj-nav-item {% if request.path == '/' %}active{% endif %}" href="{% url 'index' %}">
-    <i data-lucide="layout-grid"></i>
-    <span class="nj-label">{% trans "Dashboard" %}</span>
-  </a>
-
-  {# ============ MY TEAM ============ #}
-  <div class="nj-nav-item" data-flyout="team">
-    <i data-lucide="users"></i>
-    <span class="nj-label">{% trans "My Team" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="users"></i></span>
-        <span class="nj-fly-title">{% trans "My Team" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "TEAM MANAGEMENT" %}</div>
-          <a class="nj-fly-item" href="{% url 'team:team_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
-            <span class="nj-fi-label">{% trans "Team members" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'team:team_tasks' %}">
-            <span class="nj-fi-icon"><i data-lucide="list-checks"></i></span>
-            <span class="nj-fi-label">{% trans "Assign task" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'team:team_messages' %}">
-            <span class="nj-fi-icon"><i data-lucide="message-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Messages" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'team:team_roles' %}">
-            <span class="nj-fi-icon"><i data-lucide="shield"></i></span>
-            <span class="nj-fi-label">{% trans "Manage roles" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'team:team_meetings' %}">
-            <span class="nj-fi-icon"><i data-lucide="video"></i></span>
-            <span class="nj-fi-label">{% trans "Schedule meeting" %}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ============ ACCOUNTING ============ #}
-  <div class="nj-nav-item" data-flyout="accounting">
-    <i data-lucide="calculator"></i>
-    <span class="nj-label">{% trans "Accounting" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="calculator"></i></span>
-        <span class="nj-fly-title">{% trans "Accounting" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "LEDGERS" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounting:index' %}">
-            <span class="nj-fi-icon"><i data-lucide="book"></i></span>
-            <span class="nj-fi-label">{% trans "View ledgers" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openBookSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Create ledger" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "REPORTS" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounting:sales_dashboard' %}">
-            <span class="nj-fi-icon"><i data-lucide="bar-chart-3"></i></span>
-            <span class="nj-fi-label">{% trans "Sales dashboard" %}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ============ CURRENT ACCOUNT ============ #}
-  <div class="nj-nav-item" data-flyout="cari">
-    <i data-lucide="contact"></i>
-    <span class="nj-label">{% trans "Accounts" context "sidebar" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="contact"></i></span>
-        <span class="nj-fly-title">{% trans "Current Account" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "ACCOUNTS" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounts:list' %}">
-            <span class="nj-fi-icon"><i data-lucide="id-card"></i></span>
-            <span class="nj-fi-label">{% trans "All Accounts" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:create' %}">
-            <span class="nj-fi-icon"><i data-lucide="user-plus"></i></span>
-            <span class="nj-fi-label">{% trans "New Account" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "INVOICES" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounts:invoice_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="file-text"></i></span>
-            <span class="nj-fi-label">{% trans "All Invoices" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:invoice_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="file-plus"></i></span>
-            <span class="nj-fi-label">{% trans "New Invoice" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "COLLECTION / PAYMENT" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounts:payment_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="wallet"></i></span>
-            <span class="nj-fi-label">{% trans "All Payments" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:payment_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="hand-coins"></i></span>
-            <span class="nj-fi-label">{% trans "New Collection / Payment" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "CHECK / PROMISSORY NOTE" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounts:check_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="scroll-text"></i></span>
-            <span class="nj-fi-label">{% trans "Portfolio" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:check_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "New Check / Note" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "REPORTS" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounts:report_index' %}">
-            <span class="nj-fi-icon"><i data-lucide="pie-chart"></i></span>
-            <span class="nj-fi-label">{% trans "Report Center" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:report_aging' %}">
-            <span class="nj-fi-icon"><i data-lucide="clock"></i></span>
-            <span class="nj-fi-label">{% trans "Aging" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:report_trial_balance' %}">
-            <span class="nj-fi-icon"><i data-lucide="layout-grid"></i></span>
-            <span class="nj-fi-label">{% trans "Trial Balance" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:report_due_calendar' %}">
-            <span class="nj-fi-icon"><i data-lucide="calendar-clock"></i></span>
-            <span class="nj-fi-label">{% trans "Due Calendar" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:report_credit_limit' %}">
-            <span class="nj-fi-icon"><i data-lucide="shield-alert"></i></span>
-            <span class="nj-fi-label">{% trans "Credit Limit" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "HELP" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounts:help' %}">
-            <span class="nj-fi-icon"><i data-lucide="book-open"></i></span>
-            <span class="nj-fi-label">📘 {% trans "User Guide" %}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ============ MARKETING ============ #}
-  <div class="nj-nav-item" data-flyout="marketing">
-    <i data-lucide="target"></i>
-    <span class="nj-label">{% trans "Marketing" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="target"></i></span>
-        <span class="nj-fly-title">{% trans "Marketing" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "PRODUCTS" %}</div>
-          <a class="nj-fly-item" href="{% url 'marketing:product_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Create product" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'marketing:product_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
-            <span class="nj-fi-label">{% trans "Product list" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'marketing:product_group_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="layers"></i></span>
-            <span class="nj-fi-label">{% trans "Product groups" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'marketing:product_group_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Add product group" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "CUSTOMERS" %}</div>
-          <a class="nj-fly-item" href="{% url 'crm:company_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="building-2"></i></span>
-            <span class="nj-fi-label">{% trans "Companies" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'crm:contact_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="users"></i></span>
-            <span class="nj-fi-label">{% trans "Contacts" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "BLOG" %}</div>
-          <a class="nj-fly-item" href="{% url 'marketing:blog_create' %}">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Create blog post" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'marketing:blog_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="book-open"></i></span>
-            <span class="nj-fi-label">{% trans "Blog list" %}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ============ OPERATIONS ============ #}
-  <div class="nj-nav-item" data-flyout="operations">
-    <i data-lucide="settings-2"></i>
-    <span class="nj-label">{% trans "Operations" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="settings-2"></i></span>
-        <span class="nj-fly-title">{% trans "Operations" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "QR ACTIONS" %}</div>
-          <a class="nj-fly-item" href="{% url 'operating:scan_order_item_unit' %}">
-            <span class="nj-fi-icon"><i data-lucide="qr-code"></i></span>
-            <span class="nj-fi-label">{% trans "QR scan" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'operating:scan_order_item_unit_pack' %}">
-            <span class="nj-fi-icon"><i data-lucide="package-2"></i></span>
-            <span class="nj-fi-label">{% trans "QR scan package" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "RAW MATERIAL" %}</div>
-          <a class="nj-fly-item" href="{% url 'operating:raw_material_good_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
-            <span class="nj-fi-label">{% trans "Raw material list" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openRawMaterialSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="box"></i></span>
-            <span class="nj-fi-label">{% trans "Create raw material" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openRawMaterialReceiptSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="file-text"></i></span>
-            <span class="nj-fi-label">{% trans "Raw material receipt" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openRawMaterialItemSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="plus-square"></i></span>
-            <span class="nj-fi-label">{% trans "Raw material item" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "ORDERS" %}</div>
-          <a class="nj-fly-item" href="#" onclick="openOrderSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Create order" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'operating:order_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="list"></i></span>
-            <span class="nj-fi-label">{% trans "Order list" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "WAREHOUSE" %}</div>
-          <a class="nj-fly-item" href="{% url 'operating:warehouse_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="warehouse"></i></span>
-            <span class="nj-fi-label">{% trans "My warehouses" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'operating:create_warehouse' %}">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Add warehouse" %}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ============ PROCUREMENT ============ #}
-  <div class="nj-nav-item" data-flyout="procurement">
-    <i data-lucide="shopping-basket"></i>
-    <span class="nj-label">{% trans "Procurement" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="shopping-basket"></i></span>
-        <span class="nj-fly-title">{% trans "Procurement" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "PURCHASING" %}</div>
-          <a class="nj-fly-item" href="{% url 'accounts:invoice_list' %}?type=purchase">
-            <span class="nj-fi-icon"><i data-lucide="package-plus"></i></span>
-            <span class="nj-fi-label">{% trans "Purchases" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'procurement:request_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="file-text"></i></span>
-            <span class="nj-fi-label">{% trans "Purchase requests" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'accounts:purchase_order_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="receipt"></i></span>
-            <span class="nj-fi-label">{% trans "Purchase orders" %}</span>
-          </a>
-        </div>
-        <div class="nj-fly-group">
-          <div class="nj-fly-group-title">{% trans "SUPPLIERS" %}</div>
-          <a class="nj-fly-item" href="{% url 'crm:supplier_list' %}">
-            <span class="nj-fi-icon"><i data-lucide="truck"></i></span>
-            <span class="nj-fi-label">{% trans "Supplier list" %}</span>
-          </a>
-          <a class="nj-fly-item" href="#" onclick="openAddSupplierSidebar(); return false;">
-            <span class="nj-fi-icon"><i data-lucide="plus-circle"></i></span>
-            <span class="nj-fi-label">{% trans "Add supplier" %}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ============ ANALYTICS ============ #}
-  <a class="nj-nav-item" href="{% url 'operating:order_analytics' %}">
-    <i data-lucide="line-chart"></i>
-    <span class="nj-label">{% trans "Analytics" %}</span>
-  </a>
-
-  {# ============ MAIL ============ #}
-  <div class="nj-nav-item" data-flyout="mail">
-    <i data-lucide="mail"></i>
-    <span class="nj-label">{% trans "Mail" %}</span>
-    <i data-lucide="chevron-right" class="nj-chev"></i>
-    <div class="nj-flyout">
-      <div class="nj-fly-arrow"></div>
-      <div class="nj-fly-head">
-        <span class="nj-fly-icon"><i data-lucide="mail"></i></span>
-        <span class="nj-fly-title">{% trans "Mail" %}</span>
-      </div>
-      <div class="nj-fly-body">
-        <div class="nj-fly-group">
-          <a class="nj-fly-item" href="{% url 'email_automation:dashboard' %}">
-            <span class="nj-fi-icon"><i data-lucide="gauge"></i></span>
-            <span class="nj-fi-label">{% trans "Email automation" %}</span>
-          </a>
-          <a class="nj-fly-item" href="{% url 'email_automation:my_emails' %}">
-            <span class="nj-fi-icon"><i data-lucide="inbox"></i></span>
-            <span class="nj-fi-label">{% trans "My emails" %}</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ============ NOTES ============ #}
-  <a class="nj-nav-item" href="{% url 'notes:index' %}">
-    <i data-lucide="sticky-note"></i>
-    <span class="nj-label">{% trans "Notes" %}</span>
-  </a>
-
+    {% else %}
+      {% url s.url as section_href %}
+      <a class="nj-nav-item{% if request.path == section_href %} active{% endif %}" href="{{ section_href }}">
+        <i data-lucide="{{ s.icon }}"></i>
+        <span class="nj-label">{{ s.label }}</span>
+      </a>
+    {% endif %}
+  {% endfor %}
 
 </aside>
 

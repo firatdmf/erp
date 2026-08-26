@@ -11,6 +11,7 @@ from django.views import View, generic
 from django.views.generic.edit import ModelFormMixin
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest, Http404
 from django.db import transaction
+from erp.search_utils import unaccent_icontains
 from django.db import models
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
@@ -122,8 +123,7 @@ class ProductList(generic.ListView):
 
         if search_query:
             queryset = queryset.filter(
-                models.Q(title__icontains=search_query) |
-                models.Q(sku__icontains=search_query)
+                unaccent_icontains(search_query, 'title', 'sku')
             )
 
         if category_id and category_id != 'all':
@@ -3289,9 +3289,7 @@ class BlogList(generic.ListView):
         
         if search_query:
             queryset = queryset.filter(
-                models.Q(title_tr__icontains=search_query) |
-                models.Q(title_en__icontains=search_query) |
-                models.Q(slug__icontains=search_query)
+                unaccent_icontains(search_query, 'title_tr', 'title_en', 'slug')
             )
         
         return queryset.order_by('-published_at')

@@ -4,6 +4,7 @@ from crm.models import Contact, Company
 from django.utils import timezone
 import datetime
 import calendar
+import re
 from django.conf import settings
 # from django.utils.timezone import make_aware
 import pytz
@@ -157,6 +158,19 @@ def dashboard_component(csrf_token,path,member):
     delegated_tasks_data = []
     completed_tasks_data = []
     if _theme == 'nejum' and member:
+        # Preview of the task's description for the card. Paragraph
+        # breaks the author typed are kept — the card renders with
+        # `white-space: pre-line` — but runs of spaces and blank lines
+        # are collapsed, and the whole thing is trimmed here so the
+        # JSON payload handed to the client stays small.
+        def _desc_preview(raw, limit=220):
+            text = '\n'.join(' '.join(line.split())
+                             for line in (raw or '').splitlines())
+            text = re.sub(r'\n{3,}', '\n\n', text).strip()
+            if len(text) > limit:
+                text = text[:limit - 1].rstrip() + '…'
+            return text
+
         try:
             qs = (
                 Task.objects
@@ -243,6 +257,7 @@ def dashboard_component(csrf_token,path,member):
                 payload = {
                     'id': t.id,
                     'name': t.name,
+                    'description': _desc_preview(t.description),
                     'priority': (t.priority or 'medium'),
                     'date_label': t.due_date.strftime('%d.%m.%Y'),
                     # ISO date string for client-side sorting/grouping
@@ -329,6 +344,7 @@ def dashboard_component(csrf_token,path,member):
                     completed_tasks_data.append({
                         'id': t.id,
                         'name': t.name,
+                        'description': _desc_preview(t.description),
                         'priority': (t.priority or 'medium'),
                         'date_label': t.due_date.strftime('%d.%m.%Y') if t.due_date else '',
                         'date_iso': t.due_date.isoformat() if t.due_date else '',
@@ -389,6 +405,7 @@ def dashboard_component(csrf_token,path,member):
                 _payload_d = {
                     'id': t.id,
                     'name': t.name,
+                    'description': _desc_preview(t.description),
                     'can_edit': _can_edit_d,
                     'can_delete': _can_delete_d,
                     'priority': (t.priority or 'medium'),
@@ -477,6 +494,7 @@ def dashboard_component(csrf_token,path,member):
                         tt_payload = {
                             'id': tt.id,
                             'name': tt.title,
+                            'description': _desc_preview(tt.description),
                             'priority': (tt.priority or 'medium'),
                             'date_label': tt_date.strftime('%d.%m.%Y'),
                             'date_iso': tt_date.isoformat(),
@@ -571,3 +589,16 @@ def test_component(csrf_token):
 @register.simple_tag
 def search_component(csrf_token):
     return render_to_string('components/search_component.html',{'context':"This is the test page context","csrf_token":csrf_token})
+
+
+@register.simple_tag
+def nav_sections(surface="desktop"):
+    """The shared main-navigation definition (see erp/nav.py).
+
+    `surface="mobile"` returns the drawer's arrangement of the same
+    sections — reordered for the phone's daily flow, with the link-only
+    sections gathered under one heading. The items are identical either
+    way; only the markup around them differs.
+    """
+    from erp.nav import NAV_SECTIONS, mobile_sections
+    return mobile_sections() if surface == "mobile" else NAV_SECTIONS

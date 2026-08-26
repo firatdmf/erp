@@ -5,6 +5,7 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views import View, generic
 from .models import Contact, Company, Note, CompanyFollowUp, Supplier
 from todo.models import Task
+from erp.search_utils import unaccent_icontains
 from .forms import ContactCreateForm, ContactUpdateForm, NoteForm, CompanyForm, SupplierForm
 from todo.forms import TaskForm
 from itertools import chain
@@ -59,12 +60,13 @@ class ContactList(generic.ListView):
         search_query = self.request.GET.get('search', '').strip()
         
         if search_query:
-            # Search in name, email array, phone array, and company name
+            # Name and company name fold Turkish letters (ş/s, ı/i/İ/I,
+            # ö/o, ç/c, ğ/g); email/phone are ArrayFields, which the
+            # unaccent lookup can't reach — and they hold no diacritics.
             queryset = queryset.filter(
-                Q(name__icontains=search_query) |
+                unaccent_icontains(search_query, 'name', 'company__name') |
                 Q(email__icontains=search_query) |
-                Q(phone__icontains=search_query) |
-                Q(company__name__icontains=search_query)
+                Q(phone__icontains=search_query)
             )
         
         return queryset
@@ -92,9 +94,9 @@ class CompanyList(generic.ListView):
         search_query = self.request.GET.get('search', '').strip()
         
         if search_query:
-            # Search in name, email array, phone array
+            # Name folds Turkish letters; email/phone are ArrayFields.
             queryset = queryset.filter(
-                Q(name__icontains=search_query) |
+                unaccent_icontains(search_query, 'name') |
                 Q(email__icontains=search_query) |
                 Q(phone__icontains=search_query)
             )
@@ -1091,7 +1093,7 @@ class delete_company_from_contact(View):
 
 def company_search(request):
     q = request.GET.get("company_name", "")
-    companies = Company.objects.filter(name__icontains=q) if q else []
+    companies = Company.objects.filter(unaccent_icontains(q, "name")) if q else []
     if companies:
         html = "<ul class='search-results-list'>"
         for company in companies:
@@ -1121,8 +1123,8 @@ def customer_autocomplete(request):
     query = request.GET.get("customer", "")
     if query == "":
         return HttpResponse("")
-    contacts = Contact.objects.filter(name__icontains=query)[:5]
-    companies = Company.objects.filter(name__icontains=query)[:5]
+    contacts = Contact.objects.filter(unaccent_icontains(query, "name"))[:5]
+    companies = Company.objects.filter(unaccent_icontains(query, "name"))[:5]
 
     parts = ["<ul class='customer-autocomplete-list'>"]
     for contact in contacts:
@@ -1373,11 +1375,12 @@ class SupplierList(generic.ListView):
         
         if search_query:
             queryset = queryset.filter(
-                Q(company_name__icontains=search_query) |
-                Q(contact_name__icontains=search_query) |
+                unaccent_icontains(
+                    search_query,
+                    'company_name', 'contact_name', 'country',
+                ) |
                 Q(email__icontains=search_query) |
-                Q(phone__icontains=search_query) |
-                Q(country__icontains=search_query)
+                Q(phone__icontains=search_query)
             )
         return queryset
 
@@ -1601,7 +1604,11 @@ def supplier_search_companies(request):
     q = (request.GET.get("q") or "").strip()
     if not q:
         return JsonResponse({"results": []})
-    qs = Company.objects.filter(name__icontains=q).order_by("name")[:12]
+    qs = (
+        Company.objects
+        .filter(unaccent_icontains(q, "name"))
+        .order_by("name")[:12]
+    )
     results = [
         {
             "id": c.pk,
@@ -1621,11 +1628,7 @@ def supplier_search_contacts(request):
         return JsonResponse({"results": []})
     qs = (
         Contact.objects.select_related("company")
-        .filter(
-            Q(name__icontains=q)
-            | Q(job_title__icontains=q)
-            | Q(company__name__icontains=q)
-        )
+        .filter(unaccent_icontains(q, "name", "job_title", "company__name"))
         .order_by("name")[:12]
     )
     results = []

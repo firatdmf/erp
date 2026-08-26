@@ -205,50 +205,56 @@ body > main {
   cursor: default;
 }
 /* ------------------------------------------------------------------------
-   Compact mode for the Cari (Current Account) flyout — it has 6 sections
-   so we tighten spacing globally inside this specific flyout to fit on
-   typical viewports without scroll.
+   Compact mode for the Accounting flyout. It absorbed the old top-level
+   Cari (Current Account) menu, so it now carries ten groups where that one
+   carried six — spacing is tightened globally inside this flyout, and the
+   body scrolls rather than running off the screen on a short viewport.
+   The compact rules were written for [data-flyout="cari"]; that section no
+   longer exists, so they moved here with it.
    ------------------------------------------------------------------------ */
-[data-flyout="cari"] > .nj-flyout {
+[data-flyout="accounting"] > .nj-flyout {
   padding: 8px 0 6px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fly-head {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-head {
   padding: 2px 16px 8px;
   margin-bottom: 4px;
   gap: 10px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fly-icon {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-icon {
   width: 32px;
   height: 32px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fly-title {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-title {
   font-size: 15px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fly-body {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-body {
   padding: 0 6px 4px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fly-group + .nj-fly-group {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-group + .nj-fly-group {
   margin-top: 2px;
   padding-top: 2px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fly-group-title {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-group-title {
   padding: 6px 10px 2px;
   font-size: 9.5px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fly-item {
+[data-flyout="accounting"] > .nj-flyout .nj-fly-item {
   padding: 5px 8px;
   gap: 10px;
   font-size: 13px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fi-icon {
+[data-flyout="accounting"] > .nj-flyout .nj-fi-icon {
   width: 22px;
   height: 22px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fi-icon svg {
+[data-flyout="accounting"] > .nj-flyout .nj-fi-icon svg {
   width: 12px;
   height: 12px;
 }
-[data-flyout="cari"] > .nj-flyout .nj-fi-label {
+[data-flyout="accounting"] > .nj-flyout .nj-fi-label {
   font-size: 13px;
 }
 .nj-nav-item.nj-open > .nj-flyout,

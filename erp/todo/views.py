@@ -3,6 +3,7 @@ from django.http import HttpResponse,HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django import forms
 from .models import Task
+from erp.search_utils import unaccent_icontains
 from django.http import HttpRequest
 from django.utils import timezone
 from django.template.loader import render_to_string
@@ -268,15 +269,14 @@ class TaskReport(View):
             'created_by__user'
         ).order_by('-priority', 'due_date')
         
-        # Apply search filter for My Tasks (OPTIMIZED - Türkçe karakter desteği ile)
+        # Apply search filter for My Tasks. unaccent_icontains folds
+        # Turkish letters on both sides (ş/s, ı/i/İ/I, ö/o, ç/c, ğ/g).
         if search_query:
-            # Türkçe karakterler için upper() kullan (İ/i problemi için)
-            search_upper = search_query.upper()
             my_tasks_query = my_tasks_query.filter(
-                Q(name__icontains=search_query) |
-                Q(description__icontains=search_query) |
-                Q(contact__name__icontains=search_query) |
-                Q(company__name__icontains=search_query)
+                unaccent_icontains(
+                    search_query,
+                    'name', 'description', 'contact__name', 'company__name',
+                )
             )
         
         print(f"My tasks count: {my_tasks_query.count()}")
@@ -298,17 +298,14 @@ class TaskReport(View):
             'created_by__user'
         ).order_by('-priority', 'due_date')
         
-        # Apply search filter for Assigned Tasks (OPTIMIZED - Türkçe karakter desteği ile)
+        # Apply search filter for Assigned Tasks
         if search_query:
-            # Türkçe karakterler için upper() kullan (İ/i problemi için)
-            search_upper = search_query.upper()
             assigned_tasks_query = assigned_tasks_query.filter(
-                Q(name__icontains=search_query) |
-                Q(description__icontains=search_query) |
-                Q(contact__name__icontains=search_query) |
-                Q(company__name__icontains=search_query) |
-                Q(member__user__first_name__icontains=search_query) |
-                Q(member__user__last_name__icontains=search_query)
+                unaccent_icontains(
+                    search_query,
+                    'name', 'description', 'contact__name', 'company__name',
+                    'member__user__first_name', 'member__user__last_name',
+                )
             )
         
         print(f"Assigned tasks count: {assigned_tasks_query.count()}")
@@ -328,12 +325,11 @@ class TaskReport(View):
         # Apply search filter for Future Tasks
         if search_query:
             future_tasks_query = future_tasks_query.filter(
-                Q(name__icontains=search_query) |
-                Q(description__icontains=search_query) |
-                Q(contact__name__icontains=search_query) |
-                Q(company__name__icontains=search_query) |
-                Q(member__user__first_name__icontains=search_query) |
-                Q(member__user__last_name__icontains=search_query)
+                unaccent_icontains(
+                    search_query,
+                    'name', 'description', 'contact__name', 'company__name',
+                    'member__user__first_name', 'member__user__last_name',
+                )
             )
         
         print(f"Future tasks count: {future_tasks_query.count()}")
@@ -557,8 +553,12 @@ def search_contacts_and_companies(request):
     search_query = request.GET.get("search_query", "")
 
     # Query the database for contacts and companies with matching names
-    matching_contacts = Contact.objects.filter(name__icontains=search_query)
-    matching_companies = Company.objects.filter(name__icontains=search_query)
+    matching_contacts = Contact.objects.filter(
+        unaccent_icontains(search_query, 'name')
+    )
+    matching_companies = Company.objects.filter(
+        unaccent_icontains(search_query, 'name')
+    )
 
     # Serialize the suggestions as JSON
     # suggestions = list(matching_contacts.values_list('name', flat=True)) + list(matching_companies.values_list('name', flat=True))

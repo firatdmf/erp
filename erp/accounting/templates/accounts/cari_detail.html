@@ -263,7 +263,8 @@
           </div>
           <div style="display:flex; gap:8px; flex-wrap: wrap;">
             <a class="cd-btn primary" href="{% url 'accounts:invoice_create' %}?account={{ cari.pk }}"><i data-lucide="file-plus"></i>{% trans "Issue Invoice" %}</a>
-            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' %}?account={{ cari.pk }}"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FFFAF0, #FFFFFF); border-color: #FED7AA; color: #B27500;" href="{% url 'accounts:payment_create' %}?account={{ cari.pk }}&type=collection"><i data-lucide="wallet"></i>{% trans "Take Payment" %}</a>
+            <a class="cd-btn ghost" style="background: linear-gradient(180deg, #FEF2F2, #FFFFFF); border-color: #FECACA; color: #B91C1C;" href="{% url 'accounts:payment_create' %}?account={{ cari.pk }}&type=payment"><i data-lucide="banknote"></i>{% trans "Make Payment" %}</a>
             <a class="cd-btn ghost" style="background: linear-gradient(180deg, #F5F3FF, #FFFFFF); border-color: #DDD6FE; color: #7E22CE;" href="{% url 'accounts:check_create' %}?account={{ cari.pk }}"><i data-lucide="scroll-text"></i>{% trans "Check / Note" %}</a>
             <a class="cd-btn ghost" href="{% url 'accounts:movement_create' cari.pk %}"><i data-lucide="plus-circle"></i>{% trans "Add Movement" %}</a>
           </div>

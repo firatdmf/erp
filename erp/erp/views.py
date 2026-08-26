@@ -9,6 +9,7 @@ from crm.models import Contact, Company
 from itertools import chain
 from operator import attrgetter
 from django.db.models import Value, CharField
+from .search_utils import unaccent_icontains
 
 # from django.contrib.auth.decorators import login_required
 # from django.utils.decorators import method_decorator
@@ -314,7 +315,7 @@ class GlobalSearch(View):
                 email_text=Cast('email', TextField()),
                 phone_text=Cast('phone', TextField())
             ).filter(
-                Q(name__icontains=query) |
+                unaccent_icontains(query, 'name') |
                 Q(email_text__icontains=query) |
                 Q(phone_text__icontains=query)
             )[:limit]
@@ -339,7 +340,7 @@ class GlobalSearch(View):
                 email_text=Cast('email', TextField()),
                 phone_text=Cast('phone', TextField())
             ).filter(
-                Q(name__icontains=query) |
+                unaccent_icontains(query, 'name') |
                 Q(email_text__icontains=query) |
                 Q(phone_text__icontains=query)
             )[:limit]
@@ -361,7 +362,7 @@ class GlobalSearch(View):
             from marketing.models import Product
             products = (
                 Product.objects
-                .filter(Q(title__icontains=query) | Q(sku__icontains=query))
+                .filter(unaccent_icontains(query, 'title', 'sku'))
                 .select_related('primary_image')[:limit]
             )
             for p in products:
@@ -390,7 +391,9 @@ class GlobalSearch(View):
         # Let's include in 'all' or if we add a 'search-tasks' tab. 
         # For now 'all' only unless user asks.
         if search_type == 'all':
-            tasks = Task.objects.filter(name__icontains=query)[:5]
+            tasks = Task.objects.filter(
+                unaccent_icontains(query, 'name', 'description')
+            )[:5]
             for t in tasks:
                 try:
                     url = reverse('todo:task_detail', args=[t.id])
@@ -407,7 +410,7 @@ class GlobalSearch(View):
         # 5. Orders
         if search_type in ['all', 'orders']:
             from operating.models import Order
-            order_filter = Q(order_number__icontains=query)
+            order_filter = unaccent_icontains(query, 'order_number')
             # Only add id filter if query is numeric
             if query.isdigit():
                 order_filter |= Q(id=int(query))

@@ -236,6 +236,12 @@ class PaymentCreate(View):
         if prefilled_cari:
             cash_qs = cash_qs.filter(book=prefilled_cari.book)
 
+        # "Take Payment" / "Make Payment" land here with ?type= so the
+        # form opens on the right side without the user re-picking it.
+        initial_type = request.GET.get("type")
+        if initial_type not in dict(Payment.PAYMENT_TYPES):
+            initial_type = "collection"
+
         return render(request, self.template_name, {
             "payment": None,
             "prefilled_cari": prefilled_cari,
@@ -244,6 +250,7 @@ class PaymentCreate(View):
             "currencies": CurrencyCategory.objects.all().order_by("code"),
             "type_choices":   Payment.PAYMENT_TYPES,
             "method_choices": Payment.METHOD_CHOICES,
+            "initial_type":   initial_type,
             "open_invoices_json": json.dumps(_serialize_invoices(open_invoices), default=str),
         })
 

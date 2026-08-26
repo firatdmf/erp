@@ -156,6 +156,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
+    # Registers the `__unaccent` lookup used by erp/search_utils.py.
+    "django.contrib.postgres",
     "corsheaders",  # CORS support for Next.js frontend
     "erp",
     "todo",

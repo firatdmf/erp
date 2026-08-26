@@ -69,5 +69,36 @@
 </div>
 {% block js %}
 <script src="{% static 'operating/js/create_edit_order.js' %}"></script>
+<script>
+  // The results list is filled by htmx and used to stay up until the input was
+  // cleared — click away, switch fields, it followed you around. Closing on an
+  // outside click (rather than on blur) can't race with picking a row.
+  (function () {
+    function wire(inputId, resultsId) {
+      const input = document.getElementById(inputId);
+      const results = document.getElementById(resultsId);
+      if (!input || !results || results.dataset.dismissWired) return;
+      results.dataset.dismissWired = '1';
+      // CAPTURE phase: the New Order sidebar's panel stops click propagation
+      // (base.html: onclick="event.stopPropagation()"), so a bubble-phase
+      // listener on document never sees clicks inside it — which is most of
+      // the places you'd click to dismiss this.
+      document.addEventListener('click', function (e) {
+        if (e.target === input || results.contains(e.target)) return;
+        results.innerHTML = '';
+      }, true);
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { results.innerHTML = ''; input.blur(); }
+      });
+    }
+    wire('product-input', 'product-search-results');
+    wire('od-add-product-input', 'od-add-product-results');
+    document.body.addEventListener('htmx:afterSwap', function () {
+      wire('product-input', 'product-search-results');
+      wire('od-add-product-input', 'od-add-product-results');
+    });
+  })();
+</script>
+
 {% endblock %}
 {% endblock %}

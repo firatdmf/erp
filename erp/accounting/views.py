@@ -443,6 +443,65 @@ class SetMyWorkingBook(generic.detail.SingleObjectMixin, generic.View):
 
 
 @method_decorator(login_required, name="dispatch")
+class WorkingBookRedirect(generic.RedirectView):
+    """Send a book-scoped view the member's working book.
+
+    The sidebar is built from erp/nav.py, a module-level list with no
+    request behind it, so `{% url it.url %}` can take no arguments. Every
+    action moved off the book page needs a book id, so the menu points
+    here instead and the book is resolved per request from
+    Member.default_book — the same "working book" the book page's own
+    toggle sets.
+
+    A member who has not picked one lands on the ledger index rather than
+    a 404 or somebody else's book: choosing the book is the step they are
+    missing, so send them where that choice is made.
+    """
+    permanent = False
+    target = None
+
+    def get_redirect_url(self, *args, **kwargs):
+        member = getattr(self.request.user, "member", None)
+        book = getattr(member, "default_book", None)
+        if not book:
+            return reverse("accounting:index")
+        return reverse(self.target, args=[book.pk])
+
+
+def _sum_in_base(model, book, field):
+    """Total `field` across a book's rows, each converted at its own rate.
+
+    These tables carry a currency FK per row, so a plain Sum() adds TRY to
+    USD and returns a number that is not money — the same trap
+    CariMovement.amount_base exists to avoid. Book 2's three capital rows
+    are one USD, one EUR and one TRY, so the naive total was wrong by
+    whatever the non-USD pair happened to be worth.
+
+    A row whose currency has no published rate is skipped rather than
+    guessed at, and the caller shows the equation as unbalanced — which is
+    the truthful outcome, since the money really is unaccounted for.
+    """
+    from .services import get_exchange_rate
+
+    base = get_base_currency()
+    total = Decimal("0.00")
+
+    for row in model.objects.filter(book=book).select_related("currency"):
+        amount = getattr(row, field) or Decimal("0.00")
+        if not amount:
+            continue
+        if row.currency_id == base.pk:
+            total += Decimal(amount)
+            continue
+        rate = get_exchange_rate(row.currency.code, base.code)
+        if not rate:
+            continue
+        total += (Decimal(amount) * Decimal(rate)).quantize(Decimal("0.01"))
+
+    return total
+
+
+@method_decorator(login_required, name="dispatch")
 class BookDetail(generic.DetailView):
     model = Book
     template_name = "accounting/book_detail.html"
@@ -477,6 +536,25 @@ class BookDetail(generic.DetailView):
             .order_by("currency__code", "name")
         )
 
+        # Who owes the book money and who it owes, read off the cari cards
+        # rather than the AR/AP mirror tables the block above still holds.
+        # Those mirrors are written per-movement by signals_accounts and
+        # skip the movement types _mirror_to_legacy has no side for, so the
+        # payable table lists ten rows against three hundred real ones.
+        # Showing them would contradict the equation directly above, which
+        # is built from the netted cached_balance.
+        cari_qs = CariAccount.objects.filter(book=book)
+        context["top_receivables"] = (
+            cari_qs.filter(cached_balance__gt=0)
+            .order_by("-cached_balance")[:10]
+        )
+        context["top_payables"] = (
+            cari_qs.filter(cached_balance__lt=0)
+            .order_by("cached_balance")[:10]
+        )
+        context["receivable_count"] = cari_qs.filter(cached_balance__gt=0).count()
+        context["payable_count"] = cari_qs.filter(cached_balance__lt=0).count()
+
         # Stakeholders, with the stake each one's shares actually buy.
         # Book.total_shares is the pool every holding is measured against
         # ("used to calculate stake of each owner based on their shares"),
@@ -501,7 +579,75 @@ class BookDetail(generic.DetailView):
         context["shares_pool"] = pool
         context["shares_issued"] = sum(sb.shares for sb in book.stakeholders.all())
 
+        context.update(self._accounting_equation(book))
+
         return context
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _accounting_equation(book):
+        """Assets = Liabilities + Equity, as far as the data supports it.
+
+        Receivables and payables are read off CariAccount.cached_balance,
+        NOT the AssetAccountsReceivable / LiabilityAccountsPayable tables.
+        Those two are append-only mirrors that signals_accounts writes on
+        every CariMovement, and _mirror_to_legacy silently skips the
+        movement types it has no side for — so the payable mirror holds ten
+        rows where the ledger has three hundred. Summing them reports a
+        position that is off by six figures. cached_balance is the netted
+        figure the rest of the app already trusts, and it reconciles to the
+        Excel export to the cent.
+
+        The equation will NOT balance, and that is a property of the data
+        rather than of this function. Equity here is only the four figures
+        somebody typed in — capital, revenue, expense, dividend. Nothing
+        posts a trading result to it, so accumulated profit has no home and
+        the difference lands in `imbalance` for the template to show. The
+        honest number is the one worth rendering; a plug that forced the
+        two sides to agree would hide exactly the thing worth seeing.
+        """
+        zero = Decimal("0.00")
+
+        try:
+            cash = get_total_base_currency_balance(book.pk)
+        except ValidationError:
+            # A currency with no exchange rate — report the cash we can
+            # convert rather than 500-ing the whole page.
+            cash = zero
+
+        cari = CariAccount.objects.filter(book=book).aggregate(
+            receivable=Sum("cached_balance", filter=Q(cached_balance__gt=0)),
+            payable=Sum("cached_balance", filter=Q(cached_balance__lt=0)),
+        )
+        receivable = cari["receivable"] or zero
+        payable = abs(cari["payable"] or zero)
+
+        fixed = _sum_in_base(AssetFixedAsset, book, "value")
+        capital = _sum_in_base(EquityCapital, book, "amount")
+        revenue = _sum_in_base(EquityRevenue, book, "amount")
+        expense = _sum_in_base(EquityExpense, book, "amount")
+        dividend = _sum_in_base(EquityDivident, book, "amount")
+
+        assets = cash + receivable + fixed
+        equity = capital + revenue - expense - dividend
+        liabilities = payable
+
+        return {
+            "eq_cash": cash,
+            "eq_receivable": receivable,
+            "eq_fixed": fixed,
+            "eq_assets": assets,
+            "eq_payable": payable,
+            "eq_liabilities": liabilities,
+            "eq_capital": capital,
+            "eq_revenue": revenue,
+            "eq_expense": expense,
+            "eq_dividend": dividend,
+            "eq_equity": equity,
+            "eq_right_side": liabilities + equity,
+            "eq_imbalance": assets - (liabilities + equity),
+            "eq_balanced": abs(assets - (liabilities + equity)) < Decimal("0.01"),
+        }
 
     def get_object(self):
         # Get the primary key from the URL
@@ -1224,14 +1370,27 @@ class CashTransactionEntryList(generic.ListView):
     model = CashTransactionEntry
     template_name = "accounting/cash_transaction_entry_list.html"
 
+    paginate_by = 50
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["base_currency_symbol"] = str(get_base_currency().symbol)
+        context["book"] = Book.objects.get(pk=self.kwargs.get("pk"))
         return context
 
     def get_queryset(self):
+        # Ordered here rather than by piping the page through
+        # |dictsortreversed in the template: that sorted only the rows the
+        # paginator had already chosen, so "newest first" was true within a
+        # page and false across the list. select_related keeps the row loop
+        # off a query per cash account, currency and content type.
         book_pk = self.kwargs.get("pk")
-        return CashTransactionEntry.objects.filter(book=book_pk)
+        return (
+            CashTransactionEntry.objects
+            .filter(book=book_pk)
+            .select_related("cash_account", "currency", "content_type")
+            .order_by("-created_at", "-pk")
+        )
 
 
 # @method_decorator(login_required, name='dispatch')
@@ -1376,6 +1535,20 @@ class MakeInTransfer(generic.edit.CreateView):
 class MakeCurrencyExchange(generic.edit.FormView):
     form_class = CurrencyExchangeForm
     template_name = "accounting/make_currency_exchange.html"
+
+    def get_context_data(self, **kwargs):
+        # The page needs the book itself for the breadcrumb, and the cash
+        # balances beside the form — picking which account to draw from is
+        # guesswork without them.
+        context = super().get_context_data(**kwargs)
+        book = Book.objects.get(pk=self.kwargs.get("pk"))
+        context["book"] = book
+        context["cash_accounts"] = (
+            CashAccount.objects.filter(book=book)
+            .select_related("currency")
+            .order_by("currency__code", "name")
+        )
+        return context
 
     def get_success_url(self) -> str:
         return reverse_lazy(

@@ -3302,10 +3302,22 @@ def product_autocomplete(request):
         .prefetch_related("catalog_variant__product_variant_attribute_values")
         .order_by("name")[:60]
     )
+    # What is actually SELLABLE, not what is on the shelf: metres already
+    # reserved into another order are spoken for, and offering them here is
+    # how a roll gets promised twice. One query for the whole result set.
+    from decimal import Decimal as _D
+    from .models import OrderRollReservation
+    reserved_by_wp = {}
+    for wp_id, meters in (OrderRollReservation.objects
+                          .filter(warehouse_product__in=[w.pk for w in wh_rows], consumed=False)
+                          .values_list("warehouse_product_id", "meters")):
+        reserved_by_wp[wp_id] = reserved_by_wp.get(wp_id, _D("0")) + (meters or _D("0"))
+
     wh_groups = {}          # variant_id -> {"wp": first wp, "stocks": [(wh, qty)]}
     for wp in wh_rows:
         g = wh_groups.setdefault(wp.catalog_variant_id, {"wp": wp, "stocks": []})
-        g["stocks"].append((wp.warehouse.name, wp.quantity or 0))
+        free = (wp.quantity or _D("0")) - reserved_by_wp.get(wp.pk, _D("0"))
+        g["stocks"].append((wp.warehouse.name, free))
     wh_variant_ids = set(wh_groups.keys())
 
     # ── 2) Catalog-only fallback (nothing already shown as warehouse) ─
@@ -3487,8 +3499,20 @@ def product_autocomplete(request):
     items = []
 
     # Warehouse rows first — shared products get picked FROM the warehouse.
-    for group in list(wh_groups.values())[:8]:
+    # The cap used to be 8 and cut silently, so searching "PETEK" showed
+    # seven colours of one fabric and hid the eighth with no sign anything
+    # was missing. A list this size is still comfortable to scan, and
+    # whatever doesn't fit now says so.
+    WH_ROWS = 20
+    wh_all = list(wh_groups.values())
+    for group in wh_all[:WH_ROWS]:
         items.append(render_wh_item(group))
+    if len(wh_all) > WH_ROWS:
+        items.append(
+            f"<li style='padding:7px 12px;font-size:11.5px;color:#6B7280;"
+            f"background:#F8FAFC;cursor:default;' onmousedown='event.preventDefault()'>"
+            f"+{len(wh_all) - WH_ROWS} more in the warehouse — type more to narrow it down</li>"
+        )
 
     # Catalog-only: skip every variant that lives in a warehouse (those
     # are the rows above); keep variant-less products and unlinked variants.

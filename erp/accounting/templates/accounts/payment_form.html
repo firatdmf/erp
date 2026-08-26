@@ -220,7 +220,7 @@
               <div class="pf-f">
                 <label>{% trans "Type" %}</label>
                 <select name="type" id="paymentType">
-                  {% for v,l in type_choices %}<option value="{{ v }}" {% if payment and payment.type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+                  {% for v,l in type_choices %}<option value="{{ v }}" {% if payment %}{% if payment.type == v %}selected{% endif %}{% elif v == initial_type %}selected{% endif %}>{{ l }}</option>{% endfor %}
                 </select>
               </div>
               <div class="pf-f">
@@ -534,7 +534,7 @@ if (window.lucide) lucide.createIcons();
         return { value: o.value, label: o.textContent.trim(), currency: o.dataset.currency };
       });
 
-    function sync() {
+    function sync(isInitial) {
       var wanted = currencySel.value;
       var previous = cashSel.value;
       var matches = all.filter(function (o) { return o.currency === wanted; });
@@ -550,18 +550,21 @@ if (window.lucide) lucide.createIcons();
 
       // Keep an existing choice when it still fits the currency; take the
       // only account when there is exactly one; leave it open otherwise
-      // rather than guessing between several.
+      // rather than guessing between several. The single-match guess only
+      // applies once the user actively changes currency — on the initial
+      // render it would override a payment that genuinely had no cash
+      // account selected.
       if (matches.some(function (o) { return o.value === previous; })) {
         cashSel.value = previous;
-      } else if (matches.length === 1) {
+      } else if (!isInitial && matches.length === 1) {
         cashSel.value = matches[0].value;
       } else {
         cashSel.value = '';
       }
     }
 
-    currencySel.addEventListener('change', sync);
-    sync();
+    currencySel.addEventListener('change', function () { sync(false); });
+    sync(true);
   })();
 </script>
 {% endblock %}

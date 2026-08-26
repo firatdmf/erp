@@ -1067,6 +1067,12 @@ class CashTransactionEntry(models.Model):
     )
 
     # ------------------- below are calculated automatically. -------------------------
+    # DEAD as of the move to derived running balances — nothing reads it.
+    # The transactions page works this out with a window function over the
+    # book (views.running_cash_balances), because a stored running balance
+    # is only true until something before it in the sequence changes, and a
+    # backdated or edited row changes plenty. Kept as a column so the change
+    # needed no migration; a follow-up should drop it and its sibling below.
     cash_account_balance = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
@@ -1075,6 +1081,7 @@ class CashTransactionEntry(models.Model):
     amount_in_base_currency = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
+    # DEAD — see cash_account_balance above.
     total_base_currency_balance = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
@@ -1108,75 +1115,34 @@ class CashTransactionEntry(models.Model):
         return (self.created_at or timezone.now()).date()
 
     def save(self, *args, **kwargs):
-        base_currency = get_base_currency()  # always get fresh
-
         if self.date is None:
             self.date = self.derive_date()
 
-        # set account balance if not provided
-        if self.cash_account_balance is None:
-            self.cash_account_balance = self.cash_account.balance
-
-        # normalize amount to base currency
-        if self.currency.code != base_currency.code:
-            from .services import get_exchange_rate
-
-            rate = get_exchange_rate(self.currency.code, base_currency.code)
-            if not rate:
-                raise ValidationError(
-                    {"currency_rate": "Currency rate failed to compute."}
-                )
-            self.amount_in_base_currency = (self.amount * rate).quantize(
-                Decimal("0.01")
-            )
-        else:
-            self.amount_in_base_currency = self.amount
-
-        # Running total of the book's cash, in base currency.
+        # What this amount was worth in base currency.
         #
-        # Read live off the cash accounts rather than chained off the
-        # previous row's stored total. Chaining drifts, because this table
-        # is not the only thing that moves cash: Payment.post() writes
-        # straight to CashAccount.balance with a raw F() UPDATE (see
-        # models_accounts.Payment) and records nothing here, so the chain
-        # never saw that money and kept counting from a stale figure. Book 2
-        # read $59.60 against a real $1,804.98 that way. Chaining was also
-        # wrong in the other direction: an AssetAccountsReceivable /
-        # LiabilityAccountsPayable row records what is owed and moves no
-        # cash, yet it shifted the running total anyway.
+        # Converted once, when the row is first written, and then left alone.
+        # It used to be re-derived on every save at whatever rate the API
+        # happened to return that minute, so merely re-saving a row — linking
+        # a cash account to an old payment, say — silently restated what a
+        # past transaction had been worth. A transaction's value in base
+        # currency is a fact about the day it happened, not about today.
         #
-        # Every caller updates CashAccount.balance before creating the
-        # entry, so the live total here is the book's real position at the
-        # moment this row is written — whatever moved it, and whether or not
-        # that something bothered to write an entry.
-        #
-        # Only stamped as the row is created. Re-saving an existing entry
-        # leaves the stored figure alone, so history is not rewritten to
-        # today's total (and services.update_cash_transaction_entry_total_
-        # base_currency_balance can still re-stamp a row deliberately).
-        if self._state.adding or self.total_base_currency_balance is None:
-            from .views import get_total_base_currency_balance
+        # Set it explicitly to None to have it reconverted on purpose (an
+        # edit that changes the amount does exactly that).
+        if self.amount_in_base_currency is None:
+            base_currency = get_base_currency()
+            if self.currency.code == base_currency.code:
+                self.amount_in_base_currency = self.amount
+            else:
+                from .services import get_exchange_rate
 
-            try:
-                self.total_base_currency_balance = get_total_base_currency_balance(
-                    book_pk=self.book_id
-                )
-            except ValidationError:
-                # A currency we hold has no rate right now. Recording the
-                # cash movement still has to succeed — falling back to the
-                # old chained arithmetic keeps the column approximately
-                # right, and the next entry saved with rates available
-                # re-anchors it to the live total.
-                prev_balance = (
-                    CashTransactionEntry.objects.filter(book=self.book)
-                    .order_by("-pk")
-                    .values_list("total_base_currency_balance", flat=True)
-                    .first()
-                ) or Decimal("0.00")
-                self.total_base_currency_balance = (
-                    prev_balance + self.amount_in_base_currency
-                    if self.is_amount_positive
-                    else prev_balance - self.amount_in_base_currency
+                rate = get_exchange_rate(self.currency.code, base_currency.code)
+                if not rate:
+                    raise ValidationError(
+                        {"currency_rate": "Currency rate failed to compute."}
+                    )
+                self.amount_in_base_currency = (self.amount * rate).quantize(
+                    Decimal("0.01")
                 )
 
         super().save(*args, **kwargs)

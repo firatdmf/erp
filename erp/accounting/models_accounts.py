@@ -1139,11 +1139,10 @@ class Payment(models.Model):
         entry.currency = self.currency
         entry.cash_account_id = self.cash_account_id
         entry.date = self.date
-        # Blanked so save() re-derives them from the accounts as they stand
-        # now; the figures the row was first written with describe a cash
-        # position that the edit has just changed.
-        entry.cash_account_balance = None
-        entry.total_base_currency_balance = None
+        # Reconverted on purpose: the amount or the currency may have just
+        # changed, so what the row is worth in base currency has to be
+        # worked out again rather than carried over from the old figures.
+        entry.amount_in_base_currency = None
         entry.save()
         return entry
 

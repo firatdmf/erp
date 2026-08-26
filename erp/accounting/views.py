@@ -22,7 +22,8 @@ from django.utils.translation import gettext as _g
 
 from django.http import JsonResponse
 from django.db.models import Q
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Window, Case, When, F, Value, DecimalField
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import timedelta
 import decimal
@@ -1365,10 +1366,10 @@ class EquityExpenseList(generic.ListView):
         )
 
 
-# The relations describe_cash_entry_source falls back to when a source has
-# no text of its own. Followed up front, because reaching them one row at a
-# time is how a 50-row page turns into 100 extra queries.
-DESCRIPTION_RELATIONS = ("cari", "member", "supplier")
+# The relations cash_entry_heading reads. Followed up front, because
+# reaching them one row at a time is how a 50-row page turns into 100
+# extra queries.
+DESCRIPTION_RELATIONS = ("cari", "member", "supplier", "category")
 
 
 def _source_queryset(model):
@@ -1382,18 +1383,76 @@ def _source_queryset(model):
     return queryset.select_related(*related) if related else queryset
 
 
-def cash_entry_party(obj):
-    """Who the money moved to or from, if the source names anyone.
+def running_cash_balances(book_pk):
+    """{entry pk: (account balance, book total)} across a book's whole ledger.
+
+    Worked out from the rows every time they are shown, rather than stamped
+    onto each row when it is written. A stored running total is only correct
+    until something upstream of it changes, and things upstream do change:
+    backdating a payment moves it into the middle of the sequence, editing an
+    amount alters every total after it, cancelling removes a row entirely.
+    Each of those left the stored figures describing a past that no longer
+    happened, and needed a repair command run afterwards to become true again.
+    Derived figures cannot go stale.
+
+    Both columns come from one query, as window functions over the book:
+    the account balance partitioned by cash account, the book total across
+    all of them.
+
+    The window has to see the whole book, so this cannot be folded into the
+    page's own queryset — a WHERE runs before the window, and filtering to
+    one cash account first would total only that account's rows and call the
+    result the book's. Hence a separate pass keyed by primary key.
+    """
+    signed_amount = Case(
+        When(is_amount_positive=True, then=Coalesce(F("amount"), Value(0))),
+        default=-Coalesce(F("amount"), Value(0)),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+    signed_base = Case(
+        When(
+            is_amount_positive=True,
+            then=Coalesce(F("amount_in_base_currency"), Value(0)),
+        ),
+        default=-Coalesce(F("amount_in_base_currency"), Value(0)),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+    # The order the money moved in, and the order the page shows: the date
+    # first, then when it was recorded, then the id so equal timestamps still
+    # have exactly one answer.
+    sequence = [F("date").asc(), F("created_at").asc(), F("pk").asc()]
+
+    rows = (
+        CashTransactionEntry.objects.filter(book=book_pk)
+        .annotate(
+            account_running=Window(
+                Sum(signed_amount),
+                partition_by=[F("cash_account_id")],
+                order_by=sequence,
+            ),
+            book_running=Window(Sum(signed_base), order_by=sequence),
+        )
+        .values_list("pk", "account_running", "book_running")
+    )
+    return {pk: (account, book) for pk, account, book in rows}
+
+
+def cash_entry_heading(obj):
+    """The line that identifies a cash row, above whatever was typed on it.
+
+    What identifies a row depends on what moved the money: a collection or
+    payment is identified by the account it was with, a capital deposit or
+    dividend by the member, an expense by its category. All three answer
+    "what is this", where the description answers "which one".
 
     Kept apart from the description rather than used as a fallback for it.
-    They are not alternatives: the counterparty is who a collection came
-    from, and the typed note is why. Folding them into one field meant
-    whichever was checked first hid the other, so a payment that had been
-    given a description stopped naming its account.
+    They are not alternatives, and folding them into one field meant
+    whichever was checked first hid the other — which is how a payment that
+    had been given a description stopped naming its account.
     """
     if obj is None:
         return ""
-    for field in ("cari", "member", "supplier"):
+    for field in ("cari", "member", "supplier", "category"):
         related = getattr(obj, field, None)
         if related is not None:
             return str(related)
@@ -1406,7 +1465,7 @@ def describe_cash_entry_source(obj, accounts=None):
     Whatever was typed when the row was entered. A source with no such
     field — a currency exchange has none — is described from what it is
     instead, because a blank column teaches the reader nothing. Who it was
-    with is cash_entry_party's job, and is shown alongside this.
+    or what it was is cash_entry_heading's job, shown alongside this.
 
     `accounts` is a {pk: CashAccount} map for the book, so describing an
     exchange costs no extra queries; the view already loads it for the
@@ -1497,10 +1556,14 @@ class CashTransactionEntryList(generic.ListView):
                 _source_queryset(model).in_bulk(by_type[content_type.pk])
             )
 
+        balances = running_cash_balances(book.pk)
         for entry in entries:
             source = sources.get(entry.content_type_id, {}).get(entry.content_pk)
-            entry.source_party = cash_entry_party(source)
+            entry.source_heading = cash_entry_heading(source)
             entry.source_description = describe_cash_entry_source(source, accounts)
+            entry.account_running, entry.book_running = balances.get(
+                entry.pk, (None, None)
+            )
         context["object_list"] = entries
         return context
 

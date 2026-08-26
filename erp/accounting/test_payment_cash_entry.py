@@ -71,8 +71,9 @@ class PaymentCashEntryTest(TestCase):
         self.assertTrue(entry.is_amount_positive)
         self.assertEqual(entry.cash_account_id, self.cash.pk)
         self.assertEqual(entry.date, payment.date)
-        # Stamped after the balance moved: 1000 + 400.
-        self.assertEqual(entry.cash_account_balance, Decimal("1400.00"))
+        # The cash actually moved: 1000 + 400.
+        self.cash.refresh_from_db()
+        self.assertEqual(self.cash.balance, Decimal("1400.00"))
 
     def test_a_payment_out_is_recorded_as_money_leaving(self):
         payment = self._payment(cash_account=self.cash, ptype="payment")
@@ -80,7 +81,8 @@ class PaymentCashEntryTest(TestCase):
 
         entry = self._entries(payment).get()
         self.assertFalse(entry.is_amount_positive)
-        self.assertEqual(entry.cash_account_balance, Decimal("600.00"))
+        self.cash.refresh_from_db()
+        self.assertEqual(self.cash.balance, Decimal("600.00"))
 
     def test_confirming_without_a_cash_account_writes_nothing(self):
         """No cash account means no cash moved — there is nothing to record."""

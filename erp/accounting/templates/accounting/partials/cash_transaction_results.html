@@ -62,16 +62,16 @@
       </td>
       <td><span class="tx-kind">{{ t.content_type.name|default:"—" }}</span></td>
       <td class="tx-what">
-        {% if t.source_party %}<span class="who">{{ t.source_party }}</span>{% endif %}
+        {% if t.source_heading %}<span class="lead">{{ t.source_heading }}</span>{% endif %}
         {% if t.source_description %}{{ t.source_description }}
-        {% elif not t.source_party %}<span class="none">—</span>{% endif %}
+        {% elif not t.source_heading %}<span class="none">—</span>{% endif %}
       </td>
       <td>{{ t.cash_account.name }} <span class="tx-muted">{{ t.currency.code }}</span></td>
       <td class="num {% if t.is_amount_positive %}tx-in{% else %}tx-out{% endif %}">
         {% if t.is_amount_positive %}+{% else %}&minus;{% endif %}{{ t.currency.symbol }}{{ t.amount|format_money }}
       </td>
-      <td class="num">{{ t.currency.symbol }}{{ t.cash_account_balance|format_money }}</td>
-      <td class="num tx-muted">{{ base_currency_symbol }}{{ t.total_base_currency_balance|format_money }}</td>
+      <td class="num">{{ t.currency.symbol }}{{ t.account_running|format_money }}</td>
+      <td class="num tx-muted">{{ base_currency_symbol }}{{ t.book_running|format_money }}</td>
     </tr>
     {% endfor %}
   </tbody>

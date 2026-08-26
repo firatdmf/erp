@@ -1,35 +1,21 @@
-"""Make the cash ledger a complete record, then recompute its running total.
+"""Backfill the cash ledger rows that payments never wrote, and check it adds up.
 
-CashTransactionEntry.total_base_currency_balance is the book's total cash in
-base currency after each row. It used to be chained off the previous row's
-stored value, which drifts, because this table was never the only thing that
-moved cash: Payment.post() writes straight to CashAccount.balance with a raw
-F() UPDATE (models_accounts.Payment) and records nothing here. Book 2's newest
-row read $59.60 against a real $1,804.98.
+A payment moves cash by writing straight to CashAccount.balance. It used to
+record nothing in CashTransactionEntry, so money moved that the transactions
+page never showed — book 2's ledger was missing $1,745 of collections that
+way. Payment.sync_cash_entry() now writes those rows as they happen, from
+confirm, from the edit view and from cancel; this command catches up anything
+recorded before that existed.
 
-CashTransactionEntry.save() now stamps new rows from the live cash accounts,
-so the drift stops there. This command repairs what is already stored, in two
-phases:
+It then checks the invariant that makes the ledger trustworthy: summing a
+cash account's entries from zero should land exactly on the account's own
+balance. If it does not, something is still moving cash without writing here,
+and the difference is reported rather than papered over.
 
-  1. Backfill — write the missing entry for every confirmed Payment that named
-     a cash account. Cancelled payments are skipped: their cash was reversed,
-     so they moved nothing on net. Each backfilled row is dated from the
-     payment itself so it sorts into its true place in the list.
-
-  2. Recompute — walk every row of the book oldest → newest and accumulate the
-     signed amounts, setting both cash_account_balance (per account) and
-     total_base_currency_balance (per book) from zero.
-
-Phase 2 is only meaningful once phase 1 has made the ledger complete; the
-check at the end confirms it, by comparing the accumulated per-account totals
-against the live CashAccount.balance values. If those disagree, something
-still moves cash without writing here and the mismatch is reported rather
-than papered over.
-
-The recomputed book total uses each row's amount_in_base_currency, which was
-converted at the rate in force when the row was written. It will therefore sit
-a little away from the dashboard's live figure, which converts today's
-balances at today's rate. That gap is real and is reported, not hidden.
+Running balances are no longer stored, so there is nothing to recompute —
+the transactions page derives them from the rows every time it renders them
+(views.running_cash_balances). This command's job is only to make sure the
+rows themselves are all present.
 
 Dry run by default — pass --apply to write.
 """
@@ -45,7 +31,7 @@ from accounting.models_accounts import Payment
 
 
 class Command(BaseCommand):
-    help = "Backfill payment cash entries and recompute running balances."
+    help = "Backfill missing payment cash entries and verify the ledger adds up."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -61,8 +47,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from accounting.views import get_total_base_currency_balance
-
         apply_changes = options["apply"]
 
         book_ids = (
@@ -81,17 +65,9 @@ class Command(BaseCommand):
 
         for book_id in book_ids:
             book = Book.objects.get(pk=book_id)
-            self.stdout.write(
-                self.style.MIGRATE_HEADING(f"\nBook {book_id} ({book})")
-            )
+            self.stdout.write(self.style.MIGRATE_HEADING(f"\nBook {book_id} ({book})"))
             pending = self._backfill(book, apply_changes)
-            # On a dry run the phase-1 rows were not written, so splice them
-            # into phase 2's view of the ledger. Without that the preview
-            # recomputes a ledger still missing the payments and reports a
-            # mismatch that applying would not actually produce.
-            self._recompute(
-                book, apply_changes, get_total_base_currency_balance, pending
-            )
+            self._verify(book, pending)
 
         if not apply_changes:
             self.stdout.write(
@@ -99,9 +75,12 @@ class Command(BaseCommand):
             )
 
     # ------------------------------------------------------------------
-    # Phase 1
-    # ------------------------------------------------------------------
     def _backfill(self, book, apply_changes):
+        """Write the entry for every confirmed payment that lacks one.
+
+        Cancelled payments are skipped: their cash was reversed, so on net
+        they moved nothing and have no place in the ledger.
+        """
         payment_ct = ContentType.objects.get_for_model(Payment)
         already = set(
             CashTransactionEntry.objects.filter(
@@ -133,125 +112,43 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             for p in missing:
-                entry = CashTransactionEntry.objects.create(
-                    book=book,
-                    content_type=payment_ct,
-                    content_pk=p.pk,
-                    amount=p.amount,
-                    is_amount_positive=p.cash_sign > 0,
-                    currency=p.currency,
-                    cash_account=p.cash_account,
-                )
-                # `date` is derived from the payment, so the row already
-                # files under the right day. created_at is auto_now_add and
-                # would claim the backfill happened now; point it at when the
-                # payment was actually recorded instead.
-                CashTransactionEntry.objects.filter(pk=entry.pk).update(
-                    created_at=p.created_at
-                )
+                entry = p.sync_cash_entry()
+                # created_at is auto_now_add and would claim the backfill
+                # happened now. `date` already files the row under the day
+                # the money moved; this puts the recorded-at stamp right too.
+                if entry is not None:
+                    CashTransactionEntry.objects.filter(pk=entry.pk).update(
+                        created_at=p.created_at
+                    )
         return []
 
     # ------------------------------------------------------------------
-    # Phase 2
-    # ------------------------------------------------------------------
-    def _recompute(
-        self, book, apply_changes, get_total_base_currency_balance, pending=()
-    ):
-        entries = list(
-            CashTransactionEntry.objects.filter(book=book)
-            .select_related("cash_account", "currency")
-            .order_by("date", "created_at", "pk")
+    def _verify(self, book, pending):
+        """Does each account equal the sum of its own entries?
+
+        `pending` are rows a dry run would have written but did not, so their
+        amounts are counted here too — otherwise a preview would report a
+        mismatch that applying would not actually leave behind.
+        """
+        sums = {}
+        rows = CashTransactionEntry.objects.filter(book=book).values_list(
+            "cash_account_id", "amount", "is_amount_positive"
         )
-        entries.extend(self._preview_rows(book, pending))
-        entries.sort(key=lambda e: (e.date, e.created_at, e.pk or 0))
-
-        if not entries:
-            self.stdout.write("  recompute: no entries.")
-            return
-
-        per_account = {}
-        book_total = Decimal("0.00")
-        planned = []
-
-        for e in entries:
-            amount = e.amount or Decimal("0.00")
-            base = e.amount_in_base_currency or Decimal("0.00")
-            if not e.is_amount_positive:
-                amount, base = -amount, -base
-
-            acct_id = e.cash_account_id
-            if acct_id is not None:
-                per_account[acct_id] = per_account.get(acct_id, Decimal("0.00")) + amount
-            book_total += base
-
-            new_acct_balance = per_account.get(acct_id) if acct_id else None
-            if e.pk is None:
-                # A phase-1 row previewed on a dry run: it counts towards the
-                # totals but there is nothing to update.
-                self.stdout.write(
-                    f"  entry NEW (payment {e.content_pk}): account "
-                    f"→ {new_acct_balance}, book → {book_total}"
-                )
+        for account_id, amount, positive in rows:
+            if account_id is None:
                 continue
-            if (
-                e.total_base_currency_balance != book_total
-                or (acct_id and e.cash_account_balance != new_acct_balance)
-            ):
-                planned.append((e, new_acct_balance, book_total))
+            delta = (amount or Decimal("0.00")) * (1 if positive else -1)
+            sums[account_id] = sums.get(account_id, Decimal("0.00")) + delta
 
-        for e, acct_balance, total in planned:
-            self.stdout.write(
-                f"  entry {e.pk}: account {e.cash_account_balance} → {acct_balance}, "
-                f"book {e.total_base_currency_balance} → {total}"
-            )
-
-        if planned and apply_changes:
-            with transaction.atomic():
-                for e, acct_balance, total in planned:
-                    CashTransactionEntry.objects.filter(pk=e.pk).update(
-                        cash_account_balance=acct_balance,
-                        total_base_currency_balance=total,
-                    )
-        elif not planned:
-            self.stdout.write("  recompute: already correct.")
-
-        self._verify(book, per_account, book_total, get_total_base_currency_balance)
-
-    # ------------------------------------------------------------------
-    def _preview_rows(self, book, pending):
-        """Unsaved stand-ins for the phase-1 rows, so a dry run adds up."""
-        from accounting.models import get_base_currency
-        from accounting.services import get_exchange_rate
-
-        base = get_base_currency()
-        rows = []
         for p in pending:
-            if p.currency.code == base.code:
-                in_base = p.amount
-            else:
-                rate = get_exchange_rate(p.currency.code, base.code)
-                in_base = (p.amount * rate).quantize(Decimal("0.01")) if rate else None
-            rows.append(
-                CashTransactionEntry(
-                    book=book,
-                    content_pk=p.pk,
-                    amount=p.amount,
-                    is_amount_positive=p.cash_sign > 0,
-                    currency=p.currency,
-                    cash_account=p.cash_account,
-                    amount_in_base_currency=in_base,
-                    date=p.date,
-                    created_at=p.created_at,
-                )
+            delta = p.amount * Decimal(p.cash_sign)
+            sums[p.cash_account_id] = (
+                sums.get(p.cash_account_id, Decimal("0.00")) + delta
             )
-        return rows
 
-    # ------------------------------------------------------------------
-    def _verify(self, book, per_account, book_total, get_total_base_currency_balance):
-        """Does the ledger, summed from zero, reproduce the live balances?"""
         ok = True
-        for account in CashAccount.objects.filter(book=book):
-            summed = per_account.get(account.pk, Decimal("0.00"))
+        for account in CashAccount.objects.filter(book=book).select_related("currency"):
+            summed = sums.get(account.pk, Decimal("0.00"))
             if summed != account.balance:
                 ok = False
                 self.stdout.write(
@@ -268,9 +165,3 @@ class Command(BaseCommand):
                     "  verified: every cash account equals the sum of its entries."
                 )
             )
-
-        live = get_total_base_currency_balance(book_pk=book.pk)
-        self.stdout.write(
-            f"  book total: ledger {book_total} vs live {live} "
-            f"(difference {live - book_total} — FX timing, see module docstring)"
-        )

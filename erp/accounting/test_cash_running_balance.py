@@ -76,49 +76,104 @@ class CashEntryTestBase(TestCase):
 
 
 class CashRunningBalanceTests(CashEntryTestBase):
-    """total_base_currency_balance must track the real cash."""
+    """Running balances are worked out from the rows, not stamped onto them.
 
-    def test_running_total_follows_the_entries(self):
-        self.assertEqual(self._entry("600.00", True).total_base_currency_balance,
-                         Decimal("600.00"))
-        self.assertEqual(self._entry("100.00", False).total_base_currency_balance,
-                         Decimal("500.00"))
+    Derived, so they cannot describe a past that later edits changed. These
+    assert on views.running_cash_balances rather than on any stored column.
+    """
 
-    def test_cash_moved_without_an_entry_is_still_counted(self):
-        """The drift that put book 2 at $59.60 against a real $1,804.98.
+    def _balances(self):
+        from accounting.views import running_cash_balances
 
-        Payment.post() updates CashAccount.balance with a raw F() UPDATE and
-        writes no entry here. The next entry must still report the book's
-        true total, not the stale chain.
-        """
-        self._entry("600.00", True)
+        return running_cash_balances(self.book.pk)
 
-        # A confirmed Payment lands $1,245 in the kasa, writing no entry.
+    def _entry_dated(self, amount, positive, date):
+        """An entry whose source carries `date`, so it sorts by it."""
+        delta = Decimal(amount) if positive else -Decimal(amount)
         CashAccount.objects.filter(pk=self.kasa.pk).update(
-            balance=Decimal("600.00") + Decimal("1245.00")
+            balance=models.F("balance") + delta
+        )
+        self.kasa.refresh_from_db()
+        capital = EquityCapital.objects.create(
+            book=self.book, member=self.member, date_invested=date,
+            cash_account=self.kasa, currency=self.usd, amount=Decimal(amount),
+        )
+        return CashTransactionEntry.objects.create(
+            book=self.book,
+            content_type=ContentType.objects.get_for_model(EquityCapital),
+            content_pk=capital.pk,
+            amount=Decimal(amount),
+            is_amount_positive=positive,
+            currency=self.usd,
+            cash_account=self.kasa,
         )
 
-        entry = self._entry("100.00", False)
-        # 600 + 1245 - 100
-        self.assertEqual(entry.total_base_currency_balance, Decimal("1745.00"))
+    def test_the_running_total_accumulates_down_the_ledger(self):
+        first = self._entry("600.00", True)
+        second = self._entry("100.00", False)
 
-    def test_resaving_an_entry_does_not_restamp_it(self):
-        """History must not be rewritten to today's total on any later save."""
-        entry = self._entry("600.00", True)
-        self._entry("400.00", True)
+        balances = self._balances()
+        self.assertEqual(balances[first.pk], (Decimal("600.00"), Decimal("600.00")))
+        self.assertEqual(balances[second.pk], (Decimal("500.00"), Decimal("500.00")))
 
-        entry.refresh_from_db()
-        entry.save()
-        entry.refresh_from_db()
-        self.assertEqual(entry.total_base_currency_balance, Decimal("600.00"))
+    def test_the_ledger_ends_where_the_cash_account_stands(self):
+        """The invariant: sum the entries, get the account."""
+        self._entry("600.00", True)
+        last = self._entry("100.00", False)
+
+        self.kasa.refresh_from_db()
+        self.assertEqual(self._balances()[last.pk][0], self.kasa.balance)
+
+    def test_a_backdated_row_sorts_into_the_middle_and_totals_follow(self):
+        """What a stored running balance could not do without a repair run."""
+        early = self._entry_dated("100.00", True, "2026-08-10")
+        late = self._entry_dated("200.00", True, "2026-08-20")
+        # Entered last, but it happened between the two.
+        middle = self._entry_dated("50.00", True, "2026-08-15")
+
+        balances = self._balances()
+        self.assertEqual(balances[early.pk][1], Decimal("100.00"))
+        self.assertEqual(balances[middle.pk][1], Decimal("150.00"))
+        self.assertEqual(balances[late.pk][1], Decimal("350.00"))
+
+    def test_editing_an_amount_moves_every_total_after_it(self):
+        """No repair command in between — the figures are derived."""
+        first = self._entry_dated("100.00", True, "2026-08-10")
+        second = self._entry_dated("200.00", True, "2026-08-20")
+        self.assertEqual(self._balances()[second.pk][1], Decimal("300.00"))
+
+        first.amount = Decimal("500.00")
+        first.amount_in_base_currency = None  # reconvert on purpose
+        first.save()
+
+        self.assertEqual(self._balances()[second.pk][1], Decimal("700.00"))
 
     def test_a_negative_total_is_not_flattened_to_zero(self):
-        """The old code clamped anything under a cent to 0.00, sign and all."""
-        self._entry("100.00", True)
-        CashAccount.objects.filter(pk=self.kasa.pk).update(balance=Decimal("-250.00"))
+        """The old stored column clamped anything under a cent to 0.00."""
+        entry = self._entry("100.00", False)
+        self.assertEqual(self._balances()[entry.pk][1], Decimal("-100.00"))
 
-        entry = self._entry("50.00", False)
-        self.assertEqual(entry.total_base_currency_balance, Decimal("-300.00"))
+    def test_each_account_runs_its_own_balance(self):
+        vault = CashAccount.objects.create(
+            book=self.book, name="Vault", currency=self.usd, balance=Decimal("0.00")
+        )
+        kasa_row = self._entry("600.00", True)
+        capital = EquityCapital.objects.first()
+        vault_row = CashTransactionEntry.objects.create(
+            book=self.book,
+            content_type=ContentType.objects.get_for_model(EquityCapital),
+            content_pk=capital.pk,
+            amount=Decimal("25.00"),
+            is_amount_positive=True,
+            currency=self.usd,
+            cash_account=vault,
+        )
+
+        balances = self._balances()
+        # Each account's own running balance, but one shared book total.
+        self.assertEqual(balances[kasa_row.pk][0], Decimal("600.00"))
+        self.assertEqual(balances[vault_row.pk][0], Decimal("25.00"))
+        self.assertEqual(balances[vault_row.pk][1], Decimal("625.00"))
 
 
 class CashEntryDateTests(CashEntryTestBase):
@@ -270,7 +325,7 @@ class CashEntryListPageTests(CashEntryTestBase):
         response = self.client.get(self.url())
         self.assertContains(response, str(self.member))
         row = response.context["object_list"][0]
-        self.assertEqual(row.source_party, str(self.member))
+        self.assertEqual(row.source_heading, str(self.member))
         self.assertEqual(row.source_description, "")
 
     def test_filtering_narrows_to_one_cash_account(self):
@@ -389,8 +444,8 @@ class CashEntryExchangeDescriptionTests(CashEntryTestBase):
         )
 
 
-class CashEntryPartyTests(CashEntryTestBase):
-    """Who the money moved with, shown alongside the note rather than instead."""
+class CashEntryHeadingTests(CashEntryTestBase):
+    """What the row is, shown alongside the note rather than instead of it."""
 
     def setUp(self):
         super().setUp()
@@ -425,13 +480,13 @@ class CashEntryPartyTests(CashEntryTestBase):
         )
 
         row = self.client.get(self.url()).context["object_list"][0]
-        self.assertEqual(row.source_party, str(self.member))
+        self.assertEqual(row.source_heading, str(self.member))
         self.assertEqual(row.source_description, "dükkanda elden verdi")
 
-    def test_an_exchange_has_no_party(self):
+    def test_an_exchange_has_no_heading(self):
         """Nobody is on the other side of moving your own money."""
         from accounting.models import CurrencyExchange
-        from accounting.views import cash_entry_party
+        from accounting.views import cash_entry_heading
 
         vault = CashAccount.objects.create(
             book=self.book, name="Vault", currency=self.usd, balance=Decimal("0.00")
@@ -444,7 +499,7 @@ class CashEntryPartyTests(CashEntryTestBase):
             to_amount=Decimal("10.00"),
             date="2026-08-21",
         )
-        self.assertEqual(cash_entry_party(exchange), "")
+        self.assertEqual(cash_entry_heading(exchange), "")
 
 
 class CashEntryHtmxTests(CashEntryTestBase):
@@ -484,3 +539,66 @@ class CashEntryHtmxTests(CashEntryTestBase):
             self.url(), HTTP_HX_REQUEST="true"
         ).content.decode()
         self.assertIn(fragment.strip(), page)
+
+
+class CashEntryExpenseHeadingTests(CashEntryTestBase):
+    """An expense is identified by its category, the way a payment is by its cari."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(get_user_model().objects.get(username="teller"))
+
+    def test_the_expense_category_leads_the_cell(self):
+        from accounting.views import cash_entry_heading
+
+        expense = EquityExpense.objects.create(
+            book=self.book,
+            category=ExpenseCategory.objects.create(name="Contract Labor"),
+            cash_account=self.kasa,
+            currency=self.usd,
+            amount=Decimal("815.00"),
+            date="2026-08-20",
+            description="hamal cuval",
+        )
+        self.assertEqual(cash_entry_heading(expense), "Contract Labor")
+
+    def test_an_uncategorised_expense_shows_only_its_description(self):
+        from accounting.views import cash_entry_heading
+
+        expense = EquityExpense.objects.create(
+            book=self.book,
+            cash_account=self.kasa,
+            currency=self.usd,
+            amount=Decimal("600.00"),
+            date="2026-08-21",
+            description="",
+        )
+        self.assertEqual(cash_entry_heading(expense), "")
+
+    def test_the_page_renders_category_above_description(self):
+        expense = EquityExpense.objects.create(
+            book=self.book,
+            category=ExpenseCategory.objects.create(name="Wages"),
+            cash_account=self.kasa,
+            currency=self.usd,
+            amount=Decimal("600.00"),
+            date="2026-08-21",
+            description="ustabaşı",
+        )
+        CashAccount.objects.filter(pk=self.kasa.pk).update(balance=Decimal("1000.00"))
+        self.kasa.refresh_from_db()
+        CashTransactionEntry.objects.create(
+            book=self.book,
+            content_type=ContentType.objects.get_for_model(EquityExpense),
+            content_pk=expense.pk,
+            amount=Decimal("600.00"),
+            is_amount_positive=False,
+            currency=self.usd,
+            cash_account=self.kasa,
+        )
+        url = reverse(
+            "accounting:cash_transaction_entry_list", kwargs={"pk": self.book.pk}
+        )
+        row = self.client.get(url).context["object_list"][0]
+        self.assertEqual(row.source_heading, "Wages")
+        self.assertEqual(row.source_description, "ustabaşı")

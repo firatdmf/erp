@@ -1,8 +1,7 @@
 import requests
 from datetime import date
 from decimal import Decimal
-from .models import CurrencyExchangeRate, CashTransactionEntry
-from .views import get_total_base_currency_balance
+from .models import CurrencyExchangeRate
 
 
 def _fetch_rate(from_currency: str, to_currency: str) -> Decimal:
@@ -75,11 +74,3 @@ def get_exchange_rate(from_currency: str, to_currency: str) -> Decimal:
         return None
 
 
-def update_cash_transaction_entry_total_base_currency_balance(book_pk):
-    total = get_total_base_currency_balance(book_pk)
-    cash_transaction_entry = CashTransactionEntry.objects.filter(book=book_pk).latest(
-        "pk"
-    )
-    cash_transaction_entry.total_base_currency_balance = total
-    cash_transaction_entry.save(update_fields=["total_base_currency_balance"])
-    return total

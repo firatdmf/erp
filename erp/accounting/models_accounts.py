@@ -361,7 +361,11 @@ class CariMovement(models.Model):
             self.amount_base = self.amount.quantize(Decimal("0.01"))
         elif not self.amount_base:
             from accounting.services import get_exchange_rate
-            rate = get_exchange_rate(self.currency.code, base_code) or Decimal("1.000000")
+            # The rate on the movement's own date — a backdated row is worth
+            # what it was worth then.
+            rate = get_exchange_rate(
+                self.currency.code, base_code, on_date=self.date
+            ) or Decimal("1.000000")
             self.exchange_rate = Decimal(str(rate))
             self.amount_base = (self.amount * self.exchange_rate).quantize(Decimal("0.01"))
 
@@ -995,8 +999,19 @@ class Payment(models.Model):
     amount        = models.DecimalField(max_digits=14, decimal_places=2,
                                         help_text="Always positive — sign comes from `type`")
     currency      = models.ForeignKey("accounting.CurrencyCategory", on_delete=models.PROTECT)
+    # The rate the person recording this payment says applies, to the book's
+    # base currency. Null means they did not say, and the published rate for
+    # `date` is used instead.
+    #
+    # Nullable rather than defaulting to 1.000000, because a default is
+    # indistinguishable from a deliberate entry: a payment in lira carrying
+    # "1.000000" would otherwise read as an instruction to treat one lira as
+    # one dollar. Null says nothing, which is what an untouched field means.
     exchange_rate = models.DecimalField(max_digits=14, decimal_places=6,
-                                        default=Decimal("1.000000"))
+                                        null=True, blank=True,
+                                        help_text="Rate to the book's base "
+                                                  "currency. Blank → the "
+                                                  "published rate for the date.")
 
     # Cash side — money lands here (or leaves here)
     cash_account = models.ForeignKey(

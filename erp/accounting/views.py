@@ -39,7 +39,10 @@ from django.contrib.contenttypes.models import ContentType
 
 
 def get_total_base_currency_balance(book_pk):
-    base_currency = get_base_currency()
+    # The book's own reporting currency, not the deployment's — two books
+    # need not keep their accounts in the same one.
+    book = Book.objects.filter(pk=book_pk).first()
+    base_currency = book.effective_base_currency if book else get_base_currency()
     total = Decimal("0.00")
 
     for currency_category in CurrencyCategory.objects.all():
@@ -858,7 +861,6 @@ def handle_equity_transaction(
         is_amount_positive=is_amount_positive,
         currency=currency,
         cash_account=cash_account,
-        cash_account_balance=cash_account.balance,
     )
     print("the time2 it took:", "--- %s seconds ---" % (time.time() - start_time))
     print("all done")
@@ -883,7 +885,6 @@ def handle_payable_and_receivable(
         is_amount_positive=is_amount_positive,
         currency=currency,
         cash_account=cash_account,
-        cash_account_balance=cash_account.balance,
     )
 
 
@@ -1519,7 +1520,8 @@ class CashTransactionEntryList(generic.ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         book = Book.objects.get(pk=self.kwargs.get("pk"))
-        context["base_currency_symbol"] = str(get_base_currency().symbol)
+        context["base_currency"] = book.effective_base_currency
+        context["base_currency_symbol"] = str(book.effective_base_currency.symbol)
         context["book"] = book
 
         accounts = {

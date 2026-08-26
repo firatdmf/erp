@@ -5,7 +5,7 @@ from authentication.models import Member
 # from operating.models import Product
 from django.utils import timezone
 from decimal import Decimal
-from datetime import timedelta
+from datetime import date, timedelta
 from crm.models import Supplier
 
 from django.conf import settings
@@ -109,12 +109,16 @@ def invoice_items_default():
 # Create your models here.
 
 
-# Fetch currency rates daily via services.py (runs when we save a CashTransactionEntry)
+# Fetched on demand by services.get_exchange_rate, one row per pair per day.
 class CurrencyExchangeRate(models.Model):
     from_currency = models.CharField(max_length=3)  # e.g. 'USD'
     to_currency = models.CharField(max_length=3)  # e.g. 'EUR'
     rate = models.DecimalField(max_digits=20, decimal_places=6)
-    date = models.DateField(auto_now_add=True)
+    # The day this rate APPLIES to, which is not always the day it was
+    # fetched. auto_now_add made those the same thing and so made history
+    # unstorable: a rate looked up for the 17th was filed under today, and
+    # the next backdated lookup found nothing and fetched again.
+    date = models.DateField(default=date.today)
 
     class Meta:
         unique_together = ("from_currency", "to_currency", "date")
@@ -174,6 +178,34 @@ class Book(models.Model):
     )
     # Number of shares available. Will be used to calculate stake of each owner based on their shares
     total_shares = models.PositiveIntegerField(default=10000000)
+
+    # The currency this book reports in — what its totals are expressed in
+    # and what every other currency is converted to.
+    #
+    # It belongs to the book, not to the deployment. It used to come from
+    # settings.BASE_CURRENCY_CODE, one value for every book at once, which
+    # is only tenable while every book happens to report in the same
+    # currency. A book trading in lira should be able to keep its accounts
+    # in lira without the deployment changing under the others.
+    #
+    # Blank falls back to settings.BASE_CURRENCY_CODE, so a book created
+    # before this existed (or by code that does not set it) still reports
+    # in something sensible. Read it through effective_base_currency
+    # rather than directly.
+    base_currency = models.ForeignKey(
+        "CurrencyCategory",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="books_based_here",
+        help_text="Currency this book's totals are reported in. "
+                  "Blank → the deployment default.",
+    )
+
+    @property
+    def effective_base_currency(self):
+        """The currency this book reports in, falling back to the default."""
+        return self.base_currency or get_base_currency()
 
     class Meta:
         constraints = [
@@ -1067,23 +1099,24 @@ class CashTransactionEntry(models.Model):
     )
 
     # ------------------- below are calculated automatically. -------------------------
-    # DEAD as of the move to derived running balances — nothing reads it.
-    # The transactions page works this out with a window function over the
-    # book (views.running_cash_balances), because a stored running balance
-    # is only true until something before it in the sequence changes, and a
-    # backdated or edited row changes plenty. Kept as a column so the change
-    # needed no migration; a follow-up should drop it and its sibling below.
-    cash_account_balance = models.DecimalField(
-        max_digits=12, decimal_places=2, blank=True, null=True
-    )
+    # The running account balance and book total used to be stored here, one
+    # snapshot per row. They are gone: a snapshot is only true until
+    # something earlier in the sequence changes, and backdating, editing and
+    # cancelling all change earlier things. The transactions page derives
+    # both from the rows on every render (views.running_cash_balances).
 
-    # for amount normalized to base currency (e.g. USD)
+    # What this amount was worth in base currency (e.g. USD) on the day it
+    # moved. Converted once and kept — see save().
     amount_in_base_currency = models.DecimalField(
         max_digits=12, decimal_places=2, blank=True, null=True
     )
-    # DEAD — see cash_account_balance above.
-    total_base_currency_balance = models.DecimalField(
-        max_digits=12, decimal_places=2, blank=True, null=True
+
+    # The rate that conversion used, kept so the arithmetic can be checked
+    # and so nothing has to guess it again later. Null when the entry is
+    # already in the book's base currency — there was no conversion, and a
+    # rate of 1 would be a fact about nothing.
+    exchange_rate = models.DecimalField(
+        max_digits=20, decimal_places=6, blank=True, null=True
     )
 
     # --------------------------------------------
@@ -1114,6 +1147,29 @@ class CashTransactionEntry(models.Model):
         # created_at is unset until the first save, hence the now() fallback.
         return (self.created_at or timezone.now()).date()
 
+    def resolve_exchange_rate(self, base_currency):
+        """The rate to use, in order of who has the better claim to know it.
+
+        1. A rate set on this entry — nothing overrides a rate already here.
+        2. A rate entered on the source. Whoever recorded the transaction
+           was there; a cash exchange at the döviz bürosu is not the
+           mid-market rate, and their figure beats any API's.
+        3. The published rate for the day the money moved — not today's,
+           which is a fact about a different day.
+        """
+        if self.exchange_rate:
+            return self.exchange_rate
+
+        entered = getattr(self.content, "exchange_rate", None)
+        if entered:
+            return Decimal(entered)
+
+        from .services import get_exchange_rate
+
+        return get_exchange_rate(
+            self.currency.code, base_currency.code, on_date=self.date
+        )
+
     def save(self, *args, **kwargs):
         if self.date is None:
             self.date = self.derive_date()
@@ -1130,17 +1186,19 @@ class CashTransactionEntry(models.Model):
         # Set it explicitly to None to have it reconverted on purpose (an
         # edit that changes the amount does exactly that).
         if self.amount_in_base_currency is None:
-            base_currency = get_base_currency()
-            if self.currency.code == base_currency.code:
+            base_currency = self.book.effective_base_currency
+            if self.currency_id == base_currency.pk:
+                # Already the book's own currency: nothing was converted, so
+                # there is no rate to record.
                 self.amount_in_base_currency = self.amount
+                self.exchange_rate = None
             else:
-                from .services import get_exchange_rate
-
-                rate = get_exchange_rate(self.currency.code, base_currency.code)
+                rate = self.resolve_exchange_rate(base_currency)
                 if not rate:
                     raise ValidationError(
                         {"currency_rate": "Currency rate failed to compute."}
                     )
+                self.exchange_rate = rate
                 self.amount_in_base_currency = (self.amount * rate).quantize(
                     Decimal("0.01")
                 )

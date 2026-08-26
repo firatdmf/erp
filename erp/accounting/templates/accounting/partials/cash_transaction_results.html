@@ -69,6 +69,18 @@
       <td>{{ t.cash_account.name }} <span class="tx-muted">{{ t.currency.code }}</span></td>
       <td class="num {% if t.is_amount_positive %}tx-in{% else %}tx-out{% endif %}">
         {% if t.is_amount_positive %}+{% else %}&minus;{% endif %}{{ t.currency.symbol }}{{ t.amount|format_money }}
+        {% comment %}
+          What it was worth in the book's currency, and the rate that made
+          it so. Shown only when a conversion actually happened — a row
+          already in the book's own currency was not converted, and
+          repeating the same figure at a rate of 1 says nothing.
+        {% endcomment %}
+        {% if t.exchange_rate %}
+        <span class="tx-fx" title="Rate on {{ t.date|date:'d M Y' }}">
+          {{ base_currency_symbol }}{{ t.amount_in_base_currency|format_money }}
+          <span class="r">@ {{ t.exchange_rate|floatformat:4 }}</span>
+        </span>
+        {% endif %}
       </td>
       <td class="num">{{ t.currency.symbol }}{{ t.account_running|format_money }}</td>
       <td class="num tx-muted">{{ base_currency_symbol }}{{ t.book_running|format_money }}</td>

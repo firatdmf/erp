@@ -67,7 +67,16 @@ def _label_pdf_bytes(product, rolls, detail_url=None, title=None):
     items = list(rolls) if rolls else [None]
     for roll in items:
         bc_val = (roll.barcode if (roll and roll.barcode) else (product.barcode or sku or ""))
-        meters = (roll.meters if roll else product.quantity) or 0
+        # What is physically on the roll NOW, not the length it arrived
+        # at: a cut roll carries meters_remaining, and the reprinted label
+        # goes back on that shorter roll. meters_remaining is null for a
+        # roll that has never been cut, so fall back to meters there.
+        if roll is not None:
+            meters = (roll.meters_remaining
+                      if roll.meters_remaining is not None else roll.meters)
+        else:
+            meters = product.quantity
+        meters = meters or 0
 
         # ── QR (top-right) — encodes the ROLL barcode so a QR scan flows
         #    through the same warehouse-lookup pipeline as a 1D scan. QRs

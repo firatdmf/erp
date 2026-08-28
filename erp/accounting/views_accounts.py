@@ -17,6 +17,8 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -26,7 +28,10 @@ from django.utils.translation import gettext_lazy as _, gettext as _g
 from django.views import View
 
 from accounting.models import Book, CurrencyCategory
-from .models import CariAccount, CariMovement, CariSettings, Payment, Invoice
+from .models import (
+    CariAccount, CariMovement, CariSettings, CariTransfer, Payment, Invoice,
+)
+from .forms import CariTransferForm
 
 
 # ---------------------------------------------------------------------------
@@ -439,8 +444,11 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
         if model is not None and model.__name__ == "CariTransfer":
             # One leg of a pair. Editing it alone would move a balance out
             # of one account without moving it into the other, so the row
-            # is read-only here and the transfer is undone as a whole.
-            return _("Account transfer"), None, False
+            # is read-only here and corrected on the transfer, which
+            # rewrites both legs together.
+            return (_("Account transfer"),
+                    reverse("accounts:transfer_edit", args=[mv.source_id]),
+                    False)
         # Some other document we don't have a route for — still not ours
         # to edit, since whatever posted it can repost it.
         return _("Linked document"), None, False
@@ -1064,6 +1072,93 @@ class CariMovementDelete(View):
         mv.delete()
         messages.success(request, _g("Movement deleted."))
         return redirect("accounts:statement", pk=cari.pk)
+
+
+# ---------------------------------------------------------------------------
+# Account transfer (virman) — the document behind a pair of ledger legs
+# ---------------------------------------------------------------------------
+@method_decorator(login_required, name="dispatch")
+class CariTransferEdit(View):
+    """Correct a posted transfer, from either of the legs it wrote.
+
+    A transfer owns two ledger rows in two different accounts, so neither
+    is editable where it sits: moving one leg alone would take a balance
+    out of one account without putting it into the other. _movement_owner
+    has always said so — but it had nowhere to send the user, because a
+    transfer could be made and never looked at again. This is that page.
+
+    Saving is unpost() then post(), not a field-by-field edit of the two
+    legs. The pair only cancels because both were stamped from one rate on
+    one date (see CariTransfer.post), and rewriting them individually is
+    how that invariant gets lost. Taking both rows back and writing them
+    again from the corrected transfer keeps the guarantee the model makes.
+
+    Both steps run in one transaction: a failure between them would leave
+    the transfer posted to nothing and two balances short.
+    """
+
+    template_name = "accounts/transfer_form.html"
+
+    def _transfer(self, pk):
+        return get_object_or_404(
+            CariTransfer.objects.select_related(
+                "from_cari", "to_cari", "currency", "book", "created_by__user"
+            ),
+            pk=pk,
+        )
+
+    def _render(self, request, transfer, form=None):
+        return render(request, self.template_name, {
+            "transfer": transfer,
+            "form": form or CariTransferForm(instance=transfer, book=transfer.book),
+            # Where to go back to. A transfer belongs to two accounts and
+            # favours neither, so the source is where the operator most
+            # likely came from — the leg that lost the balance.
+            "back_cari": transfer.from_cari,
+        })
+
+    def get(self, request, pk):
+        return self._render(request, self._transfer(pk))
+
+    def post(self, request, pk):
+        transfer = self._transfer(pk)
+        form = CariTransferForm(request.POST, instance=transfer, book=transfer.book)
+        if not form.is_valid():
+            return self._render(request, transfer, form=form)
+        try:
+            with transaction.atomic():
+                transfer.unpost()
+                transfer = form.save(commit=False)
+                transfer.book = form.cleaned_data.get("book") or transfer.book
+                transfer.save()
+                transfer.post(user=request.user)
+        except ValidationError as exc:
+            # The model guards the same rules the form does; this is the
+            # belt to the form's braces rather than a path the UI reaches.
+            form.add_error(None, exc.messages)
+            return self._render(request, self._transfer(pk), form=form)
+
+        messages.success(request, _g("Transfer updated."))
+        return redirect("accounts:statement", pk=transfer.from_cari_id)
+
+
+@method_decorator(login_required, name="dispatch")
+class CariTransferUndo(View):
+    """Take a transfer back: both legs go, both balances re-derive.
+
+    Deleted rather than reversed with counter-movements — see
+    CariTransfer.unpost(). The transfer row itself goes too, so an undone
+    transfer leaves no document behind claiming to have moved something.
+    """
+
+    def post(self, request, pk):
+        transfer = get_object_or_404(CariTransfer, pk=pk)
+        from_pk = transfer.from_cari_id
+        with transaction.atomic():
+            transfer.unpost()
+            transfer.delete()
+        messages.success(request, _g("Transfer undone."))
+        return redirect("accounts:statement", pk=from_pk)
 
 
 # ---------------------------------------------------------------------------

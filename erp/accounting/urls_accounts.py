@@ -43,6 +43,11 @@ urlpatterns = [
     path("<int:pk>/movements/<int:mv_pk>/edit/",   views.CariMovementEdit.as_view(),   name="movement_edit"),
     path("<int:pk>/movements/<int:mv_pk>/delete/", views.CariMovementDelete.as_view(), name="movement_delete"),
 
+    # --- Account transfers (virman) — the document behind a pair of legs.
+    # Not nested under an account: a transfer belongs to two of them.
+    path("transfers/<int:pk>/",      views.CariTransferEdit.as_view(), name="transfer_edit"),
+    path("transfers/<int:pk>/undo/", views.CariTransferUndo.as_view(), name="transfer_undo"),
+
     # --- Invoices ---
     path("invoices/",                    views_invoice.InvoiceList.as_view(),           name="invoice_list"),
     path("invoices/new/",                views_invoice.InvoiceCreate.as_view(),         name="invoice_create"),

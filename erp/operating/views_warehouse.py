@@ -1643,10 +1643,18 @@ def catalog_variant_match(request, pk, product_id):
     uses at save time — so the preview badge and the actual save never
     disagree on what counts as "the same variant".
 
-    Only matches variants that have a real WarehouseProduct link — see
-    catalog_product_variants for why. Matching an orphaned catalog
-    variant would silently add real intake stock to a row with no
-    warehouse row behind it, instead of properly creating/linking one."""
+    The real-WarehouseProduct requirement applies to the NAME/attribute
+    match only — see catalog_product_variants for why. Matching an orphaned
+    catalog variant on a colour would silently add real intake stock to a
+    row with no warehouse row behind it, instead of properly creating or
+    linking one.
+
+    An EXACT SKU match is the opposite case. variant_sku is globally unique,
+    so the save (sync_roll_to_catalog step 2) has no choice but to reuse the
+    row that already holds the typed code — it cannot mint a second variant
+    under the same SKU. Excluding orphans here made the badge promise "new"
+    for a SKU the save then reused, which is exactly the preview/save
+    disagreement this endpoint exists to prevent."""
     from .catalog_sync import translate_color, _norm_attr, _norm_value
     from marketing.models import Product, ProductVariant
 
@@ -1669,9 +1677,11 @@ def catalog_variant_match(request, pk, product_id):
         # catalogued as "petrol+marletto" or "MARLETTOO" read as NEW here and
         # was then reused by the save — the preview and the save disagreeing
         # is exactly what this endpoint exists to prevent.
+        # No warehouse-link filter here: see the docstring. The SKU is
+        # unique, so whatever holds it IS the row the save will land on,
+        # stock behind it or not.
         match = (ProductVariant.objects
-                 .filter(product=product, warehouse_products__isnull=False,
-                         variant_sku__iexact=sku)
+                 .filter(product=product, variant_sku__iexact=sku)
                  .first())
     if match is None and product is not None and name:
         match = (ProductVariant.objects

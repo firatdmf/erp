@@ -493,6 +493,56 @@ def _invoice_line_desc(order_item):
     return (desc or "Item")[:300]
 
 
+def refresh_invoice_lines_for_variant(variant):
+    """Re-render every invoice line that names `variant`, after its SKU changed.
+
+    A line's `description` is a snapshot cut at invoicing time and it embeds
+    the variant SKU ("24861T YARIMAT ALTIN — g77 [K24861T.G77]"). Renaming a
+    variant used to leave every existing document still printing the dead
+    code, so the invoice disagreed with the catalog and a search for the new
+    SKU found none of the paperwork that quotes it.
+
+    Same two exclusions as sync_invoice_for_order, for the same reasons:
+      * draft — issue() builds its lines from the order later anyway.
+      * e-Arşiv filed (earsiv_uuid) — that document went to the tax
+        authority and cannot be quietly rewritten. It needs a credit note,
+        which is a human decision, so it is reported back to the caller
+        rather than silently diverging.
+    A cancelled invoice IS re-rendered: nothing was filed, and leaving it
+    quoting a SKU that no longer exists only hides it from search.
+
+    Only order-derived lines carry a SKU — purchase lines are named from the
+    goods-receipt form and store no variant — so nothing else needs redoing.
+
+    Returns (updated_count, skipped_invoice_ids).
+    """
+    from .models import InvoiceItem
+
+    if not variant or not variant.pk:
+        return 0, []
+
+    updated, skipped = 0, []
+    rows = (InvoiceItem.objects
+            .filter(variant_id=variant.pk)
+            .exclude(order_item=None)
+            .select_related("invoice", "order_item", "order_item__product",
+                            "order_item__product_variant"))
+    for row in rows:
+        inv = row.invoice
+        if inv is None or inv.status == "draft":
+            continue
+        if inv.earsiv_uuid:
+            if inv.pk not in skipped:
+                skipped.append(inv.pk)
+            continue
+        desc = _invoice_line_desc(row.order_item)
+        if desc != row.description:
+            row.description = desc
+            row.save(update_fields=["description"])
+            updated += 1
+    return updated, skipped
+
+
 def sync_invoice_for_order(order):
     """Re-align a live order-attached invoice with its order.
 

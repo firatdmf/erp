@@ -7727,12 +7727,8 @@ msgid "This product has no variants yet."
 msgstr "Bu üründe henüz varyant yok."
 
 #: operating/templates/operating/warehouse_detail.html:0
-msgid "MEVCUT"
+msgid "exists"
 msgstr "MEVCUT"
-
-#: operating/templates/operating/warehouse_detail.html:0
-msgid "YENİ"
-msgstr "YENİ"
 
 #: operating/templates/operating/warehouse_detail.html:0
 msgid "will add stock to this variant"

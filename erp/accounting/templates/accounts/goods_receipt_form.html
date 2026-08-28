@@ -1147,14 +1147,14 @@
         if (vEl._npMatchToken !== reqToken) return;
         if (d.exists) {
           badge.classList.add('show'); badge.classList.remove('new');
-          badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "MEVCUT" %} — ' +
+          badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "exists" %} — ' +
             '{% trans "will add stock to this variant" %} (' +
             (Math.round((d.variant_quantity || 0) * 100) / 100) + ')';
           skuI.value = d.variant_sku || skuI.value;
           skuI.dataset.matchLocked = '1';
         } else {
           badge.classList.add('show', 'new');
-          badge.innerHTML = '<i class="fa fa-plus-circle"></i> {% trans "YENİ" %} — {% trans "will create a new variant" %}';
+          badge.innerHTML = '<i class="fa fa-plus-circle"></i> {% trans "new" %} — {% trans "will create a new variant" %}';
           delete skuI.dataset.matchLocked;
           npSuggestVariantSku(vEl);
         }
@@ -1165,7 +1165,7 @@
   };
 
   // Hand-editing a SKU that was locked to an existing variant's real sku
-  // breaks that match — the badge must stop claiming "MEVCUT" for a sku the
+  // breaks that match — the badge must stop claiming "exists" for a sku the
   // save will actually ignore (the backend still dedups by attribute, not
   // by the typed sku, so keeping the old badge up would be misleading).
   window.npUnlockVariantSku = function (skuI) {
@@ -1387,7 +1387,7 @@
 
   // Clear the existing-variants chip row and every match badge for ONE
   // card — called whenever that card's selected main product changes or is
-  // cleared, so a stale "MEVCUT/YENİ" verdict from the previous product
+  // cleared, so a stale "exists/new" verdict from the previous product
   // never lingers.
   window.npResetExistingVariants = function (cardEl) {
     cardEl._npExistingVariants = [];
@@ -1457,7 +1457,7 @@
     if (badge) {
       badge.classList.add('show');
       badge.classList.remove('new');
-      badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "MEVCUT" %} — ' +
+      badge.innerHTML = '<i class="fa fa-check-circle"></i> {% trans "exists" %} — ' +
         '{% trans "will add stock to this variant" %} (' +
         (Math.round((v.variant_quantity || 0) * 100) / 100) + ')';
     }

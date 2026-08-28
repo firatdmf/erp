@@ -220,7 +220,7 @@ class CatalogSearchLabelTest(TestCase):
 
 
 class VariantMatchBySkuTest(TestCase):
-    """The MEVCUT/YENİ badge answers on the SKU, because that is what the
+    """The exists/new badge answers on the SKU, because that is what the
     save dedups on ("same SKU = same variant" — perform_intake)."""
 
     def setUp(self):
@@ -261,6 +261,43 @@ class VariantMatchBySkuTest(TestCase):
         """Names that translate cleanly keep working — nothing regressed for
         the products that were matching before."""
         self.assertFalse(self._match(name="MARLETTOO")["exists"])
+
+    def test_a_variant_with_no_warehouse_row_still_reads_as_existing(self):
+        """An orphaned variant — catalogued, but with every warehouse row
+        since deleted — owns its SKU just as firmly as a stocked one.
+
+        variant_sku is globally unique, so sync_roll_to_catalog cannot mint a
+        second variant under the typed code; it reuses this row. The badge
+        used to exclude orphans and promise "new" for a SKU the save then
+        reused, which is the preview/save disagreement this endpoint exists
+        to prevent.
+        """
+        from marketing.models import ProductVariant
+        orphan = ProductVariant.objects.create(
+            product=self.product, variant_sku="N1464T.G77",
+            variant_quantity=Decimal("0"))
+        self.assertEqual(orphan.warehouse_products.count(), 0)
+
+        d = self._match(sku="N1464T.G77", name="YARIMAT ALTIN")
+        self.assertTrue(d["exists"])
+        self.assertEqual(d["variant_sku"], "N1464T.G77")
+        self.assertAlmostEqual(d["variant_quantity"], 0.0, places=2)
+
+    def test_an_orphan_is_still_never_matched_on_its_colour_alone(self):
+        """The warehouse-link guard stays on the NAME branch: matching an
+        orphan by colour would pour real intake stock into a row with no
+        warehouse row behind it. Only an exact SKU may reach one."""
+        from marketing.models import (
+            ProductVariant, ProductVariantAttribute, ProductVariantAttributeValue,
+        )
+        orphan = ProductVariant.objects.create(
+            product=self.product, variant_sku="N1464T.G88")
+        attr = ProductVariantAttribute.objects.create(name="color")
+        val = ProductVariantAttributeValue.objects.create(
+            product_variant_attribute=attr, product_variant_attribute_value="white")
+        orphan.product_variant_attribute_values.add(val)
+
+        self.assertFalse(self._match(name="Beyaz")["exists"])
 
 
 class LongVariantSkuTest(TestCase):

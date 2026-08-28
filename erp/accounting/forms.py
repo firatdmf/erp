@@ -538,7 +538,7 @@ class CariTransferForm(forms.ModelForm):
         # book's own, since there is nothing to convert otherwise.
         self.fields["exchange_rate"].required = False
         self.fields["exchange_rate"].widget = forms.NumberInput(attrs={
-            "step": "0.000001", "min": "0", "placeholder": "0.000000",
+            "step": "0.00000001", "min": "0", "placeholder": "0.00000000",
         })
         self.fields["currency"].widget = CurrencyCodeSelect(
             choices=self.fields["currency"].choices

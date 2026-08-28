@@ -779,7 +779,11 @@
     function syncRateFromTotal() {
       var t = parseFloat(totalInput.value);
       var a = typedAmount();
-      rateInput.value = (isFinite(t) && a) ? (t / a).toFixed(6) : '';
+      // 8dp, matching the column CariTransferForm writes to. At 6 the rate
+      // implied by a typed total was quantised hard enough to move the total
+      // itself: a step of the sixth decimal is 4.4 cents at 43,940 TRY, so
+      // 913 came back 912.99.
+      rateInput.value = (isFinite(t) && a) ? (t / a).toFixed(8) : '';
       syncEquation();
     }
 
@@ -794,7 +798,7 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.rate) {
-            rateInput.value = parseFloat(d.rate).toFixed(6);
+            rateInput.value = parseFloat(d.rate).toFixed(8);
             note.textContent = "{% trans 'published rate for' %} " + (d.date || '');
           } else {
             // No published rate is not an error to interrupt with — it is

@@ -362,7 +362,15 @@ class CariMovement(models.Model):
 
     amount        = models.DecimalField(max_digits=14, decimal_places=2)
     currency      = models.ForeignKey("accounting.CurrencyCategory", on_delete=models.PROTECT)
-    exchange_rate = models.DecimalField(max_digits=14, decimal_places=6, default=Decimal("1.000000"),
+    # 8 decimals, not 6. A rate is only ever read back multiplied by an
+    # amount, and 6 decimals quantise the PRODUCT: at 43,940 TRY one step
+    # of the sixth decimal moves the base total by 4.4 cents, so $913.00
+    # was simply not reachable — 912.99 and 913.03 were. Whoever typed the
+    # figure they actually converted at watched it come back as a different
+    # one. max_digits widens in step so the integer range is unchanged;
+    # every rate on the book is below 1.0 in any case, since these are
+    # stored as currency→base (TRY→USD ≈ 0.0208).
+    exchange_rate = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("1.00000000"),
                                         help_text="Rate from movement currency to base (USD)")
     amount_base   = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"),
                                         help_text="Amount normalized to base currency (USD)")
@@ -1742,7 +1750,11 @@ class CariTransfer(models.Model):
     # deliberate entry, so a transfer in lira carrying "1.000000" would
     # read as an instruction to treat one lira as one dollar. Null says
     # nothing, which is what an untouched field means.
-    exchange_rate = models.DecimalField(max_digits=14, decimal_places=6,
+    # 8 decimals for the reason CariMovement.exchange_rate gives — and it
+    # has to match that column, since post() stamps this straight onto both
+    # legs. Widening one without the other would round the rate right back
+    # on the way into the ledger.
+    exchange_rate = models.DecimalField(max_digits=16, decimal_places=8,
                                         null=True, blank=True,
                                         help_text="Rate to the book's base "
                                                   "currency. Blank → the "

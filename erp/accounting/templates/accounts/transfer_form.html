@@ -335,7 +335,11 @@
     function syncRateFromTotal() {
       var t = parseFloat(totalInput.value);
       var a = typedAmount();
-      rateInput.value = (isFinite(t) && a) ? (t / a).toFixed(6) : '';
+      // 8dp, matching the column. At 6 the rate implied by a typed total
+      // was quantised hard enough to move the total itself — 913 came back
+      // as 912.99, because a step of the sixth decimal is 4.4 cents at this
+      // amount. Rounding here is rounding the answer, not the input.
+      rateInput.value = (isFinite(t) && a) ? (t / a).toFixed(8) : '';
       syncEquation();
     }
 
@@ -349,7 +353,7 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.rate) {
-            rateInput.value = parseFloat(d.rate).toFixed(6);
+            rateInput.value = parseFloat(d.rate).toFixed(8);
             note.textContent = "{% trans 'published rate for' %} " + (d.date || '');
           } else {
             // No published rate is not an error to interrupt with — it is

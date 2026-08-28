@@ -186,3 +186,52 @@ class TransferEditRateTest(TransferTestBase):
         form = CariTransferForm(book=self.book)
         self.assertEqual(form.fields["date"].widget.attrs.get("value"),
                          _date.today().strftime("%Y-%m-%d"))
+
+    def test_the_base_total_the_operator_types_is_the_one_that_posts(self):
+        """The complaint this precision exists for.
+
+        At 43,940 TRY one step of a SIXTH decimal moves the base total by
+        4.4 cents, so $913.00 was not on the grid — the rate rounded to
+        0.020778 and the ledger came back 912.99, every time. Eight decimals
+        put every cent within reach.
+        """
+        big = CariTransfer.objects.create(
+            book=self.book, date="2026-02-01",
+            from_cari=self.a, to_cari=self.b,
+            amount=Decimal("43940.00"), currency=self.try_,
+            exchange_rate=Decimal("0.02077800"),
+        )
+        big.post()
+        self.assertEqual(abs(big.from_movement.amount_base), Decimal("912.99"))
+
+        # The rate the page derives from a typed total of 913.00.
+        self.client.post(reverse("accounts:transfer_edit", args=[big.pk]), {
+            "book": self.book.pk, "date": "2026-02-01",
+            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "amount": "43940.00", "currency": self.try_.pk,
+            "exchange_rate": "0.02077833",
+        })
+        big.refresh_from_db()
+        legs = [big.from_movement, big.to_movement]
+        self.assertEqual({abs(m.amount_base) for m in legs}, {Decimal("913.00")})
+        self.assertEqual(sum(m.amount_base for m in legs), Decimal("0.00"))
+
+    def test_the_rate_column_keeps_all_eight_decimals(self):
+        """Widening the transfer alone would not have worked: post() stamps
+        its rate straight onto both legs, so CariMovement had to widen with
+        it or round the rate right back on the way into the ledger."""
+        from accounting.models import CariMovement
+        rate = Decimal("0.02077833")
+        self.transfer.exchange_rate = rate
+        self.transfer.save()
+        self.transfer.unpost()
+        self.transfer.post()
+        self.transfer.refresh_from_db()
+        for leg in (self.transfer.from_movement, self.transfer.to_movement):
+            self.assertEqual(leg.exchange_rate, rate)
+        self.assertEqual(CariMovement._meta.get_field("exchange_rate").decimal_places, 8)
+
+    def test_the_rate_box_accepts_eight_decimals(self):
+        from accounting.forms import CariTransferForm
+        form = CariTransferForm(book=self.book)
+        self.assertEqual(form.fields["exchange_rate"].widget.attrs["step"], "0.00000001")

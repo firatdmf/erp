@@ -8909,3 +8909,12 @@ msgstr "Bu satırı bir %(doc)s kaydı oluşturdu ve onu yeniden hesaplıyor. D�
 
 msgid "This row belongs to a %(doc)s and is not edited on its own."
 msgstr "Bu satır bir %(doc)s kaydına ait ve tek başına düzenlenmez."
+
+msgid "Delete expense"
+msgstr "Gideri sil"
+
+msgid "Delete this expense? Whatever it posted — the cash it took or the debt it created — is undone with it."
+msgstr "Bu gider silinsin mi? Neyi işlediyse — aldığı nakit ya da yarattığı borç — onunla birlikte geri alınır."
+
+msgid "%(amount)s expense deleted."
+msgstr "%(amount)s tutarındaki gider silindi."

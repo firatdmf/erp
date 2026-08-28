@@ -165,6 +165,8 @@
   .pf-effect { margin-top: 14px; background: #F8FAFC; border: 1px solid #E7ECF2; border-radius: 10px; padding: 12px 14px; font: 500 12.5px var(--font-sans); color: var(--gray-600); line-height: 1.55; }
   .pf-effect b { color: var(--ink); }
   .pf-actions { margin-top: 16px; display: grid; gap: 8px; }
+  .pf-btn.danger { background: white; border: 1px solid #F0C4C4; color: #B23B12; margin-top: 6px; }
+  .pf-btn.danger:hover { background: #FEF4F2; border-color: #E4A4A4; }
   .pf-posted { margin-top: 10px; background: var(--nejum-teal-50); border: 1px solid rgba(20,127,116,0.18); border-radius: 10px; padding: 12px 14px; }
   .pf-posted .t { font: 700 10.5px var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--nejum-teal-700); margin-bottom: 5px; }
   .pf-posted a { font: 700 13px var(--font-sans); color: var(--ink); text-decoration: none; }
@@ -429,6 +431,25 @@
                 {% if object.pk %}{% trans "Save changes" %}{% else %}{% trans "Save expense" %}{% endif %}
               </button>
               <a href="{% url 'accounting:equity_expense_list' pk=book.pk %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+
+              {% if object.pk %}
+              {% comment %}
+                formaction rather than a form of its own: this sits inside
+                the expense form, and a <form> cannot nest — the browser
+                drops the inner one, so the button would have quietly
+                saved instead of deleted. formnovalidate because a delete
+                has no business being blocked by an empty amount.
+
+                Still a POST. A delete a prefetch or a crawler could follow
+                would unwind a ledger entry on its own.
+              {% endcomment %}
+              <button type="submit" class="pf-btn danger"
+                      formaction="{% url 'accounting:delete_equity_expense' pk=book.pk expense_pk=object.pk %}"
+                      formmethod="post" formnovalidate
+                      onclick="return confirm('{% trans "Delete this expense? Whatever it posted — the cash it took or the debt it created — is undone with it." %}');">
+                {% trans "Delete expense" %}
+              </button>
+              {% endif %}
             </div>
           </div>
         </div>

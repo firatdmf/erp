@@ -1345,6 +1345,37 @@ class AddEquityExpense(EquityExpensePage, generic.edit.CreateView):
 
 
 @method_decorator(login_required, name="dispatch")
+class DeleteEquityExpense(View):
+    """Remove an expense that should never have been one.
+
+    Not every wrong entry is a wrong figure. An expense recorded for
+    something that turns out not to be the book's expense at all — a tax
+    paid on another account's behalf, say — cannot be edited into what it
+    should have been, because what it should have been is a different kind
+    of record. It has to go, and then the right one is made.
+
+    POST only: a link that a crawler or a prefetch can follow must not be
+    able to unwind a ledger entry.
+    """
+
+    def post(self, request, pk, expense_pk):
+        expense = get_object_or_404(EquityExpense, pk=expense_pk, book_id=pk)
+        note = _g("%(amount)s expense deleted.") % {
+            "amount": f"{expense.amount} {expense.currency.code}",
+        }
+        with transaction.atomic():
+            # Give the cash back or drop the debt first — deleting the row
+            # on its own would leave whichever it posted standing, with
+            # nothing left to explain it.
+            unpost_expense(expense)
+            expense.delete()
+        messages.success(request, note)
+        return HttpResponseRedirect(
+            reverse("accounting:equity_expense_list", kwargs={"pk": pk})
+        )
+
+
+@method_decorator(login_required, name="dispatch")
 class EditEquityExpense(EquityExpensePage, generic.edit.UpdateView):
     """Correct an expense, including what funded it.
 

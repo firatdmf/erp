@@ -451,6 +451,67 @@ class ExpensePaidOnAccountTests(TestCase):
             1,
         )
 
+    # -- deleting ------------------------------------------------------------
+    def _delete(self, expense):
+        return self.client.post(
+            reverse("accounting:delete_equity_expense",
+                    kwargs={"pk": self.book.pk, "expense_pk": expense.pk})
+        )
+
+    def test_deleting_an_on_account_expense_drops_the_debt_with_it(self):
+        """Not every wrong entry is a wrong figure — an expense that was
+        never the book's expense cannot be edited into the right thing."""
+        self._post()
+        expense = EquityExpense.objects.get()
+
+        self._delete(expense)
+
+        self.assertFalse(EquityExpense.objects.exists())
+        self.assertFalse(CariMovement.objects.exists())
+        self.firat.refresh_from_db()
+        self.assertEqual(self.firat.cached_balance, Decimal("0.00"))
+
+    def test_deleting_a_cash_expense_gives_the_cash_back(self):
+        self._post(cash_account=self.kasa.pk, paid_by_cari="")
+        expense = EquityExpense.objects.get()
+
+        self._delete(expense)
+
+        self.kasa.refresh_from_db()
+        self.assertEqual(self.kasa.balance, Decimal("1000.00"))
+        self.assertFalse(
+            CashTransactionEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(EquityExpense),
+                content_pk=expense.pk,
+            ).exists()
+        )
+
+    def test_a_get_cannot_delete_an_expense(self):
+        """A link a prefetch could follow must not unwind a ledger entry."""
+        self._post()
+        expense = EquityExpense.objects.get()
+
+        response = self.client.get(
+            reverse("accounting:delete_equity_expense",
+                    kwargs={"pk": self.book.pk, "expense_pk": expense.pk})
+        )
+
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(EquityExpense.objects.filter(pk=expense.pk).exists())
+
+    def test_an_expense_cannot_be_deleted_through_another_books_url(self):
+        self._post()
+        expense = EquityExpense.objects.get()
+        other = Book.objects.create(name="Other", base_currency=self.usd)
+
+        response = self.client.post(
+            reverse("accounting:delete_equity_expense",
+                    kwargs={"pk": other.pk, "expense_pk": expense.pk})
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(EquityExpense.objects.filter(pk=expense.pk).exists())
+
     def test_an_expense_cannot_be_edited_through_another_books_url(self):
         self._post()
         expense = EquityExpense.objects.get()

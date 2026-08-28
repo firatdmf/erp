@@ -8879,3 +8879,33 @@ msgstr "Bu hesapta iptal edilmiş fatura, ödeme ya da senet yok."
 
 msgid "Nothing cancelled here left a ledger row — the documents below are the record."
 msgstr "Burada iptal edilenlerin hiçbiri defterde satır bırakmadı — kayıt, aşağıdaki belgelerdir."
+
+msgid "The row"
+msgstr "Hareket"
+
+msgid "Debit — they owe us"
+msgstr "Borç — bize borçlu"
+
+msgid "Credit — we owe them"
+msgstr "Alacak — biz borçluyuz"
+
+msgid "In base currency"
+msgstr "Ana para biriminde"
+
+msgid "Balance after"
+msgstr "Sonraki bakiye"
+
+msgid "Entered by"
+msgstr "Giren"
+
+msgid "Counts toward the balance"
+msgstr "Bakiyeye dahil"
+
+msgid "No — cancelled"
+msgstr "Hayır — iptal edildi"
+
+msgid "This row was posted by a %(doc)s, which recomputes it. Correct it there and this follows — an edit made here would be overwritten the next time that document is touched."
+msgstr "Bu satırı bir %(doc)s kaydı oluşturdu ve onu yeniden hesaplıyor. Düzeltmeyi orada yapın, bu satır kendiliğinden uyar — burada yapılan bir düzenleme, o belgeye bir dahaki dokunuşta üzerine yazılır."
+
+msgid "This row belongs to a %(doc)s and is not edited on its own."
+msgstr "Bu satır bir %(doc)s kaydına ait ve tek başına düzenlenmez."

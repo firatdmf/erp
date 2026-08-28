@@ -427,6 +427,15 @@ def _movement_owner(mv, linked_payment=None, linked_invoice=None, is_cancel_row=
         if model is not None and model.__name__ == "Order":
             return (_("Order"),
                     reverse("operating:order_detail", args=[mv.source_id]), False)
+        if model is not None and model.__name__ == "EquityExpense":
+            # An expense somebody settled on the book's behalf. The expense
+            # is what posts this row and what reposts it on every edit, so
+            # it is corrected there — and now there is a page to send the
+            # user to, which is why this is no longer a dead end.
+            return (_("Expense"),
+                    reverse("accounting:edit_equity_expense",
+                            kwargs={"pk": mv.book_id, "expense_pk": mv.source_id}),
+                    False)
         if model is not None and model.__name__ == "CariTransfer":
             # One leg of a pair. Editing it alone would move a balance out
             # of one account without moving it into the other, so the row
@@ -925,6 +934,51 @@ def _own_movement_or_redirect(request, cari, mv_pk):
 
 
 @method_decorator(login_required, name="dispatch")
+@method_decorator(login_required, name="dispatch")
+class CariMovementDetail(View):
+    """One ledger row, in full, and the way to correct it.
+
+    The tables print a row across a handful of columns; this is the place
+    that answers what it actually is — what it converted at and came to,
+    where it sits in the running balance, who entered it, and which
+    document, if any, owns it.
+
+    That last one decides what the page offers. A hand-entered row is
+    edited here. A row a document posted is not: the document recomputes
+    it, so an edit made in place is overwritten the next time the document
+    is touched — silently, and only sometimes. Those rows get a link to
+    the document instead, which is the same rule _movement_owner already
+    enforces for the pencil in the tables and for a typed URL.
+    """
+
+    template_name = "accounts/movement_detail.html"
+
+    def get(self, request, pk, mv_pk):
+        cari = get_object_or_404(CariAccount, pk=pk)
+        mv = get_object_or_404(
+            CariMovement.objects.select_related(
+                "currency", "cari", "book", "created_by__user"
+            ),
+            pk=mv_pk, cari=cari,
+        )
+
+        # The balance as of this row: everything up to and including it,
+        # by the same rule the account page and the statement sum by.
+        # Rebuilt rather than passed in, so the figure is right whichever
+        # page the user arrived from.
+        running = cari.movements.live().filter(
+            Q(date__lt=mv.date) | Q(date=mv.date, id__lte=mv.id)
+        ).aggregate(s=Sum("amount_base"))["s"] or Decimal("0.00")
+
+        row = _attach_links([{"mv": mv, "balance_after": running}])[0]
+        return render(request, self.template_name, {
+            "cari": cari,
+            "mv": mv,
+            "row": row,
+            "balance_after": running,
+        })
+
+
 class CariMovementEdit(View):
     """Edit a hand-entered ledger row — an opening balance, an
     adjustment, interest, a discount.

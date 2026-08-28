@@ -39,6 +39,7 @@ urlpatterns = [
     path("<int:pk>/edit/",            views.CariEdit.as_view(),           name="edit"),
     path("<int:pk>/delete/",          views.CariDelete.as_view(),         name="delete"),
     path("<int:pk>/movements/new/",   views.CariMovementCreate.as_view(), name="movement_create"),
+    path("<int:pk>/movements/<int:mv_pk>/",        views.CariMovementDetail.as_view(), name="movement_detail"),
     path("<int:pk>/movements/<int:mv_pk>/edit/",   views.CariMovementEdit.as_view(),   name="movement_edit"),
     path("<int:pk>/movements/<int:mv_pk>/delete/", views.CariMovementDelete.as_view(), name="movement_delete"),
 

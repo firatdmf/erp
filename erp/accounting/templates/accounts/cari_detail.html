@@ -85,6 +85,10 @@
   /* Balance hero card */
   .cd-balance { padding: 28px 24px; text-align: center; background: linear-gradient(180deg, #FAFCFB 0%, #FFFFFF 100%); }
   .cd-balance .lbl { font: 600 11px var(--font-sans); letter-spacing: 0.18em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 8px; }
+  .cd-tbl .mv-id-h { width: 1%; }
+  .cd-tbl .mv-id a { font: 600 11.5px var(--font-mono); color: var(--gray-500);
+                     text-decoration: none; white-space: nowrap; }
+  .cd-tbl .mv-id a:hover { color: var(--nejum-teal-700); text-decoration: underline; }
   /* The base-currency value of a row that had to be converted, under the
      figure it was converted from — same idea as .st-fx on the statement. */
   .cd-fx { display:block; font: 500 10.5px var(--font-mono); color: var(--gray-500);
@@ -367,7 +371,7 @@
         {% if movements %}
         <table class="cd-tbl">
           <thead>
-            <tr><th>{% trans "Date" %}</th><th>{% trans "Type" %}</th><th>{% trans "Description" %}</th><th>{% trans "Reference" %}</th><th class="num">{% trans "Amount" %}</th><th class="num">{% trans "Balance" %}</th></tr>
+            <tr><th class="mv-id-h">#</th><th>{% trans "Date" %}</th><th>{% trans "Type" %}</th><th>{% trans "Description" %}</th><th>{% trans "Reference" %}</th><th class="num">{% trans "Amount" %}</th><th class="num">{% trans "Balance" %}</th></tr>
           </thead>
           <tbody>
             {% for m in movements %}
@@ -376,6 +380,17 @@
               {% elif inv %}{% url 'accounts:invoice_detail' inv.pk as link_url %}
               {% endif %}
             <tr {% if link_url %}class="mv-link" data-href="{{ link_url }}" style="cursor:pointer;"{% endif %}>
+              {% comment %}
+                The row's own id, and the way into it. A row is a thing you
+                can be wrong about — until now the table was the only view
+                of one, and there was nowhere to go to see what it converted
+                at or to correct it. stopPropagation because the <tr> may
+                already carry a click of its own to the linked document.
+              {% endcomment %}
+              <td class="mv-id">
+                <a href="{% url 'accounts:movement_detail' cari.pk m.mv.pk %}"
+                   onclick="event.stopPropagation();">{{ m.mv.pk }}</a>
+              </td>
               <td style="color: var(--gray-600); font-size: 12.5px;">{{ m.mv.date|date:"d.m.Y" }}</td>
               <td>
                 {% if link_url %}

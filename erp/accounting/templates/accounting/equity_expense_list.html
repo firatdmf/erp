@@ -21,7 +21,7 @@
 
       {% for expense in object_list %}
         <tr>
-          <td>{{ expense.pk }}</td>
+          <td><a href="{% url 'accounting:edit_equity_expense' pk=expense.book_id expense_pk=expense.pk %}">{{ expense.pk }}</a></td>
           <td>{{ expense.date }}</td>
           <td>{{ expense.category|default:"—" }}</td>
           <td style="color:red;">{{ expense.currency.symbol }}{{ expense.amount|format_money }}</td>

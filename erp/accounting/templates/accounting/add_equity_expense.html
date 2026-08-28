@@ -165,6 +165,11 @@
   .pf-effect { margin-top: 14px; background: #F8FAFC; border: 1px solid #E7ECF2; border-radius: 10px; padding: 12px 14px; font: 500 12.5px var(--font-sans); color: var(--gray-600); line-height: 1.55; }
   .pf-effect b { color: var(--ink); }
   .pf-actions { margin-top: 16px; display: grid; gap: 8px; }
+  .pf-posted { margin-top: 10px; background: var(--nejum-teal-50); border: 1px solid rgba(20,127,116,0.18); border-radius: 10px; padding: 12px 14px; }
+  .pf-posted .t { font: 700 10.5px var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--nejum-teal-700); margin-bottom: 5px; }
+  .pf-posted a { font: 700 13px var(--font-sans); color: var(--ink); text-decoration: none; }
+  .pf-posted a:hover { color: var(--nejum-teal-700); text-decoration: underline; }
+  .pf-posted .n { font: 500 12px var(--font-sans); color: var(--gray-600); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
   /* The rate converter that partials/fx_rate_field.html appends, dressed to
      match the payment form's version of the same control. */
@@ -182,12 +187,15 @@
 
 {% block content %}
 <div class="pf">
-  <a href="{% url 'accounting:book_detail' pk=book.pk %}" class="pf-back">&larr; {{ book.name }}</a>
+  <a href="{% if object.pk %}{% url 'accounting:equity_expense_list' pk=book.pk %}{% else %}{% url 'accounting:book_detail' pk=book.pk %}{% endif %}"
+     class="pf-back">&larr; {% if object.pk %}{% trans "Expenses" %}{% else %}{{ book.name }}{% endif %}</a>
 
   <div class="pf-head">
     <div>
-      <div class="pf-eyebrow">{% trans "Expense" %}</div>
-      <h1 class="pf-title">{% trans "Record an expense" %}</h1>
+      <div class="pf-eyebrow">{% trans "Expense" %}{% if object.pk %} · #{{ object.pk }}{% endif %}</div>
+      <h1 class="pf-title">
+        {% if object.pk %}{% trans "Edit expense" %}{% else %}{% trans "Record an expense" %}{% endif %}
+      </h1>
     </div>
   </div>
 
@@ -209,74 +217,6 @@
 
     <div class="pf-grid">
       <div>
-        <div class="pf-card">
-          <div class="pf-sect">
-            <div class="pf-sect-h">
-              <span class="ico"><i class="fa fa-receipt"></i></span>
-              <h3>{% trans "The expense" %}</h3>
-              <span class="sub">{% trans "What was spent, when, and on what" %}</span>
-            </div>
-
-            <div class="pf-row four">
-              <div class="pf-f">
-                <label>{% trans "Amount" %}</label>
-                {# unlocalized: a number input only accepts a dot decimal, never 1234,56 #}
-                <input type="number" step="0.01" min="0.01" required
-                       name="amount" id="id_amount"
-                       value="{% if form.amount.value %}{{ form.amount.value|unlocalize }}{% endif %}"
-                       placeholder="{{ 0|floatformat:2 }}">
-              </div>
-              <div class="pf-f">
-                <label>{% trans "Currency" %}</label>
-                {% comment %}
-                  Free to choose while a current account is funding this: a
-                  cari holds a mix of currencies by design, so a USD account
-                  can have settled a lira bill. Locked to the account on the
-                  cash path, because a cash balance is decremented without
-                  converting — see EquityExpenseForm.clean. Disabled submits
-                  nothing, which is why `currency` is not a required field.
-                {% endcomment %}
-                <select name="currency" id="id_currency">
-                  {% for c in currencies %}
-                    <option value="{{ c.pk }}" data-code="{{ c.code }}"
-                            {% if form.currency.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.code }}</option>
-                  {% endfor %}
-                </select>
-                <span class="hint" id="currencyHint"></span>
-              </div>
-              <div class="pf-f">
-                <label>{% trans "Date" %}</label>
-                {% comment %}
-                  form.data is the raw POST (empty on a fresh GET), so a
-                  rejected submit keeps what was typed and a new form opens on
-                  today — without a date object being localized into something
-                  the input cannot parse.
-                {% endcomment %}
-                <input type="date" name="date" id="id_date" required
-                       value="{{ form.data.date|default:today }}">
-              </div>
-              <div class="pf-f">
-                <label>{% trans "Category" %}</label>
-                <select name="category" id="id_category">
-                  <option value="">{% trans "— None —" %}</option>
-                  {% for c in categories %}
-                    <option value="{{ c.pk }}" {% if form.category.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-
-            <div class="pf-row wide" style="margin-top:14px;">
-              <div class="pf-f">
-                <label>{% trans "Description" %}</label>
-                <input type="text" name="description" maxlength="200"
-                       value="{{ form.description.value|default_if_none:'' }}"
-                       placeholder="{% trans 'What was this expense for?' %}">
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div class="pf-card">
           <div class="pf-sect">
             <div class="pf-sect-h">
@@ -365,6 +305,65 @@
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="pf-card">
+          <div class="pf-sect">
+            <div class="pf-sect-h">
+              <span class="ico"><i class="fa fa-receipt"></i></span>
+              <h3>{% trans "The expense" %}</h3>
+              <span class="sub">{% trans "What was spent, when, and on what" %}</span>
+            </div>
+
+            <div class="pf-row four">
+              <div class="pf-f">
+                <label>{% trans "Amount" %}</label>
+                {# unlocalized: a number input only accepts a dot decimal, never 1234,56 #}
+                <input type="number" step="0.01" min="0.01" required
+                       name="amount" id="id_amount"
+                       value="{% if form.amount.value %}{{ form.amount.value|unlocalize }}{% endif %}"
+                       placeholder="{{ 0|floatformat:2 }}">
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Currency" %}</label>
+                {% comment %}
+                  Free to choose while a current account is funding this: a
+                  cari holds a mix of currencies by design, so a USD account
+                  can have settled a lira bill. Locked to the account on the
+                  cash path, because a cash balance is decremented without
+                  converting — see EquityExpenseForm.clean. Disabled submits
+                  nothing, which is why `currency` is not a required field.
+                {% endcomment %}
+                <select name="currency" id="id_currency">
+                  {% for c in currencies %}
+                    <option value="{{ c.pk }}" data-code="{{ c.code }}"
+                            {% if form.currency.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.code }}</option>
+                  {% endfor %}
+                </select>
+                <span class="hint" id="currencyHint"></span>
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Date" %}</label>
+                {% comment %}
+                  form.data is the raw POST (empty on a fresh GET), so a
+                  rejected submit keeps what was typed and a new form opens on
+                  today — without a date object being localized into something
+                  the input cannot parse.
+                {% endcomment %}
+                <input type="date" name="date" id="id_date" required
+                       value="{{ form.data.date|default:today }}">
+              </div>
+              <div class="pf-f">
+                <label>{% trans "Category" %}</label>
+                <select name="category" id="id_category">
+                  <option value="">{% trans "— None —" %}</option>
+                  {% for c in categories %}
+                    <option value="{{ c.pk }}" {% if form.category.value|stringformat:'s' == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
 
             <div class="pf-row wide" style="margin-top:14px;">
               <div class="pf-f">
@@ -374,6 +373,15 @@
                        value="{% if form.exchange_rate.value %}{{ form.exchange_rate.value|unlocalize }}{% endif %}"
                        placeholder="0.000000">
                 <span class="hint">{% trans "Leave as fetched, or type the rate you actually got — either box updates the other." %}</span>
+              </div>
+            </div>
+
+            <div class="pf-row wide" style="margin-top:14px;">
+              <div class="pf-f">
+                <label>{% trans "Description" %}</label>
+                <input type="text" name="description" maxlength="200"
+                       value="{{ form.description.value|default_if_none:'' }}"
+                       placeholder="{% trans 'What was this expense for?' %}">
               </div>
             </div>
           </div>
@@ -396,9 +404,32 @@
               {% trans "Choose what funded this expense." %}
             </div>
 
+            {% if ledger_movement %}
+            {% comment %}
+              Read back off the ledger, not recomputed from the form. The
+              point of landing here is to see that the other half of the
+              entry exists — so it has to be the stored row that says so.
+            {% endcomment %}
+            <div class="pf-posted">
+              <div class="t">{% trans "Posted to the account" %}</div>
+              <a href="{% url 'accounts:detail' pk=ledger_movement.cari_id %}">
+                {{ ledger_movement.cari.code }} — {{ ledger_movement.cari.name }}
+              </a>
+              <div class="n">
+                {{ ledger_movement.date }} ·
+                {{ ledger_movement.amount|floatformat:2 }} {{ ledger_movement.currency.code }}
+                {% if ledger_movement.currency_id != ledger_movement.cari.default_currency_id or ledger_movement.exchange_rate != 1 %}
+                  · {{ ledger_movement.amount_base|floatformat:2 }} {{ book.effective_base_currency.code }}
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+
             <div class="pf-actions">
-              <button type="submit" class="pf-btn primary">{% trans "Save expense" %}</button>
-              <a href="{% url 'accounting:book_detail' pk=book.pk %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
+              <button type="submit" class="pf-btn primary">
+                {% if object.pk %}{% trans "Save changes" %}{% else %}{% trans "Save expense" %}{% endif %}
+              </button>
+              <a href="{% url 'accounting:equity_expense_list' pk=book.pk %}" class="pf-btn ghost">{% trans "Cancel" %}</a>
             </div>
           </div>
         </div>

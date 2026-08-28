@@ -63,7 +63,7 @@ class ExpensePaidOnAccountTests(TestCase):
         )
         self.taxes = ExpenseCategory.objects.create(name="Taxes")
 
-    def _post(self, **overrides):
+    def _post(self, follow=False, **overrides):
         payload = {
             "book": self.book.pk, "category": self.taxes.pk,
             "cash_account": "", "paid_by_cari": self.firat.pk,
@@ -74,7 +74,7 @@ class ExpensePaidOnAccountTests(TestCase):
         payload.update(overrides)
         return self.client.post(
             reverse("accounting:add_equity_expense", kwargs={"pk": self.book.pk}),
-            payload,
+            payload, follow=follow,
         )
 
     # -- the form offers both, and says what each is in --------------------
@@ -248,6 +248,130 @@ class ExpensePaidOnAccountTests(TestCase):
 
         movement = CariMovement.objects.get(cari=self.lira_cari)
         self.assertEqual(movement.amount_base, Decimal("-20.00"))
+
+    # -- where you land afterwards -----------------------------------------
+    def test_it_says_what_it_recorded(self):
+        response = self._post(follow=True)
+
+        note = str(list(response.context["messages"])[0])
+        self.assertIn("180.59 USD", note)
+        self.assertIn(self.firat.name, note)
+
+    # -- editing ------------------------------------------------------------
+    def _edit(self, expense, **overrides):
+        payload = {
+            "book": self.book.pk, "category": self.taxes.pk,
+            "cash_account": expense.cash_account_id or "",
+            "paid_by_cari": expense.paid_by_cari_id or "",
+            "currency": expense.currency_id, "amount": str(expense.amount),
+            "date": expense.date.isoformat(), "exchange_rate": "",
+            "description": expense.description,
+        }
+        payload.update(overrides)
+        return self.client.post(
+            reverse("accounting:edit_equity_expense",
+                    kwargs={"pk": self.book.pk, "expense_pk": expense.pk}),
+            payload,
+        )
+
+    def test_the_page_you_land_on_is_the_expense_itself(self):
+        response = self._post()
+
+        expense = EquityExpense.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("accounting:edit_equity_expense",
+                    kwargs={"pk": self.book.pk, "expense_pk": expense.pk}),
+            fetch_redirect_response=False,
+        )
+
+    def test_the_page_shows_the_row_it_posted(self):
+        self._post()
+        expense = EquityExpense.objects.get()
+
+        response = self.client.get(
+            reverse("accounting:edit_equity_expense",
+                    kwargs={"pk": self.book.pk, "expense_pk": expense.pk})
+        )
+        self.assertContains(response, self.firat.code)
+        self.assertContains(response, "180.59")
+
+    def test_changing_the_amount_moves_the_debt_with_it(self):
+        self._post()
+        expense = EquityExpense.objects.get()
+
+        self._edit(expense, amount="200.00")
+
+        self.assertEqual(CariMovement.objects.filter(cari=self.firat).count(), 1)
+        self.assertEqual(
+            CariMovement.objects.get(cari=self.firat).amount, Decimal("-200.00")
+        )
+        self.firat.refresh_from_db()
+        self.assertEqual(self.firat.cached_balance, Decimal("-200.00"))
+
+    def test_moving_an_expense_from_cash_to_an_account_gives_the_cash_back(self):
+        self._post(cash_account=self.kasa.pk, paid_by_cari="")
+        expense = EquityExpense.objects.get()
+        self.kasa.refresh_from_db()
+        self.assertEqual(self.kasa.balance, Decimal("819.41"))
+
+        self._edit(expense, cash_account="", paid_by_cari=self.firat.pk)
+
+        self.kasa.refresh_from_db()
+        self.assertEqual(self.kasa.balance, Decimal("1000.00"))
+        self.assertFalse(
+            CashTransactionEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(EquityExpense),
+                content_pk=expense.pk,
+            ).exists()
+        )
+        self.firat.refresh_from_db()
+        self.assertEqual(self.firat.cached_balance, Decimal("-180.59"))
+
+    def test_moving_an_expense_from_an_account_to_cash_clears_the_debt(self):
+        self._post()
+        expense = EquityExpense.objects.get()
+
+        self._edit(expense, paid_by_cari="", cash_account=self.kasa.pk)
+
+        self.assertFalse(CariMovement.objects.exists())
+        self.firat.refresh_from_db()
+        self.assertEqual(self.firat.cached_balance, Decimal("0.00"))
+        self.kasa.refresh_from_db()
+        self.assertEqual(self.kasa.balance, Decimal("819.41"))
+
+    def test_moving_between_cash_accounts_credits_the_one_it_left(self):
+        second = CashAccount.objects.create(
+            book=self.book, name="Bank", currency=self.usd,
+            balance=Decimal("500.00"),
+        )
+        self._post(cash_account=self.kasa.pk, paid_by_cari="")
+        expense = EquityExpense.objects.get()
+
+        self._edit(expense, cash_account=second.pk)
+
+        self.kasa.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(self.kasa.balance, Decimal("1000.00"))
+        self.assertEqual(second.balance, Decimal("319.41"))
+        self.assertEqual(
+            CashTransactionEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(EquityExpense),
+                content_pk=expense.pk,
+            ).count(),
+            1,
+        )
+
+    def test_an_expense_cannot_be_edited_through_another_books_url(self):
+        self._post()
+        expense = EquityExpense.objects.get()
+        other = Book.objects.create(name="Other", base_currency=self.usd)
+
+        response = self.client.get(
+            reverse("accounting:edit_equity_expense",
+                    kwargs={"pk": other.pk, "expense_pk": expense.pk})
+        )
+        self.assertEqual(response.status_code, 404)
 
     # -- exactly one funding source ----------------------------------------
     def test_naming_both_funding_sources_is_rejected(self):

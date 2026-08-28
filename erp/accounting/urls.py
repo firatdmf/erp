@@ -53,6 +53,7 @@ urlpatterns = [
     path('books/<int:pk>/add_equity_expense/', AddEquityExpense.as_view(),name="add_equity_expense"),
     path('books/<int:pk>/add_equity_divident/', AddEquityDivident.as_view(),name="add_equity_divident"),
     path('books/<int:pk>/equity_expense_list/', EquityExpenseList.as_view(),name="equity_expense_list"),
+    path('books/<int:pk>/expenses/<int:expense_pk>/', EditEquityExpense.as_view(),name="edit_equity_expense"),
     # path('books/<int:pk>/create_invoice/', InvoiceCreateView.as_view(),name="create_invoice"),
     path('books/<int:pk>/make_in_transfer/', MakeInTransfer.as_view(),name="make_in_transfer"),
     path('books/<int:pk>/make_currency_exchange/', MakeCurrencyExchange.as_view(),name="make_currency_exchange"),

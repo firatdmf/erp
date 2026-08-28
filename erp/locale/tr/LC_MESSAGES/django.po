@@ -8849,3 +8849,18 @@ msgstr "Varsayılan olarak hesabın kendi para birimi — para başka bir birimd
 
 msgid "Set by the cash account."
 msgstr "Kasa hesabına göre belirlenir."
+
+msgid "Edit expense"
+msgstr "Gideri düzenle"
+
+msgid "Posted to the account"
+msgstr "Cari hesaba işlendi"
+
+msgid "%(amount)s expense recorded — %(account)s is owed it."
+msgstr "%(amount)s tutarında gider kaydedildi — %(account)s hesabına borçlanıldı."
+
+msgid "%(amount)s expense recorded, paid from %(account)s."
+msgstr "%(amount)s tutarında gider kaydedildi, %(account)s hesabından ödendi."
+
+msgid "That account does not hold enough: %s"
+msgstr "Bu hesapta yeterli bakiye yok: %s"

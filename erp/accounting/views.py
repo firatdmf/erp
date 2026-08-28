@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.shortcuts import get_object_or_404, render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 
 # from django.views.generic import TemplateView
 from django.urls import reverse_lazy, reverse
@@ -897,6 +897,51 @@ def handle_expense_on_account(book, expense, member=None):
     )
 
 
+def post_expense(book, expense, member=None):
+    """Apply an expense's effect on the ledger, whichever funded it.
+
+    One definition, so creating and editing cannot drift: an edit unposts
+    and re-posts through this same pair rather than working out the
+    difference between two states. Reversing and re-applying is more work
+    for the database and far less work to be sure of — a diff has to be
+    right about every field that moved, while this only has to be right
+    about one entry at a time.
+    """
+    if expense.cash_account_id:
+        return handle_equity_transaction(
+            book, expense.amount, expense.currency,
+            expense, expense.pk, expense.cash_account,
+        )
+    return handle_expense_on_account(book, expense, member)
+
+
+def unpost_expense(expense):
+    """Undo what post_expense did, reading the funding off the row given.
+
+    Call it with the expense AS STORED, not as edited: it is the old cash
+    account that has to be given the money back, and the old movement that
+    has to go.
+    """
+    content_type = ContentType.objects.get_for_model(EquityExpense)
+    if expense.cash_account_id:
+        # F() rather than read-modify-write: two people editing two
+        # expenses out of one account must not overwrite each other's
+        # balance. Giving money back cannot go negative, so nothing here
+        # needs the validation CashAccount.save() would run.
+        CashAccount.objects.filter(pk=expense.cash_account_id).update(
+            balance=F("balance") + expense.amount
+        )
+        CashTransactionEntry.objects.filter(
+            content_type=content_type, content_pk=expense.pk
+        ).delete()
+    else:
+        # post_delete recomputes the account's balance — see
+        # signals_accounts.recompute_after_delete.
+        CariMovement.objects.filter(
+            source_type=content_type, source_id=expense.pk
+        ).delete()
+
+
 # -------
 
 
@@ -1100,11 +1145,21 @@ class AddEquityRevenue(generic.edit.CreateView):
         return super().form_invalid(form)
 
 
-@method_decorator(login_required, name="dispatch")
-class AddEquityExpense(generic.edit.CreateView):
+class EquityExpensePage:
+    """The shared half of the two expense pages.
+
+    Recording an expense and correcting one are the same form over the same
+    row, so they are the same page — reached at different URLs and landing
+    on the entry either way. Only what happens on save differs, which is
+    all the two subclasses below hold.
+    """
+
     model = EquityExpense
     form_class = EquityExpenseForm
     template_name = "accounting/add_equity_expense.html"
+
+    def get_book(self):
+        return Book.objects.get(pk=self.kwargs.get("pk"))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1135,7 +1190,26 @@ class AddEquityExpense(generic.edit.CreateView):
             ]
             context["categories"] = form.fields["category"].queryset
             context["currencies"] = CurrencyCategory.objects.all().order_by("code")
+        # What the entry actually did, read back off the ledger rather than
+        # recomputed from the form — the point of landing here is to see
+        # that both halves of it exist.
+        context["ledger_movement"] = self.ledger_movement()
         return context
+
+    def ledger_movement(self):
+        """The cari movement this expense posted, if it posted one."""
+        expense = getattr(self, "object", None)
+        if expense is None or not expense.pk or not expense.paid_by_cari_id:
+            return None
+        return (
+            CariMovement.objects
+            .filter(
+                source_type=ContentType.objects.get_for_model(EquityExpense),
+                source_id=expense.pk,
+            )
+            .select_related("currency", "cari")
+            .first()
+        )
 
     def get_template_names(self):
         if self.request.headers.get('HX-Request') or self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -1145,69 +1219,34 @@ class AddEquityExpense(generic.edit.CreateView):
     # below gets the book value from the url and puts it into keyword arguments (it is important because in the forms.py file we use it to filter possible cash accounts for that book)
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        kwargs["book"] = book
+        kwargs["book"] = self.get_book()
         return kwargs
 
-    # below pre-selecting the book field in the form according to the pk in the url
-    # get initial is a function that is applicable to update and create views like these forms.
-    def get_initial(self):
-        # Get the book by primary key from the URL
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-        # Set the initial value of the book field to the book retrieved
-        # By default make the currency US Dollars (which is 1)
-        return {"book": book}
-
-    @transaction.atomic
-    def form_valid(self, form):
-        book_pk = self.kwargs.get("pk")
-        book = Book.objects.get(pk=book_pk)
-
-        # expense amount
-        amount = form.cleaned_data.get("amount")
-        # Exactly one of these is set — the form's clean() and the model's
-        # check constraint both say so, so the branch below is a choice
-        # between two funded expenses, never a check for an unfunded one.
-        cash_account = form.cleaned_data.get("cash_account")
-        cari = form.cleaned_data.get("paid_by_cari")
-        # The entry is denominated by whatever funded it; the form settled
-        # which that is.
-        currency = form.cleaned_data.get("currency")
-        self.object = form.save(commit=False)
-        self.object.currency = currency
-        self.object.save()
-        equity_pk = self.object.pk
-        equity_instance = self.object
-        if cash_account:
-            result = handle_equity_transaction(
-                book, amount, currency, equity_instance, equity_pk, cash_account
-            )
-            if result is not True:
-                form.add_error(None, "Form error: in handle_equity_transaction function")
-                return self.form_invalid(form)
-        else:
-            # No cash moved, so no CashTransactionEntry and no account
-            # balance to touch. The credit goes to the account of whoever
-            # paid — see handle_expense_on_account.
-            handle_expense_on_account(
-                book, equity_instance, getattr(self.request.user, "member", None)
-            )
-
-        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'message': 'Expense added successfully!',
-                'redirect_url': self.get_success_url()
-            })
-
-        # This method saves the form instance to the database and then redirects the user to a success URL.
-        return super().form_valid(form)
+    def _recorded_message(self) -> str:
+        """What just happened, in the terms the entry was made in."""
+        expense = self.object
+        amount = f"{expense.amount} {expense.currency.code}"
+        if expense.paid_by_cari_id:
+            return _g("%(amount)s expense recorded — %(account)s is owed it.") % {
+                "amount": amount, "account": expense.paid_by_cari.name,
+            }
+        return _g("%(amount)s expense recorded, paid from %(account)s.") % {
+            "amount": amount, "account": expense.cash_account.name,
+        }
 
     def get_success_url(self) -> str:
+        """The expense's own page.
+
+        Not the book, which reports a position that one expense moves by an
+        amount too small to see, and not the list, which says an entry
+        exists without showing what it did. Its own page shows the figures
+        back, the ledger row it posted and the account that carries it —
+        and is where a correction is made, so the answer to "is that
+        right?" and the way to fix it are the same screen.
+        """
         return reverse(
-            "accounting:book_detail", kwargs={"pk": self.kwargs.get("pk")}
+            "accounting:edit_equity_expense",
+            kwargs={"pk": self.kwargs.get("pk"), "expense_pk": self.object.pk},
         )
 
     # what happens when form validation fails
@@ -1226,7 +1265,86 @@ class AddEquityExpense(generic.edit.CreateView):
             print(f"Form error: {error}")
         return super().form_invalid(form)
 
+    def _respond(self, form):
+        messages.success(self.request, self._recorded_message())
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': self._recorded_message(),
+                'redirect_url': self.get_success_url()
+            })
+        return HttpResponseRedirect(self.get_success_url())
 
+
+@method_decorator(login_required, name="dispatch")
+class AddEquityExpense(EquityExpensePage, generic.edit.CreateView):
+
+    # below pre-selecting the book field in the form according to the pk in the url
+    # get initial is a function that is applicable to update and create views like these forms.
+    def get_initial(self):
+        # Set the initial value of the book field to the book in the URL
+        return {"book": self.get_book()}
+
+    @transaction.atomic
+    def form_valid(self, form):
+        book = self.get_book()
+        # Exactly one funding source is set — the form's clean() and the
+        # model's check constraint both say so, so post_expense is choosing
+        # between two funded expenses, never checking for an unfunded one.
+        self.object = form.save(commit=False)
+        self.object.currency = form.cleaned_data.get("currency")
+        self.object.save()
+        try:
+            post_expense(book, self.object,
+                         getattr(self.request.user, "member", None))
+        except ValidationError as exc:
+            # The one that reaches here is CashAccount's "balance cannot be
+            # less than zero" — a real answer, and better shown on the form
+            # than as a 500.
+            form.add_error("cash_account", _g("That account does not hold enough: %s") % exc.messages[0])
+            return self.form_invalid(form)
+        return self._respond(form)
+
+
+@method_decorator(login_required, name="dispatch")
+class EditEquityExpense(EquityExpensePage, generic.edit.UpdateView):
+    """Correct an expense, including what funded it.
+
+    The edit is a reversal and a fresh posting, not an adjustment of the
+    rows already there. Money may have moved between two cash accounts, or
+    stopped being cash at all and become a debt to somebody — there is no
+    single row to amend in that case, and working out which of the four
+    transitions this is would be four chances to be wrong. Unposting the
+    stored row and posting the edited one is right for all of them.
+    """
+
+    pk_url_kwarg = "expense_pk"
+
+    def get_queryset(self):
+        # Scoped to the book in the URL: an expense reached through the
+        # wrong book's URL is a 404, not somebody else's row to edit.
+        return EquityExpense.objects.filter(book_id=self.kwargs.get("pk"))
+
+    @transaction.atomic
+    def form_valid(self, form):
+        book = self.get_book()
+        # The row AS STORED — it is the old cash account that gets the
+        # money back and the old movement that goes. form.save(commit=False)
+        # mutates self.object in place, so this has to be read first, and
+        # from the database rather than from the instance being edited.
+        stored = EquityExpense.objects.get(pk=self.object.pk)
+        unpost_expense(stored)
+
+        self.object = form.save(commit=False)
+        self.object.currency = form.cleaned_data.get("currency")
+        self.object.save()
+        try:
+            post_expense(book, self.object,
+                         getattr(self.request.user, "member", None))
+        except ValidationError as exc:
+            form.add_error("cash_account", _g("That account does not hold enough: %s") % exc.messages[0])
+            return self.form_invalid(form)
+        return self._respond(form)
 @method_decorator(login_required, name="dispatch")
 class AddEquityDivident(generic.edit.CreateView):
     model = EquityDivident

@@ -126,3 +126,63 @@ class TransferEditPageTest(TransferTestBase):
 
     def test_undo_is_post_only(self):
         self.assertEqual(self.client.get(self.undo_url()).status_code, 405)
+
+
+class TransferEditRateTest(TransferTestBase):
+    """The rate row: the same two-way converter the create page has.
+
+    Both legs are stamped from one rate, so it decides how many base-currency
+    units actually leave one account and land on the other.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.transfer = CariTransfer.objects.create(
+            book=self.book, date="2026-02-01",
+            from_cari=self.a, to_cari=self.b,
+            amount=Decimal("1000.00"), currency=self.try_,
+            exchange_rate=Decimal("0.020000"),
+        )
+        self.transfer.post()
+
+    def edit_url(self):
+        return reverse("accounts:transfer_edit", args=[self.transfer.pk])
+
+    def test_the_page_knows_what_it_converts_into(self):
+        r = self.client.get(self.edit_url())
+        self.assertEqual(r.context["base_currency"].code, "USD")
+
+    def test_the_rate_row_is_rendered(self):
+        html = self.client.get(self.edit_url()).content.decode()
+        for hook in ("mfFxRow", "mfFxBaseTotal", "mfFxReset", "mfTransferForm"):
+            self.assertIn(hook, html)
+
+    def test_a_corrected_rate_reaches_both_legs(self):
+        """Typing a rate — or the base total that implies it — is the whole
+        point of the row, so it has to land on the rows that are written."""
+        self.client.post(self.edit_url(), {
+            "book": self.book.pk, "date": "2026-02-01",
+            "from_cari": self.a.pk, "to_cari": self.b.pk,
+            "amount": "1000.00", "currency": self.try_.pk,
+            "exchange_rate": "0.030000",
+        })
+        self.transfer.refresh_from_db()
+        legs = [self.transfer.from_movement, self.transfer.to_movement]
+        self.assertEqual({m.exchange_rate for m in legs}, {Decimal("0.030000")})
+        self.assertEqual({abs(m.amount_base) for m in legs}, {Decimal("30.00")})
+        self.assertEqual(sum(m.amount_base for m in legs), Decimal("0.00"))
+
+    def test_an_edit_does_not_force_todays_date_into_the_widget(self):
+        """The instance carries its own date. Forcing today's in beside it
+        rendered a second value attribute after the real one."""
+        from accounting.forms import CariTransferForm
+        form = CariTransferForm(instance=self.transfer, book=self.book)
+        self.assertNotIn("value", form.fields["date"].widget.attrs)
+        self.assertEqual(str(form["date"]).count('value='), 1)
+
+    def test_a_new_transfer_still_defaults_to_today(self):
+        from datetime import date as _date
+        from accounting.forms import CariTransferForm
+        form = CariTransferForm(book=self.book)
+        self.assertEqual(form.fields["date"].widget.attrs.get("value"),
+                         _date.today().strftime("%Y-%m-%d"))

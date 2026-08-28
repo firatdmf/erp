@@ -526,7 +526,12 @@ class CariTransferForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         book = kwargs.pop("book", None)
         super().__init__(*args, **kwargs)
-        self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
+        # Only for a transfer being made. On an edit the instance carries
+        # its own date, and forcing today's into the widget attrs renders a
+        # second value="" after the real one — the browser keeps the first,
+        # so it read correctly and was one attribute away from not.
+        if self.instance.pk is None:
+            self.fields["date"].widget.attrs["value"] = date.today().strftime("%Y-%m-%d")
         self.fields["description"].required = False
         # Blank means "nobody said" — the published rate for the date
         # applies. Only shown at all when the currency differs from the

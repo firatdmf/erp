@@ -15,6 +15,7 @@ import json
 import re
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -1115,6 +1116,15 @@ class CariTransferEdit(View):
             # favours neither, so the source is where the operator most
             # likely came from — the leg that lost the balance.
             "back_cari": transfer.from_cari,
+            # What the rate row converts INTO. Deliberately
+            # settings.BASE_CURRENCY_CODE and not the book's own base, for
+            # the reason MakeInTransfer.render_page spells out: the ledger
+            # converts against the former, so taking the latter would let
+            # the page label and convert against one currency while the
+            # rows it writes used another.
+            "base_currency": CurrencyCategory.objects.filter(
+                code=getattr(settings, "BASE_CURRENCY_CODE", "USD")
+            ).first(),
         })
 
     def get(self, request, pk):

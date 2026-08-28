@@ -88,6 +88,28 @@
   .mf-undo .txt { font: 500 12.5px var(--font-sans); color: var(--gray-600); }
   .mf-undo .txt b { display:block; font: 700 13px var(--font-sans); color: var(--ink); margin-bottom: 2px; }
   .mf-undo form { margin-left: auto; }
+
+  /* Rate override — only shown when there is a conversion to make. The
+     rate and the converted total are the same relationship read from
+     either end, so either can be typed and the other follows. Whichever
+     was touched last is held fixed: whoever is correcting the transfer may
+     well know the rate they actually got better than a published source. */
+  .mf-fx-grid { display: grid; grid-template-columns: 1fr auto 1.4fr auto; gap: 8px; align-items: center; }
+  .mf-fx-eq { color: #8A96A6; font-weight: 600; }
+  .mf-fx-total { position: relative; display: flex; align-items: center; }
+  .mf-fx-total input { width: 100%; padding-right: 3.2rem; }
+  .mf-fx-code { position: absolute; right: .7rem; font-size: .8rem; color: #8A96A6; pointer-events: none; }
+  .mf-fx-reset {
+    border: 1px solid #E0E6EE; background: #fff; border-radius: 8px; padding: 0 .7rem; height: 38px;
+    font: 600 12px var(--font-sans); color: var(--gray-700); cursor: pointer; white-space: nowrap;
+  }
+  .mf-fx-reset:hover { border-color: var(--nejum-teal-500); color: var(--nejum-teal-700); }
+  .mf-fx-note { margin-left: .4rem; font: 400 11px var(--font-sans); color: var(--gray-500); text-transform: none; letter-spacing: 0; }
+  @media (max-width: 720px) {
+    .mf-fx-grid { grid-template-columns: 1fr; }
+    /* Kept on narrow screens: it names what is multiplied. */
+    .mf-fx-eq { display: block; margin: .2rem 0; }
+  }
 </style>
 {% endblock %}
 
@@ -103,7 +125,7 @@
     <h1 class="mf-title">{% trans "Edit Transfer" %}</h1>
   </div>
 
-  <form method="post">
+  <form method="post" id="mfTransferForm">
     {% csrf_token %}
     {{ form.book }}
 
@@ -171,15 +193,34 @@
           </div>
 
           {% comment %}
-            Both legs are stamped from this one rate, so it decides how many
-            base-currency units actually leave one account and land on the
-            other. Blank means "nobody said" — the published rate for the
-            date applies.
+            Shown only when the transfer's currency differs from the base
+            one — same currency means nothing is converted, and a rate of 1
+            beside a repeated figure tells the reader nothing.
+
+            Not cosmetic: an account's balance is the sum of its movements
+            in BASE currency, so this rate decides how many dollars actually
+            leave one account and land on the other. Both legs are stamped
+            from this one number.
           {% endcomment %}
-          <div class="mf-f {% if form.exchange_rate.errors %}has-error{% endif %}">
-            <label>{% trans "Exchange rate" %}</label>
-            {{ form.exchange_rate }}
-            <span class="hint">{% trans "Leave blank for the published rate on this date." %}</span>
+          <div class="mf-f span-2 {% if form.exchange_rate.errors %}has-error{% endif %}"
+               id="mfFxRow" style="display:none;">
+            <label>
+              {% trans "Exchange rate" %}
+              <span class="mf-fx-note" id="mfFxNote"></span>
+            </label>
+            <div class="mf-fx-grid">
+              {{ form.exchange_rate }}
+              <span class="mf-fx-eq" id="mfFxEq"></span>
+              <div class="mf-fx-total">
+                <input type="number" step="0.01" min="0" id="mfFxBaseTotal" placeholder="0.00">
+                <span class="mf-fx-code" id="mfFxBaseCode"></span>
+              </div>
+              <button type="button" class="mf-fx-reset" id="mfFxReset"
+                      title="{% trans 'Use the published rate for this date' %}">
+                {% trans "Use published" %}
+              </button>
+            </div>
+            <span class="hint">{% trans "Either box updates the other — type the rate you got, or the total it came to." %}</span>
             {{ form.exchange_rate.errors }}
           </div>
 
@@ -227,5 +268,138 @@
 
 <script>
   if (window.lucide) lucide.createIcons();
+
+  // --- rate override ---------------------------------------------------
+  // The same converter and the same endpoint the create page and the
+  // payment form use. Shown only when the transfer's currency differs from
+  // the base one, because there is nothing to convert otherwise.
+  (function () {
+    var form = document.getElementById('mfTransferForm');
+    var row = document.getElementById('mfFxRow');
+    if (!form || !row) return;
+
+    var FX_LOOKUP_URL = "{% url 'accounts:fx_rate_lookup' %}";
+    var BASE_CODE = "{{ base_currency.code|default_if_none:'' }}";
+
+    var rateInput = form.querySelector('[name="exchange_rate"]');
+    var currency  = form.querySelector('select[name="currency"]');
+    var amount    = form.querySelector('[name="amount"]');
+    var date      = form.querySelector('[name="date"]');
+    var totalInput = document.getElementById('mfFxBaseTotal');
+    var codeLabel  = document.getElementById('mfFxBaseCode');
+    var note       = document.getElementById('mfFxNote');
+    var reset      = document.getElementById('mfFxReset');
+    var eq         = document.getElementById('mfFxEq');
+    if (!rateInput || !currency) return;
+
+    codeLabel.textContent = BASE_CODE;
+
+    function selectedCode() {
+      var opt = currency.options[currency.selectedIndex];
+      return opt ? (opt.getAttribute('data-code') || '') : '';
+    }
+    function converting() {
+      var code = selectedCode();
+      return !!(code && BASE_CODE && code !== BASE_CODE);
+    }
+
+    // null, not 0, when the box is empty. Coercing it to zero renders the
+    // row as "0.020800 = 0.00", and a figure sitting after an "=" states
+    // something about the rate — 0.00 there reads as "the rate is
+    // nothing". An amount nobody has typed has no product yet.
+    function typedAmount() {
+      var v = parseFloat(amount && amount.value);
+      return isFinite(v) ? v : null;
+    }
+
+    // "× 43,940 TRY =" — the multiplicand said out loud, so the row reads
+    // as an equation that holds rather than two numbers either side of an
+    // "=". It also says what the empty total is waiting for.
+    function syncEquation() {
+      if (!eq) return;
+      var a = typedAmount();
+      var code = selectedCode();
+      var lhs = (a === null)
+        ? "{% trans 'amount' %}"
+        : a.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      eq.textContent = '\u00d7 ' + lhs + (code ? ' ' + code : '') + ' =';
+    }
+
+    function syncTotalFromRate() {
+      var r = parseFloat(rateInput.value);
+      var a = typedAmount();
+      // Blank, not 0.00, while there is no amount to multiply.
+      totalInput.value = (isFinite(r) && r > 0 && a !== null) ? (a * r).toFixed(2) : '';
+      syncEquation();
+    }
+    function syncRateFromTotal() {
+      var t = parseFloat(totalInput.value);
+      var a = typedAmount();
+      rateInput.value = (isFinite(t) && a) ? (t / a).toFixed(6) : '';
+      syncEquation();
+    }
+
+    function fetchPublished() {
+      if (!converting()) return;
+      note.textContent = "{% trans 'fetching…' %}";
+      var url = FX_LOOKUP_URL + '?from=' + encodeURIComponent(selectedCode()) +
+                '&to=' + encodeURIComponent(BASE_CODE) +
+                '&date=' + encodeURIComponent(date ? date.value : '');
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.rate) {
+            rateInput.value = parseFloat(d.rate).toFixed(6);
+            note.textContent = "{% trans 'published rate for' %} " + (d.date || '');
+          } else {
+            // No published rate is not an error to interrupt with — it is
+            // a blank box for whoever was there to fill in.
+            rateInput.value = '';
+            note.textContent = "{% trans 'no published rate — type the one you got' %}";
+          }
+          syncTotalFromRate();
+        })
+        .catch(function () {
+          note.textContent = "{% trans 'rate unavailable — type the one you got' %}";
+        });
+    }
+
+    function onCurrencyOrDateChange() {
+      if (!converting()) {
+        row.style.display = 'none';
+        // Cleared so a currency switched back to the base one does not
+        // leave a stale rate behind on the POST.
+        rateInput.value = '';
+        totalInput.value = '';
+        return;
+      }
+      row.style.display = '';
+      syncEquation();
+      fetchPublished();
+    }
+
+    currency.addEventListener('change', onCurrencyOrDateChange);
+    if (date) date.addEventListener('change', onCurrencyOrDateChange);
+    // Both `input` and `change`: `input` alone misses the paths that set a
+    // value without typing — autofill, the number spinner in some
+    // browsers, and a value restored on back/forward navigation — each of
+    // which would leave one box stale beside the other.
+    ['input', 'change'].forEach(function (evt) {
+      rateInput.addEventListener(evt, syncTotalFromRate);
+      totalInput.addEventListener(evt, syncRateFromTotal);
+      if (amount) amount.addEventListener(evt, syncTotalFromRate);
+    });
+    reset.addEventListener('click', fetchPublished);
+
+    // On an edit the transfer arrives with the rate it was posted at, and
+    // that is the one its two legs are actually stamped with. Keep it and
+    // show what it came to, rather than fetching over it — re-fetching
+    // would silently restate a posted transfer at today's published rate.
+    if (converting()) {
+      row.style.display = '';
+      if (rateInput.value) { syncTotalFromRate(); note.textContent = "{% trans 'as posted' %}"; }
+      else { fetchPublished(); }
+    }
+  })();
 </script>
 {% endblock %}

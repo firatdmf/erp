@@ -29,6 +29,9 @@ class TransferEditPageTest(TransferTestBase):
     def edit_url(self, t=None):
         return reverse("accounts:transfer_edit", args=[(t or self.transfer).pk])
 
+    def detail_url(self, t=None):
+        return reverse("accounts:transfer_detail", args=[(t or self.transfer).pk])
+
     def undo_url(self, t=None):
         return reverse("accounts:transfer_undo", args=[(t or self.transfer).pk])
 
@@ -61,6 +64,9 @@ class TransferEditPageTest(TransferTestBase):
             "amount": "250.00", "currency": self.usd.pk,
         })
         self.assertEqual(r.status_code, 302)
+        # Lands on the transfer, not on one of the two statements — which
+        # would answer for one account and say nothing about the other.
+        self.assertEqual(r["Location"], self.detail_url())
         self.assertEqual(self.balances(), (Decimal("750.00"), Decimal("250.00")))
 
     def test_the_corrected_pair_still_nets_to_zero(self):
@@ -126,6 +132,33 @@ class TransferEditPageTest(TransferTestBase):
 
     def test_undo_is_post_only(self):
         self.assertEqual(self.client.get(self.undo_url()).status_code, 405)
+
+    # --- the detail page -------------------------------------------------
+
+    def test_the_detail_page_names_both_legs(self):
+        r = self.client.get(self.detail_url())
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode()
+        for account in (self.a, self.b):
+            self.assertIn(account.code, html)
+            self.assertIn(reverse("accounts:movement_detail",
+                                  args=[account.pk, getattr(
+                                      self.transfer,
+                                      "from_movement" if account == self.a else "to_movement").pk]),
+                          html)
+
+    def test_the_detail_page_offers_edit_and_undo(self):
+        html = self.client.get(self.detail_url()).content.decode()
+        self.assertIn(self.edit_url(), html)
+        self.assertIn(self.undo_url(), html)
+
+    def test_the_leg_links_to_the_edit_form_not_the_detail_page(self):
+        """Same as an invoice or a payment: the ledger row's button is the
+        one that corrects the document, because that is what the note beside
+        it tells the reader to do."""
+        from accounting.views_accounts import _movement_owner
+        _label, url, _editable = _movement_owner(self.transfer.from_movement)
+        self.assertEqual(url, self.edit_url())
 
 
 class TransferEditRateTest(TransferTestBase):

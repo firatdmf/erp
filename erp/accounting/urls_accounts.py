@@ -45,8 +45,9 @@ urlpatterns = [
 
     # --- Account transfers (virman) — the document behind a pair of legs.
     # Not nested under an account: a transfer belongs to two of them.
-    path("transfers/<int:pk>/",      views.CariTransferEdit.as_view(), name="transfer_edit"),
-    path("transfers/<int:pk>/undo/", views.CariTransferUndo.as_view(), name="transfer_undo"),
+    path("transfers/<int:pk>/",      views.CariTransferDetail.as_view(), name="transfer_detail"),
+    path("transfers/<int:pk>/edit/", views.CariTransferEdit.as_view(),   name="transfer_edit"),
+    path("transfers/<int:pk>/undo/", views.CariTransferUndo.as_view(),   name="transfer_undo"),
 
     # --- Invoices ---
     path("invoices/",                    views_invoice.InvoiceList.as_view(),           name="invoice_list"),

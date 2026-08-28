@@ -1079,6 +1079,42 @@ class CariMovementDelete(View):
 # Account transfer (virman) — the document behind a pair of ledger legs
 # ---------------------------------------------------------------------------
 @method_decorator(login_required, name="dispatch")
+class CariTransferDetail(View):
+    """One transfer, in full, and the way to correct it.
+
+    Sits at transfers/<pk>/ with the edit form at transfers/<pk>/edit/,
+    the shape every other document here already has — invoices/<pk>/ and
+    invoices/<pk>/edit/, movements/<pk>/ and movements/<pk>/edit/. Landing
+    here after a save is the point: the statement it used to redirect to
+    answers for one of the two accounts and says nothing about what was
+    just written to the other.
+
+    Both legs are named, each linking to its own ledger row, because a
+    transfer is only ever half-visible from either account's statement.
+    """
+
+    template_name = "accounts/transfer_detail.html"
+
+    def get(self, request, pk):
+        transfer = get_object_or_404(
+            CariTransfer.objects.select_related(
+                "from_cari", "to_cari", "currency", "book", "created_by__user",
+                "from_movement", "to_movement",
+            ),
+            pk=pk,
+        )
+        return render(request, self.template_name, {
+            "transfer": transfer,
+            # The legs, paired with the account each one lands on, so the
+            # template does not have to re-derive which is which.
+            "legs": [
+                ("from", transfer.from_cari, transfer.from_movement),
+                ("to", transfer.to_cari, transfer.to_movement),
+            ],
+        })
+
+
+@method_decorator(login_required, name="dispatch")
 class CariTransferEdit(View):
     """Correct a posted transfer, from either of the legs it wrote.
 
@@ -1149,7 +1185,7 @@ class CariTransferEdit(View):
             return self._render(request, self._transfer(pk), form=form)
 
         messages.success(request, _g("Transfer updated."))
-        return redirect("accounts:statement", pk=transfer.from_cari_id)
+        return redirect("accounts:transfer_detail", pk=transfer.pk)
 
 
 @method_decorator(login_required, name="dispatch")

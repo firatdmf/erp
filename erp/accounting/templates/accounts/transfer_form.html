@@ -116,8 +116,8 @@
 {% block content %}
 <div class="mf">
 
-  <a class="mf-back" href="{% url 'accounts:statement' back_cari.pk %}">
-    <i data-lucide="arrow-left"></i> {{ back_cari.name }}
+  <a class="mf-back" href="{% url 'accounts:transfer_detail' transfer.pk %}">
+    <i data-lucide="arrow-left"></i> {% trans "Back to the transfer" %}
   </a>
 
   <div class="mf-head">
@@ -239,7 +239,7 @@
           {% trans "Saving takes both ledger rows back and writes them again, so the pair keeps cancelling." %}
         </div>
         <div class="mf-foot-r">
-          <a href="{% url 'accounts:statement' back_cari.pk %}" class="mf-btn ghost">{% trans "Cancel" %}</a>
+          <a href="{% url 'accounts:transfer_detail' transfer.pk %}" class="mf-btn ghost">{% trans "Cancel" %}</a>
           <button type="submit" class="mf-btn primary">
             <i data-lucide="check"></i>{% trans "Save Changes" %}
           </button>
